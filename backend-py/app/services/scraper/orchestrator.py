@@ -147,7 +147,12 @@ async def _apply_render_listing_pages(
         try:
             _rlp_html = None
             for _rlp_attempt in range(3):
-                _rlp_html = await _fetch_fn(_rlp_url, render=_rlp_render)
+                try:
+                    _rlp_html = await _fetch_fn(_rlp_url, render=_rlp_render, rate_limit=False)
+                except TypeError:
+                    # _fetch_fn may be a test double / injected callable that
+                    # doesn't accept rate_limit — fall back gracefully.
+                    _rlp_html = await _fetch_fn(_rlp_url, render=_rlp_render)
                 if _rlp_html:
                     break
                 _rlp_wait = (_rlp_attempt + 1) * 12

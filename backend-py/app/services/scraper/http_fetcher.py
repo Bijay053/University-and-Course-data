@@ -295,6 +295,7 @@ async def fetch_html_scrape_do(
     render: bool = False,
     wait_for_ms: int = 3000,
     geo_code: str | None = None,
+    rate_limit: bool = True,
 ) -> str | None:
     """Fetch via Scrape.do residential proxy — paid tier-4/5 Cloudflare bypass.
 
@@ -326,11 +327,24 @@ async def fetch_html_scrape_do(
     # Task #229: cross-process throttle so the 8-worker fleet doesn't exhaust the
     # shared Scrape.do account in bursts.  No-op unless scrape_do_rate_limit_per_sec
     # is configured > 0; fail-open on any Redis issue.
-    try:
-        from app.services.scraper.rate_limiter import acquire_scrape_do
-        await acquire_scrape_do()
-    except Exception as _rl_exc:  # noqa: BLE001 — never block a fetch on the limiter
-        log.debug("scrape_do rate-limit acquire skipped: %s", _rl_exc)
+    #
+    # rate_limit=False is used by the discovery-phase fast-path (sequential,
+    # max ~25 listing-page fetches, hard-deadlined by discovery_phase_timeout_s)
+    # so it never queues behind a *different* university's high-volume parallel
+    # course-extraction burst.  Cardiff job_68778b8f7bb2 (2026-07-06): the fleet
+    # rate limiter (enabled fleet-wide the same day to fix QMUL's fetch_failed
+    # burst) shares one small per-second budget across every Scrape.do caller;
+    # QMUL's concurrent course-fetch retries saturated that budget, so each of
+    # Cardiff's one-at-a-time discovery calls waited up to _MAX_WAIT_S (30s) for
+    # a token, and ~10 such waits blew through the 300s discovery deadline.
+    # Discovery itself is low-volume and doesn't need protection from bursts —
+    # it's the victim here, not the cause — so it's exempted from the limiter.
+    if rate_limit:
+        try:
+            from app.services.scraper.rate_limiter import acquire_scrape_do
+            await acquire_scrape_do()
+        except Exception as _rl_exc:  # noqa: BLE001 — never block a fetch on the limiter
+            log.debug("scrape_do rate-limit acquire skipped: %s", _rl_exc)
     try:
         params: dict[str, str] = {"token": token, "url": url}
         if render:
@@ -726,7 +740,7 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
                 " — going straight to Scrape.do static (skipping httpx/cffi)",
                 url,
             )
-            _disc_static = await fetch_html_scrape_do(url, render=False)
+            _disc_static = await fetch_html_scrape_do(url, render=False, rate_limit=False)
             if _disc_static is not None and not _is_spa_shell(_disc_static):
                 from app.services.scraper.snapshot_context import stage_snapshot as _stage
                 _stage(url, _disc_static, "scrape_do_static")
@@ -748,7 +762,7 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
                 " failed or SPA shell — retrying with render=True before httpx",
                 url,
             )
-            _disc_rendered = await fetch_html_scrape_do(url, render=True)
+            _disc_rendered = await fetch_html_scrape_do(url, render=True, rate_limit=False)
             if _disc_rendered is not None and not _is_spa_shell(_disc_rendered):
                 from app.services.scraper.snapshot_context import stage_snapshot as _stage
                 _stage(url, _disc_rendered, "scrape_do_render")

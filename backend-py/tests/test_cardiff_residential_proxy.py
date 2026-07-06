@@ -238,6 +238,82 @@ class TestScrapeDoSkipFallbacks:
         )
 
     @pytest.mark.asyncio
+    async def test_discovery_fast_path_exempt_from_rate_limiter(self):
+        """Discovery-phase scrape.do calls must NOT go through acquire_scrape_do().
+
+        Regression test — Cardiff job_68778b8f7bb2 (2026-07-06): the fleet-wide
+        Scrape.do rate limiter (enabled to fix QMUL's fetch_failed burst) shares
+        one small per-second token budget across every caller.  QMUL's parallel
+        course-extraction retries saturated that budget, so each of Cardiff's
+        one-at-a-time discovery calls waited up to 30s for a token and discovery
+        blew through its 300s deadline after only 4/25 listing pages.  Discovery
+        is low-volume and sequential — it is the victim of bursts, not the
+        cause — so its fast-path fetches must bypass the limiter entirely.
+        """
+        cfg = _cardiff_uni_config()
+        cfg.discovery = DiscoveryConfig(scrape_do_skip_fallbacks=True)
+        set_uni_config(cfg)
+
+        rate_limit_flags: list[bool] = []
+
+        async def _mock_scrape_do(
+            url: str, *, render: bool = False, rate_limit: bool = True, **kw: Any
+        ) -> str:
+            rate_limit_flags.append(rate_limit)
+            return _MINIMAL_HTML
+
+        with (
+            patch(
+                "app.services.scraper.http_fetcher.fetch_html_scrape_do",
+                side_effect=_mock_scrape_do,
+            ),
+            patch.dict(os.environ, {"SCRAPE_DO_TOKEN": "test-token-xyz"}),
+        ):
+            from app.services.scraper.http_fetcher import fetch_html
+
+            result = await fetch_html("https://www.cardiff.ac.uk/study/courses/")
+
+        assert result == _MINIMAL_HTML
+        assert rate_limit_flags, "discovery fast-path must call fetch_html_scrape_do"
+        assert all(flag is False for flag in rate_limit_flags), (
+            "discovery-phase fetch_html_scrape_do calls must pass rate_limit=False "
+            f"so they never queue behind another university's burst; got {rate_limit_flags}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_discovery_rate_limit_false_actually_skips_acquire(self):
+        """rate_limit=False on fetch_html_scrape_do must skip acquire_scrape_do()."""
+        from app.services.scraper.http_fetcher import fetch_html_scrape_do
+
+        acquire_called = False
+
+        async def _fake_acquire() -> None:
+            nonlocal acquire_called
+            acquire_called = True
+
+        with (
+            patch.dict(os.environ, {"SCRAPE_DO_TOKEN": "test-token-xyz"}),
+            patch(
+                "app.services.scraper.rate_limiter.acquire_scrape_do",
+                side_effect=_fake_acquire,
+            ),
+            patch("httpx.AsyncClient.get") as mock_get,
+        ):
+            mock_resp = MagicMock()
+            mock_resp.status_code = 200
+            mock_resp.text = _MINIMAL_HTML
+            mock_get.return_value = mock_resp
+            await fetch_html_scrape_do(
+                "https://www.cardiff.ac.uk/study/courses/",
+                render=False,
+                rate_limit=False,
+            )
+
+        assert not acquire_called, (
+            "acquire_scrape_do() must NOT be called when rate_limit=False"
+        )
+
+    @pytest.mark.asyncio
     async def test_skip_fallbacks_static_fallback_when_render_fails(self):
         """When render=True returns None, static (render=False) is tried next."""
         set_uni_config(_cardiff_uni_config())

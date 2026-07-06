@@ -174,3 +174,45 @@ in-process-only concurrency guard is a false sense of safety once multiple
 Celery prefork workers exist — always check whether a cross-process
 Redis-backed mechanism already exists (it did here, unused) before adding
 more in-process guards or retries.
+
+## Rate-limiter fix broke a sibling university — discovery starved by another job's burst
+
+**Symptom:** the very next day after the `scrape_do_rate_limit_per_sec=3.0`
+fix above shipped, a *different* university (Cardiff, job_68778b8f7bb2,
+`discovery.scrape_do_skip_fallbacks: true`) failed discovery with "exceeded
+300s deadline" after crawling only 4/25 listing pages, despite Cardiff's own
+config being unchanged. `scrape_do_render_calls`/`scrape_do_static_calls`
+were both 0 for the job (those job-level counters are keyed off a
+ContextVar only set during course-level extraction, so they don't capture
+discovery-phase Scrape.do activity — don't use them to rule out Scrape.do
+involvement in a discovery-phase stall).
+
+**Root cause:** the new fleet-wide Redis token bucket has ONE small shared
+budget (`capacity=ceil(3.0)=3`/sec) across *every* Scrape.do caller,
+regardless of which university or which phase (discovery vs. course
+extraction) is calling. A concurrent QMUL run (job_7cf9059a5269, started
+8s before Cardiff's job, confirmed via `started_at` overlap in
+`scrape_runtime_jobs`) was issuing many parallel course-extraction Scrape.do
+calls (now itself calling more per course thanks to the 3-step retry ladder
+in the same fix), saturating that 3/sec budget. Cardiff's discovery loop is
+strictly *sequential* — one listing-page fetch at a time, awaited — so each
+call had to wait for a free token, up to `_MAX_WAIT_S=30s` per call. A
+handful of such waits blew straight through the 300s discovery deadline.
+Discovery is the *victim* of another job's burst here, not the cause of one.
+
+**Fix:** added a `rate_limit: bool = True` parameter to
+`fetch_html_scrape_do()`; the discovery-phase fast-path call sites
+(`scrape_do_skip_fallbacks` branch in `fetch_html()`, and the
+`_apply_render_listing_pages` listing-page fallback in `orchestrator.py`)
+now pass `rate_limit=False` so they skip `acquire_scrape_do()` entirely and
+never queue behind a sibling job's course-extraction burst. Course-level
+extraction calls (the original QMUL burst source, and the reason the
+limiter exists) are untouched and still throttled at 3/sec.
+
+**Generalizes:** any time a fleet-wide shared-resource throttle is added to
+fix one heavy consumer's burst, check every *other* caller of that same
+resource for a fundamentally different usage shape (sequential + low-volume
++ hard-deadlined, vs. parallel + high-volume + retryable) before assuming a
+single shared budget is safe for all of them. A budget sized for smoothing
+bursty parallel retries can starve a serial caller with a tight deadline
+even though its own volume never approaches the limit.
