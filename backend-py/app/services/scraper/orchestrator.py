@@ -3684,6 +3684,21 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # re-extracting (and re-paying Scrape.do/Gemini for) hundreds of courses
         # that are already staged.  Reviewer-rejected rows are NOT skipped (see
         # _already_staged_urls) so a rejection is always re-evaluated.
+        #
+        # IMPORTANT (fixed after a real QMUL bug report — "very few courses,
+        # out of 409 got very few"): do NOT shrink job.total_found /
+        # summary["discovered"] to the post-filter remaining count here. An
+        # earlier version of this code did that specifically to stop the
+        # finalize step from clobbering the resume-adjusted total back to
+        # the true discovery count — but the side effect was that the DB
+        # row (and therefore the UI) reported total_found=152 instead of
+        # 409, making a healthy 350/409-staged university look like it only
+        # has 152 courses. Instead we keep total_found at the true discovery
+        # count and fold the already-staged count into `imported` at
+        # finalize time (via `_resume_already_staged`) so imported + skipped
+        # + errors reconciles against the real total_found with nothing
+        # appearing "unaccounted for".
+        _resume_already_staged = 0
         if settings.scrape_resume_enabled and job.university_id and links:
             try:
                 _done_urls = await _already_staged_urls(
@@ -3697,21 +3712,12 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     ]
                     _skipped_resume = _before - len(links)
                     if _skipped_resume > 0:
-                        job.total_found = len(links)
-                        # Keep summary["discovered"] in lockstep — the
-                        # finalize step (`job.total_found =
-                        # summary["discovered"]`) otherwise clobbers this
-                        # resume-adjusted total back to the stale
-                        # pre-resume discovery count once the run
-                        # completes, making it look like N courses went
-                        # unaccounted for when they were actually
-                        # legitimately skipped here as already-staged.
-                        summary["discovered"] = len(links)
+                        _resume_already_staged = _skipped_resume
                         await db.commit()
                         log.info(
                             "[RESUME] %s: skipping %d already-staged course(s); "
-                            "%d remaining to extract",
-                            uni_name, _skipped_resume, len(links),
+                            "%d remaining to extract (total_found stays at %d)",
+                            uni_name, _skipped_resume, len(links), _before,
                         )
                         await emit(
                             "status",
@@ -4879,9 +4885,17 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             return {"ok": False, "reason": f"already_{job.status}", **summary}
         job.status = "completed" if finished_cleanly else "failed"
         # Always update progress counters from this run.
+        # `_resume_already_staged` (Task #229 resume checkpoint, fixed after
+        # a real QMUL bug report) folds courses skipped as already-staged
+        # from an earlier interrupted run back into `imported` here, since
+        # `summary["discovered"]`/total_found is kept at the TRUE discovery
+        # count (not shrunk to the post-filter remaining count). This keeps
+        # imported + skipped + errors == total_found, so the UI shows the
+        # real cumulative progress (e.g. 350/409) instead of only this run's
+        # slice (e.g. 93/152), which looked like most courses were missing.
         job.total_found = summary["discovered"]
         job.current = summary["discovered"]
-        job.imported = summary["staged"]
+        job.imported = summary["staged"] + _resume_already_staged
         job.skipped = summary["skipped"]
         job.errors = summary["errors"]
         # Gemini cost tracking (Component 3 & 4)

@@ -60,30 +60,50 @@ restart that workflow (not just verify the file diff) after any change under
 `app/services/scraper/`, and confirm via `ps -o lstart` vs the file's mtime,
 or by grepping the fresh worker log for a marker unique to the new code.
 
-## "Missing courses" total_found mismatch (fixed) — not data loss, a display bug
+## "Only got 152 of 409 courses" total_found mismatch (fixed twice — final fix inverts the first)
 
-**Symptom:** a job reports `total_found=409` but `imported+skipped+errors`
-only sums to ~354-358, looking like ~50 courses were silently dropped.
+**Symptom v1:** a job reports `total_found=409` but `imported+skipped+errors`
+only sums to ~354-358 (looks like ~50 courses silently dropped).
+
+**Symptom v2 (the actual live QMUL bug report — "out of 409 courses, got very
+few"):** after an interrupted run resumes, the API reports
+`totalFound: 152` (the post-resume-filter *remaining* count) even though
+350/409 courses are healthily staged — making a fully-healthy 85%-complete
+university look like it only has 152 courses total.
 
 **Root cause:** the RESUME CHECKPOINT logic (`_already_staged_urls` in
-orchestrator.py) correctly skips courses already staged by a prior run and
-updates `job.total_found = len(links)` mid-run to the trimmed count. But job
-finalization unconditionally runs `job.total_found = summary["discovered"]`,
-and `summary["discovered"]` was never updated in the resume block — only
-`job.total_found` was. Finalize clobbered the resume-adjusted total back to
-the stale pre-resume full-discovery count, making a fully-accounted-for run
-look like a gap.
+`orchestrator.py`) filters already-staged courses out of the work list so a
+resumed run doesn't re-pay for extraction. An earlier fix (v1, now
+superseded) made this checkpoint set `job.total_found = len(links)` /
+`summary["discovered"] = len(links)` to the *trimmed* remaining count, so
+finalize's `job.total_found = summary["discovered"]` wouldn't clobber it back
+to the stale full-discovery count. That "fixed" the v1 accounting mismatch
+but created the v2 bug: total_found now permanently shows the post-resume
+remainder (152), not the true discovery count (409), for the rest of that
+job's life — including in the UI.
 
-**Fix:** wherever `job.total_found = len(links)` is set after trimming the
-links list (resume checkpoint, max_courses cap, etc.), also set
-`summary["discovered"] = len(links)` in the same block, since that's the
-value finalize uses to overwrite `job.total_found` at the very end — the two
-must stay in lockstep or any trim gets silently undone.
+**Final fix (inverts v1):** do NOT shrink `job.total_found` /
+`summary["discovered"]` at the resume checkpoint at all — leave both at the
+true discovery count. Instead, capture the just-skipped-as-already-staged
+count in a local (`_resume_already_staged`) and fold it into `job.imported`
+at finalize time: `job.imported = summary["staged"] + _resume_already_staged`.
+This keeps `total_found` always meaning "true discovery count" (what
+operators expect it to mean) while `imported + skipped + errors` still
+reconciles against it with nothing "unaccounted for".
 
 **Diagnostic:** before assuming a job "lost" courses, check for a
-`resume_checkpoint` event in `scrape_runtime_logs` for that job. If present,
-verify `already_staged + imported + skipped + errors == total_found` — if it
-balances, nothing was lost, it's just a reporting artifact (pre-fix).
+`resume_checkpoint` event in `scrape_runtime_logs` for that job. Verify
+`already_staged + imported(this-run) + skipped + errors == total_found`.
+Also sanity-check `total_found` itself looks like the real catalogue size,
+not a suspiciously small number that showed up right after a resume event —
+that's the signature of the v2 bug on any code predating this fix.
+
+**Generalizes:** any code path that trims a discovered-links list mid-run
+(resume checkpoint, future dedup passes, etc.) should fold the trimmed-out
+count into a *progress* counter (`imported`/`skipped`) rather than mutating
+`total_found`/`summary["discovered"]` downward — those two fields should only
+ever reflect the true catalogue size once discovery + URL-filtering settles,
+never a resume/retry artifact.
 
 ## Real fetch_failed burst root cause (fixed) — missing Scrape.do concurrency cap
 
