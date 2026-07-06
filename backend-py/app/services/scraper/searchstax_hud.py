@@ -1244,12 +1244,48 @@ async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> tuple[list[dict
                 params.update(cfg.extra_params or {})
                 params.update(_embedded_params)  # per-endpoint overrides (e.g. model=)
 
-                try:
-                    resp = await client.get(_base_url, params=params, headers=headers)
-                    resp.raise_for_status()
-                    data = resp.json()
-                except Exception as exc:
-                    log.error("[SEARCHSTAX links_only] fetch failed (start=%d): %s", start, exc)
+                # QMUL job_77bdcbe6d7bb (2026-07-06): 409 docs found but only
+                # 300 queued, with 0 title-based exclusions and 0 skipped —
+                # the 4th page (start=300) was silently failing (transient
+                # 429/5xx from SearchStax after 3 rapid back-to-back
+                # requests) and the old code just gave up on the whole
+                # endpoint the instant *any* page errored, discarding every
+                # later page with no visible error in the job log. Retry a
+                # failed page a few times with backoff before giving up, and
+                # emit a real warning (not just a log.error nobody sees) so
+                # a genuine failure is visible instead of masquerading as
+                # "409 found, 300 queued" with no explanation.
+                data: dict | None = None
+                _page_exc: Exception | None = None
+                for _attempt in range(3):
+                    try:
+                        resp = await client.get(_base_url, params=params, headers=headers)
+                        resp.raise_for_status()
+                        data = resp.json()
+                        _page_exc = None
+                        break
+                    except Exception as exc:  # noqa: BLE001
+                        _page_exc = exc
+                        log.warning(
+                            "[SEARCHSTAX links_only] fetch failed (start=%d, "
+                            "attempt=%d/3): %s",
+                            start, _attempt + 1, exc,
+                        )
+                        if _attempt < 2:
+                            await asyncio.sleep(1.5 * (_attempt + 1))
+
+                if data is None:
+                    log.error(
+                        "[SEARCHSTAX links_only] fetch failed (start=%d) after "
+                        "3 attempts — giving up on this endpoint: %s",
+                        start, _page_exc,
+                    )
+                    await _emit(
+                        f"[SEARCHSTAX links_only] WARNING: page fetch failed at "
+                        f"start={start} after 3 retries ({_page_exc}) — only "
+                        f"{len(links)} of {total if total is not None else '?'} "
+                        "course(s) will be queued for this endpoint."
+                    )
                     break
 
                 response = data.get("response", {})
@@ -1350,7 +1386,13 @@ async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> tuple[list[dict
                 if cfg.max_courses and len(links) >= cfg.max_courses:
                     links = links[: cfg.max_courses]
                     break
-                await asyncio.sleep(0)
+                # Small pacing delay between pages — rapid back-to-back
+                # requests to the public SearchStax token were observed to
+                # trigger a transient failure partway through pagination
+                # (QMUL: page 4/5 failed, silently truncating 409 -> 300).
+                # A brief delay plus the retry-with-backoff above make
+                # pagination resilient to that.
+                await asyncio.sleep(0.25)
 
     _title_excluded = title_excl_prefix + title_excl_sub
     await _emit(
@@ -1518,12 +1560,38 @@ async def fetch_searchstax_links(
                 params.update(cfg.extra_params or {})
                 params.update(_embedded_params)  # per-endpoint overrides (e.g. model=)
 
-                try:
-                    resp = await client.get(_base_url, params=params, headers=headers)
-                    resp.raise_for_status()
-                    data = resp.json()
-                except Exception as _fetch_exc:
-                    log.error("[SEARCHSTAX] fetch failed (start=%d): %s", start, _fetch_exc)
+                # See the links_only loop above for why this retries instead
+                # of giving up on the first transient failure (QMUL: 409
+                # found -> 300 silently queued when page 4 errored).
+                data = None
+                _page_exc = None
+                for _attempt in range(3):
+                    try:
+                        resp = await client.get(_base_url, params=params, headers=headers)
+                        resp.raise_for_status()
+                        data = resp.json()
+                        _page_exc = None
+                        break
+                    except Exception as _fetch_exc:  # noqa: BLE001
+                        _page_exc = _fetch_exc
+                        log.warning(
+                            "[SEARCHSTAX] fetch failed (start=%d, attempt=%d/3): %s",
+                            start, _attempt + 1, _fetch_exc,
+                        )
+                        if _attempt < 2:
+                            await asyncio.sleep(1.5 * (_attempt + 1))
+
+                if data is None:
+                    log.error(
+                        "[SEARCHSTAX] fetch failed (start=%d) after 3 attempts — "
+                        "giving up on this endpoint: %s", start, _page_exc,
+                    )
+                    await _emit(
+                        f"[SEARCHSTAX] WARNING: page fetch failed at start={start} "
+                        f"after 3 retries ({_page_exc}) — only {len(links)} of "
+                        f"{total if total is not None else '?'} course(s) will be "
+                        "queued for this endpoint."
+                    )
                     break
 
                 response = data.get("response", {})
@@ -1565,7 +1633,7 @@ async def fetch_searchstax_links(
                 if cfg.max_courses and len(links) >= cfg.max_courses:
                     links = links[: cfg.max_courses]
                     break
-                await asyncio.sleep(0)  # cooperative yield between pages
+                await asyncio.sleep(0.25)  # pacing delay — see links_only loop above
 
     await _emit(
         f"[SEARCHSTAX] Built {len(links)} course record(s) "

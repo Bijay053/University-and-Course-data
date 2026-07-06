@@ -11,12 +11,18 @@ course payloads:
 """
 from __future__ import annotations
 
+from typing import Any
+
+import httpx
 import pytest
 
+from app.services.scraper import searchstax_hud
+from app.services.scraper.config.schema import SearchStaxConfig
 from app.services.scraper.searchstax_hud import (
     _academic_level,
     _extract_entry_requirement,
     _fee_for,
+    _fetch_links_only,
     _parse_duration,
     _parse_intakes,
     _reformat_name,
@@ -284,3 +290,118 @@ class TestReformatName:
         name, level = _reformat_name(None, "UG")
         assert name is None
         assert level is None
+
+
+# ── _fetch_links_only pagination retry (QMUL 409 -> 300 regression) ──────────
+#
+# QMUL job 2026-07-06: SearchStax reported 409 course docs found but only 300
+# were queued for extraction, with 0 title-exclusions and 0 skipped — a page
+# fetch mid-pagination failed transiently and the old code silently gave up
+# on the whole endpoint the instant any single page errored. These tests
+# cover the fix: retry a failed page a few times before giving up, and
+# surface a real warning via `emit` when pagination genuinely can't recover.
+
+class _FakeResponse:
+    def __init__(self, json_data: dict[str, Any]) -> None:
+        self._json = json_data
+
+    def raise_for_status(self) -> None:
+        pass
+
+    def json(self) -> dict[str, Any]:
+        return self._json
+
+
+class _FlakyAsyncClient:
+    """Fake httpx.AsyncClient whose .get() replays a scripted sequence of
+    outcomes (Exception or JSON payload) per ``start`` offset, popped in
+    order. Lets tests simulate "fails N times then succeeds" or "always
+    fails" per Solr page without touching the network.
+    """
+
+    def __init__(self, responses: dict[int, list[Any]], **_kwargs: Any) -> None:
+        self._responses = {k: list(v) for k, v in responses.items()}
+        self.calls: list[int] = []
+
+    async def __aenter__(self) -> "_FlakyAsyncClient":
+        return self
+
+    async def __aexit__(self, *exc: Any) -> bool:
+        return False
+
+    async def get(self, url: str, params: dict | None = None, headers: dict | None = None):
+        start = int((params or {}).get("start", 0))
+        self.calls.append(start)
+        outcome = self._responses[start].pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return _FakeResponse(outcome)
+
+
+def _page(docs: list[dict], num_found: int) -> dict:
+    return {"response": {"numFound": num_found, "docs": docs}}
+
+
+def _cfg(**overrides: Any) -> SearchStaxConfig:
+    base = dict(
+        endpoint="https://searchcloud.example.com/core/select",
+        links_only=True,
+        page_size=2,
+        filter_query="",
+    )
+    base.update(overrides)
+    return SearchStaxConfig(**base)
+
+
+class TestFetchLinksOnlyRetry:
+    @pytest.fixture(autouse=True)
+    def _no_sleep(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # The retry/pacing delays are real asyncio.sleep() calls — skip them
+        # so the test suite doesn't slow down.
+        async def _instant_sleep(_seconds: float) -> None:
+            return None
+
+        monkeypatch.setattr(searchstax_hud.asyncio, "sleep", _instant_sleep)
+
+    @pytest.mark.asyncio
+    async def test_transient_failure_is_retried_and_recovers(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        docs_page0 = [{"url_t": "/course/a", "title_t": "Course A"}, {"url_t": "/course/b", "title_t": "Course B"}]
+        docs_page1 = [{"url_t": "/course/c", "title_t": "Course C"}]
+        responses = {
+            0: [httpx.ConnectError("boom"), _page(docs_page0, num_found=3)],
+            2: [_page(docs_page1, num_found=3)],
+        }
+        client = _FlakyAsyncClient(responses)
+        monkeypatch.setattr(searchstax_hud.httpx, "AsyncClient", lambda **_kw: client)
+
+        links, stats = await _fetch_links_only(_cfg())
+
+        assert [l["url"] for l in links] == ["/course/a", "/course/b", "/course/c"]
+        # First 'start' offset was hit twice (fail, then succeed).
+        assert client.calls == [0, 0, 2]
+
+    @pytest.mark.asyncio
+    async def test_persistent_failure_gives_up_with_partial_results_and_warns(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        docs_page0 = [{"url_t": "/course/a", "title_t": "Course A"}, {"url_t": "/course/b", "title_t": "Course B"}]
+        responses = {
+            0: [_page(docs_page0, num_found=5)],
+            2: [httpx.ConnectError("boom")] * 3,
+        }
+        client = _FlakyAsyncClient(responses)
+        monkeypatch.setattr(searchstax_hud.httpx, "AsyncClient", lambda **_kw: client)
+
+        warnings: list[str] = []
+
+        async def _emit(_kind: str, msg: str, **_kw: Any) -> None:
+            warnings.append(msg)
+
+        links, stats = await _fetch_links_only(_cfg(), emit=_emit)
+
+        # Only the first page's docs made it through — pagination gave up
+        # after exhausting retries on the second page, but did NOT crash and
+        # did NOT silently swallow the shortfall.
+        assert [l["url"] for l in links] == ["/course/a", "/course/b"]
+        assert client.calls == [0, 2, 2, 2]
+        assert any("WARNING" in w and "start=2" in w for w in warnings)
