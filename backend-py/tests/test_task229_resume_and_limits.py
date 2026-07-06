@@ -194,9 +194,15 @@ def test_rate_limiter_fail_open_on_unreachable_redis(monkeypatch):
 
 
 def test_acquire_helpers_are_disabled_by_default():
-    # Default config ships both limiters off (0.0) → instant pass-through.
-    monkeypatch_rate = settings.scrape_do_rate_limit_per_sec
-    assert monkeypatch_rate == 0.0
+    # gemini_rate_limit_per_sec ships off (0.0) by default.
+    # scrape_do_rate_limit_per_sec ships ENABLED (3.0/sec) as of the QMUL
+    # job_4fb674e585b2 fix (2026-07-06): cross-process semaphores alone
+    # cannot bound Scrape.do contention across 8 prefork Celery workers
+    # sharing one account, so the fleet-wide Redis token bucket must be on
+    # by default to smooth bursts. Either way, `acquire_scrape_do()` never
+    # raises and always returns True (real or fail-open pass-through).
+    assert settings.gemini_rate_limit_per_sec == 0.0
+    assert settings.scrape_do_rate_limit_per_sec > 0.0
     assert _run(rate_limiter.acquire_scrape_do()) is True
     assert _run(rate_limiter.acquire_gemini()) is True
 

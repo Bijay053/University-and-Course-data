@@ -641,18 +641,39 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
             # concurrent load (12 parallel HTTP workers) Scrape.do's proxy pool
             # occasionally returns a transient 502/"ROTATION_FAILED" for a
             # request that would succeed moments later (same failure signature
-            # documented for the Ulster sitemap fetch).  A single short-backoff
-            # retry recovers most of these without adding a real rescue tier.
-            # QMUL job_5f5ab180197a (2026-07-03): 47/409 courses (~11%) were
-            # lost to exactly this gap — render+static both failed once, and
-            # skip_browser_rescue left nothing else to try.
-            log.info(
-                "fetch %s: scrape_do_skip_fallbacks fast-path exhausted"
-                " (render+static) — retrying render once after backoff",
-                url,
-            )
-            await asyncio.sleep(3.0)
-            _rendered_retry = await fetch_html_scrape_do(url, render=True)
+            # documented for the Ulster sitemap fetch).
+            #
+            # QMUL job_5f5ab180197a (2026-07-03): a single short-backoff retry
+            # recovered most of the 47/409 (~11%) courses lost to this gap.
+            # QMUL job_4fb674e585b2 (2026-07-06): under heavier concurrent load
+            # (multiple universities sharing the same SCRAPE_DO_TOKEN account
+            # at once) the transient-failure rate got much worse — 279/409
+            # (~68%) courses were lost — and a single retry was no longer
+            # enough because the account-wide contention window regularly
+            # outlasts one 3s backoff.  Use a short exponential-backoff retry
+            # ladder (render, static, render) instead of one fixed retry so
+            # a course only fails for good after 5 total Scrape.do attempts
+            # spread across ~26s of backoff, giving transient saturation time
+            # to clear.
+            _retry_backoffs = (3.0, 8.0, 15.0)
+            _retry_modes = (True, False, True)  # render, static, render
+            _rendered_retry: str | None = None
+            for _attempt, (_backoff, _use_render) in enumerate(
+                zip(_retry_backoffs, _retry_modes), start=1
+            ):
+                log.info(
+                    "fetch %s: scrape_do_skip_fallbacks fast-path exhausted"
+                    " (render+static) — retry %d/%d (%s) after %.0fs backoff",
+                    url, _attempt, len(_retry_backoffs),
+                    "render" if _use_render else "static", _backoff,
+                )
+                await asyncio.sleep(_backoff)
+                _candidate = await fetch_html_scrape_do(url, render=_use_render)
+                if _candidate is not None and (
+                    _use_render or not _is_spa_shell(_candidate)
+                ):
+                    _rendered_retry = _candidate
+                    break
             if _rendered_retry is not None:
                 return _rendered_retry
             # Last resort: Wayback Machine.  Universities with

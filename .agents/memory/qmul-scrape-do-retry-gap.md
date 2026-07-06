@@ -139,3 +139,38 @@ calls for 409 courses (one call per course, no wasted retries at all).
 (Cardiff, UWL, WLV, HUD) shares the same single Scrape.do account and was
 equally exposed to this burst-failure mode, even though only QMUL happened to
 surface it loudly. No YAML change needed — the semaphore is global.
+
+## Regression despite the semaphore fix — per-process semaphore doesn't bound the fleet
+
+**Symptom:** even after the `max_scrape_do_concurrency` semaphore fix above,
+a later QMUL run (job_4fb674e585b2, 2026-07-06) lost 279/409 (~68%) courses
+to `fetch_failed` — far worse than the 0% the semaphore fix had achieved.
+
+**Root cause:** `_scrape_do_sem` is a plain in-process `asyncio.Semaphore`.
+Celery's default prefork pool spawns 8 *separate OS processes*
+(`--concurrency=8`), each importing `http_fetcher.py` fresh and getting its
+own semaphore instance. So `max_scrape_do_concurrency=5` only bounds
+concurrency *within one worker process* — if other Celery tasks (other
+university scrapes) are running in sibling worker processes at the same
+time, real account-wide concurrent Scrape.do connections can be up to
+`8 * 5 = 40`, still enough to saturate/rate-limit the shared account. The
+one genuinely cross-process mechanism, `scrape_do_rate_limit_per_sec` (a
+Redis token bucket, see `rate_limiter.py`, built for exactly this problem),
+was sitting at its default of `0.0` (disabled) the whole time.
+
+**Fix (two parts, both in this round):**
+1. Widened the existing single retry (render only) into a 3-step
+   exponential-backoff ladder — render → static → render at 3s/8s/15s —
+   before falling through to Wayback, since one retry proved insufficient
+   once contention got worse.
+2. Changed `settings.scrape_do_rate_limit_per_sec` default from `0.0` to
+   `3.0`, actually engaging the pre-built cross-process throttle so bursts
+   get smoothed fleet-wide, not just per-process. This is fail-open (30s
+   max wait, then proceeds anyway) so it can only add latency, never block.
+
+**Lesson:** when a university's YAML relies on a *single* fetch tier with no
+fallback (`scrape_do_skip_fallbacks` + `skip_browser_rescue`), any
+in-process-only concurrency guard is a false sense of safety once multiple
+Celery prefork workers exist — always check whether a cross-process
+Redis-backed mechanism already exists (it did here, unused) before adding
+more in-process guards or retries.

@@ -109,10 +109,21 @@ class Settings(BaseSettings):
     max_concurrent_scrapes: int = 0
 
     # Cross-process token-bucket rate limits (calls/sec, Redis-coordinated).
-    # In-process semaphores cannot bound contention across the 8 prefork workers
-    # that share ONE Scrape.do account and ONE Gemini quota.  0.0 = disabled
-    # (no throttling; existing behaviour).  Set >0 on prod to tame 429 storms.
-    scrape_do_rate_limit_per_sec: float = 0.0
+    # In-process semaphores (e.g. `max_scrape_do_concurrency`) cannot bound
+    # contention across the 8 prefork Celery workers that share ONE Scrape.do
+    # account and ONE Gemini quota — each worker process gets its OWN
+    # semaphore instance, so real fleet-wide concurrency is up to
+    # 8 * max_scrape_do_concurrency, not just max_scrape_do_concurrency.
+    # QMUL job_4fb674e585b2 (2026-07-06): with this still at 0.0 (disabled),
+    # 279/409 (~68%) courses were lost to fetch_failed under concurrent
+    # cross-university Scrape.do load — far worse than the 11-28% documented
+    # for the in-process-only mitigations above. Defaulting to a small
+    # positive fleet-wide ceiling (still overridable via env var) actually
+    # engages this pre-built Redis token bucket so bursts get smoothed across
+    # every worker, not just within one. 3.0/sec is deliberately conservative
+    # (fails open after a 30s wait budget, so it can only add latency, never
+    # block scraping outright) — raise if Scrape.do's plan concurrency allows.
+    scrape_do_rate_limit_per_sec: float = 3.0
     gemini_rate_limit_per_sec: float = 0.0
 
     # In-process hard cap on concurrent Scrape.do HTTP requests (per Celery

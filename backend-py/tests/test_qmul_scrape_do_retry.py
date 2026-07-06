@@ -19,10 +19,14 @@ blip on BOTH render and static permanently loses that course as
 ``fetch_failed`` with no further recourse. This happened to 47/409 QMUL
 courses (~11%) in job_5f5ab180197a.
 
-The fix adds a single short-backoff retry (render=True again) after the
-existing render->static chain both fail, before finally giving up. These
-tests verify that retry fires (and can rescue a transient failure) without
-changing behaviour when the fast-path already succeeds on the first pass.
+The first fix added a single short-backoff retry (render=True again) after
+the existing render->static chain both fail. job_4fb674e585b2 (2026-07-06)
+showed that under heavier cross-university Scrape.do contention a single
+retry is no longer enough (279/409, ~68%, lost) — so the retry was widened
+to a 3-step exponential-backoff ladder (render, static, render at 3s/8s/15s)
+before finally falling back to Wayback. These tests verify the retry ladder
+fires (and can rescue a transient failure) without changing behaviour when
+the fast-path already succeeds on the first pass.
 """
 from __future__ import annotations
 
@@ -111,10 +115,10 @@ async def test_retry_rescues_transient_double_failure():
 
 @pytest.mark.asyncio
 async def test_falls_back_to_wayback_when_all_scrape_do_attempts_fail():
-    """When render, static, AND the retry all fail, fetch_html falls back to
-    the Wayback Machine as a last resort (archive.org is not subject to the
-    live WAF that blocks both httpx and Scrape.do's proxy pool for these
-    universities) before finally giving up."""
+    """When render, static, AND the full 3-step retry ladder all fail,
+    fetch_html falls back to the Wayback Machine as a last resort (archive.org
+    is not subject to the live WAF that blocks both httpx and Scrape.do's
+    proxy pool for these universities) before finally giving up."""
     set_uni_config(_qmul_uni_config())
 
     calls: list[dict] = []
@@ -143,9 +147,14 @@ async def test_falls_back_to_wayback_when_all_scrape_do_attempts_fail():
             result = await fetch_html(_QMUL_COURSE_URL)
 
     render_calls = [c for c in calls if c["render"]]
-    assert len(render_calls) == 2, (
-        f"expected initial render attempt + one retry even on total failure, got "
+    static_calls = [c for c in calls if not c["render"]]
+    assert len(render_calls) == 3, (
+        f"expected initial render attempt + 2 render retries in the ladder, got "
         f"{len(render_calls)}: {calls}"
+    )
+    assert len(static_calls) == 2, (
+        f"expected initial static attempt + 1 static retry in the ladder, got "
+        f"{len(static_calls)}: {calls}"
     )
     assert result == _MINIMAL_HTML, (
         "Wayback Machine success must be returned instead of giving up"
@@ -184,9 +193,14 @@ async def test_returns_none_when_wayback_also_fails():
             result = await fetch_html(_QMUL_COURSE_URL)
 
     render_calls = [c for c in calls if c["render"]]
-    assert len(render_calls) == 2, (
-        f"expected initial render attempt + one retry even on total failure, got "
-        f"{len(render_calls)}: {calls}"
+    static_calls = [c for c in calls if not c["render"]]
+    assert len(render_calls) == 3, (
+        f"expected initial render attempt + 2 render retries even on total "
+        f"failure, got {len(render_calls)}: {calls}"
+    )
+    assert len(static_calls) == 2, (
+        f"expected initial static attempt + 1 static retry even on total "
+        f"failure, got {len(static_calls)}: {calls}"
     )
     assert result is None
 
