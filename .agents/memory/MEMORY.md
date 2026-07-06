@@ -7,6 +7,7 @@
 - [pytest asyncio isolation](pytest-asyncio-isolation.md) — use asyncio.new_event_loop() not get_event_loop() in sync test helpers; full suite has session-scoped loop that conflicts
 - [Phase 9 verification engine](phase9-verification.md) — cross-source confidence: html/pdf/api=30, pattern/ai=5; conflict caps score at 35; None avg_confidence does NOT block auto-publish
 - [Phase 13 monitoring engine](phase13-monitoring.md) — university_watchers + lightweight probes; smart scheduling from change_frequency_days EMA; 30-min Celery beat; bulk-enable auto-creates watchers from scrape_url.
+- [Scrape.do discovery timeout mismatch](scrape-do-discovery-timeout-mismatch.md) — generic short per-page timeout wrapping a slow-but-successful rendering-proxy call discards every response; widen timeout + prefetch seeds concurrently.
 - [Slug derivation for non-www subdomains](slug-subdomain-fix.md) — study.csu.edu.au → slug 'study' not 'csu'; loader needs _GENERIC_SUBDOMAINS stripping.
 - [Year-based URL deduplication pipeline](year-dedup-pipeline.md) — Phase A.5c pre-extraction: ignore_urls→ignore_years→slug_without_year dedup; prefer_urls_matching is tiebreaker in Step 3.
 - [JCU URL rewrite Cloudflare lesson](jcu-cloudflare-lesson.md) — ?international=true on static HTTP triggers Cloudflare bot challenge (0 staged); JS-tab universities need browser rescue, not URL rewrite.

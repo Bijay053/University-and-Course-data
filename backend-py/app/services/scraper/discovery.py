@@ -731,6 +731,26 @@ async def discover_course_links(
     def _remaining_budget_s() -> float:
         return _discovery_deadline - time.monotonic()
 
+    # Cardiff "doesn't scrape at all" (2026-07-06, post job_a2b4e95ec235):
+    # the fix above tapers retries, but every attempt was STILL being cut
+    # off before it could ever succeed. Root cause: when
+    # discovery.scrape_do_skip_fallbacks is set, every discovery-phase fetch
+    # goes straight to Scrape.do (fetch_html_scrape_do uses its own internal
+    # httpx client with timeout=90s — see http_fetcher.py). The generic
+    # discovery_page_fetch_timeout_s (45s) was cutting the call off via
+    # asyncio.wait_for *before* Scrape.do's own 90s client timeout could
+    # even fire, so a legitimately-slow-but-successful ~60-85s Scrape.do
+    # response was thrown away as a "timeout" on every single attempt —
+    # 0 successful fetches, ever, for a Cloudflare-Enterprise host that
+    # requires Scrape.do. Give those fetches enough room to actually
+    # complete (matches the internal client's own ceiling + margin).
+    _disc_uses_scrape_do = bool(
+        getattr(discovery_config, "scrape_do_skip_fallbacks", False)
+    )
+    _page_fetch_timeout_s: float = (
+        95.0 if _disc_uses_scrape_do else float(settings.discovery_page_fetch_timeout_s)
+    )
+
     # Diagnostic (2026-07-03, Ulster job_ec86dc5866cb re-run): a per-uni YAML
     # can document `discovery.sitemap_url` in a comment without the key
     # actually being set (silent config-authoring mistake) — the code then
@@ -962,6 +982,58 @@ async def discover_course_links(
                     "[DISCOVER] invalid force_candidate_url_patterns regex %r — skipped", _raw
                 )
 
+    # Cardiff "doesn't scrape at all" (2026-07-06): even with the longer
+    # per-page timeout above, 3 sequential ~90s Scrape.do seed fetches still
+    # sum to ~270s — nearly the whole discovery_phase_timeout_s budget —
+    # because the BFS loop processes the queue one URL at a time. The
+    # pre-seeded depth-0 URLs (start_url + any extra discovery_config.
+    # seed_urls) are independent listing pages with no BFS dependency on
+    # each other, so fetch them concurrently instead: wall time becomes
+    # roughly the slowest single call instead of their sum, leaving the
+    # rest of the budget free for actually walking the crawl. Only done
+    # when Scrape.do is the fetch path (the scenario that made this
+    # necessary) to keep the change scoped to the failure it fixes.
+    _SEED_PREFETCH_MISS = object()
+    _seed_prefetch_cache: dict[str, str | None] = {}
+    if _disc_uses_scrape_do:
+        _prefetch_urls = [_u for (_u, _d) in queue if _d == 0]
+        if _prefetch_urls:
+            log.info(
+                "[DISCOVER] scrape_do-backed discovery: prefetching %d seed "
+                "URL(s) concurrently (timeout=%.0fs each) instead of "
+                "sequentially",
+                len(_prefetch_urls),
+                _page_fetch_timeout_s,
+            )
+            if emit:
+                await emit(
+                    "status",
+                    f"[DISCOVER] prefetching {len(_prefetch_urls)} seed "
+                    "URL(s) concurrently via Scrape.do",
+                    phase="discover",
+                    kind="seed_prefetch_start",
+                )
+
+            async def _prefetch_one(_u: str) -> tuple[str, str | None]:
+                _timeout = min(_page_fetch_timeout_s, max(_remaining_budget_s(), 1.0))
+                try:
+                    _html = await asyncio.wait_for(
+                        fetch_html(_u, retries=0), timeout=_timeout
+                    )
+                except asyncio.TimeoutError:
+                    log.warning(
+                        "[DISCOVER] seed prefetch timed out after %ss — %s",
+                        _timeout,
+                        _u,
+                    )
+                    _html = None
+                return _u, _html
+
+            _prefetch_results = await asyncio.gather(
+                *(_prefetch_one(_u) for _u in _prefetch_urls)
+            )
+            _seed_prefetch_cache.update(dict(_prefetch_results))
+
     while queue and len(visited) < max_pages and len(found) < max_courses:
         url, depth = queue.pop(0)
         # Dedup on normalized URL so ?studentType=international and the bare
@@ -1073,15 +1145,18 @@ async def discover_course_links(
         # degrades to the existing "fetch failed" handling (skip this page,
         # move on) instead of consuming the whole budget.
         async def _bounded_fetch(_u: str) -> str | None:
+            _cached = _seed_prefetch_cache.pop(_u, _SEED_PREFETCH_MISS)
+            if _cached is not _SEED_PREFETCH_MISS:
+                return _cached
             try:
                 return await asyncio.wait_for(
                     fetch_html(_u, retries=0),
-                    timeout=settings.discovery_page_fetch_timeout_s,
+                    timeout=_page_fetch_timeout_s,
                 )
             except asyncio.TimeoutError:
                 log.warning(
                     "[DISCOVER] fetch timed out after %ss — %s",
-                    settings.discovery_page_fetch_timeout_s,
+                    _page_fetch_timeout_s,
                     _u,
                 )
                 return None
@@ -1092,9 +1167,16 @@ async def discover_course_links(
         # fallback afterward. Without this, a handful of uniformly-timing-out
         # seed URLs can each burn a full extra attempt and starve the
         # fallback of any time at all — turning "slow" into "nothing at all
-        # got scraped".
-        if not html and _remaining_budget_s() > (
-            settings.discovery_page_fetch_timeout_s + _SITEMAP_FALLBACK_MIN_BUDGET_S
+        # got scraped". When Scrape.do is in play (_page_fetch_timeout_s
+        # already stretched to fit its own 90s client timeout), a same-length
+        # retry after a genuine timeout is very unlikely to succeed any
+        # faster — skip the discovery-level retry entirely and rely on the
+        # parallel seed prefetch below instead.
+        if (
+            not html
+            and not _disc_uses_scrape_do
+            and _remaining_budget_s()
+            > (_page_fetch_timeout_s + _SITEMAP_FALLBACK_MIN_BUDGET_S)
         ):
             # Brief pause then one more attempt on the same URL — handles
             # transient 5xx / rate-limit blips on category listing pages
@@ -1115,7 +1197,7 @@ async def discover_course_links(
             not html
             and "?" in url
             and _remaining_budget_s()
-            > (settings.discovery_page_fetch_timeout_s + _SITEMAP_FALLBACK_MIN_BUDGET_S)
+            > (_page_fetch_timeout_s + _SITEMAP_FALLBACK_MIN_BUDGET_S)
         ):
             _bare_url = url.split("?", 1)[0]
             if _bare_url not in visited:

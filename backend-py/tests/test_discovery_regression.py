@@ -409,3 +409,77 @@ async def test_uniformly_failing_seeds_leave_budget_for_sitemap_fallback(monkeyp
         f"discover_course_links took {elapsed:.1f}s against a 1s discovery "
         "budget — retries were not tapered off as the deadline approached"
     )
+
+
+# ── Cardiff "doesn't scrape at all" fix: scrape.do-backed seeds must get
+#    enough per-call time to actually succeed, and must be fetched
+#    concurrently rather than one-at-a-time ─────────────────────────────
+#
+# job_a2b4e95ec235 (2026-07-06, post first fix): the retry-tapering fix
+# above was in place, but Cardiff still failed every single discovery run.
+# Root cause: discovery.scrape_do_skip_fallbacks routes every discovery
+# fetch straight to Scrape.do, whose own internal HTTP client uses a 90s
+# timeout — but discover_course_links was still cutting each attempt off
+# at the generic discovery_page_fetch_timeout_s (45s), well before
+# Scrape.do's legitimately-slow-but-successful response could ever land.
+# Every attempt got thrown away as a false "timeout" — 0 successful
+# fetches, ever. The fix (a) widens the per-page timeout to fit Scrape.do's
+# own ceiling when scrape_do_skip_fallbacks is set, and (b) fetches the
+# pre-seeded depth-0 URLs concurrently instead of sequentially so 3 slow
+# calls take roughly as long as the slowest one, not their sum.
+
+
+@pytest.mark.asyncio
+async def test_scrape_do_seeds_get_full_timeout_and_run_concurrently(monkeypatch):
+    """When discovery.scrape_do_skip_fallbacks is set, seed URLs must each
+    get the full Scrape.do-sized timeout (not the generic short one) and
+    must be fetched in parallel, not one-by-one.
+    """
+    from app.services.scraper.config.schema import DiscoveryConfig
+
+    seed_a = "https://example.edu/study/undergraduate/a-to-z"
+    seed_b = "https://example.edu/study/postgraduate/research"
+    seed_c = "https://example.edu/study/postgraduate/taught"
+
+    call_timestamps: dict[str, float] = {}
+
+    async def slow_but_successful(url, **kwargs):
+        # Simulates a real Scrape.do call that takes noticeably longer than
+        # the old 45s generic cap but well within the widened timeout.
+        call_timestamps[url] = asyncio.get_event_loop().time()
+        await asyncio.sleep(0.3)
+        return "<html><body>no course links here</body></html>"
+
+    monkeypatch.setattr(discovery, "fetch_html", slow_but_successful)
+
+    cfg = DiscoveryConfig(
+        scrape_do_skip_fallbacks=True,
+        seed_urls=[seed_a, seed_b, seed_c],
+    )
+
+    started = asyncio.get_event_loop().time()
+    await discovery.discover_course_links(
+        seed_a,
+        max_pages=25,
+        max_courses=200,
+        discovery_config=cfg,
+    )
+    elapsed = asyncio.get_event_loop().time() - started
+
+    seed_urls_set = {seed_a, seed_b, seed_c}
+    assert seed_urls_set.issubset(call_timestamps), (
+        "all 3 seed URLs must have actually been fetched "
+        f"(missing: {seed_urls_set - set(call_timestamps)})"
+    )
+    # All 3 seed calls should have started within a small window of each
+    # other, not staggered ~0.3s+ apart (which would indicate sequential
+    # fetching instead of the intended concurrent prefetch). Other,
+    # unrelated fetch_html calls (alternate-listing-path probes etc.) may
+    # legitimately happen later in discover_course_links and are ignored
+    # here — this assertion is scoped to just the 3 configured seeds.
+    seed_timestamps = [call_timestamps[u] for u in seed_urls_set]
+    spread = max(seed_timestamps) - min(seed_timestamps)
+    assert spread < 0.2, (
+        f"seed fetch start times spread over {spread:.2f}s — expected "
+        "concurrent dispatch, not sequential"
+    )
