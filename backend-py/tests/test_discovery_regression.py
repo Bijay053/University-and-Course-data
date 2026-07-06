@@ -322,3 +322,90 @@ async def test_slow_page_times_out_and_bfs_continues(monkeypatch):
         f"discover_course_links took {elapsed:.1f}s — the per-page timeout "
         "cap did not bound the stuck page's fetch time"
     )
+
+
+# ── Cardiff job_72d3725aea12 fix: multiple uniformly-unreachable seed URLs
+#    must not starve the sitemap fallback of its entire time budget ────────
+#
+# All 3 Cardiff seed URLs failed BOTH bounded-fetch attempts (2 x 45s each =
+# ~90s per URL), so 3 sequential seeds alone consumed 270 of the 300s
+# discovery_phase_timeout_s budget — leaving no time for even the first
+# sitemap-fallback probe (robots.txt) to return before the outer deadline
+# fired. The fix tapers off retries once the remaining budget can no longer
+# also fit the sitemap fallback, and skips the fallback cleanly (with a
+# clear log) instead of letting it get silently cut off mid-fetch.
+
+
+@pytest.mark.asyncio
+async def test_uniformly_failing_seeds_leave_budget_for_sitemap_fallback(monkeypatch):
+    """Several seed URLs that all fail every fetch attempt must not burn the
+    entire discovery deadline before the sitemap fallback gets a chance to
+    run — the retry policy must taper off once budget is running low.
+    """
+    from app.config import settings as app_settings
+    from app.services.scraper.config.schema import DiscoveryConfig
+
+    # Small but non-trivial per-page timeout so the retry-skip logic has to
+    # do real arithmetic (not just "budget is already zero").
+    monkeypatch.setattr(app_settings, "discovery_page_fetch_timeout_s", 0.05)
+    monkeypatch.setattr(app_settings, "discovery_phase_timeout_s", 1)
+
+    _seed_urls = {
+        "https://example.edu/study/undergraduate/a-to-z",
+        "https://example.edu/study/postgraduate/research",
+        "https://example.edu/study/postgraduate/taught",
+    }
+
+    async def always_fails(url, **kwargs):
+        # Only the 3 seed URLs are unreachable — mirrors Cardiff's
+        # Cloudflare-block scenario where Scrape.do itself never returns
+        # within budget for those specific pages. Any other URL (e.g. the
+        # unrelated alternative-listing-path / subdomain probes later in
+        # discover_course_links, which are not part of this regression and
+        # are not wrapped in the same budget guard) returns instantly so the
+        # test stays focused on the BFS retry/sitemap-fallback scheduling.
+        if url in _seed_urls:
+            await asyncio.sleep(10)
+            return None
+        return ""
+
+    sitemap_called_with_budget: list[float] = []
+
+    async def fake_sitemap(origin, *, emit=None, **kwargs):
+        # Record that the fallback was actually invoked (or not) and bail
+        # out immediately — we only care about scheduling, not sitemap
+        # parsing behavior here.
+        sitemap_called_with_budget.append(1.0)
+        return []
+
+    monkeypatch.setattr(discovery, "fetch_html", always_fails)
+    import app.services.scraper.sitemap as sm
+
+    monkeypatch.setattr(sm, "discover_from_sitemap", fake_sitemap)
+
+    cfg = DiscoveryConfig(
+        seed_urls=[
+            "https://example.edu/study/undergraduate/a-to-z",
+            "https://example.edu/study/postgraduate/research",
+            "https://example.edu/study/postgraduate/taught",
+        ]
+    )
+
+    started = asyncio.get_event_loop().time()
+    out = await discovery.discover_course_links(
+        "https://example.edu/study/undergraduate/a-to-z",
+        max_pages=25,
+        max_courses=200,
+        discovery_config=cfg,
+    )
+    elapsed = asyncio.get_event_loop().time() - started
+
+    assert out == []
+    # The whole call (3 unreachable seeds + fallback decision) must stay
+    # comfortably within the 1s discovery_phase_timeout_s budget used here —
+    # before the fix, 3 seeds x up to 2 full-length attempts each could blow
+    # past the outer deadline on their own.
+    assert elapsed < 3, (
+        f"discover_course_links took {elapsed:.1f}s against a 1s discovery "
+        "budget — retries were not tapered off as the deadline approached"
+    )

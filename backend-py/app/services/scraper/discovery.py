@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import time
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse, urlunparse, urlencode, parse_qsl, parse_qs, unquote
 
@@ -711,6 +712,25 @@ async def discover_course_links(
     parsed = urlparse(start_url)
     origin = f"{parsed.scheme}://{parsed.netloc}"
 
+    # Time-budget tracking (Cardiff job_72d3725aea12, 2026-07-06): this
+    # function is wrapped in `asyncio.wait_for(..., timeout=discovery_phase_
+    # timeout_s)` by the caller. Without an internal notion of the deadline,
+    # the BFS loop's per-URL retry policy (initial attempt + 1s-sleep retry
+    # + optional bare-URL retry, each up to discovery_page_fetch_timeout_s)
+    # can burn almost the ENTIRE outer deadline on a handful of seed URLs
+    # that are all genuinely unreachable (e.g. Scrape.do itself timing out
+    # against a Cloudflare-blocked host) — 3 seed URLs x 2 attempts x 45s
+    # ate 270 of the 300s budget, leaving only ~27s before the deadline
+    # fired, not enough time for even the first sitemap-fallback probe to
+    # return. Track the deadline so retries taper off, and the sitemap
+    # fallback bails out cleanly (clear log) instead of getting silently
+    # cut off mid-fetch by the outer wait_for.
+    _discovery_deadline = time.monotonic() + settings.discovery_phase_timeout_s
+    _SITEMAP_FALLBACK_MIN_BUDGET_S = 30
+
+    def _remaining_budget_s() -> float:
+        return _discovery_deadline - time.monotonic()
+
     # Diagnostic (2026-07-03, Ulster job_ec86dc5866cb re-run): a per-uni YAML
     # can document `discovery.sitemap_url` in a comment without the key
     # actually being set (silent config-authoring mistake) — the code then
@@ -1067,16 +1087,36 @@ async def discover_course_links(
                 return None
 
         html = await _bounded_fetch(url)
-        if not html:
+        # Budget guard (Cardiff job_72d3725aea12): only spend a retry if
+        # enough of the discovery deadline remains to also fit the sitemap
+        # fallback afterward. Without this, a handful of uniformly-timing-out
+        # seed URLs can each burn a full extra attempt and starve the
+        # fallback of any time at all — turning "slow" into "nothing at all
+        # got scraped".
+        if not html and _remaining_budget_s() > (
+            settings.discovery_page_fetch_timeout_s + _SITEMAP_FALLBACK_MIN_BUDGET_S
+        ):
             # Brief pause then one more attempt on the same URL — handles
             # transient 5xx / rate-limit blips on category listing pages
             # (e.g. /nursing-and-midwifery) without compounding delay.
             await asyncio.sleep(1)
             html = await _bounded_fetch(url)
+        elif not html:
+            log.warning(
+                "[DISCOVER] skipping retry for %s — only %.0fs left in discovery "
+                "budget, reserving it for sitemap fallback",
+                url,
+                _remaining_budget_s(),
+            )
         # Issue 3: if still nothing and the URL had a query string (e.g.
         # ?studentType=international), retry with the bare path once — some
         # servers reject the param but serve the page fine without it.
-        if not html and "?" in url:
+        if (
+            not html
+            and "?" in url
+            and _remaining_budget_s()
+            > (settings.discovery_page_fetch_timeout_s + _SITEMAP_FALLBACK_MIN_BUDGET_S)
+        ):
             _bare_url = url.split("?", 1)[0]
             if _bare_url not in visited:
                 await asyncio.sleep(1)
@@ -1332,7 +1372,32 @@ async def discover_course_links(
     # Many universities (e.g. those with JS-driven catalogues) link only
     # a handful of "featured" courses from the homepage but publish the
     # full catalogue in sitemap.xml.
-    if len(found) < _SITEMAP_FALLBACK_THRESHOLD and origin:
+    if len(found) < _SITEMAP_FALLBACK_THRESHOLD and origin and _remaining_budget_s() < 5:
+        # Budget guard (Cardiff job_72d3725aea12): if the BFS crawl alone has
+        # already exhausted (almost) the entire discovery deadline, don't
+        # even start the sitemap fallback — it would get silently cancelled
+        # mid-fetch by the outer `asyncio.wait_for` with zero diagnostic
+        # output (exactly what made this failure look like a silent stall).
+        # Failing fast here with a clear log is strictly better than a
+        # deadline-exceeded exception with no visibility into what the last
+        # attempted step even was.
+        log.warning(
+            "[DISCOVER] skipping sitemap fallback for %s — only %.0fs left "
+            "in discovery budget (BFS crawl consumed the rest)",
+            origin,
+            _remaining_budget_s(),
+        )
+        if emit:
+            await emit(
+                "status",
+                f"[DISCOVER] Crawl yielded only {len(found)} candidate(s) but "
+                "skipping sitemap fallback — discovery budget nearly exhausted "
+                f"({_remaining_budget_s():.0f}s left)",
+                phase="discover",
+                kind="sitemap_skipped_budget",
+                crawl_total=len(found),
+            )
+    elif len(found) < _SITEMAP_FALLBACK_THRESHOLD and origin:
         if emit:
             await emit(
                 "status",
@@ -1356,10 +1421,27 @@ async def discover_course_links(
                         _fb_allow_pats.append(re.compile(_ap_str, re.IGNORECASE))
                     except re.error:
                         pass
-            sitemap_courses = await discover_from_sitemap(
-                origin, emit=emit, sitemap_url=_explicit_sm, offset=_sm_offset,
-                allow_url_patterns=_fb_allow_pats or None,
+            # Bound the whole sitemap-fallback probe chain (robots.txt +
+            # up to 4 generic index paths, each internally capped at
+            # sitemap._PROBE_TIMEOUT_S=100s) to whatever's actually left of
+            # the discovery deadline, so a slow/blocked sitemap host can't
+            # consume time beyond the outer wait_for's own limit — it just
+            # returns whatever it found so far instead of getting killed
+            # with no cleanup.
+            sitemap_courses = await asyncio.wait_for(
+                discover_from_sitemap(
+                    origin, emit=emit, sitemap_url=_explicit_sm, offset=_sm_offset,
+                    allow_url_patterns=_fb_allow_pats or None,
+                ),
+                timeout=max(_remaining_budget_s(), 1.0),
             )
+        except asyncio.TimeoutError:
+            log.warning(
+                "[DISCOVER] sitemap fallback for %s timed out (discovery "
+                "budget exhausted)",
+                origin,
+            )
+            sitemap_courses = []
         except Exception as exc:
             log.warning("sitemap fallback failed for %s: %s", origin, exc)
             sitemap_courses = []
