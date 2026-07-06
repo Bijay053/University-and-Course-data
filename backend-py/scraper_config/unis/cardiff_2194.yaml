@@ -1,12 +1,15 @@
-# Cardiff University
+# Cardiff University (id=2194)
 # Hostname: www.cardiff.ac.uk
 #
-# NOTE (2026-07-06): unis/cardiff_2194.yaml now exists and SHADOWS this file
-# entirely for Cardiff University (id=2194) — the loader picks the
-# id-specific file first when present. Edit cardiff_2194.yaml, not this file,
-# for any config changes affecting the live Cardiff scrape. This file is
-# kept only as a fallback for a future "cardiff"-slug host with no
-# id-specific override.
+# This is the id-specific config file (unis/{slug}_{university_id}.yaml).
+# It shadows unis/cardiff.yaml ENTIRELY once present (loader.py picks the
+# id-specific file first when it exists — see loader.py's lookup-order
+# comment). Created 2026-07-06 as a 1:1 copy of cardiff.yaml (no slug
+# collision exists for "cardiff" today; this file exists per explicit
+# request to pin Cardiff's config to its university_id). Keep both files in
+# sync, or fold cardiff.yaml's future edits in here — cardiff.yaml itself is
+# now dead weight for uni_id=2194 but is left in place in case another
+# "cardiff"-slug host is ever added without an id-specific override.
 #
 # CLOUDFLARE ENTERPRISE IP-BLOCK: All datacenter IPs return 403 — listing pages,
 # course pages, sitemap, robots.txt.  cffi (TLS impersonation) does NOT bypass it.
