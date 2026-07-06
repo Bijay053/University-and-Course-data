@@ -143,6 +143,15 @@ Do NOT fix the NameError first. Order matters because step 4 is a shared-code ch
 
 Rationale: if the NameError fix sweep finds regressions on unexpected unis, that means the `re.*` call was doing something other unis depend on — far better to discover that through the sweep than through bug reports.
 
+### Kingston discovery-timeout fix (2026-07-06)
+
+Kingston (like earlier Cardiff/QMUL cases) was failing with "[DISCOVER] Discovery phase exceeded 300s deadline". Unlike Cardiff (CF-Enterprise IP block, fixed via `scrape_do_render`), Kingston's root cause was different and shared-code:
+
+- **Root cause**: `http_fetcher.py`'s `fetch_html()` classified 403/429/503 with `cf-ray`/cloudflare headers all as "Cloudflare block" and immediately escalated through the full tiered ladder (cffi retry → Wayback → Scrape.do static → Scrape.do render). For Kingston, pages past ~11 in the BFS trip Cloudflare's plain rate limiter (429, not a challenge) — cffi normally works fine here — but every 429 still paid the latency of Wayback + (if `SCRAPE_DO_TOKEN` set) Scrape.do round-trips, which cumulatively blew the 300s discovery budget across the ~35-page crawl.
+- **Also found**: the per-university `discovery.use_wayback: false` flag (which Kingston sets, documenting "archive.org has nothing useful here") was only wired into the orchestrator's separate discovery-wide Wayback CDX sweep — the per-request Wayback tier inside `fetch_html()`'s CF-block ladder ignored it completely.
+- **Fix** (`backend-py/app/services/scraper/http_fetcher.py`): (1) a 429 now gets 2 short same-tier backoff retries (3s/8s) via plain httpx before falling through to the cffi/Wayback/Scrape.do ladder — since only waiting resolves a rate limit, not switching transport; (2) the per-request Wayback tier is now skipped when the active `UniConfig.discovery.use_wayback` is explicitly `False`. Tier-4/5 Scrape.do escalation was deliberately left untouched (Cardiff/Westminster/QMUL rely on it; broader gating would need a full regression sweep).
+- **Tests**: `backend-py/tests/test_kingston_rate_limit_retry.py` (4 tests) — 429 backoff-then-cffi-fallback, and Wayback-tier skip/no-skip. Full `http_fetcher`-adjacent regression suite (Cardiff, QMUL, discovery, sitemap, browser toggle) re-verified green.
+
 ### Data Model
 
 The database schema includes tables for `universities`, `courses`, `intakes`, `fees`, `english_requirements`, `academic_requirements`, `scholarships`, `scraping_jobs`, `scraping_changes`, `scraped_courses` (staging), and `import_jobs`.

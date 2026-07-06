@@ -796,6 +796,7 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
 
     last_exc: Exception | None = None
     got_cloudflare_block = False
+    cf_block_status: int | None = None
     got_hard_403 = False
     html_200: str | None = None  # track 200 result so we can check for SPA shell
 
@@ -813,6 +814,7 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
                         break  # exit loop; post-loop logic decides what to return
                     if _is_cloudflare_block(r):
                         got_cloudflare_block = True
+                        cf_block_status = r.status_code
                         log.info(
                             "fetch %s -> %s (Cloudflare WAF) — will retry with TLS impersonation",
                             url, r.status_code,
@@ -868,6 +870,47 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
 
     # ── Cloudflare WAF block — tiered fallback ────────────────────────────────
     if got_cloudflare_block:
+        # Rate-limit fast path (Kingston job_*, 2026-07-06): a 429 with
+        # cf-ray/cf-mitigated headers is Cloudflare's WAF *rate limiter*
+        # tripping, not a bot-detection challenge page. For hosts where
+        # plain httpx/cffi normally succeeds fine (Kingston: "cffi bypasses
+        # it successfully"), escalating straight into the full CF-block
+        # ladder (cffi retry -> Wayback -> Scrape.do static -> Scrape.do
+        # render) on every rate-limited page burns several extra seconds of
+        # external round-trips per page for a problem those tiers cannot
+        # actually fix — only a longer wait can. At Kingston's bfs_page_
+        # budget=35, once page ~11 starts tripping 429s, every subsequent
+        # page paying that full ladder's latency instead of a short backoff
+        # is what exhausted the whole discovery_phase_timeout_s (300s)
+        # budget with the crawl stuck deep in the queue. Give 429s a couple
+        # of cheap same-tier backoff retries first; only fall through to the
+        # heavier escalation ladder below if the rate limit hasn't cleared.
+        if cf_block_status == 429:
+            for _rl_attempt, _rl_backoff in enumerate((3.0, 8.0), start=1):
+                log.info(
+                    "fetch %s: 429 rate-limited — backoff retry %d/2 after %.0fs"
+                    " before escalating to cffi/Wayback/Scrape.do",
+                    url, _rl_attempt, _rl_backoff,
+                )
+                await asyncio.sleep(_rl_backoff)
+                try:
+                    async with _sem:
+                        async with _client() as _rl_c:
+                            _rl_r = await _rl_c.get(url, cookies=cookies_for_url(url))
+                            if _rl_r.status_code == 200:
+                                from app.services.scraper.snapshot_context import (
+                                    stage_snapshot as _stage,
+                                )
+                                _stage(url, _rl_r.text, "httpx")
+                                return _rl_r.text
+                            if not _is_cloudflare_block(_rl_r):
+                                break
+                except Exception as _rl_exc:  # noqa: BLE001
+                    log.warning(
+                        "fetch %s: 429 backoff retry attempt %d failed: %s",
+                        url, _rl_attempt, _rl_exc,
+                    )
+
         # Tier 2: curl_cffi Chrome TLS impersonation
         cffi_result = await fetch_html_cffi(url)
         if cffi_result is not None:
@@ -904,16 +947,36 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
                 "fetch %s: Scrape.do render failed — falling back to Wayback Machine",
                 url,
             )
-        # Tier 3: Wayback Machine archived HTML (free, zero API cost)
-        log.info(
-            "fetch %s: curl_cffi blocked — trying Wayback Machine archived HTML",
-            url,
-        )
-        wayback_result = await fetch_html_wayback(url)
-        if wayback_result is not None:
-            from app.services.scraper.snapshot_context import stage_snapshot as _stage
-            _stage(url, wayback_result, "wayback")
-            return wayback_result
+        # Tier 3: Wayback Machine archived HTML (free, zero API cost) — unless
+        # the per-university config explicitly disables it (use_wayback:
+        # false). Kingston docs this explicitly: "archive.org has no useful
+        # snapshots and adds latency for nothing". This per-request tier
+        # previously ignored that flag entirely (it only gated the
+        # orchestrator's separate discovery-wide Wayback CDX sweep), so every
+        # rate-limited/blocked page still paid an archive.org round-trip that
+        # the operator had already opted out of.
+        _skip_wayback_tier = False
+        try:
+            from app.services.scraper.config.context import get_uni_config as _guc_wb
+            _skip_wayback_tier = _guc_wb().discovery.use_wayback is False
+        except Exception:  # noqa: BLE001
+            pass
+        if _skip_wayback_tier:
+            log.info(
+                "fetch %s: curl_cffi blocked — use_wayback=false, skipping"
+                " Wayback tier",
+                url,
+            )
+        else:
+            log.info(
+                "fetch %s: curl_cffi blocked — trying Wayback Machine archived HTML",
+                url,
+            )
+            wayback_result = await fetch_html_wayback(url)
+            if wayback_result is not None:
+                from app.services.scraper.snapshot_context import stage_snapshot as _stage
+                _stage(url, wayback_result, "wayback")
+                return wayback_result
         # Tier 4: Scrape.do static (residential proxy, no JS rendering)
         if _has_scrape_do:
             log.info(
