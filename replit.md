@@ -152,6 +152,15 @@ Kingston (like earlier Cardiff/QMUL cases) was failing with "[DISCOVER] Discover
 - **Fix** (`backend-py/app/services/scraper/http_fetcher.py`): (1) a 429 now gets 2 short same-tier backoff retries (3s/8s) via plain httpx before falling through to the cffi/Wayback/Scrape.do ladder — since only waiting resolves a rate limit, not switching transport; (2) the per-request Wayback tier is now skipped when the active `UniConfig.discovery.use_wayback` is explicitly `False`. Tier-4/5 Scrape.do escalation was deliberately left untouched (Cardiff/Westminster/QMUL rely on it; broader gating would need a full regression sweep).
 - **Tests**: `backend-py/tests/test_kingston_rate_limit_retry.py` (4 tests) — 429 backoff-then-cffi-fallback, and Wayback-tier skip/no-skip. Full `http_fetcher`-adjacent regression suite (Cardiff, QMUL, discovery, sitemap, browser toggle) re-verified green.
 
+### QMUL "missing courses" review-visibility fix (2026-07-06)
+
+Reported as "122 staged, 59 rejected, rest missing out of 409" — not a data-loss bug. `total_found=409`, `imported=350` (staged), `skipped=59` on the actual completed job all summed correctly; the missing-looking 228 courses were legitimately staged `scraped_courses` rows sitting under **two earlier job_ids** from runs that were interrupted (by Celery worker restarts during the Kingston fix deploy) and then resumed under a new job_id per the task229 resume checkpoint (`_clear_stale_dedup` in `orchestrator.py` preserves a recently-failed/stopped job's pending rows so the next run skips already-processed URLs instead of re-scraping them).
+
+- **Root cause**: `GET /api/scrape/staged/{job_id}` (`backend-py/app/routers/scrape.py`) filtered strictly by `scrape_job_id == job_id`, so the review UI only ever showed the *latest* run's slice of pending courses. Rows staged under a stale, resumed-from job_id were still `status='pending'` in the DB (fully reviewable/approvable) but invisible in the normal review screen.
+- **Fix**: the endpoint now resolves the job's `university_id` and returns all `status='pending'` `scraped_courses` for that university (falls back to the old job_id-only filter if the job_id doesn't resolve to a row). This makes the review queue show every currently-pending course for a university regardless of which run in a resume chain staged it.
+- **Test**: `backend-py/tests/test_staged_resume_chain_visibility.py` — two `scrape_runtime_jobs` rows (one `failed`, one `completed`) for the same university, each with its own pending `scraped_courses` row; asserts `/staged/{new_job_id}` returns both.
+- **Not changed**: the runs-history list's per-job `stagedCount` (`GET /api/scrape/runs`) still reports per-job_id counts — that's a historical/audit view and is correct as-is; only the reviewer-facing staged-courses list needed to aggregate across the resume chain.
+
 ### Data Model
 
 The database schema includes tables for `universities`, `courses`, `intakes`, `fees`, `english_requirements`, `academic_requirements`, `scholarships`, `scraping_jobs`, `scraping_changes`, `scraped_courses` (staging), and `import_jobs`.

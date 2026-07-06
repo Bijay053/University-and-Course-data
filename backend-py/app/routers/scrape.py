@@ -1993,14 +1993,32 @@ async def staged_one(
     # still work because the React fetch (scraping.tsx:489) treats
     # ``Array.isArray(payload)`` as the legacy branch.
     if not sc_id_or_job.isdigit():
+        job = await db.get(ScrapeRuntimeJob, sc_id_or_job)
+        # Large scrapes can resume across multiple ``scrape_runtime_jobs`` rows
+        # (see ``_clear_stale_dedup`` / task229 resume checkpoint): a worker
+        # restart or timeout leaves a partial job's staged courses behind
+        # (status stays 'pending'), and the *next* run for the same
+        # university picks up where it left off under a NEW job_id, skipping
+        # URLs already staged. Those earlier-job rows are never re-tagged
+        # with the new job_id, so filtering strictly by ``scrape_job_id``
+        # here made the review screen show only the latest run's slice
+        # (e.g. 122 of 409 for QMUL) while the rest sat invisible-but-still
+        # 'pending' under stale job_ids from the interrupted runs. Reviewers
+        # need every currently-pending course for the university, regardless
+        # of which run staged it, so scope by university_id when we can
+        # resolve one. Fall back to the old job_id-only filter if the job_id
+        # doesn't resolve to a job row (e.g. a stale/unknown id).
+        if job is not None:
+            where_clause = ScrapedCourse.university_id == job.university_id
+        else:
+            where_clause = ScrapedCourse.scrape_job_id == sc_id_or_job
         rows = (await db.execute(
-            select(ScrapedCourse).where(ScrapedCourse.scrape_job_id == sc_id_or_job)
+            select(ScrapedCourse).where(where_clause, ScrapedCourse.status == "pending")
             .order_by(ScrapedCourse.created_at.desc())
         )).scalars().all()
         courses = [_staged_row_to_dict(s) for s in rows]
         await _attach_evidence_bulk(db, courses)
         await _attach_recovery_counts_bulk(db, courses)
-        job = await db.get(ScrapeRuntimeJob, sc_id_or_job)
         last_scrape = None
         if job:
             duration_ms: int | None = None
