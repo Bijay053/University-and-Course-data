@@ -841,6 +841,24 @@ def should_stage_course(
     # be listed for this specific course yet — stage for human review instead
     # of auto-rejecting.  International fees on a separate page are legitimate.
     if payload.get("international_fee") is None:
+        # Hard block: fee.py's structured-table extractor found a real fee
+        # table on THIS course's own page and confirmed it has Home/Part-time
+        # rows only — no International + Full-time row at all (e.g. HNC
+        # Building Studies at Wolverhampton). That is definitive, per-course
+        # evidence that the course is not offered to international students,
+        # not merely "we couldn't find the fee yet". None of the staging
+        # escape hatches below apply here — they exist for the "unknown fee"
+        # case, and applying them (e.g. institutional degree_level_defaults)
+        # would fabricate a price for a course nobody can pay as an
+        # international student. Reject outright, before escape hatch 1.
+        if payload.get("fee_table_confirmed_no_international"):
+            log.info(
+                "[REJECT] course=%r url=%r — fee table confirms no "
+                "International + Full-time row (Home/Part-time only course)",
+                effective_name,
+                source_url,
+            )
+            return (False, "no_international_fee")
         # Escape hatch 1: university has a central fee page — the per-course
         # fee may legitimately not appear on the individual page.
         if payload.get("has_central_fee_page"):

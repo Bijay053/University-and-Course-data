@@ -6690,7 +6690,25 @@ async def extract_course(
         except Exception:
             pass
         _fee_defaults_map: dict = getattr(_fee_dl_cfg, "degree_level_defaults", {}) or {}
-        if not _bail_empty_text and _fee_defaults_map and payload.get("international_fee") in (None, "", 0):
+        # Definitive per-course signal from fee.py: a structured fee table was
+        # found on this exact course page, but it has ONLY Home/Part-time rows
+        # and no International + Full-time row at all (e.g. HNC Building
+        # Studies at Wolverhampton). That is stronger evidence than "we found
+        # no fee data" — it means the university itself does not offer this
+        # specific course to international students. Applying the flat
+        # institutional degree_level_defaults fee here would fabricate a price
+        # for a course nobody can actually pay as an international student, so
+        # skip the fallback and let it stay null (→ rejected downstream by the
+        # normal no_international_fee gate).
+        _fee_table_confirmed_no_intl = bool(
+            payload.get("fee_table_confirmed_no_international")
+        )
+        if (
+            not _bail_empty_text
+            and _fee_defaults_map
+            and not _fee_table_confirmed_no_intl
+            and payload.get("international_fee") in (None, "", 0)
+        ):
             _fdl_raw = (payload.get("degree_level") or "").lower().strip()
             _fdl_tier: str | None = None
             if _fdl_raw:

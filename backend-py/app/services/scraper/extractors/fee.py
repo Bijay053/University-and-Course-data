@@ -1425,9 +1425,28 @@ async def extract(
     _table_result = _extract_fee_table_row(html)
     if _table_result is _FEE_TABLE_FOUND_NO_INTL:
         # Structured fee table exists but has NO International + Full-time row
-        # (e.g. a part-time-only course like HNC Building Studies).
-        # Return empty so the text-scan fallback never picks up a Home fee.
-        return []
+        # (e.g. a part-time-only course like HNC Building Studies — Home /
+        # Part-time only, no International pricing published for it at all).
+        # This is a *definitive* per-course signal that the course is not
+        # offered to international students — distinct from "we simply have
+        # no fee data yet".  Surface it as its own evidence field so callers
+        # (single_course.py's institutional degree_level_defaults fallback)
+        # can skip filling in a flat/default international fee for this
+        # specific course, instead of silently overwriting a confirmed
+        # "no international offering" with a guessed institutional average.
+        # Do NOT return a value for international_fee itself — the text-scan
+        # fallback must never pick up the Home/part-time figure.
+        return [
+            ExtractionResult(
+                field_key="fee_table_confirmed_no_international",
+                value=True,
+                normalized={"fee_table_confirmed_no_international": True},
+                confidence=0.0,
+                snippet="Structured fee table found, but no International + "
+                        "Full-time row exists (Home/Part-time only).",
+                method="fee.table_no_intl_row",
+            )
+        ]
     if _table_result is not None:
         _tbl_amount, _tbl_ctx = _table_result  # type: ignore[misc]
         _tbl_currency = _detect_currency(_tbl_ctx, country)

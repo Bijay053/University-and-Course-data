@@ -357,6 +357,52 @@ class TestShouldStageCourseOnlineOnly:
         assert reason == "online_only"
 
 
+class TestFeeTableConfirmedNoInternational:
+    """When fee.py's structured-table extractor confirms a course's own fee
+    table has Home/Part-time rows only (no International + Full-time row —
+    e.g. HNC Building Studies at Wolverhampton), the course must be rejected
+    outright, bypassing the staging escape hatches (central fee page,
+    degree_level_defaults, skip_per_course_browser) that exist only for the
+    "we don't know the fee yet" case."""
+
+    def test_rejects_even_with_degree_level_defaults_available(self) -> None:
+        payload = {
+            "course_name": "Hnc Building Studies",
+            "international_fee": None,
+            "study_mode": "On Campus",
+            "fee_table_confirmed_no_international": True,
+        }
+        ok, reason = should_stage_course("Hnc Building Studies", payload)
+        assert ok is False
+        assert reason == "no_international_fee"
+
+    def test_rejects_even_with_central_fee_page(self) -> None:
+        payload = {
+            "course_name": "Hnc Building Studies",
+            "international_fee": None,
+            "study_mode": "On Campus",
+            "has_central_fee_page": True,
+            "fee_table_confirmed_no_international": True,
+        }
+        ok, reason = should_stage_course("Hnc Building Studies", payload)
+        assert ok is False
+        assert reason == "no_international_fee"
+
+    def test_normal_missing_fee_without_signal_still_uses_escape_hatches(self) -> None:
+        """Sanity check: a course with a plain missing fee (no definitive
+        no-international signal) still benefits from the central-fee-page
+        escape hatch as before."""
+        payload = {
+            "course_name": "Bachelor of Some Other Course",
+            "international_fee": None,
+            "study_mode": "On Campus",
+            "has_central_fee_page": True,
+        }
+        ok, reason = should_stage_course("Bachelor of Some Other Course", payload)
+        assert ok is True
+        assert reason == "accepted"
+
+
 class TestUtasOnlineBlankLocation:
     """UTAS-specific guard: blank course_location must reject even when
     location_text contains 'Online'.

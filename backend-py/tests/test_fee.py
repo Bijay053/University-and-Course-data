@@ -199,31 +199,41 @@ def test_fee_table_picks_international_fulltime_latest_year():
 
 def test_fee_table_rejects_home_only_no_international_rows():
     """When the fee table has ONLY Home rows (e.g. HNC Building Studies,
-    part-time only), the extractor must return an empty list so no fee is
-    stored and the course is left with a missing-fee flag for operator review."""
+    part-time only), the extractor must NOT store the Home fee as the
+    international tuition. Instead it must return a definitive
+    "fee_table_confirmed_no_international" signal so the pipeline can
+    reject the course instead of fabricating an institutional default fee
+    for it (a course this university does not actually offer to
+    international students)."""
     html = _uk_fee_table_html([
         ("Home", "Full time",  "£9,790 per year", "2026 to 27"),
         ("Home", "Part time",  "£4,895 per year", "2026 to 27"),
     ])
     out = _run(fee.extract(html, "https://www.wlv.ac.uk/course/hnc-building"))
-    assert out == [], (
-        "A Home-only fee table must produce no result — not store the Home fee "
-        f"as the international tuition. Got: {out!r}"
+    assert len(out) == 1, f"Expected exactly one sentinel result, got: {out!r}"
+    assert out[0].field_key == "fee_table_confirmed_no_international"
+    assert out[0].normalized == {"fee_table_confirmed_no_international": True}
+    assert not any(r.field_key == "international_fee" for r in out), (
+        "A Home-only fee table must never produce an international_fee value. "
+        f"Got: {out!r}"
     )
 
 
-def test_fee_table_parttime_international_only_returns_empty():
+def test_fee_table_parttime_international_only_returns_no_intl_signal():
     """If International rows exist but ONLY for Part time (no Full-time
-    International row), the extractor must return [] rather than store a
-    part-time rate as the annual international fee."""
+    International row), the extractor must not store a part-time rate as the
+    annual international fee — it should surface the same definitive
+    "no International + Full-time row" signal instead."""
     html = _uk_fee_table_html([
         ("Home",          "Full time",  "£9,790 per year", "2026 to 27"),
         ("International", "Part time",  "£9,000 per year", "2026 to 27"),
     ])
     out = _run(fee.extract(html, "https://www.wlv.ac.uk/course/pt-only"))
-    assert out == [], (
-        "International Part-time-only table must produce no result. "
-        f"Got: {out!r}"
+    assert len(out) == 1, f"Expected exactly one sentinel result, got: {out!r}"
+    assert out[0].field_key == "fee_table_confirmed_no_international"
+    assert not any(r.field_key == "international_fee" for r in out), (
+        "International Part-time-only table must never produce an "
+        f"international_fee value. Got: {out!r}"
     )
 
 
