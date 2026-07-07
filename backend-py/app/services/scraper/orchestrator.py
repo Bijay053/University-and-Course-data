@@ -3777,6 +3777,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         _browser_retry_empty_count: int = 0
         _skipped_empty_count: int = 0
         _fallback_skipped_count: int = 0
+        _cpd_skipped_count: int = 0
 
         # Collect non-error result dicts across all batches for the data-quality
         # check that runs after staging (it reads payloads, not the DB).
@@ -4210,6 +4211,8 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         # skip_staging_keywords in YAML).  Count as skipped, not
                         # errors — these are intentional drops, not failures.
                         summary["skipped"] += 1
+                        if r["error"] == "skipped:cpd_short_course":
+                            _cpd_skipped_count += 1
                     else:
                         summary["errors"] += 1
                     await emit(
@@ -4552,6 +4555,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         _any_savings = (
             _http_skipped_count or _vision_skipped_count or _empty_text_count
             or _browser_retry_empty_count or _skipped_empty_count
+            or _cpd_skipped_count
         )
         _perf_savings = {
             "http_fetches_skipped": _http_skipped_count,
@@ -4560,6 +4564,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             "browser_retry_empty_text": _browser_retry_empty_count,
             "skipped_empty_text": _skipped_empty_count,
             "fallback_skipped_empty_text": _fallback_skipped_count,
+            "cpd_skipped": _cpd_skipped_count,
             "estimated_seconds_saved": _est_seconds_saved,
             "estimated_ai_calls_saved": _vision_skipped_count + _empty_text_count,
             "estimated_cost_saved_usd": _est_cost_saved_usd,

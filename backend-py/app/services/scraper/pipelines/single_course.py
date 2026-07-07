@@ -3002,6 +3002,38 @@ async def extract_course(
             else:
                 _gate_skip, _gate_reason = _gate_check(payload, evidence)
 
+            # ── Early content-based staging skip (skip_staging_keywords) ──────────
+            # Check BEFORE any Gemini call. CPD/short-course pages identified by
+            # page text (e.g. Ulster "Short course and CPD") exit here without
+            # spending primary-Gemini budget (~$0.000265/call).
+            # The late check at ~line 4839 is a safety net for unusual code paths;
+            # this early gate handles the normal flow.
+            _uc_early_kw = get_uni_config()
+            _early_skip_kws: list[str] = (
+                list(_uc_early_kw.extraction.skip_staging_keywords)
+                if _uc_early_kw else []
+            )
+            if _early_skip_kws:
+                _early_text = (_h2t_gate(rendered_html or html or "") or "").lower()
+                for _esk in _early_skip_kws:
+                    if _esk.lower() in _early_text:
+                        log.info(
+                            "[SKIP-STAGING] CPD/short-course detected (%r) — aborting before Gemini on %s",
+                            _esk, url,
+                        )
+                        if emit:
+                            await emit(
+                                "status",
+                                f"[SKIP-STAGING] CPD/short-course detected ({_esk!r}) — not staging",
+                                phase="extract", kind="staging_skipped_cpd", url=url,
+                            )
+                        return {
+                            "url": url,
+                            "error": "skipped:cpd_short_course",
+                            "payload": {},
+                            "evidence": [],
+                        }
+
             _gp_filled: dict[str, Any] = {}
             _gp_dbg: dict[str, Any] = {}
             _gp_in_tok: int = 0

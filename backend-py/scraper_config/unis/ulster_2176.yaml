@@ -118,8 +118,12 @@ discovery:
   #
   # Blocking 202728 eliminates the duplication:
   #   592 (202627) − 26 blocked (pgce:9 + degree-apprenticeship:17) = 566 candidates
-  # skip_staging_keywords then filters CPD pages by content → ~557 staged courses.
-  # This matches the user-verified count of 557 international-eligible courses.
+  #
+  # Of those 566, ~210 are CPD/short-course modules (verified 2026-07-07).
+  # skip_staging_keywords: ["Short course and CPD"] filters them by page content.
+  # Expected outcome: ~356 staged courses (266 international-eligible + ~90 rejected
+  # for missing fee/data). The previous comment "~557 staged" was incorrect —
+  # the sitemap includes far more CPD modules than URL-blocking alone can filter.
   #
   # Previous attempts:
   #   year_dedup_mode: keep_latest + strip_trailing_id:true  →  362 courses

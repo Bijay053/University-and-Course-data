@@ -33,6 +33,7 @@ type ScrapeLog = {
     fallback_skipped_empty_text: number;
     vision_ocr_skipped: number;
     empty_text_ai_skipped: number;
+    cpd_skipped: number;
     estimated_seconds_saved: number;
     estimated_ai_calls_saved: number;
     estimated_cost_saved_usd: number;
@@ -395,6 +396,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     browser_retry_empty_text: number;
     skipped_empty_text: number;
     fallback_skipped_empty_text: number;
+    cpd_skipped: number;
     estimated_seconds_saved: number;
     estimated_ai_calls_saved: number;
     estimated_cost_saved_usd: number;
@@ -1976,6 +1978,12 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                     <div className="flex justify-between">
                       <span>Defaults suppressed (no text)</span>
                       <span className="font-medium">{performanceSavings.fallback_skipped_empty_text}</span>
+                    </div>
+                  )}
+                  {(performanceSavings.cpd_skipped ?? 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span>CPD / short-course filtered</span>
+                      <span className="font-medium text-amber-600">{performanceSavings.cpd_skipped}</span>
                     </div>
                   )}
                   {performanceSavings.vision_ocr_skipped > 0 && (
