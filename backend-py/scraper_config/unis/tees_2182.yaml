@@ -43,9 +43,20 @@
 # be stripped before JSON-parsing (see strip_response_prefix, added to
 # GenericSearchApiConfig for this fix). Only a `Referer` header pointing back
 # at the coursesearch page is required — no cookies/session needed.
+#
+# allow_url_patterns fix (2026-07-07): the API returns 697 courses across
+# three URL path families:
+#   /undergraduate_courses/  (263)
+#   /postgraduate_courses/   (253)
+#   /parttime_courses/       (181 — CPD/short courses, QUALIFICATIONTYPE=short)
+# The original allow_url_patterns only listed UG + PG, so all 181 parttime
+# courses were silently dropped at Phase A.5b in orchestrator.py AFTER the
+# generic_search_api tier already returned them. Added /parttime_courses/ to
+# allow_url_patterns; discovery now returns 661 links (697 − 36 apprenticeship
+# blocks). expected_min_courses raised from 80 → 600 accordingly.
 
 discovery:
-  expected_min_courses: 80
+  expected_min_courses: 600
 
   generic_search_api:
     method: POST
@@ -82,6 +93,7 @@ discovery:
   allow_url_patterns:
     - '/undergraduate_courses/'
     - '/postgraduate_courses/'
+    - '/parttime_courses/'
   block_url_patterns:
     - 'degree_apprenticeship'
     - '(apprenticeship)'
