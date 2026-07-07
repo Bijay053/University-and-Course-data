@@ -195,26 +195,61 @@ async def _fetch_text(url: str, *, timeout: float = _PROBE_TIMEOUT_S) -> str:
     whole sitemap fallback indefinitely. Every outcome (success, timeout,
     exception) is logged with the probe URL so a stuck run is diagnosable
     from the worker log instead of just going silent.
+
+    Retries once on empty response (0 bytes): Scrape.do occasionally returns
+    empty content transiently for static XML files (rate-limit jitter, brief
+    residential-proxy rotation). Without a retry the entire sitemap falls
+    through to slow browser discovery (~90 s, very few links found).
     """
+    _RETRY_DELAYS = (5.0, 15.0)  # seconds between retry attempts
+
     start = time.monotonic()
-    try:
-        text = await asyncio.wait_for(fetch_html(url), timeout=timeout)
-        elapsed = time.monotonic() - start
-        log.info(
-            "sitemap probe %s -> %d bytes in %.1fs", url, len(text or ""), elapsed
-        )
-        return text or ""
-    except asyncio.TimeoutError:
-        elapsed = time.monotonic() - start
-        log.warning(
-            "sitemap probe %s TIMED OUT after %.1fs (limit %.0fs)",
-            url, elapsed, timeout,
-        )
-        return ""
-    except Exception as exc:
-        elapsed = time.monotonic() - start
-        log.debug("sitemap probe %s failed after %.1fs: %s", url, elapsed, exc)
-        return ""
+    for _attempt, _delay in enumerate(
+        [None] + list(_RETRY_DELAYS), start=0
+    ):
+        if _delay is not None:
+            log.info(
+                "sitemap probe %s returned empty — retrying in %.0fs (attempt %d)",
+                url, _delay, _attempt,
+            )
+            await asyncio.sleep(_delay)
+        try:
+            text = await asyncio.wait_for(fetch_html(url), timeout=timeout)
+            elapsed = time.monotonic() - start
+            if text:
+                log.info(
+                    "sitemap probe %s -> %d bytes in %.1fs (attempt %d)",
+                    url, len(text), elapsed, _attempt,
+                )
+                return text
+            # Empty response — loop for retry
+            log.info(
+                "sitemap probe %s -> 0 bytes in %.1fs (attempt %d)",
+                url, elapsed, _attempt,
+            )
+        except asyncio.TimeoutError:
+            elapsed = time.monotonic() - start
+            log.warning(
+                "sitemap probe %s TIMED OUT after %.1fs (limit %.0fs, attempt %d)",
+                url, elapsed, timeout, _attempt,
+            )
+            # Timeout is definitive — don't retry (would just time out again)
+            return ""
+        except Exception as exc:
+            elapsed = time.monotonic() - start
+            log.debug(
+                "sitemap probe %s failed after %.1fs (attempt %d): %s",
+                url, elapsed, _attempt, exc,
+            )
+            return ""
+
+    # All attempts returned empty
+    elapsed = time.monotonic() - start
+    log.warning(
+        "sitemap probe %s returned empty after %d attempt(s) in %.1fs — giving up",
+        url, len(_RETRY_DELAYS) + 1, elapsed,
+    )
+    return ""
 
 
 def _same_registrable_host(host_a: str, host_b: str) -> bool:
