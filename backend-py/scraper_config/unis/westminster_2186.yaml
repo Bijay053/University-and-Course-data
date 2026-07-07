@@ -2,19 +2,26 @@
 # Hostname: www.westminster.ac.uk
 # Country: United Kingdom  |  Currency: GBP
 #
-# Discovery: sitemap-based (all 841 course URLs are on sitemap.xml?page=1).
+# Discovery: sitemap-based (all 841+ course URLs are on sitemap.xml?page=1).
 #   Westminster's Drupal search pagination is non-deterministic — the same course
 #   URL appears at different page positions between requests, so seeding the 85
 #   search pages misses ~324 courses through BFS deduplication.
 #   Sitemap page 1 contains exactly 841 /-courses/20.../ URLs, stable and
 #   authoritative. BFS kept only for mop-up (apprenticeship paths not in sitemap).
 #
+# TIMEOUT FIX (2026-07-07): bfs_page_budget was 1000, causing the BFS to crawl
+#   100+ Drupal facet-combination search pages (mode × type × date combos) before
+#   the 300s discovery deadline fired and the job failed with total_found=0.
+#   Reduced to 30 — enough for apprenticeship mop-up without blowing the deadline.
+#   The sitemap supplement (always_sitemap_supplement: true) is the primary source
+#   for all 841 course URLs; BFS is only needed for non-sitemap apprenticeship paths.
+#
 # Course URL format: /{subject}-courses/{year}/{month}/{mode}/{slug}
 # e.g. /accounting-and-finance-courses/2026-27/september/full-time/accounting-and-finance-bsc-honours
 discovery:
   sitemap_url: https://www.westminster.ac.uk/sitemap.xml?page=1
   always_sitemap_supplement: true
-  bfs_page_budget: 1000
+  bfs_page_budget: 30
   max_candidates: 1200
   seed_urls:
   - https://www.westminster.ac.uk/course-search?course=&f%5B0%5D=course_type%3A26&f%5B1%5D=course_type%3A926

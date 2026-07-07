@@ -93,7 +93,7 @@ discovery:
   allow_url_patterns:
     - '/undergraduate_courses/'
     - '/postgraduate_courses/'
-    - '/parttime_courses/'
+    # - '/parttime_courses/'
   block_url_patterns:
     - 'degree_apprenticeship'
     - '(apprenticeship)'

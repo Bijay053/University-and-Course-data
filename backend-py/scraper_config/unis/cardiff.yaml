@@ -45,6 +45,15 @@ discovery:
   # the host-cache from being populated only after those failures.
   scrape_do_skip_fallbacks: true
 
+  # TIMEOUT FIX (2026-07-07): Cardiff was failing with "Discovery phase exceeded
+  # 300s deadline" (total_found=0 across 12+ consecutive runs). Each listing page
+  # fetch goes through Scrape.do (static → render=True if SPA shell), which is
+  # 20-30s per page via headless Chrome. The default 25-page BFS budget × 30s
+  # = 750s, far over the 300s deadline. Cardiff's 3 seed URLs are exhaustive
+  # a-to-z listing pages that contain the full course catalogue — BFS only needs
+  # to visit those 3 seeds plus a few pagination/follow-up pages.
+  bfs_page_budget: 5
+
   seed_urls:
     - https://www.cardiff.ac.uk/study/undergraduate/courses/a-to-z
     - https://www.cardiff.ac.uk/study/postgraduate/research/programmes/a-to-z
