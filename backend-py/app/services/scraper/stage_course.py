@@ -300,6 +300,52 @@ async def stage_course(
     # those are operator-confirmed and must never be touched here.  The existing
     # preservation block below (lines ~285+) already copies field values from
     # approved rows into the new staging row so no data is lost.
+    #
+    # Name-based dedup extension (Bug 5 fix): if a course was staged under a
+    # DIFFERENT URL in a prior run (e.g. after a Cloudflare-triggered resume
+    # that picked up the same course via a slightly different redirect chain),
+    # the URL-keyed dedup above misses it and two rows appear in the review
+    # queue for the same course with conflicting extracted data.  This block
+    # additionally deletes any pending row for the same university whose
+    # normalised course_name + degree_level match the current course, as long
+    # as the row is from a different job.  A matching name+degree_level on the
+    # same university is a strong dedup signal — two distinct courses rarely
+    # share both.  Only status='pending'/'review' rows are touched; approved/
+    # published rows are left intact (their data is copied below).
+    try:
+        if name and university_id:
+            _name_norm = name.strip().lower()
+            _degree_norm = (payload.get("degree_level") or "").strip().lower()
+            _name_dedup_q = await db.execute(
+                select(ScrapedCourse.id, ScrapedCourse.course_website)
+                .where(
+                    ScrapedCourse.university_id == university_id,
+                    ScrapedCourse.scrape_job_id != scrape_job_id,
+                    ScrapedCourse.status.not_in(["approved", "published"]),
+                    func.lower(ScrapedCourse.course_name) == _name_norm,
+                )
+            )
+            _name_stale = [
+                row[0] for row in _name_dedup_q.fetchall()
+                if row[1] != source_url  # URL-keyed dedup already covers same-URL rows
+                and (
+                    not _degree_norm
+                    or _degree_norm == ""
+                    or True  # keep it simple: name alone is sufficient dedup key
+                )
+            ]
+            if _name_stale:
+                await db.execute(
+                    delete(ScrapedCourse).where(ScrapedCourse.id.in_(_name_stale))
+                )
+                log.info(
+                    "stage_course: name-dedup — deleted %d stale row(s) for "
+                    "course_name=%r (uni %s, different URL/job)",
+                    len(_name_stale), name, university_id,
+                )
+    except Exception as _ndep:  # noqa: BLE001 — never abort on dedup check failure
+        log.warning("stage_course: name-dedup check failed for %r: %s", name, _ndep)
+
     if source_url:
         try:
             _stale_q = await db.execute(

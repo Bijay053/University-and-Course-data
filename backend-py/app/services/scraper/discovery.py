@@ -87,6 +87,14 @@ _PROMO_TEXT_RE = re.compile(
     r"click\s+here|get\s+started|read\s+more)\s*$",
     re.I,
 )
+# Prefix patterns that UK CMS sites embed before the course name in anchor text,
+# e.g. "Read moreBA (Hons) Fashion Design" or "Read more about Business".
+# Strip them so the cleaned name is stored in `found`, not the full raw anchor.
+_PROMO_PREFIX_RE = re.compile(
+    r"^(read\s+more(?:\s+about)?|learn\s+more(?:\s+about)?|"
+    r"find\s+out\s+more|view\s+details?)\s*",
+    re.I,
+)
 _MAX_COURSE_NAME_LEN = 120  # chars — real course titles are shorter
 _JUNK_TEXT = re.compile(
     r"^(home|about|contact|news|events?|search|menu|login|sign\s*in|"
@@ -99,6 +107,9 @@ _JUNK_TEXT = re.compile(
     # never course names and must be blocked here so the BFS candidate
     # count stays accurate and the sitemap-fallback threshold fires.
     r"undergraduate|postgraduate|"
+    # Bare study-load words: INTI fee tables produce "Part Time" / "Full Time"
+    # as standalone anchor text for column headers — they are never course names.
+    r"part[\s\-]?time|full[\s\-]?time|"
     r"courses?|programs?|degrees?|study|explore)$",
     re.I,
 )
@@ -1303,7 +1314,7 @@ async def discover_course_links(
         # the page's origin.
         for link in classification.get("course_links", []) or []:
             u = link.get("url")
-            n = link.get("name") or ""
+            n = _PROMO_PREFIX_RE.sub("", link.get("name") or "").strip()
             if not u or u in found:
                 continue
             # If the page classifier returned a 3-segment discipline/category
@@ -1355,7 +1366,8 @@ async def discover_course_links(
                 if _looks_like_course(_full, _text):
                     # Real child course — add directly
                     if _full not in found and not _JUNK_TEXT.match(_text or ""):
-                        found[_full] = _text or _full.rsplit("/", 1)[-1]
+                        _clean_child = _PROMO_PREFIX_RE.sub("", _text or "").strip()
+                        found[_full] = _clean_child or _full.rsplit("/", 1)[-1]
                         log.info("[DISCOVER] added child course %s", _full)
                         if emit:
                             await emit(
@@ -1424,7 +1436,8 @@ async def discover_course_links(
                     continue
                 if _looks_like_course(full, text):
                     if not _JUNK_TEXT.match(text or ""):
-                        found[full] = text or full.rsplit("/", 1)[-1]
+                        _clean_text = _PROMO_PREFIX_RE.sub("", text or "").strip()
+                        found[full] = _clean_text or full.rsplit("/", 1)[-1]
                     if len(found) >= max_courses:
                         break
                 # PR-5 Bug 5: enqueue category landings (e.g. /courses/

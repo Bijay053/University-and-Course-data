@@ -4933,6 +4933,47 @@ async def extract_course(
                     break
 
     if use_ai_fallback:
+        # ── English-section gate for IELTS ai_fallback (Bug 7 fix) ──────────
+        # ai_fallback.fill_missing was hallucinating ielts_overall (e.g.
+        # IELTS 3.0 for a bachelor's) when the course page has no English
+        # requirements section — Gemini returns a plausible-sounding score
+        # instead of null. Fix: detect whether any English requirement heading
+        # appears in the page HTML BEFORE the ai_fallback call; if none is
+        # found, exclude ielts_overall from the fields passed to fill_missing.
+        # This prevents the model from being asked to invent a score from a
+        # page that makes no mention of IELTS. Missing-IELTS warnings are
+        # acceptable; invented scores are not.
+        _af_check_html_lower = (rendered_html or html or "").lower()
+        _AF_ENGLISH_HEADING_PATTERNS = (
+            "english language requirement",
+            "english requirement",
+            "english proficiency",
+            "ielts requirement",
+            "language requirement",
+            "english language proficiency",
+            "ielts:",
+            "ielts ",
+            "pte:",
+            "pte ",
+        )
+        _af_english_section_present = any(
+            p in _af_check_html_lower for p in _AF_ENGLISH_HEADING_PATTERNS
+        )
+        # Build an explicit fields override when no English section found.
+        # fill_missing defaults to all _FIELD_HINTS keys; passing an explicit
+        # list lets the caller exclude sensitive fields without touching the module.
+        _af_fields_override: list[str] | None = None
+        if not _af_english_section_present:
+            _af_fields_override = [
+                f for f in ai_fallback._FIELD_HINTS
+                if f != "ielts_overall"
+            ]
+            log.info(
+                "[AI_FALLBACK] no English section detected — "
+                "excluding ielts_overall from fallback fill on %s",
+                url,
+            )
+
         # Note which slots are still empty so the UI can show *what* the AI
         # is being asked to fill (helpful when diagnosing weak per-page
         # extraction on a new university template).
@@ -5052,7 +5093,7 @@ async def extract_course(
             # the existing "AI failure" path — extraction proceeds
             # without AI fill, which is the same UX as a model error.
             ai_filled = await asyncio.wait_for(
-                ai_fallback.fill_missing(payload, html=html, url=url),
+                ai_fallback.fill_missing(payload, html=html, url=url, fields=_af_fields_override),
                 timeout=_AI_FALLBACK_TIMEOUT_SEC,
             )
         except asyncio.TimeoutError:
@@ -5109,6 +5150,9 @@ async def extract_course(
         # Guard: only override when YAML has an EXPLICIT non-AUD currency
         # (i.e. the operator intentionally configured it) AND the payload
         # currently holds 'AUD' (from AI) or nothing.
+        # Both payload["fee_currency"] (AI-filled) AND payload["currency"]
+        # (staged to DB and read by the review UI) are corrected so neither
+        # the data-quality check nor the review table shows the wrong symbol.
         try:
             _af_fees_cfg = getattr(
                 getattr(get_uni_config(), "extraction", None), "fees", None
@@ -5120,8 +5164,14 @@ async def extract_course(
                 _ai_set_cur = payload.get("fee_currency") or "AUD"
                 if _ai_set_cur == "AUD":
                     payload["fee_currency"] = _af_yaml_cur
+                    # Also sync the "currency" key — this is what the review
+                    # table reads (c.currency) and what the degree_level_defaults
+                    # block later uses via setdefault().  Without this sync the
+                    # review table still shows "A$" even when fee_currency=MYR.
+                    if (payload.get("currency") or "AUD") == "AUD":
+                        payload["currency"] = _af_yaml_cur
                     log.debug(
-                        "[CURRENCY-FIX] %s: fee_currency AUD → %s "
+                        "[CURRENCY-FIX] %s: fee_currency/currency AUD → %s "
                         "(YAML default_currency override after AI fallback)",
                         url, _af_yaml_cur,
                     )
@@ -6950,6 +7000,64 @@ async def extract_course(
     if _sc_host in _FULL_COURSE_FEE_HOSTS and payload.get("fee_term") == "Annual":
         payload["fee_term"] = "Full Course"
 
+    # ── MYR total-fee normalizer ──────────────────────────────────────────────
+    # INTI and similar Malaysian universities quote TOTAL programme fees with
+    # no "per year" qualifier, e.g. "From RM46,588 — Programme can be completed
+    # in 2 Years". Gemini labels these "Annual" or "Full Course" nondeterministically.
+    #
+    # Rule: if fee_currency=="MYR" AND fee_term=="Annual" AND duration>1yr AND
+    #   the page text contains no per-year/per-annum/per-semester signal →
+    #   relabel fee_term="Full Course" so the fee_calculation_mode:
+    #   full_course_to_annual recipe (set in YAML) divides by duration.
+    # This runs BEFORE recipe rules (which run in orchestrator.py after this
+    # function returns) so the conversion sees the corrected "Full Course" term.
+    _myr_fee = payload.get("international_fee")
+    _myr_term = payload.get("fee_term")
+    _myr_cur = (payload.get("fee_currency") or payload.get("currency") or "").upper()
+    _myr_dur = payload.get("duration")
+    _myr_dur_term_raw = (payload.get("duration_term") or "").lower()
+    if (
+        _myr_cur == "MYR"
+        and _myr_term == "Annual"
+        and _myr_fee and isinstance(_myr_fee, (int, float)) and _myr_fee > 0
+        and _myr_dur and isinstance(_myr_dur, (int, float))
+    ):
+        # Compute duration in years (need > 1 yr to bother dividing)
+        _myr_years: float | None = None
+        if "year" in _myr_dur_term_raw:
+            _myr_years = float(_myr_dur)
+        elif "month" in _myr_dur_term_raw:
+            _myr_years = float(_myr_dur) / 12.0
+        elif "week" in _myr_dur_term_raw:
+            _myr_years = float(_myr_dur) / 52.0
+        if _myr_years and _myr_years > 1.0:
+            _PER_YEAR_SIGNAL_RE = _re.compile(
+                r"\b(per\s+year|per\s+annum|p\.a\.|annually|per\s+semester"
+                r"|per\s+trimester|per\s+term|per\s+intake|each\s+year)\b",
+                _re.IGNORECASE,
+            )
+            # Use raw HTML — per-year signals appear in visible text which is
+            # present in the HTML source regardless of rendering.
+            _myr_page_check = (rendered_html or html or "")[:10000]
+            if not _PER_YEAR_SIGNAL_RE.search(_myr_page_check):
+                payload["fee_term"] = "Full Course"
+                evidence.append({
+                    "field_key": "fee_term",
+                    "value": "Full Course",
+                    "confidence": 0.78,
+                    "method": "fee_term:myr_total_normalizer",
+                    "snippet": (
+                        f"MYR site ({_sc_host}): no per-year/per-annum language found "
+                        f"in page — Annual relabelled Full Course for recipe division "
+                        f"(fee={_myr_fee:.0f}, dur={_myr_dur} {_myr_dur_term_raw})"
+                    ),
+                })
+                log.info(
+                    "[MYR FEE NORMALIZER] fee_term Annual → Full Course on %s "
+                    "(fee=%.0f MYR, dur=%s %s, no per-year signal in page text)",
+                    url, _myr_fee, _myr_dur, _myr_dur_term_raw,
+                )
+
     # ── Graduate Diploma name-based degree_level correction ───────────────────
     # When the course name contains "Graduate Diploma" or "Postgraduate Diploma"
     # the degree level is definitively known from the title and must not be
@@ -7574,6 +7682,40 @@ async def extract_course(
                 "(blank — keyfacts panel had no Location row)",
                 url, _bcu_loc_source,
             )
+
+    # ── Generic YAML campus_allowlist enforcement ─────────────────────────────
+    # Mirrors the BCU hard guard above but is driven by the per-university
+    # YAML config (extraction.location.campus_allowlist) rather than a
+    # hardcoded hostname check.  The allowlist is a list of canonical campus
+    # names / city tokens.  Any course_location that shares NO token (case-
+    # insensitive substring) with any allowlist entry is cleared to None.
+    #
+    # Use-case: INTI (newinti.edu.my) — fee tables expose "Sydney" (a Sydney
+    # partner-campus column header) and bare "University" as campus labels.
+    # The allowlist restricts staging to confirmed INTI campuses only.
+    try:
+        _gal_cfg = getattr(get_uni_config(), "extraction", None)
+        _gal_allowlist: list[str] = list(getattr(_gal_cfg, "campus_allowlist", None) or [])
+        if _gal_allowlist:
+            _gal_raw = (payload.get("course_location") or "").strip()
+            if _gal_raw:
+                _gal_raw_lower = _gal_raw.lower()
+                _gal_ok = any(av.lower() in _gal_raw_lower for av in _gal_allowlist)
+                if not _gal_ok:
+                    log.warning(
+                        "[CAMPUS ALLOWLIST] cleared course_location=%r on %s "
+                        "(not in campus_allowlist=%r)",
+                        _gal_raw, url, _gal_allowlist,
+                    )
+                    payload["course_location"] = None
+                    for _gal_ev in evidence:
+                        if (
+                            _gal_ev.get("field_key") == "course_location"
+                            and _gal_ev.get("decision_status") == "selected"
+                        ):
+                            _gal_ev["decision_status"] = "needs_review"
+    except Exception as _gal_exc:  # noqa: BLE001 — never break the pipeline
+        log.warning("campus_allowlist check failed on %s: %s", url, _gal_exc)
 
     # ── Evidence selection finalisation ────────────────────────────────────
     # Mark the winning evidence row for each field as decision_status="selected"
