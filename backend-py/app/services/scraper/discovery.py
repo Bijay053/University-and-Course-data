@@ -1592,7 +1592,18 @@ async def discover_course_links(
                     phase="discover",
                     kind="alt_probe",
                 )
-            _alt_html = await fetch_html(_alt_url, retries=0)
+            # Cap each alt-probe at 20 s. With scrape_do_skip_fallbacks=True
+            # the Scrape.do static + render attempts can each take 30-60 s on
+            # Cloudflare-protected hosts (e.g. ACU), so 7 probes × 90 s = 630 s
+            # easily exceeds the 300 s discovery deadline. We cancel early and
+            # move on — these paths don't exist for most universities anyway.
+            try:
+                _alt_html = await asyncio.wait_for(
+                    fetch_html(_alt_url, retries=0), timeout=20.0
+                )
+            except asyncio.TimeoutError:
+                log.debug("[DISCOVER] alt probe %s timed out (>20s), skipping", _alt_url)
+                continue
             if not _alt_html:
                 continue
             visited.add(_alt_url)
