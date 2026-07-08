@@ -64,3 +64,15 @@ discovery:
   browser_time_budget_s: 120
   browser_early_stop_courses: 200
   expected_min_courses: 80
+
+extraction:
+  # Static course pages have NO <h1>; the only name candidate is the page
+  # <title>, which carries the CMS suffix "… | ACU courses" (verified live
+  # 2026-07-08). Strip it before cleaning so staged names are pure degree
+  # names. endswith-literal match, applied to RAW title pre-_clean().
+  course_name:
+    strip_title_suffixes:
+      - " | ACU courses"
+      - " | ACU Courses"
+      - "| ACU courses"
+      - "| ACU Courses"
