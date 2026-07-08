@@ -417,7 +417,17 @@ _NON_LOCATION_PHRASES: frozenset[str] = frozenset({
     "international",
     "domestic students",
     "international students",
+    "local students",
+    "local student",
     "domestic and international",
+    # Fee-table column headers and UI chrome that bleed into location extraction.
+    # Malaysian universities (INTI, etc.) use "Campus | Local Students | International Students"
+    # as a fee-table header row; the DOM walk picks up "Local Students" as a campus name.
+    "select a campus",
+    "select campus",
+    "choose campus",
+    "all campuses",
+    "campus",
     # UTAS "Study period" panel value — availability label, not a campus name.
     "study period",
     # Newcastle (and similar) sidebar headings that the DOM-walk pass would

@@ -95,7 +95,12 @@ interface Props {
 
 function feeDisplay(c: ReviewStagedCourse) {
   if (c.internationalFee == null || c.internationalFee === "") return null;
-  const sym = c.currency === "GBP" ? "\u00A3" : c.currency === "USD" ? "$" : "A$";
+  const _CURRENCY_SYMBOLS: Record<string, string> = {
+    GBP: "£", USD: "$", EUR: "€", NZD: "NZ$", CAD: "CA$", SGD: "S$",
+    MYR: "RM ", IDR: "Rp ", THB: "฿", VND: "₫", PHP: "₱",
+    INR: "₹", JPY: "¥", CNY: "¥", KRW: "₩",
+  };
+  const sym = _CURRENCY_SYMBOLS[c.currency ?? ""] ?? (c.currency && c.currency !== "AUD" ? `${c.currency} ` : "A$");
   const num = typeof c.internationalFee === "number"
     ? c.internationalFee.toLocaleString()
     : c.internationalFee;

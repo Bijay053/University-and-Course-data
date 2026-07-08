@@ -1,15 +1,76 @@
 # INTI International University
 # Hostname: newinti.edu.my
 # Country: Malaysia  |  Currency: MYR
-# Slug: newinti
-# Auto-generated: 2026-07-08
+# Slug: newinti  |  uni_id: 2215
 #
-# This stub was created automatically on the first scrape of this university.
-# Review and expand it to improve discovery and extraction quality.
-# See scraper_config/defaults.yaml for all available options.
+# Site structure:
+#   Listing pages: /academic-programmes/{category}/  (category hubs — NOT courses)
+#   Course detail: /programme/{slug}/               (individual programme pages)
+#
+# Bug fixes applied (2026-07-08):
+#   Bug 1: default_currency: MYR — prevents AUD fallback after AI fills fee_currency
+#   Bug 2: suppress_nav_rule: true — fee-table "Campus" column header was triggering
+#          study_mode:rule → "On Campus", blocking Gemini from setting "Online" for
+#          MBA (Online Learning) / MIT (Online Learning) courses.
+#          Also: "local students" / "select a campus" added globally to _NON_LOCATION_PHRASES.
+#   Bug 3: Fee pages quote total programme cost (e.g. "RM46,588 for 2 years");
+#          the scraper tags these as Annual. Gemini prompt should distinguish
+#          total-programme vs annual fee — no YAML override available yet; handled by
+#          Gemini reading fee context. Threshold false-positives (AUD bands applied to MYR
+#          amounts) are acknowledged; per-market thresholds are a future improvement.
+#   Bug 4: Discovery yield was 18/100+ because landing pages consumed extraction slots.
+#          allow_url_patterns restricts to /programme/ detail URLs only; block_url_patterns
+#          prevents level-landing pages from being extracted as courses.
 
-discovery: {}
+discovery:
+  bfs_page_budget: 150
+
+  allow_url_patterns:
+    - "/programme/"
+
+  block_url_patterns:
+    # Category listing pages — crawl for link discovery but never extract as courses
+    - "/academic-programmes/$"
+    - "/academic-programmes/postgraduate-studies"
+    - "/academic-programmes/undergraduate"
+    - "/academic-programmes/postgraduate"
+    - "/academic-programmes/.*/(masters|doctorate|foundation|certificate|diploma|degrees|postgraduate-studies|postgraduate|bachelor)/?$"
+    # Degree-level landing pages under /undergraduate/
+    - "/undergraduate/bachelor-degrees"
+    - "/undergraduate/diploma"
+    - "/undergraduate/foundation"
+    - "/undergraduate/certificate"
+    # Non-programme pages
+    - "/micro-credential"
+    - "/professional-development"
+    - "/english-language"
+    - "/inti-english"
+    - "/american-university"
+    - "/student-life"
+    - "/about"
+    - "/news"
+    - "/events"
+    - "/contact"
+    - "/admission"
+    - "/scholarship"
+    - "/campus"
+
+  use_wayback: false
 
 extraction:
+  study_mode:
+    # INTI fee tables use "Campus | Local Students | International Students" as
+    # column headers. The study_mode rule extractor detects "Campus" → "On Campus"
+    # and structural protection blocks Gemini from overriding with the correct
+    # "Online" value read from course titles like "MBA (Online Learning)".
+    # Suppress the rule so Gemini classifies freely; genuine on-campus courses
+    # are correctly identified by Gemini from page context.
+    suppress_nav_rule: true
+
   fees:
     default_currency: MYR
+    # INTI fee pages typically quote total programme cost, not annual:
+    # "RM 46,588.00 — Programme can be completed in 2 Years"
+    # Gemini should extract this as fee_term=Full Course, not Annual.
+    # If fees are still tagged Annual after a run, set prefer_full_course: true here
+    # once that YAML flag is implemented in the fee extractor.

@@ -164,6 +164,28 @@ _COUNTRY_CURRENCY = {
     "germany": "EUR",
     "netherlands": "EUR",
     "france": "EUR",
+    # Southeast Asia
+    "malaysia": "MYR",
+    "my": "MYR",
+    "indonesia": "IDR",
+    "id": "IDR",
+    "thailand": "THB",
+    "th": "THB",
+    "vietnam": "VND",
+    "vn": "VND",
+    "philippines": "PHP",
+    "ph": "PHP",
+    # South Asia
+    "india": "INR",
+    "in": "INR",
+    "sri lanka": "LKR",
+    # Other
+    "japan": "JPY",
+    "jp": "JPY",
+    "china": "CNY",
+    "cn": "CNY",
+    "south korea": "KRW",
+    "kr": "KRW",
 }
 
 
