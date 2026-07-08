@@ -1,4 +1,28 @@
-# ACU test
+# ACU — Australian Catholic University
 # Hostname: www.acu.edu.au
+# Courses live at /course/<slug>
+# Sitemap lists /handbook/handbook-YYYY/course/<slug> which _dedup_year_variants
+# rewrites to /course/<slug> — no extra YAML needed for that rewrite.
+#
+# Cloudflare Enterprise blocks plain httpx on ALL fetches (BFS listing, sitemaps).
+# scrape_do_skip_fallbacks: true routes sitemap probes through Scrape.do static
+# (residential proxy, ~$0.0005/call) which bypasses Cloudflare.
+# www.acu.edu.au is already in _ALWAYS_SITEMAP_SUPPLEMENT_HOSTS in discovery.py
+# so the sitemap is always probed regardless of BFS outcome.
+#
+# Root cause of 0-courses runs: job_77fd305d5d72 got 0 bytes on all 4 standard
+# sitemap probes because plain httpx was used (scrape_do_skip_fallbacks not set).
 
-discovery: {}
+discovery:
+  scrape_do_skip_fallbacks: true
+  allow_url_patterns:
+    - '/course/'
+  block_url_patterns:
+    - '/short-courses'
+    - '/professional-development'
+    - '/microcredential'
+    - '/handbook/handbook-201'
+    - '/handbook/handbook-202[0-3]'
+  browser_time_budget_s: 120
+  browser_early_stop_courses: 200
+  expected_min_courses: 80
