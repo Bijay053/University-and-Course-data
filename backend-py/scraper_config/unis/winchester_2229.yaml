@@ -1,0 +1,66 @@
+# University of Winchester
+# Hostname: www.winchester.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+# Slug: winchester  |  uni_id: 2229
+#
+# Discovery: SSR course search page with paginate=146 returns all 145 courses
+# in one HTML response (137 /Courses/ + 8 /Degree-Apprenticeship-Programmes/).
+# Direct httpx access works (no Cloudflare, no JS rendering required).
+#
+# Course URL patterns:
+#   Standard:       /study/{category}/Courses/{slug}/
+#   Apprenticeship: /study/Apprenticeships/Degree-Apprenticeship-Programmes/{slug}/
+#
+# Fee note: Course pages show UK domestic fee only (e.g. "From £9,790 pa").
+# No international fee is displayed on course pages — Gemini AI handles extraction.
+
+discovery:
+  seed_urls:
+    - "https://www.winchester.ac.uk/study/Find-Your-Course/?keywords=&paginate=146&courseType=Foundation%20Year&courseType=Undergraduate&courseType=Postgraduate&courseType=Degree%20Apprenticeship&courseType=Research%20Degree"
+
+  bfs_page_budget: 200
+
+  # Match both standard courses and degree apprenticeship programmes
+  allow_url_patterns:
+    - "/Courses/"
+    - "/Degree-Apprenticeship-Programmes/"
+
+  block_url_patterns:
+    - "/Why-Winchester/"
+    - "/how-to-apply/"
+    - "/apply-after-deadline/"
+    - "/subjects/"
+    - "/Prospectus/"
+    - "/Mature-Students/"
+    - "/Ask-a-question/"
+    - "/Podcasts/"
+    - "/What-is-a-Foundation-Year-/"
+    - "/Meet-our-Foundation-Year"
+    - "/Research-Degrees-at-Winchester/"
+    - "/What-are-Degree-Apprenticeships/"
+    - "/Information-for-learners/"
+    - "/Information-for-employers/"
+    - "/Business-and-Digital-Technologies-Partnerships/"
+    - "/Health-and-Social-Work-partnerships/"
+    - "/further-study-options/"
+    - "/international/"
+    - "/open-days/"
+    - "/accommodation/"
+    - "/student-life/"
+    - "/about/"
+    - "/news/"
+    - "/alumni/"
+    - "/research/"
+    - "/business/"
+
+  use_wayback: false
+
+extraction:
+  course_name:
+    # Title format: "BA (Hons) Accounting and Finance - University of Winchester"
+    # Strip the suffix to get the full qualified course name.
+    strip_title_suffixes:
+      - " - University of Winchester"
+
+  fees:
+    default_currency: GBP
