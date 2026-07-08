@@ -70,7 +70,10 @@ discovery:
   always_browser_discover: false
   use_stealth_browser: true
   use_wayback: false
-  bfs_page_budget: null
+  # 125 courses found on page 1 alone (job_50d1b89fa01b). With scrape_do_skip_fallbacks,
+  # each Scrape.do page takes ~20-25s. bfs_page_budget: null = 25 pages = ~10 min discovery.
+  # Capped at 5: page 1 finds everything; pages 2-5 are safety margin for pagination.
+  bfs_page_budget: 5
   browser_early_stop_courses: 180
   max_candidates: 220
 
@@ -83,7 +86,16 @@ discovery:
 
   block_url_patterns:
     - '/linkassets/'
-    - '/courses/study/'
+    # Category/filter pages — match the allow_url_patterns regex but add 0 new candidates.
+    # Without blocking, BFS visits them via Scrape.do (~25s each) wasting time.
+    # Fixed missing trailing slash: '/courses/study/' didn't match '/courses/study'.
+    - '/courses/study'
+    - '/courses/online'
+    - '/courses/research'
+    - '/courses/undergraduate'
+    - '/courses/postgraduate'
+    - '/courses/search'
+    - '/courses/pathways'
     - '/news'
     - '/events'
     - '/staff/'
