@@ -14,35 +14,29 @@
 # so non-course archive cruft (/courses/admission/, /courses/adult.jsp, …)
 # is filtered out before extraction.
 discovery:
-  use_wayback: true
+  # 2026-07-08 — Wayback disabled; browser budget raised to 180 s
+  # ---------------------------------------------------------------
+  # Previous config: use_wayback=true + always_browser_discover=true.
+  # Problem: browser found only 38 courses in 90 s, then Wayback CDX
+  # added 661 archived URLs from past years → 655 extractable pages →
+  # 2-3 hour runs dominated by browser-fetching stale retired courses.
+  #
+  # Fix:
+  #   use_wayback: false  — discard the 661 stale Wayback URLs entirely;
+  #                          the seed set already covers the live catalogue.
+  #   browser_time_budget_s: 180  — double the nav budget so the seeded
+  #                          /study/<area> listing pages can be fully walked.
+  #   browser_early_stop_courses: 400  — raise the course-count cap so
+  #                          discovery doesn't stop at 100 mid-catalogue.
+  #
+  # After the first run: compare staged count against QUT's published
+  # catalogue size (~200-400 international courses).  If still truncating,
+  # either add more /study/<area> seed pages or raise budget further.
+  use_wayback: false
+  browser_time_budget_s: 180
+  browser_early_stop_courses: 400
   must_contain:
     - "/courses/"
-  # 2026-05-17 — Bachelor & Master courses missing from QUT scrapes
-  # ----------------------------------------------------------------
-  # User report: only ~33 rows staged from QUT, with virtually every
-  # single-degree Bachelor (Business, Engineering, IT, Nursing, Law) and
-  # most Masters absent.  Root cause:
-  #
-  #   1. detect_course_listing_page() picked /study/online/undergraduate-courses
-  #      from the homepage redirect — that's the ONLINE-ONLY filter, which
-  #      catalogues only diplomas / grad certs / short courses, NOT the full
-  #      on-campus Bachelor / Master catalogue.
-  #   2. BFS yielded 0 candidates from that landing page (it's a JS-rendered
-  #      category index with no static anchor links).
-  #   3. Browser-based discovery fell back to homepage-nav walking and found
-  #      only 56 candidates from a ~200-course international catalogue,
-  #      because homepage nav doesn't link directly to the per-discipline
-  #      /study/<area> pages where the Bachelor/Master listings live.
-  #   4. Wayback CDX has been returning HTTP 503 transiently for QUT.
-  #
-  # Fix: switch to the proven Newcastle / UTAS pattern — enable
-  # always_browser_discover so the Playwright pass becomes the primary
-  # discovery mechanism, and seed it with the per-discipline /study/<area>
-  # pages via _HOST_EXTRA_SEEDS[qut.edu.au] in
-  # backend-py/app/services/scraper/browser_discover_generic.py.  That seed
-  # set drives the catalogue from ~56 candidates back up to the full
-  # ~150-200 international catalogue with deterministic, Wayback-free
-  # discovery.
   always_browser_discover: true
 
 extraction:
