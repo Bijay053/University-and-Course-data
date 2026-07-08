@@ -767,13 +767,21 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
                 from app.services.scraper.snapshot_context import stage_snapshot as _stage
                 _stage(url, _disc_rendered, "scrape_do_render")
                 return _disc_rendered
-            # Both Scrape.do modes failed — fall through to normal httpx so
-            # discovery degrades gracefully rather than returning zero links.
+            # Both Scrape.do modes failed. When scrape_do_skip_fallbacks=True
+            # the caller explicitly told us to skip the httpx/cffi chain because
+            # Cloudflare blocks all datacenter IPs on this host. Falling through
+            # to httpx now would hang for 60-90 s before returning "" (httpx
+            # timeout 30s + cffi timeout 30s) — consuming the 300s discovery
+            # deadline. Return "" immediately so the BFS/sitemap loop moves on.
+            # If this was a legitimate URL the subsequent browser/render tiers
+            # will still discover it.
             log.warning(
                 "fetch %s: discovery scrape_do_skip_fallbacks fast-path failed"
-                " (static AND render) — falling back to direct httpx",
+                " (static AND render) — returning empty immediately"
+                " (skipping httpx/cffi per discovery.scrape_do_skip_fallbacks)",
                 url,
             )
+            return ""
 
     # Fast-path: if BOTH httpx and curl_cffi previously failed for this host
     # (recorded in _cf_always_scrape_do), skip straight to Scrape.do static

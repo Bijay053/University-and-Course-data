@@ -70,10 +70,11 @@ discovery:
   always_browser_discover: false
   use_stealth_browser: true
   use_wayback: false
-  # 125 courses found on page 1 alone (job_50d1b89fa01b). With scrape_do_skip_fallbacks,
-  # each Scrape.do page takes ~20-25s. bfs_page_budget: null = 25 pages = ~10 min discovery.
-  # Capped at 5: page 1 finds everything; pages 2-5 are safety margin for pagination.
-  bfs_page_budget: 5
+  # 125 courses found on page 1 alone (job_50d1b89fa01b, job_16c76d0e5565).
+  # With scrape_do_skip_fallbacks each Scrape.do page takes ~20-25s.
+  # Pages 2+ add 0 new candidates and may trigger the Scrape.do→httpx fallback
+  # hang. Budget=1: fetch seed URL only, stop. ~20s discovery vs 100s+ with 5.
+  bfs_page_budget: 1
   browser_early_stop_courses: 180
   max_candidates: 220
 
