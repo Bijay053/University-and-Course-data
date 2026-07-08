@@ -59,6 +59,14 @@ discovery:
     base_url: "https://www.jcu.edu.au"
 
   # ── BFS / browser fallback (when API returns 0 links) ────────────────────
+  # scrape_do_skip_fallbacks: true — JCU's Cloudflare now blocks plain
+  # httpx and curl_cffi on all fetches (BFS listing page + sitemap probes).
+  # Without this, every sitemap probe hangs for the full _PROBE_TIMEOUT_S
+  # (100s) before giving up, and 3 probes × 100s = 300s → discovery deadline.
+  # Confirmed broken: job_c8f93129006c (2026-07-08) "ERROR: fetch failed for
+  # https://www.jcu.edu.au/courses" + "Discovery phase exceeded 300s deadline".
+  # Previously (2026-05-30 job, 104 courses) cffi worked; no longer.
+  scrape_do_skip_fallbacks: true
   always_browser_discover: false
   use_stealth_browser: true
   use_wayback: false
