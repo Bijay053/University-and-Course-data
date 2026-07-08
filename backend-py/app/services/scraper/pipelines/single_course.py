@@ -5178,6 +5178,17 @@ async def extract_course(
         except Exception:  # noqa: BLE001
             pass  # never break extraction on config-access error
 
+        # ── Universal currency sync ────────────────────────────────────────
+        # The CURRENCY-FIX guard above only fires when fee_currency was 'AUD'
+        # (AI default). When AI correctly extracts MYR/GBP/NZD directly,
+        # payload["currency"] (the DB column the review table reads) is never
+        # set because only the degree_level_defaults fallback block
+        # (setdefault) writes it — and that block only runs when no fee was
+        # found on the page. Sync unconditionally here so both columns agree.
+        _fc_sync = payload.get("fee_currency")
+        if _fc_sync and not payload.get("currency"):
+            payload["currency"] = _fc_sync
+
         # ── Post-ai_fallback study_mode correction (2026-05-31) ──────────
         # The first _rule_only_online / _low_conf_online correction earlier
         # in this function runs BEFORE ai_fallback fills course_location, so
