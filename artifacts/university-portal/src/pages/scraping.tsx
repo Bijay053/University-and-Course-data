@@ -2635,7 +2635,8 @@ export default function Scraping() {
                         </td>
                         <td className="p-2 text-right font-medium whitespace-nowrap">
                           {course.internationalFee ? (() => {
-                            const currSym = course.currency === "GBP" ? "£" : course.currency === "USD" ? "$" : "A$";
+                            const _CURR_MAP: Record<string, string> = { GBP: "£", USD: "$", EUR: "€", MYR: "RM", NZD: "NZ$", CAD: "CA$", SGD: "S$", AUD: "A$" };
+                            const currSym = (course.currency && _CURR_MAP[course.currency]) ? _CURR_MAP[course.currency] : (course.currency ? `${course.currency} ` : "A$");
                             const isFullCourse = (course.feeTerm || "").toLowerCase().includes("full");
                             const dur = course.duration;
                             const durTerm = (course.durationTerm || "year").toLowerCase();
