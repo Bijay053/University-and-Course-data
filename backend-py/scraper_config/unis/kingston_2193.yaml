@@ -1,0 +1,198 @@
+# Kingston University London (university_id=2193)
+# Hostname: www.kingston.ac.uk
+#
+# id-specific file: unis/kingston_2193.yaml
+# Shadows unis/kingston.yaml entirely once present (loader picks id-specific first).
+# Keep in sync with kingston.yaml or merge future edits here.
+#
+# ── CLOUDFLARE ENTERPRISE BLOCK (2026-07-08) ─────────────────────────────────
+# Kingston has fully escalated to CF Enterprise (same as Cardiff):
+#   plain httpx    → 403 for ALL paths (listing pages, course pages, sitemap)
+#   curl_cffi      → 403 for ALL paths (CF Enterprise blocks at ASN/IP level)
+#   Scrape.do static → 502 on sitemap + listing pages
+#   Scrape.do render=true → 200 on both sitemap (2MB index) AND course pages
+#
+# http_fetcher already has a static→render auto-retry on 502 (see lines 674-691
+# of http_fetcher.py).  Setting scrape_do_skip_fallbacks=true in discovery
+# routes sitemap/BFS through Scrape.do; static 502s trigger the render retry
+# automatically — no additional code change required.
+#
+# ── DISCOVERY STRATEGY ───────────────────────────────────────────────────────
+# The listing pages (/study/undergraduate/courses etc.) are a Drupal JS SPA
+# that lazy-loads courses via XHR AFTER render — even 12s Scrape.do wait +
+# scrollPage returns 0 course links. BFS is therefore useless for discovery.
+#
+# The SITEMAP is the reliable catalogue source:
+#   sitemap.xml → index → sitemap.xml?page=1 (2000 entries, 261 course URLs)
+#                        + sitemap.xml?page=2 (191 entries, non-course)
+#   Course URL pattern: /study/{undergraduate|postgraduate|foundation}/{slug}
+#   Counts: 123 UG + 129 PG + 9 foundation = 261 total (verified 2026-07-08)
+#
+# BFS is set to minimal budget (3 pages): it visits the 3 seed URLs, finds
+# nothing (lazy AJAX), and exits.  Sitemap supplement provides all courses.
+#
+# ── EXTRACTION STRATEGY ──────────────────────────────────────────────────────
+# Course detail pages are /study/{level}/{slug} (Numiko/Tailwind template).
+# This is a NEW template — completely different HTML from the old /courses/...
+# pages.  Key selectors updated; Gemini AI handles fields where XPath is empty.
+#
+# scrape_do_render:true uses headless Chrome through Scrape.do's residential
+# IP pool — bypasses CF Enterprise.  scrape_do_skip_fallbacks:true skips the
+# doomed httpx/cffi attempts.  skip_browser_rescue:true prevents the datacenter
+# Playwright from firing (also 403).
+#
+# Verified live 2026-07-08:
+#   Course page fetch: 200, 373KB rendered HTML, all fields visible
+#   H1: <span>Course Name</span>  → use //h1//text()
+#   Fee table: <tr><td>International  Full Time £N</td></tr>
+#   IELTS: in JSON-escaped drupalSettings blob → Gemini extracts cleanly
+
+discovery:
+  # Route ALL discovery fetches (sitemap, BFS) through Scrape.do.
+  # Static → 502 on Kingston → http_fetcher auto-retries with render=true.
+  # This is the same fix as cardiff_2194.yaml.
+  scrape_do_skip_fallbacks: true
+
+  # BFS is completely bypassed — no seed_urls and minimal budget.
+  # Kingston listing pages are lazy AJAX (Drupal JS SPA); Scrape.do render=true
+  # renders the shell but courses are XHR-loaded post-render → 0 course links.
+  # Any BFS render call burns ~40-60s of the 300s discovery budget for nothing.
+  bfs_page_budget: 1
+
+  # Point DIRECTLY to sub-sitemap page=1, bypassing the index fetch entirely.
+  # Rationale: Kingston's sitemap.xml is an index with 2 sub-pages:
+  #   page=1 → 2000 entries, 261 course URLs (all courses here)
+  #   page=2 → 191 entries, 0 course URLs (blog/news/non-course pages)
+  # Skipping the index fetch saves one 60-90s Scrape.do render=true call, and
+  # eliminates the page=2 attempt — critical for fitting within the 300s
+  # discovery budget (home page + BFS + sitemap ≈ 3 × ~70s = ~210s vs ~280s).
+  # Also skips the 7 alt-listing-path probes (discovery.py line 1596).
+  sitemap_url: https://www.kingston.ac.uk/sitemap.xml?page=1
+
+  # also set always_sitemap_supplement so it fires even if BFS finds 0
+  always_sitemap_supplement: true
+
+  # Sitemap course URL pattern: /study/{undergraduate|postgraduate|foundation}/{slug}
+  # /undergraduate/ and /postgraduate/ etc. substring-match these correctly.
+  allow_url_patterns:
+    - '/study/undergraduate/'
+    - '/study/postgraduate/'
+    - '/study/foundation/'
+
+  block_url_patterns:
+    - '/news'
+    - '/events'
+    - '/staff/'
+    - '/about'
+    - '/contact'
+    - '/linkassets/'
+
+  # Listing hubs — BFS visits these but they yield no course links (lazy AJAX).
+  listing_only_patterns:
+    - '/study/undergraduate/courses'
+    - '/study/postgraduate/courses'
+    - '/study/foundation/courses'
+
+  use_wayback: false
+
+extraction:
+  # Scrape.do headless Chrome (residential IP) bypasses CF Enterprise 403.
+  # skip_fallbacks: true skips the doomed httpx/cffi attempts (saves ~1-2s/course).
+  # skip_browser_rescue: true prevents datacenter Playwright (also 403).
+  scrape_do_render: true
+  scrape_do_skip_fallbacks: true
+  skip_browser_rescue: true
+
+  # Slightly lower parallelism — render calls are ~4-6s each; 3 concurrent
+  # keeps throughput good without overwhelming the residential proxy pool.
+  max_parallel_fetch: 3
+
+  filters:
+    domestic_only:
+      enabled: false
+
+    online_only:
+      enabled: false
+
+  fees:
+    default_currency: "GBP"
+    prefer_international: true
+    prefer_annual_over_total: true
+    fee_year: "2025"
+    fee_term: "year"
+
+    reject_keywords:
+      - "Domestic"
+      - "Home student"
+      - "UK student"
+
+  english:
+    source: course_page
+    # Entry requirements section — Numiko template uses accordion items
+    source_xpath: "//div[contains(@class,'c-accordion-item') and (.//h3[contains(.,'Entry requirement')] or .//h3[contains(.,'English language')])]"
+
+    ielts:
+      raw_xpath: ".//p[contains(., 'IELTS')] | .//li[contains(., 'IELTS')] | .//strong[contains(., 'IELTS')]/.."
+      remove_tags: true
+      patterns:
+        overall:
+          - 'score\sof\s.?(\d\.?\d)'
+          - 'IELTS\s+of\s+(\d\.?\d)'
+          - 'of\s*(\d\.?\d*)'
+        each:
+          - 'no\selement\sbelow\s*(\d\.?\d*)'
+          - '(\d\.?\d*)\sin\sall'
+      apply_each_to:
+        - ielts_reading
+        - ielts_writing
+        - ielts_listening
+        - ielts_speaking
+
+  degree_from_url:
+    rules:
+      - match_keyword: "undergraduate"
+        value: "undergraduate"
+      - match_keyword: "postgraduate"
+        value: "postgraduate"
+
+  selectors:
+    # New /study/{level}/{slug} Numiko template — completely different from
+    # the old /courses/... template.  Selectors updated to match 2026 structure.
+
+    # H1 wraps text in <span>; use //text() descendant to capture it.
+    course_name:
+      xpath: "normalize-space(//h1)"
+
+    city:
+      value: "London"
+
+    # Fee table: "International" is in <th scope="row">, fee amount in adjacent <td>.
+    # Structure: <tr><th>International</th><td>Full Time £19,700</td></tr>
+    fee_international:
+      xpath: "//tr[th[contains(.,'International') and not(contains(.,'Home'))]]/td[contains(.,'£')]"
+      multi: true
+      first_as_fee_int: true
+
+    course_description:
+      xpath: "//div[contains(@class,'c-accordion-item') and .//h3[contains(.,'Overview') or contains(.,'About')]] | //section[contains(@class,'overview')] | //div[contains(@class,'c-container-fl') and position()=1]//p[string-length(normalize-space(.))>80][1]"
+
+    other_requirements:
+      xpath: "//div[contains(@class,'c-accordion-item') and .//h3[contains(.,'Entry requirement') or contains(.,'Admission')]]"
+
+    career:
+      xpath: "//div[contains(@class,'c-accordion-item') and .//h3[contains(.,'Career') or contains(.,'graduate') or contains(.,'employ')]]"
+
+    course_structure:
+      xpath: "//div[contains(@class,'c-accordion-item') and .//h3[contains(.,'structure') or contains(.,'module') or contains(.,'content') or contains(.,'unit')]]"
+
+    duration:
+      xpath: "//div[contains(@class,'c-accordion-item') and .//h3[contains(.,'Key fact') or contains(.,'Course detail')]] | //table[contains(.,'Duration')]//tr[td[contains(.,'Duration')]]//td[2]"
+
+    intake_month:
+      xpath: "//table[contains(.,'Start') or contains(.,'Intake')]//tr[td[contains(.,'Start')]]/td[2] | //div[contains(.,'Start date') or contains(.,'January') or contains(.,'September')]"
+
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false
