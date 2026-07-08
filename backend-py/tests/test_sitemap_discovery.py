@@ -16,6 +16,20 @@ import pytest
 from app.services.scraper import sitemap as sitemap_mod
 
 
+@pytest.fixture(autouse=True)
+def _zero_retry_delays(monkeypatch):
+    """Zero out the empty-response retry backoff sleeps.
+
+    ``_fetch_text`` retries empty responses after real ``asyncio.sleep``
+    delays (5s + 15s). With every non-mapped candidate returning "" from the
+    mocked ``fetch_html``, those sleeps add ~20s per probed candidate (~100s
+    per test that walks all 4 index paths + robots.txt) without exercising
+    any additional logic. Retry *behavior* keeps the same code path — only
+    the wall-clock delay is removed.
+    """
+    monkeypatch.setattr(sitemap_mod, "_RETRY_DELAYS", (0.0, 0.0))
+
+
 def _patch_fetch(monkeypatch, responses: dict[str, str]) -> list[str]:
     """Replace ``fetch_html`` with a dict-backed fake; track call order."""
     calls: list[str] = []

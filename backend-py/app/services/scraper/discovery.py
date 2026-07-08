@@ -1106,7 +1106,31 @@ async def discover_course_links(
                         )
                         break
 
-        if not _yaml_allow_override and not _yaml_listing_override:
+        # Seed exemption (ACU job_edd918ab4c88, 2026-07-08): URLs enqueued at
+        # depth 0 are crawl seeds — either explicitly configured in YAML
+        # (seed_urls / listing pre-seeds) or selected by discovery itself as
+        # the course-listing start page.  The URL classifier exists to filter
+        # *crawled links*, not seeds; a global prefix rule like "/study-at-"
+        # (added for UOW marketing pages) must never block a configured
+        # listing seed like ACU's /study-at-acu/find-a-course/.  Crawled
+        # links (depth >= 1) keep full classification.
+        if depth == 0 and not _yaml_allow_override and not _yaml_listing_override:
+            try:
+                from app.services.scraper.guards import is_blocked_page as _ibp_seed
+
+                _seed_blocked, _seed_reason = _ibp_seed(url, None)
+            except Exception:  # noqa: BLE001
+                _seed_blocked, _seed_reason = (False, "")
+            if _seed_blocked:
+                log.info(
+                    "[DISCOVER] seed exemption: %s matched block rule %r but is a"
+                    " crawl seed — fetching anyway (classification applies to"
+                    " crawled links only)",
+                    url,
+                    _seed_reason,
+                )
+
+        if depth > 0 and not _yaml_allow_override and not _yaml_listing_override:
             try:
                 from app.services.scraper.guards import is_blocked_page
 

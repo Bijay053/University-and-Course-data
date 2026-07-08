@@ -452,6 +452,17 @@ async def test_scrape_do_seeds_get_full_timeout_and_run_concurrently(monkeypatch
 
     monkeypatch.setattr(discovery, "fetch_html", slow_but_successful)
 
+    # The mocked pages contain no course links, so the BFS ends with 0
+    # candidates and the sitemap fallback fires. Stub it out like the other
+    # tests in this file do — otherwise it probes example.edu with the REAL
+    # (unmocked) sitemap-module fetch_html plus empty-response retry sleeps,
+    # adding ~100s of wall clock to a fully-mocked test.
+    async def fake_sitemap(origin, *, emit=None):
+        return []
+
+    import app.services.scraper.sitemap as sm
+    monkeypatch.setattr(sm, "discover_from_sitemap", fake_sitemap)
+
     cfg = DiscoveryConfig(
         scrape_do_skip_fallbacks=True,
         seed_urls=[seed_a, seed_b, seed_c],

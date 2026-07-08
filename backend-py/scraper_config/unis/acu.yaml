@@ -14,7 +14,45 @@
 # sitemap probes because plain httpx was used (scrape_do_skip_fallbacks not set).
 
 discovery:
+  # ── API-first discovery (2026-07-08) ─────────────────────────────────────
+  # The find-a-course results grid is a Vue SPA: course-search-result pages
+  # contain ZERO server-rendered course links, so BFS/browser discovery can
+  # never see the catalogue.  The grid's Vue app (coursesearchresult.js) reads
+  # data-dataURL="/webapi/GetCourseResult/get" from #courses-search-results
+  # and axios-GETs it with CourseType + sr (Sitecore search-root GUID, from
+  # the sr="..." attribute on the same element).  We call that JSON API
+  # directly — one request per CourseType slice, ~248 unique courses total
+  # (UG 118, PG 111, Research 5, Other 23; ResultCount=248 on every slice).
+  # Empty CourseType returns only 223 URLs, so we enumerate all 4 slices.
+  # NOT paginated — each call returns the full slice (the grid's "show more"
+  # is client-side batching of already-fetched rows).
+  # The /webapi/ endpoint is NOT Cloudflare-blocked for plain httpx (verified
+  # 2026-07-08: direct httpx 200 in 1s) — only page/sitemap fetches are.
+  generic_search_api:
+    url: "https://www.acu.edu.au/webapi/GetCourseResult/get?CourseType=Undergraduate&sr=%7B8E9AA42C-FDB2-49CE-AE29-7B34CBD33CAB%7D"
+    additional_urls:
+      - "https://www.acu.edu.au/webapi/GetCourseResult/get?CourseType=Postgraduate&sr=%7B8E9AA42C-FDB2-49CE-AE29-7B34CBD33CAB%7D"
+      - "https://www.acu.edu.au/webapi/GetCourseResult/get?CourseType=Research&sr=%7B8E9AA42C-FDB2-49CE-AE29-7B34CBD33CAB%7D"
+      - "https://www.acu.edu.au/webapi/GetCourseResult/get?CourseType=Other&sr=%7B8E9AA42C-FDB2-49CE-AE29-7B34CBD33CAB%7D"
+    root_path: "CoursesResults"
+    url_fields: ["URL"]
+    title_fields: ["CourseName", "PageTitle"]
+    allow_url_patterns:
+      - '/course/'
+    block_url_patterns:
+      - '/short-courses'
+      - '/professional-development'
+      - '/microcredential'
+    normalize_relative_urls: true
+    base_url: "https://www.acu.edu.au"
   scrape_do_skip_fallbacks: true
+  # Pin the course-listing seed explicitly (job_edd918ab4c88, 2026-07-08):
+  # seed_urls[0] becomes the BFS start URL, so discovery no longer depends on
+  # home-page detection to find the listing.  This URL matches the global
+  # "/study-at-" marketing_page prefix rule (added for UOW) — crawl seeds are
+  # exempt from URL classification (see discovery.py seed exemption).
+  seed_urls:
+    - 'https://www.acu.edu.au/study-at-acu/find-a-course/'
   allow_url_patterns:
     - '/course/'
   block_url_patterns:

@@ -182,55 +182,97 @@ def _is_course_loc(loc: str, *, base_host: str = "") -> bool:
 # ~9s, 66.7s total). At 15s the outer wait_for cancelled the whole chain
 # before the render retry ever ran, so discover_from_sitemap always saw
 # "0 byte(s)" for Ulster even though the fetch would have succeeded given
-# enough time. Raised to give the full static+render retry chain room to
-# complete; still bounded so a genuinely dead sitemap URL can't hang forever.
+# enough time.
+#
+# ACU job_edd918ab4c88 (2026-07-08): this value is now a TOTAL budget per
+# probe INCLUDING all retry attempts and backoff sleeps.  The previous
+# implementation applied it per-attempt (3 attempts x 100s + 20s of delays =
+# 320s worst case per probe), so a single blocked sitemap URL could consume
+# the entire 300s discovery deadline.  The brief asked for a 25s hard cap,
+# but that would re-break Ulster (successful chain observed at 66.7s), so
+# the total is kept at 100s — still guaranteeing all 4 standard probes plus
+# BFS fit inside the deadline in the typical fast-fail case, and a single
+# hung probe can never take more than 100s.
 _PROBE_TIMEOUT_S: Final = 100.0
+
+# Module-level so tests can monkeypatch the delays to 0 (the retry sleeps
+# are real asyncio.sleep calls — with 5 empty probe candidates the default
+# 5s+15s delays add ~100s of pure sleeping to a fully-mocked test run).
+_RETRY_DELAYS: tuple[float, ...] = (5.0, 15.0)  # seconds between retry attempts
+_MIN_FETCH_BUDGET = 10.0  # don't start an attempt with less than this left
+_SLOW_EMPTY_S = 15.0  # empty response slower than this => transport block
 
 
 async def _fetch_text(url: str, *, timeout: float = _PROBE_TIMEOUT_S) -> str:
     """``fetch_html`` returns "" on any error — the fallback should
     keep going through the rest of the candidate list rather than abort.
 
-    Wrapped in ``asyncio.wait_for`` so a hung transport can never block the
-    whole sitemap fallback indefinitely. Every outcome (success, timeout,
-    exception) is logged with the probe URL so a stuck run is diagnosable
-    from the worker log instead of just going silent.
+    ``timeout`` is a TOTAL budget for this probe: all retry attempts and
+    backoff sleeps must fit inside it.  Each attempt's ``asyncio.wait_for``
+    is bounded by the *remaining* budget, and a retry is only started when
+    enough budget remains for the backoff sleep plus a meaningful fetch.
 
-    Retries once on empty response (0 bytes): Scrape.do occasionally returns
+    Retries on empty response (0 bytes): Scrape.do occasionally returns
     empty content transiently for static XML files (rate-limit jitter, brief
     residential-proxy rotation). Without a retry the entire sitemap falls
     through to slow browser discovery (~90 s, very few links found).
+    Retries are skipped when the previous attempt was slow (>15s) — a slow
+    empty response indicates a transport block (Cloudflare / Scrape.do
+    failure), not transient jitter, and retrying would just burn the budget.
     """
-    _RETRY_DELAYS = (5.0, 15.0)  # seconds between retry attempts
-
     start = time.monotonic()
-    for _attempt, _delay in enumerate(
-        [None] + list(_RETRY_DELAYS), start=0
-    ):
+
+    def _remaining() -> float:
+        return timeout - (time.monotonic() - start)
+
+    for _attempt, _delay in enumerate([None] + list(_RETRY_DELAYS), start=0):
         if _delay is not None:
+            if _remaining() < _delay + _MIN_FETCH_BUDGET:
+                log.warning(
+                    "sitemap probe %s: %.1fs budget left of %.0fs — skipping"
+                    " retry %d, giving up",
+                    url, _remaining(), timeout, _attempt,
+                )
+                return ""
             log.info(
                 "sitemap probe %s returned empty — retrying in %.0fs (attempt %d)",
                 url, _delay, _attempt,
             )
             await asyncio.sleep(_delay)
+        _attempt_start = time.monotonic()
         try:
-            text = await asyncio.wait_for(fetch_html(url), timeout=timeout)
+            text = await asyncio.wait_for(
+                fetch_html(url), timeout=max(_remaining(), 0.1)
+            )
             elapsed = time.monotonic() - start
+            _attempt_took = time.monotonic() - _attempt_start
             if text:
                 log.info(
                     "sitemap probe %s -> %d bytes in %.1fs (attempt %d)",
                     url, len(text), elapsed, _attempt,
                 )
                 return text
-            # Empty response — loop for retry
+            # Empty response.  Fast-empty => transient jitter, worth a retry.
+            # Slow-empty => the full Scrape.do static+render chain ran and
+            # failed (transport blocked); retrying would fail the same way.
             log.info(
-                "sitemap probe %s -> 0 bytes in %.1fs (attempt %d)",
-                url, elapsed, _attempt,
+                "sitemap probe %s -> 0 bytes in %.1fs (attempt %d, attempt took %.1fs)"
+                " — transport failed or blocked (see 'scrape.do fetch' log lines"
+                " for status codes)",
+                url, elapsed, _attempt, _attempt_took,
             )
+            if _attempt_took > _SLOW_EMPTY_S:
+                log.warning(
+                    "sitemap probe %s: empty after %.1fs fetch — transport block,"
+                    " not transient jitter; skipping remaining retries",
+                    url, _attempt_took,
+                )
+                return ""
         except asyncio.TimeoutError:
             elapsed = time.monotonic() - start
             log.warning(
-                "sitemap probe %s TIMED OUT after %.1fs (limit %.0fs, attempt %d)",
+                "sitemap probe %s TIMED OUT after %.1fs (total budget %.0fs,"
+                " attempt %d) — transport hung",
                 url, elapsed, timeout, _attempt,
             )
             # Timeout is definitive — don't retry (would just time out again)
@@ -399,14 +441,27 @@ async def discover_from_sitemap(
             # fetch outcome per-candidate so a stalled/blocked probe is
             # diagnosable from the job log instead of only from
             # DEBUG-level worker logs.
+            # 0 bytes = the transport chain (Scrape.do static/render, httpx,
+            # cffi) failed or was blocked — NOT "the sitemap has no XML".
+            # A non-empty response without "<" means we fetched something
+            # that isn't XML (e.g. a Cloudflare challenge page).  Label the
+            # two cases distinctly so a transport block is not misread as a
+            # missing sitemap (ACU job_edd918ab4c88, 2026-07-08).
+            _nbytes = len(xml or "")
+            _why = (
+                "transport failed or blocked (see 'scrape.do fetch' worker-log"
+                " lines for status codes)"
+                if _nbytes == 0
+                else "fetched but content is not XML (likely challenge/error page)"
+            )
             if emit:
                 await emit(
                     "status",
                     f"[DISCOVER] sitemap {sm_url}: fetch returned "
-                    f"{len(xml or '')} byte(s) — no usable XML, skipping",
+                    f"{_nbytes} byte(s) — {_why}, skipping",
                     phase="discover",
                     kind="sitemap_fetch_failed",
-                    bytes=len(xml or ""),
+                    bytes=_nbytes,
                 )
             continue
         all_locs = _LOC_RE.findall(xml)

@@ -1121,7 +1121,14 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
                         else:
                             resp = await client.post(_api_url, headers=cfg.headers, json=req_params)
                     else:
-                        resp = await client.get(_api_url, headers=cfg.headers, params=req_params)
+                        # NOTE: pass None (not {}) when there are no params —
+                        # httpx REPLACES the URL's existing query string whenever
+                        # a params argument is given, even an empty dict. Unis
+                        # that put the full query in `url` (e.g. ACU's
+                        # ?CourseType=...&sr=...) would silently lose it.
+                        resp = await client.get(
+                            _api_url, headers=cfg.headers, params=req_params or None
+                        )
                 except Exception as exc:
                     await _emit(
                         f"request failed (page {page_num}, network error): {exc}"
