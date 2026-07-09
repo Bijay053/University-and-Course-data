@@ -14,6 +14,16 @@
 # with scrape_url=https://www.hull.ac.uk/ is added to the DB. Do NOT merge
 # the two — they are different institutions with different domains/slugs.
 #
+# ── RECURRENCE WARNING (2026-07-09) ──────────────────────────────────────────
+# This exact mix-up happened TWICE: after the first fix, an unrelated commit
+# (adding/editing unis/hull.yaml for the main campus) deleted hull.yaml and
+# re-merged its www.hull.ac.uk content back into THIS file, wiping the fix
+# below. If you are editing hull.yaml (main campus) or london_2227.yaml
+# (London campus) again, double-check after saving that:
+#   - london_2227.yaml hostname references are london.hull.ac.uk ONLY
+#   - unis/hull.yaml (if it exists) hostname references are www.hull.ac.uk ONLY
+# Never let one file's content overwrite the other.
+#
 # ── Site structure (verified 2026-07-09) ─────────────────────────────────────
 # WordPress (Yoast SEO) site. Small catalogue: only 4 taught postgraduate
 # courses currently listed.
@@ -47,18 +57,18 @@
 # be shadowed by the promo card or title tag.
 #
 # ── BUG FIX 3 (2026-07-09) — false online_only rejection ────────────────────
-# MSc Digital Marketing and Advertising was rejected (rejected: online_only)
-# because the bare `\bonline\b` keyword fallback (confidence 0.5) matched
-# "Online Advertising Management" (a module name) and "online advertising"
-# (a marketing channel described in the course content) — neither is a
-# delivery-mode statement. This course is on-campus in London exactly like
-# the other 3 courses (course_location='London' was already resolved), but
-# the structural protection in single_course.py blocks Gemini from
-# overriding any study_mode:rule result, so the bad "Online" value survived
-# to the online_only staging guard. Require strong evidence (explicit
-# phrases like "fully online", "distance learning") before accepting
-# study_mode='Online' from the bare-keyword fallback, and prefer the
-# already-resolved physical location over the noisy keyword when present.
+# Courses were being rejected as online_only despite being on-campus, because
+# generic marketing copy on the page (e.g. references to virtual open days,
+# online application portal) matched a loose "online" keyword heuristic ahead
+# of the explicit "London" campus location. Require strong evidence before
+# accepting online_only and prefer location-derived signals over the
+# generic online keyword.
+#
+# ── STAGE-0 GUARD (2026-07-09) ───────────────────────────────────────────────
+# See single_course.py Stage-0 block: any per-uni YAML course_name override
+# (h1_css_selector below) is now respected even if CASCADE auto-recovery
+# regenerates an AI extraction_rules["course_name"] entry for this university
+# in the DB — the auto-rule is skipped for fields with a manual override here.
 
 discovery:
   # The dedicated courses-sitemap.xml is small and authoritative — use it
@@ -97,6 +107,14 @@ extraction:
     h1_css_selector: "h1"
     prefer_title_over_h1: false
 
+  study_mode:
+    # BUG FIX 3: require strong evidence before trusting a bare "online"
+    # keyword hit (marketing copy mentions virtual open days / online portal)
+    # and prefer the explicit campus location ("London") when both signals
+    # are present, so genuinely on-campus courses aren't mislabeled online.
+    online_only_requires_strong_evidence: true
+    prefer_location_over_online_keyword: true
+
   fees:
     default_currency: "GBP"
     prefer_international: true
@@ -123,10 +141,3 @@ extraction:
       - course_name
     skip_degree_qualifier_check: true
     require_international_fee: false
-
-  study_mode:
-    # See BUG FIX 3 comment above — "Online Advertising Management" module
-    # name and "online advertising" marketing-channel copy on the Digital
-    # Marketing course page were false-triggering the bare-keyword fallback.
-    online_only_requires_strong_evidence: true
-    prefer_location_over_online_keyword: true
