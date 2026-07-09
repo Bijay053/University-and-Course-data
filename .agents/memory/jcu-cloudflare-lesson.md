@@ -3,6 +3,15 @@ name: JCU Cloudflare Enterprise escalation
 description: JCU blocks all transports except Scrape.do render=true; static Scrape.do always 502s ROTATION_FAILED; discovery must go render-first.
 ---
 
+## ECU contrast
+ECU (ecu.edu.au) has a harder failure mode: Scrape.do render=true CAN fetch
+individual course pages but the course LISTING (SPA) loads course data via XHR
+to ecu-search.funnelback.squiz.cloud which is *separately* CF-protected. Even
+12s waitFor returns 0 course links. Fix requires a Funnelback provider (like HUD
+SearchStax) that can access the Funnelback subdomain via super=true residential
+proxies. External host found in rendered HTML: ecu-search.funnelback.squiz.cloud.
+See ecu.yaml for the documented blocker.
+
 ## Rule
 When a Cloudflare-Enterprise site persistently returns 502 ROTATION_FAILED from
 Scrape.do *static* but succeeds with `render=true`, configure the uni YAML with
