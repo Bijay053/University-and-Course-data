@@ -10,55 +10,104 @@
 #   - English requirements are published on individual course pages via an
 #     embedded accordion — Playwright pass needed for some courses.
 #
-# ── Cloudflare block (2026-07-09) ────────────────────────────────────────────
-# ECU's Cloudflare now blocks: plain httpx (403), curl_cffi (403), Scrape.do
+# ── Cloudflare / Funnelback block (2026-07-09) ───────────────────────────────
+# ECU's Cloudflare blocks: plain httpx (403), curl_cffi (403), Scrape.do
 # static (502 ROTATION_FAILED).  Scrape.do render=true works for INDIVIDUAL
 # course pages at /degrees/courses/<slug>.
 #
-# DISCOVERY IS CURRENTLY BROKEN — root cause is different from JCU/Kingston:
-#   ECU's course listing pages (/degrees/courses/all, /degrees/undergraduate,
-#   /degrees/postgraduate) are full React SPAs.  They load course data via XHR
-#   to ecu-search.funnelback.squiz.cloud (their Funnelback/Squiz search index),
-#   which is SEPARATELY Cloudflare-protected.  Even Scrape.do render=true can
-#   GET the ECU page HTML (70-90KB), but the XHR inside the browser to
-#   Funnelback fails (CF-blocked separately), so the course list never loads
-#   in the DOM.  Tested: 6s, 8s, 12s waitFor all return 0 course links.
-#   Wayback CDX only has garbage URLs.  Direct Funnelback API → CF block.
+# BOTH listing pages are React SPAs that load via Funnelback XHR:
+#   /degrees/undergraduate  — SPA, 0 static links even with render=true+10s
+#   /degrees/postgraduate   — SPA, 0 static links (Funnelback CF-blocked)
 #
-# REQUIRED FIX: Implement a Funnelback provider (like the HUD SearchStax
-#   provider in searchstax_hud.py) that queries ecu-search.funnelback.squiz.cloud
-#   via Scrape.do render=true with super=true (residential proxy) to bypass the
-#   CF block on the Funnelback subdomain.  The collection name and API endpoint
-#   pattern need to be determined by inspecting the ECU JS bundle network calls.
+# DISCOVERY APPROACH (2026-07-09):
+#   UG:  BFS from /degrees/courses/all follows Funnelback pagination links
+#        (?start_rank=11/21/31...), each returning 10 unique UG course slugs.
+#        The allow_url_patterns restricts BFS traversal so only course-detail
+#        pages and start_rank= pagination are followed (tab variants are NOT
+#        allowed through global blocks, saving ~5 BFS page slots per run).
+#   PG:  4 explicit seeds (one per faculty) pre-seeded into BFS queue.
+#        Individual PG pages are fully accessible via Scrape.do render=true.
+#        Cross-links on each seed page yield additional PG candidates.
 #
-# Until then: extraction config uses render=true so that courses coming in via
-# repair pass or manual entry are extracted correctly.
+# Things that do NOT work for PG listing discovery:
+#     - Scrape.do render=true on /degrees/postgraduate (0 links, SPA+Funnelback)
+#     - Scrape.do render=true on /degrees/undergraduate (0 links, SPA+Funnelback)
+#     - ECU sitemap.xml is Cloudflare-blocked (0 bytes returned)
+#     - always_sitemap_supplement: true → 6 sitemap probes × ~25s = 150s wasted,
+#       triggers 300s discovery timeout without adding any courses
+#     - Wayback CDX for ecu.edu.au/degrees/courses/* (0 results)
+#
+# PAGINATION NOTE (2026-07-09):
+#   /degrees/courses/all?start_rank=N loads 10 unique courses per page via BFS.
+#   start_rank= URLs are ALSO in block_url_patterns to prevent the pagination
+#   page URL from appearing as a candidate (only its course links are kept).
+#
+# "COURSE DETAILS" / "SUPPLEMENTAL" REJECTIONS (2026-07-09):
+#   ~5 discovered course URLs at /degrees/courses/<slug> resolve to ECU 404
+#   pages (stale slugs in the UG listing HTML).  The 404 template H1 is
+#   "Supplemental"; the guard correctly rejects these with reason
+#   category_landing_page_missing_degree_qualifier.  No code change needed.
+#
+# DOMESTIC ONLY SKIPS (2026-07-09):
+#   ~20 Advanced Diploma programs (CUA-code courses) are legitimately
+#   domestic-only.  Honours programs are staged correctly (not rejected).
 # ─────────────────────────────────────────────────────────────────────────────
 
 discovery:
-  # Cloudflare blocks all static transports; render=true works for individual
-  # pages but the course listing XHR (Funnelback) is separately CF-blocked.
-  # Seeds below are best-effort — they will be fetched via render but course
-  # links will NOT appear in the rendered HTML until Funnelback bypass is implemented.
   scrape_do_skip_fallbacks: true
   scrape_do_render: true
   use_wayback: false
+
+  # NOTE: always_sitemap_supplement is NOT set.  ECU's sitemap.xml is
+  # Cloudflare-blocked (returns 0 bytes) and discover_from_sitemap() probes 6
+  # sitemap URL candidates × ~25s each = ~150s of the 300s discovery budget
+  # wasted.  UG courses are discovered via Funnelback pagination in BFS:
+  # /degrees/courses/all?start_rank=N returns 10 real course links per page.
+  # With block patterns preventing nav-tab URL waste, budget=25 comfortably
+  # reaches all 103 UG courses (10 per Funnelback page × ~10 pages).
+
   seed_urls:
+    # ── BFS start (original) ───────────────────────────────────────────────
+    # /degrees/courses/all is the ECU all-courses Funnelback SPA page.  The
+    # React component renders 10 courses and BFS follows the pagination links
+    # (?start_rank=11/21/31...) to collect all ~103 UG courses.  nav-tab
+    # variants (f.Tabs, collection=ecu) are now blocked to save BFS budget.
     - https://www.ecu.edu.au/degrees/courses/all
-    - https://www.ecu.edu.au/degrees/undergraduate
-    - https://www.ecu.edu.au/degrees/postgraduate
+    # ── Postgraduate — one confirmed seed per faculty ──────────────────────
+    # Faculty seeds confirmed valid 2026-07-09.  Each is accessible via
+    # render=true and is added to the BFS candidate set as a self-candidate.
+    # Cross-links from each page may also yield additional PG candidates.
+    #   Business: → graduate-certificate-of-business, graduate-diploma-of-business,
+    #               doctor-of-philosophy-integrated
+    #   Health:   → master-of-nursing-studies (and related)
+    #   Engineering: → doctor-of-philosophy
+    #   Education:   → master-of-education-accelerated-online
+    - https://www.ecu.edu.au/degrees/courses/master-of-business-administration
+    - https://www.ecu.edu.au/degrees/courses/master-of-nursing
+    - https://www.ecu.edu.au/degrees/courses/master-of-engineering-science
+    - https://www.ecu.edu.au/degrees/courses/master-of-education
+
   allow_url_patterns:
-    - /degrees/courses/
+    # Course detail pages: slug always contains at least one hyphen
+    # (bachelor-of-science, master-of-engineering, etc.).  Rejects broad hub
+    # pages like /degrees/courses/all and /degrees/courses/search.
+    - /degrees/courses/[a-z]+-
+    # Funnelback pagination — ONLY start_rank= URLs add new course links.
+    # Tab variants (f.Tabs=Staff, f.Tabs=AskUs, etc.) produce 0 new candidates
+    # and waste BFS budget; this pattern only allows genuine pagination.
+    - start_rank=
+
   block_url_patterns:
-    - /degrees/courses/all
-    - /degrees/courses/search
-    - /degrees/postgraduate
-    - /degrees/undergraduate
-    - /degrees/choose-mid-year
-  bfs_page_budget: 10
-  # Even with render=true the BFS will likely find 0 candidates because the
-  # course list is XHR-loaded from Funnelback (separately CF-blocked).
-  # The job will fall through to the discovery failure alert path.
+    # Funnelback pagination/tab URL variants — these appear when BFS follows
+    # nav links from /degrees/courses/all.  All generate 0 course candidates.
+    # ECU post-filter in discovery.py handles hub/listing URL rejection for
+    # non-Funnelback URLs.
+    - start_rank=          # Funnelback pagination (same 10 courses every time)
+    - collection=ecu%7E   # Funnelback search API calls (tab/collection variants)
+    - f\.Tabs%7C           # Funnelback tab filter params (URL-encoded f.Tabs|)
+
+  # 5 seeds (1 BFS start + 4 PG) + 20 pages for BFS cross-link following.
+  bfs_page_budget: 25
 
 extraction:
   # Course pages at /degrees/courses/<slug> return full HTML via render=true.
