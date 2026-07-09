@@ -35,6 +35,16 @@ from app.config import settings
 from app.services.scraper.extractors.curtin_session import cookies_for_url
 
 log = logging.getLogger(__name__)
+
+
+class ScrapedoAccountError(RuntimeError):
+    """Raised when Scrape.do returns 401 or 403 — auth token invalid or credits exhausted.
+
+    Propagates out of fetch_html_scrape_do so the orchestrator can abort the job
+    immediately rather than accumulating hundreds of silent None returns.
+    """
+
+
 _sem = asyncio.Semaphore(settings.max_http_concurrency)
 # In-process cap on concurrent Scrape.do requests — see config.py
 # `max_scrape_do_concurrency` for the QMUL burst-failure rationale.  Without
@@ -345,24 +355,48 @@ async def fetch_html_scrape_do(
             await acquire_scrape_do()
         except Exception as _rl_exc:  # noqa: BLE001 — never block a fetch on the limiter
             log.debug("scrape_do rate-limit acquire skipped: %s", _rl_exc)
-    try:
-        params: dict[str, str] = {"token": token, "url": url}
-        if render:
-            params["render"] = "true"
-            params["waitFor"] = str(wait_for_ms)
-        if geo_code:
-            params["geoCode"] = geo_code.upper()
-        # Bound real concurrent connections to the shared Scrape.do account —
-        # see `_scrape_do_sem` definition for the QMUL burst-failure rationale.
-        async with _scrape_do_sem:
-            async with httpx.AsyncClient(timeout=90, follow_redirects=True) as c:
-                r = await c.get("https://api.scrape.do", params=params)
-            if r.status_code == 200 and len(r.text) > 500:
+    params: dict[str, str] = {"token": token, "url": url}
+    if render:
+        params["render"] = "true"
+        params["waitFor"] = str(wait_for_ms)
+    if geo_code:
+        params["geoCode"] = geo_code.upper()
+    # T03: Exponential-backoff retry for transient Scrape.do failures.
+    # JCU root cause: account concurrency/rate-limit rejection returned non-200
+    # with zero retry — 96/103 courses silently returned None.
+    # Three total attempts with 2 s / 8 s / 30 s inter-attempt pauses.
+    # The semaphore is RELEASED between attempts so sibling coroutines can
+    # proceed while this one waits; it is re-acquired before the next attempt.
+    _SD_RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
+    _SD_BACKOFFS = (2.0, 8.0, 30.0)  # seconds between attempts
+    _last_sd_r: httpx.Response | None = None
+
+    for _sd_attempt in range(len(_SD_BACKOFFS) + 1):  # attempts 0..3
+        if _sd_attempt > 0:
+            _wait = _SD_BACKOFFS[_sd_attempt - 1]
+            # Honor Retry-After header when the server provides one.
+            if _last_sd_r is not None:
+                _ra = _last_sd_r.headers.get("retry-after", "")
+                try:
+                    _wait = max(_wait, float(_ra))
+                except (ValueError, TypeError):
+                    pass
+            log.info(
+                "[FETCH RETRY] scrape.do %s render=%s → attempt %d/%d after %.0fs backoff",
+                url, render, _sd_attempt + 1, len(_SD_BACKOFFS) + 1, _wait,
+            )
+            await asyncio.sleep(_wait)
+        try:
+            # Bound real concurrent connections to the shared Scrape.do account —
+            # see `_scrape_do_sem` definition for the QMUL burst-failure rationale.
+            async with _scrape_do_sem:
+                async with httpx.AsyncClient(timeout=90, follow_redirects=True) as c:
+                    _last_sd_r = await c.get("https://api.scrape.do", params=params)
+            _status = _last_sd_r.status_code
+            if _status == 200 and len(_last_sd_r.text) > 500:
                 log.info(
                     "scrape.do fetch %s render=%s -> 200 (%d chars)",
-                    url,
-                    render,
-                    len(r.text),
+                    url, render, len(_last_sd_r.text),
                 )
                 # Per-job call counter (shared mutable dict via ContextVar).
                 _sd_ctrs = _scrape_do_job_counters.get()
@@ -371,7 +405,7 @@ async def fetch_html_scrape_do(
                         _sd_ctrs["render"] += 1
                     else:
                         _sd_ctrs["static"] += 1
-                html_result = _unescape_json_html(r.text)
+                html_result = _unescape_json_html(_last_sd_r.text)
                 # Stage the final fetched HTML so _extract_only() can save it
                 # to S3 *after* extract_course() completes.  This ensures only
                 # the winning fetch (not retries or intermediate fallbacks) is
@@ -383,17 +417,54 @@ async def fetch_html_scrape_do(
                     fetch_method="scrape_do_render" if render else "scrape_do_static",
                 )
                 return html_result
+            # 401/403 from Scrape.do itself = bad token or credits exhausted.
+            # Raise immediately — no retry will fix a bad account state, and
+            # the orchestrator needs to abort the job to avoid burning quota.
+            if _status in (401, 403):
+                raise ScrapedoAccountError(
+                    f"Scrape.do auth/credits error HTTP {_status} for {url!r} — "
+                    "check SCRAPE_DO_TOKEN and account balance"
+                )
+            # 404/410 = page genuinely not found on the origin — no retry needed.
+            if _status in (404, 410):
+                log.info(
+                    "[FETCH FAIL] scrape.do %s render=%s → %s page-not-found (no retry)",
+                    url, render, _status,
+                )
+                return None
+            # Transient overload — retry if budget remains.
+            if _status in _SD_RETRY_STATUSES and _sd_attempt < len(_SD_BACKOFFS):
+                log.warning(
+                    "[FETCH FAIL] scrape.do %s render=%s → status=%s attempt %d/%d "
+                    "body=%r — scheduling retry with backoff",
+                    url, render, _status, _sd_attempt + 1, len(_SD_BACKOFFS) + 1,
+                    _last_sd_r.text[:300],
+                )
+                continue
+            # Final attempt or non-retryable non-200.
             log.warning(
-                "scrape.do fetch %s render=%s -> %s (%d chars)",
-                url,
-                render,
-                r.status_code,
-                len(r.text),
+                "[FETCH FAIL] scrape.do %s render=%s → status=%s attempt %d/%d body=%r",
+                url, render, _status, _sd_attempt + 1, len(_SD_BACKOFFS) + 1,
+                _last_sd_r.text[:300],
             )
             return None
-    except Exception as exc:
-        log.warning("scrape.do fetch %s render=%s failed: %s", url, render, exc)
-        return None
+        except ScrapedoAccountError:
+            raise  # always propagate — orchestrator must abort the job
+        except Exception as _sd_exc:
+            if _sd_attempt < len(_SD_BACKOFFS):
+                log.warning(
+                    "[FETCH FAIL] scrape.do %s render=%s → exception attempt %d/%d: %s"
+                    " — scheduling retry",
+                    url, render, _sd_attempt + 1, len(_SD_BACKOFFS) + 1, _sd_exc,
+                )
+                continue
+            log.warning(
+                "[FETCH FAIL] scrape.do %s render=%s → exception final attempt %d/%d: %s",
+                url, render, _sd_attempt + 1, len(_SD_BACKOFFS) + 1, _sd_exc,
+            )
+            return None
+    # All retries exhausted — should not reach here in practice.
+    return None
 
 
 def _is_cloudflare_block(resp: httpx.Response) -> bool:

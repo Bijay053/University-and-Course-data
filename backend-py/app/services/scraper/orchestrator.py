@@ -597,7 +597,7 @@ async def _clear_stale_dedup(
             "AND NOT EXISTS ("
             "    SELECT 1 FROM scrape_runtime_jobs j2"
             "    WHERE j2.runtime_job_id = sc.scrape_job_id"
-            "      AND j2.status IN ('queued', 'failed', 'stopped')"
+            "      AND j2.status IN ('queued', 'failed', 'stopped', 'failed_degraded', 'failed_provider')"
             "      AND j2.updated_at > NOW() - (:rw || ' minutes')::interval"
             ")"
         )
@@ -690,7 +690,7 @@ async def _already_staged_urls(
             JOIN scrape_runtime_jobs j ON j.runtime_job_id = sc.scrape_job_id
             WHERE sc.university_id = :uid
               AND sc.status = 'pending'
-              AND j.status IN ('queued', 'running', 'stopped', 'failed')
+              AND j.status IN ('queued', 'running', 'stopped', 'failed', 'failed_degraded', 'failed_provider', 'completed_with_warnings')
               AND j.updated_at > NOW() - (:rw || ' minutes')::interval
               AND sc.course_website IS NOT NULL
               AND sc.course_website <> ''
@@ -3782,6 +3782,12 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Collect non-error result dicts across all batches for the data-quality
         # check that runs after staging (it reads payloads, not the DB).
         _all_staged_dicts: list[dict] = []
+        # T04 recovery sweep: links whose fetch failed in the main batch pass.
+        # Populated during result processing below; swept sequentially after all
+        # batches complete so burst-rate-limited Scrape.do accounts have had time
+        # to recover.  Counters are adjusted in-place so the T05 failure-rate
+        # guard below sees the post-sweep (recovered) numbers.
+        _sweep_links: list[dict] = []
 
         # ── Batch extraction + staging ────────────────────────────────────────
         # Allow per-uni YAML to tune the batch size via `extraction.batch_size`.
@@ -4186,13 +4192,16 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     # Skip quickly without calling stage_course (empty payload would
                     # just be rejected at the staging gate anyway, wasting a DB call).
                     summary["fetch_failed"] += 1
+                    # Queue for T04 sweep so the URL gets a second chance after
+                    # all batches have run and the account rate-limit has cleared.
+                    _sweep_links.append({"url": r.get("url"), "name": r.get("name", "?")})
                     log.warning(
-                        "[429-EXHAUSTED] all retries used up for %s — skipping staging",
+                        "[429-EXHAUSTED] all retries used up for %s — queued for sweep",
                         r.get("url", "?")[:80],
                     )
                     await emit(
                         "status",
-                        f"[STAGE] 429-exhausted (all retries): {r.get('name', '?')}",
+                        f"[STAGE] 429-exhausted (queued for sweep): {r.get('name', '?')}",
                         phase="stage",
                         kind="rate_limited_exhausted",
                         url=r.get("url"),
@@ -4201,6 +4210,8 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 if r.get("error"):
                     if r["error"].startswith("fetch") or "fetch_failed" in r.get("error", ""):
                         summary["fetch_failed"] += 1
+                        # Queue for T04 sweep — sequential retry after all batches.
+                        _sweep_links.append({"url": r.get("url"), "name": r.get("name", "?")})
                     elif r["error"] == "rejected: duplicate_name_deduplicated":
                         # Dedup rejections are correct behaviour (same course from
                         # multiple URLs — best version kept).  Count as skipped, not
@@ -4496,6 +4507,89 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             # Explicitly free the batch result list so GC can reclaim the
             # memory before the next batch's extraction begins.
             del results
+
+        # ── T04: End-of-batch recovery sweep ─────────────────────────────────
+        # Re-extract URLs that returned fetch_failed during the main parallel
+        # batch pass.  Sequential (concurrency=1, 2 s gap) so a recovering
+        # Scrape.do account is not hit with another burst.  Summary counters
+        # are updated in-place so the T05 failure-rate guard sees post-sweep
+        # numbers (recovered courses reduce the effective failure rate).
+        if _sweep_links:
+            log.info(
+                "[SWEEP] %d fetch-failed URL(s) queued for sequential recovery pass",
+                len(_sweep_links),
+            )
+            await emit(
+                "status",
+                f"[SWEEP] {len(_sweep_links)} fetch-failed URL(s) → sequential recovery",
+                phase="sweep", kind="sweep_start", count=len(_sweep_links),
+            )
+            _sweep_recovered = 0
+            for _sweep_lk in _sweep_links:
+                _sweep_url = (_sweep_lk.get("url") or "?")
+                try:
+                    await asyncio.sleep(2.0)  # brief pause between sweep retries
+                    _sw_r = await _extract_only(
+                        _sweep_lk,
+                        uni_country,
+                        uni_pdf_data or None,
+                        emit=emit,
+                        vision_image_cache=vision_image_cache,
+                        central_data=central_data,
+                        extraction_rules=_ac_ext_rules,
+                        seen_pdf_urls=seen_pdf_urls,
+                    )
+                    if not isinstance(_sw_r, dict) or _sw_r.get("error"):
+                        log.info(
+                            "[SWEEP] %s still failed after retry: %s",
+                            _sweep_url[:80],
+                            _sw_r.get("error") if isinstance(_sw_r, dict) else type(_sw_r).__name__,
+                        )
+                        continue
+                    _sw_payload = dict(_sw_r.get("payload") or {})
+                    async with AsyncSessionLocal() as _sw_stage_db:
+                        _sw_res = await stage_course(
+                            _sw_stage_db,
+                            scrape_job_id=runtime_job_id,
+                            university_id=uni_id,
+                            course_name=_sw_r["name"],
+                            payload=_sw_payload,
+                            evidence=_sw_r.get("evidence") or [],
+                            source_url=_sweep_url,
+                        )
+                    if _sw_res.saved:
+                        summary["staged"] += 1
+                        summary["fetch_failed"] = max(0, summary["fetch_failed"] - 1)
+                        _sweep_recovered += 1
+                        await emit(
+                            "status",
+                            f"[SWEEP] recovered: {_sw_r.get('name', '?')}",
+                            phase="sweep", kind="sweep_recovered", url=_sweep_url,
+                        )
+                    else:
+                        summary["skipped"] += 1
+                        summary["fetch_failed"] = max(0, summary["fetch_failed"] - 1)
+                        _sweep_recovered += 1
+                        await emit(
+                            "status",
+                            f"[SWEEP] skipped (staging gate rejected): {_sw_r.get('name', '?')}",
+                            phase="sweep", kind="sweep_skipped", url=_sweep_url,
+                        )
+                except Exception as _sw_exc:  # noqa: BLE001 — sweep must never abort the job
+                    log.warning(
+                        "[SWEEP] extraction/stage failed for %s: %s",
+                        _sweep_url[:80], _sw_exc,
+                    )
+            log.info(
+                "[SWEEP] recovered %d/%d failed URL(s)",
+                _sweep_recovered, len(_sweep_links),
+            )
+            await emit(
+                "status",
+                f"[SWEEP] recovered {_sweep_recovered}/{len(_sweep_links)} failed URL(s)",
+                phase="sweep", kind="sweep_done",
+                recovered=_sweep_recovered, total=len(_sweep_links),
+            )
 
         # ── Write Gemini call log once after all batches ──────────────────────
         if _all_gemini_calls:
@@ -4886,6 +4980,49 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             )
             summary["staged"] = actual_staged
         await emit("status", f"Staged {summary['staged']} courses, {summary['skipped']} skipped, {summary['fetch_failed']} fetch errors", phase="complete", **summary)
+        # ── T05: Fetch-failure rate guard ─────────────────────────────────────
+        # When > 30 % of discovered courses failed the fetch step (e.g. Scrape.do
+        # account exhausted mid-run) mark the job 'failed_degraded' so the
+        # approval / bulk-approve scripts know NOT to replace live published data
+        # with a near-empty result set.  10–30 % → 'completed_with_warnings'.
+        # Evaluated AFTER the T04 sweep so recovered courses reduce the rate.
+        _discovered_n = summary.get("discovered", 0)
+        _fetch_fail_n = summary.get("fetch_failed", 0)
+        _fetch_failure_rate = _fetch_fail_n / max(1, _discovered_n)
+        _forced_status: str | None = None
+        if _discovered_n > 0 and _fetch_failure_rate > 0.30:
+            _forced_status = "failed_degraded"
+            log.warning(
+                "[FAILURE GUARD] fetch_failure_rate=%.1f%% (%d/%d) > 30%% — "
+                "marking job failed_degraded",
+                _fetch_failure_rate * 100, _fetch_fail_n, _discovered_n,
+            )
+            await emit(
+                "status",
+                f"[FAILURE GUARD] {_fetch_fail_n}/{_discovered_n} courses failed fetch "
+                f"({_fetch_failure_rate * 100:.0f}%) — job marked failed_degraded "
+                "(existing published data protected)",
+                phase="complete", kind="failure_guard",
+                fetch_failed=_fetch_fail_n, discovered=_discovered_n,
+                rate=round(_fetch_failure_rate, 3),
+                level="error",
+            )
+        elif _discovered_n > 0 and _fetch_failure_rate > 0.10:
+            _forced_status = "completed_with_warnings"
+            log.warning(
+                "[FAILURE GUARD] fetch_failure_rate=%.1f%% (%d/%d) > 10%% — "
+                "marking completed_with_warnings",
+                _fetch_failure_rate * 100, _fetch_fail_n, _discovered_n,
+            )
+            await emit(
+                "status",
+                f"[FAILURE GUARD] {_fetch_fail_n}/{_discovered_n} courses failed fetch "
+                f"({_fetch_failure_rate * 100:.0f}%) — completed_with_warnings",
+                phase="complete", kind="failure_guard_warn",
+                fetch_failed=_fetch_fail_n, discovered=_discovered_n,
+                rate=round(_fetch_failure_rate, 3),
+                level="warn",
+            )
         finished_cleanly = summary["errors"] == 0 or (
             summary["staged"] + summary["skipped"] > 0
         )
@@ -4898,13 +5035,16 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Re-read straight from the DB — the in-memory ``job`` is
         # stale w.r.t. concurrent commits from /active reaper etc.
         await db.refresh(job, ["status"])
-        if job.status in {"stopped", "failed", "completed"}:
+        if job.status in {"stopped", "failed", "completed", "failed_degraded", "failed_provider", "completed_with_warnings"}:
             log.info(
                 "Scrape %s already terminal (%s) — skipping finalize",
                 runtime_job_id, job.status,
             )
             return {"ok": False, "reason": f"already_{job.status}", **summary}
-        job.status = "completed" if finished_cleanly else "failed"
+        if _forced_status is not None:
+            job.status = _forced_status
+        else:
+            job.status = "completed" if finished_cleanly else "failed"
         # Always update progress counters from this run.
         # `_resume_already_staged` (Task #229 resume checkpoint, fixed after
         # a real QMUL bug report) folds courses skipped as already-staged
