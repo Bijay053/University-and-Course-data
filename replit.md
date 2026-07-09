@@ -135,6 +135,14 @@ Canvas-reported bug: "HNC Building Studies should be rejected because it is part
 - **Verified**: live scrape.do fetch of the HNC Building Studies page confirms the sentinel now fires correctly, and `should_stage_course` rejects the course end-to-end. QMUL has no `fees.degree_level_defaults` configured, so this specific fallback-masking bug did not apply there — the shared row-selection fix still benefits all UK universities with structured fee tables.
 - **Tests**: `tests/test_fee.py` (rewritten for the new sentinel) and a new `TestFeeTableConfirmedNoInternational` class in `tests/test_guards.py` (3 tests — reject despite `degree_level_defaults`, reject despite `has_central_fee_page`, sanity check that normal missing-fee courses still use escape hatches). All pass; one pre-existing unrelated failure (`test_missing_ielts_is_warning` in `test_data_quality.py`) confirmed out of scope.
 
+### Fetch-layer brief (2026-07-09, dev)
+
+- **A3 fetch-error registry**: `http_fetcher.py` records the final failure (status/tier/detail) per URL in a bounded dict; discovery log lines append `format_fetch_error(url)` so "fetch failed" is never opaque.
+- **B account-wide Scrape.do semaphore** (`scrape_do_semaphore.py`): Redis zset caps fleet-wide in-flight Scrape.do calls across all 8 prefork workers. Opt-in via `SCRAPEDO_MAX_CONCURRENCY` (default 0 = disabled); fail-open on any Redis error; stale slots reaped after 180 s; gauge log `[SCRAPEDO GAUGE] in-flight N/cap`. Local semaphore is acquired first, account slot nested inside.
+- **C1 7-day discovery URL cache** (`discovery_url_cache` table, migration 046 — applied in dev, run `scripts/apply_migration_046.py` on prod): re-scrapes within 7 days skip the whole discovery phase. Bypass with `forceDiscovery: true` in the start-scrape body. Only healthy runs (≥5 course links, fetch-fail <30%) write the cache; SearchStax unis excluded; BFS-blocked fee URLs persisted alongside (marked `fee_page: true`).
+- **C4 per-phase DONE timing**: DONE line now ends with `Discovery:Xs | Extraction:Xs | Sweep:Xs | Staging:Xs`.
+- Tests: `tests/test_fetch_layer_brief.py` (30 tests). C2/C3 of the brief deferred.
+
 ### Data Model
 
 The database schema includes tables for `universities`, `courses`, `intakes`, `fees`, `english_requirements`, `academic_requirements`, `scholarships`, `scraping_jobs`, `scraping_changes`, `scraped_courses` (staging), and `import_jobs`.

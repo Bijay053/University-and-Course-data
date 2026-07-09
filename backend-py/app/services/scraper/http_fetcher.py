@@ -25,6 +25,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import time
 import urllib.parse
 from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
@@ -43,6 +44,69 @@ class ScrapedoAccountError(RuntimeError):
     Propagates out of fetch_html_scrape_do so the orchestrator can abort the job
     immediately rather than accumulating hundreds of silent None returns.
     """
+
+
+# ---------------------------------------------------------------------------
+# A3 — last-fetch-error registry
+# ---------------------------------------------------------------------------
+# fetch_html / fetch_html_scrape_do return ``str | None`` at ~40 call sites, so
+# failures can't carry status codes in the return value without touching every
+# caller.  Instead, the *final-failure* point of each fetcher records the last
+# known error (HTTP status, tier that failed, response snippet) here, keyed by
+# URL.  Callers that log user-facing failure lines (e.g. discovery's
+# "[DISCOVER] ERROR: fetch failed") consult ``get_last_fetch_error(url)`` to
+# include a real diagnosis instead of "check site connectivity".
+# Bounded FIFO dict — per-process, same event loop as the callers that read it.
+_MAX_FETCH_ERRORS = 512
+_last_fetch_errors: dict[str, dict] = {}
+
+
+def _record_fetch_error(
+    url: str,
+    *,
+    status: int | None = None,
+    tier: str = "",
+    detail: str = "",
+) -> None:
+    """Record the final failure for *url* (bounded, oldest-first eviction)."""
+    while len(_last_fetch_errors) >= _MAX_FETCH_ERRORS:
+        try:
+            _last_fetch_errors.pop(next(iter(_last_fetch_errors)))
+        except (StopIteration, KeyError):  # pragma: no cover — race-free in asyncio
+            break
+    _last_fetch_errors[url] = {
+        "status": status,
+        "tier": tier,
+        "detail": (detail or "")[:200],
+        "ts": time.time(),
+    }
+
+
+def get_last_fetch_error(url: str) -> dict | None:
+    """Return the last recorded fetch failure for *url* (or None).
+
+    Checks the exact URL first, then the bare URL without query string —
+    discovery retries strip query params, so the recorded key may differ.
+    """
+    err = _last_fetch_errors.get(url)
+    if err is None and "?" in url:
+        err = _last_fetch_errors.get(url.split("?", 1)[0])
+    return err
+
+
+def format_fetch_error(url: str) -> str:
+    """Human-readable one-liner of the last failure for *url* ('' if unknown)."""
+    err = get_last_fetch_error(url)
+    if not err:
+        return ""
+    parts = []
+    if err.get("status") is not None:
+        parts.append(f"HTTP {err['status']}")
+    if err.get("tier"):
+        parts.append(f"tier={err['tier']}")
+    if err.get("detail"):
+        parts.append(f"body={err['detail'][:120]!r}")
+    return " ".join(parts)
 
 
 _sem = asyncio.Semaphore(settings.max_http_concurrency)
@@ -389,9 +453,20 @@ async def fetch_html_scrape_do(
         try:
             # Bound real concurrent connections to the shared Scrape.do account —
             # see `_scrape_do_sem` definition for the QMUL burst-failure rationale.
+            # Part B (fetch-layer brief): the ACCOUNT-WIDE Redis slot bounds the
+            # true fleet-wide in-flight count too (8 prefork workers × 5 local
+            # = 40 without it).  Nesting order matters: the LOCAL semaphore is
+            # acquired FIRST so a coroutine never holds a scarce fleet-wide
+            # Redis slot while merely queueing behind its own process's local
+            # semaphore.  Both are acquired INSIDE the retry loop and released
+            # between attempts so a backing-off coroutine never starves the
+            # rest of the fleet.  account_slot() is a no-op unless
+            # scrape_do_account_concurrency > 0 and fails open on any Redis error.
+            from app.services.scraper.scrape_do_semaphore import account_slot
             async with _scrape_do_sem:
-                async with httpx.AsyncClient(timeout=90, follow_redirects=True) as c:
-                    _last_sd_r = await c.get("https://api.scrape.do", params=params)
+                async with account_slot():
+                    async with httpx.AsyncClient(timeout=90, follow_redirects=True) as c:
+                        _last_sd_r = await c.get("https://api.scrape.do", params=params)
             _status = _last_sd_r.status_code
             if _status == 200 and len(_last_sd_r.text) > 500:
                 log.info(
@@ -431,6 +506,10 @@ async def fetch_html_scrape_do(
                     "[FETCH FAIL] scrape.do %s render=%s → %s page-not-found (no retry)",
                     url, render, _status,
                 )
+                _record_fetch_error(
+                    url, status=_status, tier="scrape_do",
+                    detail="page not found",
+                )
                 return None
             # Transient overload — retry if budget remains.
             if _status in _SD_RETRY_STATUSES and _sd_attempt < len(_SD_BACKOFFS):
@@ -447,6 +526,10 @@ async def fetch_html_scrape_do(
                 url, render, _status, _sd_attempt + 1, len(_SD_BACKOFFS) + 1,
                 _last_sd_r.text[:300],
             )
+            _record_fetch_error(
+                url, status=_status, tier="scrape_do",
+                detail=_last_sd_r.text[:200],
+            )
             return None
         except ScrapedoAccountError:
             raise  # always propagate — orchestrator must abort the job
@@ -461,6 +544,10 @@ async def fetch_html_scrape_do(
             log.warning(
                 "[FETCH FAIL] scrape.do %s render=%s → exception final attempt %d/%d: %s",
                 url, render, _sd_attempt + 1, len(_SD_BACKOFFS) + 1, _sd_exc,
+            )
+            _record_fetch_error(
+                url, status=None, tier="scrape_do",
+                detail=f"exception: {_sd_exc}",
             )
             return None
     # All retries exhausted — should not reach here in practice.
@@ -874,6 +961,7 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
         return None
 
     last_exc: Exception | None = None
+    last_status: int | None = None
     got_cloudflare_block = False
     cf_block_status: int | None = None
     got_hard_403 = False
@@ -888,6 +976,7 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
                     # Returns {} for every other host so this is a true
                     # no-op for ~100 universities in the fleet.
                     r = await c.get(url, cookies=cookies_for_url(url))
+                    last_status = r.status_code
                     if r.status_code == 200:
                         html_200 = r.text
                         break  # exit loop; post-loop logic decides what to return
@@ -918,6 +1007,10 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
     if got_hard_403:
         # Server explicitly rejected the request — no point trying cffi or
         # Wayback Machine. Return None so the pipeline records a fetch_failed.
+        _record_fetch_error(
+            url, status=403, tier="httpx",
+            detail="hard 403 from origin (not Cloudflare) — retries skipped",
+        )
         return None
 
     # ── Got HTTP 200 ──────────────────────────────────────────────────────────
@@ -1078,8 +1171,21 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
             "fetch %s: all tiers exhausted (httpx, curl_cffi, Wayback, Scrape.do)",
             url,
         )
+        _record_fetch_error(
+            url, status=cf_block_status, tier="cf_ladder",
+            detail="Cloudflare block — httpx/cffi/Wayback/Scrape.do all failed",
+        )
         return None
 
     if last_exc:
         log.error("fetch %s exhausted retries: %s", url, last_exc)
+        _record_fetch_error(
+            url, status=None, tier="httpx",
+            detail=f"exception: {last_exc}",
+        )
+    else:
+        _record_fetch_error(
+            url, status=last_status, tier="httpx",
+            detail="non-200 responses on all attempts",
+        )
     return None

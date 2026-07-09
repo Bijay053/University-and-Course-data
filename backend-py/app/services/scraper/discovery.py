@@ -19,7 +19,7 @@ from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse, urlunparse, urlencode, parse_qsl, parse_qs, unquote
 
 from app.config import settings
-from app.services.scraper.http_fetcher import fetch_html
+from app.services.scraper.http_fetcher import fetch_html, format_fetch_error
 
 log = logging.getLogger(__name__)
 
@@ -1243,18 +1243,24 @@ async def discover_course_links(
                         "[DISCOVER] fetch succeeded without query params for %s", url
                     )
         if not html:
+            # A3 (fetch-layer brief): include the actual HTTP status / tier /
+            # response snippet recorded by http_fetcher at its final-failure
+            # point, so operators can distinguish 429 vs 403 vs timeout
+            # instead of guessing from "check site connectivity".
+            _err_detail = format_fetch_error(url) or "no status recorded (timeout?)"
             # Log at ERROR level so missing-category failures are visible
             # in the dashboard sweep log, not just silently skipped.
             log.error(
-                "[DISCOVER] fetch failed (all retries) — %s — courses in this "
-                "category will be missing from this run",
+                "[DISCOVER] fetch failed (all retries) — %s — %s — courses in "
+                "this category will be missing from this run",
                 url,
+                _err_detail,
             )
             if emit:
                 await emit(
                     "status",
-                    f"[DISCOVER] ERROR: fetch failed for {url} — courses in this "
-                    f"category will be missing. Check site connectivity.",
+                    f"[DISCOVER] ERROR: fetch failed for {url} — {_err_detail} "
+                    f"— courses in this category will be missing.",
                     phase="discover",
                     kind="page_fetch_fail",
                     error=True,

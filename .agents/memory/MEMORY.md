@@ -59,3 +59,5 @@
 - [Discovery budget guard](discovery-budget-guard.md) — Cardiff silent-stall: N failing seed URLs can burn the whole discovery_phase_timeout_s before sitemap fallback runs; gate retries/fallback on remaining budget, not just per-call timeout.
 - [Kingston CF Enterprise fix](kingston-cf-enterprise-fix.md) — same transport as Cardiff (scrape_do_skip_fallbacks + render=true); key: point sitemap_url to sitemap.xml?page=1 directly (skips index + page=2 + 7 alt probes, saves ~140s in 300s budget); fee in <th> not <td>.
 - [Fetch reliability overhaul T01-T08](fetch-reliability-overhaul.md) — ScrapedoAccountError + 3-attempt retry (2s/8s/30s) in fetch_html_scrape_do; sweep pass + failed_degraded guard in orchestrator.
+- [Discovery URL cache](discovery-url-cache.md) — cached fast-paths must carry the skipped phase's side-channel outputs (blocked fee URLs) too; never cache provider-payload links.
+- [Distributed semaphore lessons](distributed-semaphore-lessons.md) — acquire local semaphore BEFORE fleet-wide Redis slot; cache one redis.asyncio client per event loop (WeakKeyDictionary).

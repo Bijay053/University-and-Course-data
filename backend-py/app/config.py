@@ -12,7 +12,7 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _ENV_FILE = Path(__file__).parent.parent / ".env"
@@ -157,6 +157,25 @@ class Settings(BaseSettings):
     # — that token bucket smooths cross-worker call *rate*, this bounds
     # simultaneous in-flight *connections* from this process.
     max_scrape_do_concurrency: int = 5
+
+    # Fetch-layer brief Part B: ACCOUNT-WIDE hard cap on simultaneous in-flight
+    # Scrape.do requests across the ENTIRE Celery fleet (Redis-coordinated).
+    # The in-process semaphore above caps 5 per worker process, but with 8
+    # prefork workers the real account-level concurrency can reach 40 — far
+    # above the Scrape.do plan's concurrent-connection limit, causing 429/502
+    # rejection storms.  This setting bounds the true account-wide number.
+    # 0 = disabled (existing behaviour: in-process semaphore only).
+    # Fail-open: any Redis error falls back to the in-process semaphore.
+    # Override via SCRAPEDO_MAX_CONCURRENCY (brief's name) or
+    # SCRAPE_DO_ACCOUNT_CONCURRENCY env var.
+    scrape_do_account_concurrency: int = Field(
+        default=0,
+        validation_alias=AliasChoices(
+            "SCRAPEDO_MAX_CONCURRENCY",
+            "SCRAPE_DO_ACCOUNT_CONCURRENCY",
+            "scrape_do_account_concurrency",
+        ),
+    )
 
     # Task #233: per-course Gemini primary-extraction timeout (seconds).
     # The full-extraction Gemini call is wrapped in asyncio.wait_for around the

@@ -18,6 +18,9 @@ class StartScrapeBody(BaseModel):
     default_study_mode: str | None = Field(default=None, alias="defaultStudyMode")
     fast_mode: bool = Field(default=False, alias="fastMode")
     bulk_mode: bool = Field(default=False, alias="bulkMode")
+    # C1 (fetch-layer brief): bypass the 7-day discovery URL cache and force a
+    # full fresh discovery crawl for this run.
+    force_discovery: bool = Field(default=False, alias="forceDiscovery")
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
 

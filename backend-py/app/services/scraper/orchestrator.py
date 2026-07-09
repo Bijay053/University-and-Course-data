@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import time
 from datetime import datetime, timezone
 from typing import Any
 
@@ -1226,6 +1227,10 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     max_pages = int(_yaml_pb)
             except Exception:  # noqa: BLE001
                 pass
+        # C4 (fetch-layer brief): per-phase wall-clock marks for the ══ DONE ══
+        # summary line — Discovery / Extraction / Sweep / Staging.  The 30-min
+        # budget can't be managed without seeing where the time goes.
+        _ph_marks: dict[str, float] = {"disc_start": time.monotonic()}
         log.info("Discovering course links from %s (fast_mode=%s)", scrape_url, job.fast_mode)
         await emit("status", f"Fetching {scrape_url}...", phase="fetch")
         await emit("status", "Discovering candidate course pages...", phase="discover")
@@ -1248,6 +1253,75 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # extend the Cloudflare rate-limit window — all for zero gain since
         # browser discovery subsumes the BFS result set.
         _always_browser = getattr(_uni_cfg.discovery, "always_browser_discover", False)
+
+        # ── C1 (fetch-layer brief): 7-day discovery URL cache ────────────────
+        # A fresh discovery pass (BFS crawl + sitemap probes + browser + Wayback)
+        # costs 2-5 minutes and dozens of Scrape.do calls, yet a university's
+        # course-URL list barely changes week to week.  When a cache row exists,
+        # is younger than 7 days, and holds >= 5 links, pre-seed `links` from it:
+        # every pre-BFS provider and the BFS itself is gated on `if not links`,
+        # so they are all skipped naturally; browser discovery is disabled via
+        # _always_browser=False and the Wayback supplement checks _disc_cache_hit.
+        # Bypassed when: the run was started with forceDiscovery=true, or the
+        # uni uses a SearchStax provider (its link dicts embed large prebuilt
+        # payloads that must never be served stale — and the provider is a
+        # single fast Solr call anyway).  Read errors fail open to normal
+        # discovery.  Post-discovery filters (must_contain, allow/block
+        # patterns, year-dedup) still run on cached links as usual.
+        _disc_cache_hit = False
+        _c1_rp = job.request_payload or {}
+        _c1_force = bool(_c1_rp.get("forceDiscovery") or _c1_rp.get("force_discovery"))
+        if not _c1_force and getattr(_uni_cfg.discovery, "searchstax", None) is None:
+            try:
+                from app.models import DiscoveryUrlCache as _DUC
+                _c1_row = await db.get(_DUC, uni_id)
+                if _c1_row is not None and _c1_row.links:
+                    _c1_age_s = (
+                        datetime.now(timezone.utc) - _c1_row.discovered_at
+                    ).total_seconds()
+                    _c1_age_d = _c1_age_s / 86400.0
+                    # Rows persist two entry kinds: course links, and BFS-blocked
+                    # fee-page URLs (marked fee_page=True) so the Bug-7 central-
+                    # fee-page fallback still works on cached runs where BFS is
+                    # skipped.  The >=5 freshness gate counts COURSE links only.
+                    _c1_course = [
+                        dict(_lk) for _lk in _c1_row.links
+                        if _lk.get("url") and not _lk.get("fee_page")
+                    ]
+                    if _c1_age_d < 7.0 and len(_c1_course) >= 5:
+                        links = _c1_course
+                        _discover_blocked_fee_urls.extend(
+                            _lk["url"] for _lk in _c1_row.links
+                            if _lk.get("url") and _lk.get("fee_page")
+                        )
+                        _disc_cache_hit = True
+                        _always_browser = False
+                        log.info(
+                            "[DISCOVER] cache hit — %d URLs, age %.1fd",
+                            len(links), _c1_age_d,
+                        )
+                        await emit(
+                            "status",
+                            f"[DISCOVER] cache hit — {len(links)} URLs, age "
+                            f"{_c1_age_d:.1f}d (start with forceDiscovery=true "
+                            f"to re-crawl)",
+                            phase="discover",
+                            kind="discovery_cache_hit",
+                            count=len(links),
+                            age_days=round(_c1_age_d, 1),
+                        )
+                    elif _c1_age_d >= 7.0:
+                        log.info(
+                            "[DISCOVER] cache stale (age %.1fd >= 7d) — full discovery",
+                            _c1_age_d,
+                        )
+            except Exception as _c1_exc:  # noqa: BLE001 — cache must never block discovery
+                log.warning(
+                    "[DISCOVER] discovery_url_cache read failed (fail-open): %s",
+                    _c1_exc,
+                )
+        elif _c1_force:
+            log.info("[DISCOVER] forceDiscovery=true — bypassing discovery URL cache")
 
         # ── Advanced Recipe: JSON API discovery ───────────────────────────────
         # When the operator stored a recipe with discovery_strategy=json_api
@@ -2025,7 +2099,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Short-circuit for MQ: when MQ-specific sweep produced links, skip
         # Wayback — archive.org has shallow coverage of this Cloudflare-
         # walled host and the tier would just add latency / noise.
-        if _use_wayback is not False and (not links or _use_wayback) and not (_is_mq_host and links):
+        if _use_wayback is not False and (not links or _use_wayback) and not (_is_mq_host and links) and not _disc_cache_hit:
             try:
                 from app.services.scraper.wayback_discover import wayback_discover
                 if links and _use_wayback:
@@ -2224,6 +2298,35 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # so the DB and UI always reflect the *extractable* count, not the raw one.
         summary["discovered_raw"] = len(links)
         summary["discovered"] = len(links)   # placeholder — overwritten below
+        _ph_marks["disc_end"] = time.monotonic()  # C4 phase timing
+        # C1: capture a sanitized (name+url only) snapshot of the RAW discovered
+        # links for the 7-day cache.  Skipped when this run itself was served
+        # from the cache, or when link dicts embed provider payloads
+        # (SearchStax/Swiftype prebuilt results must never be cached — they'd
+        # be served stale and are huge).  Written at end-of-run only if the
+        # run stayed healthy (>=5 links, fetch-fail rate <30%).
+        _c1_links_for_cache: list[dict] = []
+        if not _disc_cache_hit and links:
+            _c1_payload_keys = ("searchstax_result", "swiftype_result", "payload")
+            _c1_has_payload = any(
+                any(_k in _lk for _k in _c1_payload_keys) for _lk in links[:20]
+            )
+            if not _c1_has_payload:
+                _c1_links_for_cache = [
+                    {"name": _lk.get("name"), "url": _lk.get("url")}
+                    for _lk in links
+                    if _lk.get("url")
+                ]
+        # Course-link count BEFORE fee-page entries are appended — the
+        # write-through health gate must count real course links only.
+        _c1_course_link_n = len(_c1_links_for_cache)
+        if _c1_links_for_cache and _discover_blocked_fee_urls:
+            # Persist BFS-blocked fee-page URLs alongside the course links so
+            # the central-fee-page fallback keeps working on cache-hit runs.
+            _c1_links_for_cache.extend(
+                {"url": _u, "fee_page": True}
+                for _u in dict.fromkeys(_discover_blocked_fee_urls)
+            )
         log.info(
             "Discovered %d raw candidate course link(s) for %s",
             len(links), uni_name,
@@ -4514,6 +4617,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Scrape.do account is not hit with another burst.  Summary counters
         # are updated in-place so the T05 failure-rate guard sees post-sweep
         # numbers (recovered courses reduce the effective failure rate).
+        _ph_marks["sweep_start"] = time.monotonic()  # C4 phase timing
         if _sweep_links:
             log.info(
                 "[SWEEP] %d fetch-failed URL(s) queued for sequential recovery pass",
@@ -4590,6 +4694,8 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 phase="sweep", kind="sweep_done",
                 recovered=_sweep_recovered, total=len(_sweep_links),
             )
+
+        _ph_marks["sweep_end"] = time.monotonic()  # C4 phase timing
 
         # ── Write Gemini call log once after all batches ──────────────────────
         if _all_gemini_calls:
@@ -4900,6 +5006,51 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Build human-readable skip breakdown for the log line.
         _skip_parts = [f"{k}={v}" for k, v in sorted(skip_reasons.items(), key=lambda x: -x[1])]
         _skip_detail = f" ({', '.join(_skip_parts)})" if _skip_parts else ""
+        # ── C1 write-through: persist discovered URLs for 7-day reuse ────────
+        # Only a healthy run may (over)write the cache: >=5 sanitized links AND
+        # a post-sweep fetch-fail rate under 30%.  A degraded run (Scrape.do
+        # outage, CF storm) must not poison the cache with a partial URL list.
+        # Best-effort: any DB error is logged and ignored.
+        _c1_cacheable = locals().get("_c1_links_for_cache") or []
+        _c1_course_n = locals().get("_c1_course_link_n") or 0
+        if _c1_course_n >= 5:
+            _c1_attempted = max(1, summary.get("discovered", 0))
+            _c1_fail_rate = summary.get("fetch_failed", 0) / _c1_attempted
+            if _c1_fail_rate < 0.30:
+                try:
+                    from sqlalchemy.dialects.postgresql import insert as _c1_pg_insert
+                    from app.models import DiscoveryUrlCache as _DUC2
+                    async with AsyncSessionLocal() as _c1_db:
+                        _c1_stmt = _c1_pg_insert(_DUC2).values(
+                            university_id=uni_id,
+                            links=_c1_cacheable,
+                            link_count=len(_c1_cacheable),
+                            discovered_at=datetime.now(timezone.utc),
+                        ).on_conflict_do_update(
+                            index_elements=["university_id"],
+                            set_={
+                                "links": _c1_cacheable,
+                                "link_count": len(_c1_cacheable),
+                                "discovered_at": datetime.now(timezone.utc),
+                            },
+                        )
+                        await _c1_db.execute(_c1_stmt)
+                        await _c1_db.commit()
+                    log.info(
+                        "[DISCOVER] cached %d discovered URL(s) for 7-day reuse",
+                        len(_c1_cacheable),
+                    )
+                except Exception as _c1_wexc:  # noqa: BLE001 — cache write is best-effort
+                    log.warning(
+                        "[DISCOVER] discovery_url_cache write failed (ignored): %s",
+                        _c1_wexc,
+                    )
+            else:
+                log.info(
+                    "[DISCOVER] not caching discovery URLs — fetch-fail rate "
+                    "%.0f%% >= 30%% (degraded run must not poison the cache)",
+                    _c1_fail_rate * 100,
+                )
         # QMUL "no traces" bug (2026-07-06): summary["fetch_failed"] (courses
         # whose initial HTTP/Scrape.do fetch came back empty and — because
         # skip_browser_rescue/skip_per_course_browser was set for that uni —
@@ -4921,6 +5072,35 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 f" | SearchStax title-filter excluded:{_ss_filter_stats['searchstax_title_excluded']}"
                 f" queued:{_ss_filter_stats.get('searchstax_queued', '?')}"
             )
+        # C4 (fetch-layer brief): per-phase timing so the 30-min budget can be
+        # managed. Discovery ≤5min cold / ~0 cached · Extraction ≤20min ·
+        # Sweep+Staging ≤5min.  "Staging" here = post-sweep finalization
+        # (Gemini call log, auto-publish gate, DB writes) — per-course staging
+        # itself is interleaved with extraction.
+        _ph_now = time.monotonic()
+        _ph_t0 = _ph_marks.get("disc_start", _ph_now)
+        _ph_disc_s = max(0.0, _ph_marks.get("disc_end", _ph_t0) - _ph_t0)
+        _ph_extract_s = max(
+            0.0,
+            _ph_marks.get("sweep_start", _ph_now)
+            - _ph_marks.get("disc_end", _ph_marks.get("sweep_start", _ph_now)),
+        )
+        _ph_sweep_s = max(
+            0.0,
+            _ph_marks.get("sweep_end", _ph_now)
+            - _ph_marks.get("sweep_start", _ph_marks.get("sweep_end", _ph_now)),
+        )
+        _ph_staging_s = max(0.0, _ph_now - _ph_marks.get("sweep_end", _ph_now))
+        _phase_timings = {
+            "discovery_s": round(_ph_disc_s, 1),
+            "extraction_s": round(_ph_extract_s, 1),
+            "sweep_s": round(_ph_sweep_s, 1),
+            "staging_s": round(_ph_staging_s, 1),
+        }
+        _done_msg += (
+            f" | Discovery:{_ph_disc_s:.0f}s | Extraction:{_ph_extract_s:.0f}s"
+            f" | Sweep:{_ph_sweep_s:.0f}s | Staging:{_ph_staging_s:.0f}s"
+        )
         await emit(
             "done",
             _done_msg,
@@ -4934,6 +5114,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             skip_reason_samples=skip_reason_samples,
             searchstax_filter=_ss_filter_stats or None,
             performance_savings=_perf_savings,
+            phase_timings=_phase_timings,
             level="success",
         )
         # PR-1.5: post-run sanity check on the imported counter.

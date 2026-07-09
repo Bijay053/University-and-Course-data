@@ -478,6 +478,8 @@ async def start_scrape(
             "scholarshipPage": body.scholarship_page or None,
             "academicRequirementsPage": body.academic_requirements_page or None,
             "defaultStudyMode": body.default_study_mode or None,
+            # C1: bypass the 7-day discovery URL cache for this run.
+            "forceDiscovery": bool(body.force_discovery),
         },
     )
     db.add(job)

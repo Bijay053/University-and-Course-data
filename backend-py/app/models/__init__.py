@@ -5,6 +5,7 @@ existing Drizzle migrations remain the source of truth.
 """
 from app.models.academic_level_option import AcademicLevelOption
 from app.models.discovery_failure_alert import DiscoveryFailureAlert
+from app.models.discovery_url_cache import DiscoveryUrlCache
 from app.models.central_page_cache import CentralPageCache
 from app.models.academic_requirement import AcademicRequirement
 from app.models.acronym import CourseAcronymOption
@@ -53,6 +54,7 @@ __all__ = [
     "GeminiCallLog",
     "AcademicRequirement",
     "CentralPageCache",
+    "DiscoveryUrlCache",
     "AssessmentNote",
     "BulkSession",
     "Course",
