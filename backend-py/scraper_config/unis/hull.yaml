@@ -1,0 +1,71 @@
+# University of Hull
+# Hostname: www.hull.ac.uk
+# Slug: hull  (loader derives: strip www → hull.ac.uk → first label)
+#
+# IMPORTANT: www.hull.ac.uk is NOT yet in the universities DB.
+# Add the record (scrape_url='https://www.hull.ac.uk/') before running a scrape
+# so that load_uni_config() can pick up this file.
+#
+# ── Page structure (verified 2026-07-09) ─────────────────────────────────────
+# All three course-listing pages return full static HTML with every course link
+# embedded in the page body — no JavaScript rendering required for discovery.
+#
+#   Listing pages (static HTML, no render needed):
+#     /study/undergraduate/courses       → ~248 UG course slugs
+#     /study/postgraduate-taught/courses  → ~159 PG-Taught course slugs
+#     /study/postgraduate-research/courses→ ~64  PG-Research slugs
+#
+#   Course detail pages (~560 KB SSR payload):
+#     Fee, IELTS, duration, mode all present in the embedded SSR JSON blob.
+#     No Scrape.do or Playwright needed; plain httpx returns everything.
+#     No Cloudflare protection detected on any page.
+#
+# ── URL patterns ─────────────────────────────────────────────────────────────
+#   UG detail:          /study/undergraduate/courses/<slug>
+#   PG-Taught detail:   /study/postgraduate-taught/courses/<slug>
+#   PG-Research detail: /study/postgraduate-research/courses/<slug>
+# ─────────────────────────────────────────────────────────────────────────────
+
+discovery:
+  seed_urls:
+    # All three listing pages are comprehensive — each contains every course
+    # for that level in the static HTML.  BFS visits these three pages and
+    # collects all course detail URLs in a single pass (budget = 3).
+    - https://www.hull.ac.uk/study/undergraduate/courses
+    - https://www.hull.ac.uk/study/postgraduate-taught/courses
+    - https://www.hull.ac.uk/study/postgraduate-research/courses
+
+  # bfs_page_budget = exactly 3 seeds — all course links are on the listing
+  # pages themselves; no further traversal is needed.
+  bfs_page_budget: 3
+
+  allow_url_patterns:
+    # Only allow course-detail URLs through global blocks during BFS traversal.
+    # Each pattern requires a non-empty slug segment after the last "/courses/",
+    # which rejects the hub listing pages (no slug) and any sub-hub nav links.
+    - /study/undergraduate/courses/[^/?#\s]
+    - /study/postgraduate-taught/courses/[^/?#\s]
+    - /study/postgraduate-research/courses/[^/?#\s]
+
+  block_url_patterns:
+    # Guard: prevent the listing hub pages themselves from becoming candidates
+    # (they are listing pages, not extractable course detail pages).
+    - /study/undergraduate/courses/?$
+    - /study/postgraduate-taught/courses/?$
+    - /study/postgraduate-research/courses/?$
+
+  # No Cloudflare protection on hull.ac.uk — plain httpx works for listing pages.
+  # Scrape.do is not needed for discovery.
+  scrape_do_render: false
+
+  # Hull sitemap is not needed — all courses discovered from the three listing pages.
+  always_sitemap_supplement: false
+
+extraction:
+  # Course detail pages (~560 KB SSR payload) contain fee, IELTS, duration,
+  # and study mode in the embedded server-side JSON — no render needed.
+  # Plain httpx retrieves all fields reliably.
+  scrape_do_render: false
+  skip_per_course_browser: true
+  skip_browser_rescue: true
+  max_parallel_fetch: 6
