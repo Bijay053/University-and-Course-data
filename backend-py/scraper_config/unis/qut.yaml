@@ -14,30 +14,58 @@
 # so non-course archive cruft (/courses/admission/, /courses/adult.jsp, …)
 # is filtered out before extraction.
 discovery:
-  # 2026-07-08 — Wayback disabled; browser budget raised to 180 s
-  # ---------------------------------------------------------------
-  # Previous config: use_wayback=true + always_browser_discover=true.
-  # Problem: browser found only 38 courses in 90 s, then Wayback CDX
-  # added 661 archived URLs from past years → 655 extractable pages →
-  # 2-3 hour runs dominated by browser-fetching stale retired courses.
+  # 2026-07-08 run 2 — postgrad seeds added; budget raised to 420 s
+  # ----------------------------------------------------------------
+  # Previous problem: all 15 hardcoded seeds were undergrad-only
+  # (/study/<faculty>). The browser hit the 180 s budget with 61 nav
+  # candidates still in the heap; the crawler was only just reaching
+  # /study/postgraduate/business (nav #16) when it stopped. Postgrad
+  # sections (Masters, Grad Certs, PG Diplomas) were entirely missed.
   #
   # Fix:
-  #   use_wayback: false  — discard the 661 stale Wayback URLs entirely;
-  #                          the seed set already covers the live catalogue.
-  #   browser_time_budget_s: 180  — double the nav budget so the seeded
-  #                          /study/<area> listing pages can be fully walked.
-  #   browser_early_stop_courses: 400  — raise the course-count cap so
-  #                          discovery doesn't stop at 100 mid-catalogue.
+  #   seed_urls — 11 /study/postgraduate/<faculty> pages added as YAML
+  #               seeds (run FIRST, +300 priority vs +200 for hardcoded).
+  #               URL structure confirmed from nav #16 in the 180 s run:
+  #               /study/postgraduate/business/short-courses-and-... →
+  #               base is /study/postgraduate/business.  Cloudflare
+  #               returns 403 to plain curl on all QUT pages; seeds are
+  #               visited by Playwright which handles CF fine (same as
+  #               the undergrad seeds that already work).
+  #   browser_time_budget_s: 420 — 26 total seeds × ~6 s each ≈ 156 s
+  #               seed phase; 264 s BFS headroom for sub-listing pages.
+  #               180 s was insufficient even for the undergrad heap.
   #
-  # After the first run: compare staged count against QUT's published
-  # catalogue size (~200-400 international courses).  If still truncating,
-  # either add more /study/<area> seed pages or raise budget further.
+  # After this run: compare staged count against QUT's published
+  # international catalogue (~200+ courses). If still truncating on
+  # specific faculties, add sub-faculty seeds or raise budget to 600 s.
+  #
+  # Separate known issue (NOT fixed here): TOEFL 120 hallucination on
+  # QUT diploma rows (Diploma in Health Science etc). TOEFL 120 is the
+  # perfect score; a regex is matching something else on the page.
+  # Investigate after confirming catalogue coverage is correct.
   use_wayback: false
-  browser_time_budget_s: 180
+  browser_time_budget_s: 420
   browser_early_stop_courses: 400
   must_contain:
     - "/courses/"
   always_browser_discover: true
+  seed_urls:
+    # Postgraduate listing pages — same faculty slugs as undergrad seeds
+    # hardcoded in _HOST_EXTRA_SEEDS (browser_discover_generic.py).
+    # These run FIRST (higher priority score) so postgrad courses are
+    # discovered before the BFS budget is consumed by undergrad nav.
+    - https://www.qut.edu.au/study/postgraduate
+    - https://www.qut.edu.au/study/postgraduate/business
+    - https://www.qut.edu.au/study/postgraduate/creative-industries
+    - https://www.qut.edu.au/study/postgraduate/design-and-architecture
+    - https://www.qut.edu.au/study/postgraduate/education
+    - https://www.qut.edu.au/study/postgraduate/engineering
+    - https://www.qut.edu.au/study/postgraduate/health
+    - https://www.qut.edu.au/study/postgraduate/information-technology
+    - https://www.qut.edu.au/study/postgraduate/justice-and-law
+    - https://www.qut.edu.au/study/postgraduate/science-and-mathematics
+    - https://www.qut.edu.au/study/postgraduate/social-work-and-human-services
+    - https://www.qut.edu.au/study/postgraduate/communication
 
 extraction:
   filters:
