@@ -29,3 +29,20 @@ with the parent institution's much larger main-campus config during multi-univer
 **How to apply:** when picking up a new university-scrape bug report, always re-derive the
 slug from the DB's actual `scrape_url` and diff it against any existing YAML content's
 seed URLs before assuming the file is correct — don't just check the filename.
+
+## Follow-up (2026-07-09): file reverted after the fix was committed
+
+After committing the London-campus fix, the working-tree copy of `london_2227.yaml` was
+later found silently reverted back to the wrong main-campus (`www.hull.ac.uk`) content and
+staged again — with no corresponding user edit. Always re-`read` a just-fixed per-uni YAML
+file (don't trust memory/summary of its content) before debugging a "still broken" report
+against it; compare against `git show HEAD:<path>` if the content looks unexpectedly wrong.
+
+## Debugging gotcha: `extract_course()` return shape
+
+`single_course.extract_course()` returns `{"url":..., "payload": {...fields...},
+"evidence": [...]}` — NOT the flat fields dict directly. Calling
+`result.get("course_name")` on the top-level return always gives `None` even when
+extraction succeeded; use `result["payload"].get("course_name")`. Wasted significant
+debugging time chasing a phantom "course_name extracts as None" bug that was actually
+this test-harness mistake.

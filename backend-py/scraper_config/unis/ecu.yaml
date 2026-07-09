@@ -63,29 +63,55 @@ discovery:
   # sitemap URL candidates × ~25s each = ~150s of the 300s discovery budget
   # wasted.  UG courses are discovered via Funnelback pagination in BFS:
   # /degrees/courses/all?start_rank=N returns 10 real course links per page.
-  # With block patterns preventing nav-tab URL waste, budget=25 comfortably
-  # reaches all 103 UG courses (10 per Funnelback page × ~10 pages).
+  # With block patterns preventing nav-tab URL waste, budget=60 covers the
+  # ~10 UG pagination pages (10 courses each) plus 26 explicit PG seeds.
 
   seed_urls:
-    # ── BFS start (original) ───────────────────────────────────────────────
+    # ── BFS start (UG) ────────────────────────────────────────────────────
     # /degrees/courses/all is the ECU all-courses Funnelback SPA page.  The
     # React component renders 10 courses and BFS follows the pagination links
     # (?start_rank=11/21/31...) to collect all ~103 UG courses.  nav-tab
     # variants (f.Tabs, collection=ecu) are now blocked to save BFS budget.
     - https://www.ecu.edu.au/degrees/courses/all
-    # ── Postgraduate — one confirmed seed per faculty ──────────────────────
-    # Faculty seeds confirmed valid 2026-07-09.  Each is accessible via
-    # render=true and is added to the BFS candidate set as a self-candidate.
-    # Cross-links from each page may also yield additional PG candidates.
-    #   Business: → graduate-certificate-of-business, graduate-diploma-of-business,
-    #               doctor-of-philosophy-integrated
-    #   Health:   → master-of-nursing-studies (and related)
-    #   Engineering: → doctor-of-philosophy
-    #   Education:   → master-of-education-accelerated-online
+    # ── Postgraduate — explicit seeds by faculty (2026-07-09+) ──────────
+    # /degrees/postgraduate is a CF-blocked Funnelback SPA (0 links even with
+    # render=true).  Strategy: seed one confirmed course page per discipline.
+    # BFS cross-links (related-courses sections on each page) yield additional
+    # PG candidates.  404 seeds are silently skipped by the 404 guard.
+    #
+    # Business / Commerce
     - https://www.ecu.edu.au/degrees/courses/master-of-business-administration
+    - https://www.ecu.edu.au/degrees/courses/master-of-commerce
+    - https://www.ecu.edu.au/degrees/courses/master-of-professional-accounting
+    - https://www.ecu.edu.au/degrees/courses/master-of-marketing-communications
+    - https://www.ecu.edu.au/degrees/courses/master-of-human-resource-management
+    - https://www.ecu.edu.au/degrees/courses/master-of-international-tourism-and-hospitality-management
+    # Health Sciences
     - https://www.ecu.edu.au/degrees/courses/master-of-nursing
+    - https://www.ecu.edu.au/degrees/courses/master-of-nursing-studies
+    - https://www.ecu.edu.au/degrees/courses/master-of-public-health
+    - https://www.ecu.edu.au/degrees/courses/master-of-physiotherapy
+    - https://www.ecu.edu.au/degrees/courses/master-of-occupational-therapy
+    - https://www.ecu.edu.au/degrees/courses/master-of-sport-science
+    - https://www.ecu.edu.au/degrees/courses/master-of-clinical-exercise-physiology
+    - https://www.ecu.edu.au/degrees/courses/master-of-psychology
+    # Engineering / Computing
     - https://www.ecu.edu.au/degrees/courses/master-of-engineering-science
+    - https://www.ecu.edu.au/degrees/courses/master-of-information-technology
+    - https://www.ecu.edu.au/degrees/courses/master-of-cyber-security
+    # Education
     - https://www.ecu.edu.au/degrees/courses/master-of-education
+    - https://www.ecu.edu.au/degrees/courses/master-of-teaching-primary
+    - https://www.ecu.edu.au/degrees/courses/master-of-teaching-secondary
+    - https://www.ecu.edu.au/degrees/courses/master-of-special-education
+    # Arts / Social Sciences / Science
+    - https://www.ecu.edu.au/degrees/courses/master-of-counselling
+    - https://www.ecu.edu.au/degrees/courses/master-of-social-work
+    - https://www.ecu.edu.au/degrees/courses/master-of-speech-pathology
+    - https://www.ecu.edu.au/degrees/courses/master-of-science-biomedical-science
+    # Research / Doctoral
+    - https://www.ecu.edu.au/degrees/courses/doctor-of-philosophy
+    - https://www.ecu.edu.au/degrees/courses/doctor-of-philosophy-integrated
 
   allow_url_patterns:
     # Course detail pages: slug always contains at least one hyphen
@@ -106,8 +132,9 @@ discovery:
     - collection=ecu%7E   # Funnelback search API calls (tab/collection variants)
     - f\.Tabs%7C           # Funnelback tab filter params (URL-encoded f.Tabs|)
 
-  # 5 seeds (1 BFS start + 4 PG) + 20 pages for BFS cross-link following.
-  bfs_page_budget: 25
+  # 1 UG BFS seed + ~10 UG pagination pages (~100 UG courses) +
+  # ~26 PG seeds + cross-links and related-course BFS hops.
+  bfs_page_budget: 60
 
 extraction:
   # Course pages at /degrees/courses/<slug> return full HTML via render=true.

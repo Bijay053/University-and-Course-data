@@ -32,6 +32,19 @@
 # Fee format on detail pages: "International: £17,000, Home: £12,100"
 # IELTS format: "academic IELTS 6.0 overall, with 5.5 in each skill"
 # Sections present: "Fees & funding" (h2), "Intakes:" (h4)
+#
+# ── BUG FIX 2 (2026-07-09) — wrong course_name extracted ────────────────────
+# All 4 courses were rejected at staging with "generic category page" because
+# the deterministic course_name extractor picked the WRONG heading: every
+# course detail page also embeds a promo card
+#   <div class="card-body blue-bg"><h3 class="card-title">Study With Us</h3>...
+# and the page's `<title>` tag also resolves to a generic/marketing string
+# ("Study With Us | University of Hull - London") ahead of the real `<h1>`
+# in whatever candidate-ranking path fired for this template — so "Study
+# With Us" reached staging as course_name for every course. The real course
+# title (e.g. "MSc Business Management") is the page's single true `<h1>`.
+# Force the deterministic extractor to use `<h1>` explicitly so it can never
+# be shadowed by the promo card or title tag.
 
 discovery:
   # The dedicated courses-sitemap.xml is small and authoritative — use it
@@ -63,6 +76,12 @@ extraction:
   skip_per_course_browser: true
   skip_browser_rescue: true
   max_parallel_fetch: 4
+
+  course_name:
+    # Force the real <h1> course title so the "Study With Us" promo card
+    # (<h3 class="card-title">) and the generic <title> tag never outrank it.
+    h1_css_selector: "h1"
+    prefer_title_over_h1: false
 
   fees:
     default_currency: "GBP"

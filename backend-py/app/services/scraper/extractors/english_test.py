@@ -575,7 +575,7 @@ def _toefl(text: str) -> dict[str, float] | None:
     )
     if m:
         ov, mn = float(m.group(1)), float(m.group(2))
-        if 0 <= ov <= 120 and 0 <= mn <= 30:
+        if 30 <= ov <= 120 and 0 <= mn <= 30:
             return {"overall": ov, "listening": mn, "reading": mn, "writing": mn, "speaking": mn}
     # Table layout: "TOEFL iBT  60  12" or "TOEFL | 60 | 12".
     m = re.search(
@@ -585,12 +585,12 @@ def _toefl(text: str) -> dict[str, float] | None:
     )
     if m:
         ov, mn = float(m.group(1)), float(m.group(2))
-        if 0 <= ov <= 120 and 0 <= mn <= 30:
+        if 30 <= ov <= 120 and 0 <= mn <= 30:
             return {"overall": ov, "listening": mn, "reading": mn, "writing": mn, "speaking": mn}
     m = re.search(r"toefl(?:\s+ibt)?[:\s]+([0-9]{2,3})", text, re.I)
     if m:
         ov = float(m.group(1))
-        if 0 <= ov <= 120:
+        if 30 <= ov <= 120:
             floor = _try_floor(text, m.end(), 0.0, 30.0)
             if floor is not None:
                 return {"overall": ov, "listening": floor, "reading": floor, "writing": floor, "speaking": floor}
@@ -608,7 +608,7 @@ def _toefl(text: str) -> dict[str, float] | None:
     )
     if m:
         ov = float(m.group(1))
-        if 0 <= ov <= 120:
+        if 30 <= ov <= 120:
             floor = _try_floor(text, m.end(), 0.0, 30.0)
             if floor is not None:
                 return {"overall": ov, "listening": floor, "reading": floor, "writing": floor, "speaking": floor}

@@ -3,6 +3,7 @@
 - [Cloudflare 429 vs block classification](cf-429-vs-block.md) — 429 rate-limit ≠ 403/503 challenge; per-uni use_wayback flag was wired at only one of two call sites.
 - [Staged-review resume-chain visibility](staged-review-resume-chain-visibility.md) — per-job_id staged-course filters hide pending rows from earlier resumed jobs; scope by university_id+status instead.
 - [HUD SearchStax provider](hud-searchstax.md) — Huddersfield scrapes Solr directly (SPA bypass); completeness hit 85.1% after adding academic_level + entry-req extractors.
+- [Multi-campus slug collision](multi-campus-slug-collision.md) — satellite-campus YAML can silently revert to parent uni's config; re-`read`/diff vs git HEAD before trusting it; extract_course() returns {"payload":{...}}, not flat fields.
 - [Phase 2 autonomous pipeline](phase2-pipeline.md) — Stage 0 CSS/XPath/regex rules injected before heuristics; evidence key is `field_key` not `field`; `attribute="text"` is inner-text sentinel in _apply_css
 - [CASCADE smart split](cascade-split.md) — staged<5 → discovery_failure (probe_and_configure); staged≥5+avg<70% → extraction_failure (repair_extractor); YAML always wins
 - [Repair module arg order](repair-arg-order.md) — `compute_field_fill_rates(scrape_run_id, db)` and `fetch_repair_samples(scrape_run_id, db, n=3)` — run_id first, db second
