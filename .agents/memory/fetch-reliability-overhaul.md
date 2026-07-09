@@ -7,6 +7,10 @@ description: ScrapedoAccountError + retry in fetch_html_scrape_do; sweep pass + 
 `fetch_html_scrape_do` now retries 429/5xx up to 3 times (backoffs 2s/8s/30s).
 401/403 raises `ScrapedoAccountError` immediately (no retry).
 404/410 returns None immediately (page-not-found, no retry).
+5xx with `ROTATION_FAILED` in body AND render=False returns None immediately
+(no retry — proxy connect refusal never heals by retrying static; lets the
+caller's render tier fire while budget remains). render=True keeps the ladder.
+See jcu-cloudflare-lesson.md.
 
 ## Why
 JCU run job_830c773066e0 saved only 7/103 courses — 96 returned None because

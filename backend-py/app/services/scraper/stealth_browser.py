@@ -42,6 +42,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import weakref
 from contextlib import asynccontextmanager
 from typing import Optional
 
@@ -52,7 +53,6 @@ log = logging.getLogger(__name__)
 # in dev this prevents collision with a user's existing X session).
 _XVFB_PROC: Optional[subprocess.Popen] = None
 _XVFB_DISPLAY: Optional[str] = None
-_XVFB_LOCK = asyncio.Lock()
 _XVFB_SCREEN = "1280x800x24"
 _XVFB_MAX_DISPLAY = 119  # probe :99..:119 if :99 is occupied
 
@@ -63,15 +63,39 @@ _XVFB_MAX_DISPLAY = 119  # probe :99..:119 if :99 is occupied
 # settings.max_browser_concurrency; the stealth path needs a tighter cap
 # because each instance is much heavier.
 _STEALTH_MAX_CONCURRENCY = 2
-_STEALTH_SEM: Optional[asyncio.Semaphore] = None
+
+# asyncio primitives bind to the first event loop that awaits them, and Celery
+# prefork runs each task in its own asyncio.run() loop — a module-level Lock
+# or Semaphore raises "is bound to a different event loop" for the second
+# scrape job in the same worker process (same bug as http_fetcher's
+# _scrape_do_sem, observed on JCU 2026-07-09).  Keep one instance per loop.
+_LOOP_PRIMS: "weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, dict]" = (
+    weakref.WeakKeyDictionary()
+)
+
+
+def _loop_prim(name: str, factory):
+    loop = asyncio.get_running_loop()
+    per_loop = _LOOP_PRIMS.get(loop)
+    if per_loop is None:
+        per_loop = {}
+        _LOOP_PRIMS[loop] = per_loop
+    obj = per_loop.get(name)
+    if obj is None:
+        obj = factory()
+        per_loop[name] = obj
+    return obj
+
+
+def _xvfb_lock() -> asyncio.Lock:
+    return _loop_prim("xvfb_lock", asyncio.Lock)
 
 
 def _stealth_sem() -> asyncio.Semaphore:
-    """Lazy per-event-loop semaphore for stealth fetches."""
-    global _STEALTH_SEM
-    if _STEALTH_SEM is None:
-        _STEALTH_SEM = asyncio.Semaphore(_STEALTH_MAX_CONCURRENCY)
-    return _STEALTH_SEM
+    """Per-event-loop semaphore for stealth fetches."""
+    return _loop_prim(
+        "stealth_sem", lambda: asyncio.Semaphore(_STEALTH_MAX_CONCURRENCY)
+    )
 
 
 def _shutdown_xvfb() -> None:
@@ -118,7 +142,7 @@ async def ensure_xvfb() -> Optional[str]:
     if _XVFB_PROC is not None and _XVFB_PROC.poll() is None and _XVFB_DISPLAY:
         return _XVFB_DISPLAY
 
-    async with _XVFB_LOCK:
+    async with _xvfb_lock():
         if _XVFB_PROC is not None and _XVFB_PROC.poll() is None and _XVFB_DISPLAY:
             return _XVFB_DISPLAY
 

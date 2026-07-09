@@ -67,6 +67,13 @@ discovery:
   # https://www.jcu.edu.au/courses" + "Discovery phase exceeded 300s deadline".
   # Previously (2026-05-30 job, 104 courses) cffi worked; no longer.
   scrape_do_skip_fallbacks: true
+  # scrape_do_render: true — Scrape.do STATIC now ALWAYS fails on JCU with
+  # 502 ROTATION_FAILED ("cannot connect target url" — proxy-level connect
+  # refusal, retrying static never helps).  Verified live 2026-07-09
+  # (job_a127d35039d1): static → 502 after ~58s; render=true → 200, 354KB,
+  # title "Courses - JCU Australia".  Going straight to headless render
+  # keeps the seed prefetch inside its 95s timeout.
+  scrape_do_render: true
   always_browser_discover: false
   use_stealth_browser: true
   use_wayback: false
@@ -106,7 +113,15 @@ discovery:
 
 extraction:
   skip_browser_rescue: true   # Cloudflare Enterprise blocks Playwright too; rescue wastes 30 s/course
-  max_parallel_fetch: 8
+  # Course pages: direct httpx/cffi now 403 (CF challenge, verified 2026-07-09)
+  # and Scrape.do static 502s with ROTATION_FAILED — headless render through
+  # the residential browser pool is the only working transport (same fix as
+  # kingston_2193.yaml / cardiff_2194.yaml).
+  scrape_do_render: true
+  scrape_do_skip_fallbacks: true
+  # Render calls are slower than static; 4 concurrent keeps throughput
+  # reasonable without overwhelming the residential proxy pool.
+  max_parallel_fetch: 4
 
   filters:
     domestic_only:

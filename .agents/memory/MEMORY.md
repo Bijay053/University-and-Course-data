@@ -13,7 +13,7 @@
 - [Scrape.do discovery timeout mismatch](scrape-do-discovery-timeout-mismatch.md) — generic short per-page timeout wrapping a slow-but-successful rendering-proxy call discards every response; widen timeout + prefetch seeds concurrently.
 - [Slug derivation for non-www subdomains](slug-subdomain-fix.md) — study.csu.edu.au → slug 'study' not 'csu'; loader needs _GENERIC_SUBDOMAINS stripping.
 - [Year-based URL deduplication pipeline](year-dedup-pipeline.md) — Phase A.5c pre-extraction: ignore_urls→ignore_years→slug_without_year dedup; prefer_urls_matching is tiebreaker in Step 3.
-- [JCU URL rewrite Cloudflare lesson](jcu-cloudflare-lesson.md) — ?international=true on static HTTP triggers Cloudflare bot challenge (0 staged); JS-tab universities need browser rescue, not URL rewrite.
+- [JCU Cloudflare Enterprise escalation](jcu-cloudflare-lesson.md) — all transports dead except Scrape.do render=true; static 502 ROTATION_FAILED = fail fast, go render-first in discovery+extraction.
 - [SCU year URL regex fix](scu-year-regex-fix.md) — 4-digit course codes (e.g. 5350) fool `\d{4}` regex; use `20\d{2}` to restrict to real years.
 - [JCU band_mapping flow fix](jcu-band-mapping-flow.md) — band_mapping must override central_page values; outer ielts_missing guard blocks it when central already filled the slot.
 - [Swinburne 3-level URL structure](swinburne-url-depth.md) — /courses/find-a-course/faculty/subject is sub-category hub (no course data); individual courses are at depth 3 (/faculty/subject/course-slug). allow_url_patterns must require 3 segments.
@@ -59,5 +59,6 @@
 - [Discovery budget guard](discovery-budget-guard.md) — Cardiff silent-stall: N failing seed URLs can burn the whole discovery_phase_timeout_s before sitemap fallback runs; gate retries/fallback on remaining budget, not just per-call timeout.
 - [Kingston CF Enterprise fix](kingston-cf-enterprise-fix.md) — same transport as Cardiff (scrape_do_skip_fallbacks + render=true); key: point sitemap_url to sitemap.xml?page=1 directly (skips index + page=2 + 7 alt probes, saves ~140s in 300s budget); fee in <th> not <td>.
 - [Fetch reliability overhaul T01-T08](fetch-reliability-overhaul.md) — ScrapedoAccountError + 3-attempt retry (2s/8s/30s) in fetch_html_scrape_do; sweep pass + failed_degraded guard in orchestrator.
+- [Event-loop-bound primitives in Celery](event-loop-bound-primitives.md) — module-level asyncio.Semaphore/Lock break across per-task loops; use per-loop lazy getter dicts.
 - [Discovery URL cache](discovery-url-cache.md) — cached fast-paths must carry the skipped phase's side-channel outputs (blocked fee URLs) too; never cache provider-payload links.
 - [Distributed semaphore lessons](distributed-semaphore-lessons.md) — acquire local semaphore BEFORE fleet-wide Redis slot; cache one redis.asyncio client per event loop (WeakKeyDictionary).

@@ -197,10 +197,48 @@ class TestScrapeDoSemaphore:
         # a coroutine must never hold a scarce account slot while merely
         # queueing behind its own process's semaphore.
         src = (_SCRAPER_DIR / "http_fetcher.py").read_text(encoding="utf-8")
-        i = src.index("async with _scrape_do_sem:")
+        i = src.index("async with _get_scrape_do_sem():")
         assert "async with account_slot():" in src[i : i + 120], (
             "account_slot must be nested INSIDE the local Scrape.do semaphore"
         )
+
+    def test_local_semaphores_are_per_event_loop(self):
+        # Regression for the JCU whole-job discovery failure (2026-07-09):
+        # module-level asyncio.Semaphore binds to the first loop that awaits
+        # it, so the SECOND scrape job in the same prefork worker process
+        # failed every Scrape.do call with "bound to a different event loop".
+        import importlib
+
+        hf = importlib.import_module("app.services.scraper.http_fetcher")
+
+        async def grab():
+            return hf._get_sem(), hf._get_scrape_do_sem()
+
+        loop1 = asyncio.new_event_loop()
+        try:
+            s1a, s1b = loop1.run_until_complete(grab())
+            s1a2, s1b2 = loop1.run_until_complete(grab())
+        finally:
+            loop1.close()
+        loop2 = asyncio.new_event_loop()
+        try:
+            s2a, s2b = loop2.run_until_complete(grab())
+        finally:
+            loop2.close()
+        assert s1a is s1a2 and s1b is s1b2, "same loop must reuse its semaphores"
+        assert s2a is not s1a and s2b is not s1b, (
+            "a new event loop must get FRESH semaphores"
+        )
+        # No module-level bound primitives may remain in either module.
+        for mod in ("http_fetcher.py", "stealth_browser.py"):
+            src2 = (_SCRAPER_DIR / mod).read_text(encoding="utf-8")
+            import re
+            bad = re.findall(
+                r"^_\w+(?::[^=\n]+)?\s*=\s*asyncio\.(?:Semaphore|Lock|Event|Condition)\(",
+                src2,
+                flags=re.M,
+            )
+            assert not bad, f"{mod} still has module-level asyncio primitives: {bad}"
 
     def test_semaphore_reuses_per_loop_client(self):
         from app.services.scraper import scrape_do_semaphore as sem

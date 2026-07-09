@@ -1154,6 +1154,19 @@ class DiscoveryConfig(BaseModel):
             "degrades gracefully rather than silently returning zero links."
         ),
     )
+    scrape_do_render: bool = Field(
+        default=False,
+        description=(
+            "When True (and scrape_do_skip_fallbacks is also True), discovery-phase "
+            "fetches go STRAIGHT to Scrape.do headless render (render=True, "
+            "residential browser pool, ~$0.006/call) instead of trying static "
+            "first.  Use for hosts where Scrape.do static ALWAYS fails with "
+            "ROTATION_FAILED ('cannot connect target url') — e.g. JCU, Ulster — "
+            "so the doomed ~30-60s static attempt doesn't burn the seed-prefetch "
+            "timeout before the render fallback can fire.  Has no effect unless "
+            "SCRAPE_DO_TOKEN is set and discovery.scrape_do_skip_fallbacks is True."
+        ),
+    )
     block_url_patterns: list[str] = Field(
         default_factory=list,
         description=(

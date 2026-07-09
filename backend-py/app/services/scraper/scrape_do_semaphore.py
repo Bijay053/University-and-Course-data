@@ -31,7 +31,7 @@ backoff sleeps so a waiting worker elsewhere can use it).  The LOCAL
 per-process semaphore must be acquired FIRST so a coroutine never holds a
 scarce fleet-wide slot while queueing behind its own process's semaphore:
 
-    async with _scrape_do_sem:
+    async with _get_scrape_do_sem():
         async with account_slot():
             ... one Scrape.do HTTP attempt ...
 """

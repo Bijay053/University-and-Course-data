@@ -199,14 +199,32 @@ def test_stealth_concurrency_cap_is_tight():
     )
 
 
-def test_stealth_sem_is_singleton():
-    """_stealth_sem() must return the same Semaphore across calls so
-    in-flight stealth fetches actually contend for the cap."""
+def test_stealth_sem_is_per_event_loop():
+    """_stealth_sem() must return the SAME Semaphore within one event loop
+    (so in-flight stealth fetches contend for the cap) but a FRESH one on a
+    new loop — asyncio primitives bind to the first loop that awaits them,
+    and Celery prefork runs each task in its own asyncio.run() loop (JCU
+    whole-job discovery failure, 2026-07-09)."""
+    import asyncio
+
     from app.services.scraper.stealth_browser import _stealth_sem
 
-    s1 = _stealth_sem()
-    s2 = _stealth_sem()
-    assert s1 is s2
+    async def grab():
+        return _stealth_sem()
+
+    loop1 = asyncio.new_event_loop()
+    try:
+        s1 = loop1.run_until_complete(grab())
+        s2 = loop1.run_until_complete(grab())
+    finally:
+        loop1.close()
+    loop2 = asyncio.new_event_loop()
+    try:
+        s3 = loop2.run_until_complete(grab())
+    finally:
+        loop2.close()
+    assert s1 is s2, "same loop must reuse its semaphore"
+    assert s3 is not s1, "a new event loop must get a fresh semaphore"
 
 
 def test_atexit_handler_registered():
@@ -246,7 +264,10 @@ def test_browser_pool_falls_back_when_stealth_returns_none(monkeypatch):
 
     fallback_called = {"n": 0}
 
-    async def fake_inner(self, url, *, wait_until, timeout, settle_ms, click_international):
+    async def fake_inner(
+        self, url, *, wait_until, timeout, settle_ms, click_international,
+        actions=None,
+    ):
         fallback_called["n"] += 1
         return "<html>fallback</html>"
 

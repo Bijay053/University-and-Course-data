@@ -27,6 +27,7 @@ import logging
 import os
 import time
 import urllib.parse
+import weakref
 from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
 
@@ -109,14 +110,47 @@ def format_fetch_error(url: str) -> str:
     return " ".join(parts)
 
 
-_sem = asyncio.Semaphore(settings.max_http_concurrency)
-# In-process cap on concurrent Scrape.do requests — see config.py
-# `max_scrape_do_concurrency` for the QMUL burst-failure rationale.  Without
-# this, up to _MAX_PARALLEL_FETCH (12) course-fetch tasks can each fire a
-# render=true request at the shared Scrape.do account simultaneously, and the
-# retry on failure lands in the same saturated window, producing genuine
-# fetch_failed results for URLs that fetch fine in isolation.
-_scrape_do_sem = asyncio.Semaphore(settings.max_scrape_do_concurrency)
+# Concurrency caps are per-EVENT-LOOP, not per-process: Celery prefork runs
+# each task in its own asyncio.run() loop, and an asyncio.Semaphore binds to
+# the first loop that awaits it.  A module-level instance therefore raised
+# "<Semaphore ...> is bound to a different event loop" for EVERY fetch in the
+# second scrape job handled by the same worker process (observed as a
+# whole-job discovery failure on JCU, 2026-07-09).  The WeakKeyDictionary
+# drops a loop's semaphores automatically when the loop is garbage-collected.
+_LOOP_SEMS: "weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, dict[str, asyncio.Semaphore]]" = (
+    weakref.WeakKeyDictionary()
+)
+
+
+def _loop_sem(name: str, limit: int) -> asyncio.Semaphore:
+    loop = asyncio.get_running_loop()
+    per_loop = _LOOP_SEMS.get(loop)
+    if per_loop is None:
+        per_loop = {}
+        _LOOP_SEMS[loop] = per_loop
+    sem = per_loop.get(name)
+    if sem is None:
+        sem = asyncio.Semaphore(limit)
+        per_loop[name] = sem
+    return sem
+
+
+def _get_sem() -> asyncio.Semaphore:
+    """General outbound-HTTP concurrency cap for the current event loop."""
+    return _loop_sem("http", settings.max_http_concurrency)
+
+
+def _get_scrape_do_sem() -> asyncio.Semaphore:
+    """In-process cap on concurrent Scrape.do requests (current loop).
+
+    See config.py `max_scrape_do_concurrency` for the QMUL burst-failure
+    rationale.  Without this, up to _MAX_PARALLEL_FETCH (12) course-fetch
+    tasks can each fire a render=true request at the shared Scrape.do account
+    simultaneously, and the retry on failure lands in the same saturated
+    window, producing genuine fetch_failed results for URLs that fetch fine
+    in isolation.
+    """
+    return _loop_sem("scrape_do", settings.max_scrape_do_concurrency)
 
 # ---------------------------------------------------------------------------
 # Per-process Cloudflare fast-path cache
@@ -463,7 +497,7 @@ async def fetch_html_scrape_do(
             # rest of the fleet.  account_slot() is a no-op unless
             # scrape_do_account_concurrency > 0 and fails open on any Redis error.
             from app.services.scraper.scrape_do_semaphore import account_slot
-            async with _scrape_do_sem:
+            async with _get_scrape_do_sem():
                 async with account_slot():
                     async with httpx.AsyncClient(timeout=90, follow_redirects=True) as c:
                         _last_sd_r = await c.get("https://api.scrape.do", params=params)
@@ -509,6 +543,33 @@ async def fetch_html_scrape_do(
                 _record_fetch_error(
                     url, status=_status, tier="scrape_do",
                     detail="page not found",
+                )
+                return None
+            # ROTATION_FAILED (ErrorCode 90, "cannot connect target url") on a
+            # STATIC call is a proxy-level connect failure: the target host is
+            # refusing Scrape.do's datacenter/proxy exit IPs outright.  Ulster
+            # (job_ec86dc5866cb) and JCU (job_a127d35039d1) both show this is
+            # persistent — retrying static harder never helps, only the
+            # render=True residential-browser pool gets through.  Fail fast so
+            # the caller's static→render escalation fires while there is still
+            # budget left (each doomed static attempt costs ~30-60s of latency).
+            # render=True ROTATION_FAILED stays on the normal retry ladder —
+            # the browser pool rotates real residential IPs, so retrying there
+            # genuinely can succeed.
+            if (
+                not render
+                and _status in _SD_RETRY_STATUSES
+                and "ROTATION_FAILED" in _last_sd_r.text[:600]
+            ):
+                log.warning(
+                    "[FETCH FAIL] scrape.do %s render=False → status=%s "
+                    "ROTATION_FAILED (proxy cannot connect to target) — failing "
+                    "fast so the render=True tier can fire (no static retries)",
+                    url, _status,
+                )
+                _record_fetch_error(
+                    url, status=_status, tier="scrape_do",
+                    detail="ROTATION_FAILED static — fail fast to render tier",
                 )
                 return None
             # Transient overload — retry if budget remains.
@@ -887,18 +948,34 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
     # 2-4 attempts per listing URL before the host-cache kicks in.
     if not _scrape_do_render and not _scrape_do_static and _has_scrape_do:
         _disc_skip = False
+        _disc_render_first = False
         try:
             from app.services.scraper.config.context import get_uni_config as _guc_disc
-            _disc_skip = _guc_disc().discovery.scrape_do_skip_fallbacks
+            _disc_cfg = _guc_disc().discovery
+            _disc_skip = _disc_cfg.scrape_do_skip_fallbacks
+            _disc_render_first = _disc_cfg.scrape_do_render
         except Exception:  # noqa: BLE001
             pass
         if _disc_skip:
-            log.info(
-                "fetch %s: discovery.scrape_do_skip_fallbacks=True"
-                " — going straight to Scrape.do static (skipping httpx/cffi)",
-                url,
-            )
-            _disc_static = await fetch_html_scrape_do(url, render=False, rate_limit=False)
+            # discovery.scrape_do_render=True: static ALWAYS fails with
+            # ROTATION_FAILED on this host (e.g. JCU) — skip the doomed
+            # ~30-60s static attempt and go straight to headless render so
+            # the seed prefetch fits inside its timeout.
+            _disc_static = None
+            if not _disc_render_first:
+                log.info(
+                    "fetch %s: discovery.scrape_do_skip_fallbacks=True"
+                    " — going straight to Scrape.do static (skipping httpx/cffi)",
+                    url,
+                )
+                _disc_static = await fetch_html_scrape_do(url, render=False, rate_limit=False)
+            else:
+                log.info(
+                    "fetch %s: discovery.scrape_do_render=True"
+                    " — going straight to Scrape.do headless render"
+                    " (skipping httpx/cffi AND the doomed static attempt)",
+                    url,
+                )
             if _disc_static is not None and not _is_spa_shell(_disc_static):
                 from app.services.scraper.snapshot_context import stage_snapshot as _stage
                 _stage(url, _disc_static, "scrape_do_static")
@@ -968,7 +1045,7 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
     html_200: str | None = None  # track 200 result so we can check for SPA shell
 
     for attempt in range(retries + 1):
-        async with _sem:
+        async with _get_sem():
             try:
                 async with _client() as c:
                     # Per-host session priming (currently only Curtin —
@@ -1066,7 +1143,7 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
                 )
                 await asyncio.sleep(_rl_backoff)
                 try:
-                    async with _sem:
+                    async with _get_sem():
                         async with _client() as _rl_c:
                             _rl_r = await _rl_c.get(url, cookies=cookies_for_url(url))
                             if _rl_r.status_code == 200:
