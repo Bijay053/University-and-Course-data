@@ -1,0 +1,28 @@
+# University Center Leeds
+# Hostname: ucleeds.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+# Slug: ucleeds
+# Auto-generated: 2026-07-09
+#
+# ── BUG FIX (2026-07-09) — 41/44 courses rejected as "category landing page" ──
+# Course detail pages on ucleeds.ac.uk render the H1 as a bare subject title
+# ("Acting", "Biosciences", "Applied Animal Management and Behaviour") with no
+# degree-level qualifier text in the heading itself — the "BA (Hons)" / "MSc"
+# suffix only appears in the page <title>/breadcrumb/discovery-link text, not
+# the H1 the course_name extractor reads. guards.should_stage_course()'s
+# _name_has_degree_qualifier() check rejected every one of these as a generic
+# category-landing page (reason: category_landing_page_missing_degree_qualifier)
+# even though each page is a genuine, fully-extractable course (100/100 or
+# 80/100 field completeness). This is the same class of false-positive the
+# ARU/Writtle skip_degree_qualifier_check flag exists for — the URL-pattern
+# filters at discovery time already exclude the real category/hub pages
+# (Courses, Undergraduate Courses, Postgraduate Courses, Subject Areas), so
+# disabling the name-based check here is safe.
+
+discovery: {}
+
+extraction:
+  fees:
+    default_currency: GBP
+  staging:
+    skip_degree_qualifier_check: true
