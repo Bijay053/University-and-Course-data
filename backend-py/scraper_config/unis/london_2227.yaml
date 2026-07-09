@@ -45,6 +45,20 @@
 # title (e.g. "MSc Business Management") is the page's single true `<h1>`.
 # Force the deterministic extractor to use `<h1>` explicitly so it can never
 # be shadowed by the promo card or title tag.
+#
+# ── BUG FIX 3 (2026-07-09) — false online_only rejection ────────────────────
+# MSc Digital Marketing and Advertising was rejected (rejected: online_only)
+# because the bare `\bonline\b` keyword fallback (confidence 0.5) matched
+# "Online Advertising Management" (a module name) and "online advertising"
+# (a marketing channel described in the course content) — neither is a
+# delivery-mode statement. This course is on-campus in London exactly like
+# the other 3 courses (course_location='London' was already resolved), but
+# the structural protection in single_course.py blocks Gemini from
+# overriding any study_mode:rule result, so the bad "Online" value survived
+# to the online_only staging guard. Require strong evidence (explicit
+# phrases like "fully online", "distance learning") before accepting
+# study_mode='Online' from the bare-keyword fallback, and prefer the
+# already-resolved physical location over the noisy keyword when present.
 
 discovery:
   # The dedicated courses-sitemap.xml is small and authoritative — use it
@@ -109,3 +123,10 @@ extraction:
       - course_name
     skip_degree_qualifier_check: true
     require_international_fee: false
+
+  study_mode:
+    # See BUG FIX 3 comment above — "Online Advertising Management" module
+    # name and "online advertising" marketing-channel copy on the Digital
+    # Marketing course page were false-triggering the bare-keyword fallback.
+    online_only_requires_strong_evidence: true
+    prefer_location_over_online_keyword: true
