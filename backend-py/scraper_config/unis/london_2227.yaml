@@ -1,15 +1,92 @@
-# University of Hull (London)
+# University of Hull (London) — university_id=2227
 # Hostname: london.hull.ac.uk
-# Country: United Kingdom  |  Currency: GBP
-# Slug: london
-# Auto-generated: 2026-07-09
 #
-# This stub was created automatically on the first scrape of this university.
-# Review and expand it to improve discovery and extraction quality.
-# See scraper_config/defaults.yaml for all available options.
+# ── BUG FIX (2026-07-09) ─────────────────────────────────────────────────────
+# This file previously contained the MAIN Hull campus config (www.hull.ac.uk,
+# ~471 courses) by mistake — a slug/domain mix-up. University of Hull (London)
+# is a SEPARATE small satellite campus on a different domain (WordPress site,
+# only 4 courses), not the same catalogue as the main Hull campus. The old
+# content caused a 100% domain-guard block: every discovered link pointed to
+# www.hull.ac.uk while the expected apex domain was london.hull.ac.uk.
+#
+# The main-Hull config (www.hull.ac.uk, 471 courses) lives in the separate
+# generic unis/hull.yaml file and only applies once/if a university record
+# with scrape_url=https://www.hull.ac.uk/ is added to the DB. Do NOT merge
+# the two — they are different institutions with different domains/slugs.
+#
+# ── Site structure (verified 2026-07-09) ─────────────────────────────────────
+# WordPress (Yoast SEO) site. Small catalogue: only 4 taught postgraduate
+# courses currently listed.
+#   /courses/                 → listing page (also has an RSS feed, ignore)
+#   /courses-sitemap.xml      → authoritative course list (5 <loc> entries:
+#                                the /courses/ listing page itself + 4 courses)
+#   Course detail pages are static HTML — plain httpx returns full content,
+#   no Cloudflare, no JS rendering needed.
+#
+# Verified course URLs (2026-07-09):
+#   /courses/msc-artificial-intelligence-and-data-science/
+#   /courses/msc-business-management/
+#   /courses/msc-digital-marketing-and-advertising/
+#   /courses/msc-logistics-and-supply-chain-management/
+#
+# Fee format on detail pages: "International: £17,000, Home: £12,100"
+# IELTS format: "academic IELTS 6.0 overall, with 5.5 in each skill"
+# Sections present: "Fees & funding" (h2), "Intakes:" (h4)
 
-discovery: {}
+discovery:
+  # The dedicated courses-sitemap.xml is small and authoritative — use it
+  # directly instead of BFS over /courses/ (which also surfaces a /feed/ URL).
+  sitemap_url: https://london.hull.ac.uk/courses-sitemap.xml
+  always_sitemap_supplement: true
+
+  # Also seed the listing page as a BFS fallback/cross-check; catalogue is
+  # tiny so a low budget is enough.
+  seed_urls:
+    - https://london.hull.ac.uk/courses/
+  bfs_page_budget: 2
+
+  allow_url_patterns:
+    - /courses/[^/?#\s]
+
+  block_url_patterns:
+    - /courses/?$
+    - /courses/feed/?$
+
+  # No Cloudflare protection detected; plain httpx works for discovery.
+  scrape_do_render: false
+  use_wayback: false
 
 extraction:
+  # Static WordPress HTML — plain httpx retrieves fee/IELTS/intake content
+  # directly. No render or browser rescue needed.
+  scrape_do_render: false
+  skip_per_course_browser: true
+  skip_browser_rescue: true
+  max_parallel_fetch: 4
+
   fees:
-    default_currency: GBP
+    default_currency: "GBP"
+    prefer_international: true
+
+  english:
+    source: course_page
+    ielts:
+      raw_xpath: ".//p[contains(., 'IELTS')] | .//span[contains(., 'IELTS')]"
+      patterns:
+        overall:
+          - 'IELTS\s*(\d\.?\d*)\s*overall'
+          - 'of\s*(\d\.?\d*)'
+        each:
+          - '(\d\.?\d*)\sin\seach\sskill'
+          - 'no\selement\sbelow\s*(\d\.?\d*)'
+      apply_each_to:
+        - ielts_reading
+        - ielts_writing
+        - ielts_listening
+        - ielts_speaking
+
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false
