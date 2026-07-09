@@ -912,6 +912,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             kind="stopped",
             level="warn",
         )
+        _stopped_total = summary.get("staged", 0) + _resume_already_staged
         await emit(
             "done",
             f"══ STOPPED ══ Found:{summary.get('discovered', 0)} | "
@@ -920,14 +921,14 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             f"Errors:{summary.get('errors', 0)}",
             phase="complete",
             totalFound=summary.get("discovered", 0),
-            imported=summary.get("staged", 0),
+            imported=_stopped_total,
             skipped=summary.get("skipped", 0),
             errors=summary.get("errors", 0),
             level="warn",
         )
         job.status = "stopped"
         job.total_found = summary.get("discovered", 0)
-        job.imported = summary.get("staged", 0)
+        job.imported = _stopped_total
         job.skipped = summary.get("skipped", 0)
         job.errors = summary.get("errors", 0)
         job.completed_at = datetime.now(timezone.utc)
@@ -5101,12 +5102,19 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             f" | Discovery:{_ph_disc_s:.0f}s | Extraction:{_ph_extract_s:.0f}s"
             f" | Sweep:{_ph_sweep_s:.0f}s | Staging:{_ph_staging_s:.0f}s"
         )
+        # `imported` in the SSE event must match `job.imported` in the DB
+        # (summary["staged"] + _resume_already_staged) so the "Review N Courses"
+        # button in the UI shows the TOTAL courses available for review, not just
+        # the new ones staged this run.  Without this, a resume-checkpoint run
+        # (e.g. 25 new + 105 already-pending = 130 total) shows "Review 25 Courses"
+        # but the review panel loads 130.
+        _total_imported = summary.get("staged", 0) + _resume_already_staged
         await emit(
             "done",
             _done_msg,
             phase="complete",
             totalFound=summary.get("discovered", 0),
-            imported=summary.get("staged", 0),
+            imported=_total_imported,
             skipped=summary.get("skipped", 0),
             errors=summary.get("errors", 0),
             fetchFailed=_fetch_failed_n,
