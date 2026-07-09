@@ -1,15 +1,127 @@
-# University of Hertfordshire
+# University of Hertfordshire (university_id=2226)
 # Hostname: www.herts.ac.uk
-# Country: United Kingdom  |  Currency: GBP
-# Slug: herts
-# Auto-generated: 2026-07-09
 #
-# This stub was created automatically on the first scrape of this university.
-# Review and expand it to improve discovery and extraction quality.
-# See scraper_config/defaults.yaml for all available options.
+# id-specific file: unis/herts_2226.yaml
+# Loader picks this before any generic herts.yaml.
+#
+# ── CLOUDFLARE ENTERPRISE BLOCK (2026-07-09) ─────────────────────────────────
+# Same failure mode as Cardiff (id=2194) and Kingston (id=2193):
+#   plain httpx     → 403 for ALL paths
+#   curl_cffi       → 403 for ALL paths (CF Enterprise blocks at ASN/IP level)
+#   Scrape.do static → 502 ROTATION_FAILED on homepage, listing pages, sitemap
+#   Scrape.do render=true → 200 on homepage AND sitemap (3.9 MB, 844 courses)
+#
+# http_fetcher.py auto-escalates static 502 → render=true (lines 674-691).
+# Setting scrape_do_skip_fallbacks=true routes discovery/extraction directly
+# to Scrape.do; the 502→render auto-retry handles the rest.
+#
+# ── DISCOVERY STRATEGY ───────────────────────────────────────────────────────
+# Listing pages (/courses/undergraduate etc.) are lazy-AJAX SPAs:
+#   Scrape.do render=true on /courses/undergraduate → 322 KB rendered HTML,
+#   only 27 nav-hub links — no individual course pages.
+# BFS is therefore useless; minimal budget prevents timeout.
+#
+# SITEMAP is the reliable source:
+#   sitemap.xml → renders as 3.9 MB body (NOT paginated — sitemap.xml and
+#   sitemap.xml?page=1 return identical content).  Contains 844 course paths.
+#
+# ── SITEMAP URL PATTERN BREAKDOWN (verified 2026-07-09) ─────────────────────
+#   /courses/undergraduate/...        → 142 UG degree courses     ✓ KEEP
+#   /courses/postgraduate-masters/... → 281 PG Taught courses     ✓ KEEP
+#   /courses/research/...             → 131 Research degrees       ✓ KEEP
+#   /courses/foundation/...           →   5 Foundation courses     ✓ KEEP
+#   /courses/online-distance-learning/→  12 Online/distance        ✓ KEEP
+#   /courses/short/...                → 143 Short/CPD              ✗ SKIP
+#   /courses/undergraduate-courses/...→  64 Old category hub pages ✗ SKIP
+#   /courses/postgraduate-masters-study/→24 Old PG hub pages       ✗ SKIP
+#   /courses/degree-apprenticeships/  →  24 UK-only apprenticeships✗ SKIP
+#   /courses/apprenticeship-study/    →   3 UK-only apprenticeships✗ SKIP
+#   /courses/search/, /course-picker/ →      utility paths         ✗ SKIP
+#   /courses/pre-sessional-english/   →   1 non-degree             ✗ SKIP
+#   /courses/preparatory/             →   4 non-degree             ✗ SKIP
+#   /courses/short-courses-and-cpd/   →   7 CPD                    ✗ SKIP
+#   ─────────────────────────────────────────────────────────────────────────
+#   Net after filtering: ~571 candidate course pages
+# ─────────────────────────────────────────────────────────────────────────────
 
-discovery: {}
+discovery:
+  # Route ALL fetches (BFS + sitemap) through Scrape.do.
+  # Static → 502 on Herts → http_fetcher auto-retries with render=true.
+  # Skips the doomed httpx/cffi datacenter tiers upfront.
+  scrape_do_skip_fallbacks: true
+
+  # BFS is bypassed — listing pages yield only nav-hub links (lazy AJAX).
+  # Budget=1 visits the homepage once, finds 0 course candidates, exits
+  # immediately so the sitemap supplement runs within the 300s budget.
+  bfs_page_budget: 1
+
+  # Herts sitemap.xml is NOT paginated (sitemap.xml and sitemap.xml?page=1
+  # return identical 3.9 MB content). Point directly to the root sitemap
+  # to skip any index-redirect overhead.
+  sitemap_url: https://www.herts.ac.uk/sitemap.xml
+
+  # Run sitemap even if BFS somehow finds ≥5 candidates.
+  always_sitemap_supplement: true
+
+  # Wayback has nothing useful for herts.ac.uk; disable to save budget.
+  use_wayback: false
+
+  allow_url_patterns:
+    # Individual degree course pages — flat slug after the level path.
+    - /courses/undergraduate/
+    - /courses/postgraduate-masters/
+    - /courses/research/
+    - /courses/foundation/
+    - /courses/online-distance-learning/
+
+  block_url_patterns:
+    # Short/CPD courses — not full international degree programmes.
+    - /courses/short
+    - /courses/short-courses-and-cpd
+    # Old category hub pages — 2+ path segments after the level (not a course).
+    - /courses/undergraduate-courses/
+    - /courses/postgraduate-masters-study/
+    # UK-only apprenticeships (government-funded domestic programmes).
+    - /courses/degree-apprenticeships/
+    - /courses/apprenticeship-study/
+    # Non-degree or utility paths.
+    - /courses/search
+    - /courses/course-picker
+    - /courses/pre-sessional-english
+    - /courses/preparatory
 
 extraction:
+  # Scrape.do headless Chrome (residential IP) bypasses CF Enterprise 403.
+  # skip_fallbacks: true skips the doomed httpx/cffi attempts (~1-2s/course).
+  # skip_browser_rescue: true prevents datacenter Playwright (also 403).
+  scrape_do_render: true
+  scrape_do_skip_fallbacks: true
+  skip_browser_rescue: true
+
+  # render calls are ~4-6s each; 3 concurrent keeps throughput good without
+  # overwhelming the residential proxy pool.
+  max_parallel_fetch: 3
+
   fees:
-    default_currency: GBP
+    default_currency: "GBP"
+    prefer_international: true
+    prefer_annual_over_total: true
+    fee_year: "2025"
+    fee_term: "year"
+    reject_keywords:
+      - "Home"
+      - "UK student"
+      - "Domestic"
+
+  filters:
+    domestic_only:
+      enabled: true   # apprenticeships that slip through caught here
+
+    online_only:
+      enabled: false  # Herts has legitimate online international programmes
+
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false
