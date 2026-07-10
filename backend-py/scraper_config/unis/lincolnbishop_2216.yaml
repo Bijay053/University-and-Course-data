@@ -1,0 +1,32 @@
+# Lincoln Bishop University
+# Hostname: www.lincolnbishop.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+# Slug: lincolnbishop
+# Auto-generated: 2026-07-10
+#
+# This stub was created automatically on the first scrape of this university.
+# Review and expand it to improve discovery and extraction quality.
+# See scraper_config/defaults.yaml for all available options.
+
+discovery:
+  # The /courses listing page is fully static (no JS/render needed) and
+  # lists all ~121 course detail links directly in the initial HTML — no
+  # pagination exists. Default BFS heuristics were only finding 33 because
+  # many of these slugs (e.g. /courses/heas, /courses/primed, /courses/ba-teachlearn)
+  # don't look like course-detail pages to the generic classifier and were
+  # being treated as category-landing/nav noise. force_candidate_url_patterns
+  # promotes every /courses/<slug> URL straight to the candidate set,
+  # bypassing that heuristic entirely.
+  seed_urls:
+    - https://www.lincolnbishop.ac.uk/courses
+  allow_url_patterns:
+    - ^https://www\.lincolnbishop\.ac\.uk/courses/(?!search$)[a-z0-9-]+$
+  force_candidate_url_patterns:
+    - ^https://www\.lincolnbishop\.ac\.uk/courses/(?!search$)[a-z0-9-]+$
+  course_detail_url_patterns:
+    - ^https://www\.lincolnbishop\.ac\.uk/courses/(?!search$)[a-z0-9-]+$
+  bfs_page_budget: 10
+
+extraction:
+  fees:
+    default_currency: GBP
