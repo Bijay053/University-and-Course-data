@@ -30,3 +30,39 @@ discovery:
 extraction:
   fees:
     default_currency: GBP
+  staging:
+    # Lincoln Bishop course pages use bare subject titles as their H1
+    # ("Business Management", "Criminology", "History with Foundation
+    # Year", etc.) with NO leading/trailing degree-qualifier word (no
+    # "BA (Hons)" prefix/suffix anywhere in the title). The generic
+    # category-landing-page guard (_name_has_degree_qualifier) requires
+    # such a qualifier and was rejecting 97/121 + 5 sweep-stage duplicates
+    # = 102 of 107 skipped courses in job_e56a966a0fec (2026-07-10),
+    # including obviously real single-course pages like "Business
+    # Management", "Psychology", "Health & Social Care with Foundation
+    # Year". Verified these are genuine course-detail pages (not category
+    # listings) via live fetch + log trace of babusiness/business-marketing
+    # etc. Non-course URLs are already excluded upstream by this uni's
+    # narrow allow_url_patterns/course_detail_url_patterns (only
+    # /courses/<slug> is ever a candidate), so disabling the name-based
+    # qualifier check here carries no risk of admitting real listing pages.
+    skip_degree_qualifier_check: true
+  filters:
+    online_only:
+      # 4 courses (Primary Education with Qts [+Foundation Year], Pgce
+      # Primary Full/Part-time) were wrongly rejected as online_only in
+      # job_e56a966a0fec even though [FIELD SUMMARY] showed
+      # StudyMode='On Campus' pre-Gemini and course_location='Lincoln' in
+      # the final [FIELD TRACE]. Root cause: single_course.py's
+      # no_location_online_override fires when course_location is blank
+      # at browser-retry time and downgrades study_mode to "Online"; the
+      # browser_location_restore that should undo this only re-checks
+      # course_location at one point in the pipeline, but here
+      # course_location was filled later by the AI/Gemini fallback pass,
+      # after that restore check already ran — so the downgrade never got
+      # reversed even though a real campus (Lincoln) was ultimately found.
+      # Lincoln Bishop is a physical UK college with no genuinely
+      # online-only undergraduate/PGCE/QTS programmes, so disabling this
+      # filter for this university is safe until the pipeline ordering
+      # bug is fixed upstream.
+      enabled: false
