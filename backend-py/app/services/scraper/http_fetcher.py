@@ -1011,7 +1011,20 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
                 " failed or SPA shell — retrying with render=True before httpx",
                 url,
             )
-            _disc_rendered = await fetch_html_scrape_do(url, render=True, rate_limit=False)
+            # max_retries=1: cap the render leg at 2 total attempts (not the
+            # default 4). Observed render-tier failures on this host take
+            # ~57-60s EACH to come back with a 502 (not a quick rejection),
+            # so the default 2s/8s/30s/4-attempt ladder needs ~250s+ to
+            # exhaust — far more than the 150s outer sitemap-probe budget
+            # (_PROBE_TIMEOUT_S in sitemap.py) can ever provide, so every
+            # probe timed out mid-ladder without the outer wait_for() ever
+            # seeing a real success/failure result from a later attempt.
+            # Two attempts (~60s + 2s backoff + ~60s = ~122s worst case)
+            # reliably fit inside 150s and matches what that budget was
+            # originally sized for.
+            _disc_rendered = await fetch_html_scrape_do(
+                url, render=True, rate_limit=False, max_retries=1
+            )
             if _disc_rendered is not None and not _is_spa_shell(_disc_rendered):
                 from app.services.scraper.snapshot_context import stage_snapshot as _stage
                 _stage(url, _disc_rendered, "scrape_do_render")

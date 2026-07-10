@@ -153,6 +153,26 @@ discovery:
     - 'degree-apprenticeship'
     - '/courses/202728/'
 
+  # STOPGAP (2026-07-10): Scrape.do is currently returning 502
+  # ROTATION_FAILED for BOTH static and render=True on
+  # www.ulster.ac.uk/site-maps/sitemap-courses.xml — an external Scrape.do
+  # outage/degradation for this host, not a code bug (verified: the render
+  # leg now correctly gets 2 real attempts at ~57-60s each within the 150s
+  # sitemap probe budget — see http_fetcher.py max_retries=1 fix — and both
+  # still 502). No Wayback snapshot of the sitemap XML exists either.
+  # When the sitemap fetch fails, discovery falls through to
+  # browser_discover_generic, which was capped at the default 90s and only
+  # found 38 of ~566 courses (job log showed blocked_nav=53 — i.e. dozens of
+  # nav links were still queued when the time budget cut it off, so more
+  # courses ARE reachable via nav, just not within 90s).
+  # Raising the budget here is a safety net for isolated Scrape.do
+  # degradation windows so a run during an outage still finds a reasonable
+  # course count instead of just 38. Remove/revert once Scrape.do's proxy
+  # pool for this host is confirmed stable again (re-test without this
+  # override) — this does not fix the underlying outage, it only makes the
+  # browser-fallback path less lossy while it lasts.
+  browser_time_budget_s: 240
+
 extraction:
   # Ulster course pages have dedicated /fees/ and /entry-requirements/ sub-pages
   # that carry data not always in the main Scrape.do static HTML.
