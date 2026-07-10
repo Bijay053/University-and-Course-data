@@ -543,6 +543,8 @@ export default function Scraping() {
   const { toast } = useToast();
   const [jobs, setJobs] = useState<ImportJob[]>([]);
   const [uniStats, setUniStats] = useState<UniStat[]>([]);
+  const [uniCoveragePage, setUniCoveragePage] = useState(1);
+  const [uniCoveragePageSize, setUniCoveragePageSize] = useState(25);
   const [loadingJobs, setLoadingJobs] = useState(true);
 
   const [scrapeUrls, setScrapeUrls] = useState<string[]>([""]);
@@ -3911,9 +3913,29 @@ export default function Scraping() {
       </div>
 
       <div>
-        <h2 className="text-lg font-semibold mb-3">University Coverage</h2>
+        <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+          <h2 className="text-lg font-semibold">University Coverage</h2>
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <span>{uniStats.length} universities</span>
+            <span>·</span>
+            <span>Show</span>
+            <select
+              className="border rounded px-2 py-1 text-sm text-gray-700 bg-white"
+              value={uniCoveragePageSize}
+              onChange={(e) => {
+                setUniCoveragePageSize(Number(e.target.value));
+                setUniCoveragePage(1);
+              }}
+            >
+              {[10, 25, 50, 100].map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+            <span>per page</span>
+          </div>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {uniStats.map((u) => (
+          {uniStats.slice((uniCoveragePage - 1) * uniCoveragePageSize, uniCoveragePage * uniCoveragePageSize).map((u) => (
             <Link key={u.id} href={`/universities/${u.id}`}>
               <div className="border rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer bg-white">
                 <div className="flex items-start justify-between gap-2">
@@ -3936,6 +3958,51 @@ export default function Scraping() {
             </Link>
           ))}
         </div>
+        {uniStats.length > uniCoveragePageSize && (() => {
+          const totalPages = Math.ceil(uniStats.length / uniCoveragePageSize);
+          const startItem = (uniCoveragePage - 1) * uniCoveragePageSize + 1;
+          const endItem = Math.min(uniCoveragePage * uniCoveragePageSize, uniStats.length);
+          const pageWindow: number[] = [];
+          for (let p = Math.max(1, uniCoveragePage - 2); p <= Math.min(totalPages, uniCoveragePage + 2); p++) {
+            pageWindow.push(p);
+          }
+          return (
+            <div className="flex items-center justify-between mt-4 text-sm text-gray-500 flex-wrap gap-2">
+              <span>Showing {startItem}–{endItem} of {uniStats.length} universities</span>
+              <div className="flex items-center gap-1">
+                <button
+                  className="px-2 py-1 rounded border bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  onClick={() => setUniCoveragePage(1)}
+                  disabled={uniCoveragePage === 1}
+                >«</button>
+                <button
+                  className="px-2 py-1 rounded border bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  onClick={() => setUniCoveragePage(p => Math.max(1, p - 1))}
+                  disabled={uniCoveragePage === 1}
+                >‹</button>
+                {pageWindow[0] > 1 && <span className="px-1">…</span>}
+                {pageWindow.map((p) => (
+                  <button
+                    key={p}
+                    className={`px-2.5 py-1 rounded border ${p === uniCoveragePage ? "bg-blue-600 text-white border-blue-600 font-semibold" : "bg-white hover:bg-gray-50"}`}
+                    onClick={() => setUniCoveragePage(p)}
+                  >{p}</button>
+                ))}
+                {pageWindow[pageWindow.length - 1] < totalPages && <span className="px-1">…</span>}
+                <button
+                  className="px-2 py-1 rounded border bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  onClick={() => setUniCoveragePage(p => Math.min(totalPages, p + 1))}
+                  disabled={uniCoveragePage === totalPages}
+                >›</button>
+                <button
+                  className="px-2 py-1 rounded border bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  onClick={() => setUniCoveragePage(totalPages)}
+                  disabled={uniCoveragePage === totalPages}
+                >»</button>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       <div>
