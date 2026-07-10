@@ -885,6 +885,12 @@ _STRUCTURAL_COURSE_PAGE_PREFIXES: tuple[str, ...] = (
     "rule:intake",     # rule-based intake inference
     "rule:study_mode", # rule-based study-mode inference
     "rule:cricos",     # rule-based CRICOS inference
+    "degree_level:",   # degree_level.*_banner / *_panel — structural award-text
+                       # parses (e.g. Leeds Trinity .banner-title__sub, BCU panel)
+                       # and their co-derived academic_level. Without this prefix
+                       # gemini_primary silently overwrote a correct structural
+                       # academic_level="Undergraduate" with a wrong "Year 12"
+                       # classification (2026-07-10 Leeds Trinity bug).
     # NOTE: rule:english and rule:fee intentionally excluded — Gemini reading
     # the actual page is more reliable than a generic degree-level heuristic.
 )

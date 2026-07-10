@@ -23,7 +23,7 @@ _CATALOGUE_SEGS: frozenset[str] = frozenset({
 
 _PREPOSITIONS = {"of", "in", "and", "for", "the", "with", "to", "on", "by"}
 _ACRONYMS = {
-    "MBA", "BBA", "BA", "BS", "BSc", "MSc", "PhD", "ICT", "IT", "AI",
+    "MBA", "BBA", "BA", "MA", "BS", "BSc", "MSc", "PhD", "ICT", "IT", "AI",
     "MD", "JD", "LLM", "LLB", "ME", "MEng", "EMBA", "GDip", "GCert",
     "MIT", "USQ", "CSU", "UTS", "ANU", "UNSW", "UoN", "RMIT",
     # Issue 3b: Roman numerals used in AQF course names (Certificate III,
@@ -239,11 +239,78 @@ def _clean(raw: str) -> str | None:
     return _smart_case(txt)
 
 
+def _from_ltu_banner(html: str) -> str | None:
+    """Leeds Trinity University banner-title structural extractor.
+
+    LTU course pages split the degree title across three sibling elements
+    inside ``div.banner-title-box``:
+
+        <div class="banner-title__lead">Undergraduate</div>
+        <h1 class="banner-title__main">Nursing (Mental Health)</h1>
+        <div class="banner-title__sub">BSc (Hons)</div>
+
+    The bare ``<h1>`` (banner-title__main) only carries the plain subject
+    name with no degree qualifier — this is what fed the earlier
+    category-landing-page false-positive (see skip_degree_qualifier_check
+    in leedstrinity_2220.yaml) and left the staged course_name missing the
+    "BSc (Hons)" prefix entirely. The award text lives in a sibling
+    ``banner-title__sub`` div, not in the H1 or the ``<title>`` tag, so
+    neither the default h1 extraction nor prefer_title_over_h1 can recover
+    it. This structural pre-pass combines sub + main into the full degree
+    title (e.g. "BSc (Hons) Nursing (Mental Health)").
+
+    The ``banner-title__*`` class names are LTU-specific (BEM-style, tied to
+    their "lt-section-course-banner" component) and unlikely to collide with
+    other universities, so this check is unconditional like the BCU panel
+    pre-pass in degree_level.py — it simply returns None when absent.
+    """
+    main = soup_local = None
+    try:
+        soup_local = BeautifulSoup(html, "html.parser")
+        main = soup_local.select_one("h1.banner-title__main")
+    except Exception:  # noqa: BLE001
+        return None
+    if not main or not soup_local:
+        return None
+    box = main.find_parent(class_="banner-title-box") or main.find_parent()
+    if not box:
+        return None
+    sub = box.select_one(".banner-title__sub")
+    name_text = main.get_text(" ", strip=True)
+    if not name_text:
+        return None
+    sub_text = sub.get_text(" ", strip=True) if sub else ""
+    combined = f"{sub_text} {name_text}".strip() if sub_text else name_text
+    return combined or None
+
+
 async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG001
     if not html:
         return []
     soup = BeautifulSoup(html, "html.parser")
     candidates: list[tuple[str, str, float]] = []
+
+    _ltu_name = _from_ltu_banner(html)
+    if _ltu_name:
+        cleaned = _clean(_ltu_name)
+        if cleaned:
+            try:
+                from app.services.scraper.course_name_cleaner import clean_course_name_with_config
+                _cn_cleaned, _ = clean_course_name_with_config(cleaned)
+                if _cn_cleaned != cleaned:
+                    cleaned = _cn_cleaned
+            except Exception:  # noqa: BLE001
+                pass
+            return [
+                ExtractionResult(
+                    field_key="course_name",
+                    value=cleaned,
+                    normalized={"course_name": cleaned},
+                    confidence=0.95,
+                    method="course_name.ltu_banner",
+                    snippet=_ltu_name[:160],
+                )
+            ]
 
     # Per-uni YAML option: h1_css_selector — use a targeted CSS selector instead
     # of a bare soup.find("h1") when the page has multiple H1 elements and the

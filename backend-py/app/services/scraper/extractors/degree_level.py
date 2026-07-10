@@ -256,6 +256,61 @@ def classify_degree_level(course_name: str, page_text: str = "") -> tuple[str | 
     return None, "unknown", None
 
 
+def _from_ltu_banner(html: str) -> tuple[str | None, str, str | None]:
+    """Leeds Trinity University banner-title structural extractor.
+
+    Mirrors ``course_name._from_ltu_banner``: LTU pages split the degree
+    title into three sibling elements inside ``div.banner-title-box``:
+
+        <div class="banner-title__lead">Undergraduate</div>
+        <h1 class="banner-title__main">Nursing (Mental Health)</h1>
+        <div class="banner-title__sub">BSc (Hons)</div>
+
+    Neither the name-based nor page-lead/body-qual strategies in
+    ``classify_degree_level`` see the "BSc (Hons)" award text reliably —
+    it sits in a sibling div, not the H1, and often falls outside the
+    150-char page_lead window because of preceding nav/header text. This
+    pre-pass reads ``banner-title__sub`` (award, e.g. "BSc (Hons)") for
+    primary classification, falling back to ``banner-title__lead``
+    (level, e.g. "Undergraduate"/"Postgraduate") mapped directly.
+
+    Returns (degree_level, method, snippet) matching
+    ``classify_degree_level``'s shape.
+    """
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:  # pragma: no cover
+        return None, "unknown", None
+
+    soup = BeautifulSoup(html, "html.parser")
+    main = soup.select_one("h1.banner-title__main")
+    if not main:
+        return None, "unknown", None
+    box = main.find_parent(class_="banner-title-box") or main.find_parent()
+    if not box:
+        return None, "unknown", None
+    sub_el = box.select_one(".banner-title__sub")
+    lead_el = box.select_one(".banner-title__lead")
+
+    if sub_el:
+        award = sub_el.get_text(" ", strip=True)
+        hit = _classify_text(award, _NAME_PATTERNS)
+        if hit:
+            return hit, "ltu_banner_award", award[:200]
+
+    if lead_el:
+        lead = lead_el.get_text(" ", strip=True).lower()
+        _LTU_LEVEL_MAP: dict[str, str] = {
+            "undergraduate": "Bachelor's",
+            "postgraduate": "Master's",
+        }
+        mapped = _LTU_LEVEL_MAP.get(lead)
+        if mapped:
+            return mapped, "ltu_banner_level", lead_el.get_text(" ", strip=True)[:200]
+
+    return None, "unknown", None
+
+
 def _from_bcu_panel(html: str) -> tuple[str | None, str, str | None]:
     """BCU-specific degree-level extractor: reads the 'Award' field from
     the structured course facts panel ``div.course__key-info__inner``.
@@ -370,6 +425,35 @@ async def extract(html: str, url: str, course_name: str | None = None) -> list[E
                 confidence=0.82,  # structural derivation — lower than Gemini (0.9+)
                 method="degree_level:derived_academic_level",
                 snippet=f"academic_level derived from degree_level={_bcu_degree!r}",
+            ))
+        return results
+
+    # Leeds Trinity structural pre-pass — reads the award/level text from
+    # the banner-title-box sibling divs (see _from_ltu_banner docstring).
+    # Runs before generic text classification for the same reason as the
+    # BCU pre-pass: the award text is not reliably visible to the name- or
+    # page-lead-based heuristics on this CMS.
+    _ltu_degree, _ltu_method, _ltu_snippet = _from_ltu_banner(html)
+    if _ltu_degree:
+        results = [
+            ExtractionResult(
+                field_key=field_key,
+                value=_ltu_degree,
+                normalized={"degree_level": _ltu_degree},
+                confidence=0.95,
+                method=f"degree_level:{_ltu_method}",
+                snippet=_ltu_snippet,
+            )
+        ]
+        _acad = _academic_level_from_degree(_ltu_degree)
+        if _acad:
+            results.append(ExtractionResult(
+                field_key="academic_level",
+                value=_acad,
+                normalized={"academic_level": _acad},
+                confidence=0.82,
+                method="degree_level:derived_academic_level",
+                snippet=f"academic_level derived from degree_level={_ltu_degree!r}",
             ))
         return results
 
