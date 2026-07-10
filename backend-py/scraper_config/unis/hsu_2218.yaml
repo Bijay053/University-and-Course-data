@@ -8,7 +8,23 @@
 # Review and expand it to improve discovery and extraction quality.
 # See scraper_config/defaults.yaml for all available options.
 
-discovery: {}
+discovery:
+  # Full course catalogue is published as a WordPress SEO sitemap. Use it
+  # directly instead of BFS crawling — avoids missing pages behind
+  # pagination/nav and avoids classifier misses on course-detail slugs.
+  sitemap_url: https://www.hsu.ac.uk/course-sitemap.xml
+  # BFS only reaches courses linked from nav/subject-area pages (~59);
+  # the sitemap has the full catalogue (~87). Force the unconditional
+  # merge instead of relying on the <15-candidate alt-probe threshold.
+  always_sitemap_supplement: true
+  allow_url_patterns:
+    - ^https://www\.hsu\.ac\.uk/course/[a-z0-9-]+/?$
+  force_candidate_url_patterns:
+    - ^https://www\.hsu\.ac\.uk/course/[a-z0-9-]+/?$
+  course_detail_url_patterns:
+    - ^https://www\.hsu\.ac\.uk/course/[a-z0-9-]+/?$
+  block_url_patterns:
+    - ^https://www\.hsu\.ac\.uk/course/?$
 
 extraction:
   fees:
