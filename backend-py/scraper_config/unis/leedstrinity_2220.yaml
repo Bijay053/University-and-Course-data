@@ -1,0 +1,42 @@
+# Leeds Trinity University
+# Hostname: www.leedstrinity.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+# Slug: leedstrinity
+# Auto-generated: 2026-07-10
+#
+# 2026-07-10: Leeds Trinity's course-search listing page is a SearchStax
+# "Search Studio JS" widget (same family as HUD/WLV/Durham/QMU) — the visible
+# HTML has no course cards; the widget queries a SearchStax-hosted Solr core
+# client-side. Confirmed via curl against the Solr endpoint directly:
+# numFound=134, matching the user-reported course count exactly.
+#
+# links_only mode (like WLV, NOT like HUD): Solr docs here only carry
+# metadata (title, award, level, mode, location, school) — no fee/IELTS/
+# entry-requirement text field — so Solr is used purely for URL discovery.
+# Each discovered URL still goes through the normal per-course HTTP/browser
+# extraction pipeline (fees, IELTS, entry requirements come from the live
+# page, same as any non-SearchStax university).
+#
+# Auth: the read-only token the Search Studio widget ships to every browser
+# (view-source on the listing page -> `studioConfig.connector.select_auth_token`).
+# Not a server secret, but stored via token_env per project convention.
+# Env var: LEEDSTRINITY_SEARCHSTAX_TOKEN (already set).
+
+discovery:
+  searchstax:
+    endpoint: "https://searchcloud-1-eu-west-2.searchstax.com/29847/ltu-1638/emselect"
+    token_env: LEEDSTRINITY_SEARCHSTAX_TOKEN
+    filter_query: 'sectionType_s:"courses"'
+    extra_params:
+      model: courses
+    use_generic_mapper: true
+    links_only: true
+    page_size: 100
+    url_fields:
+      - url
+    title_fields:
+      - CourseTitle_t
+
+extraction:
+  fees:
+    default_currency: GBP
