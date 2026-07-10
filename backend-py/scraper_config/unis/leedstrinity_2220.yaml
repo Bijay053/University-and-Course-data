@@ -40,3 +40,15 @@ discovery:
 extraction:
   fees:
     default_currency: GBP
+  staging:
+    # 2026-07-10: Leeds Trinity course pages use plain subject titles as the
+    # H1/course_name (e.g. "Criminology", "Film", "Games Design", "Digital
+    # Marketing") with no "BA (Hons)"-style degree-level prefix. The generic
+    # should_stage_course() guard's _name_has_degree_qualifier check treats
+    # any title lacking a degree word as a category/landing page and rejects
+    # it — this was silently dropping 90%+ of real Leeds Trinity courses
+    # (127/132 rejected as category_landing_page_missing_degree_qualifier).
+    # SearchStax discovery + block_url_patterns already scope links to real
+    # course detail pages, so the degree-qualifier name check is redundant
+    # and actively harmful here. Same opt-out pattern used for ARU/Writtle.
+    skip_degree_qualifier_check: true
