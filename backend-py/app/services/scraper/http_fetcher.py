@@ -404,6 +404,7 @@ async def fetch_html_scrape_do(
     wait_for_ms: int = 3000,
     geo_code: str | None = None,
     rate_limit: bool = True,
+    max_retries: int | None = None,
 ) -> str | None:
     """Fetch via Scrape.do residential proxy — paid tier-4/5 Cloudflare bypass.
 
@@ -467,6 +468,12 @@ async def fetch_html_scrape_do(
     # proceed while this one waits; it is re-acquired before the next attempt.
     _SD_RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
     _SD_BACKOFFS = (2.0, 8.0, 30.0)  # seconds between attempts
+    if max_retries is not None:
+        # Caller wants a shorter (or zero) retry ladder — e.g. a doomed
+        # static-tier probe on a host that never recovers on this leg, so
+        # the caller would rather fail fast and spend its time budget on
+        # the tier that actually works (see Ulster sitemap discovery).
+        _SD_BACKOFFS = _SD_BACKOFFS[:max_retries]
     _last_sd_r: httpx.Response | None = None
 
     for _sd_attempt in range(len(_SD_BACKOFFS) + 1):  # attempts 0..3
@@ -968,7 +975,14 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
                     " — going straight to Scrape.do static (skipping httpx/cffi)",
                     url,
                 )
-                _disc_static = await fetch_html_scrape_do(url, render=False, rate_limit=False)
+                # max_retries=0: this static leg is known-doomed on hosts that
+                # reach this branch (Cloudflare Enterprise blocks it outright),
+                # so don't burn the internal 2/8/30s backoff ladder chasing a
+                # 502 that will never turn into a 200 — fail fast and spend
+                # the discovery time budget on the render=True tier instead.
+                _disc_static = await fetch_html_scrape_do(
+                    url, render=False, rate_limit=False, max_retries=0
+                )
             else:
                 log.info(
                     "fetch %s: discovery.scrape_do_render=True"

@@ -1035,7 +1035,15 @@ async def discover_course_links(
     # necessary) to keep the change scoped to the failure it fixes.
     _SEED_PREFETCH_MISS = object()
     _seed_prefetch_cache: dict[str, str | None] = {}
-    if _disc_uses_scrape_do:
+    # Ulster (2026-07-10): when bfs_page_budget=0 (max_pages<=0) the while-loop
+    # below never runs (len(visited) < max_pages is false immediately), so any
+    # seed prefetch result is discarded unread. For sites where the seed page
+    # is JS-only virtual-list and yields 0 hrefs anyway (see ulster_2176.yaml),
+    # this was burning ~95s of the 300s discovery_phase_timeout_s budget on a
+    # Scrape.do call whose result could never be used — starving the
+    # sitemap-fallback probe of retry budget it needed to survive Cloudflare's
+    # flaky ROTATION_FAILED errors. Skip the prefetch entirely in that case.
+    if _disc_uses_scrape_do and max_pages > 0:
         _prefetch_urls = [_u for (_u, _d) in queue if _d == 0]
         if _prefetch_urls:
             log.info(

@@ -55,3 +55,13 @@ Plan accordingly — these jobs cannot be monitored within a single session.
 **Fix**: raised `_PROBE_TIMEOUT_S` in `sitemap.py` from 15.0 to 100.0 to give the full static+render retry room to complete.
 
 **How to diagnose this class of bug**: don't trust the browser-facing job log alone — it's built from `emit()` calls only. The `discovery.scrape_do_skip_fallbacks=True` / retry / failure lines are `log.info`/`log.warning` calls to the Python logger, only visible in the raw Celery worker log (or by re-running the fetch in isolation via a one-off script that calls `get_config_for_host()` + `set_uni_config()` + the fetch function directly). Reproducing in isolation is the fastest way to see the true timing breakdown.
+
+## Second regression (2026-07-10): 987→35→38 courses, `_PROBE_TIMEOUT_S` bump alone was insufficient
+
+**Symptom**: after the 2026-07-03 fix above, Ulster regressed again to 35-38 courses. Raising `_PROBE_TIMEOUT_S` to 150s still wasn't enough — the sitemap fetch timed out on attempt 0 with no visible retry.
+
+**Root cause (deeper layer)**: `fetch_html_scrape_do()` has its OWN internal exponential-backoff retry ladder (2s/8s/30s = up to 4 attempts) for any 429/500/502/503/504 response, independent of the discovery fast-path's outer static→render retry. On a host where the static leg is *known-doomed* (Cloudflare Enterprise always 502s it), that internal ladder burns ~40s+ retrying a call that will never succeed, before the code even falls through to the render=True leg — which then burns its own ~40s+ ladder. Two full doomed-then-working ladders easily exceed even a 150s outer timeout when Scrape.do's proxy pool is degraded.
+
+**Fix**: added `max_retries: int | None = None` param to `fetch_html_scrape_do()` (`http_fetcher.py`) — when set, truncates the internal `_SD_BACKOFFS` tuple. The discovery fast-path's static-leg call (in `fetch_html()`, the `scrape_do_skip_fallbacks` branch) now passes `max_retries=0` so the doomed static attempt fails after one shot instead of four, preserving the outer timeout budget for the render=True leg (which keeps its full default retry ladder).
+
+**Lesson**: when a retry ladder isn't behaving as expected, check for a SECOND, independent retry ladder nested one layer deeper — `fetch_html()`'s own static→render retry and `fetch_html_scrape_do()`'s internal backoff loop look like one system from the caller's side but stack multiplicatively.

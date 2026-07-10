@@ -193,7 +193,20 @@ def _is_course_loc(loc: str, *, base_host: str = "") -> bool:
 # the total is kept at 100s — still guaranteeing all 4 standard probes plus
 # BFS fit inside the deadline in the typical fast-fail case, and a single
 # hung probe can never take more than 100s.
-_PROBE_TIMEOUT_S: Final = 100.0
+#
+# Ulster regression (2026-07-10, 566→35 courses): Cloudflare Enterprise
+# started returning ROTATION_FAILED (502) on Scrape.do's render=True tier
+# for www.ulster.ac.uk itself (not just static) roughly half the time, and
+# each failing render attempt takes ~58s to come back. http_fetcher's own
+# retry ladder (2s/8s/30s backoffs) needs ~124s just to reach a second
+# render attempt, which the previous 100s budget cut off mid-retry every
+# time — the probe always "TIMED OUT" before a lucky retry could land,
+# even though a bare retry with more patience regularly succeeds (verified
+# via direct scrape.do calls). Raised to 150s so two render attempts fit.
+# Paired with the discovery.py fix that skips the (always-wasted, ~95s)
+# seed-URL prefetch when bfs_page_budget=0, so the extra 50s here doesn't
+# regress universities that share the 300s discovery_phase_timeout_s.
+_PROBE_TIMEOUT_S: Final = 150.0
 
 # Module-level so tests can monkeypatch the delays to 0 (the retry sleeps
 # are real asyncio.sleep calls — with 5 empty probe candidates the default
