@@ -29,3 +29,18 @@ discovery:
 extraction:
   fees:
     default_currency: GBP
+  staging:
+    # 4 courses were skipped in job_e5c90d6d674f (2026-07-10) as
+    # no_international_fee: Pgcert Enhanced Clinical Practice
+    # (Apprenticeship), Fdsc Assistant Practitioner – Podiatry [+
+    # Apprenticeship], Pgcert First Contact Practice. These are UK
+    # apprenticeship/CPD courses aimed at practising healthcare staff —
+    # apprenticeships are legally UK-employer-funded and CPD short courses
+    # are for existing domestic clinicians, so HSU's site never publishes
+    # an international fee for them (Pgcert First Contact Practice only
+    # has a domestic fee of £2,775 — DATA QUALITY correctly flagged this as
+    # domestic_fee_only_no_international, not a low/incorrect international
+    # fee). Rather than silently dropping these real courses, stage them
+    # for human review without a fee so an operator can confirm/price them
+    # manually instead of the pipeline guessing a number.
+    require_international_fee: false
