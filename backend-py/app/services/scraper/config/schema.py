@@ -982,6 +982,57 @@ class VuwApiConfig(BaseModel):
     )
 
 
+class SrucApiConfig(BaseModel):
+    """SRUC (Scotland's Rural College) — direct Umbraco JSON API provider.
+
+    SRUC's course-catalogue listing page (``/course-catalogue/``) is a JS SPA
+    that renders course "cards" client-side from a single Umbraco endpoint:
+    ``/Umbraco/Api/CourseApi/GetCourses``.  Each card can show several
+    qualification-level "capsule" buttons (e.g. "MA at SCQF level 5", "MA at
+    SCQF level 6", "BSc (Hons)", "HNC", "HND", "NC") — each capsule is a
+    DISTINCT course with its own ``coursePageUrl``, nested under the parent
+    course's ``qualifications`` array. A naive one-link-per-card discovery
+    undercounts badly (51 parent course entries vs 93 individual
+    qualification pages).
+
+    The endpoint returns ``allCourses`` (all study modes) with no working
+    server-side filter — the "Full time" filter on the front-end is applied
+    client-side by checking each course's ``filterIds`` array against the
+    GUID of the "Full Time" entry in ``filterOptions`` (Study modes group).
+    This provider replicates that client-side filter, then flattens every
+    matching course's ``qualifications`` array into individual course links.
+
+    Example::
+
+        discovery:
+          sruc_api:
+            enabled: true
+            study_mode_filter: "Full Time"
+    """
+
+    enabled: bool = Field(default=True, description="Set false to disable without removing the block.")
+    base_url: str = Field(
+        default="https://www.sruc.ac.uk",
+        description="Base URL used to resolve the API endpoint and relative coursePageUrl values.",
+    )
+    endpoint: str = Field(
+        default="/Umbraco/Api/CourseApi/GetCourses",
+        description="Path (relative to base_url) of the Umbraco course-catalogue JSON API.",
+    )
+    study_mode_filter: Optional[str] = Field(
+        default="Full Time",
+        description=(
+            "Name of the 'Study modes' filterOptions entry to filter courses by "
+            "(case-insensitive exact match), matched against each course's "
+            "filterIds array. Set to null to include all study modes (no filtering)."
+        ),
+    )
+    currency: str = Field(
+        default="GBP",
+        description="Currency code for international fees (default GBP).",
+    )
+
+
 class DiscoveryConfig(BaseModel):
     """Safe to replay against unknown universities (Tier-3 playbook matching)."""
 
@@ -1069,6 +1120,16 @@ class DiscoveryConfig(BaseModel):
             "without any per-course HTML fetch. The VUW course pages are a React "
             "SPA that returns a loading shell — this provider bypasses them entirely. "
             "See VuwApiConfig."
+        ),
+    )
+    sruc_api: Optional[SrucApiConfig] = Field(
+        default=None,
+        description=(
+            "SRUC (Scotland's Rural College) — direct Umbraco JSON API provider. "
+            "When present, fetches the CourseApi/GetCourses endpoint, replicates "
+            "the 'Full Time' client-side filter, and flattens each course's "
+            "qualifications array (capsule buttons) into individual course links. "
+            "See SrucApiConfig."
         ),
     )
     seed_page_click_pagination: Optional[SeedPageClickPaginationConfig] = Field(

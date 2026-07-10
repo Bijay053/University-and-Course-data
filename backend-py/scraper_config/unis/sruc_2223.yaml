@@ -8,7 +8,18 @@
 # Review and expand it to improve discovery and extraction quality.
 # See scraper_config/defaults.yaml for all available options.
 
-discovery: {}
+# Discovery: SRUC's /course-catalogue/ listing is a JS SPA that renders course
+# cards from a single Umbraco JSON API (Umbraco/Api/CourseApi/GetCourses).
+# Each card can show multiple qualification-level "capsule" buttons (e.g.
+# "MA at SCQF level 5", "BSc (Hons)", "HNC", "HND", "NC") — each capsule is a
+# distinct course with its own page. The sruc_api provider queries this API
+# directly, replicates the "Full time" client-side filter (matches the
+# operator-reported 38 full-time courses), and flattens each matching
+# course's qualifications into individual course links (68 total pages).
+discovery:
+  sruc_api:
+    enabled: true
+    study_mode_filter: "Full Time"
 
 extraction:
   fees:

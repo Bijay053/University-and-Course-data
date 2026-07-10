@@ -1390,6 +1390,37 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 else:
                     log.warning("[RECIPE] json_api returned 0 links — falling through to BFS discovery")
 
+        # ── SRUC (Scotland's Rural College) JSON API provider ────────────────
+        # When discovery.sruc_api is set, fetch the Umbraco CourseApi/GetCourses
+        # endpoint, replicate the "Full time" client-side filter, and flatten
+        # each matching course's qualifications (capsule buttons) into
+        # individual course links. Per-course HTML extraction still runs
+        # normally on each qualification's own page (links-only provider).
+        _sruc_api_cfg = getattr(_uni_cfg.discovery, "sruc_api", None)
+        if _sruc_api_cfg is not None and getattr(_sruc_api_cfg, "enabled", True):
+            from app.services.scraper.sruc_api import fetch_sruc_links
+            log.info("[SRUC_API] sruc_api discovery configured — querying CourseApi ...")
+            _sruc_error: str | None = None
+            try:
+                links = await fetch_sruc_links(_sruc_api_cfg, emit=emit)
+            except Exception as _sruc_exc:  # noqa: BLE001
+                log.error("[SRUC_API] provider failed: %s", _sruc_exc, exc_info=True)
+                links = []
+                _sruc_error = str(_sruc_exc)
+            _always_browser = False  # links-only provider — normal per-course HTML extraction follows
+            if not links:
+                _failure_msg = (
+                    "SRUC API provider returned 0 links — aborting. "
+                    "Check that /Umbraco/Api/CourseApi/GetCourses is reachable and "
+                    "study_mode_filter matches a 'Study modes' filterOptions entry. "
+                    f"Provider error: {_sruc_error or 'none'}."
+                )
+                log.error(_failure_msg)
+                job.status = "failed"
+                job.error_message = _failure_msg
+                await db.commit()
+                return
+
         # ── Manchester XML catalogue provider ─────────────────────────────────
         # When discovery.manchester_xml is set, fetch all courses from the
         # three public XML feeds (UG/PGT/PGR) — no BFS, no browser needed for
@@ -2985,6 +3016,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             _searchstax_cfg is not None
             or (getattr(_uni_cfg.discovery, "swiftype", None) is not None)
             or (getattr(_uni_cfg.discovery, "manchester_xml", None) is not None)
+            or (getattr(_uni_cfg.discovery, "sruc_api", None) is not None)
         )
         if _skip_url_filters_searchstax and links:
             log.info(
