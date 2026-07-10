@@ -67,34 +67,58 @@ discovery:
   # ~10 UG pagination pages (10 courses each) plus 26 explicit PG seeds.
 
   seed_urls:
-    # ── BFS start (UG) ────────────────────────────────────────────────────
-    # /degrees/courses/all is the ECU all-courses Funnelback SPA page.  The
-    # React component renders 10 courses and BFS follows the pagination links
-    # (?start_rank=11/21/31...) to collect all ~103 UG courses.  nav-tab
-    # variants (f.Tabs, collection=ecu) are now blocked to save BFS budget.
+    # ── BFS start (UG Funnelback pagination) ─────────────────────────────
+    # /degrees/courses/all is the ECU all-courses Funnelback SPA page.  It
+    # renders 10 courses per "page" via ?start_rank= pagination.
+    #
+    # IMPORTANT — pre-seed ALL pagination pages explicitly (2026-07-10 fix):
+    # Previously only the root /all URL was seeded and BFS was expected to
+    # follow ?start_rank= links between pages.  BFS resolved those relative
+    # query-string links against the already-parameterized current page URL,
+    # merging both query strings instead of replacing — producing doubled
+    # Funnelback params (?collection=X&collection=X&waitFor=3000&waitFor=3000
+    # …).  Scrape.do render=true on a malformed doubled-param URL hangs for
+    # 80s+ and blows the 300s discovery budget.
+    # By seeding every page directly, BFS never needs to follow ?start_rank=
+    # links between pagination pages (they are already in the queue), so no
+    # URL merging occurs.  start_rank= is also removed from allow_url_patterns
+    # so BFS ignores any pagination links it encounters on each page.
+    # Each page returns 10 UG course links; 12 pages covers ~120 UG courses.
     - https://www.ecu.edu.au/degrees/courses/all
-    # ── Postgraduate — explicit seeds by faculty (2026-07-09+) ──────────
+    - https://www.ecu.edu.au/degrees/courses/all?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=11&waitFor=3000&profile=main
+    - https://www.ecu.edu.au/degrees/courses/all?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=21&waitFor=3000&profile=main
+    - https://www.ecu.edu.au/degrees/courses/all?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=31&waitFor=3000&profile=main
+    - https://www.ecu.edu.au/degrees/courses/all?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=41&waitFor=3000&profile=main
+    - https://www.ecu.edu.au/degrees/courses/all?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=51&waitFor=3000&profile=main
+    - https://www.ecu.edu.au/degrees/courses/all?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=61&waitFor=3000&profile=main
+    - https://www.ecu.edu.au/degrees/courses/all?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=71&waitFor=3000&profile=main
+    - https://www.ecu.edu.au/degrees/courses/all?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=81&waitFor=3000&profile=main
+    - https://www.ecu.edu.au/degrees/courses/all?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=91&waitFor=3000&profile=main
+    - https://www.ecu.edu.au/degrees/courses/all?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=101&waitFor=3000&profile=main
+    - https://www.ecu.edu.au/degrees/courses/all?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=111&waitFor=3000&profile=main
+    # ── Postgraduate — explicit seeds by faculty ──────────────────────────
     # /degrees/postgraduate is a CF-blocked Funnelback SPA (0 links even with
     # render=true).  Strategy: seed one confirmed course page per discipline.
     # BFS cross-links (related-courses sections on each page) yield additional
-    # PG candidates.  404 seeds are silently skipped by the 404 guard.
+    # PG candidates.
+    #
+    # Stale 404 seeds removed (2026-07-10) — ECU discontinued these pages:
+    #   master-of-commerce, master-of-marketing-communications,
+    #   master-of-international-tourism-and-hospitality-management,
+    #   master-of-physiotherapy, master-of-occupational-therapy,
+    #   master-of-sport-science, master-of-clinical-exercise-physiology,
+    #   master-of-psychology, master-of-special-education, master-of-social-work,
+    #   master-of-speech-pathology, master-of-science-biomedical-science.
+    # Each stale seed wastes one Scrape.do render call + one BFS page slot.
     #
     # Business / Commerce
     - https://www.ecu.edu.au/degrees/courses/master-of-business-administration
-    - https://www.ecu.edu.au/degrees/courses/master-of-commerce
     - https://www.ecu.edu.au/degrees/courses/master-of-professional-accounting
-    - https://www.ecu.edu.au/degrees/courses/master-of-marketing-communications
     - https://www.ecu.edu.au/degrees/courses/master-of-human-resource-management
-    - https://www.ecu.edu.au/degrees/courses/master-of-international-tourism-and-hospitality-management
     # Health Sciences
     - https://www.ecu.edu.au/degrees/courses/master-of-nursing
     - https://www.ecu.edu.au/degrees/courses/master-of-nursing-studies
     - https://www.ecu.edu.au/degrees/courses/master-of-public-health
-    - https://www.ecu.edu.au/degrees/courses/master-of-physiotherapy
-    - https://www.ecu.edu.au/degrees/courses/master-of-occupational-therapy
-    - https://www.ecu.edu.au/degrees/courses/master-of-sport-science
-    - https://www.ecu.edu.au/degrees/courses/master-of-clinical-exercise-physiology
-    - https://www.ecu.edu.au/degrees/courses/master-of-psychology
     # Engineering / Computing
     - https://www.ecu.edu.au/degrees/courses/master-of-engineering-science
     - https://www.ecu.edu.au/degrees/courses/master-of-information-technology
@@ -103,12 +127,8 @@ discovery:
     - https://www.ecu.edu.au/degrees/courses/master-of-education
     - https://www.ecu.edu.au/degrees/courses/master-of-teaching-primary
     - https://www.ecu.edu.au/degrees/courses/master-of-teaching-secondary
-    - https://www.ecu.edu.au/degrees/courses/master-of-special-education
     # Arts / Social Sciences / Science
     - https://www.ecu.edu.au/degrees/courses/master-of-counselling
-    - https://www.ecu.edu.au/degrees/courses/master-of-social-work
-    - https://www.ecu.edu.au/degrees/courses/master-of-speech-pathology
-    - https://www.ecu.edu.au/degrees/courses/master-of-science-biomedical-science
     # Research / Doctoral
     - https://www.ecu.edu.au/degrees/courses/doctor-of-philosophy
     - https://www.ecu.edu.au/degrees/courses/doctor-of-philosophy-integrated
@@ -118,10 +138,12 @@ discovery:
     # (bachelor-of-science, master-of-engineering, etc.).  Rejects broad hub
     # pages like /degrees/courses/all and /degrees/courses/search.
     - /degrees/courses/[a-z]+-
-    # Funnelback pagination — ONLY start_rank= URLs add new course links.
-    # Tab variants (f.Tabs=Staff, f.Tabs=AskUs, etc.) produce 0 new candidates
-    # and waste BFS budget; this pattern only allows genuine pagination.
-    - start_rank=
+    # NOTE: start_rank= is intentionally NOT in allow_url_patterns (2026-07-10).
+    # All pagination pages are pre-seeded above; BFS must NOT follow ?start_rank=
+    # links it encounters on each page, because resolving a relative
+    # ?start_rank=21&... href against an already-parameterized page URL merges
+    # both query strings, producing doubled Funnelback params that cause a
+    # Scrape.do render=true hang and a 300s discovery timeout.
 
   block_url_patterns:
     # Funnelback pagination/tab URL variants — these appear when BFS follows
@@ -131,6 +153,16 @@ discovery:
     - start_rank=          # Funnelback pagination (same 10 courses every time)
     - collection=ecu%7E   # Funnelback search API calls (tab/collection variants)
     - f\.Tabs%7C           # Funnelback tab filter params (URL-encoded f.Tabs|)
+    # Non-course site sections — these pages have degree-related text so the
+    # BFS classifier wrongly adds them as course candidates (2026-07-10 fix):
+    #   /future-students/course-entry/international-student-enquiries  → enquiry form
+    #   /future-students/course-entry/english-proficiency-bands        → IELTS band table
+    #   /future-students/course-entry                                  → listing of above
+    #   /study/events                                                  → events calendar
+    #   /degrees/study-areas/*                                         → faculty hubs
+    - /future-students/
+    - /study/events
+    - /degrees/study-areas/
 
   # 1 UG BFS seed + ~10 UG pagination pages (~100 UG courses) +
   # ~26 PG seeds + cross-links and related-course BFS hops.

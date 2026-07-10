@@ -571,6 +571,21 @@ def _resolve(href: str, base: str, origin: str) -> str | None:
     full = _unwrap_funnelback_redirect(full)
     if not full.startswith(origin):
         return None
+    # Guard against doubled query params (ECU/Funnelback: the pagination JS
+    # on a rendered page appends start_rank + all other params to the current
+    # URL's query string instead of replacing it, producing URLs like
+    # ?collection=X&collection=X&start_rank=81&waitFor=3000&waitFor=3000.
+    # These pass both dedup checks (different exact string and different
+    # normalized form from the pre-seeded clean URL) so they enter the BFS
+    # queue and, when fetched via Scrape.do render=true, can hang for 80s+
+    # blowing the 300s discovery budget.  Duplicate query params are always
+    # a URL-generation bug — no valid page URL ever needs the same key twice.
+    try:
+        _qs_keys: list[str] = [k for k, _ in parse_qsl(urlparse(full).query, keep_blank_values=True)]
+        if len(_qs_keys) != len(set(_qs_keys)):
+            return None  # doubled param — silently reject
+    except Exception:  # noqa: BLE001
+        pass
     return full
 
 
@@ -959,6 +974,20 @@ async def discover_course_links(
             except re.error:
                 log.warning("[DISCOVER] invalid allow_url_patterns regex %r — skipped", _raw)
 
+    # block_url_patterns: compiled early so the BFS traversal loop can skip
+    # matching URLs BEFORE fetching them (budget guard for Scrape.do-backed
+    # discovery where each fetch costs ~6s).  The same patterns are also
+    # applied post-BFS as a candidate filter (see line ~1940); compiling here
+    # is cheap and prevents redundant fetches of explicitly-blocked sections
+    # (e.g. ECU's /future-students/, /study/events, /degrees/study-areas/).
+    _yaml_block_compiled_early: list[re.Pattern[str]] = []
+    if discovery_config is not None:
+        for _raw_blk in list(getattr(discovery_config, "block_url_patterns", None) or []):
+            try:
+                _yaml_block_compiled_early.append(re.compile(_raw_blk, re.IGNORECASE))
+            except re.error:
+                log.warning("[DISCOVER] invalid block_url_patterns regex %r — skipped", _raw_blk)
+
     # Listing-override patterns: URLs matching these bypass is_blocked_page AND
     # are treated as discovery/listing pages (crawled but NOT added to found).
     # Combines allow_blocked_listing_patterns (blocked-path override) and
@@ -1163,6 +1192,26 @@ async def discover_course_links(
                 # empty list as `_blocked_fee_urls_sink`; we append here.
                 if _block_reason == "fee_page" and _blocked_fee_urls_sink is not None:
                     _blocked_fee_urls_sink.append(url)
+                continue
+
+        # YAML block_url_patterns — traversal-level guard (depth > 0 only;
+        # depth-0 seeds are always fetched regardless).  This mirrors the
+        # post-BFS block_url_patterns filter but fires BEFORE the fetch so
+        # that Scrape.do-backed discovery doesn't waste render budget on
+        # pages the operator has explicitly excluded (e.g. ECU's
+        # /future-students/, /study/events, /degrees/study-areas/).
+        # allow_url_patterns takes precedence (already checked above).
+        if depth > 0 and _yaml_block_compiled_early and not _yaml_allow_override:
+            _bfs_blocked = any(_p.search(url) for _p in _yaml_block_compiled_early)
+            if _bfs_blocked:
+                if emit:
+                    await emit(
+                        "status",
+                        f"[DISCOVER] block_url_patterns (BFS): skipping {url}",
+                        phase="discover",
+                        kind="bfs_block_url_pattern",
+                    )
+                log.info("[DISCOVER] block_url_patterns (BFS): skipping %s", url)
                 continue
 
         # Discovery-level fetch: one shot (retries=0) so that this loop —
