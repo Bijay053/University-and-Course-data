@@ -230,8 +230,8 @@ _PLACEMENT_CONTEXT_RE = re.compile(
 _PLACEMENT_OPT_YEAR_RE = re.compile(
     r",?\s*or\s+\d+(?:\.\d+)?\s*(?:years?)?\s*"
     r"(?:if\s+(?:a\s+)?|with\s+(?:a(?:n)?\s+)?)"
-    r"(?:work|industrial|professional|sandwich|optional|integrated)"
-    r"\s+placement\b[^,;\n]*",
+    r"(?:(?:work|industrial|professional|sandwich|optional|integrated)\s+)?"
+    r"placement\b[^,;\n]*",
     re.IGNORECASE,
 )
 
