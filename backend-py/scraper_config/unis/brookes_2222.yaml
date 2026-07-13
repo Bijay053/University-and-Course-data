@@ -1,0 +1,98 @@
+# Oxford Brookes University
+# Hostname: www.brookes.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+#
+# Discovery notes (2026-07-13):
+#
+#   Course listing is powered by a Funnelback search at
+#   search.brookes.ac.uk/s/search.html — that subdomain is Cloudflare-
+#   protected (direct HTTP and Scrape.do render/static both 502 ROTATION_FAILED).
+#   We do NOT need the Funnelback endpoint at all.
+#
+#   SOLUTION: Oxford Brookes maintains a dedicated XML sitemap at
+#   https://www.brookes.ac.uk/sitemap/courses (linked from
+#   https://www.brookes.ac.uk/sitemap.xml). This endpoint:
+#     - Lives on the main www.brookes.ac.uk domain (no Cloudflare challenge)
+#     - Returns 200 OK directly (plain httpx, no Scrape.do needed)
+#     - Contains 429 course URLs (verified 2026-07-13)
+#     - Breakdown: 232 undergraduate + 85 postgraduate + 39 research +
+#       8 pathways + 65 cpd
+#
+#   Individual course pages at www.brookes.ac.uk/courses/... also return
+#   200 OK via plain httpx (167KB SSR HTML), with fee data in static HTML
+#   using HTML-entity pound signs (&#163;). No Scrape.do needed for
+#   extraction either.
+#
+#   Expected course count: ~345 full-time courses (UG + PG + research +
+#   pathways, excluding CPD which is domestic/professional-only). CPD URLs
+#   follow the /courses/cpd/ pattern and are blocked below.
+#
+#   The previous stub YAML had discovery: {} (empty), so the scraper fell
+#   back to pure BFS from www.brookes.ac.uk, which only surfaced 74 course
+#   links found in regular site navigation — missing most of the catalogue.
+
+discovery:
+  # Dedicated courses sitemap — 429 entries, directly accessible.
+  sitemap_url: 'https://www.brookes.ac.uk/sitemap/courses'
+
+  # Force sitemap unconditionally so we never accidentally degrade to
+  # BFS-only if future changes alter the BFS candidate count threshold.
+  always_sitemap_supplement: true
+
+  # Skip BFS entirely. The sitemap has the full catalogue and www.brookes.ac.uk
+  # page navigation only surfaces a subset of courses (~74 via BFS). BFS is
+  # wasted work here.
+  bfs_page_budget: 0
+
+  # Accept only /courses/<category>/<slug> URLs from the sitemap.
+  # This pattern matches all course types (undergraduate, postgraduate,
+  # research, pathways) while being specific enough to reject site-navigation
+  # and utility pages.
+  allow_url_patterns:
+    - 'brookes\.ac\.uk/courses/[^/]+/[^/]+'
+
+  # Block CPD (Continuing Professional Development) courses — these are
+  # domestic/professional-development only and not available to international
+  # students. The sitemap contains 65 such URLs at /courses/cpd/...
+  block_url_patterns:
+    - '/courses/cpd/'
+
+  # Cover the full sitemap (429 entries) with comfortable headroom.
+  max_candidates: 500
+
+extraction:
+  fees:
+    default_currency: GBP
+
+  # www.brookes.ac.uk is not Cloudflare-protected — plain httpx returns 200
+  # on all course pages. No Scrape.do needed. Keeping default behaviour
+  # (httpx → curl_cffi fallback) which is both cheaper and faster.
+  # Do NOT add scrape_do_skip_fallbacks or scrape_do_render here — they would
+  # unnecessarily route traffic through a paid proxy.
+
+  # Brookes course page H1 is just the subject name ("Accounting and Finance"),
+  # while the degree qualifier (BSc/MSc/MA etc.) appears in the <title> tag:
+  # "BSc (Hons) in Accounting and Finance at Oxford Brookes University".
+  # strip_title_suffixes removes the provider suffix so the extracted course
+  # name becomes the full, clean "BSc (Hons) in Accounting and Finance".
+  strip_title_suffixes:
+    - " at Oxford Brookes University"
+
+  staging:
+    # H1 on Brookes pages is subject-only (no degree abbreviation), which
+    # would cause the degree-qualifier guard to reject ~164 valid courses.
+    # strip_title_suffixes above makes the page <title> (which does have the
+    # qualifier) the preferred name source, but disabling the guard here is
+    # an explicit safety net so course name extraction quirks don't silently
+    # drop courses.
+    skip_degree_qualifier_check: true
+
+    # Research courses (39 in sitemap: /courses/research/…) are funded PhD
+    # studentships with no international fee listed. Allow them through to
+    # staging so reviewers can assess each one; the fee-missing data-quality
+    # warning will flag them for human review.
+    require_international_fee: false
+
+  filters:
+    online_only:
+      enabled: false
