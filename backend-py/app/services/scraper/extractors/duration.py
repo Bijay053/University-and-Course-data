@@ -219,6 +219,21 @@ _PLACEMENT_CONTEXT_RE = re.compile(
     r"industry\s+placement|internship\s+(?:hours?|days?|weeks?))\b",
     re.IGNORECASE,
 )
+# UK universities often note an optional placement year as an extension of
+# the nominal program duration:
+#   "Full time: 4 Years, or 5 if a work placement is chosen"
+#   "3 years full-time, or 4 with an industrial placement year"
+# These clauses contain the word "placement" but describe an OPTIONAL
+# extension year, not placement-hours / practicum context. Strip them
+# before checking _PLACEMENT_CONTEXT_RE so Pattern-1 is not suppressed
+# for the labeled full-time duration that precedes the clause.
+_PLACEMENT_OPT_YEAR_RE = re.compile(
+    r",?\s*or\s+\d+(?:\.\d+)?\s*(?:years?)?\s*"
+    r"(?:if\s+(?:a\s+)?|with\s+(?:a(?:n)?\s+)?)"
+    r"(?:work|industrial|professional|sandwich|optional|integrated)"
+    r"\s+placement\b[^,;\n]*",
+    re.IGNORECASE,
+)
 
 # "Minimum 2 years, up to a maximum of 5 years" — always prefer the MINIMUM
 # (floor) duration when the page advertises a range.  Without this the weight
@@ -800,7 +815,13 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
         is_combined_degree_sentence = bool(_COMBINED_DEGREE_CONTEXT_RE.search(s))
         # Sentences describing field placement / practicum hours must not
         # contribute Pattern-1 or Pattern-2 matches (see _PLACEMENT_CONTEXT_RE).
-        is_placement_sentence = bool(_PLACEMENT_CONTEXT_RE.search(s))
+        # Exception: strip optional-year extension clauses first (e.g.
+        # ", or 5 if a work placement is chosen") — these mention "placement"
+        # but only as an optional additional year, not as placement hours.
+        # Stripping them before the check preserves Pattern-1 for the labeled
+        # full-time duration that precedes the clause.
+        _s_placement_check = _PLACEMENT_OPT_YEAR_RE.sub("", s)
+        is_placement_sentence = bool(_PLACEMENT_CONTEXT_RE.search(_s_placement_check))
 
         # "Minimum N years, up to a maximum of M years" — always use the floor.
         # Add at Pattern-0 priority (×100) and skip remaining patterns for this
