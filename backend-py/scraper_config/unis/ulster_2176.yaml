@@ -153,25 +153,35 @@ discovery:
     - 'degree-apprenticeship'
     - '/courses/202728/'
 
-  # STOPGAP (2026-07-10): Scrape.do is currently returning 502
-  # ROTATION_FAILED for BOTH static and render=True on
-  # www.ulster.ac.uk/site-maps/sitemap-courses.xml — an external Scrape.do
-  # outage/degradation for this host, not a code bug (verified: the render
-  # leg now correctly gets 2 real attempts at ~57-60s each within the 150s
-  # sitemap probe budget — see http_fetcher.py max_retries=1 fix — and both
-  # still 502). No Wayback snapshot of the sitemap XML exists either.
-  # When the sitemap fetch fails, discovery falls through to
-  # browser_discover_generic, which was capped at the default 90s and only
-  # found 38 of ~566 courses (job log showed blocked_nav=53 — i.e. dozens of
-  # nav links were still queued when the time budget cut it off, so more
-  # courses ARE reachable via nav, just not within 90s).
-  # Raising the budget here is a safety net for isolated Scrape.do
-  # degradation windows so a run during an outage still finds a reasonable
-  # course count instead of just 38. Remove/revert once Scrape.do's proxy
-  # pool for this host is confirmed stable again (re-test without this
-  # override) — this does not fix the underlying outage, it only makes the
-  # browser-fallback path less lossy while it lasts.
-  browser_time_budget_s: 240
+  # ── Static URL fallback (2026-07-13) ──────────────────────────────────────
+  # Scrape.do proxy pool has been returning 502 ROTATION_FAILED for
+  # www.ulster.ac.uk/site-maps/sitemap-courses.xml for several days.
+  # Direct HTTP is 403 (Cloudflare Enterprise). No Wayback snapshot exists.
+  #
+  # Root-cause investigation found that Scrape.do render=true DOES work for
+  # regular Ulster pages (e.g. /courses returns 200, 177KB) — the failure is
+  # specific to the sitemap XML URL's Cloudflare routing rules.
+  #
+  # The Funnelback course search (ulster~sp-courses collection on squiz.cloud)
+  # embeds course URLs in squiz.cloud/s/redirect links inside its rendered HTML.
+  # A one-time harvest script (backend-py/scripts/harvest_ulster_urls.py) paged
+  # through all 6 Funnelback result pages via Scrape.do render and extracted
+  # 530 course URLs (Full-time filter). Stored in ulster_2176_course_urls.txt.
+  #
+  # static_course_urls_file bypasses ALL discovery tiers (BFS/sitemap/browser/
+  # Wayback) and uses these pre-harvested URLs directly as candidates.
+  # block_url_patterns (pgce, degree-apprenticeship) are still applied.
+  #
+  # TO REFRESH: when Scrape.do recovers for the sitemap URL:
+  #   1. Remove static_course_urls_file: line below
+  #   2. The sitemap_url config above will take effect again automatically
+  # OR run: python3 backend-py/scripts/harvest_ulster_urls.py to re-harvest.
+  static_course_urls_file: 'scraper_config/unis/ulster_2176_course_urls.txt'
+
+  # Raised from 240 to 600 as a second-level fallback:  if the static URL
+  # file is ever missing/stale, browser discovery gets 10 min to find courses
+  # via nav traversal instead of the previous 240s (~62 courses only).
+  browser_time_budget_s: 600
 
 extraction:
   # Ulster course pages have dedicated /fees/ and /entry-requirements/ sub-pages

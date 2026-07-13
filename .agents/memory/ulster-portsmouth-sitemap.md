@@ -9,11 +9,13 @@ description: How to configure Cloudflare-blocked UK universities (Ulster, Portsm
 
 **Fix**: `always_sitemap_supplement: true` forces sitemap unconditionally regardless of BFS count.
 
-**Sitemap**: `https://www.ulster.ac.uk/site-maps/sitemap-courses.xml` — 987 URLs at `/courses/202627/<slug>-<id>`. Accessible via Scrape.do (direct HTTP returns 403). Individual course pages also blocked by Cloudflare → fall back to Wayback Machine (5-10s per page).
+**Sitemap**: `https://www.ulster.ac.uk/site-maps/sitemap-courses.xml` — 1050 URLs at `/courses/202627/<slug>-<id>` + `/courses/202728/<slug>-<id>`. Accessible via Scrape.do (direct HTTP returns 403). Individual course pages also served via Scrape.do static (249KB SSR HTML; Cloudflare Enterprise blocks httpx/cffi/render/Playwright).
 
 **allow_url_patterns**: `ulster\.ac\.uk/courses/\d{6}/` — blocks the 38 /study/* nav links while passing all sitemap course URLs.
 
-**max_candidates**: Must be 1000+ (default 200 caps well below the 987 in sitemap).
+**max_candidates**: Must be 1500+ (sitemap has 1050 raw URLs).
+
+**block_url_patterns**: `/courses/202728/` (future year, incomplete), `pgce`, `degree-apprenticeship`.
 
 **Warning**: `always_sitemap_supplement: true` must be in the YAML BEFORE the job starts — it's loaded at job start time, not at trigger time.
 
@@ -37,43 +39,56 @@ Starting a new scrape while one is already running for the same university_id re
 
 ## Sequential extraction bottleneck
 
-Each course takes ~70s end-to-end (page fetch + extraction + AI fallback + snapshot upload). With 8 Celery workers and universities running on separate workers, one job processes its university sequentially. Approximate runtimes:
-- 200 courses (Ulster job 3): ~4 hours
-- 419 courses (Portsmouth job 2): ~6 hours  
-- 987 courses (Ulster job 4): ~19 hours
-
-Plan accordingly — these jobs cannot be monitored within a single session.
-
-**Why:** Celery `--concurrency=8` = 8 worker processes. Each university scrape runs on one process. Within that process the asyncio extraction loop has very low concurrency (effectively ~1-2 courses at a time due to Wayback/Scrape.do rate limits and Gemini AI sequential calls).
+Each course takes ~4s end-to-end via Scrape.do static (max_parallel_fetch: 4 for Ulster). Approximate runtimes for Ulster:
+- 265 courses: ~35 min
+- 575 courses: ~45-60 min
 
 ## Sitemap probe outer-timeout vs. discovery-fast-path retry chain (2026-07-03)
 
-**Symptom**: discovery.scrape_do_skip_fallbacks=True hosts (Ulster) suddenly regressed from ~987 to ~33 courses — sitemap log showed "fetch returned 0 byte(s)" even though the sitemap URL and YAML config were correct and the discovery fast-path's static→render retry code was in place and running.
+**Symptom**: discovery.scrape_do_skip_fallbacks=True hosts (Ulster) suddenly regressed from ~987 to ~33 courses — sitemap log showed "fetch returned 0 byte(s)" even though the sitemap URL and YAML config were correct.
 
-**Root cause**: `sitemap.py`'s `_fetch_text()` wraps the whole `fetch_html()` call (which internally does static→502→render-retry) in an outer `asyncio.wait_for(..., timeout=_PROBE_TIMEOUT_S)`. When Scrape.do's static/residential pool is slow to fail over (observed: ~58s to 502 before the render retry succeeds in ~9s, ~67s total), a 15s outer timeout kills the whole chain before the render retry ever runs — so it looks identical to "no sitemap" even though the fetch would succeed given time.
+**Root cause**: `sitemap.py`'s `_fetch_text()` wraps the whole `fetch_html()` call in an outer `asyncio.wait_for(..., timeout=_PROBE_TIMEOUT_S)`. When Scrape.do's static pool is slow to fail over (~58s to 502 before the render retry succeeds in ~9s, ~67s total), a 15s outer timeout kills the whole chain before the render retry runs.
 
-**Fix**: raised `_PROBE_TIMEOUT_S` in `sitemap.py` from 15.0 to 100.0 to give the full static+render retry room to complete.
+**Fix**: raised `_PROBE_TIMEOUT_S` in `sitemap.py` from 15.0 to 100.0.
 
-**How to diagnose this class of bug**: don't trust the browser-facing job log alone — it's built from `emit()` calls only. The `discovery.scrape_do_skip_fallbacks=True` / retry / failure lines are `log.info`/`log.warning` calls to the Python logger, only visible in the raw Celery worker log (or by re-running the fetch in isolation via a one-off script that calls `get_config_for_host()` + `set_uni_config()` + the fetch function directly). Reproducing in isolation is the fastest way to see the true timing breakdown.
+## Second regression (2026-07-10): 987→35→38 courses
 
-## Second regression (2026-07-10): 987→35→38 courses, `_PROBE_TIMEOUT_S` bump alone was insufficient
+**Root cause**: `fetch_html_scrape_do()` has its OWN internal exponential-backoff retry ladder (2s/8s/30s = up to 4 attempts). On a host where the static leg is doomed (Cloudflare Enterprise always 502s it), that internal ladder burns ~40s+ retrying before falling through to render=True leg. Two full ladders easily exceed even a 150s outer timeout.
 
-**Symptom**: after the 2026-07-03 fix above, Ulster regressed again to 35-38 courses. Raising `_PROBE_TIMEOUT_S` to 150s still wasn't enough — the sitemap fetch timed out on attempt 0 with no visible retry.
-
-**Root cause (deeper layer)**: `fetch_html_scrape_do()` has its OWN internal exponential-backoff retry ladder (2s/8s/30s = up to 4 attempts) for any 429/500/502/503/504 response, independent of the discovery fast-path's outer static→render retry. On a host where the static leg is *known-doomed* (Cloudflare Enterprise always 502s it), that internal ladder burns ~40s+ retrying a call that will never succeed, before the code even falls through to the render=True leg — which then burns its own ~40s+ ladder. Two full doomed-then-working ladders easily exceed even a 150s outer timeout when Scrape.do's proxy pool is degraded.
-
-**Fix**: added `max_retries: int | None = None` param to `fetch_html_scrape_do()` (`http_fetcher.py`) — when set, truncates the internal `_SD_BACKOFFS` tuple. The discovery fast-path's static-leg call (in `fetch_html()`, the `scrape_do_skip_fallbacks` branch) now passes `max_retries=0` so the doomed static attempt fails after one shot instead of four, preserving the outer timeout budget for the render=True leg (which keeps its full default retry ladder).
-
-**Lesson**: when a retry ladder isn't behaving as expected, check for a SECOND, independent retry ladder nested one layer deeper — `fetch_html()`'s own static→render retry and `fetch_html_scrape_do()`'s internal backoff loop look like one system from the caller's side but stack multiplicatively.
+**Fix**: added `max_retries: int | None = None` param to `fetch_html_scrape_do()` (`http_fetcher.py`). The static-leg call in the `scrape_do_skip_fallbacks` branch now passes `max_retries=0` so it fails after one shot.
 
 ## Third regression (2026-07-10): discovery cache poisoning + render-ladder still didn't fit budget
 
-**Symptom**: even after the `max_retries=0` static-leg fix above shipped and was verified once (job found 566), Ulster kept reporting 38 courses on every subsequent run, including ones without `forceDiscovery`.
+**Root cause A — discovery cache poisoning**: `discovery_url_cache` had cached `link_count=38` from a bad run. Every non-`forceDiscovery` run replayed the stale count. **Any "found fewer than expected" report must check/delete the `discovery_url_cache` row first.**
 
-**Root cause A — discovery cache poisoning**: the C1 7-day `discovery_url_cache` table (keyed by `university_id`) had cached `link_count=38` from a bad run that predated the fix. Since normal (non-`forceDiscovery`) runs skip discovery entirely and reuse the cached count, every run kept replaying the stale 38 forever regardless of code fixes. **Any "found way fewer than expected" report must include checking/deleting the relevant `discovery_url_cache` row** — a code fix alone produces zero visible effect until the poisoned cache entry is cleared.
+**Root cause B — render ladder didn't fit outer probe budget**: render=True leg still used the default 4-attempt ladder. ~57-60s per attempt × 2 = ~122s. Fixed by passing `max_retries=1` (2 total attempts).
 
-**Root cause B — render ladder still didn't fit the outer probe budget**: after clearing the cache, `forceDiscovery=true` re-ran real discovery and exposed a second bug: the discovery fast-path's render=True leg (in `fetch_html()`) still used the *default* 4-attempt retry ladder. On this host, Scrape.do's render tier was taking ~57-60s per attempt to fail (not a fast rejection) — real, in-flight latency — so 4 attempts need 250s+, but `sitemap.py`'s outer `_PROBE_TIMEOUT_S` is 150s. The probe was killed mid-attempt every time, discarding a real (failing) response instead of letting the ladder complete on its own terms. Fixed by passing `max_retries=1` (2 total attempts, ~60s+2s backoff+~60s ≈ 122s) to that specific render call so it fits inside 150s.
+**Then: genuine Scrape.do outage confirmed**. Both static and render legs returned 502 `ROTATION_FAILED` even with `super=true`. Not fixable client-side.
 
-**Then discovered: genuine Scrape.do-side outage for this host.** With the retry-ladder now correctly using its full (smaller) budget, BOTH static and render legs still returned 502 `ROTATION_FAILED` — confirmed independently outside the app by calling the Scrape.do API directly with `super=true` and `super=true&render=true`, both still 502. No Wayback snapshot of the sitemap XML exists either. This is not fixable client-side; it requires Scrape.do's proxy pool for this host to recover.
+## Fourth regression / Funnelback harvest approach (2026-07-13)
 
-**Stopgap applied**: raised `discovery.browser_time_budget_s` to 240 (default 90) in `ulster_2176.yaml` so the nav-based `browser_discover_generic` fallback (which fires when the sitemap fetch fails) covers more of the nav tree before cutting off — improved 38→62 courses in one test run. This is structurally still incomplete vs. the full ~566-course sitemap catalog (nav discovery can only find what's linked from crawled listing/subject pages) and should be reverted once the sitemap path is confirmed healthy again — don't leave an inflated browser budget as permanent config for a host that normally relies on the sitemap. **Also**: a partial-but-"healthy" (≥5 links) browser-fallback run still gets written to `discovery_url_cache` and will re-poison it for 7 days — delete the cache row again after any such fallback run before considering the incident closed.
+**Symptom**: sitemap URL has been returning 502 ROTATION_FAILED for multiple days. Browser fallback with 240s budget only finds 62 courses.
+
+**Root cause**: Scrape.do proxy pool has a sustained outage specifically for the sitemap XML URL (`/site-maps/sitemap-courses.xml`). Regular Ulster pages still work (Scrape.do render=true returns 200 for `/courses`).
+
+**Investigation findings**:
+- `www.ulster.ac.uk/courses` uses Funnelback DXP v16 (Squiz Cloud collection `ulster~sp-courses`)
+- Course results are embedded in the rendered HTML as `squiz.cloud/s/redirect?...&url=<course-url>&...` links
+- These redirect hrefs use HTML entity encoding (`&amp;`) so naive URL extraction fails
+- Scrape.do render=true with `waitFor=8000` retrieves all 100 courses per page
+- 11 pages needed for ~1060 total URLs (601 in 202627, 459 in 202728)
+- After blocking 202728/pgce/degree-apprenticeship: **575 candidates**
+
+**Fix**: `discovery.static_course_urls_file` option added to `DiscoveryConfig` in `schema.py` and orchestrator. When set, reads pre-harvested course URLs from a text file (one per line, `#` comments ignored), applies `block_url_patterns`, and uses them directly as candidates — bypassing all other discovery tiers.
+
+**Harvest script**: `backend-py/scripts/harvest_ulster_urls.py` — re-run when the URL list goes stale.
+**URL file**: `backend-py/scraper_config/unis/ulster_2176_course_urls.txt` (1060 lines, committed to git).
+
+**To restore sitemap path** when Scrape.do recovers: remove `static_course_urls_file:` line from `ulster_2176.yaml` — the existing `sitemap_url:` config takes effect automatically.
+
+**How to diagnose Scrape.do outage vs. code bug**:
+1. Test direct: `curl -s -o /dev/null -w "%{http_code}" https://www.ulster.ac.uk/site-maps/sitemap-courses.xml` → 403 (Cloudflare)
+2. Test cffi: `python3 -c "from curl_cffi import requests as r; print(r.get('...', impersonate='chrome120').status_code)"` → 500 (cffi fails)
+3. Test Scrape.do static: API call with `render=false` → 502 = outage
+4. Test Scrape.do render: API call with `render=true` → 502 = full outage for this host
+5. Test regular Ulster page via Scrape.do render: if this returns 200, outage is SITEMAP-URL-SPECIFIC

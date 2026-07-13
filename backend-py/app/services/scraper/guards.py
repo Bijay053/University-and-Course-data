@@ -646,11 +646,37 @@ def should_stage_course(
                 _slug,
             )
 
+    # Bot / cookie-consent page rejection — runs UNCONDITIONALLY before the
+    # degree-qualifier check so that skip_degree_qualifier_check:true YAML
+    # overrides (e.g. Ulster) cannot let cookie-banner pages slip through.
+    # Only obviously-non-course titles are matched; false positives are safe
+    # to add here because a real course name can never start with these phrases.
+    _BOT_PAGE_NAME_RE = re.compile(
+        r"^(?:"
+        r"this\s+site\s+uses\s+cookies|"
+        r"we\s+use\s+cookies|"
+        r"cookie\s+(?:policy|consent|notice|settings)|"
+        r"our\s+use\s+of\s+cookies|"
+        r"just\s+a\s+moment|"
+        r"access\s+denied|"
+        r"attention\s+required"
+        r")",
+        re.IGNORECASE,
+    )
+    _raw_page_name = (payload.get("course_name") or course_name or "").strip()
+    if _raw_page_name and _BOT_PAGE_NAME_RE.match(_raw_page_name):
+        log.info(
+            "[REJECT] course=%r url=%r — rejected (bot_detection_page): "
+            "course name matches a known bot-detection/cookie-consent page pattern.",
+            _raw_page_name, source_url,
+        )
+        return (False, "bot_detection_page")
+
     # Bug A: reject pages whose extracted title has no degree-level qualifier.
     # Prefer payload["course_name"] (from H1 via course_name extractor) over
     # the discovery-link name (passed as course_name param) — the H1 is the
     # canonical page title and the most reliable signal.
-    effective_name = (payload.get("course_name") or course_name or "").strip()
+    effective_name = _raw_page_name
     # Per-uni YAML opt-out: skip_degree_qualifier_check=true disables the
     # name-based check for universities (e.g. ARU/Writtle) whose SPA pages
     # surface course_name from JSON metadata without the degree prefix.

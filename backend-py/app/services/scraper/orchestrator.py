@@ -1510,6 +1510,41 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 await db.commit()
                 return
 
+        # ── Static course URL list ────────────────────────────────────────────
+        # When discovery.static_course_urls_file is set in the per-uni YAML,
+        # load pre-harvested course URLs from that file and use them directly as
+        # discovery candidates — bypassing BFS, sitemap, browser, and Wayback.
+        # This is a recovery path for universities where the sitemap/Funnelback
+        # is temporarily unavailable (e.g. Scrape.do proxy-pool outage for that
+        # host) but the URL list can be obtained by another means.
+        _static_urls_file = getattr(_uni_cfg.discovery, "static_course_urls_file", None)
+        if _static_urls_file and not links:
+            import os as _os
+            _static_path = _static_urls_file if _os.path.isabs(_static_urls_file) else (
+                _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(
+                    _os.path.dirname(_os.path.abspath(__file__))))), _static_urls_file)
+            )
+            try:
+                with open(_static_path) as _sf:
+                    _static_raw = [ln.strip() for ln in _sf if ln.strip() and not ln.startswith("#")]
+                # Apply block_url_patterns filter so YAML blocks still apply
+                _block_pats = list(_uni_cfg.discovery.block_url_patterns or [])
+                if _block_pats:
+                    import re as _re
+                    _static_raw = [
+                        u for u in _static_raw
+                        if not any(_re.search(p, u) for p in _block_pats)
+                    ]
+                links = [
+                    {"name": u.rstrip("/").split("/")[-1].replace("-", " ").title(), "url": u}
+                    for u in _static_raw
+                ]
+                _always_browser = False
+                emit(f"[STATIC_URLS] Loaded {len(links)} course URLs from {_static_urls_file}")
+                log.info("[STATIC_URLS] %d links from %s", len(links), _static_urls_file)
+            except Exception as _sf_exc:  # noqa: BLE001
+                log.error("[STATIC_URLS] Failed to load %s: %s", _static_urls_file, _sf_exc)
+
         # When a uni's YAML declares a discovery.searchstax block, the course
         # catalogue is fetched straight from its SearchStax Solr core. Each doc
         # already carries structured fields + full page text, so we build

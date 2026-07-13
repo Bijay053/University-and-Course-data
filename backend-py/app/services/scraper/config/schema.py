@@ -1174,6 +1174,18 @@ class DiscoveryConfig(BaseModel):
             "When false (default), autonomous API detection never runs."
         ),
     )
+    static_course_urls_file: Optional[str] = Field(
+        default=None,
+        description=(
+            "Path to a plain-text file (one URL per line, relative to backend-py/) "
+            "containing pre-harvested course page URLs.  When present, these URLs are "
+            "used directly as discovery candidates — all other discovery tiers "
+            "(BFS, sitemap, browser, Wayback) are skipped entirely.  "
+            "Use when the primary discovery mechanism (sitemap, Funnelback search) is "
+            "temporarily unavailable but the course URL list is known and stable. "
+            "Example: 'scraper_config/unis/ulster_2176_course_urls.txt'."
+        ),
+    )
     fallback_subdomains: list[str] = Field(
         default_factory=list,
         description=(
