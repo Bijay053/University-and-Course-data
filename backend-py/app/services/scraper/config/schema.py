@@ -2236,6 +2236,19 @@ class StudyModeConfig(BaseModel):
             "from duplicating the Course Location column."
         ),
     )
+    distance_learning_with_campus_is_blended: bool = Field(
+        default=False,
+        description=(
+            "When True, a study_mode='Online' result derived from a "
+            "'distance learning' pattern is upgraded to 'Blended' when a "
+            "non-empty course_location (physical campus) was also extracted "
+            "on the same page.  Use for universities (e.g. Oxford Brookes) "
+            "that list 'Distance learning' alongside physical campus names "
+            "in the same Location section, meaning the course is available "
+            "both online and in-person.  Has no effect when study_mode is "
+            "not 'Online' or when course_location is empty."
+        ),
+    )
 
 
 class IntakeConfig(BaseModel):

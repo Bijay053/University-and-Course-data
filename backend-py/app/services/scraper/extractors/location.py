@@ -855,7 +855,30 @@ def _from_headings(soup: BeautifulSoup) -> str | None:
         if nxt is None:
             continue
         if nxt.name == "p":
-            candidate = compact(nxt.get_text(" ", strip=True))
+            # Collect ALL consecutive <p> siblings and normalise each one
+            # individually before joining.  Some CMSes (e.g. Oxford Brookes)
+            # render each location on its own <p> tag:
+            #   <p>Distance learning</p>
+            #   <p>City of Oxford College (part of Activate Learning)</p>
+            #   <p>Reading College (part of Activate Learning)</p>
+            # When the first <p> is a virtual-only delivery method ("Distance
+            # learning"), _normalise() correctly returns None for that part.
+            # Joining all parts first and then calling _normalise() can fail
+            # the `len > 80 and commas < 3` guard even when the individual
+            # physical campus names are valid.  Normalising per-part and
+            # joining the survivors avoids that false rejection.
+            normed_parts: list[str] = []
+            sib = nxt
+            while sib is not None and getattr(sib, "name", None) == "p":
+                t = compact(sib.get_text(" ", strip=True))
+                if t:
+                    v_part = _normalise(t)
+                    if v_part:
+                        normed_parts.append(v_part)
+                sib = sib.find_next_sibling()
+            if normed_parts:
+                return ", ".join(normed_parts)
+            continue
         elif nxt.name in ("ul", "ol"):
             items = [compact(li.get_text(" ", strip=True)) for li in nxt.find_all("li")]
             candidate = ", ".join(filter(None, items))

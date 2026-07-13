@@ -5732,6 +5732,45 @@ async def extract_course(
         except Exception:
             pass
 
+    # ── distance_learning_with_campus_is_blended upgrade ─────────────────────
+    # When YAML sets extraction.study_mode.distance_learning_with_campus_is_blended:
+    # true, a study_mode='Online' result derived from a 'distance learning'
+    # pattern is upgraded to 'Blended' when a physical campus location was
+    # also extracted.  Oxford Brookes lists "Distance learning" alongside
+    # physical campuses in the same Location section; the course is available
+    # both online and in-person, so the correct mode is 'Blended'.
+    if payload.get("study_mode") == "Online" and payload.get("course_location", "").strip():
+        try:
+            from app.services.scraper.config.context import get_uni_config as _get_dlcb
+            _dlcb_uc = _get_dlcb()
+            if _dlcb_uc is not None:
+                _dlcb_sm = getattr(
+                    getattr(_dlcb_uc, "extraction", None), "study_mode", None
+                )
+                if _dlcb_sm is not None and getattr(
+                    _dlcb_sm, "distance_learning_with_campus_is_blended", False
+                ):
+                    payload["study_mode"] = "Blended"
+                    evidence.append({
+                        "field_key": "study_mode",
+                        "value": "Blended",
+                        "confidence": 0.8,
+                        "method": "study_mode:distance_learning_with_campus_is_blended",
+                        "snippet": (
+                            "distance_learning_with_campus_is_blended=True: "
+                            "Online upgraded to Blended — physical campus also "
+                            f"extracted: {(payload.get('course_location') or '')[:80]}"
+                        ),
+                    })
+                    log.info(
+                        "[STUDY_MODE] distance_learning_with_campus_is_blended: "
+                        "upgraded Online → Blended (location=%r) %s",
+                        payload.get("course_location"),
+                        url,
+                    )
+        except Exception:
+            pass
+
     # ── CRICOS code extraction from the course page ──────────────────────────
     # Extract CRICOS code early so it is available during PDF row matching.
     # ``cricos_code`` is stored in the payload and mapped to the DB column by

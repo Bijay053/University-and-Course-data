@@ -93,6 +93,21 @@ extraction:
     # warning will flag them for human review.
     require_international_fee: false
 
+  # Location extraction: Brookes renders each location value as a separate <p>
+  # tag under an h3 "Location" heading, e.g.:
+  #   <h3>Location</h3>
+  #   <p>Distance learning</p>
+  #   <p>City of Oxford College (part of Activate Learning)</p>
+  #   <p>Reading College (part of Activate Learning)</p>
+  # The _from_headings extractor now collects all consecutive <p> siblings, so
+  # "Distance learning" is stripped by _REMOVE_VIRTUAL and the physical campuses
+  # are returned correctly.
+
+  # Study mode: courses that list "Distance learning" alongside physical campuses
+  # in the Location section are available both online and in-person → Blended.
+  study_mode:
+    distance_learning_with_campus_is_blended: true
+
   filters:
     online_only:
       enabled: false
