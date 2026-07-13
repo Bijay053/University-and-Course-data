@@ -7309,9 +7309,31 @@ async def extract_course(
                 and _dur_term == "year"
                 and 0.9 <= _dur_years <= 1.25
             )
+            # Final-year-entry / top-up bachelor degrees are also legitimately
+            # 1 year long.  "Final year entry" means the student enters the last
+            # year of a bachelor program (having completed the earlier years via
+            # HNC/HND or another qualification), so 1 Year is correct data.
+            # Detect via course name keywords or the URL slug.
+            _url_slug_l = (url or "").lower()
+            _topup_signal = (
+                "final year entry" in _course_name_l
+                or "final-year-entry" in _course_name_l
+                or "final-year entry" in _course_name_l
+                or "top-up" in _course_name_l
+                or "top up" in _course_name_l
+                or "final-year-entry" in _url_slug_l
+                or "final-year-entry" in _url_slug_l
+                or "top-up" in _url_slug_l
+            )
+            _is_topup_one_year = (
+                _topup_signal
+                and _dur_term == "year"
+                and 0.9 <= _dur_years <= 1.25
+            )
             _bachelor_floor_breach = (
                 _is_bachelor_only
                 and not _is_honours_one_year
+                and not _is_topup_one_year
                 and 0 < _dur_years < 2.0
             )
             if _dur_years > _SUSPICIOUS_MAX or _dur_years < 0.25 or _bachelor_floor_breach:
