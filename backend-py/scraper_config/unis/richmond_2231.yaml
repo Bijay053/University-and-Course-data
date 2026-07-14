@@ -1,0 +1,174 @@
+# Richmond American University London
+# Hostname: www.richmond.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+
+discovery:
+  auto_api_discovery: false
+  use_stealth_browser: false
+
+  # Root entry points extracted from your start_urls
+  seed_urls:
+    - https://www.richmond.ac.uk/undergraduate-programmes/
+    - https://www.richmond.ac.uk/postgraduate-programmes/
+
+  # Richmond has ~15 UG + ~9 PG = ~24 courses. 2 listing pages + 24 course pages
+  # + navigation explored = ~80 pages needed. Previous value of 10 was too low.
+  bfs_page_budget: 80
+  max_candidates: 100
+  expected_min_courses: 20
+  always_sitemap_supplement: false
+  always_browser_discover: false
+  skip_browser_discovery: true
+  use_wayback: false
+
+  # Shield directory landing indexes from being misclassified as courses.
+  # force_index_pages uses an ANCHORED regex so only root listing pages match.
+  force_index_pages:
+    - '^https://www\.richmond\.ac\.uk/[a-z0-9-]+-programmes/?$'
+
+  # NOTE: listing_only_patterns was removed — the old '(?i)-programmes' substring
+  # matched ALL course URLs under /undergraduate-programmes/* and /postgraduate-
+  # programmes/*, suppressing every course as a "listing page". force_index_pages
+  # above already protects the root listing pages with an anchored regex.
+
+  # Restrict discovery to deep program slugs only
+  allow_url_patterns:
+    - '^https://www\.richmond\.ac\.uk/[a-z0-9-]+/'
+
+  block_url_patterns:
+    - '/news'
+    - '/events'
+    - '/about'
+    - '/contact'
+    - '/faculty/'
+    - '/staff/'
+    - '/student-life/'
+    - '/fees-and-funding'
+    - '/accommodation'
+    - '\.pdf$'
+
+extraction:
+  max_parallel_fetch: 4
+  skip_browser_rescue: false
+  skip_per_course_browser: false
+  browser_wait_strategy: domcontentloaded
+  browser_dcl_settle_ms: 1000
+
+  filters:
+    domestic_only:
+      enabled: false
+    online_only:
+      enabled: false
+
+  fees:
+    default_currency: GBP
+    prefer_international: true
+    prefer_annual_over_total: true
+    fee_year: "2026"
+    fee_term: "year"
+    reject_keywords:
+      - Home student
+      - UK student
+      - Domestic
+
+  english:
+    source: course_page
+    source_xpath: "//div[contains(@id, 'entry-requirements-content')]"
+    
+    ielts:
+      raw_xpath: ".//li[contains(text(), 'IELTS')]"
+      remove_tags: true
+      patterns:
+        overall:
+          - 'ielts:?\s*(\d\.?\d*)'
+          - 'score\s*of\s*(\d\.?\d*)'
+        each:
+          - 'lower\s*than\s*(\d\.?\d*)'
+          - 'no\s*element\s*below\s*(\d\.?\d*)'
+      apply_each_to:
+        - ielts_reading
+        - ielts_writing
+        - ielts_listening
+        - ielts_speaking
+
+    pte:
+      raw_xpath: ".//li[contains(text(), 'Pearson') or contains(text(), 'PTE')]"
+      remove_tags: true
+      patterns:
+        overall:
+          - ':?\s*(\d{2,3})'
+          - 'score\s*of\s*(\d{2,3})'
+        each:
+          - 'lower\s*than\s*(\d{2,3})'
+      apply_each_to:
+        - pte_reading
+        - pte_writing
+        - pte_listening
+        - pte_speaking
+
+    toefl:
+      raw_xpath: ".//li[contains(text(), 'TOEFL')]"
+      remove_tags: true
+      patterns:
+        overall:
+          - 'toefl\s*ibt:?\s*(\d{2,3})'
+          - 'score\s*of\s*(\d{2,3})'
+        each:
+          - 'lower\s*than\s*(\d{2,3})'
+      apply_each_to:
+        - toefl_reading
+        - toefl_writing
+        - toefl_listening
+        - toefl_speaking
+
+  selectors:
+    # Anchor text selector used in response.xpath rules
+    course_list:
+      xpath: "//a[contains(@class, 'programme-title')]"
+
+    course_name:
+      xpath: "//h1/text() | //main//h1"
+
+    course_link:
+      xpath: "./@href"
+
+    city:
+      value: "London"
+
+    degree:
+      xpath: "//div[contains(@class, 'programme-fact-icons')]//p[contains(.//text(), 'Degree')]/following-sibling::p/text()"
+
+    duration:
+      xpath: "//div[contains(@class, 'programme-fact-icons')]//p[contains(.//text(), 'Duration') or contains(.//text(), 'Length')]/following-sibling::p/text()"
+      also_use_as_study_load: true
+
+    course_description:
+      xpath: "//div[contains(@id, 'about-the-programme-content')]"
+
+    course_structure:
+      xpath: "//div[contains(@id, 'what-you-will-study-content')]"
+
+    career:
+      xpath: "//div[contains(@id, 'careers-and-employability-content')]"
+
+    other_requirements:
+      xpath: "//div[contains(@id, 'entry-requirements-content')]"
+
+    # Targets your exact 'INT' text sibling string logic for international scales
+    fee_international:
+      primary:
+        xpath: "//div[contains(@class, 'programme-fact-icons')]//p[contains(.//text(), 'Fee')]/following-sibling::p/text()[contains(., 'INT') or contains(., '£')]"
+
+  text_cleaning:
+    global_substring_blocklist:
+      - Apply now
+      - Find out more
+      - Enquire now
+      - Request an application pack
+      - Request information
+
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false
