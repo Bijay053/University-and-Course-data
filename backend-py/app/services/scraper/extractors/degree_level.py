@@ -122,7 +122,16 @@ _NAME_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bfd\s*\(\s*sci(?:ence)?\s*\)", re.IGNORECASE), "Bachelor's"),
     (re.compile(r"\bfoundation\s+degree\b", re.IGNORECASE), "Bachelor's"),
     (re.compile(r"\bfd(?:a|sc)\b", re.IGNORECASE), "Bachelor's"),  # FdA, FdSc
+    # Bare "Fd" prefix used by some UK universities (e.g. Canterbury Christ
+    # Church) for Foundation Degrees when the subject name follows directly:
+    # "Fd Childhood, Youth & Communities".  Must come after the FdA/FdSc rule
+    # so the more-specific abbreviations still take precedence.
+    (re.compile(r"\bfd\b", re.IGNORECASE), "Bachelor's"),        # bare Fd
     (re.compile(r"\bhn[cd]\b", re.IGNORECASE), "Bachelor's"),   # HNC, HND
+    # CertHE (Certificate of Higher Education) — UK Level 4 qualification,
+    # equivalent to the first year of a bachelor's programme.  Treated as
+    # Bachelor's so that undergraduate fee / IELTS defaults apply correctly.
+    (re.compile(r"\bcert\s*he\b", re.IGNORECASE), "Bachelor's"),  # CertHE
     # Existing broad bachelor patterns — BSc (Hons) style covered by b\.?sc;
     # BHons added explicitly for courses whose title leads with the honours tag.
     # BBA (Bachelor of Business Administration) and BSW (Bachelor of Social Work)

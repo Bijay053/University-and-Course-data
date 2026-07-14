@@ -6763,7 +6763,7 @@ async def extract_course(
     # state a lower requirement that would be wrongly overridden.
     try:
         _eng_cfg = getattr(getattr(get_uni_config(), "extraction", None), "english", None)
-        if not _bail_empty_text and _eng_cfg is not None and not bool(payload.get("is_pathway")):
+        if _eng_cfg is not None and not bool(payload.get("is_pathway")):
             # Resolve degree-level tier for per-level defaults (e.g. UG 6.0 / PG 6.5).
             _dl_raw = (payload.get("degree_level") or "").lower().strip()
             _dl_tier: str | None = None

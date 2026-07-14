@@ -668,6 +668,60 @@ def _extract_fee_table_row(
                         if _cb_amount > (best_amount or 0):
                             best_amount = _cb_amount
                             best_ctx = _cb_ctx
+            # ── Nationality-column layout ─────────────────────────────────────
+            # Some UK universities (e.g. Canterbury Christ Church) put UK and
+            # Overseas/International as *column headers*, with Full-time /
+            # Part-time as row labels:
+            #   <tr><th></th><th>UK</th><th>Overseas</th></tr>
+            #   <tr><td>Full-time</td><td>£9,790</td><td>£17,000</td></tr>
+            # The row-label check above never fires because no single row
+            # contains both "Overseas" and "Full-time". Detect by requiring
+            # BOTH a home column (UK / Home / Domestic) AND an
+            # international column (International / Overseas) in the header,
+            # then pick the international-column cell from Full-time rows.
+            if not found_fee_table and rows:
+                _hdr_nc = rows[0]
+                _intl_col_nc: "int | None" = None
+                _home_col_nc: "int | None" = None
+                for _ci_nc, _cell_nc in enumerate(_hdr_nc):
+                    if _ROW_INTL_RE.search(_cell_nc) and _intl_col_nc is None:
+                        _intl_col_nc = _ci_nc
+                    elif (
+                        re.search(r"\b(UK|Home|Domestic)\b", _cell_nc, re.I)
+                        and _home_col_nc is None
+                    ):
+                        _home_col_nc = _ci_nc
+                if _intl_col_nc is not None and _home_col_nc is not None:
+                    for _row_nc in rows[1:]:
+                        if len(_row_nc) <= _intl_col_nc:
+                            continue
+                        _row_nc_text = " | ".join(_row_nc)
+                        if not _ROW_FULLTIME_RE.search(_row_nc_text):
+                            continue
+                        # Skip combined header rows that show both modes.
+                        if _ROW_PARTTIME_RE.search(_row_nc[0] if _row_nc else ""):
+                            continue
+                        _intl_cell_nc = _row_nc[_intl_col_nc]
+                        _am_nc = _AMOUNT_RE.search(_intl_cell_nc)
+                        if not _am_nc:
+                            continue
+                        _raw_nc = _am_nc.group(2) or _am_nc.group(3) or ""
+                        _amt_nc = _parse_amount(_raw_nc)
+                        if _amt_nc is None or _amt_nc < 5_000:
+                            continue
+                        _yr_nc = -1
+                        _ym_nc = _ROW_YEAR_RE.search(_row_nc_text)
+                        if _ym_nc:
+                            _yr_nc = int("20" + _ym_nc.group(1))
+                        if _yr_nc > best_year or (
+                            _yr_nc == best_year and _amt_nc > (best_amount or 0)
+                        ):
+                            best_year = _yr_nc
+                            best_amount = _amt_nc
+                            best_ctx = "nationality-column table: " + " | ".join(
+                                _row_nc
+                            )
+                        found_fee_table = True
             if not found_fee_table:
                 continue
 
