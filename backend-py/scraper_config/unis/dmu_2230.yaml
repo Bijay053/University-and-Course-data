@@ -1,0 +1,150 @@
+# De Montfort University
+# Hostname: www.dmu.ac.uk
+#
+# Discovery fix (2026-07-14):
+#   • seed_urls[0] is always skipped by the BFS pre-seeder (it assumes index 0
+#     equals the start_url already in the queue). All listing pages must live in
+#     [1:] so they are actually pre-seeded. The placeholder below is intentional.
+#   • bfs_page_budget raised to 350: 16 listing pages + ~250 course pages = ~266.
+#   • max_candidates raised to 350: DMU has ~240 courses across UG + PG.
+#   • PG pages 6–7 added: verified to have 20 courses each (windowed pagination
+#     hid them from page 1's pagination widget, so they were missing).
+#   • allow_url_patterns lowercased to actually match canonical course URLs
+#     (dmu.ac.uk redirects mixed-case /Study/Courses/ to lowercase /study/courses/).
+
+discovery:
+  seed_urls:
+    # [0] is always skipped by pre-seeder — use the scrape_url as placeholder.
+    - https://www.dmu.ac.uk/
+
+    # --- Undergraduate listing pages (pages 1–8) ---
+    - https://www.dmu.ac.uk/study/courses/undergraduate-courses/undergraduate-courses.aspx
+    - https://www.dmu.ac.uk/study/courses/undergraduate-courses/undergraduate-courses.aspx?courselisting1_List_GoToPage=2
+    - https://www.dmu.ac.uk/study/courses/undergraduate-courses/undergraduate-courses.aspx?courselisting1_List_GoToPage=3
+    - https://www.dmu.ac.uk/study/courses/undergraduate-courses/undergraduate-courses.aspx?courselisting1_List_GoToPage=4
+    - https://www.dmu.ac.uk/study/courses/undergraduate-courses/undergraduate-courses.aspx?courselisting1_List_GoToPage=5
+    - https://www.dmu.ac.uk/study/courses/undergraduate-courses/undergraduate-courses.aspx?courselisting1_List_GoToPage=6
+    - https://www.dmu.ac.uk/study/courses/undergraduate-courses/undergraduate-courses.aspx?courselisting1_List_GoToPage=7
+    - https://www.dmu.ac.uk/study/courses/undergraduate-courses/undergraduate-courses.aspx?courselisting1_List_GoToPage=8
+
+    # --- Postgraduate listing pages (pages 1–7, verified; 8 tentative) ---
+    - https://www.dmu.ac.uk/study/courses/postgraduate-courses/postgraduate-courses.aspx
+    - https://www.dmu.ac.uk/study/courses/postgraduate-courses/postgraduate-courses.aspx?courselisting1_List_GoToPage=2
+    - https://www.dmu.ac.uk/study/courses/postgraduate-courses/postgraduate-courses.aspx?courselisting1_List_GoToPage=3
+    - https://www.dmu.ac.uk/study/courses/postgraduate-courses/postgraduate-courses.aspx?courselisting1_List_GoToPage=4
+    - https://www.dmu.ac.uk/study/courses/postgraduate-courses/postgraduate-courses.aspx?courselisting1_List_GoToPage=5
+    - https://www.dmu.ac.uk/study/courses/postgraduate-courses/postgraduate-courses.aspx?courselisting1_List_GoToPage=6
+    - https://www.dmu.ac.uk/study/courses/postgraduate-courses/postgraduate-courses.aspx?courselisting1_List_GoToPage=7
+
+  # 16 listing pages + ~250 course pages = ~266. 350 provides headroom.
+  bfs_page_budget: 350
+
+  # DMU has ~240 courses. Default 200 would truncate late-alphabet courses.
+  max_candidates: 350
+
+  allow_url_patterns:
+    - '/study/courses/'
+
+  block_url_patterns:
+    - '/news'
+    - '/events'
+    - '/staff/'
+    - '/about'
+    - '/contact'
+    - '/linkassets/'
+
+extraction:
+  max_parallel_fetch: 8
+
+  filters:
+    domestic_only:
+      enabled: false
+
+    online_only:
+      enabled: false
+
+  fees:
+    default_currency: "GBP"
+    prefer_international: true
+    prefer_annual_over_total: true
+    fee_year: "2025"
+    fee_term: "year"
+
+    reject_keywords:
+      - "Domestic"
+      - "Home student"
+      - "UK student"
+
+  english:
+    source: course_page
+    source_xpath:
+      primary: "//section[contains(@id, 'entry-requirements')]"
+      fallback: "//h2[contains(@id, 'entry_criteria')]/following-sibling::div"
+
+    ielts:
+      raw_xpath: ".//p[contains(., 'IELTS')]/text()"
+      patterns:
+        overall:
+          - 'score\s*of\s*(\d\.?\d*)'
+        each:
+          - '(\d\.?\d*)\s*in\s*each\s*band'
+      apply_each_to:
+        - ielts_reading
+        - ielts_writing
+        - ielts_listening
+        - ielts_speaking
+
+  study_mode:
+    source_xpath: ".//td[3]//text()"
+    rules:
+      - match_keywords:
+          - "Distance"
+        value: "Online"
+
+  selectors:
+    city:
+      value: "Leicester"
+
+    course_description:
+      primary:
+        xpath: "//h2[contains(@id, 'overview')]/following-sibling::div[1]"
+      fallback:
+        xpath: "//div[contains(@id, 'overview_text')]"
+
+    course_structure:
+      primary:
+        xpath: "//div[contains(@class, 'structureContent')]"
+      fallback:
+        xpath: "//section[contains(@id, 'wys')]"
+
+    career:
+      primary:
+        xpath: "//div[contains(@class, 'where-could-we-take-you')]"
+      fallback:
+        xpath: "//h2[contains(@id, 'opportunities_and_careers')]/following-sibling::div[contains(@class, 'columns')]"
+
+    other_requirements:
+      primary:
+        xpath: "//section[contains(@id, 'entry-requirements')]"
+      fallback:
+        xpath: "//h2[contains(@id, 'entry_criteria')]/following-sibling::div"
+
+    key_facts:
+      primary:
+        condition_xpath: "//div[contains(@data-kftab, '2')]//div[contains(@class, 'key-facts-col')]"
+        intake_month_xpath: "//div[contains(@data-kftab, '2')]//div[contains(@class, 'key-facts-col')]//p[contains(., 'Start date')]/text()"
+        duration_xpath: "//div[contains(@data-kftab, '2')]//div[contains(@class, 'key-facts-col')]//p[contains(., 'Duration')]/text()"
+        fee_international_xpath: "//div[contains(@data-kftab, '2')]//p[contains(., '£')]/text()"
+
+      fallback:
+        condition_xpath: "//section[contains(@id, 'key-facts-all')]"
+        degree_xpath: "//div[contains(@class, 'gridItemTitle') and contains(.//p/text(), 'Study level')]/following-sibling::div[1]//p//text()"
+        intake_month_xpath: "//div[contains(@class, 'gridItemTitle') and contains(.//p/text(), 'Start date')]/following-sibling::div[1]//p//text()"
+        duration_xpath: "//div[contains(@class, 'gridItemTitle') and contains(.//p/text(), 'Duration')]/following-sibling::div[1]//p//text()"
+        fee_international_xpath: "//div[contains(@class, 'gridItemTitle') and contains(.//p/text(), 'Fee')]/following-sibling::div[1]//p[contains(text(), 'international')]//text()"
+
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false
