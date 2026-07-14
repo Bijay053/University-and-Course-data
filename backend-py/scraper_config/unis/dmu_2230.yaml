@@ -2,19 +2,24 @@
 # Hostname: www.dmu.ac.uk
 #
 # Discovery fix (2026-07-14):
-#   • seed_urls[0] is always skipped by the BFS pre-seeder (it assumes index 0
-#     equals the start_url already in the queue). All listing pages must live in
-#     [1:] so they are actually pre-seeded. The placeholder below is intentional.
-#   • bfs_page_budget raised to 350: 16 listing pages + ~250 course pages = ~266.
+#   • use_wayback: false — the DB auto_config probe set use_wayback:true after
+#     a failed initial run. DMU is directly accessible; Wayback has only ~42
+#     stale URLs. This YAML override forces direct BFS crawl of the live site.
+#   • seed_urls[0] = scrape_url (homepage) so BFS starts normally; [1:] are
+#     extra seeds pre-queued into the BFS at depth 0.
+#   • bfs_page_budget raised to 350: 15 listing pages + ~250 course pages.
 #   • max_candidates raised to 350: DMU has ~240 courses across UG + PG.
 #   • PG pages 6–7 added: verified to have 20 courses each (windowed pagination
 #     hid them from page 1's pagination widget, so they were missing).
-#   • allow_url_patterns lowercased to actually match canonical course URLs
-#     (dmu.ac.uk redirects mixed-case /Study/Courses/ to lowercase /study/courses/).
 
 discovery:
+  # CRITICAL: override the probe-written auto_config that set use_wayback:true.
+  # Wayback archive only has ~42 stale DMU course URLs; direct BFS gets ~240.
+  use_wayback: false
+
   seed_urls:
-    # [0] is always skipped by pre-seeder — use the scrape_url as placeholder.
+    # [0] matches the scrape_url so BFS starts at homepage (no override).
+    # All listing pages are in [1:] so they are pre-seeded into the BFS queue.
     - https://www.dmu.ac.uk/
 
     # --- Undergraduate listing pages (pages 1–8) ---
