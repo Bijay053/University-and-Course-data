@@ -239,6 +239,55 @@ def _clean(raw: str) -> str | None:
     return _smart_case(txt)
 
 
+def _from_lancashire_banner(html: str) -> str | None:
+    """University of Central Lancashire (UCLan) hero-banner structural extractor.
+
+    Lancashire course pages split the degree title across two sibling elements
+    inside ``div.hero-banner__title-and-tags``:
+
+        <h1 class="hero-banner__title">Midwifery</h1>
+        <div class="hero-banner__tags">
+          <span class="hero-banner__tag">MSc/PGDip/PGCert</span>
+        </div>
+
+    The bare H1 carries only the plain subject name; the qualification lives in
+    a ``span.hero-banner__tag`` sibling. Neither H1 extraction nor
+    ``prefer_title_over_h1`` can recover the full name
+    "MSc/PGDip/PGCert Midwifery". This pre-pass combines them.
+
+    NOTE: ``_smart_case`` / ``_clean`` is intentionally skipped on the combined
+    result.  Slash-separated qualifiers like "MSc/PGDip/PGCert" are treated as
+    a single whitespace-delimited token by ``_smart_case`` and would be
+    lowercased to "Msc/pgdip/pgcert".  The CMS already formats the
+    qualification correctly so no case transformation is needed.
+
+    The ``hero-banner__title`` / ``hero-banner__tag`` class names are
+    Lancashire-specific (BEM component style) and are unlikely to collide with
+    other universities, so this check is unconditional — it simply returns None
+    when absent.
+    """
+    try:
+        soup_local = BeautifulSoup(html, "html.parser")
+        h1 = soup_local.select_one("h1.hero-banner__title")
+    except Exception:  # noqa: BLE001
+        return None
+    if not h1:
+        return None
+    # Walk up to the title-and-tags container to find the sibling tag span.
+    container = h1.find_parent(class_="hero-banner__title-and-tags")
+    tag_span = (
+        container.select_one("span.hero-banner__tag")
+        if container
+        else soup_local.select_one("span.hero-banner__tag")
+    )
+    h1_text = h1.get_text(" ", strip=True)
+    if not h1_text:
+        return None
+    tag_text = tag_span.get_text(" ", strip=True) if tag_span else ""
+    combined = f"{tag_text} {h1_text}".strip() if tag_text else h1_text
+    return combined or None
+
+
 def _from_ltu_banner(html: str) -> str | None:
     """Leeds Trinity University banner-title structural extractor.
 
@@ -289,6 +338,24 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
         return []
     soup = BeautifulSoup(html, "html.parser")
     candidates: list[tuple[str, str, float]] = []
+
+    # Lancashire hero-banner pre-pass: combines span.hero-banner__tag
+    # ("MSc/PGDip/PGCert") + h1.hero-banner__title ("Midwifery") without
+    # running through _smart_case (slashes break the acronym canon lookup).
+    _lancashire_name = _from_lancashire_banner(html)
+    if _lancashire_name:
+        _raw = re.sub(r"\s+", " ", _lancashire_name).strip()
+        if _raw and 3 <= len(_raw) <= 200:
+            return [
+                ExtractionResult(
+                    field_key="course_name",
+                    value=_raw,
+                    normalized={"course_name": _raw},
+                    confidence=0.95,
+                    method="course_name.lancashire_banner",
+                    snippet=_raw[:160],
+                )
+            ]
 
     _ltu_name = _from_ltu_banner(html)
     if _ltu_name:
