@@ -48,8 +48,8 @@ discovery:
   max_candidates: 350
 
   allow_url_patterns:
-    - '/study/courses/'
-
+    - '/study/courses/undergraduate-courses/'
+    - '/study/courses/postgraduate-courses/'
   block_url_patterns:
     - '/news'
     - '/events'
@@ -60,6 +60,17 @@ discovery:
 
 extraction:
   max_parallel_fetch: 8
+
+  # DMU title tag format: "Course Name Degree (Hons)- with optional placement year"
+  # First H1 has only the bare subject ("Accounting and Finance") without the degree
+  # qualifier. prefer_title_over_h1 picks up the full degree name from <title>.
+  # strip_title_suffixes removes the university name if it appears (safety net).
+  course_name:
+    prefer_title_over_h1: true
+    strip_title_suffixes:
+      - ' | De Montfort University'
+      - ' - De Montfort University'
+      - ' | DMU'
 
   filters:
     domestic_only:
