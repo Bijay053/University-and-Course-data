@@ -164,7 +164,7 @@ def _get_scrape_do_sem() -> asyncio.Semaphore:
 _cf_always_scrape_do: set[str] = set()
 
 # ---------------------------------------------------------------------------
-# Shared persistent AsyncClient — connection-pool reuse
+# Shared persistent AsyncClient — connection-pool reuse, per event loop
 # ---------------------------------------------------------------------------
 # Creating a fresh AsyncClient() per request pays a new TCP+TLS handshake for
 # every URL even when hitting the same host repeatedly (500 courses → 500
@@ -173,28 +173,51 @@ _cf_always_scrape_do: set[str] = set()
 # asyncio is single-threaded/cooperative so there is no data-race risk on the
 # client object itself; httpx.AsyncClient is explicitly documented as
 # concurrency-safe.
-_shared_http_client: httpx.AsyncClient | None = None
+#
+# Per-event-loop clients (not per-process):
+# Celery prefork runs each task in its own asyncio.run() loop.  A single
+# module-level AsyncClient instance is bound to the first loop that created
+# it; when the second task starts on the same worker process, that loop is
+# already closed.  Calling `await _shared_http_client.get(url)` then raises
+# "Event loop is closed" because the client's internal connection pool tries
+# to schedule on the closed loop.  The check `.is_closed` only catches
+# explicit `await client.aclose()` calls — it does NOT detect a closed loop.
+# Solution: same WeakKeyDictionary pattern as _LOOP_SEMS so each event loop
+# gets its own client and stale clients are garbage-collected with their loop.
+_LOOP_CLIENTS: "weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, httpx.AsyncClient]" = (
+    weakref.WeakKeyDictionary()
+)
 
 
 def _get_shared_client() -> httpx.AsyncClient:
-    """Return (or lazily create) the module-level shared AsyncClient."""
-    global _shared_http_client
-    if _shared_http_client is None or _shared_http_client.is_closed:
-        _shared_http_client = httpx.AsyncClient(
-            timeout=httpx.Timeout(15.0, connect=10.0),
-            follow_redirects=True,
-            limits=httpx.Limits(
-                max_connections=60,
-                max_keepalive_connections=40,
-                keepalive_expiry=30,
-            ),
-            headers={
-                "User-Agent": _BROWSER_UA,
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.9",
-            },
-        )
-    return _shared_http_client
+    """Return (or lazily create) the shared AsyncClient for the current event loop."""
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop is not None:
+        client = _LOOP_CLIENTS.get(loop)
+        if client is not None and not client.is_closed:
+            return client
+
+    client = httpx.AsyncClient(
+        timeout=httpx.Timeout(15.0, connect=10.0),
+        follow_redirects=True,
+        limits=httpx.Limits(
+            max_connections=60,
+            max_keepalive_connections=40,
+            keepalive_expiry=30,
+        ),
+        headers={
+            "User-Agent": _BROWSER_UA,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+        },
+    )
+    if loop is not None:
+        _LOOP_CLIENTS[loop] = client
+    return client
 
 # ---------------------------------------------------------------------------
 # Scrape.do render gate — extraction-only ContextVar

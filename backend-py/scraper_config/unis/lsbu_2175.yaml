@@ -6,11 +6,19 @@
 
 discovery:
   always_sitemap_supplement: true
-  seed_urls:
-    - 'https://www.lsbu.ac.uk/study/course-finder?f.Method+of+Study%7CcoursesMode=full-time&profile=_default&query=%21nullsearch&collection=lsbu%7Esp-courses-meta&f.Level%7CcourseLevel=undergraduate'
-    - 'https://www.lsbu.ac.uk/study/course-finder?f.Method+of+Study%7CcoursesMode=full-time&profile=_default&query=%21nullsearch&collection=lsbu%7Esp-courses-meta&f.Level%7CcourseLevel=postgraduate'
-    - 'https://www.lsbu.ac.uk/study/course-finder?f.Method+of+Study%7CcoursesMode=full-time&profile=_default&query=%21nullsearch&collection=lsbu%7Esp-courses-meta&f.Level%7CcourseLevel=foundation'
-  
+  # seed_urls REMOVED — the previous Funnelback course-finder URLs were:
+  #   (a) Cloudflare-blocked (403 from all tiers)
+  #   (b) JavaScript-rendered AJAX pages — static HTML contains no course links
+  #   (c) Each URL burned ~90s in the httpx→cffi→Wayback→Scrape.do retry chain,
+  #       exhausting the 300s discovery budget before always_sitemap_supplement ran.
+  #
+  # Discovery now relies on always_sitemap_supplement: true, which issues a
+  # Wayback CDX query for www.lsbu.ac.uk/study/course-finder/* and finds ~384
+  # cached course URLs in ~10s — no per-URL retry chain needed.
+  bfs_page_budget: 5  # homepage is CF-blocked; small budget so BFS quits fast
+  use_wayback: true   # enables per-URL Wayback fallback in extraction phase
+  skip_browser_discovery: true
+
   allow_url_patterns:
     - '/study/course-finder/[a-z0-9-]+$'  # Forces strict matching of course pages only
   
