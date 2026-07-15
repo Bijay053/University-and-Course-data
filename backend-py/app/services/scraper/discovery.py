@@ -1688,7 +1688,7 @@ async def discover_course_links(
         "/study/all",
     )
     _has_explicit_sitemap = bool(_resolved_sitemap_url)
-    if len(found) < _ALT_PROBE_THRESHOLD and origin and not _has_explicit_sitemap:
+    if not _skip_sitemap and len(found) < _ALT_PROBE_THRESHOLD and origin and not _has_explicit_sitemap:
         if emit:
             await emit(
                 "status",
