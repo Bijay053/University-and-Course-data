@@ -5,18 +5,18 @@
 # Notes: Heavily blocked marketing/stories to prevent scraping alumni profiles.
 
 discovery:
-  always_sitemap_supplement: true
-  # seed_urls REMOVED — the previous Funnelback course-finder URLs were:
-  #   (a) Cloudflare-blocked (403 from all tiers)
-  #   (b) JavaScript-rendered AJAX pages — static HTML contains no course links
-  #   (c) Each URL burned ~90s in the httpx→cffi→Wayback→Scrape.do retry chain,
-  #       exhausting the 300s discovery budget before always_sitemap_supplement ran.
+  # LSBU is fully Cloudflare-blocked: httpx, cffi, Scrape.do static all fail.
+  # The sitemap probe (4 URLs × ~75s each = ~300s) exhausts the discovery
+  # budget before the orchestrator's wayback_discover() can run.
   #
-  # Discovery now relies on always_sitemap_supplement: true, which issues a
-  # Wayback CDX query for www.lsbu.ac.uk/study/course-finder/* and finds ~384
-  # cached course URLs in ~10s — no per-URL retry chain needed.
-  bfs_page_budget: 5  # homepage is CF-blocked; small budget so BFS quits fast
-  use_wayback: true   # enables per-URL Wayback fallback in extraction phase
+  # Fix: skip_sitemap_fallback=True causes discover_course_links() to return
+  # quickly (~15s — BFS tries homepage, gets CF-502, quits with 0 candidates).
+  # The orchestrator then calls wayback_discover() via use_wayback=True, which
+  # queries web.archive.org/cdx/search/cdx and finds ~384 cached course URLs.
+  skip_sitemap_fallback: true   # skip sitemap probe + supplement (CF-blocked, slow)
+  always_sitemap_supplement: false  # gated by skip_sitemap_fallback anyway; explicit
+  bfs_page_budget: 5  # homepage CF-blocked; quit fast so orchestrator CDX runs
+  use_wayback: true   # orchestrator wayback_discover() finds ~384 LSBU URLs via CDX
   skip_browser_discovery: true
 
   allow_url_patterns:

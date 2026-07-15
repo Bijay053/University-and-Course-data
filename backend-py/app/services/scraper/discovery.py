@@ -1554,7 +1554,26 @@ async def discover_course_links(
     # Many universities (e.g. those with JS-driven catalogues) link only
     # a handful of "featured" courses from the homepage but publish the
     # full catalogue in sitemap.xml.
-    if len(found) < _SITEMAP_FALLBACK_THRESHOLD and origin and _remaining_budget_s() < 5:
+    _skip_sitemap = bool(
+        discovery_config is not None
+        and getattr(discovery_config, "skip_sitemap_fallback", False)
+    )
+    if _skip_sitemap and len(found) < _SITEMAP_FALLBACK_THRESHOLD:
+        log.info(
+            "[DISCOVER] skip_sitemap_fallback=True — skipping sitemap probe for %s "
+            "(orchestrator wayback_discover will run CDX bulk lookup instead)",
+            origin,
+        )
+        if emit:
+            await emit(
+                "status",
+                f"[DISCOVER] skip_sitemap_fallback=True — skipping sitemap/supplement "
+                f"for {origin}; orchestrator will run Wayback CDX bulk lookup",
+                phase="discover",
+                kind="sitemap_skipped_config",
+                crawl_total=len(found),
+            )
+    elif len(found) < _SITEMAP_FALLBACK_THRESHOLD and origin and _remaining_budget_s() < 5:
         # Budget guard (Cardiff job_72d3725aea12): if the BFS crawl alone has
         # already exhausted (almost) the entire discovery deadline, don't
         # even start the sitemap fallback — it would get silently cancelled
@@ -1745,7 +1764,7 @@ async def discover_course_links(
         discovery_config is not None
         and getattr(discovery_config, "always_sitemap_supplement", False)
     )
-    if (parsed.netloc in _ALWAYS_SITEMAP_SUPPLEMENT_HOSTS or _yaml_always_sitemap) and origin:
+    if not _skip_sitemap and (parsed.netloc in _ALWAYS_SITEMAP_SUPPLEMENT_HOSTS or _yaml_always_sitemap) and origin:
         if emit:
             await emit(
                 "status",

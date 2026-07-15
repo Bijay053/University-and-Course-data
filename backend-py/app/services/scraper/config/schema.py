@@ -1212,6 +1212,19 @@ class DiscoveryConfig(BaseModel):
             "deep-faculty sites where BFS burns its page budget on info pages (AUT, ACU)."
         ),
     )
+    skip_sitemap_fallback: bool = Field(
+        default=False,
+        description=(
+            "Skip BOTH the sitemap fallback and always_sitemap_supplement entirely.  "
+            "Use for universities where the site is fully Cloudflare-blocked so the "
+            "sitemap probe burns the 300s discovery budget without finding anything "
+            "(e.g. LSBU: 4 sitemap URLs × ~75s per URL = 300s → timeout before the "
+            "orchestrator's wayback_discover() can run).  "
+            "With this flag, discover_course_links() returns quickly (~10-20s) with "
+            "0 candidates, the orchestrator sees links=0, and its wayback_discover() "
+            "call (triggered by use_wayback=True) does the CDX bulk lookup instead."
+        ),
+    )
     scrape_do_skip_fallbacks: bool = Field(
         default=False,
         description=(
