@@ -35,6 +35,13 @@ discovery:
     - '/research'
 
 extraction:
+  # Cardiff-style: skip doomed httpx/cffi (all datacenter IPs get CF-502) and
+  # go straight to Scrape.do headless Chrome (residential proxy, render=True).
+  # skip_browser_rescue: Playwright is also a datacenter IP — no point running it.
+  scrape_do_render: true
+  scrape_do_skip_fallbacks: true
+  skip_browser_rescue: true
+
   fees:
     default_currency: 'GBP'
     prefer_international: true
