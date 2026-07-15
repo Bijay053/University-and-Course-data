@@ -141,6 +141,15 @@ _HOST_CDX_URL_PREFIX: dict[str, str] = {
     # this is a defence-in-depth fallback if those regress.
     "www.ulster.ac.uk": "www.ulster.ac.uk/courses/*",
     "ulster.ac.uk": "www.ulster.ac.uk/courses/*",
+    # LSBU (London South Bank University): real course pages live at
+    # /study/course-finder/<slug>.  Without a targeted prefix the default
+    # www.lsbu.ac.uk/* CDX query exhausts the 10 000-row limit on
+    # alphabetically-earlier paths (/alumni/, /blog/, /news/, /research/,
+    # /stories-finder/) — '/s' sorts after most other path roots — so the
+    # /study/course-finder/* subtree is never reached and 0 course URLs
+    # are returned.  Targeting the subtree directly fixes this.
+    "www.lsbu.ac.uk": "www.lsbu.ac.uk/study/course-finder/*",
+    "lsbu.ac.uk": "www.lsbu.ac.uk/study/course-finder/*",
 }
 
 
