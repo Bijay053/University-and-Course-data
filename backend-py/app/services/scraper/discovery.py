@@ -1063,12 +1063,15 @@ async def discover_course_links(
                 )
 
             # Limit concurrent Scrape.do render calls during seed prefetch.
-            # Firing all seeds simultaneously (e.g. 27 render calls at once)
-            # saturates the Scrape.do account and causes timeouts even for
-            # pages that succeed when fetched individually. 6 concurrent
-            # render calls keeps latency predictable while still finishing
-            # well within the 300s discovery budget (ceil(N/6) × ~20s/page).
-            _SEED_SCRAPE_DO_CONCURRENCY = 6
+            # Firing all seeds simultaneously saturates the Scrape.do account
+            # and causes timeouts even for pages that succeed individually.
+            # 4 concurrent render calls stays within Scrape.do's effective
+            # per-account render parallelism limit; 6 was causing throttling
+            # that pushed later-batch seeds past the 95s per-page timeout.
+            # ceil(N/4) × ~25s/page still finishes well within the 300s
+            # discovery budget for typical seed counts (e.g. 36 seeds =
+            # 9 batches × 25s = 225s, leaving 75s for BFS cross-links).
+            _SEED_SCRAPE_DO_CONCURRENCY = 4
             _prefetch_sem = asyncio.Semaphore(_SEED_SCRAPE_DO_CONCURRENCY)
 
             async def _prefetch_one(_u: str) -> tuple[str, str | None]:

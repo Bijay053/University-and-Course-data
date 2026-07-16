@@ -29,10 +29,12 @@
 #      their individual courses are seeded directly instead.
 #
 # ── Concurrent seed prefetch fix ─────────────────────────────────────────────
-# Scrape.do render calls are now limited to 6 concurrent (discovery.py
-# semaphore added 2026-07-16).  Before the fix, all N seed URLs were fired
-# simultaneously — 27+ concurrent render calls saturated the Scrape.do
-# account and caused random timeouts even for pages that succeed individually.
+# Scrape.do render calls are limited to 4 concurrent (discovery.py semaphore,
+# reduced from 6 on 2026-07-16).  Before the fix, all N seeds fired together —
+# 27+ concurrent render calls saturated the Scrape.do account and caused random
+# timeouts.  6 concurrent was still too high (3 seeds in later batches timed
+# out due to Scrape.do render throttling); 4 stays within the account's
+# effective parallel render limit.
 #
 # Things that do NOT work:
 #   - Scrape.do render=true on /degrees/postgraduate (0 links, SPA+Funnelback)
@@ -93,6 +95,16 @@ discovery:
     - https://www.ecu.edu.au/degrees/courses/all?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=101&waitFor=3000&profile=main
     - https://www.ecu.edu.au/degrees/courses/all?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=111&waitFor=3000&profile=main
 
+    # ── Arts / Social Sciences — seeded early (slot 13) ──────────────────────
+    # master-of-counselling has 0 cross-links on its page AND is absent from
+    # the PhD hub's cross-links (verified 2026-07-16).  It must be seeded
+    # directly.  Placed here (seed 13) so it gets a fresh budget before the
+    # heavier hub pages consume Scrape.do render slots; in earlier runs it was
+    # seed 32 and consistently timed out under concurrent render load.
+    # master-of-arts-performing-arts is covered by doctor-of-philosophy hub
+    # (confirmed present in hub's 44 cross-links) — not seeded directly.
+    - https://www.ecu.edu.au/degrees/courses/master-of-counselling
+
     # ── Business / Commerce (hub seeds — yield cross-links) ───────────────────
     - https://www.ecu.edu.au/degrees/courses/master-of-business-administration
     - https://www.ecu.edu.au/degrees/courses/master-of-professional-accounting
@@ -111,24 +123,19 @@ discovery:
     - https://www.ecu.edu.au/degrees/courses/master-of-computing-and-security-by-research
 
     # ── Education ─────────────────────────────────────────────────────────────
-    # These were previously seeded via hub pages (master-of-education,
-    # master-of-teaching-primary/secondary) which timed out under concurrent
-    # Scrape.do load.  Individual courses are now seeded directly.
+    # master-of-teaching-primary is NOT seeded directly: it was seed 26 and
+    # consistently timed out.  It IS covered by master-of-teaching-secondary
+    # (a hub that found 25 course cross-links including teaching-primary in
+    # the log at page 27).
     - https://www.ecu.edu.au/degrees/courses/master-of-education
     - https://www.ecu.edu.au/degrees/courses/master-of-education-advanced
     - https://www.ecu.edu.au/degrees/courses/master-of-education-accelerated-online
     - https://www.ecu.edu.au/degrees/courses/master-of-education-by-research
-    - https://www.ecu.edu.au/degrees/courses/master-of-teaching-primary
     - https://www.ecu.edu.au/degrees/courses/master-of-teaching-secondary
     - https://www.ecu.edu.au/degrees/courses/graduate-certificate-of-education
     - https://www.ecu.edu.au/degrees/courses/graduate-certificate-of-education-accelerated-online
     - https://www.ecu.edu.au/degrees/courses/graduate-diploma-in-teaching-primary
     - https://www.ecu.edu.au/degrees/courses/graduate-diploma-in-teaching-secondary
-
-    # ── Arts / Social Sciences ────────────────────────────────────────────────
-    # master-of-counselling has 0 cross-links; seeded directly.
-    - https://www.ecu.edu.au/degrees/courses/master-of-counselling
-    - https://www.ecu.edu.au/degrees/courses/master-of-arts-performing-arts
 
     # ── Research / Doctoral ───────────────────────────────────────────────────
     # doctor-of-philosophy hub linked to these 4 research degrees.
@@ -167,9 +174,19 @@ discovery:
     # captured via the explicit start_rank= pagination seeds.  The bare URL
     # appears as a cross-link on PG hub pages and wastes one BFS slot.
     - /degrees/courses/all$
+    # Non-course /degrees/* hub pages that BFS enqueues from cross-links.
+    # /degrees/ecu-city  — ECU City campus page; classified as "listing" with
+    #                      92 links but ALL are non-/degrees/courses/ URLs that
+    #                      the ECU post-filter would drop; block to avoid one
+    #                      wasted Scrape.do render call.
+    # /degrees/online    — "Study online" hub; adds itself as a candidate but
+    #                      has no /degrees/courses/ children (post-filter drops it).
+    # /degrees/uniprep   — University Preparation hub page (not a course detail).
+    - /degrees/ecu-city
+    - /degrees/online$
+    - /degrees/uniprep$
 
-  # 12 UG pagination seeds + ~25 PG seeds + cross-link BFS hops.
-  # With the concurrent Scrape.do semaphore (max 6), all seeds succeed;
+  # 12 UG pagination seeds + 22 PG seeds (semaphore=4, ~9 render batches).
   # BFS then follows cross-links from hub pages for additional candidates.
   bfs_page_budget: 90
 
