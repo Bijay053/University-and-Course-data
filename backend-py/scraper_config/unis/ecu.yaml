@@ -48,26 +48,26 @@ discovery:
     # _unwrap_funnelback_redirect() resolves each card's Funnelback redirect
     # href to a direct /degrees/courses/<slug> URL before any filter runs.
     # Page 1 (base URL — no start_rank):
-    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=
+    - https://www.ecu.edu.au/search/corporate?f.Student+type%7Cr=International&profile=main&query=&collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses
     # Pages 2-19 (start_rank=11 … 181):
-    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=11
-    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=21
-    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=31
-    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=41
-    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=51
-    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=61
-    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=71
-    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=81
-    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=91
-    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=101
-    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=111
-    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=121
-    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=131
-    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=141
-    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=151
-    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=161
-    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=171
-    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=181
+    - https://www.ecu.edu.au/search/corporate?f.Student+type%7Cr=International&profile=main&query=&collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=11
+    - https://www.ecu.edu.au/search/corporate?f.Student+type%7Cr=International&profile=main&query=&collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=21
+    - https://www.ecu.edu.au/search/corporate?f.Student+type%7Cr=International&profile=main&query=&collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=31
+    - https://www.ecu.edu.au/search/corporate?f.Student+type%7Cr=International&profile=main&query=&collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=41
+    - https://www.ecu.edu.au/search/corporate?f.Student+type%7Cr=International&profile=main&query=&collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=51
+    - https://www.ecu.edu.au/search/corporate?f.Student+type%7Cr=International&profile=main&query=&collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=61
+    - https://www.ecu.edu.au/search/corporate?f.Student+type%7Cr=International&profile=main&query=&collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=71
+    - https://www.ecu.edu.au/search/corporate?f.Student+type%7Cr=International&profile=main&query=&collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=81
+    - https://www.ecu.edu.au/search/corporate?f.Student+type%7Cr=International&profile=main&query=&collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=91
+    - https://www.ecu.edu.au/search/corporate?f.Student+type%7Cr=International&profile=main&query=&collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=101
+    - https://www.ecu.edu.au/search/corporate?f.Student+type%7Cr=International&profile=main&query=&collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=111
+    - https://www.ecu.edu.au/search/corporate?f.Student+type%7Cr=International&profile=main&query=&collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=121
+    - https://www.ecu.edu.au/search/corporate?f.Student+type%7Cr=International&profile=main&query=&collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=131
+    - https://www.ecu.edu.au/search/corporate?f.Student+type%7Cr=International&profile=main&query=&collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=141
+    - https://www.ecu.edu.au/search/corporate?f.Student+type%7Cr=International&profile=main&query=&collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=151
+    - https://www.ecu.edu.au/search/corporate?f.Student+type%7Cr=International&profile=main&query=&collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=161
+    - https://www.ecu.edu.au/search/corporate?f.Student+type%7Cr=International&profile=main&query=&collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=171
+    - https://www.ecu.edu.au/search/corporate?f.Student+type%7Cr=International&profile=main&query=&collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=181
 
   allow_url_patterns:
     # Course detail pages: slug contains at least one hyphen.
@@ -108,4 +108,8 @@ extraction:
   skip_browser_rescue: true
   filters:
     domestic_only:
-      enabled: true   # Preserve current prod behaviour.
+      # All 187 courses come from ECU's international student search filter,
+      # so every course on these pages is confirmed international.  The
+      # domestic_only guard was silently dropping legitimate courses whose
+      # pages don't surface an explicit international fee marker.
+      enabled: false
