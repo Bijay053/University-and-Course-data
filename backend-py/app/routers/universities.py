@@ -526,6 +526,8 @@ async def delete_university(
     u = await db.get(University, uni_id)
     if not u:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="University not found")
+    # scrape_run_summary has NO ACTION FK — must be deleted before the university row
+    await db.execute(sa_text("DELETE FROM scrape_run_summary WHERE university_id = :uid"), {"uid": uni_id})
     await db.execute(sa_text("DELETE FROM universities WHERE id = :uid"), {"uid": uni_id})
     await db.commit()
 
