@@ -1,75 +1,40 @@
 # Edith Cowan University
 # Hostname: www.ecu.edu.au
 #
-# Bug history / rationale:
-#   - ECU has a dedicated static-extract module (ecu_static_extract.py) that
-#     handles ECU-specific page structures.  The module uses setdefault() so
-#     standard extractors can override its values.
-#   - ECU course pages have a distinct table layout for fees that the generic
-#     fee extractor sometimes misreads.  The static extractor handles these.
-#   - English requirements are published on individual course pages via an
-#     embedded accordion — Playwright pass needed for some courses.
+# ── Discovery approach (2026-07-16 rewrite) ──────────────────────────────────
+# Previously used 12 Funnelback UG pagination seeds + 22 individual PG course
+# seeds = 34 seeds total, with persistent timeout problems on later seeds.
 #
-# ── Cloudflare / Funnelback block ────────────────────────────────────────────
-# ECU's Cloudflare blocks: plain httpx (403), curl_cffi (403), Scrape.do
-# static (502 ROTATION_FAILED).  Scrape.do render=true works for INDIVIDUAL
-# course pages at /degrees/courses/<slug>.
+# Now uses the ECU international student search URL, which lists all 187
+# international courses across 19 paginated pages (10 per page, start_rank
+# increments by 10).
 #
-# BOTH listing pages are React SPAs that load via Funnelback XHR:
-#   /degrees/undergraduate  — SPA, 0 static links even with render=true+10s
-#   /degrees/postgraduate   — SPA, 0 static links (Funnelback CF-blocked)
+# Course links on each page are Funnelback redirect hrefs of the form:
+#   https://ecu-search.funnelback.squiz.cloud/s/redirect?...&url=<encoded-url>
+# discovery.py's _unwrap_funnelback_redirect() (line ~541) already handles
+# this pattern — it extracts the real URL from the `url=` query parameter
+# before any allow/block filter or origin check is applied.  After unwrapping,
+# each link is a plain /degrees/courses/<slug> URL that:
+#   - passes allow_url_patterns (/degrees/courses/[a-z]+-), and
+#   - passes _looks_like_course() → added directly to `found` (no re-fetch).
 #
-# ── Discovery approach ────────────────────────────────────────────────────────
-# UG:  BFS from Funnelback pagination links (?start_rank=1/11/21/31…),
-#      each returning ~10 unique UG course slugs.
-#      The base URL /degrees/courses/all (no query params) always times out
-#      under concurrent Scrape.do load — replaced with start_rank=1 form.
-# PG:  Explicit individual course seeds + a few hub seeds that return
-#      cross-links.  Hubs with 0 useful cross-links are NOT used as seeds;
-#      their individual courses are seeded directly instead.
+# Net: 19 Scrape.do render calls (seeds) → 187 course URLs in `found`.
+# No hub traversal or individual PG course seeds needed.
 #
-# ── Concurrent seed prefetch fix ─────────────────────────────────────────────
-# Scrape.do render calls are limited to 4 concurrent (discovery.py semaphore,
-# reduced from 6 on 2026-07-16).  Before the fix, all N seeds fired together —
-# 27+ concurrent render calls saturated the Scrape.do account and caused random
-# timeouts.  6 concurrent was still too high (3 seeds in later batches timed
-# out due to Scrape.do render throttling); 4 stays within the account's
-# effective parallel render limit.
+# ── Pagination structure ──────────────────────────────────────────────────────
+# "1-10 of 187 results" confirmed by live fetch 2026-07-16.
+# 19 pages: page 1 = base URL, pages 2-19 = base URL + &start_rank=11/21/…/181
 #
-# Things that do NOT work:
+# ── Concurrency ───────────────────────────────────────────────────────────────
+# Scrape.do render calls limited to 4 concurrent (discovery.py semaphore).
+# 19 seeds / 4 = 5 batches × ~25 s ≈ 125 s prefetch — well within 300 s budget.
+#
+# ── Things that do NOT work ───────────────────────────────────────────────────
 #   - Scrape.do render=true on /degrees/postgraduate (0 links, SPA+Funnelback)
 #   - Scrape.do render=true on /degrees/undergraduate (0 links, SPA+Funnelback)
-#   - ECU sitemap.xml is Cloudflare-blocked (0 bytes returned)
-#   - always_sitemap_supplement: true → 6 sitemap probes × ~25s = 150s wasted,
-#     triggers 300s discovery timeout without adding any courses
+#   - ECU sitemap.xml (Cloudflare-blocked, 0 bytes)
+#   - always_sitemap_supplement (6 probes × ~25 s = 150 s, 0 results)
 #   - Wayback CDX for ecu.edu.au/degrees/courses/* (0 results)
-#
-# ── Pagination note ───────────────────────────────────────────────────────────
-# /degrees/courses/all?start_rank=N loads 10 unique courses per page.
-# start_rank= URLs are in block_url_patterns to prevent pagination page URLs
-# appearing as course candidates (only their course links are kept).
-# All pagination pages are pre-seeded explicitly — BFS must NOT follow
-# ?start_rank= links because merging query strings produces doubled Funnelback
-# params that cause Scrape.do render hangs.
-#
-# ── Individual PG courses (verified 2026-07-16) ───────────────────────────────
-# Hub pages whose individual course children are seeded directly:
-#   master-of-education      → master-of-education, master-of-education-advanced,
-#                              master-of-education-accelerated-online,
-#                              master-of-education-by-research,
-#                              graduate-certificate-of-education,
-#                              graduate-certificate-of-education-accelerated-online,
-#                              graduate-diploma-in-teaching-primary,
-#                              graduate-diploma-in-teaching-secondary,
-#                              master-of-teaching-primary, master-of-teaching-secondary
-#   doctor-of-philosophy     → master-of-computing-and-security-by-research,
-#                              master-of-science-by-research,
-#                              master-of-education-by-research,
-#                              master-of-arts-performing-arts
-#   master-of-nursing        → master-of-nursing-studies (already seeded)
-#   master-of-engineering-science → 0 cross-links, seeded directly
-#   master-of-information-technology → 0 cross-links, seeded directly
-#   master-of-counselling    → 0 cross-links, seeded directly
 # ─────────────────────────────────────────────────────────────────────────────
 
 discovery:
@@ -79,116 +44,62 @@ discovery:
   skip_sitemap_fallback: true
 
   seed_urls:
-    # ── UG Funnelback pagination (12 pages × ~10 courses = ~120 UG courses) ──
-    # The bare /degrees/courses/all URL always times out under concurrent
-    # Scrape.do load.  start_rank=1 in parameterized form is stable.
-    - https://www.ecu.edu.au/degrees/courses/all?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=1&waitFor=3000&profile=main
-    - https://www.ecu.edu.au/degrees/courses/all?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=11&waitFor=3000&profile=main
-    - https://www.ecu.edu.au/degrees/courses/all?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=21&waitFor=3000&profile=main
-    - https://www.ecu.edu.au/degrees/courses/all?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=31&waitFor=3000&profile=main
-    - https://www.ecu.edu.au/degrees/courses/all?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=41&waitFor=3000&profile=main
-    - https://www.ecu.edu.au/degrees/courses/all?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=51&waitFor=3000&profile=main
-    - https://www.ecu.edu.au/degrees/courses/all?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=61&waitFor=3000&profile=main
-    - https://www.ecu.edu.au/degrees/courses/all?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=71&waitFor=3000&profile=main
-    - https://www.ecu.edu.au/degrees/courses/all?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=81&waitFor=3000&profile=main
-    - https://www.ecu.edu.au/degrees/courses/all?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=91&waitFor=3000&profile=main
-    - https://www.ecu.edu.au/degrees/courses/all?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=101&waitFor=3000&profile=main
-    - https://www.ecu.edu.au/degrees/courses/all?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&start_rank=111&waitFor=3000&profile=main
-
-    # ── Arts / Social Sciences — seeded early (slot 13) ──────────────────────
-    # master-of-counselling has 0 cross-links on its page AND is absent from
-    # the PhD hub's cross-links (verified 2026-07-16).  It must be seeded
-    # directly.  Placed here (seed 13) so it gets a fresh budget before the
-    # heavier hub pages consume Scrape.do render slots; in earlier runs it was
-    # seed 32 and consistently timed out under concurrent render load.
-    # master-of-arts-performing-arts is covered by doctor-of-philosophy hub
-    # (confirmed present in hub's 44 cross-links) — not seeded directly.
-    - https://www.ecu.edu.au/degrees/courses/master-of-counselling
-
-    # ── Business / Commerce (hub seeds — yield cross-links) ───────────────────
-    - https://www.ecu.edu.au/degrees/courses/master-of-business-administration
-    - https://www.ecu.edu.au/degrees/courses/master-of-professional-accounting
-    - https://www.ecu.edu.au/degrees/courses/master-of-human-resource-management
-
-    # ── Health Sciences ───────────────────────────────────────────────────────
-    - https://www.ecu.edu.au/degrees/courses/master-of-nursing-studies
-    - https://www.ecu.edu.au/degrees/courses/master-of-public-health
-
-    # ── Engineering / Computing ───────────────────────────────────────────────
-    # master-of-engineering-science and master-of-information-technology have
-    # 0 course cross-links when fetched; seeded directly as individual courses.
-    - https://www.ecu.edu.au/degrees/courses/master-of-engineering-science
-    - https://www.ecu.edu.au/degrees/courses/master-of-information-technology
-    - https://www.ecu.edu.au/degrees/courses/master-of-cyber-security
-    - https://www.ecu.edu.au/degrees/courses/master-of-computing-and-security-by-research
-
-    # ── Education ─────────────────────────────────────────────────────────────
-    # master-of-teaching-primary is NOT seeded directly: it was seed 26 and
-    # consistently timed out.  It IS covered by master-of-teaching-secondary
-    # (a hub that found 25 course cross-links including teaching-primary in
-    # the log at page 27).
-    - https://www.ecu.edu.au/degrees/courses/master-of-education
-    - https://www.ecu.edu.au/degrees/courses/master-of-education-advanced
-    - https://www.ecu.edu.au/degrees/courses/master-of-education-accelerated-online
-    - https://www.ecu.edu.au/degrees/courses/master-of-education-by-research
-    - https://www.ecu.edu.au/degrees/courses/master-of-teaching-secondary
-    - https://www.ecu.edu.au/degrees/courses/graduate-certificate-of-education
-    - https://www.ecu.edu.au/degrees/courses/graduate-certificate-of-education-accelerated-online
-    - https://www.ecu.edu.au/degrees/courses/graduate-diploma-in-teaching-primary
-    - https://www.ecu.edu.au/degrees/courses/graduate-diploma-in-teaching-secondary
-
-    # ── Research / Doctoral ───────────────────────────────────────────────────
-    # doctor-of-philosophy hub linked to these 4 research degrees.
-    - https://www.ecu.edu.au/degrees/courses/doctor-of-philosophy
-    - https://www.ecu.edu.au/degrees/courses/doctor-of-philosophy-integrated
-    - https://www.ecu.edu.au/degrees/courses/master-of-science-by-research
+    # ECU international student course search — 187 courses, 19 pages × 10.
+    # _unwrap_funnelback_redirect() resolves each card's Funnelback redirect
+    # href to a direct /degrees/courses/<slug> URL before any filter runs.
+    # Page 1 (base URL — no start_rank):
+    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=
+    # Pages 2-19 (start_rank=11 … 181):
+    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=11
+    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=21
+    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=31
+    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=41
+    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=51
+    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=61
+    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=71
+    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=81
+    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=91
+    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=101
+    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=111
+    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=121
+    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=131
+    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=141
+    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=151
+    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=161
+    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=171
+    - https://www.ecu.edu.au/search/corporate?collection=ecu%7Esp-ecu-web&f.Tabs%7Cecu%7Eds-fs-courses=Courses&f.Student+type%7Cr=International&profile=main&query=&start_rank=181
 
   allow_url_patterns:
-    # Course detail pages: slug always contains at least one hyphen
-    # (bachelor-of-science, master-of-engineering, etc.).  Rejects broad hub
-    # pages like /degrees/courses/all and /degrees/courses/search.
+    # Course detail pages: slug contains at least one hyphen.
+    # Unwrapped Funnelback URLs (/degrees/courses/<slug>) match this pattern.
     - /degrees/courses/[a-z]+-
-    # NOTE: start_rank= is intentionally NOT in allow_url_patterns.
-    # All pagination pages are pre-seeded; BFS must NOT follow ?start_rank=
-    # links (merged query strings cause doubled Funnelback params → hang).
 
   block_url_patterns:
-    # Funnelback pagination/tab URL variants
-    - start_rank=          # Funnelback pagination (same 10 courses every time)
-    - collection=ecu%7E   # Funnelback search API calls
-    - f\.Tabs%7C           # Funnelback tab filter params
+    # Funnelback / search parameters — block cross-link re-queuing of search pages.
+    # Seeds bypass this check (depth=0); only cross-links from fetched pages are
+    # subject to block_url_patterns.
+    - start_rank=          # Pagination in search results
+    - collection=ecu%7E   # Funnelback collection param (search pages)
+    - f\.Tabs%7C           # Funnelback tab filter
+    - /search/corporate    # Search page itself (if found as cross-link)
     # Non-course site sections
     - /future-students/
     - /study/events
     - /degrees/study-areas/
-    # Stale postgraduate hub URLs (return HTTP 404).  These match _is_nav()
-    # because _NAV_URL_HINTS contains "/postgrad" as a substring, so BFS
-    # enqueues them.  None exist on the live site — block to avoid wasted
-    # Scrape.do render calls.
+    # Stale postgraduate hub URLs (return HTTP 404)
     - /postgraduate-
-    # Article / blog URLs under /study/extra/.  These pass _looks_like_course()
-    # because _COURSE_URL_HINTS contains "/study/" — block to prevent article
-    # pages being added to the candidate set as child courses.
+    # Article / blog URLs that falsely match _looks_like_course()
     - /study/extra
-    # Bare /degrees/courses/all (no query params) — all UG courses are already
-    # captured via the explicit start_rank= pagination seeds.  The bare URL
-    # appears as a cross-link on PG hub pages and wastes one BFS slot.
+    # Non-course /degrees/* hub pages
     - /degrees/courses/all$
-    # Non-course /degrees/* hub pages that BFS enqueues from cross-links.
-    # /degrees/ecu-city  — ECU City campus page; classified as "listing" with
-    #                      92 links but ALL are non-/degrees/courses/ URLs that
-    #                      the ECU post-filter would drop; block to avoid one
-    #                      wasted Scrape.do render call.
-    # /degrees/online    — "Study online" hub; adds itself as a candidate but
-    #                      has no /degrees/courses/ children (post-filter drops it).
-    # /degrees/uniprep   — University Preparation hub page (not a course detail).
     - /degrees/ecu-city
     - /degrees/online$
     - /degrees/uniprep$
 
-  # 12 UG pagination seeds + 22 PG seeds (semaphore=4, ~9 render batches).
-  # BFS then follows cross-links from hub pages for additional candidates.
-  bfs_page_budget: 90
+  # 19 seeds (5 batches of 4 via semaphore) + small buffer for any cross-links.
+  # In practice BFS processes only the 19 search pages; all course URLs go
+  # directly to `found` via _looks_like_course() after Funnelback unwrapping.
+  bfs_page_budget: 30
 
 extraction:
   scrape_do_render: true
