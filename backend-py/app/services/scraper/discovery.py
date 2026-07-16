@@ -1062,19 +1062,29 @@ async def discover_course_links(
                     kind="seed_prefetch_start",
                 )
 
+            # Limit concurrent Scrape.do render calls during seed prefetch.
+            # Firing all seeds simultaneously (e.g. 27 render calls at once)
+            # saturates the Scrape.do account and causes timeouts even for
+            # pages that succeed when fetched individually. 6 concurrent
+            # render calls keeps latency predictable while still finishing
+            # well within the 300s discovery budget (ceil(N/6) × ~20s/page).
+            _SEED_SCRAPE_DO_CONCURRENCY = 6
+            _prefetch_sem = asyncio.Semaphore(_SEED_SCRAPE_DO_CONCURRENCY)
+
             async def _prefetch_one(_u: str) -> tuple[str, str | None]:
-                _timeout = min(_page_fetch_timeout_s, max(_remaining_budget_s(), 1.0))
-                try:
-                    _html = await asyncio.wait_for(
-                        fetch_html(_u, retries=0), timeout=_timeout
-                    )
-                except asyncio.TimeoutError:
-                    log.warning(
-                        "[DISCOVER] seed prefetch timed out after %ss — %s",
-                        _timeout,
-                        _u,
-                    )
-                    _html = None
+                async with _prefetch_sem:
+                    _timeout = min(_page_fetch_timeout_s, max(_remaining_budget_s(), 1.0))
+                    try:
+                        _html = await asyncio.wait_for(
+                            fetch_html(_u, retries=0), timeout=_timeout
+                        )
+                    except asyncio.TimeoutError:
+                        log.warning(
+                            "[DISCOVER] seed prefetch timed out after %ss — %s",
+                            _timeout,
+                            _u,
+                        )
+                        _html = None
                 return _u, _html
 
             _prefetch_results = await asyncio.gather(
