@@ -1436,6 +1436,18 @@ async def discover_course_links(
                 _full = _resolve(_href, url, origin)
                 if not _full or _full in visited or _full in found:
                     continue
+                # Apply YAML block_url_patterns here too.  The main BFS loop
+                # only applies this guard for depth>0 queue entries, but child
+                # courses on detail pages are added directly to `found` —
+                # bypassing the BFS traversal entirely.  Without this check,
+                # URLs that match a block pattern (e.g. ECU's /study/extra/
+                # article URLs or /postgraduate-*-courses stubs) can slip into
+                # the candidate set even when the operator has explicitly
+                # blocked them.
+                if _yaml_block_compiled_early and any(
+                    _p.search(_full) for _p in _yaml_block_compiled_early
+                ):
+                    continue
                 if _looks_like_course(_full, _text):
                     # Real child course — add directly
                     if _full not in found and not _JUNK_TEXT.match(_text or ""):

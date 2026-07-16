@@ -154,6 +154,19 @@ discovery:
     - /future-students/
     - /study/events
     - /degrees/study-areas/
+    # Stale postgraduate hub URLs (return HTTP 404).  These match _is_nav()
+    # because _NAV_URL_HINTS contains "/postgrad" as a substring, so BFS
+    # enqueues them.  None exist on the live site — block to avoid wasted
+    # Scrape.do render calls.
+    - /postgraduate-
+    # Article / blog URLs under /study/extra/.  These pass _looks_like_course()
+    # because _COURSE_URL_HINTS contains "/study/" — block to prevent article
+    # pages being added to the candidate set as child courses.
+    - /study/extra
+    # Bare /degrees/courses/all (no query params) — all UG courses are already
+    # captured via the explicit start_rank= pagination seeds.  The bare URL
+    # appears as a cross-link on PG hub pages and wastes one BFS slot.
+    - /degrees/courses/all$
 
   # 12 UG pagination seeds + ~25 PG seeds + cross-link BFS hops.
   # With the concurrent Scrape.do semaphore (max 6), all seeds succeed;
