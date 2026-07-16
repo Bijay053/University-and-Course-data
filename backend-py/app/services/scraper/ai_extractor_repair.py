@@ -132,7 +132,7 @@ async def fetch_repair_samples(
             FROM scraped_courses
             WHERE scrape_job_id = :run_id
               AND course_website IS NOT NULL
-            ORDER BY id
+            ORDER BY course_website
             LIMIT :n
         """), {"run_id": scrape_run_id, "n": n})
         urls = [r[0] for r in rows if r[0]]

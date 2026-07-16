@@ -5237,21 +5237,35 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             summary["staged"] = actual_staged
         await emit("status", f"Staged {summary['staged']} courses, {summary['skipped']} skipped, {summary['fetch_failed']} fetch errors", phase="complete", **summary)
         # ── T05: Fetch-failure rate guard ─────────────────────────────────────
-        # When > 30 % of discovered courses failed the fetch step (e.g. Scrape.do
-        # account exhausted mid-run) mark the job 'failed_degraded' so the
-        # approval / bulk-approve scripts know NOT to replace live published data
-        # with a near-empty result set.  10–30 % → 'completed_with_warnings'.
-        # Evaluated AFTER the T04 sweep so recovered courses reduce the rate.
+        # When > threshold % of discovered courses failed the fetch step (e.g.
+        # Scrape.do account exhausted mid-run) mark the job 'failed_degraded' so
+        # the approval / bulk-approve scripts know NOT to replace live published
+        # data with a near-empty result set.  10–threshold % →
+        # 'completed_with_warnings'.  Evaluated AFTER the T04 sweep so recovered
+        # courses reduce the rate.
+        #
+        # The threshold defaults to 30 % but is configurable per university via
+        # discovery.failure_guard_threshold in the YAML config.  Raise it for
+        # universities whose URL-rewrite strategy legitimately produces a high
+        # proportion of 404s (e.g. CQU ?audience=INTERNATIONAL → ~48 % domestic
+        # combined-degree courses 404 → threshold raised to 0.65 in cqu.yaml).
         _discovered_n = summary.get("discovered", 0)
         _fetch_fail_n = summary.get("fetch_failed", 0)
         _fetch_failure_rate = _fetch_fail_n / max(1, _discovered_n)
+        _fg_threshold = (
+            _uni_cfg.discovery.failure_guard_threshold
+            if _uni_cfg is not None
+            else 0.30
+        )
+        _fg_warn_threshold = min(0.10, _fg_threshold / 3)
         _forced_status: str | None = None
-        if _discovered_n > 0 and _fetch_failure_rate > 0.30:
+        if _discovered_n > 0 and _fetch_failure_rate > _fg_threshold:
             _forced_status = "failed_degraded"
             log.warning(
-                "[FAILURE GUARD] fetch_failure_rate=%.1f%% (%d/%d) > 30%% — "
+                "[FAILURE GUARD] fetch_failure_rate=%.1f%% (%d/%d) > %.0f%% — "
                 "marking job failed_degraded",
                 _fetch_failure_rate * 100, _fetch_fail_n, _discovered_n,
+                _fg_threshold * 100,
             )
             await emit(
                 "status",
@@ -5263,12 +5277,13 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 rate=round(_fetch_failure_rate, 3),
                 level="error",
             )
-        elif _discovered_n > 0 and _fetch_failure_rate > 0.10:
+        elif _discovered_n > 0 and _fetch_failure_rate > _fg_warn_threshold:
             _forced_status = "completed_with_warnings"
             log.warning(
-                "[FAILURE GUARD] fetch_failure_rate=%.1f%% (%d/%d) > 10%% — "
+                "[FAILURE GUARD] fetch_failure_rate=%.1f%% (%d/%d) > %.0f%% — "
                 "marking completed_with_warnings",
                 _fetch_failure_rate * 100, _fetch_fail_n, _discovered_n,
+                _fg_warn_threshold * 100,
             )
             await emit(
                 "status",

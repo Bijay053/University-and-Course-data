@@ -77,6 +77,14 @@ discovery:
   # sitemap is what surfaces the real bachelor/master pages.
   always_sitemap_supplement: true
 
+  # CQU's ?audience=INTERNATIONAL rewrite causes ~48% of discovered URLs
+  # to return 404 — these are legitimate domestic-only combined-degree
+  # courses (e.g. LLB+BAccounting) that don't have an international page.
+  # This is expected behaviour, not a Scrape.do/network failure. Raise
+  # the failure_guard threshold to 0.65 so the job status reflects the
+  # actual extraction quality rather than the rewrite 404 rate.
+  failure_guard_threshold: 0.65
+
   # BFS budget bumped from default 25 because the bare /courses/ landing
   # page returned 0 candidates on the most recent run; sitemap is doing
   # the work but a higher budget gives BFS room to find additional links.

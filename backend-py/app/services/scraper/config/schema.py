@@ -1575,6 +1575,18 @@ class DiscoveryConfig(BaseModel):
             "Has no effect unless render_listing_pages is non-empty."
         ),
     )
+    failure_guard_threshold: float = Field(
+        default=0.30,
+        description=(
+            "Fraction of discovered URLs that may fail the fetch step before the job "
+            "is marked 'failed_degraded'.  Default is 0.30 (30%).  Raise this for "
+            "universities whose URL-rewrite strategy legitimately produces a high "
+            "proportion of 404s (e.g. CQU's ?audience=INTERNATIONAL causes ~48%% of "
+            "discovered URLs to 404 for domestic-only combined-degree courses — set "
+            "to 0.65 there).  The warning threshold is scaled proportionally: "
+            "min(0.10, failure_guard_threshold / 3)."
+        ),
+    )
 
 
 # ── Extraction sub-configs ───────────────────────────────────────────────────
