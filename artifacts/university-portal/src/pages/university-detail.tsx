@@ -12,6 +12,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import * as XLSX from "xlsx";
 import {
   Building2, MapPin, Globe, Search, ChevronLeft, ChevronRight, X,
   BookOpen, Languages, GraduationCap, Award, ExternalLink,
@@ -20,7 +21,7 @@ import {
   GitCompareArrows,
   Network,
   ChevronDown,
-  ShieldCheck, ShieldX, FlaskConical, FileEdit,
+  ShieldCheck, ShieldX, FlaskConical, FileEdit, FileDown,
 } from "lucide-react";
 
 // ── Certification Status Badge ──────────────────────────────────────────────
@@ -1139,6 +1140,7 @@ export default function UniversityDetail() {
   const [showBulkDeleteLiveConfirm, setShowBulkDeleteLiveConfirm] = useState(false);
   const [showDeleteAllLiveConfirm, setShowDeleteAllLiveConfirm] = useState(false);
   const [bulkDeletingLive, setBulkDeletingLive] = useState(false);
+  const [downloadingExcel, setDownloadingExcel] = useState(false);
   const [bulkDeleteRawRunning, setBulkDeleteRawRunning] = useState(false);
   const [showBulkDeleteRawConfirm, setShowBulkDeleteRawConfirm] = useState(false);
   const [showDeleteAllRawConfirm, setShowDeleteAllRawConfirm] = useState(false);
@@ -1540,6 +1542,67 @@ export default function UniversityDetail() {
       toast({ title: "Error", description: (e as Error).message, variant: "destructive" });
     } finally {
       setBulkDeletingLive(false);
+    }
+  }
+
+  async function downloadCoursesExcel() {
+    setDownloadingExcel(true);
+    try {
+      const params = new URLSearchParams({ universityId: String(id), page: "1", limit: "9999" });
+      if (search) params.set("search", search);
+      if (category !== ALL) params.set("category", category);
+      if (subCategory !== ALL) params.set("subCategory", subCategory);
+      if (degreeLevel !== ALL) params.set("degreeLevel", degreeLevel);
+      if (studyMode !== ALL) params.set("studyMode", studyMode);
+      const res = await fetch(`${BASE}/api/courses?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch courses");
+      const json = await res.json();
+      const rows: Record<string, string | number | null>[] = (json.data ?? []).map((c: Record<string, unknown>, i: number) => ({
+        "#": i + 1,
+        "Course Name": c.courseName ?? "",
+        "Degree Level": c.degreeLevel ?? "",
+        "Category": c.category ?? "",
+        "Sub Category": c.subCategory ?? "",
+        "Study Mode": c.studyMode ?? "",
+        "Duration": c.duration != null ? `${c.duration} ${c.durationTerm ?? ""}`.trim() : "",
+        "Study Load": c.studyLoad ?? "",
+        "Language": c.courseLanguage ?? "",
+        "Course Location": c.courseLocation ?? "",
+        "Intake Months": c.intakeMonths ?? "",
+        "Int'l Fee": c.internationalFee != null ? Number(c.internationalFee) : "",
+        "Fee Term": c.feeTerm ?? "",
+        "Fee Year": c.feeYear != null ? Number(c.feeYear) : "",
+        "Currency": c.feeCurrency ?? "",
+        "IELTS Overall": c.ieltsOverall != null ? Number(c.ieltsOverall) : "",
+        "IELTS Listening": c.ieltsListening != null ? Number(c.ieltsListening) : "",
+        "IELTS Speaking": c.ieltsSpeaking != null ? Number(c.ieltsSpeaking) : "",
+        "IELTS Writing": c.ieltsWriting != null ? Number(c.ieltsWriting) : "",
+        "IELTS Reading": c.ieltsReading != null ? Number(c.ieltsReading) : "",
+        "PTE Overall": c.pteOverall != null ? Number(c.pteOverall) : "",
+        "PTE Listening": c.pteListening != null ? Number(c.pteListening) : "",
+        "PTE Speaking": c.pteSpeaking != null ? Number(c.pteSpeaking) : "",
+        "PTE Writing": c.pteWriting != null ? Number(c.pteWriting) : "",
+        "PTE Reading": c.pteReading != null ? Number(c.pteReading) : "",
+        "TOEFL Overall": c.toeflOverall != null ? Number(c.toeflOverall) : "",
+        "TOEFL Listening": c.toeflListening != null ? Number(c.toeflListening) : "",
+        "TOEFL Speaking": c.toeflSpeaking != null ? Number(c.toeflSpeaking) : "",
+        "TOEFL Writing": c.toeflWriting != null ? Number(c.toeflWriting) : "",
+        "TOEFL Reading": c.toeflReading != null ? Number(c.toeflReading) : "",
+        "Academic Level": c.academicLevel ?? "",
+        "Academic Score": c.academicScore != null ? Number(c.academicScore) : "",
+        "Other Requirement": c.otherRequirement ?? "",
+        "Description": c.description ?? "",
+        "Course URL": c.courseUrl ?? "",
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Courses");
+      const safeName = (uni?.name ?? "University").replace(/[^a-z0-9]/gi, "_");
+      XLSX.writeFile(wb, `${safeName}_courses.xlsx`);
+    } catch (e) {
+      toast({ title: "Download failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setDownloadingExcel(false);
     }
   }
 
@@ -3544,6 +3607,18 @@ export default function UniversityDetail() {
               </Button>
             )}
             <span className="ml-auto text-sm text-muted-foreground">{total} course{total !== 1 ? "s" : ""}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void downloadCoursesExcel()}
+              disabled={downloadingExcel || total === 0}
+              className="h-9 border-green-300 text-green-700 hover:bg-green-50"
+            >
+              {downloadingExcel
+                ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                : <FileDown className="h-3.5 w-3.5 mr-1.5" />}
+              {downloadingExcel ? "Downloading…" : "Download Excel"}
+            </Button>
             <Button
               variant="outline"
               size="sm"
