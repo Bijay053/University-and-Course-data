@@ -1,9 +1,119 @@
-# University of Queensland — stub created for Week 4 scale-up.
-# Hostname: study.uq.edu.au  (course catalogue at /study/programs)
+# University of Queensland (UQ)
+# uni_id: 2233 (dev)
+# Hostname: study.uq.edu.au  — slug "uq" (loader strips generic "study" subdomain)
+# Catalogue: https://study.uq.edu.au/study-options/programs?studentType=international&type=program&year=2027
 #
-# Bug history: none yet — fill in after first scrape.
-discovery: {}
+# ── PROBLEM ─────────────────────────────────────────────────────────────────
+# Default BFS from https://study.uq.edu.au/ finds only a handful of courses
+# because the catalogue is spread across 11 paginated listing pages
+# (page=0 … page=10, 30 courses/page → 322 total).  Without explicit seeds
+# the paginator links are rarely followed before the BFS budget exhausts.
+#
+# ── FIX ─────────────────────────────────────────────────────────────────────
+# 1. Pre-seed all 11 listing pages so BFS fetches each one and harvests the
+#    30 course links per page.  bfs_page_budget raised to cover them.
+# 2. allow_url_patterns restricts candidates to individual course pages only.
+# 3. url_rewrites appends ?year=2027&studentType=international to every
+#    course URL before extraction so the international fee + IELTS view loads.
+#
+# ── HOW TO FIX THINGS ────────────────────────────────────────────────────────
+#
+#  COURSES MISSING?
+#    If UQ adds more pages, update seed_urls to include the new page numbers
+#    and raise max_candidates accordingly.
+#    Also raise bfs_page_budget by 1 per extra listing page.
+#
+#  FEES WRONG?
+#    UQ shows "Indicative annual fee … $XX,XXX" on course pages.
+#    prefer_annual_over_total: true (set below) picks the annual value.
+#    If a fee seems too low/high, check the course page directly with
+#    ?year=2027&studentType=international appended.
+#    Central fee page: https://fees.uq.edu.au/
+#
+#  IELTS / ENGLISH SCORES WRONG?
+#    UQ publishes per-course IELTS inline: "IELTS overall 7; reading 6.5;…"
+#    Standard extractor handles this.  PTE/TOEFL also appear on-page.
+#    If a score looks wrong, open the course URL with ?studentType=international.
+#
+#  INTAKE WRONG?
+#    UQ shows "Start Semester — Semester 1 (22 Feb, 2027), Semester 2 (26 Jul, 2027)".
+#    Standard month-scan extracts February → 2 and July → 7.
+#    If wrong months appear, inspect the course page for calendar noise.
+#
+#  YEAR CHANGES?
+#    Update the year in seed_urls AND in url_rewrites.append_query below.
+#    Both must stay in sync.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+
+discovery:
+  # ── Discovery budget ────────────────────────────────────────────────────────
+  # 11 listing pages × 30 courses each = 322 total.
+  # bfs_page_budget covers the 11 seeded listing pages + navigation overhead.
+  bfs_page_budget: 15
+  max_candidates: 400
+
+  # ── Entry points ────────────────────────────────────────────────────────────
+  # All 11 paginated listing pages pre-seeded with international+year params
+  # so BFS harvests all 322 course links without relying on link-following.
+  seed_urls:
+    - https://study.uq.edu.au/study-options/programs?search=&studentType=international&type=program&year=2027&page=0
+    - https://study.uq.edu.au/study-options/programs?search=&studentType=international&type=program&year=2027&page=1
+    - https://study.uq.edu.au/study-options/programs?search=&studentType=international&type=program&year=2027&page=2
+    - https://study.uq.edu.au/study-options/programs?search=&studentType=international&type=program&year=2027&page=3
+    - https://study.uq.edu.au/study-options/programs?search=&studentType=international&type=program&year=2027&page=4
+    - https://study.uq.edu.au/study-options/programs?search=&studentType=international&type=program&year=2027&page=5
+    - https://study.uq.edu.au/study-options/programs?search=&studentType=international&type=program&year=2027&page=6
+    - https://study.uq.edu.au/study-options/programs?search=&studentType=international&type=program&year=2027&page=7
+    - https://study.uq.edu.au/study-options/programs?search=&studentType=international&type=program&year=2027&page=8
+    - https://study.uq.edu.au/study-options/programs?search=&studentType=international&type=program&year=2027&page=9
+    - https://study.uq.edu.au/study-options/programs?search=&studentType=international&type=program&year=2027&page=10
+
+  # ── Whitelist: only keep individual course-detail URLs ─────────────────────
+  # Course pages: /study-options/programs/{slug}  (slug always contains a hyphen)
+  # Listing pages: /study-options/programs or /study-options/programs?page=N
+  # The trailing slash in the pattern excludes the bare listing URL.
+  allow_url_patterns:
+    - '/study-options/programs/'
+
+  # ── Block non-course pages that might slip through ─────────────────────────
+  block_url_patterns:
+    - '/study-options/programs$'       # bare listing page (no trailing slash)
+    - '/study-options/programs\?'      # paginated listing (?search=&page=N)
+    - '/news'
+    - '/events'
+    - '/scholarships'
+    - '/about'
+    - '/staff'
+    - '/research'
+    - '/contact'
+    - '/fees'
+    - '/site-map'
+
+  # ── Skip sitemap (UQ sitemap does not list per-course URLs) ─────────────────
+  skip_sitemap_fallback: true
+  use_wayback: false
+
+  # ── Expected minimum ────────────────────────────────────────────────────────
+  expected_min_courses: 280
+
 extraction:
+  # ── URL rewrite: switch course pages to international view ─────────────────
+  # Without ?studentType=international the page shows domestic fees.
+  # Without ?year=2027 the page may default to the current year (fees may differ).
+  url_rewrites:
+    - host: "study.uq.edu.au"
+      path_contains: "/study-options/programs/"
+      append_query: "year=2027&studentType=international"
+
+  # ── Fee extraction ───────────────────────────────────────────────────────────
+  fees:
+    # UQ quotes an "Indicative annual fee" — this is per-year, not total course.
+    prefer_annual_over_total: true
+    default_currency: "AUD"
+    prefer_international: true
+
+  # ── Filters ──────────────────────────────────────────────────────────────────
   filters:
     domestic_only:
       enabled: false
