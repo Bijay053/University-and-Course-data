@@ -39,7 +39,7 @@ async def list_courses(
     sub_category: str | None = Query(default=None, alias="subCategory"),
     status_filter: str | None = Query(default=None, alias="status"),
     page: int = Query(default=1, ge=1),
-    limit: int = Query(default=50, ge=1, le=500),
+    limit: int = Query(default=50, ge=1, le=10000),
 ) -> CourseListResponse:
     stmt = select(Course).join(University, Course.university_id == University.id)
     if university_id:
