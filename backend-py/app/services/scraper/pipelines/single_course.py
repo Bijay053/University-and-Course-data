@@ -1944,6 +1944,10 @@ async def extract_course(
             len(_broken_text) < 400
             and any(m in _lower for m in _BROKEN_MARKERS)
         )
+        # Tracks when a broken-CMS retry stripped an audience-related query
+        # string (e.g. ?audience=INTERNATIONAL) so the post-extractor gate
+        # can blank domestic-range fees extracted from the bare URL.
+        _stripped_audience_retry: bool = False
         if _broken_visible or _broken_short:
             # Per-uni recovery: when ``broken_cms_retry_strip_query``
             # is enabled AND the URL carries a query string, refetch
@@ -2018,6 +2022,13 @@ async def extract_course(
                                 url=url,
                             )
                             html = _retry_html
+                            # Mark that the audience-rewrite query was stripped
+                            # so the post-extractor gate can blank CSP-range fees.
+                            # The international URL returned broken CMS, meaning
+                            # no dedicated international page exists — any fee
+                            # found on the bare URL is likely the domestic rate.
+                            if "audience" in (_pu.query or "").lower():
+                                _stripped_audience_retry = True
                             # Fall through to the rest of extraction.
                         else:
                             _retry_html = None
@@ -2590,6 +2601,61 @@ async def extract_course(
                     for _fk in _KEY_FIELDS
                 },
             )
+
+    # ── CQU bare-URL fee guard ────────────────────────────────────────────────
+    # When broken_cms_retry_strip_query fired AND the stripped query contained
+    # "audience" (e.g. ?audience=INTERNATIONAL), the HTML we just extracted was
+    # fetched from the bare URL — which has no international-specific rendering.
+    # Any fee in the domestic/CSP range (≤ AUD 13,000) found on that bare URL
+    # is almost certainly the domestic rate, not the international fee.
+    # Blank it now so the course either picks up a central-page fee or fails
+    # the no-international-fee guard and is rejected rather than staged with
+    # a wrong domestic value.
+    # Courses where the bare URL genuinely shows an international fee (e.g.
+    # ~AUD 20-30K for a bachelor's) are not affected — only CSP-range amounts.
+    try:
+        if _stripped_audience_retry:
+            _gap_fee = payload.get("international_fee")
+            if _gap_fee is not None:
+                try:
+                    _gap_fee_f = float(_gap_fee)
+                    _gap_currency = (payload.get("fee_currency") or "AUD").upper()
+                    # Convert to AUD for comparison (same logic as data_quality.py)
+                    _GAP_AUD_RATES: dict[str, float] = {"GBP": 1.95, "USD": 1.55, "EUR": 1.67, "NZD": 0.92, "CAD": 1.13, "AUD": 1.0}
+                    _gap_fee_aud = _gap_fee_f * _GAP_AUD_RATES.get(_gap_currency, 1.0)
+                    if _gap_fee_aud <= 13_000.0:
+                        log.info(
+                            "[BARE_URL_FEE] Blanking domestic-range fee %.0f %s (≈ %.0f AUD) "
+                            "extracted from bare URL after audience-query strip on %s — "
+                            "no dedicated international page existed.",
+                            _gap_fee_f, _gap_currency, _gap_fee_aud, url,
+                        )
+                        payload.pop("international_fee", None)
+                        payload.pop("fee_currency", None)
+                        payload.pop("fee_term", None)
+                        payload.pop("fee_year", None)
+                        evidence[:] = [
+                            e for e in evidence
+                            if e.get("field_key") not in (
+                                "international_fee", "fee_currency", "fee_term", "fee_year"
+                            )
+                        ]
+                        evidence.append({
+                            "field_key": "international_fee",
+                            "value": None,
+                            "confidence": 0.0,
+                            "method": "bare_url_fee_blanked",
+                            "source_url": url,
+                            "snippet": (
+                                f"Fee {_gap_fee_f:.0f} {_gap_currency} blanked: "
+                                f"international page returned broken CMS; "
+                                f"bare URL fee ({_gap_fee_aud:.0f} AUD) is in domestic/CSP range."
+                            ),
+                        })
+                except (TypeError, ValueError):
+                    pass
+    except Exception:  # noqa: BLE001 — never abort extraction
+        pass
 
     # ── Bug 1 (KBS): location-based mode correction ──────────────────────────
     # The bare `\bonline\b` fallback in study_mode.py fires on marketing copy
@@ -7443,6 +7509,29 @@ async def extract_course(
                     )
     except Exception as exc:  # noqa: BLE001 — never abort extraction
         log.warning("duration degree_level_defaults fallback errored on %s: %s", url, exc)
+
+    # ── Normalise any abbreviated intake months to full names ────────────────
+    # Belt-and-suspenders: ai_extractor_run month_list transform, federation_json,
+    # and any other extractor that slips through should already emit full names
+    # after the 2026-07 fix, but normalise here as a fleet-wide safety net so
+    # abbreviated months ("Mar","Jul","Nov") never reach the scraped_courses table
+    # and trigger data_quality `invalid_intake_months` warnings on every re-scrape.
+    _raw_im = payload.get("intake_months")
+    if _raw_im:
+        try:
+            from app.services.scraper.extractors.intake import (
+                _normalise_month as _nm_sc,
+            )
+            if isinstance(_raw_im, str):
+                # Comma-separated string that wasn't converted to a list upstream
+                import re as _re_sc
+                _raw_im = [p.strip() for p in _re_sc.split(r"[,;/\n]", _raw_im) if p.strip()]
+            _normed = [_nm_sc(m) for m in _raw_im if m]
+            _normed = [m for m in _normed if m]
+            if _normed:
+                payload["intake_months"] = _normed
+        except Exception:
+            pass
 
     # ── No intake months ────────────────────────────────────────────────────
     _intake_months = payload.get("intake_months") or []

@@ -34,8 +34,8 @@ _MONTH_MAP: dict[str, int] = {
     "july": 7, "august": 8, "september": 9, "october": 10,
     "november": 11, "december": 12,
 }
-_MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+_MONTH_NAMES = ["January", "February", "March", "April", "May", "June",
+                "July", "August", "September", "October", "November", "December"]
 
 
 def _apply_transform(value: str, transform: str | None) -> str:

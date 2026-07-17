@@ -93,26 +93,27 @@ _FED_ONLINE_BRAND_RE = re.compile(
     r"^\s*federation\s+university\s+online\s*$", re.IGNORECASE
 )
 
-# Month name → 3-letter abbrev for intake parsing. Federation publishes
+# Month name → full name for intake parsing. Federation publishes
 # Start dates as full dates like "20 July 2026" / "07 September 2026" /
 # "01 March 2027" joined with literal "<br>" inside the JSON summary.
 _MONTH_NAME_TO_ABBR = {
-    "january":   "Jan", "jan": "Jan",
-    "february":  "Feb", "feb": "Feb",
-    "march":     "Mar", "mar": "Mar",
-    "april":     "Apr", "apr": "Apr",
+    "january":   "January",  "jan": "January",
+    "february":  "February", "feb": "February",
+    "march":     "March",    "mar": "March",
+    "april":     "April",    "apr": "April",
     "may":       "May",
-    "june":      "Jun", "jun": "Jun",
-    "july":      "Jul", "jul": "Jul",
-    "august":    "Aug", "aug": "Aug",
-    "september": "Sep", "sep": "Sep", "sept": "Sep",
-    "october":   "Oct", "oct": "Oct",
-    "november":  "Nov", "nov": "Nov",
-    "december":  "Dec", "dec": "Dec",
+    "june":      "June",     "jun": "June",
+    "july":      "July",     "jul": "July",
+    "august":    "August",   "aug": "August",
+    "september": "September","sep": "September", "sept": "September",
+    "october":   "October",  "oct": "October",
+    "november":  "November", "nov": "November",
+    "december":  "December", "dec": "December",
 }
-# Canonical month order so we return them in calendar order (Mar, Jul, Sep)
+# Canonical month order so we return them in calendar order (March, July, September)
 # rather than the order they appear in the JSON.
-_MONTH_ORDER = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+_MONTH_ORDER = ["January","February","March","April","May","June",
+                "July","August","September","October","November","December"]
 # Date token in a Federation Start dates summary, e.g. "20 July 2026".
 # Year is captured but unused — we only emit the month abbreviation.
 _DATE_RE = re.compile(
@@ -219,8 +220,8 @@ def extract_intake_months(html: str) -> tuple[list[str], str | None]:
     """Pull intake months from the embedded "Start dates" JSON block.
 
     Returns ``(months, raw_summary)`` where ``months`` is a deduplicated
-    calendar-ordered list of 3-letter month abbreviations
-    (e.g. ``["Mar", "Jul"]``) and ``raw_summary`` is the unparsed
+    calendar-ordered list of full month names
+    (e.g. ``["March", "July"]``) and ``raw_summary`` is the unparsed
     summary string for evidence logging.
 
     Federation publishes Start dates as full dates like
@@ -228,7 +229,7 @@ def extract_intake_months(html: str) -> tuple[list[str], str | None]:
     summary value. We split on ``<br>``, parse each date with
     :data:`_DATE_RE`, and emit the unique calendar-ordered month set
     so a page with three offerings in March / July / July returns
-    ``["Mar", "Jul"]``.
+    ``["March", "July"]``.
 
     Returns ``([], None)`` when no Start dates block is present.
     """
