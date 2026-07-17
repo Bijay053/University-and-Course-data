@@ -1,89 +1,13 @@
-# University of the Sunshine Coast (UniSC)
-# Hostname: www.unisc.edu.au  (rebranded from www.usc.edu.au — DB scrape_url already updated)
+# ─────────────────────────────────────────────────────────────────────────────
+# DEAD FILE — THIS CONFIG IS NEVER LOADED
+# ─────────────────────────────────────────────────────────────────────────────
 #
-# Extraction notes:
-#   - USC is Cloudflare-protected. HTTP fetches for individual course pages
-#     may return a 403 or JS challenge shell, causing every course to be marked
-#     fetch_failed at the staging gate.  The HTTP fetch is not useful here —
-#     it wastes a round-trip before the browser fallback fires.
-#   - Skip the initial HTTP attempt entirely and go straight to Playwright
-#     for every course page.  Combined with force_browser=true this ensures all
-#     fields (fee, IELTS, intakes, duration) are extracted from the fully-rendered
-#     DOM, not from a Cloudflare challenge page.
-#   - Cap parallel browser sessions to 2 — USC's Cloudflare tier tolerates
-#     light concurrency without triggering the interactive CAPTCHA challenge,
-#     but 4+ simultaneous sessions reliably hit the bot-detect wall.
+# Hostname: www.unisc.edu.au
+# Derived slug: "unisc"  (www. stripped → "unisc")
 #
-# Discovery fix (2026-07-17):
-#   - The courses-and-programs page (unisc.edu.au/study/courses-and-programs)
-#     is a React SPA. BFS from the homepage discovers only category-level hub
-#     pages (21 links) — individual course cards are JavaScript-rendered.
-#   - Even Scrape.do render=true on the root courses page returns only category
-#     links, not individual course links. The individual course cards are loaded
-#     dynamically WITHIN each category listing page.
-#   - Fix: pre-seed the two category listing pages (UG + PG) via Scrape.do
-#     render=true so the JS-rendered course cards are captured:
-#       UG: /study/courses-and-programs/bachelor-degrees-undergraduate-programs
-#           → renders ~65-86 international UG course links
-#       PG: /study/courses-and-programs/postgraduate-degrees
-#           → renders ~70 course links (45 international, 25 domestic-only)
-#   - XMLsitemap supplement covers courses not rendered in the category pages
-#     (pagination, lazy-load, or any category that loads beyond the waitFor).
-#     XMLsitemap has 120 UG + 72 PG = 192 depth-2 URLs.
-#   - Expected: ~131 international courses discovered (86 UG + 45 PG).
-#     The domestic_only extraction filter rejects purely domestic programs
-#     that slip through from the PG page and the sitemap.
+# The loader looks for:
+#   1. unisc_2235.yaml  (id-specific, highest priority)
+#   2. unisc.yaml       (slug fallback)
 #
-# International-student filter is applied client-side in JS — there is no URL
-# parameter to pre-filter. Discovery intentionally casts wider (192 URLs);
-# domestic_only in extraction reduces it to ~131 international courses.
-
-discovery:
-  scrape_do_render: true
-  scrape_do_skip_fallbacks: true  # skip httpx/cffi datacenter tiers (CF-blocked)
-  use_wayback: false
-  bfs_page_budget: 6              # 2 category seeds + 4 buffer
-
-  # Category listing pages — rendered via Scrape.do so JS course cards appear.
-  # Marked as listing_only so they are visited for links but not treated as
-  # course candidates.
-  seed_urls:
-    - "https://www.unisc.edu.au/study/courses-and-programs/bachelor-degrees-undergraduate-programs"
-    - "https://www.unisc.edu.au/study/courses-and-programs/postgraduate-degrees"
-
-  listing_only_patterns:
-    - '/study/courses-and-programs$'
-    - '/study/courses-and-programs/bachelor-degrees-undergraduate-programs$'
-    - '/study/courses-and-programs/postgraduate-degrees$'
-
-  # Force individual course URLs into the candidate set.
-  # Depth-2 paths under UG or PG categories are course pages.
-  force_candidate_url_patterns:
-    - '^https://www\.unisc\.edu\.au/study/courses-and-programs/bachelor-degrees-undergraduate-programs/[^/]+/?$'
-    - '^https://www\.unisc\.edu\.au/study/courses-and-programs/postgraduate-degrees/[^/]+/?$'
-
-  # Block non-degree categories and depth-3+ intake/session sub-pages.
-  block_url_patterns:
-    - '/study/courses-and-programs/majors-and-minors'
-    - '/study/courses-and-programs/previous-student-handbooks'
-    - '/study/courses-and-programs/headstart'
-    - '/study/courses-and-programs/short-courses-and-microcredentials'
-    - '/study/courses-and-programs/tertiary-preparation-pathway'
-    - '/study/courses-and-programs/[^/]+/[^/]+/'   # depth-3+ intake-specific sub-pages
-
-  # XMLsitemap supplement: covers courses not rendered within the waitFor window
-  # on the category pages (pagination, lazy-load overshoot).
-  # XMLsitemap at https://www.unisc.edu.au/XMLsitemap has 192 depth-2 UG+PG URLs.
-  sitemap_url: "https://www.unisc.edu.au/XMLsitemap"
-  always_sitemap_supplement: true
-
-  expected_min_courses: 100
-
-extraction:
-  skip_initial_http_fetch: true    # CF blocks plain HTTP — skip the wasted attempt
-  force_browser: true              # Always render via Playwright for every course page
-  max_parallel_fetch: 2            # Cap concurrency to avoid CF 429/challenge
-
-  filters:
-    domestic_only:
-      enabled: true   # Rejects courses with no international offering
+# "usc" does NOT match any of these.  All UniSC config changes must be made
+# in unisc_2235.yaml.  This file is kept as a breadcrumb only.

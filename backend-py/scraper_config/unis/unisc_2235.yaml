@@ -27,11 +27,17 @@
 #
 # Discovery approach
 # ─────────────────────────────────────────────────────────────────────────────
-# Seed the BFS with the two main listing pages so discovery starts where the
-# course links are, not at the root.  bfs_page_budget covers:
-#   - 2 seed listing pages (UG + PG)
-#   - ~17 study-area category sub-pages (each linked from the courses hub)
-#   - A few extra pages as headroom
+# Seed the BFS with the two main listing pages. XMLsitemap is also enabled as
+# a supplement because BFS from 2 seeds only finds ~76-106 of the ~131
+# expected international courses — courses under rarely-linked study-area
+# sub-categories are missed. XMLsitemap has 120 UG + 72 PG = 192 depth-4
+# URLs which fills the gaps. Together BFS + sitemap targets ~131 courses.
+#
+# IMPORTANT — correct slug note
+# ─────────────────────────────────────────────────────────────────────────────
+# hostname www.unisc.edu.au → slug = "unisc" → this file (unisc_2235.yaml)
+# is loaded. A legacy file usc.yaml exists but is NEVER loaded (wrong slug).
+# All UniSC config changes must be made here.
 #
 # Filter overrides (user requirement: extract ALL courses)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -43,7 +49,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 discovery:
-  # Start BFS from the two main course listing pages — they contain all
+  # Start BFS from the two main course listing pages — they contain most
   # course links in their static HTML.  This avoids crawling the whole site
   # root before reaching course pages.
   seed_urls:
@@ -51,13 +57,22 @@ discovery:
     - "https://www.unisc.edu.au/study/courses-and-programs/postgraduate-degrees"
 
   # Allow only depth-4 pages: /study/courses-and-programs/<category>/<slug>
-  # This excludes the depth-3 listing pages and depth-5+ sub-pages.
+  # This excludes depth-3 listing pages and depth-5+ sub-pages.
+  # Pattern is broad (substring search via re.search) so any URL containing
+  # /study/courses-and-programs/<2+-char-segment>/<1+-char-segment> passes.
+  # The 6 URLs it drops are depth-3 category pages with no course slug.
   allow_url_patterns:
-    - "/study/courses-and-programs/[a-z][a-z-]+/[a-z][a-z-]"
+    - "/study/courses-and-programs/[a-z][a-z-]+/[a-z]"
 
   block_url_patterns:
     # Depth-5+ sub-pages within a course (e.g. majors/minors pages)
     - "/study/courses-and-programs/[a-z][a-z-]+/[a-z][a-z-]+/"
+    # Non-course depth-4 pages that pass the allow pattern:
+    # "undergraduate-elective-courses" and "postgraduate-elective-courses"
+    # are unit-level elective lists, not individual course programmes.
+    - "elective-courses"
+    # "browse-postgraduate-<subject>" are category browse pages, not courses.
+    - "/browse-"
     # Non-course depth-4 pages
     - "/study/courses-and-programs/headstart/"
     - "/study/courses-and-programs/uni-pathways"
@@ -83,8 +98,13 @@ discovery:
   # carry additional course links not on the two main seed pages.
   bfs_page_budget: 100
 
-  # No sitemap available (returns empty).
-  always_sitemap_supplement: false
+  # XMLsitemap supplement: BFS from 2 seeds only finds ~76 of the ~131
+  # expected courses (courses in rarely-linked study-area sub-categories are
+  # missed). XMLsitemap at /XMLsitemap has 120 UG + 72 PG = 192 depth-4 URLs
+  # which fills the gap. The allow/block patterns above filter it down to the
+  # real international courses.
+  sitemap_url: "https://www.unisc.edu.au/XMLsitemap"
+  always_sitemap_supplement: true
 
 extraction:
   fees:
