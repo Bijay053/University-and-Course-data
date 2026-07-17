@@ -32,54 +32,46 @@
 #
 # ── Discovery strategy ────────────────────────────────────────────────────────
 #
-# UTAS operates a Funnelback (Squiz) site-search at /search that returns the
-# COMPLETE course catalogue (609 UG+PG courses).  The main listing pages
-# (/courses/undergraduate, /courses/postgraduate) show only a truncated/
-# paginated subset (106 UG + 78 PG = 184 total) — they are JS-rendered and
-# do not load all courses in the initial render.  Faculty listing pages
-# (/courses/arts-soc, /courses/health, etc.) return the same subset URLs and
+# UTAS has 609 UG+PG courses in total.  The main listing pages
+# (/courses/undergraduate, /courses/postgraduate) load only a JS-rendered
+# initial subset (106 UG + 78 PG = 184 total) — further courses require
+# scroll/pagination interaction.  Faculty listing pages
+# (/courses/arts-soc, /courses/health, etc.) surface the same subset and
 # add 0 net-new courses beyond the two main listings.
 #
-# Fix: add the Funnelback search as YAML seed_urls (7 paginated pages,
-# 100 results each, covering all 609 UG+PG courses).  YAML seeds run BEFORE
-# the hardcoded HOST_EXTRA_SEEDS faculty pages and carry a +300 priority
-# bonus so they are visited first.
+# Previous approach (Funnelback seeds) — REMOVED:
+#   7 Funnelback search pages (/search?collection=utas~sp-search&...) were
+#   seeded as YAML seed_urls to discover all 609 courses.  In live runs each
+#   page takes ~110 s and returns +0 course links: the Funnelback results are
+#   rendered asynchronously via JavaScript AFTER the initial page load; the
+#   browser snaps the DOM before the course cards appear, so no links matching
+#   the /courses/<faculty>/courses/ pattern are found.  7 pages × ~110 s =
+#   ~770 s wasted, blowing the 420 s budget before BFS nav even starts.
 #
-# Funnelback pagination: &num_ranks=100 &start_rank=N
-# 609 courses ÷ 100 = 7 pages (start_rank 1, 101, 201, 301, 401, 501, 601).
+# Current approach:
+#   Rely on the two working listing seeds plus the 8 hardcoded faculty seeds.
+#   With Funnelback removed the seed phase finishes in ~120 s, leaving ~300 s
+#   of BFS nav budget to explore pagination links discovered from the main
+#   listing pages.  This recovers as many courses as BFS nav can find.
 #
-# Time budget: 9 YAML seeds (~15-25 s each) + 10 hardcoded faculty seeds
-# (~10 s each) ≈ 235-325 s.  Set to 420 s (7 min) with headroom.
+# Time budget: 2 listing seeds (~20 s each) + 8 faculty seeds (~10 s each)
+#   = ~120 s for seeds.  Set budget to 480 s to give BFS nav ~360 s of
+#   exploration time after seeds complete.
 #
-# browser_early_stop_courses: raised to 700 so discovery does not abort the
-# BFS phase before all Funnelback pages are visited.
-#
-# Belt-and-suspenders: /courses/undergraduate and /courses/postgraduate
-# remain as YAML seeds so the 184 already-known courses are captured even
-# if the Funnelback search renders differently on a given run.
+# browser_early_stop_courses: keep at 700 so discovery does not abort before
+#   all BFS nav pages are visited.
 
 discovery:
   always_browser_discover: true   # Playwright is primary; plain HTTP blocked by CF
 
-  # Raise from default 90 s to cover all Funnelback pages + existing seeds.
-  browser_time_budget_s: 420
+  # 480 s total: ~120 s for working seeds + ~360 s for BFS nav exploration.
+  browser_time_budget_s: 480
 
-  # Do not abort the seed-visit phase early — expect 600+ courses.
+  # Do not abort BFS nav early — expect up to 600+ courses if pagination found.
   browser_early_stop_courses: 700
 
   seed_urls:
-    # ── Funnelback catalogue search (primary — covers all 609 UG+PG courses) ──
-    # Each URL returns 100 results.  7 pages × 100 = 700 > 609.
-    # The browser renders the result HTML and extracts course links matching
-    # the /courses/<faculty>/courses/<slug> allow_url_pattern below.
-    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Undergraduate&f.Course+Level%7CcourseLevel=Postgraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=1"
-    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Undergraduate&f.Course+Level%7CcourseLevel=Postgraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=101"
-    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Undergraduate&f.Course+Level%7CcourseLevel=Postgraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=201"
-    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Undergraduate&f.Course+Level%7CcourseLevel=Postgraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=301"
-    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Undergraduate&f.Course+Level%7CcourseLevel=Postgraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=401"
-    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Undergraduate&f.Course+Level%7CcourseLevel=Postgraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=501"
-    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Undergraduate&f.Course+Level%7CcourseLevel=Postgraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=601"
-    # ── Belt-and-suspenders: main listing pages (184 known-good courses) ──────
+    # ── Primary listing pages (known-good — 184 courses) ─────────────────────
     - "https://www.utas.edu.au/courses/undergraduate"
     - "https://www.utas.edu.au/courses/postgraduate"
 

@@ -1,0 +1,21 @@
+# University of the Sunshine Coast (USC)
+# Hostname: www.usc.edu.au
+#
+# USC is Cloudflare-protected. HTTP fetches for individual course pages
+# return a 403 or a JS challenge shell, causing every course to be marked
+# fetch_failed at the staging gate.  The HTTP fetch is not useful here —
+# it wastes a round-trip before the browser fallback fires.
+#
+# Fix: skip the initial HTTP attempt entirely and go straight to Playwright
+# for every course page.  Combined with force_browser=true this ensures all
+# fields (fee, IELTS, intakes, duration) are extracted from the fully-rendered
+# DOM, not from a Cloudflare challenge page.
+#
+# Cap parallel browser sessions to 2 — USC's Cloudflare tier tolerates
+# light concurrency without triggering the interactive CAPTCHA challenge,
+# but 4+ simultaneous sessions reliably hit the bot-detect wall.
+
+extraction:
+  skip_initial_http_fetch: true    # CF blocks plain HTTP — skip the wasted attempt
+  force_browser: true              # Always render via Playwright for every course page
+  max_parallel_fetch: 2            # Cap concurrency to avoid CF 429/challenge
