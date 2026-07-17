@@ -71,6 +71,13 @@ discovery:
     - "/news/"
     - "/about-us/"
     - "/events/"
+    # cd85 = Master of Research / Master by Research (offshore variants).
+    # These two slugs form a permanent 308→302 redirect loop that never
+    # resolves: master-of-research-offshore → 308 → master-by-research-offshore
+    # → 302 → master-of-research-offshore → ... (httpx raises TooManyRedirects
+    # after 20 hops). Blocking both prevents the broken-URL pair from consuming
+    # browser-fallback pool slots in every run.
+    - "/courses/cd85/"
 
   # Sitemap supplement is essential here — CQU is a JS-heavy site and
   # the static BFS pass returns very few course URLs. The 723-entry

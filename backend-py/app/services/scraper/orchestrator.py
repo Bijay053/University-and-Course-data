@@ -3806,16 +3806,41 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     # Pass the emit hook into extract_course so AI fallback can
                     # stream "[FALLBACK] AI enriching ... (missing: ...)" lines.
                     # central_data is the pre-fetched central-pages payload (Bug 2).
-                    result = await _extract_only(
-                        link,
-                        uni_country,
-                        uni_pdf_data or None,
-                        emit=emit,
-                        vision_image_cache=vision_image_cache,
-                        central_data=central_data,
-                        extraction_rules=_ac_ext_rules,
-                        seen_pdf_urls=seen_pdf_urls,
-                    )
+                    #
+                    # Hard 5-minute cap per course: if a course takes longer than
+                    # 300 s (e.g. browser fallback + Scrape.do chain stalled on a
+                    # broken URL), the batch never completes and the job stays
+                    # in_progress permanently when the Celery worker is restarted.
+                    # asyncio.wait_for cancels the inner coroutine; the semaphore
+                    # slot is released here in the outer `async with sem:` so pool
+                    # capacity is never starved.
+                    try:
+                        result = await asyncio.wait_for(
+                            _extract_only(
+                                link,
+                                uni_country,
+                                uni_pdf_data or None,
+                                emit=emit,
+                                vision_image_cache=vision_image_cache,
+                                central_data=central_data,
+                                extraction_rules=_ac_ext_rules,
+                                seen_pdf_urls=seen_pdf_urls,
+                            ),
+                            timeout=300.0,
+                        )
+                    except asyncio.TimeoutError:
+                        _timed_url = (link.get("url") or "?")[:80]
+                        log.warning(
+                            "[BOUNDED] per-course extraction exceeded 300s"
+                            " for %s — marking fetch_failed and moving on",
+                            _timed_url,
+                        )
+                        result = {
+                            "name": (link.get("name") or "").strip() or "?",
+                            "url": link.get("url"),
+                            "error": "per_course_timeout",
+                            "fetch_failed": True,
+                        }
                 # ── semaphore released here ──────────────────────────────────
                 # Check for 429-cooldown retry sentinel AFTER exiting `async
                 # with sem:` so the slot is free during the sleep.

@@ -1126,6 +1126,19 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
                         log.warning("fetch %s -> 403 (hard block) — skipping retries", url)
                         break
                     log.warning("fetch %s -> %s", url, r.status_code)
+            except httpx.TooManyRedirects as exc:
+                # Permanent redirect loop at the origin server (e.g. A→B→A).
+                # Retrying will produce the same loop — break immediately.
+                # cffi/Wayback/Scrape.do are inside the `got_cloudflare_block`
+                # branch and are NOT reached here, so the function returns None
+                # at the tail without wasting further round-trips.
+                last_exc = exc
+                log.warning(
+                    "fetch %s: TooManyRedirects — redirect loop at origin,"
+                    " skipping retry ladder",
+                    url,
+                )
+                break
             except Exception as exc:
                 last_exc = exc
                 log.warning("fetch %s attempt %s failed: %s", url, attempt, exc)
