@@ -9,6 +9,50 @@
 #   - Previously injected via hardcoded if-block in orchestrator.py lines ~836-845.
 #     YAML takes priority; the orchestrator if-block remains as a safety net
 #     until Week-2 migration removes it.
+#
+# Discovery fix (2026-07-17):
+#   - Bond's program finder (bond.edu.au/study/program-finder) is a React SPA
+#     whose course listing is loaded entirely via AJAX calls to an internal
+#     Elasticsearch endpoint.  Plain-HTTP BFS and even browser-rendered fetches
+#     both return 0 course links because the <a href="/program/..."> elements
+#     are injected into the DOM after the initial page load.
+#   - generic_search_api POSTs directly to the ES endpoint with a
+#     student_type="International students" filter, returning all programme URLs
+#     in a single request without any browser requirement.
+#   - ES response shape: hits.hits[*]._source.url[0] / .title[0]
+#     The _source.url.0 dot-path uses _dig's numeric-index unwrapping to
+#     extract the first element of the array-valued url field.
+#   - allow_url_patterns restricts to /program/ and /microcredential/ pages
+#     (221 results: ~168 /program/ + ~52 /microcredential/ + 1 other).
+
+discovery:
+  generic_search_api:
+    url: "https://bond.edu.au/api/v1/elasticsearch/bond_prod_default/_search"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+      Referer: "https://bond.edu.au/study/program-finder"
+    body:
+      query:
+        bool:
+          filter:
+            - term:
+                student_type: "International students"
+      size: 500
+      _source:
+        - title
+        - url
+        - type
+    root_path: "hits.hits"
+    url_fields:
+      - "_source.url.0"
+    title_fields:
+      - "_source.title.0"
+    allow_url_patterns:
+      - '^https://bond\.edu\.au/program/'
+      - '^https://bond\.edu\.au/microcredential/'
+    normalize_relative_urls: true
+    base_url: "https://bond.edu.au"
 
 extraction:
   english:
