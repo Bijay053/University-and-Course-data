@@ -56,16 +56,24 @@
 #     2. Executes JavaScript, allowing Funnelback's async AJAX to complete
 #     3. Returns fully-rendered HTML with all course result cards + links
 #
-#   7 paginated seeds (num_ranks=100) cover all 605 courses:
-#     page 1 → results 1–100   (start_rank=1)
-#     page 2 → results 101–200 (start_rank=101)
+#   13 paginated seeds (num_ranks=50) cover all 605 courses:
+#     page 1  → results 1–50    (start_rank=1)
+#     page 2  → results 51–100  (start_rank=51)
 #     ...
-#     page 7 → results 601–605 (start_rank=601)
+#     page 13 → results 601–605 (start_rank=601)
+#
+#   WHY num_ranks=50 (changed from 100):
+#     With num_ranks=100, Scrape.do's DOM-stable snapshot fires before all
+#     100 result cards are in the viewport / lazy-loaded.  Observed: only
+#     ~97/100 cards captured per page, plus ~15 sidebar-course links shared
+#     across all pages introduce cross-page dedup.  Net: 549/605 courses
+#     discovered.  Halving to 50 keeps all cards above-the-fold and
+#     eliminates the rendering gap → target ≥605 raw candidates.
 #
 #   Discovery config:
 #     scrape_do_skip_fallbacks: true — skip httpx/cffi datacenter tiers
 #     scrape_do_render: true         — headless Chrome in Scrape.do (residential)
-#     bfs_page_budget: 10            — 7 Funnelback seeds + 3 buffer (no deep BFS)
+#     bfs_page_budget: 16            — 13 Funnelback seeds + 3 buffer (no deep BFS)
 #     use_wayback: false             — no Wayback benefit; saves latency
 #     listing_only_patterns: /search\\? — search pages visited for links only
 #
@@ -84,27 +92,46 @@ discovery:
   scrape_do_skip_fallbacks: true
   scrape_do_render: true
 
-  # Each Scrape.do render call takes ~20-30s. 7 Funnelback seeds × 30s = 210s.
-  # bfs_page_budget: 10 — 7 seeds + buffer; BFS does not follow links from
+  # Each Scrape.do render call takes ~20-30s. Seeds are prefetched CONCURRENTLY
+  # so wall-clock discovery time ≈ slowest single render (not sum).
+  # bfs_page_budget: 16 — 13 seeds + 3 buffer; BFS does not follow links from
   # course detail pages (course URLs are added as candidates, not BFS targets).
-  bfs_page_budget: 10
+  bfs_page_budget: 16
 
   use_wayback: false
 
-  # Paginated Funnelback search — 100 results per page, 7 pages for ~605 courses.
+  # Paginated Funnelback search — 50 results per page, 13 pages for ~605 courses.
+  #
+  # WHY num_ranks=50 (not 100):
+  #   With num_ranks=100, Scrape.do captures only ~97/100 result cards per page
+  #   (the remainder are below the initial render viewport or lazy-load after
+  #   Scrape.do's DOM-stable snapshot fires).  Each page also shares ~15 sidebar/
+  #   featured course links with other pages; those duplicates reduce net-new
+  #   candidates.  Combined effect: 7 × 100 seeds → 549 raw candidates instead
+  #   of 605.  Halving to 50 results/page ensures every card is above-the-fold
+  #   in the initial render, eliminating both the rendering gap and most of the
+  #   cross-page sidebar overlap.
+  #
   # URL decoded:
   #   query= (empty → all courses)
   #   f.Tabs|utas|ds-handbook-courses,utas|ds-short-courses = Courses
   #   f.Course+Level|courseLevel = Postgraduate + Undergraduate
   #   collection = utas|sp-search
+  #   num_ranks=50, start_rank=1…601 (13 pages × 50 = 650 slots → covers 605)
   seed_urls:
-    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=1"
-    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=101"
-    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=201"
-    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=301"
-    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=401"
-    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=501"
-    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=601"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=50&start_rank=1"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=50&start_rank=51"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=50&start_rank=101"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=50&start_rank=151"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=50&start_rank=201"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=50&start_rank=251"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=50&start_rank=301"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=50&start_rank=351"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=50&start_rank=401"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=50&start_rank=451"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=50&start_rank=501"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=50&start_rank=551"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=50&start_rank=601"
 
   # Mark Funnelback search pages as listing-only: BFS visits them to extract
   # course links but does NOT add them to the course candidate set.
