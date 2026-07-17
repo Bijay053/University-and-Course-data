@@ -10,30 +10,71 @@
 #     YAML takes priority; the orchestrator if-block remains as a safety net
 #     until Week-2 migration removes it.
 #
-# Discovery fix (2026-07-17):
-#   - Bond's program finder (bond.edu.au/study/program-finder) is a React SPA;
-#     BFS from the homepage only finds ~13 featured courses visible in static HTML.
-#   - generic_search_api (ES endpoint) was the first attempt but is gated by
-#     `if not links` in the orchestrator — BFS fills `links` first so the API
-#     was never called.
-#   - Fix: use Bond's own sitemap index (sitemap.xml lists 5 child sitemaps).
-#     The sitemap discovery code recurses one level into sitemap-index files,
-#     fetching all 5 child pages and yielding 240 depth-2 /program/ and
-#     /microcredential/ URLs.  always_sitemap_supplement ensures it runs even
-#     when BFS has already found some links.
-#   - Depth-3 sub-pages (7 total: FAQ, entry-assessment, prerequisites, enquiry)
-#     are blocked so only the main course overview pages enter the extraction queue.
+# Discovery fix (2026-07-17 rev2):
+#   - Bond's program finder (bond.edu.au/study/program-finder) is a React SPA.
+#     BFS from the homepage finds only ~13 featured courses (static HTML).
+#     The sitemap approach (rev1) was also unreliable because the sitemap only
+#     indexes pages that have been crawled by the sitemap generator — it does not
+#     guarantee the International-student program list is complete.
+#   - Fix: pre-seed all 18 paginated pages of the International-student program
+#     finder and fetch each via Scrape.do render=true (residential + headless
+#     Chrome).  Each page is a listing-only source; course detail URLs extracted
+#     from it are queued as candidates.
+#   - Page count: 18 pages (page=1 … page=18) for International students.
+#     URL: /study/program-finder?student_type[]=International+students&page=N
+#   - Depth-3 sub-pages (FAQ, prerequisites, enquiry, entry-assessment) are
+#     blocked so only the main course overview pages enter the extraction queue.
+#   - Sitemap kept as supplement (always_sitemap_supplement: true) to catch any
+#     programs not surfaced in the paginated finder.
 
 discovery:
-  sitemap_url: "https://bond.edu.au/sitemap.xml"
-  always_sitemap_supplement: true
-  expected_min_courses: 150
+  scrape_do_render: true
+  scrape_do_skip_fallbacks: true  # skip httpx/cffi datacenter tiers (CF-blocked)
+  use_wayback: false
+  bfs_page_budget: 22             # 18 program-finder pages + 4 buffer
+
+  # Paginated International-student program finder — 18 pages.
+  # Each page is rendered via Scrape.do (residential + headless Chrome) and
+  # treated as a listing-only page (not a course candidate itself).
+  seed_urls:
+    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=1"
+    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=2"
+    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=3"
+    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=4"
+    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=5"
+    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=6"
+    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=7"
+    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=8"
+    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=9"
+    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=10"
+    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=11"
+    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=12"
+    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=13"
+    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=14"
+    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=15"
+    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=16"
+    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=17"
+    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=18"
+
+  # Program finder pages are listing pages only — do not treat them as course candidates.
+  listing_only_patterns:
+    - '/study/program-finder'
+
+  # Force course URLs extracted from the paginated listing into the candidate set.
   force_candidate_url_patterns:
     - '^https://bond\.edu\.au/program/[^/]+/?$'
     - '^https://bond\.edu\.au/microcredential/[^/]+/?$'
+
+  # Block depth-3+ sub-pages so only the main course overview page is extracted.
   block_url_patterns:
-    - '/program/[^/]+/[^/]+'       # depth-3+ sub-pages (FAQ, prerequisites, enquiry)
+    - '/program/[^/]+/[^/]+'
     - '/microcredential/[^/]+/[^/]+'
+
+  # Sitemap supplement: catches any programs not surfaced in the paginated finder.
+  sitemap_url: "https://bond.edu.au/sitemap.xml"
+  always_sitemap_supplement: true
+
+  expected_min_courses: 150
 
 extraction:
   english:
