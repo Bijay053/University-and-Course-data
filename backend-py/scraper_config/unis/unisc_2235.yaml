@@ -1,15 +1,119 @@
-# University of Sunshine Coast (USC)
-# Hostname: www.unisc.edu.au
+# ─────────────────────────────────────────────────────────────────────────────
+# UNIVERSITY OF SUNSHINE COAST (UniSC)
+# Hostname: www.unisc.edu.au  |  uni_id: 2235
 # Country: Australia  |  Currency: AUD
-# Slug: unisc
-# Auto-generated: 2026-07-16
+# ─────────────────────────────────────────────────────────────────────────────
 #
-# This stub was created automatically on the first scrape of this university.
-# Review and expand it to improve discovery and extraction quality.
-# See scraper_config/defaults.yaml for all available options.
+# URL structure
+# ─────────────────────────────────────────────────────────────────────────────
+# Individual course pages live at depth 4 under /study/courses-and-programs/:
+#
+#   UG: /study/courses-and-programs/bachelor-degrees-undergraduate-programs/<slug>
+#   PG: /study/courses-and-programs/postgraduate-degrees/<slug>
+#   Category cross-links (same pages, different nav path):
+#       /study/courses-and-programs/<category>/<slug>
+#
+# Depth-3 pages (e.g. /study/courses-and-programs/postgraduate-degrees) are
+# listing/category pages — they contain course links in static HTML but are not
+# individual course pages themselves.
+#
+# Depth-5+ pages (e.g. .../bachelor-of-arts/arts-majors-and-minors) are
+# sub-pages of individual courses — not courses themselves.
+#
+# The site uses AngularJS (Umbraco CMS). Course links ARE in the static HTML
+# of the category listing pages, so no browser/JS rendering is needed for
+# discovery.  Per-course fee data is Angular-rendered (ng-hide/ng-show) so
+# may require Gemini extraction or browser fallback.
+#
+# Discovery approach
+# ─────────────────────────────────────────────────────────────────────────────
+# Seed the BFS with the two main listing pages so discovery starts where the
+# course links are, not at the root.  bfs_page_budget covers:
+#   - 2 seed listing pages (UG + PG)
+#   - ~17 study-area category sub-pages (each linked from the courses hub)
+#   - A few extra pages as headroom
+#
+# Filter overrides (user requirement: extract ALL courses)
+# ─────────────────────────────────────────────────────────────────────────────
+# The user explicitly wants all 86 UG + 45 PG international courses staged
+# even if:
+#   - No international fee is found (domestic_only filter disabled)
+#   - Delivery is online-only (online_only filter disabled)
+#   - Name does not contain a standard degree qualifier (DQ check disabled)
+# ─────────────────────────────────────────────────────────────────────────────
 
-discovery: {}
+discovery:
+  # Start BFS from the two main course listing pages — they contain all
+  # course links in their static HTML.  This avoids crawling the whole site
+  # root before reaching course pages.
+  seed_urls:
+    - "https://www.unisc.edu.au/study/courses-and-programs/bachelor-degrees-undergraduate-programs"
+    - "https://www.unisc.edu.au/study/courses-and-programs/postgraduate-degrees"
+
+  # Allow only depth-4 pages: /study/courses-and-programs/<category>/<slug>
+  # This excludes the depth-3 listing pages and depth-5+ sub-pages.
+  allow_url_patterns:
+    - "/study/courses-and-programs/[a-z][a-z-]+/[a-z][a-z-]"
+
+  block_url_patterns:
+    # Depth-5+ sub-pages within a course (e.g. majors/minors pages)
+    - "/study/courses-and-programs/[a-z][a-z-]+/[a-z][a-z-]+/"
+    # Non-course depth-4 pages
+    - "/study/courses-and-programs/headstart/"
+    - "/study/courses-and-programs/uni-pathways"
+    - "/study/courses-and-programs/[a-z-]+/explore-"
+    # Subsidised programs listing page (not an individual course)
+    - "subsidised-postgraduate-programs"
+    # Generic site noise
+    - "/news/"
+    - "/about/"
+    - "/research/"
+    - "/international/apply"
+    - "/study/fees"
+    - "/study/scholarships"
+    - "/study/how-to-apply"
+    - "/study/life-at-unisc"
+    - "/study/student-support"
+    - "/study/work-placements"
+    - "/study/open-day"
+    - "/study/calendars"
+
+  # Higher budget to let BFS walk through all study-area category sub-pages
+  # (arts, business, communication, …, technology = ~17 pages) which each
+  # carry additional course links not on the two main seed pages.
+  bfs_page_budget: 100
+
+  # No sitemap available (returns empty).
+  always_sitemap_supplement: false
 
 extraction:
   fees:
     default_currency: AUD
+    # Fee data is Angular ng-show gated — static HTML may not expose
+    # international fees.  No central fee PDF known yet.
+    central_page: ""
+    fees_pdf_url: ""
+
+  english:
+    # Central English requirements page (Gemini/pattern extraction)
+    central_page: "https://www.unisc.edu.au/study/how-to-apply/english-language-requirements"
+
+  filters:
+    # ── User requirement: extract ALL international courses ──────────────────
+    # Do NOT drop courses that lack explicit international-fee data.
+    # UniSC's Angular-rendered fee panel means many courses appear to have
+    # no fee in static HTML — this is a rendering issue, not a data gap.
+    domestic_only:
+      enabled: false
+
+    # Do NOT drop online-only courses — UniSC serves international students
+    # online and the user explicitly wants these included.
+    online_only:
+      enabled: false
+
+  staging:
+    # Disable the degree-qualifier name check.  UniSC uses standard degree
+    # names (Bachelor of, Master of, Graduate Certificate in, etc.) but
+    # some course names may not parse correctly from static HTML H1 tags
+    # before the qualifier check runs.  Disabling avoids false rejects.
+    skip_degree_qualifier_check: true
