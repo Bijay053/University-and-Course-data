@@ -15,37 +15,75 @@
 #     but 4+ simultaneous sessions reliably hit the bot-detect wall.
 #
 # Discovery fix (2026-07-17):
-#   - The "Find a degree" page (unisc.edu.au/programs) is an AngularJS SPA
-#     (ProgramFinderCtrl) that filters client-side using p.cricosCode for
-#     international courses — no JSON API is exposed externally.
-#   - BFS from the homepage only discovers ~76 of ~134 international courses
-#     because category hub pages link to sub-categories, not directly to all
-#     course pages.
-#   - Fix: add sitemap discovery (XMLsitemap has 391 depth-2 course pages):
-#       bachelor-degrees-undergraduate-programs  120 pages
-#       postgraduate-degrees                      72 pages
-#       (others are majors/minors, handbooks, headstart — blocked below)
-#   - force_candidate_url_patterns forces the classifier to treat depth-2
-#     /study/courses-and-programs/{category}/{course-slug} URLs as course
-#     candidates rather than listing pages.
-#   - block_url_patterns prevents intake-specific depth-3 pages and
-#     non-degree category pages from entering the extraction queue.
+#   - The courses-and-programs page (unisc.edu.au/study/courses-and-programs)
+#     is a React SPA. BFS from the homepage discovers only category-level hub
+#     pages (21 links) — individual course cards are JavaScript-rendered.
+#   - Even Scrape.do render=true on the root courses page returns only category
+#     links, not individual course links. The individual course cards are loaded
+#     dynamically WITHIN each category listing page.
+#   - Fix: pre-seed the two category listing pages (UG + PG) via Scrape.do
+#     render=true so the JS-rendered course cards are captured:
+#       UG: /study/courses-and-programs/bachelor-degrees-undergraduate-programs
+#           → renders ~65-86 international UG course links
+#       PG: /study/courses-and-programs/postgraduate-degrees
+#           → renders ~70 course links (45 international, 25 domestic-only)
+#   - XMLsitemap supplement covers courses not rendered in the category pages
+#     (pagination, lazy-load, or any category that loads beyond the waitFor).
+#     XMLsitemap has 120 UG + 72 PG = 192 depth-2 URLs.
+#   - Expected: ~131 international courses discovered (86 UG + 45 PG).
+#     The domestic_only extraction filter rejects purely domestic programs
+#     that slip through from the PG page and the sitemap.
+#
+# International-student filter is applied client-side in JS — there is no URL
+# parameter to pre-filter. Discovery intentionally casts wider (192 URLs);
+# domestic_only in extraction reduces it to ~131 international courses.
 
 discovery:
-  sitemap_url: "https://www.unisc.edu.au/XMLsitemap"
-  always_sitemap_supplement: true
-  expected_min_courses: 100
+  scrape_do_render: true
+  scrape_do_skip_fallbacks: true  # skip httpx/cffi datacenter tiers (CF-blocked)
+  use_wayback: false
+  bfs_page_budget: 6              # 2 category seeds + 4 buffer
+
+  # Category listing pages — rendered via Scrape.do so JS course cards appear.
+  # Marked as listing_only so they are visited for links but not treated as
+  # course candidates.
+  seed_urls:
+    - "https://www.unisc.edu.au/study/courses-and-programs/bachelor-degrees-undergraduate-programs"
+    - "https://www.unisc.edu.au/study/courses-and-programs/postgraduate-degrees"
+
+  listing_only_patterns:
+    - '/study/courses-and-programs$'
+    - '/study/courses-and-programs/bachelor-degrees-undergraduate-programs$'
+    - '/study/courses-and-programs/postgraduate-degrees$'
+
+  # Force individual course URLs into the candidate set.
+  # Depth-2 paths under UG or PG categories are course pages.
   force_candidate_url_patterns:
-    - '/study/courses-and-programs/(?:bachelor-degrees-undergraduate-programs|postgraduate-degrees|courses|bachelor-of-engineering|business-and-commerce|education|engineering|environmental-studies|law-and-criminology|medical-and-health-sciences|nursing-and-midwifery|paramedicine|psychology-and-social-work|science|sport-and-exercise-science|technology|arts-and-humanities|communication|creative-industries|design)/[^/]+$'
+    - '^https://www\.unisc\.edu\.au/study/courses-and-programs/bachelor-degrees-undergraduate-programs/[^/]+/?$'
+    - '^https://www\.unisc\.edu\.au/study/courses-and-programs/postgraduate-degrees/[^/]+/?$'
+
+  # Block non-degree categories and depth-3+ intake/session sub-pages.
   block_url_patterns:
     - '/study/courses-and-programs/majors-and-minors'
     - '/study/courses-and-programs/previous-student-handbooks'
     - '/study/courses-and-programs/headstart'
     - '/study/courses-and-programs/short-courses-and-microcredentials'
     - '/study/courses-and-programs/tertiary-preparation-pathway'
-    - '/study/courses-and-programs/[^/]+/[^/]+/'   # block depth-3+ intake-specific sub-pages
+    - '/study/courses-and-programs/[^/]+/[^/]+/'   # depth-3+ intake-specific sub-pages
+
+  # XMLsitemap supplement: covers courses not rendered within the waitFor window
+  # on the category pages (pagination, lazy-load overshoot).
+  # XMLsitemap at https://www.unisc.edu.au/XMLsitemap has 192 depth-2 UG+PG URLs.
+  sitemap_url: "https://www.unisc.edu.au/XMLsitemap"
+  always_sitemap_supplement: true
+
+  expected_min_courses: 100
 
 extraction:
   skip_initial_http_fetch: true    # CF blocks plain HTTP — skip the wasted attempt
   force_browser: true              # Always render via Playwright for every course page
   max_parallel_fetch: 2            # Cap concurrency to avoid CF 429/challenge
+
+  filters:
+    domestic_only:
+      enabled: true   # Rejects courses with no international offering
