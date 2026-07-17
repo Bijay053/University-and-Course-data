@@ -12,8 +12,36 @@
 #   PTE Academic:   58 overall   (standard ETS/Pearson equivalency for IELTS 6.5)
 #   TOEFL iBT:      79 overall   (standard ETS equivalency for IELTS 6.5)
 # Source: https://www.unisq.edu.au/study/apply/entry-requirements/english-language-requirements
-discovery: {}
+# === Category landing page fix (2026-07-17) ===
+# UniSQ publishes /major/<slug> and /specialisation/<slug> pages as genuine
+# enrollable offerings for international students.  Their H1 titles
+# (e.g. "Human Resource Management", "Marketing") contain no degree-level
+# qualifier word, so the default category_landing_page_missing_degree_qualifier
+# guard incorrectly rejects them.  In the job analysed, 60/88 skipped courses
+# were caused by this false positive.
+# Fix: skip_degree_qualifier_check: true — the global URL-based blocklist
+# (_BLOCK_URL_LAST_SEGMENTS: undergraduate-study, postgraduate-study, etc.)
+# already prevents genuine category nav pages from reaching the staging gate.
+#
+# Additionally, 4 valid category listing pages are blocked by the global URL
+# blocklist during BFS discovery (last-segment / substring matches):
+#   /study/degrees-and-courses/online-study
+#   /study/degrees-and-courses/short-courses
+#   /study/degrees-and-courses/double-degrees
+#   /study/degrees-and-courses/new-degrees
+# allow_blocked_listing_patterns makes the BFS crawl them for course links
+# without adding the pages themselves as course candidates.
+
+discovery:
+  allow_blocked_listing_patterns:
+    - "/degrees-and-courses/online-study"
+    - "/degrees-and-courses/short-courses"
+    - "/degrees-and-courses/double-degrees"
+    - "/degrees-and-courses/new-degrees"
+
 extraction:
+  staging:
+    skip_degree_qualifier_check: true
   filters:
     domestic_only:
       enabled: false
