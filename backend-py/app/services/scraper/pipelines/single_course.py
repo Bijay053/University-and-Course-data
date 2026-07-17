@@ -1821,13 +1821,24 @@ async def extract_course(
     # See _is_unisq_online_only_page docstring for full rationale.
     # Reuses domestic_only payload key so guards.py:394 rejects with
     # reason "domestic_only"; also sets online_only_unisq=True for metrics.
-    # Gated on _online_filter_enabled() so that setting
-    # extraction.filters.online_only.enabled=false in the per-uni YAML
-    # also suppresses this UniSQ-specific hardcoded check (in addition to
-    # the generic URL-slug and study_mode online_only guards in guards.py).
+    # Gated on the extraction.filters.online_only.enabled config so that
+    # setting it to false in the per-uni YAML also suppresses this
+    # UniSQ-specific hardcoded check (mirrors guards.py's _online_filter_enabled
+    # logic; _online_filter_enabled is a local variable there, not importable).
+    try:
+        _uc_olsc = get_uni_config()
+        _unisq_ol_filter_on = (
+            _uc_olsc is None
+            or _uc_olsc.extraction is None
+            or _uc_olsc.extraction.filters is None
+            or _uc_olsc.extraction.filters.online_only is None
+            or bool(_uc_olsc.extraction.filters.online_only.enabled)
+        )
+    except Exception:  # noqa: BLE001
+        _unisq_ol_filter_on = True  # fail safe: keep historical reject behaviour
     if (
         "unisq.edu.au" in (url or "").lower()
-        and _online_filter_enabled()
+        and _unisq_ol_filter_on
         and _is_unisq_online_only_page(html)
     ):
         payload["domestic_only"] = True
