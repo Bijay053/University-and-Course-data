@@ -1,8 +1,91 @@
-# Griffith University — stub created for Week 5 scale-up.
-# Hostname: www.griffith.edu.au  (course catalogue under /study)
+# Griffith University — Hostname: www.griffith.edu.au
 # Multi-campus: Nathan, Mount Gravatt, Logan, Gold Coast, South Bank.
-discovery: {}
+#
+# CLOUDFLARE ENTERPRISE IP-BLOCK (same pattern as Cardiff):
+# All datacenter IPs return 403 on listing pages and sitemaps — plain httpx,
+# curl_cffi (TLS impersonation), and headless Playwright all fail.
+# The scraper's default retry chain (httpx → cffi → Wayback → Scrape.do)
+# bleeds out the entire 300s discovery budget waiting for each tier to fail
+# before moving to the next, resulting in 0 candidates and a "Discovery phase
+# exceeded 300s deadline" failure.
+#
+# Fix: go straight to Scrape.do residential proxy (skip datacenter tiers).
+#   discovery.scrape_do_skip_fallbacks: true  — listing page fetches bypass
+#     the doomed httpx+cffi datacenter tiers.
+#   discovery.scrape_do_render: true          — JS-rendered SPA listing pages
+#     need headless Chrome through Scrape.do's residential IP pool.
+#   discovery.bfs_page_budget: 6              — at 20-30s/Scrape.do render
+#     call, 6 pages × 30s = 180s — well under 300s deadline with buffer.
+#   discovery.use_wayback: false              — archive.org has no useful
+#     snapshots and adds latency; skip entirely.
+#   extraction.scrape_do_render: true         — course pages also need
+#     residential IP + JS rendering.
+#   extraction.scrape_do_skip_fallbacks: true — skip doomed datacenter tiers
+#     before Scrape.do call (~1-2s saved per course, minutes across 200+ courses).
+#   extraction.skip_browser_rescue: true      — Playwright datacenter also
+#     gets 403; Scrape.do already provides the rendering path.
+#
+# If SCRAPE_DO_TOKEN is unset, Griffith cannot be scraped from this environment
+# (all datacenter IPs are CF-enterprise blocked at IP/ASN level).
+
+discovery:
+  # Go straight to Scrape.do residential proxy — skip doomed datacenter tiers.
+  scrape_do_skip_fallbacks: true
+  scrape_do_render: true
+
+  # Reduced BFS budget: Scrape.do render takes 20-30s per listing page.
+  # 6 pages × 30s = 180s — safely under the 300s discovery deadline.
+  # Griffith's /study/degrees listing is comprehensive; BFS naturally discovers
+  # pagination links so the full catalogue is reachable within this budget.
+  bfs_page_budget: 6
+
+  # Seed directly from the course catalogue — avoids the home page redirect
+  # overhead (home page → /study/degrees redirect costs one extra Scrape.do call).
+  seed_urls:
+    - https://www.griffith.edu.au/study/degrees
+
+  use_wayback: false
+
+  allow_url_patterns:
+    - '/study/degrees'
+    - '/degrees-and-programmes'
+    - '/undergraduate'
+    - '/postgraduate'
+
+  block_url_patterns:
+    - '/news'
+    - '/events'
+    - '/staff'
+    - '/about'
+    - '/contact'
+    - '/research/'
+    - '/international/fees'
+    - '/library'
+    - '/student-services'
+
 extraction:
+  # Scrape.do residential proxy bypasses CF Enterprise block.
+  # skip_browser_rescue: datacenter Playwright also gets 403; Scrape.do is
+  # already the rendering path so the Playwright rescue adds no value.
+  scrape_do_render: true
+  scrape_do_skip_fallbacks: true
+  skip_browser_rescue: true
+  skip_per_course_browser: true
+
+  # Conservative parallelism — Scrape.do calls have account-wide concurrency
+  # limits and Griffith's CF WAF may rate-limit bursts even through residential.
+  max_parallel_fetch: 2
+
   filters:
     domestic_only:
       enabled: false
+    online_only:
+      enabled: false
+
+  fees:
+    prefer_international: true
+    prefer_annual_over_total: true
+
+  staging:
+    skip_degree_qualifier_check: true
+    require_international_fee: false
