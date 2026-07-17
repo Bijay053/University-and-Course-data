@@ -11,48 +11,29 @@
 #     until Week-2 migration removes it.
 #
 # Discovery fix (2026-07-17):
-#   - Bond's program finder (bond.edu.au/study/program-finder) is a React SPA
-#     whose course listing is loaded entirely via AJAX calls to an internal
-#     Elasticsearch endpoint.  Plain-HTTP BFS and even browser-rendered fetches
-#     both return 0 course links because the <a href="/program/..."> elements
-#     are injected into the DOM after the initial page load.
-#   - generic_search_api POSTs directly to the ES endpoint with a
-#     student_type="International students" filter, returning all programme URLs
-#     in a single request without any browser requirement.
-#   - ES response shape: hits.hits[*]._source.url[0] / .title[0]
-#     The _source.url.0 dot-path uses _dig's numeric-index unwrapping to
-#     extract the first element of the array-valued url field.
-#   - allow_url_patterns restricts to /program/ and /microcredential/ pages
-#     (221 results: ~168 /program/ + ~52 /microcredential/ + 1 other).
+#   - Bond's program finder (bond.edu.au/study/program-finder) is a React SPA;
+#     BFS from the homepage only finds ~13 featured courses visible in static HTML.
+#   - generic_search_api (ES endpoint) was the first attempt but is gated by
+#     `if not links` in the orchestrator — BFS fills `links` first so the API
+#     was never called.
+#   - Fix: use Bond's own sitemap index (sitemap.xml lists 5 child sitemaps).
+#     The sitemap discovery code recurses one level into sitemap-index files,
+#     fetching all 5 child pages and yielding 240 depth-2 /program/ and
+#     /microcredential/ URLs.  always_sitemap_supplement ensures it runs even
+#     when BFS has already found some links.
+#   - Depth-3 sub-pages (7 total: FAQ, entry-assessment, prerequisites, enquiry)
+#     are blocked so only the main course overview pages enter the extraction queue.
 
 discovery:
-  generic_search_api:
-    url: "https://bond.edu.au/api/v1/elasticsearch/bond_prod_default/_search"
-    method: POST
-    headers:
-      Content-Type: "application/json"
-      Referer: "https://bond.edu.au/study/program-finder"
-    body:
-      query:
-        bool:
-          filter:
-            - term:
-                student_type: "International students"
-      size: 500
-      _source:
-        - title
-        - url
-        - type
-    root_path: "hits.hits"
-    url_fields:
-      - "_source.url.0"
-    title_fields:
-      - "_source.title.0"
-    allow_url_patterns:
-      - '^https://bond\.edu\.au/program/'
-      - '^https://bond\.edu\.au/microcredential/'
-    normalize_relative_urls: true
-    base_url: "https://bond.edu.au"
+  sitemap_url: "https://bond.edu.au/sitemap.xml"
+  always_sitemap_supplement: true
+  expected_min_courses: 150
+  force_candidate_url_patterns:
+    - '^https://bond\.edu\.au/program/[^/]+/?$'
+    - '^https://bond\.edu\.au/microcredential/[^/]+/?$'
+  block_url_patterns:
+    - '/program/[^/]+/[^/]+'       # depth-3+ sub-pages (FAQ, prerequisites, enquiry)
+    - '/microcredential/[^/]+/[^/]+'
 
 extraction:
   english:
