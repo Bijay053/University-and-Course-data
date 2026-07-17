@@ -979,11 +979,13 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
     if not _scrape_do_render and not _scrape_do_static and _has_scrape_do:
         _disc_skip = False
         _disc_render_first = False
+        _disc_wait_for_ms = 3000
         try:
             from app.services.scraper.config.context import get_uni_config as _guc_disc
             _disc_cfg = _guc_disc().discovery
             _disc_skip = _disc_cfg.scrape_do_skip_fallbacks
             _disc_render_first = _disc_cfg.scrape_do_render
+            _disc_wait_for_ms = _disc_cfg.scrape_do_wait_for_ms
         except Exception:  # noqa: BLE001
             pass
         if _disc_skip:
@@ -1046,7 +1048,8 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
             # reliably fit inside 150s and matches what that budget was
             # originally sized for.
             _disc_rendered = await fetch_html_scrape_do(
-                url, render=True, rate_limit=False, max_retries=1
+                url, render=True, rate_limit=False, max_retries=1,
+                wait_for_ms=_disc_wait_for_ms,
             )
             if _disc_rendered is not None and not _is_spa_shell(_disc_rendered):
                 from app.services.scraper.snapshot_context import stage_snapshot as _stage

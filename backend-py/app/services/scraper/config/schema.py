@@ -1253,6 +1253,21 @@ class DiscoveryConfig(BaseModel):
             "SCRAPE_DO_TOKEN is set and discovery.scrape_do_skip_fallbacks is True."
         ),
     )
+    scrape_do_wait_for_ms: int = Field(
+        default=3000,
+        description=(
+            "Milliseconds passed as Scrape.do's waitFor parameter when "
+            "discovery.scrape_do_render=True.  Scrape.do waits this long "
+            "after the initial page-load event before taking the DOM snapshot. "
+            "Increase for pages where JavaScript lazy-loads course cards after "
+            "the initial render — e.g. Funnelback search results where 50 cards "
+            "don't all appear within the default 3 s (UTAS: 8000 ms).  "
+            "Has no effect unless scrape_do_render and scrape_do_skip_fallbacks "
+            "are both True.  Keep seed count low when raising this value: "
+            "ceil(seeds/4) * (render_time + extra_wait) must stay under "
+            "the 300 s discovery_phase_timeout_s budget."
+        ),
+    )
     block_url_patterns: list[str] = Field(
         default_factory=list,
         description=(
