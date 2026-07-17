@@ -74,3 +74,4 @@
 - [UC Leeds degree-qualifier false rejection](ucleeds-degree-qualifier-false-positive.md) — H1 lacking degree word wrongly triggers category-landing-page guard on fully-extracted courses; skip_degree_qualifier_check:true YAML flag fixes it.
 - [UniSQ browser timeout + stale-code pattern](unisq-browser-timeout.md) — Next.js SPA times out in Playwright on every page; skip_browser_rescue:true + SSR HTML sufficient; stale worker is always the first suspect for NameError on recently-added locals.
 - [Bond ES API discovery](bond-es-discovery.md) — program finder is React SPA/AJAX; query /api/v1/elasticsearch/bond_prod_default/_search with generic_search_api; _source.url.0 dot-path extracts array fields.
+- [UniSC sitemap discovery](unisc-sitemap-discovery.md) — ProgramFinderCtrl is client-side Angular (no API); XMLsitemap has 391 depth-2 course pages; block majors-and-minors/handbooks/headstart depth-1 categories + depth-3+ intake pages.

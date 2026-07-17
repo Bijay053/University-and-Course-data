@@ -1,19 +1,49 @@
-# University of the Sunshine Coast (USC)
-# Hostname: www.usc.edu.au
+# University of the Sunshine Coast (UniSC)
+# Hostname: www.unisc.edu.au  (rebranded from www.usc.edu.au — DB scrape_url already updated)
 #
-# USC is Cloudflare-protected. HTTP fetches for individual course pages
-# return a 403 or a JS challenge shell, causing every course to be marked
-# fetch_failed at the staging gate.  The HTTP fetch is not useful here —
-# it wastes a round-trip before the browser fallback fires.
+# Extraction notes:
+#   - USC is Cloudflare-protected. HTTP fetches for individual course pages
+#     may return a 403 or JS challenge shell, causing every course to be marked
+#     fetch_failed at the staging gate.  The HTTP fetch is not useful here —
+#     it wastes a round-trip before the browser fallback fires.
+#   - Skip the initial HTTP attempt entirely and go straight to Playwright
+#     for every course page.  Combined with force_browser=true this ensures all
+#     fields (fee, IELTS, intakes, duration) are extracted from the fully-rendered
+#     DOM, not from a Cloudflare challenge page.
+#   - Cap parallel browser sessions to 2 — USC's Cloudflare tier tolerates
+#     light concurrency without triggering the interactive CAPTCHA challenge,
+#     but 4+ simultaneous sessions reliably hit the bot-detect wall.
 #
-# Fix: skip the initial HTTP attempt entirely and go straight to Playwright
-# for every course page.  Combined with force_browser=true this ensures all
-# fields (fee, IELTS, intakes, duration) are extracted from the fully-rendered
-# DOM, not from a Cloudflare challenge page.
-#
-# Cap parallel browser sessions to 2 — USC's Cloudflare tier tolerates
-# light concurrency without triggering the interactive CAPTCHA challenge,
-# but 4+ simultaneous sessions reliably hit the bot-detect wall.
+# Discovery fix (2026-07-17):
+#   - The "Find a degree" page (unisc.edu.au/programs) is an AngularJS SPA
+#     (ProgramFinderCtrl) that filters client-side using p.cricosCode for
+#     international courses — no JSON API is exposed externally.
+#   - BFS from the homepage only discovers ~76 of ~134 international courses
+#     because category hub pages link to sub-categories, not directly to all
+#     course pages.
+#   - Fix: add sitemap discovery (XMLsitemap has 391 depth-2 course pages):
+#       bachelor-degrees-undergraduate-programs  120 pages
+#       postgraduate-degrees                      72 pages
+#       (others are majors/minors, handbooks, headstart — blocked below)
+#   - force_candidate_url_patterns forces the classifier to treat depth-2
+#     /study/courses-and-programs/{category}/{course-slug} URLs as course
+#     candidates rather than listing pages.
+#   - block_url_patterns prevents intake-specific depth-3 pages and
+#     non-degree category pages from entering the extraction queue.
+
+discovery:
+  sitemap_url: "https://www.unisc.edu.au/XMLsitemap"
+  always_sitemap_supplement: true
+  expected_min_courses: 100
+  force_candidate_url_patterns:
+    - '/study/courses-and-programs/(?:bachelor-degrees-undergraduate-programs|postgraduate-degrees|courses|bachelor-of-engineering|business-and-commerce|education|engineering|environmental-studies|law-and-criminology|medical-and-health-sciences|nursing-and-midwifery|paramedicine|psychology-and-social-work|science|sport-and-exercise-science|technology|arts-and-humanities|communication|creative-industries|design)/[^/]+$'
+  block_url_patterns:
+    - '/study/courses-and-programs/majors-and-minors'
+    - '/study/courses-and-programs/previous-student-handbooks'
+    - '/study/courses-and-programs/headstart'
+    - '/study/courses-and-programs/short-courses-and-microcredentials'
+    - '/study/courses-and-programs/tertiary-preparation-pathway'
+    - '/study/courses-and-programs/[^/]+/[^/]+/'   # block depth-3+ intake-specific sub-pages
 
 extraction:
   skip_initial_http_fetch: true    # CF blocks plain HTTP — skip the wasted attempt
