@@ -30,25 +30,59 @@
 # belt-and-suspenders fix for the cases where the browser tab-click misses
 # (e.g. Cloudflare CAPTCHA, tab not mounted yet).
 #
-# ── Discovery strategy (2026-05-11) ─────────────────────────────────────────
+# ── Discovery strategy ────────────────────────────────────────────────────────
 #
-# UTAS BFS starts from /courses and returns ~84 URLs via HTTP-accessible
-# faculties (health, sci-eng, tsbe, ...).  Arts-soc and other faculties
-# consistently return 403 for plain HTTP, so BFS silently misses them.
-# Master of Teaching (e7g) lives under arts-soc and was absent from every run.
+# UTAS operates a Funnelback (Squiz) site-search at /search that returns the
+# COMPLETE course catalogue (609 UG+PG courses).  The main listing pages
+# (/courses/undergraduate, /courses/postgraduate) show only a truncated/
+# paginated subset (106 UG + 78 PG = 184 total) — they are JS-rendered and
+# do not load all courses in the initial render.  Faculty listing pages
+# (/courses/arts-soc, /courses/health, etc.) return the same subset URLs and
+# add 0 net-new courses beyond the two main listings.
 #
-# Fix: always_browser_discover=true runs Playwright browser discovery IN
-# ADDITION to BFS (merging results), sweeping the faculty A-Z pages via
-# browser.  browser_discover_generic.py seeds utas.edu.au with the full
-# faculty listing pages (_HOST_EXTRA_SEEDS) so each faculty's A-Z index is
-# visited in the browser pass.
+# Fix: add the Funnelback search as YAML seed_urls (7 paginated pages,
+# 100 results each, covering all 609 UG+PG courses).  YAML seeds run BEFORE
+# the hardcoded HOST_EXTRA_SEEDS faculty pages and carry a +300 priority
+# bonus so they are visited first.
 #
-# extra_course_urls is a belt-and-suspenders entry for e7g specifically —
-# ensures it is present in the discovered set even if browser discovery
-# cannot navigate arts-soc due to Cloudflare rate-limiting on the day.
+# Funnelback pagination: &num_ranks=100 &start_rank=N
+# 609 courses ÷ 100 = 7 pages (start_rank 1, 101, 201, 301, 401, 501, 601).
+#
+# Time budget: 9 YAML seeds (~15-25 s each) + 10 hardcoded faculty seeds
+# (~10 s each) ≈ 235-325 s.  Set to 420 s (7 min) with headroom.
+#
+# browser_early_stop_courses: raised to 700 so discovery does not abort the
+# BFS phase before all Funnelback pages are visited.
+#
+# Belt-and-suspenders: /courses/undergraduate and /courses/postgraduate
+# remain as YAML seeds so the 184 already-known courses are captured even
+# if the Funnelback search renders differently on a given run.
 
 discovery:
-  always_browser_discover: true   # skip BFS; browser is primary discovery (9 faculty seeds in _HOST_EXTRA_SEEDS)
+  always_browser_discover: true   # Playwright is primary; plain HTTP blocked by CF
+
+  # Raise from default 90 s to cover all Funnelback pages + existing seeds.
+  browser_time_budget_s: 420
+
+  # Do not abort the seed-visit phase early — expect 600+ courses.
+  browser_early_stop_courses: 700
+
+  seed_urls:
+    # ── Funnelback catalogue search (primary — covers all 609 UG+PG courses) ──
+    # Each URL returns 100 results.  7 pages × 100 = 700 > 609.
+    # The browser renders the result HTML and extracts course links matching
+    # the /courses/<faculty>/courses/<slug> allow_url_pattern below.
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Undergraduate&f.Course+Level%7CcourseLevel=Postgraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=1"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Undergraduate&f.Course+Level%7CcourseLevel=Postgraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=101"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Undergraduate&f.Course+Level%7CcourseLevel=Postgraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=201"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Undergraduate&f.Course+Level%7CcourseLevel=Postgraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=301"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Undergraduate&f.Course+Level%7CcourseLevel=Postgraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=401"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Undergraduate&f.Course+Level%7CcourseLevel=Postgraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=501"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Undergraduate&f.Course+Level%7CcourseLevel=Postgraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=601"
+    # ── Belt-and-suspenders: main listing pages (184 known-good courses) ──────
+    - "https://www.utas.edu.au/courses/undergraduate"
+    - "https://www.utas.edu.au/courses/postgraduate"
+
   # Only keep URLs that match the canonical UTAS course-page pattern
   # (/courses/<faculty>/courses/<code>-<name>).  Browser discovery sweeps
   # nav links and can pick up /study/pathways-to-university,
@@ -57,6 +91,7 @@ discovery:
   allow_url_patterns:
     - "/courses/[^/]+/courses/"       # current format: /courses/<faculty>/courses/<code>
     - "/courses/\\d{4}/[^/]+/courses/" # Wayback-archived legacy format (pre-2016): /courses/2015/<faculty>/courses/<code>
+
   # Drop URLs whose path ends with "-domestic" — UTAS appends this suffix to
   # domestic-only course pages (e.g. 35a2-graduate-certificate-in-business-studies-domestic).
   # These are never international-student courses so they waste a browser slot
@@ -71,6 +106,7 @@ discovery:
     # UTAS to /courses/<faculty>/courses/<slug> paths, so this would only
     # fire if allow_url_patterns were ever removed.)
     - "/study/undergraduate"
+
   extra_course_urls:
     # Master of Teaching — under arts-soc which returns 403 for plain HTTP.
     # Belt-and-suspenders: injected unconditionally after all discovery tiers.
