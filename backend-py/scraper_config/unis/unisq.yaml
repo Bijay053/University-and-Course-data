@@ -33,6 +33,19 @@
 # allow_blocked_listing_patterns makes the BFS crawl them for course links
 # without adding the pages themselves as course candidates.
 #
+# === Browser timeout fix (2026-07-17) ===
+# UniSQ course pages are a Next.js SPA. Playwright times out on every page
+# (25 s each) because the JS bundle never settles to networkidle with the
+# ?studentType=international query param. The plain-HTTP httpx fetch gets a
+# fully SSR'd HTML response (200 OK, ~200 KB) that already contains the
+# course name, degree level, IELTS, duration, and study-mode data — the
+# browser add-nothing for this site. Fees live on the central fee page
+# anyway (see stage_on_parser_error / require_international_fee below), so
+# the browser rescue buys zero extra data at a cost of 25 s × 150 pages.
+# Fix: skip_browser_rescue: true gates BOTH browser paths in single_course.py:
+#   • the HTTP-failure browser fallback (lines ~1507-1515)
+#   • the sparse-static rescue after Gemini-primary (lines ~3722-3724)
+#
 # === Stage-all-rejected fix ===
 # Five rejection categories were preventing UniSQ courses from being staged:
 #
@@ -66,6 +79,7 @@ discovery:
     - "/degrees-and-courses/new-degrees"
 
 extraction:
+  skip_browser_rescue: true            # SSR HTML is sufficient; browser times out on every page (see comment above)
   staging:
     skip_degree_qualifier_check: true   # /major/ and /specialisation/ pages have no degree qualifier in H1
     require_international_fee: false    # fees on central page, not per-course; stage for human review

@@ -72,3 +72,4 @@
 - [Distributed semaphore lessons](distributed-semaphore-lessons.md) — acquire local semaphore BEFORE fleet-wide Redis slot; cache one redis.asyncio client per event loop (WeakKeyDictionary).
 - [block_url_patterns traversal guard](block-url-patterns-traversal.md) — block_url_patterns is now ALSO a BFS traversal-level guard (compiled early, checked pre-fetch); critical for Scrape.do-backed discovery where each blocked URL saves ~6s.
 - [UC Leeds degree-qualifier false rejection](ucleeds-degree-qualifier-false-positive.md) — H1 lacking degree word wrongly triggers category-landing-page guard on fully-extracted courses; skip_degree_qualifier_check:true YAML flag fixes it.
+- [UniSQ browser timeout + stale-code pattern](unisq-browser-timeout.md) — Next.js SPA times out in Playwright on every page; skip_browser_rescue:true + SSR HTML sufficient; stale worker is always the first suspect for NameError on recently-added locals.
