@@ -2692,6 +2692,19 @@ class StagingConfig(BaseModel):
             "hasn't rendered yet)."
         ),
     )
+    stage_on_parser_error: bool = Field(
+        default=False,
+        description=(
+            "When True, courses that hit the parser_error guard (critical fields like "
+            "international_fee or ielts_overall still missing after a full browser render) "
+            "are NOT silently dropped — they proceed to the normal staging gate instead. "
+            "Use for universities (e.g. UniSQ) where fees are published on a separate "
+            "central page and are never present on individual course pages, so the "
+            "'browser rendered but fee still missing' condition is expected and not an "
+            "extractor bug.  Combine with require_international_fee=false so the staging "
+            "gate also accepts fee-less rows for human review."
+        ),
+    )
     reject_slug_name_with_no_data: bool = Field(
         default=False,
         description=(

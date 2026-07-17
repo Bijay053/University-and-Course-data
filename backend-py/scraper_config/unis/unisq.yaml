@@ -12,6 +12,7 @@
 #   PTE Academic:   58 overall   (standard ETS/Pearson equivalency for IELTS 6.5)
 #   TOEFL iBT:      79 overall   (standard ETS equivalency for IELTS 6.5)
 # Source: https://www.unisq.edu.au/study/apply/entry-requirements/english-language-requirements
+#
 # === Category landing page fix (2026-07-17) ===
 # UniSQ publishes /major/<slug> and /specialisation/<slug> pages as genuine
 # enrollable offerings for international students.  Their H1 titles
@@ -31,6 +32,31 @@
 #   /study/degrees-and-courses/new-degrees
 # allow_blocked_listing_patterns makes the BFS crawl them for course links
 # without adding the pages themselves as course candidates.
+#
+# === Stage-all-rejected fix ===
+# Five rejection categories were preventing UniSQ courses from being staged:
+#
+# 1. domestic_only (42): The text-based filter is disabled via
+#    filters.domestic_only.enabled=false. The UniSQ-specific hardcoded
+#    online_only check in single_course.py (which reused the domestic_only
+#    payload key) is now also gated on the online_only filter config, so
+#    setting filters.online_only.enabled=false suppresses it too.
+#
+# 2. parser_error (26): Fired when international_fee or ielts_overall is still
+#    missing after browser render (single_course.py:5033). UniSQ fees live on
+#    a central fee page, not per-course — a missing fee after render is
+#    expected, not an extractor bug. stage_on_parser_error=true bypasses the
+#    orchestrator skip so the course proceeds to the normal staging gate.
+#    Combined with require_international_fee=false so the staging gate accepts
+#    fee-less rows for human review.
+#
+# 3. no_international_fee (11): require_international_fee=false — courses
+#    without a fee are staged for human review rather than auto-rejected.
+#
+# 4. online_only (5): filters.online_only.enabled=false — online-only courses
+#    are staged for review (UniSQ accepts international online enrolments).
+#
+# 5. generic_category_page (1): handled by skip_degree_qualifier_check=true.
 
 discovery:
   allow_blocked_listing_patterns:
@@ -41,10 +67,14 @@ discovery:
 
 extraction:
   staging:
-    skip_degree_qualifier_check: true
+    skip_degree_qualifier_check: true   # /major/ and /specialisation/ pages have no degree qualifier in H1
+    require_international_fee: false    # fees on central page, not per-course; stage for human review
+    stage_on_parser_error: true         # fee-missing-after-render is expected (central fee page); stage anyway
   filters:
     domestic_only:
-      enabled: false
+      enabled: false   # UniSQ has international offerings; suppress domestic-only text detection
+    online_only:
+      enabled: false   # UniSQ accepts international online enrolments; stage for review
   english:
     default_ielts: 6.5
     default_pte: 58

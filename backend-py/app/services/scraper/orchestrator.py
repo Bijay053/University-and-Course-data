@@ -4493,26 +4493,52 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 # staging entirely so the review queue is never polluted with
                 # obviously-incomplete rows. The URL and missing fields are logged
                 # so the problem is visible without the row appearing in the UI.
+                #
+                # Opt-out: staging.stage_on_parser_error=true bypasses the skip so
+                # courses proceed to the normal staging gate (combine with
+                # staging.require_international_fee=false so fee-less rows pass).
+                # Use for universities where fees are on a separate central page and
+                # a browser-rendered-but-fee-missing condition is not an extractor bug.
                 if payload.get("parser_error"):
                     _pe_fields = payload.get("parser_error_fields") or []
-                    summary["skipped"] += 1
-                    skip_reasons["parser_error"] = skip_reasons.get("parser_error", 0) + 1
-                    log.warning(
-                        "[PARSER ERROR] %s — skipped staging; critical fields missing "
-                        "after browser render: %s",
-                        r.get("url"),
-                        ", ".join(_pe_fields) if _pe_fields else "unknown",
-                    )
-                    await emit(
-                        "status",
-                        f"[PARSER ERROR] skipped: {r.get('name','?')} — "
-                        f"missing after render: {', '.join(_pe_fields) if _pe_fields else 'unknown'}",
-                        phase="stage",
-                        kind="parser_error_skip",
-                        url=r.get("url"),
-                        fields=_pe_fields,
-                    )
-                    continue
+                    _stage_pe = False
+                    try:
+                        from app.services.scraper.config.context import (  # noqa: PLC0415
+                            get_uni_config as _get_uni_cfg_pe,
+                        )
+                        _pe_uni_cfg = _get_uni_cfg_pe()
+                        if _pe_uni_cfg is not None and _pe_uni_cfg.extraction is not None:
+                            _stage_pe = bool(
+                                getattr(_pe_uni_cfg.extraction.staging, "stage_on_parser_error", False)
+                            )
+                    except Exception:  # noqa: BLE001
+                        pass
+                    if _stage_pe:
+                        log.info(
+                            "[PARSER ERROR] %s — stage_on_parser_error=true; proceeding "
+                            "to staging gate despite missing fields: %s",
+                            r.get("url"),
+                            ", ".join(_pe_fields) if _pe_fields else "unknown",
+                        )
+                    else:
+                        summary["skipped"] += 1
+                        skip_reasons["parser_error"] = skip_reasons.get("parser_error", 0) + 1
+                        log.warning(
+                            "[PARSER ERROR] %s — skipped staging; critical fields missing "
+                            "after browser render: %s",
+                            r.get("url"),
+                            ", ".join(_pe_fields) if _pe_fields else "unknown",
+                        )
+                        await emit(
+                            "status",
+                            f"[PARSER ERROR] skipped: {r.get('name','?')} — "
+                            f"missing after render: {', '.join(_pe_fields) if _pe_fields else 'unknown'}",
+                            phase="stage",
+                            kind="parser_error_skip",
+                            url=r.get("url"),
+                            fields=_pe_fields,
+                        )
+                        continue
 
                 try:
                     # [FIELD TRACE] — log key fields just before staging so we can
