@@ -21,6 +21,9 @@
 #       JS tab panels to mount.
 #
 # These will be migrated to YAML once the schema adds browser_behavior fields.
+# NOTE: these per_course_browser.py checks are keyed on the hostname, NOT on
+# discovery mode — removing always_browser_discover: true does NOT disable them.
+# Per-course extraction still runs the full Playwright browser pass.
 #
 # ── Text-level international section reorder (gemini_primary.py) ─────────────
 #
@@ -30,73 +33,94 @@
 # belt-and-suspenders fix for the cases where the browser tab-click misses
 # (e.g. Cloudflare CAPTCHA, tab not mounted yet).
 #
-# ── Discovery strategy ────────────────────────────────────────────────────────
+# ── Discovery strategy (UPDATED — Funnelback search via Scrape.do) ───────────
 #
-# UTAS has 609 UG+PG courses in total.  The main listing pages
-# (/courses/undergraduate, /courses/postgraduate) load only a JS-rendered
-# initial subset (106 UG + 78 PG = 184 total) — further courses require
-# scroll/pagination interaction.  Faculty listing pages
-# (/courses/arts-soc, /courses/health, etc.) surface the same subset and
-# add 0 net-new courses beyond the two main listings.
+# PREVIOUS approach (always_browser_discover — REMOVED):
+#   Playwright browser visited /courses/undergraduate + /courses/postgraduate.
+#   These pages use INFINITE SCROLL — the browser only captures the initial DOM
+#   (~84 UG + 103 PG = 184 courses). Further courses require scrolling, which
+#   the BFS browser cannot do.
 #
-# Previous approach (Funnelback seeds) — REMOVED:
-#   7 Funnelback search pages (/search?collection=utas~sp-search&...) were
-#   seeded as YAML seed_urls to discover all 609 courses.  In live runs each
-#   page takes ~110 s and returns +0 course links: the Funnelback results are
-#   rendered asynchronously via JavaScript AFTER the initial page load; the
-#   browser snaps the DOM before the course cards appear, so no links matching
-#   the /courses/<faculty>/courses/ pattern are found.  7 pages × ~110 s =
-#   ~770 s wasted, blowing the 420 s budget before BFS nav even starts.
+#   Funnelback search seeds were also tried but returned +0 course links: the
+#   browser ran from a DATACENTER IP, so Cloudflare JS-challenged the initial
+#   page load AND blocked any XHR/fetch requests made by the Funnelback JS,
+#   preventing the async course-card JSON from loading.
 #
-# Current approach:
-#   Rely on the two working listing seeds plus the 8 hardcoded faculty seeds.
-#   With Funnelback removed the seed phase finishes in ~120 s, leaving ~300 s
-#   of BFS nav budget to explore pagination links discovered from the main
-#   listing pages.  This recovers as many courses as BFS nav can find.
+#   Result: 187/605 courses discovered.
 #
-# Time budget: 2 listing seeds (~20 s each) + 8 faculty seeds (~10 s each)
-#   = ~120 s for seeds.  Set budget to 480 s to give BFS nav ~360 s of
-#   exploration time after seeds complete.
+# NEW approach (Scrape.do + paginated Funnelback search):
+#   UTAS's Funnelback search (https://www.utas.edu.au/search) returns all
+#   UG + PG courses in paginated HTML. Each page is fetched via Scrape.do
+#   (residential IP + headless Chrome), which:
+#     1. Bypasses Cloudflare (residential IP ≠ datacenter block)
+#     2. Executes JavaScript, allowing Funnelback's async AJAX to complete
+#     3. Returns fully-rendered HTML with all course result cards + links
 #
-# browser_early_stop_courses: keep at 700 so discovery does not abort before
-#   all BFS nav pages are visited.
+#   7 paginated seeds (num_ranks=100) cover all 605 courses:
+#     page 1 → results 1–100   (start_rank=1)
+#     page 2 → results 101–200 (start_rank=101)
+#     ...
+#     page 7 → results 601–605 (start_rank=601)
+#
+#   Discovery config:
+#     scrape_do_skip_fallbacks: true — skip httpx/cffi datacenter tiers
+#     scrape_do_render: true         — headless Chrome in Scrape.do (residential)
+#     bfs_page_budget: 10            — 7 Funnelback seeds + 3 buffer (no deep BFS)
+#     use_wayback: false             — no Wayback benefit; saves latency
+#     listing_only_patterns: /search\\? — search pages visited for links only
+#
+#   Per-course extraction is UNCHANGED:
+#     max_parallel_fetch: 1 (Cloudflare 429 at 2+)
+#     per_course_browser.py hardcoded checks still apply (hostname-keyed)
+#
+# If SCRAPE_DO_TOKEN is unset, fall back to always_browser_discover: true with
+# the original listing seeds (adds ~420 browser budget), recovering ~187 courses.
 
 discovery:
-  always_browser_discover: true   # Playwright is primary; plain HTTP blocked by CF
+  # Scrape.do residential proxy for Funnelback search discovery.
+  # Skip httpx + curl_cffi datacenter fetches — both get Cloudflare-challenged.
+  # render: true is required because Funnelback loads course cards via async AJAX
+  # (the datacenter-IP browser couldn't reach the AJAX endpoint; Scrape.do can).
+  scrape_do_skip_fallbacks: true
+  scrape_do_render: true
 
-  # 480 s total: ~120 s for working seeds + ~360 s for BFS nav exploration.
-  browser_time_budget_s: 480
+  # Each Scrape.do render call takes ~20-30s. 7 Funnelback seeds × 30s = 210s.
+  # bfs_page_budget: 10 — 7 seeds + buffer; BFS does not follow links from
+  # course detail pages (course URLs are added as candidates, not BFS targets).
+  bfs_page_budget: 10
 
-  # Do not abort BFS nav early — expect up to 600+ courses if pagination found.
-  browser_early_stop_courses: 700
+  use_wayback: false
 
+  # Paginated Funnelback search — 100 results per page, 7 pages for ~605 courses.
+  # URL decoded:
+  #   query= (empty → all courses)
+  #   f.Tabs|utas|ds-handbook-courses,utas|ds-short-courses = Courses
+  #   f.Course+Level|courseLevel = Postgraduate + Undergraduate
+  #   collection = utas|sp-search
   seed_urls:
-    # ── Primary listing pages (known-good — 184 courses) ─────────────────────
-    - "https://www.utas.edu.au/courses/undergraduate"
-    - "https://www.utas.edu.au/courses/postgraduate"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=1"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=101"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=201"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=301"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=401"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=501"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Postgraduate&f.Course+Level%7CcourseLevel=Undergraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=601"
 
-  # Only keep URLs that match the canonical UTAS course-page pattern
-  # (/courses/<faculty>/courses/<code>-<name>).  Browser discovery sweeps
-  # nav links and can pick up /study/pathways-to-university,
-  # /study/work-integrated-learning, etc. — these consume semaphore slots
-  # and trigger 429s without ever yielding a stageable course.
+  # Mark Funnelback search pages as listing-only: BFS visits them to extract
+  # course links but does NOT add them to the course candidate set.
+  listing_only_patterns:
+    - "/search\\?"
+
+  # Only keep URLs matching UTAS's canonical course-page pattern:
+  #   /courses/<faculty>/courses/<code>-<name>
+  # Prevents BFS from adding nav/footer/staff links as course candidates.
   allow_url_patterns:
     - "/courses/[^/]+/courses/"       # current format: /courses/<faculty>/courses/<code>
-    - "/courses/\\d{4}/[^/]+/courses/" # Wayback-archived legacy format (pre-2016): /courses/2015/<faculty>/courses/<code>
+    - "/courses/\\d{4}/[^/]+/courses/" # Wayback-archived legacy format (pre-2016)
 
-  # Drop URLs whose path ends with "-domestic" — UTAS appends this suffix to
-  # domestic-only course pages (e.g. 35a2-graduate-certificate-in-business-studies-domestic).
-  # These are never international-student courses so they waste a browser slot
-  # and can trigger a 429 cooldown.  Applied at Phase A.5b (after browser-discovery
-  # merge) in addition to the BFS-phase discovery.py block.
+  # Drop domestic-only and non-course URLs discovered from Funnelback pages.
   block_url_patterns:
     - "-domestic(?:/|$)"
-    # UTAS undergraduate discipline hub — category listing page, not a
-    # course detail page.  Previously a global block in discovery.py and
-    # guards.py; moved here so it only affects UTAS.
-    # (belt-and-suspenders: allow_url_patterns above already restricts
-    # UTAS to /courses/<faculty>/courses/<slug> paths, so this would only
-    # fire if allow_url_patterns were ever removed.)
     - "/study/undergraduate"
 
   extra_course_urls:
