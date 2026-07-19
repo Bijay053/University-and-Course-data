@@ -1,48 +1,137 @@
-# Deakin University — www.deakin.edu.au
+# ─────────────────────────────────────────────────────────────────────────────
+# DEAKIN UNIVERSITY
+# Hostname: www.deakin.edu.au  |  uni_id: 2252
+# Country: Australia  |  Currency: AUD
+# ─────────────────────────────────────────────────────────────────────────────
 #
-# SITE STRUCTURE (two-level category hierarchy — both cases handled by BFS):
+# SITE OVERVIEW
+# ─────────────────────────────────────────────────────────────────────────────
+# CMS: Sitecore (AngularJS rendering on some pages).
+# Cloudflare protection: yes — plain HTTP returns 403; all discovery and
+# per-course extraction must use Playwright (always_browser_discover) or
+# Scrape.do.
 #
-#   Case 1 (direct listing):
-#     /choosing-your-degree/accounting-and-finance → course tiles
+# DISCOVERY: 2-level study-area hierarchy under the international entry point
+# ─────────────────────────────────────────────────────────────────────────────
 #
-#   Case 2 (sub-category drill-in):
-#     /choosing-your-degree → study-area cards
-#       → /choosing-your-degree/accounting-and-finance → course tiles
+#   Step 1 — International landing page lists study-area cards:
+#     https://www.deakin.edu.au/international-students/choosing-your-degree
+#       h3.study-area-card--title > a  →  study area pages
 #
-#   BFS handles Case 2 natively via _is_category_landing() — sub-category pages
-#   are enqueued at depth+1 rather than staged as course candidates.
+#   Step 2 — Each study-area page lists course tiles:
+#     div.related-item__tile--course  →  a.related-item__image[@href]
+#     e.g. /international-students/choosing-your-degree/accounting-and-finance
 #
-# JS RENDERING: Deakin uses Sitecore. HTTP BFS sees no links from JS-rendered
-#   pages. Primary strategy = sitemap (bypasses JS entirely). Browser is the
-#   fallback if the sitemap proves thin on international courses.
+#   Step 3 — Individual course detail pages:
+#     URL pattern: /course/<slug>
+#     e.g. https://www.deakin.edu.au/course/bachelor-of-commerce
 #
-# SCRAPE_URL: should be set to the international-students catalogue entry point
-#   in the DB: https://www.deakin.edu.au/international-students/choosing-your-degree
+# BFS handles the 2-level hierarchy naturally. allow_url_patterns gates on
+# /course/ so only real course-detail pages are staged, while the category
+# and study-area pages are traversed but not treated as candidates.
 #
+# PER-COURSE EXTRACTION (translated from du_au Scrapy spider)
+# ─────────────────────────────────────────────────────────────────────────────
+#   course_name  → h1 (plain text, no suffix stripping needed normally)
+#   degree_level → h1 following-sibling strong  (e.g. "Bachelor of Commerce")
+#   duration     → h3[text*="Duration"] + div p  (e.g. "3 years")
+#   location     → .course--keyfacts ul li a     (may be list of campuses)
+#   study_mode   → derived from location: Online→Online, Online+other→Hybrid,
+#                  otherwise On-Campus
+#   IELTS overall → h3//*[text*="English language proficiency"]
+#                     /following::ul[1]/li  matching "score of N.N"
+#   IELTS bands  → same ul, matching "less than N.N" (all 4 bands equal value)
+#   fee (intl)   → .module__key-information--item-content--full-width  (AUD/yr)
+#   description  → .module__overview--content
+#   entry req    → div[data-section*="entry requirements"]
+# ─────────────────────────────────────────────────────────────────────────────
+
 discovery:
-  # Primary: sitemap lists all /course/* URLs directly — no JS needed.
-  always_sitemap_supplement: true
-
-  # Fallback: if sitemap yields <10 international course URLs, browser renders
-  # the JS and follows the two-level study-area card hierarchy normally.
-  always_browser_discover: true
-
-  # Budget for browser mode: ~14 study-area pages + top-level listing = 15
-  # intermediate pages, then course links are harvested directly (not fetched).
-  bfs_page_budget: 60
-
-  # Seed the international-students catalogue entry point explicitly so BFS
-  # doesn't have to guess from the homepage.
+  # The international entry point — lists all study-area cards.
+  # BFS follows the 2-level hierarchy from here automatically.
   seed_urls:
     - "https://www.deakin.edu.au/international-students/choosing-your-degree"
 
-  # Deakin course URLs live under /course/<slug> — the allow pattern ensures
-  # sub-category pages (/choosing-your-degree/*) are followed but not staged,
-  # while only real course-detail URLs are staged.
+  # Gate candidates to /course/<slug> pages only.
+  # Study-area listing pages (/choosing-your-degree/<area>) are traversed for
+  # links but are NOT staged as course candidates (they have no course data).
   allow_url_patterns:
     - "/course/"
 
+  block_url_patterns:
+    # Non-course sections reachable from course pages
+    - "/international-students/english-language-requirements"
+    - "/international-students/fees-and-scholarships"
+    - "/international-students/applying-to-deakin"
+    - "/international-students/life-in-australia"
+    - "/international-students/health-and-wellbeing"
+    - "/research/"
+    - "/about-deakin/"
+    - "/news/"
+    - "/events/"
+    - "/students/"
+    # Course sub-pages (units, handbooks) — not the course root
+    - "/course/[a-z][a-z0-9-]+/[a-z]"   # depth 3+ under a course slug
+
+  # Study-area listing pages should be visited for links but NOT staged.
+  listing_only_patterns:
+    - "/international-students/choosing-your-degree$"
+    - "/international-students/choosing-your-degree/[a-z][a-z-]+$"
+
+  # Cloudflare blocks plain HTTP (returns 403) — use browser for discovery.
+  # Playwright renders the JS-built study-area cards and course tile grids.
+  always_browser_discover: true
+
+  # Budget: 1 entry page + ~14 study-area pages + buffer = 20.
+  # Set to 60 to handle any extra pagination or sub-category pages.
+  bfs_page_budget: 60
+
+  # Sitemap supplement: Deakin's sitemap lists all /course/* URLs directly —
+  # use it as a safety net to catch any courses not linked from the
+  # international category pages (domestic-only pages that still list
+  # international fees, or recently added programmes).
+  # sitemap_url is left null so the scraper auto-probes /sitemap.xml.
+  always_sitemap_supplement: true
+
 extraction:
+  fees:
+    default_currency: AUD
+    # Deakin fee data is on individual course pages under:
+    #   .module__key-information--item-content--full-width
+    # No central fee PDF known — leave blank so per-course extraction runs.
+    central_page: ""
+    fees_pdf_url: ""
+
+  english:
+    # Central English requirements page for Deakin international students.
+    # The scraper also extracts IELTS from each course page (h3 "English
+    # language proficiency" section) so this page supplements/confirms it.
+    central_page: "https://www.deakin.edu.au/international-students/english-language-requirements"
+
+  course_name:
+    # Deakin page titles typically end with " | Deakin University" or
+    # " | Deakin" — strip the suffix if the h1 is empty/missing.
+    strip_title_suffixes:
+      - " | Deakin University"
+      - " | Deakin"
+
   filters:
+    # This spider targets the international-students catalogue — all courses
+    # found here are international offerings. Do NOT filter on fee presence
+    # because Deakin's fee is JS-rendered and may not appear in static HTML.
     domestic_only:
       enabled: false
+
+    # Deakin offers legitimate online international programmes.
+    online_only:
+      enabled: false
+
+  # ── Per-course extraction behaviour ────────────────────────────────────────
+  # Deakin blocks plain HTTP (403/CF challenge). Skip the initial static fetch
+  # and go straight to Playwright so every course page is fully rendered.
+  skip_initial_http_fetch: true
+  force_browser: true
+
+  # Limit concurrent browser sessions. Deakin's Cloudflare tier is sensitive
+  # to high concurrency — 2 parallel sessions avoids triggering bot-detect.
+  max_parallel_fetch: 2
