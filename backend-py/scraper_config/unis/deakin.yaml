@@ -8,24 +8,44 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # CMS: SquizMatrix with Angular SPA frontend (git_bridge bundle).
 # Cloudflare protection: yes — plain HTTP returns 403 from all paths including
-# sitemap.xml and robots.txt. All discovery and extraction must use Playwright
-# (always_browser_discover) or Scrape.do.
+# sitemap.xml and robots.txt. All discovery must use the browser pool
+# (always_browser_discover: true).
 #
 # DISCOVERY ARCHITECTURE (confirmed from scrape logs)
 # ─────────────────────────────────────────────────────────────────────────────
 # always_browser_discover: true → BFS is SKIPPED → browser_discover_generic runs.
 #
-# Two discovery paths (confirmed working):
+# THREE DISCOVERY PATHS (all used):
 #
 #   A. SSR seed: /international-students/choosing-your-degree
 #      PG course cards are SSR'd in the initial HTML. Playwright finds them
-#      immediately at domcontentloaded. ~12s, yields 43 PG links.
+#      immediately at domcontentloaded. ~12s, yields ~43 PG links.
 #
-#   B. Per-discipline nav pages: /study/find-a-course/<subject-area>
-#      e.g. /study/find-a-course/arts-humanities-and-social-sciences
-#      Each yields 10–30 course links in ~5s (static HTML, no Angular SPA wait).
-#      browser_discover_generic finds these by following navigation links from
-#      the pages it visits and adds them to its internal BFS heap at score=100.
+#   B. Explicit discipline seeds: /study/find-a-course/<subject-area>
+#      Each discipline page yields 10–30 course links in ~10s (static HTML).
+#      Seeding them explicitly gives +300 priority — all are processed before
+#      any BFS heap items, so heap growth does not affect discovery completeness.
+#
+#   C. Organic BFS: nav links discovered during seed visits.
+#      Budget remainder after seeds handles any remaining sub-pages.
+#
+# WHY EXPLICIT SEEDING IS REQUIRED (heap growth problem)
+# ─────────────────────────────────────────────────────────────────────────────
+# Run 2 log: "13 nav pages visited, 83 blocked, heap_remaining=51 at stop".
+# After visiting nav #13 (arts-humanities), heap grew from 34 → 51.
+# Each discipline page adds ~17 new nav links to the heap. The heap grows
+# faster than it depletes, so time-budget increases alone never reach 200+.
+# Explicit seeds bypass this entirely: they are processed at score+300 before
+# any heap item is dequeued.
+#
+# DISCIPLINE SLUGS (verified via Wayback Machine CDX query, 2026-07-19)
+# ─────────────────────────────────────────────────────────────────────────────
+# arts-humanities-and-social-sciences — ALSO confirmed in live scrape logs
+# business, data-science-and-analytics, design-and-creative-arts,
+# double-degrees, education-and-teaching, engineering, environment,
+# food-nutrition-and-dietetics, health-and-community-services,
+# health-sciences-and-allied-health
+# Additional slugs included that may exist on current site (fast-fail if 404).
 #
 # WHAT DID NOT WORK (XHR capture)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -33,37 +53,44 @@
 # courses via XHR. The XHR interceptor captured 6 JSON endpoints but Deakin's
 # API schema (proprietary SquizMatrix format) did not match any known shape in
 # _extract_courses_from_xhr_json — 0 courses from that path.
-# seed_page_settle_s: 10 added for DOM fallback consumed ~120s of budget on
-# 3 SPA seeds that contributed nothing, leaving only 13 of 64 discipline
-# nav-pages visited before the 200s budget was exhausted → 84 courses total.
-#
-# THE FIX
-# ─────────────────────────────────────────────────────────────────────────────
-# 1. Remove the 3 Angular SPA seeds (they contribute 0 courses, waste ~90s).
-# 2. Remove seed_page_settle_s (SSR seed renders immediately, no SPA wait).
-# 3. browser_time_budget_s: 280 — 280s allows the SSR seed (~12s) + all 51+
-#    remaining discipline nav-pages (~5s each) = ~267s → every course found.
-#    300s is the orchestrator's hard ceiling; 280s leaves a 20s safety margin.
+# seed_page_settle_s: 10 on 3 SPA seeds consumed ~120s of budget while
+# contributing 0 courses → removed.
 #
 # COURSE URL STRUCTURE
 # ─────────────────────────────────────────────────────────────────────────────
 # All individual course detail pages follow:
 #   https://www.deakin.edu.au/course/<slug>
 #   e.g. https://www.deakin.edu.au/course/bachelor-of-commerce
-#
-# The slug is lowercase hyphen-separated with no path segments beyond the slug.
 # ─────────────────────────────────────────────────────────────────────────────
 
 discovery:
   seed_urls:
-    # SSR'd international landing — PROVEN to find PG courses immediately.
-    # PG course cards appear in the initial HTML (SquizMatrix SSR, no Angular
-    # wait needed). Placed as the only seed so nav-page budget is maximised.
+    # ── SSR seed: yields ~43 PG courses from initial HTML immediately ──────
     - "https://www.deakin.edu.au/international-students/choosing-your-degree"
 
-  # Allow all 64 discipline nav-pages to be visited: SSR seed ~12s +
-  # 51 discipline pages × ~5s = ~267s, comfortably within this budget.
-  # Hard ceiling is the orchestrator's discovery_phase_timeout_s = 300s.
+    # ── Discipline pages (static HTML, ~10s each, 10-30 courses each) ─────
+    # Verified slugs (Wayback Machine CDX + live scrape log confirmation):
+    - "https://www.deakin.edu.au/study/find-a-course/arts-humanities-and-social-sciences"
+    - "https://www.deakin.edu.au/study/find-a-course/business"
+    - "https://www.deakin.edu.au/study/find-a-course/data-science-and-analytics"
+    - "https://www.deakin.edu.au/study/find-a-course/design-and-creative-arts"
+    - "https://www.deakin.edu.au/study/find-a-course/education-and-teaching"
+    - "https://www.deakin.edu.au/study/find-a-course/engineering"
+    - "https://www.deakin.edu.au/study/find-a-course/environment"
+    - "https://www.deakin.edu.au/study/find-a-course/food-nutrition-and-dietetics"
+    - "https://www.deakin.edu.au/study/find-a-course/health-and-community-services"
+    - "https://www.deakin.edu.au/study/find-a-course/health-sciences-and-allied-health"
+    # Additional slugs that may exist on the current site:
+    - "https://www.deakin.edu.au/study/find-a-course/law"
+    - "https://www.deakin.edu.au/study/find-a-course/nursing-and-midwifery"
+    - "https://www.deakin.edu.au/study/find-a-course/psychology"
+    - "https://www.deakin.edu.au/study/find-a-course/sport-and-exercise-science"
+    - "https://www.deakin.edu.au/study/find-a-course/architecture"
+    - "https://www.deakin.edu.au/study/find-a-course/double-degrees"
+
+  # Time budget covers: 1 SSR seed (~12s) + 16 discipline seeds × ~10s each
+  # = ~172s, plus BFS remainder for any organic sub-pages. 280s is well within
+  # the orchestrator's 300s hard ceiling.
   browser_time_budget_s: 280
 
   # Explicitly declare /course/<slug> pages as extraction candidates.
