@@ -1266,13 +1266,20 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Bypassed when: the run was started with forceDiscovery=true, or the
         # uni uses a SearchStax provider (its link dicts embed large prebuilt
         # payloads that must never be served stale — and the provider is a
-        # single fast Solr call anyway).  Read errors fail open to normal
-        # discovery.  Post-discovery filters (must_contain, allow/block
-        # patterns, year-dedup) still run on cached links as usual.
+        # single fast Solr call anyway), or the uni uses generic_search_api
+        # (a single fast API call replaces BFS entirely; serving stale BFS
+        # links from cache defeats the purpose of the YAML provider).
+        # Read errors fail open to normal discovery.  Post-discovery filters
+        # (must_contain, allow/block patterns, year-dedup) still run on
+        # cached links as usual.
         _disc_cache_hit = False
         _c1_rp = job.request_payload or {}
         _c1_force = bool(_c1_rp.get("forceDiscovery") or _c1_rp.get("force_discovery"))
-        if not _c1_force and getattr(_uni_cfg.discovery, "searchstax", None) is None:
+        _c1_has_api_provider = (
+            getattr(_uni_cfg.discovery, "searchstax", None) is not None
+            or getattr(_uni_cfg.discovery, "generic_search_api", None) is not None
+        )
+        if not _c1_force and not _c1_has_api_provider:
             try:
                 from app.models import DiscoveryUrlCache as _DUC
                 _c1_row = await db.get(_DUC, uni_id)
