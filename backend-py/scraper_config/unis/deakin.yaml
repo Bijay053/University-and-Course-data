@@ -11,24 +11,31 @@
 # per-course extraction must use Playwright (always_browser_discover) or
 # Scrape.do.
 #
-# DISCOVERY: 2-level study-area hierarchy under the international entry point
+# DISCOVERY: 2-level subject-area hierarchy under the international entry point
 # ─────────────────────────────────────────────────────────────────────────────
 #
-#   Step 1 — International landing page lists study-area cards:
+#   HOP 1 — International landing page lists subject-area cards (image cards):
 #     https://www.deakin.edu.au/international-students/choosing-your-degree
-#       h3.study-area-card--title > a  →  study area pages
+#       h3.study-area-card--title > a  →  subject-area pages
 #
-#   Step 2 — Each study-area page lists course tiles:
-#     div.related-item__tile--course  →  a.related-item__image[@href]
-#     e.g. /international-students/choosing-your-degree/accounting-and-finance
+#     Subject-area URLs:
+#       /international-students/choosing-your-degree/accounting-and-finance
+#       /international-students/choosing-your-degree/architecture
+#       /international-students/choosing-your-degree/business-and-commerce
+#       …  (~14 subject areas total)
 #
-#   Step 3 — Individual course detail pages:
-#     URL pattern: /course/<slug>
-#     e.g. https://www.deakin.edu.au/course/bachelor-of-commerce
+#   HOP 2 — Each subject-area page shows course tiles in 4 tabs:
+#       [Undergraduate] [Postgraduate] [Research] [Short courses]
+#     All tab content is pre-rendered in the DOM (hidden/shown via CSS, not
+#     lazy-loaded), so Playwright sees all tabs in one render pass.
+#     Course tiles: div.related-item__tile--course  →  a.related-item__image
+#     Course URLs: /course/<slug>
+#       e.g. https://www.deakin.edu.au/course/bachelor-of-commerce
 #
-# BFS handles the 2-level hierarchy naturally. allow_url_patterns gates on
-# /course/ so only real course-detail pages are staged, while the category
-# and study-area pages are traversed but not treated as candidates.
+#   BFS traverses HOP 1 (landing → subject areas) and HOP 2 (subject areas →
+#   course pages). listing_only_patterns marks subject-area pages as traverse-
+#   only (not extraction candidates). force_candidate_url_patterns explicitly
+#   declares /course/<slug> pages as extraction targets.
 #
 # PER-COURSE EXTRACTION (translated from du_au Scrapy spider)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -52,14 +59,21 @@ discovery:
   seed_urls:
     - "https://www.deakin.edu.au/international-students/choosing-your-degree"
 
-  # Gate candidates to /course/<slug> pages only.
-  # Study-area listing pages (/choosing-your-degree/<area>) are traversed for
-  # links but are NOT staged as course candidates (they have no course data).
+  # Explicitly declare /course/<slug> pages as extraction candidates.
+  # This prevents the BFS classifier from misidentifying a course page found
+  # 2 hops deep (landing → subject area → course) as a category page.
+  # Pattern: /course/ followed by at least one word character.
+  force_candidate_url_patterns:
+    - "^https://www\\.deakin\\.edu\\.au/course/[a-z][a-z0-9-]+/?$"
+
+  # Gate all discovery candidates to /course/<slug> only.
+  # Subject-area pages (/choosing-your-degree/<area>) are traversed for links
+  # but do NOT pass this filter — they have no extractable course data.
   allow_url_patterns:
     - "/course/"
 
   block_url_patterns:
-    # Non-course sections reachable from course pages
+    # Non-course sections — stop BFS from following these outbound links
     - "/international-students/english-language-requirements"
     - "/international-students/fees-and-scholarships"
     - "/international-students/applying-to-deakin"
@@ -70,13 +84,23 @@ discovery:
     - "/news/"
     - "/events/"
     - "/students/"
-    # Course sub-pages (units, handbooks) — not the course root
-    - "/course/[a-z][a-z0-9-]+/[a-z]"   # depth 3+ under a course slug
+    - "/library/"
+    - "/global-connect/"
+    # Course sub-pages (unit lists, course structure, handbooks) — depth 3+
+    # under a /course/<slug> root. These are not individual course pages.
+    - "/course/[a-z][a-z0-9-]+/[a-z]"
 
-  # Study-area listing pages should be visited for links but NOT staged.
+  # Mark the landing page and all subject-area pages as traverse-only.
+  # BFS visits them to collect /course/ links but does NOT stage them as
+  # extraction candidates.
+  # Pattern covers:
+  #   /international-students/choosing-your-degree          (landing)
+  #   /international-students/choosing-your-degree/accounting-and-finance
+  #   /international-students/choosing-your-degree/arts-humanities-and-social-sciences
+  #   etc.  (trailing slash variant included via /?$)
   listing_only_patterns:
-    - "/international-students/choosing-your-degree$"
-    - "/international-students/choosing-your-degree/[a-z][a-z-]+$"
+    - "/international-students/choosing-your-degree/?$"
+    - "/international-students/choosing-your-degree/[a-z][a-z0-9-]+/?$"
 
   # Cloudflare blocks plain HTTP (returns 403) — use browser for discovery.
   # Playwright renders the JS-built study-area cards and course tile grids.
