@@ -188,3 +188,8 @@ extraction:
   # Deakin's Cloudflare tier is sensitive to high concurrency.
   # 2 parallel Playwright sessions avoids triggering bot-detect.
   max_parallel_fetch: 2
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false

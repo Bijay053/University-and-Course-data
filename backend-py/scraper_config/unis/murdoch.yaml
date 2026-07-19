@@ -54,6 +54,8 @@ discovery:
 extraction:
   fees:
     default_currency: AUD
+    prefer_year_one_over_total: true   # Murdoch shows both "First year fee" and
+                                       # "Full course fee"; use the annual figure.
 
   english:
     central_page: "https://www.murdoch.edu.au/study/international-students/entry-requirements/english-language-requirements"
