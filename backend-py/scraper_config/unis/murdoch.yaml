@@ -1,7 +1,70 @@
-# Murdoch University — stub created for Week 5 scale-up.
-# Hostname: www.murdoch.edu.au  (course catalogue under /study)
-discovery: {}
+# ─────────────────────────────────────────────────────────────────────────────
+# MURDOCH UNIVERSITY
+# Hostname: www.murdoch.edu.au  |  Country: Australia  |  Currency: AUD
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# DISCOVERY: Elasticsearch API (public read-only key in their own JS bundle)
+# ─────────────────────────────────────────────────────────────────────────────
+# Murdoch's course-search SPA (https://search.murdoch.edu.au/?tab=courses)
+# queries an Elastic Cloud index directly from the browser using an API key
+# embedded in their public main.js bundle. We call that same endpoint server-
+# side — no browser or scrape.do needed for discovery.
+#
+# Index:    unified-search-courses
+# Cluster:  7482b89b357c4ef490c211d9da5893e4.australiaeast.azure.elastic-cloud.com
+# Key:      UHNHZkhKOEJjQ1RCNXAzbHFfOGw6dkFtT0J6eHh5Nk9paDl1djNRbm5Odw==
+#           (public read-only search key — embedded in search.murdoch.edu.au/js/main.*.js)
+#
+# A single POST with size=500 returns all 351 courses in one round-trip.
+#
+# EXTRACTION: plain HTTP, no Cloudflare
+# ─────────────────────────────────────────────────────────────────────────────
+# www.murdoch.edu.au course pages (/course/{level}/{code}) are fully server-
+# side rendered and accessible via plain HTTP with no Cloudflare protection.
+# Standard httpx extraction is sufficient; force_browser is NOT needed.
+#
+# Course URL structure:
+#   https://www.murdoch.edu.au/course/postgraduate/g1086
+#   https://www.murdoch.edu.au/course/undergraduate/b1395
+#   https://www.murdoch.edu.au/course/honours/bh-mrn
+# ─────────────────────────────────────────────────────────────────────────────
+
+discovery:
+  generic_search_api:
+    method: POST
+    url: "https://7482b89b357c4ef490c211d9da5893e4.australiaeast.azure.elastic-cloud.com/unified-search-courses/_search"
+    headers:
+      Authorization: "ApiKey UHNHZkhKOEJjQ1RCNXAzbHFfOGw6dkFtT0J6eHh5Nk9paDl1djNRbm5Odw=="
+      Content-Type: "application/json"
+    body:
+      query:
+        match_all: {}
+      size: 500
+      _source:
+        - url
+        - title
+    root_path: "hits.hits"
+    url_fields:
+      - "_source.url"
+    title_fields:
+      - "_source.title"
+    allow_url_patterns:
+      - "^https://www\\.murdoch\\.edu\\.au/course/"
+
 extraction:
+  fees:
+    default_currency: AUD
+
+  english:
+    central_page: "https://www.murdoch.edu.au/study/international-students/entry-requirements/english-language-requirements"
+
+  course_name:
+    strip_title_suffixes:
+      - " | Murdoch University"
+      - " | Murdoch"
+
   filters:
     domestic_only:
+      enabled: false
+    online_only:
       enabled: false
