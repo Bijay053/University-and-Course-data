@@ -6,79 +6,107 @@
 #
 # SITE OVERVIEW
 # ─────────────────────────────────────────────────────────────────────────────
-# CMS: Sitecore (AngularJS rendering on some pages).
-# Cloudflare protection: yes — plain HTTP returns 403; all discovery and
-# per-course extraction must use Playwright (always_browser_discover) or
-# Scrape.do.
+# CMS: Sitecore with Angular SPA frontend.
+# Cloudflare protection: yes — plain HTTP returns 403 from all paths including
+# sitemap.xml and robots.txt. All discovery and extraction must use Playwright
+# (always_browser_discover) or Scrape.do.
 #
-# DISCOVERY: 2-level subject-area hierarchy under the international entry point
+# WHY PREVIOUS APPROACH FOUND ONLY ~43 (ALL POSTGRADUATE) COURSES
 # ─────────────────────────────────────────────────────────────────────────────
+# The old seed was:
+#   https://www.deakin.edu.au/international-students/choosing-your-degree
 #
-#   HOP 1 — International landing page lists subject-area cards (image cards):
-#     https://www.deakin.edu.au/international-students/choosing-your-degree
-#       h3.study-area-card--title > a  →  subject-area pages
+# The subject-area pages under that path use Angular tabs (Undergraduate /
+# Postgraduate / Research / Short courses). Only the POSTGRADUATE tab's course
+# cards are server-side rendered in the initial HTML — the other tabs are
+# lazy-loaded via AJAX when clicked. Playwright's networkidle wait captures
+# the SSR'd PG content but not the client-side UG/Research content.
+# Result: ~43 PG courses, 0 UG courses.
 #
-#     Subject-area URLs:
-#       /international-students/choosing-your-degree/accounting-and-finance
-#       /international-students/choosing-your-degree/architecture
-#       /international-students/choosing-your-degree/business-and-commerce
-#       …  (~14 subject areas total)
-#
-#   HOP 2 — Each subject-area page shows course tiles in 4 tabs:
-#       [Undergraduate] [Postgraduate] [Research] [Short courses]
-#     All tab content is pre-rendered in the DOM (hidden/shown via CSS, not
-#     lazy-loaded), so Playwright sees all tabs in one render pass.
-#     Course tiles: div.related-item__tile--course  →  a.related-item__image
-#     Course URLs: /course/<slug>
-#       e.g. https://www.deakin.edu.au/course/bachelor-of-commerce
-#
-#   BFS traverses HOP 1 (landing → subject areas) and HOP 2 (subject areas →
-#   course pages). listing_only_patterns marks subject-area pages as traverse-
-#   only (not extraction candidates). force_candidate_url_patterns explicitly
-#   declares /course/<slug> pages as extraction targets.
-#
-# PER-COURSE EXTRACTION (translated from du_au Scrapy spider)
+# THE FIX: CORRECT SEED PAGES
 # ─────────────────────────────────────────────────────────────────────────────
-#   course_name  → h1 (plain text, no suffix stripping needed normally)
-#   degree_level → h1 following-sibling strong  (e.g. "Bachelor of Commerce")
-#   duration     → h3[text*="Duration"] + div p  (e.g. "3 years")
-#   location     → .course--keyfacts ul li a     (may be list of campuses)
-#   study_mode   → derived from location: Online→Online, Online+other→Hybrid,
-#                  otherwise On-Campus
-#   IELTS overall → h3//*[text*="English language proficiency"]
-#                     /following::ul[1]/li  matching "score of N.N"
-#   IELTS bands  → same ul, matching "less than N.N" (all 4 bands equal value)
-#   fee (intl)   → .module__key-information--item-content--full-width  (AUD/yr)
-#   description  → .module__overview--content
-#   entry req    → div[data-section*="entry requirements"]
+# Deakin exposes dedicated listing pages per level under /study/find-a-course/:
+#
+#   /study/find-a-course/undergraduate-courses   — all UG courses
+#   /study/find-a-course/postgraduate-courses    — all PG courses
+#   /study/find-a-course/double-degrees          — combined degrees
+#
+# These pages each render their own tab by default (no tab-switching needed),
+# so Playwright captures the full course card list in one render pass.
+#
+# The international-students filter pages are added as additional seeds:
+#   /international-students/choosing-your-degree/undergrad-degrees
+#   /international-students/choosing-your-degree/postgrad-degrees
+#
+# COURSE URL STRUCTURE
+# ─────────────────────────────────────────────────────────────────────────────
+# All individual course detail pages follow:
+#   https://www.deakin.edu.au/course/<slug>
+#   e.g. https://www.deakin.edu.au/course/bachelor-of-commerce
+#
+# The slug is lowercase hyphen-separated with no path segments beyond the slug.
 # ─────────────────────────────────────────────────────────────────────────────
 
 discovery:
-  # The international entry point — lists all study-area cards.
-  # BFS follows the 2-level hierarchy from here automatically.
   seed_urls:
+    # ── PRIMARY: level-specific listing pages ────────────────────────────────
+    # Each page renders its own default tab content (UG / PG / Double).
+    # Playwright networkidle captures all course cards in a single render pass.
+    - "https://www.deakin.edu.au/study/find-a-course/undergraduate-courses"
+    - "https://www.deakin.edu.au/study/find-a-course/postgraduate-courses"
+    - "https://www.deakin.edu.au/study/find-a-course/double-degrees"
+
+    # ── SECONDARY: international-student filter pages ─────────────────────────
+    # UG/PG filter pages on the international-students path.
+    # These render the same Angular course grid but filtered for international.
+    - "https://www.deakin.edu.au/international-students/choosing-your-degree/undergrad-degrees"
+    - "https://www.deakin.edu.au/international-students/choosing-your-degree/postgrad-degrees"
+
+    # ── FALLBACK: top-level international landing ─────────────────────────────
     - "https://www.deakin.edu.au/international-students/choosing-your-degree"
 
   # Explicitly declare /course/<slug> pages as extraction candidates.
-  # This prevents the BFS classifier from misidentifying a course page found
-  # 2 hops deep (landing → subject area → course) as a category page.
-  # Pattern: /course/ followed by at least one word character.
+  # force_candidate bypasses the global is_blocked_page classifier which
+  # might reject a course found at depth 2+ as a non-course page.
   force_candidate_url_patterns:
     - "^https://www\\.deakin\\.edu\\.au/course/[a-z][a-z0-9-]+/?$"
 
   # Gate all discovery candidates to /course/<slug> only.
-  # Subject-area pages (/choosing-your-degree/<area>) are traversed for links
-  # but do NOT pass this filter — they have no extractable course data.
+  # All listing/hub pages are traversal-only (handled by listing_only_patterns).
   allow_url_patterns:
     - "/course/"
 
+  # Mark all seed listing pages as traverse-only — BFS visits them to collect
+  # /course/<slug> links but does NOT stage them as extraction candidates.
+  listing_only_patterns:
+    # /study/find-a-course/ listing pages (UG, PG, double degrees, etc.)
+    - "/study/find-a-course/?$"
+    - "/study/find-a-course/[a-z][a-z0-9-]+/?$"
+    # /international-students/choosing-your-degree/ pages (landing + all filters)
+    - "/international-students/choosing-your-degree/?$"
+    - "/international-students/choosing-your-degree/[a-z][a-z0-9-]+/?$"
+
   block_url_patterns:
-    # Non-course sections — stop BFS from following these outbound links
-    - "/international-students/english-language-requirements"
-    - "/international-students/fees-and-scholarships"
-    - "/international-students/applying-to-deakin"
-    - "/international-students/life-in-australia"
-    - "/international-students/health-and-wellbeing"
+    # Non-course /study/ sections — block to keep BFS focused
+    - "/study/fees-and-scholarships"
+    - "/study/how-to-apply"
+    - "/study/key-dates"
+    - "/study/study-online"
+    - "/study/entry-pathways"
+    - "/study/access-programs"
+    - "/study/find-a-course-by-atar"
+    - "/study/find-a-course/short-courses"
+    - "/study/study-areas"
+    # Non-course international-students sections
+    - "/international-students/entry-requirements"
+    - "/international-students/how-to-apply"
+    - "/international-students/international-student-fees"
+    - "/international-students/international-student-scholarships"
+    - "/international-students/why-study-in-australia"
+    - "/international-students/study-abroad-and-exchange"
+    - "/international-students/help-or-contact"
+    - "/international-students/partnership-institutions"
+    # Wider site sections — never contain course pages
     - "/research/"
     - "/about-deakin/"
     - "/news/"
@@ -86,36 +114,24 @@ discovery:
     - "/students/"
     - "/library/"
     - "/global-connect/"
-    # Course sub-pages (unit lists, course structure, handbooks) — depth 3+
-    # under a /course/<slug> root. These are not individual course pages.
+    - "/faculty-of-"
+    - "/accommodation"
+    - "/indigenous-students/"
+    - "/partnerships-and-engagement/"
+    - "/student-life-and-services/"
+    # Course sub-pages (unit lists, course structure, handbooks)
+    # Pattern: /course/<slug>/<anything> — depth 3+ under a course root
     - "/course/[a-z][a-z0-9-]+/[a-z]"
 
-  # Mark the landing page and all subject-area pages as traverse-only.
-  # BFS visits them to collect /course/ links but does NOT stage them as
-  # extraction candidates.
-  # Pattern covers:
-  #   /international-students/choosing-your-degree          (landing)
-  #   /international-students/choosing-your-degree/accounting-and-finance
-  #   /international-students/choosing-your-degree/arts-humanities-and-social-sciences
-  #   etc.  (trailing slash variant included via /?$)
-  listing_only_patterns:
-    - "/international-students/choosing-your-degree/?$"
-    - "/international-students/choosing-your-degree/[a-z][a-z0-9-]+/?$"
-
-  # Cloudflare blocks plain HTTP (returns 403) — use browser for discovery.
-  # Playwright renders the JS-built study-area cards and course tile grids.
+  # Playwright renders JS-built course card grids.
   always_browser_discover: true
 
-  # Budget: 1 entry page + ~14 study-area pages + buffer = 20.
-  # Set to 60 to handle any extra pagination or sub-category pages.
-  bfs_page_budget: 60
+  # Sitemap is Cloudflare-blocked (403) from all IPs including prod server.
+  # Disabling avoids a slow 403 timeout on every scrape run.
+  always_sitemap_supplement: false
 
-  # Sitemap supplement: Deakin's sitemap lists all /course/* URLs directly —
-  # use it as a safety net to catch any courses not linked from the
-  # international category pages (domestic-only pages that still list
-  # international fees, or recently added programmes).
-  # sitemap_url is left null so the scraper auto-probes /sitemap.xml.
-  always_sitemap_supplement: true
+  # Budget: 6 seed pages + incidental traversal links = well under 60.
+  bfs_page_budget: 60
 
 extraction:
   fees:
@@ -128,21 +144,16 @@ extraction:
 
   english:
     # Central English requirements page for Deakin international students.
-    # The scraper also extracts IELTS from each course page (h3 "English
-    # language proficiency" section) so this page supplements/confirms it.
-    central_page: "https://www.deakin.edu.au/international-students/english-language-requirements"
+    central_page: "https://www.deakin.edu.au/international-students/entry-requirements/english"
 
   course_name:
-    # Deakin page titles typically end with " | Deakin University" or
-    # " | Deakin" — strip the suffix if the h1 is empty/missing.
     strip_title_suffixes:
       - " | Deakin University"
       - " | Deakin"
 
   filters:
-    # This spider targets the international-students catalogue — all courses
-    # found here are international offerings. Do NOT filter on fee presence
-    # because Deakin's fee is JS-rendered and may not appear in static HTML.
+    # Do NOT filter on fee presence — Deakin's fee panel is JS-rendered and
+    # may not appear immediately in the extracted HTML.
     domestic_only:
       enabled: false
 
@@ -150,12 +161,11 @@ extraction:
     online_only:
       enabled: false
 
-  # ── Per-course extraction behaviour ────────────────────────────────────────
   # Deakin blocks plain HTTP (403/CF challenge). Skip the initial static fetch
   # and go straight to Playwright so every course page is fully rendered.
   skip_initial_http_fetch: true
   force_browser: true
 
-  # Limit concurrent browser sessions. Deakin's Cloudflare tier is sensitive
-  # to high concurrency — 2 parallel sessions avoids triggering bot-detect.
+  # Deakin's Cloudflare tier is sensitive to high concurrency.
+  # 2 parallel Playwright sessions avoids triggering bot-detect.
   max_parallel_fetch: 2
