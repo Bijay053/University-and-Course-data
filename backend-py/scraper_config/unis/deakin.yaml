@@ -11,38 +11,39 @@
 # sitemap.xml and robots.txt. All discovery and extraction must use Playwright
 # (always_browser_discover) or Scrape.do.
 #
-# DISCOVERY ARCHITECTURE
+# DISCOVERY ARCHITECTURE (confirmed from scrape logs)
 # ─────────────────────────────────────────────────────────────────────────────
-# always_browser_discover: true SKIPS the BFS and runs browser_discover_generic
-# instead. That function reads discovery.seed_urls from the contextvar (YAML),
-# navigates to each seed directly via Playwright, and extracts <a href> links.
+# always_browser_discover: true → BFS is SKIPPED → browser_discover_generic runs.
 #
-# Wait sequence per seed (browser_discover_generic.py):
-#   1. page.goto(seed, wait_until="domcontentloaded", timeout=30s)
-#   2. wait_for_selector("a[href*='/course/']", timeout=8s) — may timeout
-#   3. asyncio.sleep(3s)                    — default settle
-#   4. asyncio.sleep(seed_page_settle_s)   — EXTRA settle for Angular XHR
-#   5. DOM link extraction (_EXTRACT_LINKS_JS)
-#   6. _SCROLL_AND_LOAD_JS (auto-fires for listing URLs) + 2nd extraction
+# Two discovery paths (confirmed working):
 #
-# WHY ~43 COURSES (ALL POSTGRADUATE) WERE FOUND BEFORE
+#   A. SSR seed: /international-students/choosing-your-degree
+#      PG course cards are SSR'd in the initial HTML. Playwright finds them
+#      immediately at domcontentloaded. ~12s, yields 43 PG links.
+#
+#   B. Per-discipline nav pages: /study/find-a-course/<subject-area>
+#      e.g. /study/find-a-course/arts-humanities-and-social-sciences
+#      Each yields 10–30 course links in ~5s (static HTML, no Angular SPA wait).
+#      browser_discover_generic finds these by following navigation links from
+#      the pages it visits and adds them to its internal BFS heap at score=100.
+#
+# WHAT DID NOT WORK (XHR capture)
 # ─────────────────────────────────────────────────────────────────────────────
-# Seeds 0–4 (Angular SPA listing pages) render their course grids via XHR
-# AFTER domcontentloaded. With only 3s settle, the DOM extraction at step 5
-# fires before Angular has fetched and rendered the course cards — so 0 links
-# are found from those seeds. The old SSR seed at position 5 was processed
-# last (within the 90s default budget) and its PG course cards ARE present
-# in the initial HTML → 43 PG links found, 0 UG.
+# Angular SPA seeds (/study/find-a-course/undergraduate-courses etc.) load
+# courses via XHR. The XHR interceptor captured 6 JSON endpoints but Deakin's
+# API schema (proprietary SquizMatrix format) did not match any known shape in
+# _extract_courses_from_xhr_json — 0 courses from that path.
+# seed_page_settle_s: 10 added for DOM fallback consumed ~120s of budget on
+# 3 SPA seeds that contributed nothing, leaving only 13 of 64 discipline
+# nav-pages visited before the 200s budget was exhausted → 84 courses total.
 #
 # THE FIX
 # ─────────────────────────────────────────────────────────────────────────────
-# 1. Move the proven SSR'd PG seed to position 0 so it always runs first.
-# 2. seed_page_settle_s: 10 — 10 extra seconds for Angular XHR + render before
-#    DOM extraction fires. Together with the 8s wait_for_selector + 3s settle,
-#    total wait is ~21s from domcontentloaded — enough for Angular to complete.
-# 3. browser_time_budget_s: 200 — allows all 4 seeds to complete within budget.
-# 4. XHR interception (built into browser_discover_generic) also captures any
-#    JSON API responses Angular makes during navigation — bonus discovery path.
+# 1. Remove the 3 Angular SPA seeds (they contribute 0 courses, waste ~90s).
+# 2. Remove seed_page_settle_s (SSR seed renders immediately, no SPA wait).
+# 3. browser_time_budget_s: 280 — 280s allows the SSR seed (~12s) + all 51+
+#    remaining discipline nav-pages (~5s each) = ~267s → every course found.
+#    300s is the orchestrator's hard ceiling; 280s leaves a 20s safety margin.
 #
 # COURSE URL STRUCTURE
 # ─────────────────────────────────────────────────────────────────────────────
@@ -55,31 +56,15 @@
 
 discovery:
   seed_urls:
-    # ── SEED 0: SSR'd international landing — PROVEN to find PG courses ───────
-    # This page has PG course cards server-side rendered in the initial HTML
-    # (SquizMatrix SSR, not Angular lazy-loaded). Playwright captures all 43+
-    # PG course links immediately without waiting for Angular XHR.
-    # Placed first so PG discovery is always guaranteed regardless of budget.
+    # SSR'd international landing — PROVEN to find PG courses immediately.
+    # PG course cards appear in the initial HTML (SquizMatrix SSR, no Angular
+    # wait needed). Placed as the only seed so nav-page budget is maximised.
     - "https://www.deakin.edu.au/international-students/choosing-your-degree"
 
-    # ── SEEDS 1–3: Angular SPA listing pages — need seed_page_settle_s ────────
-    # These pages load course cards via Angular XHR after domcontentloaded.
-    # seed_page_settle_s: 10 ensures Angular has time to fetch and render
-    # before DOM link extraction fires. The XHR response interceptor also
-    # captures JSON course data as it arrives (bonus path).
-    - "https://www.deakin.edu.au/study/find-a-course/undergraduate-courses"
-    - "https://www.deakin.edu.au/study/find-a-course/postgraduate-courses"
-    - "https://www.deakin.edu.au/study/find-a-course/double-degrees"
-
-  # Extra settle time per seed page for Angular SPA XHR completion + render.
-  # Deakin's Angular app takes ~8–12s from domcontentloaded to fully render
-  # the course card grid. Combined with the built-in 3s settle and up to 8s
-  # wait_for_selector, total wait reaches ~21s — sufficient for Angular XHR.
-  seed_page_settle_s: 10
-
-  # Allow all 4 seeds to process: ~12s (SSR seed) + 3×40s (SPA seeds) = ~132s.
-  # Extra headroom for CF challenge resolution and post-seed homepage nav.
-  browser_time_budget_s: 200
+  # Allow all 64 discipline nav-pages to be visited: SSR seed ~12s +
+  # 51 discipline pages × ~5s = ~267s, comfortably within this budget.
+  # Hard ceiling is the orchestrator's discovery_phase_timeout_s = 300s.
+  browser_time_budget_s: 280
 
   # Explicitly declare /course/<slug> pages as extraction candidates.
   # force_candidate bypasses the global is_blocked_page classifier which
@@ -88,22 +73,21 @@ discovery:
     - "^https://www\\.deakin\\.edu\\.au/course/[a-z][a-z0-9-]+/?$"
 
   # Gate all discovery candidates to /course/<slug> only.
-  # All listing/hub pages are traversal-only (handled by listing_only_patterns).
   allow_url_patterns:
     - "/course/"
 
-  # Mark all seed listing pages as traverse-only — BFS visits them to collect
-  # /course/<slug> links but does NOT stage them as extraction candidates.
+  # Mark all listing/hub pages as traverse-only (links extracted but page
+  # not staged for extraction).
   listing_only_patterns:
-    # /study/find-a-course/ listing pages (UG, PG, double degrees, etc.)
+    # /study/find-a-course/ listing pages (UG, PG, double degrees, per-area)
     - "/study/find-a-course/?$"
     - "/study/find-a-course/[a-z][a-z0-9-]+/?$"
-    # /international-students/choosing-your-degree/ pages (landing + all filters)
+    # /international-students/choosing-your-degree/ pages
     - "/international-students/choosing-your-degree/?$"
     - "/international-students/choosing-your-degree/[a-z][a-z0-9-]+/?$"
 
   block_url_patterns:
-    # Non-course /study/ sections — block to keep BFS focused
+    # Non-course /study/ sections
     - "/study/fees-and-scholarships"
     - "/study/how-to-apply"
     - "/study/key-dates"
@@ -135,32 +119,25 @@ discovery:
     - "/indigenous-students/"
     - "/partnerships-and-engagement/"
     - "/student-life-and-services/"
-    # Course sub-pages (unit lists, course structure, handbooks)
-    # Pattern: /course/<slug>/<anything> — depth 3+ under a course root
+    # Course sub-pages (unit lists, course structure, handbooks) — depth 3+
     - "/course/[a-z][a-z0-9-]+/[a-z]"
 
   # browser_discover_generic is the primary discovery engine (BFS is skipped).
   always_browser_discover: true
 
-  # Sitemap is Cloudflare-blocked (403) from all IPs including prod server.
-  # Disabling avoids a slow 403 timeout on every scrape run.
+  # Sitemap is Cloudflare-blocked (403). Disabling avoids a slow timeout.
   always_sitemap_supplement: false
 
   # bfs_page_budget only applies when BFS runs (always_browser_discover=false).
-  # Kept for defensive completeness if the flag is ever toggled.
   bfs_page_budget: 60
 
 extraction:
   fees:
     default_currency: AUD
-    # Deakin fee data is on individual course pages under:
-    #   .module__key-information--item-content--full-width
-    # No central fee PDF known — leave blank so per-course extraction runs.
     central_page: ""
     fees_pdf_url: ""
 
   english:
-    # Central English requirements page for Deakin international students.
     central_page: "https://www.deakin.edu.au/international-students/entry-requirements/english"
 
   course_name:
@@ -169,8 +146,7 @@ extraction:
       - " | Deakin"
 
   filters:
-    # Do NOT filter on fee presence — Deakin's fee panel is JS-rendered and
-    # may not appear immediately in the extracted HTML.
+    # Do NOT filter on fee presence — Deakin's fee panel is JS-rendered.
     domestic_only:
       enabled: false
 
@@ -178,8 +154,7 @@ extraction:
     online_only:
       enabled: false
 
-  # Deakin blocks plain HTTP (403/CF challenge). Skip the initial static fetch
-  # and go straight to Playwright so every course page is fully rendered.
+  # Deakin blocks plain HTTP (403/CF). Skip static fetch, go straight to Playwright.
   skip_initial_http_fetch: true
   force_browser: true
 
