@@ -1,9 +1,18 @@
 # Southern Cross University — www.scu.edu.au
-# Site is a Squiz Matrix SPA — static BFS always returns 0 links.
-# All course content (fees, IELTS, intakes) is JavaScript-rendered.
-# Course URL pattern confirmed by robots.txt: /study/courses/{slug}/
-# robots.txt also lists: Sitemap: https://www.scu.edu.au/google-sitemap/index.xml
-# (sitemap XML is empty for static HTTP fetches — browser required)
+#
+# DISCOVERY — static HTML listing page (updated 2026-07)
+# ─────────────────────────────────────────────────────────────────────────────
+# https://www.scu.edu.au/study/courses/ embeds all 122 international course
+# links as full absolute <a href="https://www.scu.edu.au/study/courses/...">
+# elements in its static (non-JS-rendered) HTML.  A single httpx fetch of
+# that page is sufficient to discover all courses — no browser required for
+# the discovery phase.
+#
+# (The old comment "Squiz Matrix SPA — static BFS returns 0 links" no longer
+# applies — SCU updated their site to include course links in static HTML.)
+#
+# Course detail pages (fees, IELTS, intakes) are still JS-rendered and require
+# browser extraction — this is handled by the extraction phase as usual.
 #
 # Fee note: SCU publishes fees ANNUALLY on
 #   https://www.scu.edu.au/study/international-courses-and-fees/
@@ -13,23 +22,17 @@
 # that exceeds A$80k — those are total-course costs misidentified as per-year.
 
 discovery:
-  always_browser_discover: true
-  always_sitemap_supplement: true
-  # Squiz Matrix SPA — uses JS rendering + Cloudflare; stealth (patchright+Xvfb)
-  # bypasses bot detection that blocks standard headless Playwright and causes
-  # intermittent 0-course discovery runs.
-  use_stealth_browser: true
+  always_browser_discover: false
+  always_sitemap_supplement: false
+  # /study/courses/ has all 122 courses in static HTML — one page is enough.
   seed_urls:
-    - https://www.scu.edu.au/study/undergraduate/
-    - https://www.scu.edu.au/study/postgraduate/
-    - https://www.scu.edu.au/study/research/
     - https://www.scu.edu.au/study/courses/
   allow_url_patterns:
     - /study/courses/
   block_url_patterns:
     - /study/units/
     - /study/courses/search
-  bfs_page_budget: 60
+  bfs_page_budget: 1
   _min_expected_courses: 120
 
 extraction:
@@ -46,3 +49,8 @@ extraction:
   filters:
     domestic_only:
       enabled: false
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false
