@@ -25,10 +25,16 @@ discovery:
   always_browser_discover: false
   always_sitemap_supplement: false
   # /study/courses/ has all 122 courses in static HTML — one page is enough.
+  # The page embeds course links as absolute hrefs with anchor text = numeric
+  # course codes (e.g. "1007289"), so _looks_like_course() returns False.
+  # force_candidate_url_patterns bypasses that check and adds every matching
+  # URL directly to the candidate set without needing drill-in.
   seed_urls:
     - https://www.scu.edu.au/study/courses/
   allow_url_patterns:
     - /study/courses/
+  force_candidate_url_patterns:
+    - '/study/courses/[a-z0-9]([a-z0-9\-]*[a-z0-9])?-\d{4,8}/$'
   block_url_patterns:
     - /study/units/
     - /study/courses/search
