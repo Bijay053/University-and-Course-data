@@ -141,6 +141,19 @@ _HOST_CDX_URL_PREFIX: dict[str, str] = {
     # this is a defence-in-depth fallback if those regress.
     "www.ulster.ac.uk": "www.ulster.ac.uk/courses/*",
     "ulster.ac.uk": "www.ulster.ac.uk/courses/*",
+    # UNE (University of New England): course pages live at
+    # /study/courses/<year>/<slug> (e.g. /study/courses/2025/bachelor-of-science).
+    # The site is fully Cloudflare Enterprise protected (HTTP 403 for all
+    # datacenter transports) and the listing page (/study/study-options/courses)
+    # is a React SPA with zero anchor-based course links in the rendered DOM —
+    # even Scrape.do render=true returns 0 course links (XHR-loaded JSON, not
+    # injected as <a> tags).  No sitemap exists.
+    # Wayback CDX is the only viable discovery mechanism.
+    # The default www.une.edu.au/* query would hit SURT-sorted non-course URLs
+    # before reaching the /study/courses/ subtree; targeting /study/courses/*
+    # directly returns only course-detail pages.
+    "www.une.edu.au": "www.une.edu.au/study/courses/*",
+    "une.edu.au": "www.une.edu.au/study/courses/*",
     # LSBU (London South Bank University): real course pages live at
     # /study/course-finder/<slug>.  Without a targeted prefix the default
     # www.lsbu.ac.uk/* CDX query exhausts the 10 000-row limit on
