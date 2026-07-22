@@ -4,119 +4,80 @@
 # Country: Australia  |  Currency: AUD
 # ─────────────────────────────────────────────────────────────────────────────
 #
-# SITE OVERVIEW
+# SITE OVERVIEW — URL STRUCTURE CHANGE (detected 2026-07)
 # ─────────────────────────────────────────────────────────────────────────────
-# CMS: Custom JS-rendered course catalogue. Plain-HTTP BFS finds ZERO course
-# links — all course listing pages are JS-rendered. Browser discovery is
-# mandatory.
+# Swinburne has completely migrated their course pages to a new URL scheme.
+# ALL old /courses/find-a-course/<faculty>/<sub-cat>/<course> URLs return 404.
+# The Funnelback search seed (/search?query=...collection=sut|sp-course-search)
+# no longer returns course cards even when browser-rendered (just nav links).
 #
-# DISCOVERY APPROACH — Funnelback search as primary seed
+# NEW URL STRUCTURE:
+#   /course/<level>/<course-slug>/
+#   /course/<level>/<course-slug>/<specialisation>/   (major/stream variants)
+#
+#   Examples:
+#     https://www.swinburne.edu.au/course/postgraduate/master-of-professional-accounting/
+#     https://www.swinburne.edu.au/course/postgraduate/master-of-professional-accounting/finance/
+#     https://www.swinburne.edu.au/course/undergraduate/bachelor-of-business/
+#
+# DISCOVERY APPROACH — sitemap
 # ─────────────────────────────────────────────────────────────────────────────
-# The university exposes a Funnelback course-search endpoint that, when
-# browser-rendered, returns all matching course cards with links to the real
-# course detail pages. Seeding this URL with num_ranks=250 gives all 235
-# international full-time course links in a single browser render pass.
+# Swinburne publishes a full course sitemap at /course/sitemap.xml with 746
+# URLs across levels:
+#   undergraduate:  288
+#   postgraduate:   217
+#   tafe:           109  (domestic only — excluded via block_url_patterns)
+#   short-courses:   65  (excluded)
+#   research:        45
+#   degree-pathway:  18
+#   inbound:          4  (excluded)
+#   ─────────────────
+#   total:          746  →  ~568 international-relevant after exclusions
 #
-#   Primary seed (Funnelback search — browser renders 235 course cards):
-#     https://www.swinburne.edu.au/search?query=&collection=sut|sp-course-search
-#       &f.Student type|Residency=international
-#       &f.Study mode|StudyModes=full-time
-#       &num_ranks=250&start_rank=1
-#
-#   Course URLs (depth-3 under /find-a-course/):
-#     /courses/find-a-course/<faculty>/<sub-category>/<course-slug>
-#     e.g. /courses/find-a-course/business/accounting/bachelor-of-accounting
-#
-# DEPTH STRUCTURE
-# ─────────────────────────────────────────────────────────────────────────────
-#   Depth-1  /courses/find-a-course/business             faculty hub (nav only)
-#   Depth-2  /courses/find-a-course/business/accounting  sub-category hub (nav)
-#   Depth-3  /courses/find-a-course/business/accounting/ COURSE DETAIL ← target
-#              bachelor-of-accounting
-#
-#   IMPORTANT: some depth-3 pages are career-guide articles, NOT courses:
-#     /courses/find-a-course/business/entrepreneurship-innovation/
-#       how-to-become-an-entrepreneur
-#   These are blocked by the "how-to-become" block pattern below.
-#
-# FACULTY SEEDS (kept as fallback)
-# ─────────────────────────────────────────────────────────────────────────────
-# If the Funnelback page renders before all cards are loaded, the faculty
-# seeds below provide a second path through the course catalogue.
+# Course pages are fully SSR (static HTML, no browser needed):
+#   - Fee visible in static HTML: AUD $36,540 confirmed
+#   - IELTS visible in static HTML: 6.5 confirmed
+#   - No Cloudflare protection
 # ─────────────────────────────────────────────────────────────────────────────
 
 discovery:
-  seed_urls:
-    # ── PRIMARY: Funnelback international full-time search — all 235 courses ──
-    # num_ranks=250 requests all results in one page; browser rendering exposes
-    # every course card link. listing_only_patterns prevents the search page
-    # itself from being staged as a course candidate.
-    - "https://www.swinburne.edu.au/search?query=&collection=sut%7Esp-course-search&f.Student+type%7CResidency=international&f.Study+mode%7CStudyModes=full-time&num_ranks=250&start_rank=1"
+  # Use the /course/ sub-sitemap as the primary discovery source.
+  # The root sitemap.xml (1291 bytes) has zero /course/ URLs but links to
+  # this sub-sitemap which has all 746 course-level URLs.
+  sitemap_url: "https://www.swinburne.edu.au/course/sitemap.xml"
+  always_sitemap_supplement: true
 
-    # ── FALLBACK: faculty-level BFS seeds ────────────────────────────────────
-    # Each faculty hub links to sub-category pages which link to course pages.
-    # Playwright renders each page in the chain to expose JS-built course links.
-    - https://www.swinburne.edu.au/courses/find-a-course/business
-    - https://www.swinburne.edu.au/courses/find-a-course/engineering
-    - https://www.swinburne.edu.au/courses/find-a-course/health
-    - https://www.swinburne.edu.au/courses/find-a-course/information-technology
-    - https://www.swinburne.edu.au/courses/find-a-course/law
-    - https://www.swinburne.edu.au/courses/find-a-course/arts-humanities-social-sciences
-    - https://www.swinburne.edu.au/courses/find-a-course/design
-    - https://www.swinburne.edu.au/courses/find-a-course/science-mathematics
-    - https://www.swinburne.edu.au/courses/find-a-course/built-environment-architecture
-    - https://www.swinburne.edu.au/courses/find-a-course/aviation
-    - https://www.swinburne.edu.au/courses/find-a-course/media-communication
+  # No browser BFS needed — the sitemap gives us all URLs directly.
+  # The old browser-based Funnelback discovery is completely broken.
+  always_browser_discover: false
 
-  # Require 3 path segments after /find-a-course/ so that depth-1 faculty
-  # and depth-2 sub-category pages are traversed for links but NOT extracted.
-  # Pattern: /courses/find-a-course/<faculty>/<sub-cat>/<course-slug>
+  # Include only international-relevant levels.
+  # Excludes: tafe (domestic-only), short-courses, inbound.
   allow_url_patterns:
-    - '/courses/find-a-course/[^/]+/[^/]+/[^/]'
-
-  # Mark the Funnelback search page as traverse-only — not a course candidate.
-  # BFS visits it, browser renders the 235 course cards, links are followed.
-  listing_only_patterns:
-    - "swinburne\\.edu\\.au/search\\?"
+    - '^https://www\.swinburne\.edu\.au/course/(undergraduate|postgraduate|honours|research|degree-pathway)/'
 
   block_url_patterns:
-    # Career-guide articles appear at depth-3 but are NOT courses
-    - '/how-to-become'
-    # Prevent BFS from following discovered search pagination links
-    - '/search\?'
-    # Other non-course sections
-    - /courses/online/
-    - /courses/planning-your-future/
-    - /courses/study-levels-explained/
-    - /courses/how-to-apply/
-    - /courses/scholarships/
-    - /courses/course-delivery-options
-    - /courses/applying/
-    - /courses/pathways/
-    - /news/
-    - /about/
-    - /research/
-    - /campus/
-    - /life/
+    - '/course/tafe/'
+    - '/course/short-courses/'
+    - '/course/inbound/'
+    - '/course/online/'
 
-  # Playwright renders JS-built course listing and course card grids.
-  always_browser_discover: true
+  # No seed_urls needed — sitemap covers everything.
+  seed_urls: []
 
-  # Sitemap is empty (1291 bytes, zero /courses/ URLs) — skip it.
-  always_sitemap_supplement: false
-
-  # Budget: 1 Funnelback page + 11 faculty seeds + ~25 sub-category pages
-  # + buffer = ~40 pages needed. Set to 100 for headroom.
-  bfs_page_budget: 100
+  # Sitemap is not empty any more — it has 746 course URLs.
+  # (The root sitemap.xml is still 1291 bytes; the /course/sitemap.xml is 87KB.)
+  bfs_page_budget: 1
 
 extraction:
   fees:
     default_currency: AUD
 
+  english:
+    central_page: "https://www.swinburne.edu.au/study/international/apply/entry-requirements/"
+
   filters:
-    # All 235 Funnelback results are international courses — do not filter on
-    # fee presence. Swinburne's fee panel is JS-rendered and may not appear
-    # in static HTML on every course page.
+    # Sitemap includes legitimate international courses at all levels.
     domestic_only:
       enabled: false
 
