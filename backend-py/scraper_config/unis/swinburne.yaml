@@ -39,53 +39,30 @@
 #   - IELTS visible in static HTML: 6.5 confirmed
 #   - No Cloudflare protection
 # ─────────────────────────────────────────────────────────────────────────────
-
 discovery:
-  # Use the /course/ sub-sitemap as the primary discovery source.
-  # The root sitemap.xml (1291 bytes) has zero /course/ URLs but links to
-  # this sub-sitemap which has all 746 course-level URLs.
-  sitemap_url: "https://www.swinburne.edu.au/course/sitemap.xml"
+  sitemap_url: https://www.swinburne.edu.au/course/sitemap.xml
   always_sitemap_supplement: true
-
-  # No browser BFS needed — the sitemap gives us all URLs directly.
-  # The old browser-based Funnelback discovery is completely broken.
   always_browser_discover: false
-
-  # Include only international-relevant levels.
-  # Excludes: tafe (domestic-only), short-courses, inbound.
   allow_url_patterns:
     - '^https://www\.swinburne\.edu\.au/course/(undergraduate|postgraduate|honours|research|degree-pathway)/'
-
   block_url_patterns:
     - '/course/tafe/'
     - '/course/short-courses/'
     - '/course/inbound/'
     - '/course/online/'
-
-  # No seed_urls needed — sitemap covers everything.
   seed_urls: []
-
-  # Sitemap is not empty any more — it has 746 course URLs.
-  # (The root sitemap.xml is still 1291 bytes; the /course/sitemap.xml is 87KB.)
   bfs_page_budget: 1
-
 extraction:
   fees:
     default_currency: AUD
-
   english:
-    central_page: "https://www.swinburne.edu.au/study/international/apply/entry-requirements/"
-
+    central_page: https://www.swinburne.edu.au/study/international/apply/entry-requirements/
   filters:
-    # Sitemap includes legitimate international courses at all levels.
     domestic_only:
       enabled: false
-
-    # Swinburne offers legitimate online international programmes.
     online_only:
       enabled: false
-
   course_name:
     strip_title_suffixes:
-      - " | Swinburne University of Technology"
-      - " | Swinburne"
+    - ' | Swinburne University of Technology'
+    - ' | Swinburne'
