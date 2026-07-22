@@ -1,7 +1,63 @@
-# University of Adelaide — stub created for Week 5 scale-up.
-# Hostname: www.adelaide.edu.au  (course catalogue under /study)
-discovery: {}
+# Adelaide University — adelaide.edu.au  (uni_id=2287)
+#
+# DISCOVERY — sitemap-based (2026-07)
+# ─────────────────────────────────────────────────────────────────────────────
+# The site has two URL namespaces that look similar but mean completely
+# different things:
+#
+#   /study/degrees/<slug>/         — degree-level PROGRAM pages (521 in sitemap)
+#   /study/degrees/online/<slug>/  — online degree programs (51 in sitemap)
+#   /study/courses/<code>/         — individual UNIT pages e.g. acct-1001 (5523!)
+#
+# We want the 572 /study/degrees/ pages.  The BFS discovered only 5 courses on
+# the first run because the /study/degrees/ listing page loads its links via
+# JavaScript (static HTML has almost no degree links).  The sitemap at
+# https://adelaide.edu.au/sitemap.xml lists all 572 degree pages, so
+# always_sitemap_supplement=true is the primary discovery mechanism.
+#
+# DATA AVAILABLE IN STATIC HTML (no browser rendering needed):
+#   • Course name    — <h1> tag
+#   • International fee — "$XX,XXX" inside .degree-details-content-section-subtitle >span
+#     (tooltip text: "Published fees are for international students starting in 2026.")
+#   • IELTS          — "IELTS Overall X.X" in page text
+#   • Intake months  — "February|July" style pipe-separated string in page
+#   • Duration       — "X year(s) full-time" in page
+#   • Study mode     — "On campus" / "online" in page
+#
+# Verified examples (2026-07-22):
+#   Bachelor of Arts                    → fee $43,400  IELTS 6.5  Feb|Jul  3yr
+#   Master of IT (Cyber Security)       → fee $53,300  IELTS 6.5  Feb|Jul  2yr
+#   Bachelor of Nursing                 → fee $46,700  IELTS 7.0  3yr
+#   Bachelor of Psychology (online)     → IELTS 6.5   Jan|Apr|Jun|Sep  3yr
+#
+# No Cloudflare protection detected; no JS rendering required for discovery.
+
+discovery:
+  always_sitemap_supplement: true
+  always_browser_discover: false
+  # Provide the sitemap URL explicitly — the 1MB sitemap has all degree URLs.
+  sitemap_url: https://adelaide.edu.au/sitemap.xml
+  seed_urls:
+    - https://adelaide.edu.au/study/degrees/
+  allow_url_patterns:
+    - /study/degrees/
+  block_url_patterns:
+    # /study/courses/ = individual units (e.g. acct-1001), NOT degree programs.
+    # There are 5523 of these in the sitemap; blocking prevents BFS budget waste.
+    - /study/courses/
+    # Landing/utility pages — not individual degree pages.
+    - /study/degrees/compare-degrees/
+    - /study/degrees/2026/
+    - /study/degrees/2027/
+  # Minimal BFS — sitemap handles discovery; budget just covers the seed page.
+  bfs_page_budget: 2
+  _min_expected_courses: 100
+
 extraction:
   filters:
     domestic_only:
       enabled: false
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: false
