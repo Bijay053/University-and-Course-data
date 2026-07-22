@@ -1,0 +1,86 @@
+# University of New England (UNE) — www.une.edu.au  (uni_id=2288)
+#
+# ── CLOUDFLARE ENTERPRISE BLOCK (2026-07-22) ─────────────────────────────────
+# All three transports (plain httpx, curl_cffi, direct) return 403 with
+# cf-ray headers on EVERY path — homepage, listing, course pages, sitemap.
+# Identical pattern to Cardiff (2194) and Kingston (2193).
+#
+# Fix: route ALL fetches through Scrape.do residential proxy pool, which
+# bypasses Cloudflare Enterprise bot-management.
+#
+# ── DISCOVERY STRATEGY ───────────────────────────────────────────────────────
+# Course URL pattern (confirmed via Wayback CDX):
+#   /study/courses/{year}/{course-slug}
+#   e.g. /study/courses/2026/bachelor-of-science
+#
+# Listing page: https://www.une.edu.au/study/study-options/courses
+# (detected in scraper log: "Home page detected → course listing found at …")
+# This page may be JS-rendered — scrape_do_render=true handles it.
+#
+# Old year-cohort URLs (2021–2024) are blocked to avoid scraping stale data.
+#
+# ── EXTRACTION STRATEGY ──────────────────────────────────────────────────────
+# single_course.py (line 1337) already appends ?international=true to all
+# /study/courses/ URLs automatically — no YAML change needed.
+# scrape_do_render=true fetches each course page through headless Chrome via
+# Scrape.do's residential IP pool, bypassing the CF Enterprise 403.
+# skip_browser_rescue=true prevents the datacenter Playwright from firing
+# (it also returns 403 from Replit's datacenter ASN).
+
+discovery:
+  # Route ALL discovery fetches (BFS, sitemap) through Scrape.do.
+  # Plain httpx / curl_cffi both return 403 — skip them entirely.
+  scrape_do_skip_fallbacks: true
+  # Use headless Chrome render for listing page (may be SPA/JS-rendered).
+  scrape_do_render: true
+
+  seed_urls:
+    - https://www.une.edu.au/study/study-options/courses
+
+  # Course pages are under /study/courses/{year}/{slug}.
+  # The listing page (/study/study-options/courses) is traversed but not
+  # itself a course candidate (depth-3 filter handles this naturally).
+  allow_url_patterns:
+    - /study/courses/
+
+  block_url_patterns:
+    # Old year cohorts — block so BFS doesn't traverse stale 2021-2024 pages.
+    - /study/courses/2021/
+    - /study/courses/2022/
+    - /study/courses/2023/
+    - /study/courses/2024/
+    # Filter and search utility pages.
+    - /study/courses?
+    - /news
+    - /events
+    - /staff/
+    - /about
+    - /contact
+
+  # Modest BFS budget — listing page may be SPA with limited static links.
+  # Sitemap supplement will inject remaining courses.
+  bfs_page_budget: 8
+
+  # Supplement BFS with sitemap, even if BFS finds some courses.
+  always_sitemap_supplement: true
+
+  # Wayback Archive does not have useful coverage of UNE course pages.
+  use_wayback: false
+
+extraction:
+  # Scrape.do headless Chrome (residential IP) bypasses CF Enterprise 403.
+  # skip_fallbacks: true skips the doomed httpx/cffi datacenter attempts.
+  # skip_browser_rescue: true prevents datacenter Playwright (also 403).
+  scrape_do_render: true
+  scrape_do_skip_fallbacks: true
+  skip_browser_rescue: true
+
+  # Lower parallelism — render calls are ~4-6s each via Scrape.do.
+  max_parallel_fetch: 3
+
+  fees:
+    default_currency: AUD
+
+  filters:
+    domestic_only:
+      enabled: false
