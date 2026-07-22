@@ -1,18 +1,38 @@
 # Southern Cross University — www.scu.edu.au
 #
-# DISCOVERY — static HTML listing page (updated 2026-07)
+# DISCOVERY — year-versioned URLs in static HTML (updated 2026-07)
 # ─────────────────────────────────────────────────────────────────────────────
-# https://www.scu.edu.au/study/courses/ embeds all 122 international course
-# links as full absolute <a href="https://www.scu.edu.au/study/courses/...">
-# elements in its static (non-JS-rendered) HTML.  A single httpx fetch of
-# that page is sufficient to discover all courses — no browser required for
-# the discovery phase.
+# https://www.scu.edu.au/study/courses/ has TWO distinct course-link sections:
 #
-# (The old comment "Squiz Matrix SPA — static BFS returns 0 links" no longer
-# applies — SCU updated their site to include course links in static HTML.)
+#   Section A (HTML comment — INVISIBLE to HTMLParser):
+#     122 base URLs like .../associate-degree-in-law-paralegal-studies-2206351/
+#     with numeric anchor text (course codes like "2206351").
+#     These live inside an HTML comment spanning positions ~81895-96977:
+#       <!-- Close
+#       <section class="masthead-no-image ...">
+#         <ul class="list-unstyled"><li><a href=".../slug/">code</a></li>...
+#       </section>
+#       Default -->
+#     Python's HTMLParser skips <a> tags inside <!-- ... --> comments, so
+#     _LinkExtractor finds ZERO base URLs.  force_candidate_url_patterns cannot
+#     help here — the hrefs never reach the BFS loop.
 #
-# Course detail pages (fees, IELTS, intakes) are still JS-rendered and require
-# browser extraction — this is handled by the extraction phase as usual.
+#   Section B (visible HTML — after position ~97000):
+#     Year-versioned URLs like .../slug/2026/ and .../slug/2027/ with full
+#     course names as anchor text.  These are NOT in a comment and ARE
+#     extracted correctly by _LinkExtractor.
+#
+# The BFS therefore discovers only year-versioned URLs (~112 x 2027 URLs and
+# ~8-113 x 2026 URLs depending on fetch transport/TLS fingerprint).
+#
+# Remedy: accept both 2026 and 2027 year URLs.  The DB recipe
+# (scrape_config.recipe.course_year) deduplicates by slug_without_year,
+# preferring 2027 — the current academic year offering.  The old
+# block_url_patterns: ["/2027/"] has been cleared from the DB recipe since
+# it was discarding the only effectively-discoverable course URLs.
+#
+# Course detail pages (fees, IELTS, intakes) are JS-rendered and require
+# browser extraction — handled by the extraction phase as usual.
 #
 # Fee note: SCU publishes fees ANNUALLY on
 #   https://www.scu.edu.au/study/international-courses-and-fees/
@@ -24,22 +44,18 @@
 discovery:
   always_browser_discover: false
   always_sitemap_supplement: false
-  # /study/courses/ has all 122 courses in static HTML — one page is enough.
-  # The page embeds course links as absolute hrefs with anchor text = numeric
-  # course codes (e.g. "1007289"), so _looks_like_course() returns False.
-  # force_candidate_url_patterns bypasses that check and adds every matching
-  # URL directly to the candidate set without needing drill-in.
+  # One BFS page is enough — the listing page is static and all course links
+  # (year-versioned 2026/2027) appear in the visible HTML after the HTML
+  # comment section closes at ~position 97000.
   seed_urls:
     - https://www.scu.edu.au/study/courses/
   allow_url_patterns:
     - /study/courses/
-  force_candidate_url_patterns:
-    - '/study/courses/[a-z0-9]([a-z0-9\-]*[a-z0-9])?-\d{4,8}/$'
   block_url_patterns:
     - /study/units/
     - /study/courses/search
   bfs_page_budget: 1
-  _min_expected_courses: 120
+  _min_expected_courses: 110
 
 extraction:
   fees:

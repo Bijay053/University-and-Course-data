@@ -76,3 +76,4 @@
 - [Bond ES API discovery](bond-es-discovery.md) — program finder is React SPA/AJAX; query /api/v1/elasticsearch/bond_prod_default/_search with generic_search_api; _source.url.0 dot-path extracts array fields.
 - [UniSC sitemap discovery](unisc-sitemap-discovery.md) — ProgramFinderCtrl is client-side Angular (no API); XMLsitemap has 391 depth-2 course pages; block majors-and-minors/handbooks/headstart depth-1 categories + depth-3+ intake pages.
 - [Bond University sitemap discovery](bond-sitemap-discovery.md) — generic_search_api gated by `if not links`; BFS fills it first; sitemap.xml index (5 child pages, 240 URLs) is the correct approach.
+- [SCU HTML-comment hidden URLs](scu-html-comment-hidden.md) — base course URLs inside an HTML comment; _LinkExtractor finds 0; force_candidate_url_patterns is useless here; fix = allow year-versioned URLs through (remove /2027/ block, prefer 2027).
