@@ -27,11 +27,12 @@
 #
 # Discovery approach
 # ─────────────────────────────────────────────────────────────────────────────
-# Seed the BFS with the two main listing pages. XMLsitemap is also enabled as
-# a supplement because BFS from 2 seeds only finds ~76-106 of the ~131
-# expected international courses — courses under rarely-linked study-area
-# sub-categories are missed. XMLsitemap has 120 UG + 72 PG = 192 depth-4
-# URLs which fills the gaps. Together BFS + sitemap targets ~131 courses.
+# Seed the BFS with the main courses-and-programs page PLUS the two specific
+# listing pages. XMLsitemap is also enabled as a supplement because BFS from
+# 2 seeds only finds ~76-106 of the ~131 expected international courses —
+# courses under rarely-linked study-area sub-categories are missed.
+# XMLsitemap has 120 UG + 72 PG = 192 depth-4 URLs which fills the gaps.
+# Together BFS + sitemap targets both undergraduate and postgraduate.
 #
 # IMPORTANT — correct slug note
 # ─────────────────────────────────────────────────────────────────────────────
@@ -41,7 +42,7 @@
 #
 # Filter overrides (user requirement: extract ALL courses)
 # ─────────────────────────────────────────────────────────────────────────────
-# The user explicitly wants all 86 UG + 45 PG international courses staged
+# The user explicitly wants all UG + PG international courses staged
 # even if:
 #   - No international fee is found (domestic_only filter disabled)
 #   - Delivery is online-only (online_only filter disabled)
@@ -49,25 +50,28 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 discovery:
-  # Start BFS from the two main course listing pages — they contain most
-  # course links in their static HTML.  This avoids crawling the whole site
-  # root before reaching course pages.
+  # Start BFS from the main courses listing page and both category pages.
+  # The main page links to the UG and PG listing pages; seeding all three
+  # ensures BFS reaches both undergraduate and postgraduate course links.
   seed_urls:
+    - "https://www.unisc.edu.au/study/courses-and-programs"
     - "https://www.unisc.edu.au/study/courses-and-programs/bachelor-degrees-undergraduate-programs"
     - "https://www.unisc.edu.au/study/courses-and-programs/postgraduate-degrees"
 
   # Allow only depth-4 pages: /study/courses-and-programs/<category>/<slug>
-  # This excludes depth-3 listing pages and depth-5+ sub-pages.
-  # Pattern is broad (substring search via re.search) so any URL containing
-  # /study/courses-and-programs/<2+-char-segment>/<1+-char-segment> passes.
-  # The 6 URLs it drops are depth-3 category pages with no course slug.
+  # The pattern is end-anchored with `$` so depth-5+ URLs (commencement
+  # session sub-pages, course-library unit pages) do NOT match.
+  # Breakdown of the end-anchored pattern:
+  #   /study/courses-and-programs/  — fixed prefix
+  #   [a-z][a-z-]+/                 — category segment (2+ alpha/hyphen chars)
+  #   [a-z][a-z-]+                  — course slug (2+ alpha/hyphen chars)
+  #   $                             — end of URL path (no trailing sub-paths)
+  # The trailing /? allows for an optional trailing slash.
   allow_url_patterns:
-    - "/study/courses-and-programs/[a-z][a-z-]+/[a-z]"
+    - "/study/courses-and-programs/[a-z][a-z-]+/[a-z][a-z-]+/?$"
 
   block_url_patterns:
-    # Depth-5+ sub-pages within a course (e.g. majors/minors pages)
-    - "/study/courses-and-programs/[a-z][a-z-]+/[a-z][a-z-]+/"
-    # Non-course depth-4 pages that pass the allow pattern:
+    # Non-course depth-4 pages:
     # "undergraduate-elective-courses" and "postgraduate-elective-courses"
     # are unit-level elective lists, not individual course programmes.
     - "elective-courses"
@@ -79,6 +83,26 @@ discovery:
     - "/study/courses-and-programs/[a-z-]+/explore-"
     # Subsidised programs listing page (not an individual course)
     - "subsidised-postgraduate-programs"
+    # Junk pages: semester/trimester schedule pages scraped as "courses"
+    - "trimester"
+    - "semester"
+    # Search results page (not a course)
+    - "/search"
+    # Category/browse pages that pass depth-4 filter but aren't courses
+    - "postgraduate-business"
+    - "-majors-and-minors"
+    - "tertiary-preparation"
+    # Unit/subject code pages (e.g. des212-visual-communication-and-culture,
+    # bsc301-applied-science-project) — individual subjects, NOT degree programs.
+    # Unit slugs start with 2-4 alpha chars followed by 3 digits.
+    - "/[a-z]{2,4}[0-9]{3}[^/]*$"
+    # Course/unit library pages under a different URL tree
+    - "/course-library/"
+    # Commencement/intake session sub-pages under individual course pages
+    # e.g. .../master-of-management/sunshine-coast-session-7-commencement
+    - "commencement"
+    - "-session-[0-9]"
+
     # Generic site noise
     - "/news/"
     - "/about/"
@@ -98,11 +122,10 @@ discovery:
   # carry additional course links not on the two main seed pages.
   bfs_page_budget: 100
 
-  # XMLsitemap supplement: BFS from 2 seeds only finds ~76 of the ~131
-  # expected courses (courses in rarely-linked study-area sub-categories are
-  # missed). XMLsitemap at /XMLsitemap has 120 UG + 72 PG = 192 depth-4 URLs
-  # which fills the gap. The allow/block patterns above filter it down to the
-  # real international courses.
+  # XMLsitemap supplement: BFS from seeds only finds ~76-89 of the expected
+  # courses (courses in rarely-linked study-area sub-categories are missed).
+  # XMLsitemap at /XMLsitemap has 120 UG + 72 PG = 192 depth-4 URLs which
+  # fills the gap. The allow/block patterns above filter it to real courses.
   sitemap_url: "https://www.unisc.edu.au/XMLsitemap"
   always_sitemap_supplement: true
 
@@ -118,6 +141,19 @@ extraction:
     # Central English requirements page (Gemini/pattern extraction)
     central_page: "https://www.unisc.edu.au/study/how-to-apply/english-language-requirements"
 
+  course_name:
+    # UniSC's Umbraco CMS appends site branding to the <title> element.
+    # When H1 extraction fails, the raw title "Bachelor of X | Unisc |
+    # University of the Sunshine Coast, Queensland, Australia" is used.
+    # Strip all known suffix forms so only the degree name remains.
+    strip_title_suffixes:
+      - " | Unisc | University of the Sunshine Coast, Queensland, Australia"
+      - " | UniSC | University of the Sunshine Coast, Queensland, Australia"
+      - " | University of the Sunshine Coast, Queensland, Australia"
+      - " | Unisc"
+      - " | UniSC"
+      - " | University of the Sunshine Coast"
+
   filters:
     # ── User requirement: extract ALL international courses ──────────────────
     # Do NOT drop courses that lack explicit international-fee data.
@@ -132,8 +168,8 @@ extraction:
       enabled: false
 
   staging:
-    # Disable the degree-qualifier name check.  UniSC uses standard degree
-    # names (Bachelor of, Master of, Graduate Certificate in, etc.) but
-    # some course names may not parse correctly from static HTML H1 tags
-    # before the qualifier check runs.  Disabling avoids false rejects.
-    skip_degree_qualifier_check: true
+    # Degree-qualifier check is ENABLED (default).  UniSC uses standard degree
+    # names: Bachelor of X, Master of Y, Graduate Certificate in Z.  The check
+    # correctly rejects unit/subject code pages (Des212, Bus301 …) that slip
+    # through the block_url_patterns filter.
+    skip_degree_qualifier_check: false
