@@ -2,55 +2,52 @@
 #
 # ── CLOUDFLARE ENTERPRISE BLOCK ──────────────────────────────────────────────
 # All three transports (plain httpx, curl_cffi, direct) return 403 with
-# cf-ray headers on EVERY path — homepage, listing, course pages, sitemap.
-# Identical pattern to Cardiff (2194) and Kingston (2193).
-#
-# Fix: route ALL fetches through Scrape.do residential proxy pool, which
-# bypasses Cloudflare Enterprise bot-management.
+# cf-ray headers — same pattern as Cardiff and Kingston.
+# All fetches must go through Scrape.do residential proxy pool.
 #
 # ── DISCOVERY STRATEGY ───────────────────────────────────────────────────────
-# Course URL pattern (confirmed via Wayback CDX):
-#   /study/courses/{year}/{course-slug}
+# Listing page (/study/study-options/courses) is a React SPA — courses are
+# XHR-loaded as JSON, so BFS finds 0 course links even with render=true.
+#
+# UNE has a dedicated course sub-sitemap:
+#   https://www.une.edu.au/cauc-static/study/sitemap.xml  → 198 course URLs
+# Course URL pattern: /study/courses/{year}/{slug}
 #   e.g. /study/courses/2025/bachelor-of-science
 #
-# Listing page: https://www.une.edu.au/study/study-options/courses
-# This is a React SPA — even Scrape.do render=true finds ZERO course links
-# because courses are XHR-loaded as JSON, not injected as <a> tags.
-# BFS is skipped (bfs_page_budget: 0) to avoid burning the 300s budget.
+# Discovery flow:
+#   BFS (budget=0, skipped) → sitemap fallback (budget=0 means 0<5 threshold
+#   always fires) → fetches sitemap_url directly → 198 candidates ✅
 #
-# Primary discovery: Wayback Machine CDX API (use_wayback: true).
-# wayback_discover.py _HOST_CDX_URL_PREFIX maps www.une.edu.au →
-#   www.une.edu.au/study/courses/* so CDX returns only course pages.
-# CDX runs with the 45s timeout + 3-attempt retry logic in wayback_discover.py.
-# Year blocks are removed so CDX results for ANY year (2021–2026) pass through;
-# the year-dedup pipeline normalises duplicates downstream.
+# The large main sitemap (sitemap.xml, 6532 entries, 0 course URLs) and the
+# sitemap_index traversal are avoided entirely by pointing sitemap_url to the
+# course-specific sub-sitemap.  This keeps the single sitemap probe fast
+# (~3-5s via Scrape.do static) and well within the 300s discovery budget.
 #
 # ── EXTRACTION STRATEGY ──────────────────────────────────────────────────────
-# single_course.py (line 1337) already appends ?international=true to all
-# /study/courses/ URLs automatically — no YAML change needed.
-# Scrape.do render=true fetches each course page through headless Chrome via
-# Scrape.do's residential IP pool, bypassing the CF Enterprise 403.
-# skip_browser_rescue: true prevents datacenter Playwright (also 403).
+# single_course.py appends ?international=true to all /study/courses/ URLs
+# automatically.  Scrape.do render=true fetches each course page via headless
+# Chrome through Scrape.do's residential IP pool, bypassing CF Enterprise 403.
 
 discovery:
   # Route ALL discovery fetches through Scrape.do.
-  # Plain httpx / curl_cffi both return 403 — skip them entirely.
+  # Plain httpx / curl_cffi both return 403.
   scrape_do_skip_fallbacks: true
-  # Use headless Chrome render for per-course page fetching.
-  # BFS skips the listing page anyway (budget=0), but render=true is needed
-  # for any BFS fallback pages the sitemap might produce.
+  # render=true for per-course page fetching during extraction.
+  # Sitemap XML itself is fetched statically (cheaper + faster).
   scrape_do_render: true
 
   seed_urls:
     - https://www.une.edu.au/study/study-options/courses
+
+  # Point directly at the course-specific sub-sitemap.
+  # Avoids probing the 6532-entry main sitemap.xml and sitemap_index.xml.
+  sitemap_url: https://www.une.edu.au/cauc-static/study/sitemap.xml
 
   # Course pages are under /study/courses/{year}/{slug}.
   allow_url_patterns:
     - /study/courses/
 
   block_url_patterns:
-    # Filter and search utility pages (not year-cohort blocks — CDX results
-    # for any year are allowed; year-dedup handles duplicates downstream).
     - /study/courses?
     - /news
     - /events
@@ -58,22 +55,21 @@ discovery:
     - /about
     - /contact
 
-  # Skip BFS entirely: the listing page is a React SPA that renders 0 course
-  # links even with Scrape.do headless Chrome. Saving all 300s for Wayback CDX.
+  # Skip BFS entirely: the listing page is a React SPA with XHR-loaded courses.
   bfs_page_budget: 0
 
-  # Supplement with sitemap (tries quickly, fails gracefully — UNE has none).
-  always_sitemap_supplement: true
+  # Disable the always-on supplement to prevent double-probing the sitemap.
+  # With budget=0, BFS always yields 0 < 5 threshold, which already triggers
+  # the sitemap fallback.  Running the supplement on top causes a second full
+  # sitemap probe that times out on sitemap-study-pages.xml.
+  always_sitemap_supplement: false
 
-  # Use Wayback CDX as the primary discovery mechanism (supplemental=True means
-  # CDX always runs regardless of BFS results). See _HOST_CDX_URL_PREFIX in
-  # wayback_discover.py for the www.une.edu.au → /study/courses/* prefix.
-  use_wayback: true
+  # CDX not needed — the cauc-static/study/sitemap.xml already covers all 198+
+  # courses.  Keeping CDX disabled avoids the extra network round-trip.
+  use_wayback: false
 
 extraction:
   # Scrape.do headless Chrome (residential IP) bypasses CF Enterprise 403.
-  # skip_fallbacks: true skips the doomed httpx/cffi datacenter attempts.
-  # skip_browser_rescue: true prevents datacenter Playwright (also 403).
   scrape_do_render: true
   scrape_do_skip_fallbacks: true
   skip_browser_rescue: true
