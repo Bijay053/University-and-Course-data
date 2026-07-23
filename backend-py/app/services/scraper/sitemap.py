@@ -21,6 +21,7 @@ the wild and a strict parser fails on the first un-escaped ampersand.
 from __future__ import annotations
 
 import asyncio
+import html as _html_module
 import logging
 import re
 import time
@@ -478,6 +479,19 @@ async def discover_from_sitemap(
                 )
             continue
         all_locs = _LOC_RE.findall(xml)
+        if not all_locs and "&lt;loc" in xml:
+            # Scrape.do render=True fetches XML via headless Chrome.  Chrome's
+            # XML viewer HTML-encodes the raw source when embedding it in the
+            # page DOM (<loc> → &lt;loc&gt;), so the plain-XML regex finds
+            # nothing.  Unescape once and retry — the URL text itself contains
+            # no HTML entities, so names/hrefs survive the round-trip intact.
+            all_locs = _LOC_RE.findall(_html_module.unescape(xml))
+            if all_locs:
+                log.info(
+                    "sitemap %s: found %d <loc> entries after HTML-unescape "
+                    "(Chrome XML viewer wraps raw XML source in HTML entities)",
+                    sm_url, len(all_locs),
+                )
         if not all_locs:
             if emit:
                 await emit(
@@ -509,8 +523,17 @@ async def discover_from_sitemap(
                 sub_xml = await _fetch_text(nested_url)
                 if not sub_xml:
                     continue
+                _sub_locs = _LOC_RE.findall(sub_xml)
+                if not _sub_locs and "&lt;loc" in sub_xml:
+                    _sub_locs = _LOC_RE.findall(_html_module.unescape(sub_xml))
+                    if _sub_locs:
+                        log.info(
+                            "sub-sitemap %s: found %d <loc> entries after "
+                            "HTML-unescape (Chrome XML viewer encoding)",
+                            nested_url, len(_sub_locs),
+                        )
                 added = 0
-                for raw_loc in _LOC_RE.findall(sub_xml):
+                for raw_loc in _sub_locs:
                     loc = _normalize_sitemap_url(raw_loc)
                     if (
                         loc in found

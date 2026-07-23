@@ -1,75 +1,81 @@
 # University of New England (UNE) — www.une.edu.au  (uni_id=2288)
 #
 # ── CLOUDFLARE ENTERPRISE BLOCK ──────────────────────────────────────────────
-# All three transports (plain httpx, curl_cffi, direct) return 403 with
-# cf-ray headers — same pattern as Cardiff and Kingston.
-# All fetches must go through Scrape.do residential proxy pool.
+# www.une.edu.au blocks ALL transports (httpx, curl_cffi, Scrape.do static).
+# Scrape.do render=True (headless Chrome + residential IP) is the only path
+# that returns real content. This applies to both the sitemap and per-course
+# pages.
 #
 # ── DISCOVERY STRATEGY ───────────────────────────────────────────────────────
 # Listing page (/study/study-options/courses) is a React SPA — courses are
 # XHR-loaded as JSON, so BFS finds 0 course links even with render=true.
 #
-# UNE has a dedicated course sub-sitemap:
-#   https://www.une.edu.au/cauc-static/study/sitemap.xml  → 198 course URLs
-# Course URL pattern: /study/courses/{year}/{slug}
-#   e.g. /study/courses/2025/bachelor-of-science
+# UNE publishes a dedicated course sitemap (~2MB, ~1920 URLs):
+#   https://www.une.edu.au/cauc-static/study/sitemap.xml
 #
-# Discovery flow:
-#   BFS (budget=0, skipped) → sitemap fallback (budget=0 means 0<5 threshold
-#   always fires) → fetches sitemap_url directly → 198 candidates ✅
+# Sitemap fetch: Scrape.do static returns 502 ROTATION_FAILED.
+# Scrape.do render=True (headless Chrome) returns 200 OK with 2MB — Chrome's
+# XML viewer embeds the raw XML in a <div id="webkit-xml-viewer-source-xml">
+# with actual <loc> tags intact. _LOC_RE finds all 1920 entries correctly.
 #
-# The large main sitemap (sitemap.xml, 6532 entries, 0 course URLs) and the
-# sitemap_index traversal are avoided entirely by pointing sitemap_url to the
-# course-specific sub-sitemap.  This keeps the single sitemap probe fast
-# (~3-5s via Scrape.do static) and well within the 300s discovery budget.
+# Course URL pattern: /study/courses/{slug}  (no year)
+#   e.g. /study/courses/bachelor-of-science
+#
+# IMPORTANT — allow_url_patterns MUST be set explicitly here.
+# The DB auto_config.discovery.allow_url_patterns stores the OLD pattern
+# '/courses/[0-9]{4}/[a-zA-Z0-9_-]+$' (year-based URLs, now obsolete).
+# Without overriding it, all 1920 <loc> entries are filtered → 0 candidates.
+#
+# The sitemap also contains ~1717 /study/units/ URLs (individual subjects/units,
+# not courses). The /study/courses/ pattern excludes these correctly.
 #
 # ── EXTRACTION STRATEGY ──────────────────────────────────────────────────────
-# single_course.py appends ?international=true to all /study/courses/ URLs
-# automatically.  Scrape.do render=true fetches each course page via headless
-# Chrome through Scrape.do's residential IP pool, bypassing CF Enterprise 403.
+# single_course.py appends ?international=true to all une.edu.au URLs
+# automatically (keyed on hostname).
+# Per-course pages (www.une.edu.au/study/courses/...) are CF Enterprise
+# blocked; Scrape.do render=True is required.
 
 discovery:
-  # Route ALL discovery fetches through Scrape.do.
-  # Plain httpx / curl_cffi both return 403.
-  scrape_do_skip_fallbacks: true
-  # render=true for per-course page fetching during extraction.
-  # Sitemap XML itself is fetched statically (cheaper + faster).
-  scrape_do_render: true
-
   seed_urls:
     - https://www.une.edu.au/study/study-options/courses
 
-  # Point directly at the course-specific sub-sitemap.
-  # Avoids probing the 6532-entry main sitemap.xml and sitemap_index.xml.
+  # Point directly at the course-specific sitemap.
+  # Avoids traversing the main sitemap_index (6500+ entries, 20+ sub-sitemaps).
   sitemap_url: https://www.une.edu.au/cauc-static/study/sitemap.xml
 
-  # Course pages are under /study/courses/{year}/{slug}.
+  # Override the stale DB auto_config pattern (was /courses/{year}/{slug}).
+  # UNE's current URL structure uses /study/courses/{slug} (no year segment).
+  # 203 of 1920 sitemap entries match this pattern (rest are /study/units/).
   allow_url_patterns:
-    - /study/courses/
+    - '/study/courses/[a-zA-Z0-9_-]+$'
+
+  # REQUIRED — skip_fallbacks=true makes the fetch chain go:
+  #   Scrape.do static (502 ROTATION_FAILED) → render=True → 200 OK, 2MB XML ✓
+  # Without this, httpx/cffi/Wayback are tried first (all 403/empty), then
+  # Scrape.do static (502), and render=True is never attempted → 0 bytes.
+  scrape_do_skip_fallbacks: true
 
   block_url_patterns:
-    - /study/courses?
     - /news
     - /events
     - /staff/
     - /about
     - /contact
 
-  # Skip BFS entirely: the listing page is a React SPA with XHR-loaded courses.
+  # Skip BFS entirely: listing page is a React SPA with XHR-loaded courses.
   bfs_page_budget: 0
 
-  # Disable the always-on supplement to prevent double-probing the sitemap.
-  # With budget=0, BFS always yields 0 < 5 threshold, which already triggers
-  # the sitemap fallback.  Running the supplement on top causes a second full
-  # sitemap probe that times out on sitemap-study-pages.xml.
+  # Disable the always-on sitemap supplement — bfs_page_budget=0 yields 0<5
+  # which already triggers the sitemap fallback. The supplement would probe
+  # 20+ sub-sitemaps from the main sitemap_index, consuming the 300s budget.
   always_sitemap_supplement: false
 
-  # CDX not needed — the cauc-static/study/sitemap.xml already covers all 198+
-  # courses.  Keeping CDX disabled avoids the extra network round-trip.
+  # CDX not needed — cauc-static sitemap covers all courses.
   use_wayback: false
 
 extraction:
-  # Scrape.do headless Chrome (residential IP) bypasses CF Enterprise 403.
+  # Scrape.do headless Chrome (residential IP) bypasses CF Enterprise 403
+  # for per-course pages.
   scrape_do_render: true
   scrape_do_skip_fallbacks: true
   skip_browser_rescue: true

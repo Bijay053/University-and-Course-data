@@ -1498,7 +1498,22 @@ async def extract(
     # This pre-pass reads the <table> DOM directly and returns the
     # International + Full-time row for the latest year — or blocks the
     # fallback entirely when no such row exists.
-    _table_result = _extract_fee_table_row(html)
+    #
+    # GUARD: This logic is UK-specific.  Non-UK universities (e.g. Australian
+    # .edu.au, NZ .ac.nz) may have course-page tables that superficially match
+    # the "Home/International × Full-time/Part-time" pattern but are NOT fee
+    # tables — causing false _FEE_TABLE_FOUND_NO_INTL signals that reject all
+    # courses.  Only run this pre-pass for .ac.uk hosts.
+    _fee_table_host = url or ""
+    try:
+        from urllib.parse import urlparse as _up
+        _fee_table_host = _up(_fee_table_host).hostname or ""
+    except Exception:
+        pass
+    _is_uk_fee_table_host = (
+        _fee_table_host.endswith(".ac.uk") or _fee_table_host == "ac.uk"
+    )
+    _table_result = _extract_fee_table_row(html) if _is_uk_fee_table_host else None
     if _table_result is _FEE_TABLE_FOUND_NO_INTL:
         # Structured fee table exists but has NO International + Full-time row
         # (e.g. a part-time-only course like HNC Building Studies — Home /
