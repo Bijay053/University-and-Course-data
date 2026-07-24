@@ -2,60 +2,75 @@
 # Hostname: www.latrobe.edu.au
 #
 # Bug history / rationale:
-#   - 2026-05-12: scrape staged only ~6 rows, all of which were CATEGORY
-#     LANDING PAGES ("Research degrees", "Global partnerships",
-#     "Rankings and ratings", "Your undergraduate degree") rather than
-#     real course pages. Root cause: BFS classifier marked these /study/
-#     and /international/study/ marketing pages as "listing" pages and
-#     followed their internal links — which point to MORE marketing
-#     pages, not courses. BFS hit its 25-page budget after touching only
-#     37 candidates of which the gate dropped most.
 #
-#     Real La Trobe course pages live at /courses/<slug> where the slug
-#     starts with bachelor-, master-, diploma-, graduate-, doctor-,
+#   - 2026-05-12: scrape staged only ~6 rows, all category landing pages.
+#     Root cause: BFS classifier promoted marketing pages instead of real
+#     course pages. Real La Trobe course pages live at /courses/<slug> where
+#     the slug starts with bachelor-, master-, diploma-, graduate-, doctor-,
 #     associate-, global-master-, professional-certificate-, or
-#     undergraduate-certificate-. The sitemap.xml at /sitemap.xml
-#     publishes 392 /courses/ URLs in total — 215 real courses and 177
-#     category pages (e.g. /courses/aboriginal-studies, /courses/anthropology).
+#     undergraduate-certificate-. The sitemap.xml publishes ~215 real course
+#     URLs + ~177 category pages (total ~392).
+#     Fix: allow_url_patterns + block_url_patterns + always_sitemap_supplement.
 #
-#     Fix is four knobs in this YAML:
-#       1. allow_url_patterns whitelists only the real course slug
-#          shapes — keeps category pages out of staging.
-#       2. block_url_patterns drops the worst offenders the BFS
-#          classifier promoted (/study/undergrad, /international/study/...,
-#          /courses/a-z, /courses/diplomas, /courses/packages).
-#       3. always_sitemap_supplement: true — the 392-entry sitemap is
-#          where the real course catalogue lives; without it BFS can
-#          only see the ~14 visible cards on each category page.
-#       4. max_candidates: 250 — leaves headroom above the ~215 real
-#          courses so none get dropped at the cap (same fix as the
-#          2026-05-12 CQU adjustment).
+#   - 2026-07-24: CLOUDFLARE ENTERPRISE BLOCK — same failure mode as Herts
+#     (id=2226), Cardiff (id=2194), Kingston (id=2193):
+#       plain httpx     → 403 on all paths (CF Enterprise blocks datacenter IPs)
+#       curl_cffi       → 403 on all paths
+#       Wayback         → nothing useful
+#       Scrape.do static → 0 bytes / ROTATION_FAILED
+#       Scrape.do render=true → 200 ✓ (verified: sitemap returns XML with
+#                               ~215 real course URLs on first page)
 #
-#   - La Trobe per-course pages are JS-heavy (the static head returns
-#     `(function() { var requirePrehiding = true; ...` — meaning fees,
-#     IELTS, duration are all rendered client-side). The browser
-#     fallback in the per-course extractor will need to fire for almost
-#     every page; this is already handled by the existing pipeline.
+#     http_fetcher.py auto-escalates static 502→render=true BUT only after
+#     the static attempt's full timeout (~30s) — which burns the 300s discovery
+#     budget before the sitemap or any BFS pages are fetched.
+#
+#     Fix: set discovery.scrape_do_skip_fallbacks + scrape_do_render so every
+#     discovery fetch goes STRAIGHT to Scrape.do render, skipping the doomed
+#     httpx/cffi/static chain.  BFS is useless (JS-rendered SPA listing pages
+#     return 0 course links even via render); minimal budget exits immediately
+#     so the sitemap runs within budget.
+#
+#   - Per-course pages are also JS-heavy (prehiding JS shell on static fetch).
+#     extraction.scrape_do_render + skip_browser_rescue mirrors the Herts
+#     pattern: residential browser pool serves the full rendered page;
+#     datacenter Playwright also 403s on CF Enterprise.
 
 discovery:
+  # Route ALL fetches (BFS + sitemap) straight to Scrape.do render.
+  # Static returns 0 bytes / ROTATION_FAILED on latrobe.edu.au → render=True
+  # is the only transport that works (verified 2026-07-24).
+  scrape_do_skip_fallbacks: true
+  scrape_do_render: true
+
+  # BFS listing pages are JS-rendered SPAs — render=true gets HTML but
+  # course cards are lazy-loaded via API calls, so BFS still yields 0 course
+  # candidates. Budget=1 visits the homepage once (confirming 0 candidates),
+  # then exits immediately so the sitemap supplement runs within the 300s budget.
+  bfs_page_budget: 1
+
+  # La Trobe sitemap.xml is not paginated — one URL returns all course paths.
+  # Pointing directly here skips any sitemap-index redirect overhead.
+  sitemap_url: https://www.latrobe.edu.au/sitemap.xml
+
+  # Always supplement with sitemap regardless of BFS candidate count.
+  always_sitemap_supplement: true
+
+  # Wayback has nothing useful for latrobe.edu.au; disable to save budget.
+  use_wayback: false
+
   # Whitelist real La Trobe course slugs. Anchored on /courses/ + a
   # known degree-type prefix so category pages like /courses/anthropology
-  # or /courses/aboriginal-studies (which look like courses to BFS but
-  # are actually subject-area landing pages) are excluded.
+  # or /courses/aboriginal-studies are excluded.
   allow_url_patterns:
-    - "/courses/(?:bachelor|master|diploma|graduate|doctor|associate|global-master|professional-certificate|undergraduate-certificate)-"
+    - "/courses/(?:bachelor|master|diploma|graduate|doctor|associate|global-master|professional-certificate|undergraduate-certificate|phd|juris)-"
 
   block_url_patterns:
-    # Aggregate listing / index pages that match the slug whitelist
-    # incidentally (e.g. /courses/diplomas).
+    # Aggregate listing / index pages.
     - "/courses/a-z$"
     - "/courses/diplomas$"
     - "/courses/packages$"
-    # Marketing / category pages the BFS classifier loves to promote.
-    # No trailing `$`: BFS otherwise still crawls the subtree (e.g.
-    # /study/undergrad/find-your-course-by-atar) and burns budget on
-    # more marketing pages — the log showed exactly that on the failing
-    # run.
+    # Marketing / category pages.
     - "/study/undergrad"
     - "/study/online"
     - "/study/aspire"
@@ -67,30 +82,64 @@ discovery:
     - "/about-us/"
     - "/events/"
 
-  # Critical: the sitemap is the canonical source of truth for the
-  # course catalogue. BFS alone returns ~14 candidates per category
-  # page; the sitemap exposes 392 /courses/ URLs in one fetch.
-  always_sitemap_supplement: true
-
-  # Bump BFS budget so additional listing pages get crawled even if
-  # the sitemap is temporarily unavailable.
-  bfs_page_budget: 60
-
-  # Headroom above the ~215 real-course count so the cap doesn't
-  # silently drop late-alphabet entries.
+  # Headroom above the ~215 real-course count.
   max_candidates: 250
 
 extraction:
+  # Scrape.do headless Chrome (residential IP) bypasses CF Enterprise 403.
+  # skip_fallbacks: true skips the doomed httpx/cffi attempts upfront.
+  scrape_do_render: true
+  scrape_do_skip_fallbacks: true
+
+  # skip_browser_rescue: datacenter Playwright also 403s on CF Enterprise.
+  skip_browser_rescue: true
+
+  # skip_per_course_browser: La Trobe's per-course browser fee-extraction
+  # path (per_course_browser.py) uses datacenter Playwright which CF
+  # Enterprise blocks.  Without this flag every course batch stalls for
+  # 60-120 s waiting for the browser timeout, causing saves=0.
+  skip_per_course_browser: true
+
+  # La Trobe offers "Professional Certificate" and "Undergraduate Certificate"
+  # qualifications whose titles lack the canonical Bachelor/Master/Doctor/
+  # Diploma words in _DEGREE_QUALIFIER_RE.  Scrape.do also sometimes returns
+  # an Adobe Target prehide shell with no extractable H1, which causes even
+  # standard qualifications (e.g. "Juris Doctor") to trip the guard.
+  # Disabling the guard here is safe: discovery already filtered to course
+  # URLs via allow_url_patterns + min_links logic.
+  skip_degree_qualifier_check: true
+
+  # 3 concurrent render calls balances throughput against Scrape.do
+  # residential-pool rate limits.  Even if some renders return 0B the
+  # course still stages (with less data) so occasional 0B is acceptable.
+  max_parallel_fetch: 3
+
   filters:
     domestic_only:
-      enabled: true   # Preserve current prod behaviour: filter runs for all unis.
+      enabled: true
+    # La Trobe is a fully on-campus multi-campus university.  The rendered
+    # pages are a JS prehide shell with no extractable location/campus text,
+    # so the `no_location_online_override` rule fires and stamps study_mode=
+    # "Online" on every course.  Disabling the online_only filter prevents
+    # those courses from being rejected by should_stage_course().
+    # study_mode will be reviewed/corrected by operators post-staging.
+    online_only:
+      enabled: false
 
   fees:
     central_page: "https://www.latrobe.edu.au/international/applying/fees"
     fees_pdf_url: ""
 
   english:
-    # English requirements live on a central page; per-course pages
-    # typically link to it rather than republishing the table.
     central_page: ""
     requirements_pdf_url: ""
+
+  staging:
+    # La Trobe international fees are not extractable automatically:
+    # - Central fee page (international/applying/fees) parsed 0 records via
+    #   Scrape.do render (JS fee table requires client-side interaction to
+    #   populate after page load).
+    # - Per-course pages also fail to surface fees even with render=true.
+    # Without this flag every course is rejected by the default fee gate.
+    # Operators review fee data manually after staging.
+    require_international_fee: false

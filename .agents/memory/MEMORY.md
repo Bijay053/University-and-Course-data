@@ -1,3 +1,4 @@
+- [La Trobe CF Enterprise fixes](latrobe-cf-enterprise.md) — Full fix stack: render+skip_fallbacks+skip_browser+skip_per_course_browser+skip_degree_qualifier; online_only off; max_parallel_fetch≥3.
 - [Phase 9B conflict resolution](phase9b-conflict-resolution.md) — T001-T004: repair order, confidence formula, field normalizer canon forms, schema (migration 028), KPI API shape, pre-existing test failures.
 - [QMUL fetch_failed visibility gap](qmul-fetch-failed-visibility.md) — DONE-line + DB persistence for scraper fetch losses already exist (run_summary.py, http_fetcher.py retry ladder); grep before re-adding.
 - [Cloudflare 429 vs block classification](cf-429-vs-block.md) — 429 rate-limit ≠ 403/503 challenge; per-uni use_wayback flag was wired at only one of two call sites.
