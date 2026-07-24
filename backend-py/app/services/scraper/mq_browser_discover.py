@@ -278,13 +278,14 @@ async def _discover_from_coursehandbook_sitemap(
     """Harvest MQ course URLs from coursehandbook.mq.edu.au sitemaps.
 
     Uses the stealth context (patchright + xvfb) to bypass the
-    Cloudflare challenge that fronts the handbook host.  Returns
-    ``[{"url": str, "name": ""}, ...]`` deduped, capped at *max_courses*,
-    or ``[]`` on any failure (caller falls back to the widget sweep).
+    Cloudflare challenge that fronts the handbook host for the sitemap
+    XML files.  The per-course title resolver that follows uses plain
+    httpx (coursehandbook.mq.edu.au course-detail pages are accessible
+    without a browser; the sitemap index/child URLs are not reliably so).
 
-    The empty ``name`` is filled later by the single-course extractor
-    from the page ``<title>`` (verified shape: "Bachelor of Biodiversity
-    and Conservation").
+    Returns ``[{"url": admissions_url, "name": course_name}, ...]``
+    deduped, capped at *max_courses*, or ``[]`` on any failure (caller
+    falls back to the widget sweep).
     """
     try:
         from app.services.scraper.stealth_browser import stealth_context
@@ -335,10 +336,10 @@ async def _discover_from_coursehandbook_sitemap(
                 f"{len(child_sitemaps)} child sitemap(s)"
             )
 
-            # Step 2: walk each child sitemap, filter to current-year
+            # Step 2: walk each child sitemap, filter to target-year
             # /courses/CXXXX URLs.  Sitemap-1 + sitemap-3 each hold ~10K
-            # URLs (units + aos + doubledegree dominate), so we keep the
-            # filter strict and exit early on max_courses.
+            # URLs (units + aos + doubledegree dominate), so the filter
+            # is strict and we exit early on max_courses.
             for child in child_sitemaps:
                 if len(course_urls) >= max_courses:
                     break
@@ -421,44 +422,64 @@ async def _resolve_to_study_urls(
     """For each coursehandbook URL, extract the course name from <title>
     and construct the equivalent www.mq.edu.au admissions URL.
 
-    Runs in parallel batches of :data:`_RESOLVE_PARALLEL` using a single
-    stealth_context (which keeps the patchright + xvfb session alive
-    across all gotos — far cheaper than spinning up one context per
-    URL). Returns ``[{"url": admissions_url, "name": title}, ...]``
-    deduped on admissions URL.
+    coursehandbook.mq.edu.au is NOT Cloudflare-protected — plain httpx
+    returns 200 OK with the correct per-course <title> in the static HTML
+    (verified 2026-07-24: C000001 → "Bachelor of Biodiversity and
+    Conservation", 208 KB SSR response, no CF challenge).  Using plain
+    httpx instead of patchright is therefore both faster (~200 ms/request
+    vs 10-15 s browser goto) and more reliable — the old patchright-based
+    resolver timed out on ~256/383 courses because the 15 s per-page limit
+    was exhausted by browser startup + 208 KB page load, silently dropping
+    two-thirds of the catalogue.
 
-    URLs whose <title> can't be parsed (empty / "Handbook" site nav /
-    fetch error) are skipped with a warning rather than emitted with a
+    Runs 20 concurrent httpx requests (no rate-limit risk; coursehandbook
+    is a lightweight CDN-backed SSR app).  Returns
+    ``[{"url": admissions_url, "name": title}, ...]`` deduped on
+    admissions URL.
+
+    URLs whose <title> can't be parsed (empty / "Handbook" site-nav title
+    / fetch error) are skipped with a warning rather than emitted with a
     bad slug.
     """
     if not handbook_urls:
         return []
-    try:
-        from app.services.scraper.stealth_browser import stealth_context
-    except Exception as exc:  # noqa: BLE001
-        log.warning("mq_browser_discover: stealth_browser unavailable for resolver — %s", exc)
-        return []
+
+    import httpx as _httpx
+
+    _HTTPX_PARALLEL = 20
+    _HTTPX_TIMEOUT = 20.0  # per-request; 208 KB SSR page ~200 ms normally
 
     out_by_url: dict[str, dict] = {}
     skipped = 0
+    sem = asyncio.Semaphore(_HTTPX_PARALLEL)
 
-    async def _resolve_one(page, handbook_url: str) -> tuple[str, str] | None:
-        try:
-            await page.goto(
-                handbook_url,
-                wait_until="domcontentloaded",
-                timeout=_RESOLVE_GOTO_TIMEOUT_MS,
-            )
-            body = await page.content()
-        except Exception as exc:  # noqa: BLE001
-            log.warning("mq resolver: goto %s failed: %s", handbook_url, exc)
-            return None
+    _HEADERS = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/131.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+    }
+
+    async def _resolve_one(client: "_httpx.AsyncClient", handbook_url: str) -> tuple[str, str] | None:
+        async with sem:
+            try:
+                r = await client.get(handbook_url, timeout=_HTTPX_TIMEOUT)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("mq resolver: httpx GET %s failed: %s", handbook_url, exc)
+                return None
+            if r.status_code >= 400:
+                log.warning("mq resolver: %s → HTTP %s", handbook_url, r.status_code)
+                return None
+            body = r.text
         m = re.search(r"<title>([^<]+)</title>", body, re.I)
         if not m:
             return None
         raw_title = m.group(1).strip()
-        # "Handbook" is the literal site-nav title when the SPA shell
-        # didn't get the per-course override; skip rather than emit
+        # "Handbook" is the fallback site-nav title when the SSR didn't
+        # inject a per-course override; skip rather than emit
         # /courses/handbook as a garbage admissions URL.
         if not raw_title or raw_title.lower() in ("handbook", "macquarie university handbook"):
             return None
@@ -468,49 +489,33 @@ async def _resolve_to_study_urls(
         admissions_url = f"{_STUDY_URL_BASE}{slug}"
         return (admissions_url, raw_title)
 
-    async def _worker(queue: asyncio.Queue, ctx) -> None:
-        nonlocal skipped
-        page = await ctx.new_page()
-        try:
-            while True:
-                try:
-                    handbook_url = queue.get_nowait()
-                except asyncio.QueueEmpty:
-                    return
-                try:
-                    result = await _resolve_one(page, handbook_url)
-                    if result is None:
-                        skipped += 1
-                    else:
-                        admissions_url, name = result
-                        if admissions_url not in out_by_url:
-                            out_by_url[admissions_url] = {"url": admissions_url, "name": name}
-                finally:
-                    queue.task_done()
-        finally:
-            try:
-                await page.close()
-            except Exception:  # noqa: BLE001
-                pass
-
-    queue: asyncio.Queue = asyncio.Queue()
-    for u in handbook_urls:
-        queue.put_nowait(u)
-
     try:
-        async with stealth_context() as ctx:
-            workers = [
-                asyncio.create_task(_worker(queue, ctx))
-                for _ in range(min(_RESOLVE_PARALLEL, len(handbook_urls)))
+        async with _httpx.AsyncClient(
+            headers=_HEADERS,
+            follow_redirects=True,
+        ) as client:
+            tasks = [
+                asyncio.create_task(_resolve_one(client, url))
+                for url in handbook_urls
             ]
-            await asyncio.gather(*workers, return_exceptions=True)
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for result in results:
+            if isinstance(result, Exception):
+                skipped += 1
+            elif result is None:
+                skipped += 1
+            else:
+                admissions_url, name = result
+                if admissions_url not in out_by_url:
+                    out_by_url[admissions_url] = {"url": admissions_url, "name": name}
     except Exception as exc:  # noqa: BLE001
-        log.warning("mq_browser_discover: resolver pass raised: %s", exc)
+        log.warning("mq_browser_discover: httpx resolver pass raised: %s", exc)
 
     if skipped:
         await emit_fn(
             f"[DISCOVER] MQ: resolver skipped {skipped} URL(s) with "
-            f"unparseable <title>"
+            f"unparseable <title> or fetch error"
         )
     return sorted(out_by_url.values(), key=lambda d: d["url"])
 
@@ -719,18 +724,26 @@ async def browser_discover_mq(
             _ch_exc,
         )
         ch_links = []
-    # Floor of 20 is conservative — even a partial sitemap fetch giving
-    # us 20+ valid course URLs is dramatically better than the widget
-    # sweep's typical 0-6 nav junk.  Empty result → fall through.
-    if len(ch_links) >= 20:
-        return ch_links[:max_courses]
+    # Seed the merged dict with handbook results immediately so BFS
+    # additions below de-duplicate on admissions URL.
+    merged: dict[str, dict] = {d["url"]: d for d in ch_links}
+
+    # If handbook already produced a full catalogue, skip the expensive
+    # browser sweep.  The threshold is intentionally high (350) so the
+    # BFS also runs when the handbook is only partial, letting the two
+    # discovery tiers complement each other.  Empty handbook result (< 20)
+    # falls straight through to BFS-only mode.
+    if len(merged) >= 350:
+        await _emit(
+            f"[DISCOVER] MQ: handbook at {len(merged)} courses — skipping "
+            f"browser sweep (catalogue is complete)"
+        )
+        return sorted(merged.values(), key=lambda d: d["url"])[:max_courses]
 
     await _emit(
         f"[DISCOVER] MQ: starting browser sweep across {len(_SEED_URLS)} "
-        f"catalogue seed(s)"
+        f"catalogue seed(s) to supplement {len(merged)} handbook courses"
     )
-
-    merged: dict[str, dict] = {}
 
     try:
         async with _pool.page() as page:
