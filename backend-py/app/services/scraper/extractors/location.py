@@ -84,7 +84,7 @@ _NAV_TEXT_LOCATION_RE = re.compile(
     r"career\s+(?:outcomes?|services?)|related\s+(?:courses?|programs?)|"
     r"contact\s+us|news\s+and\s+events|open\s+day|"
     r"research\s+(?:degrees?|programs?)|find\s+a\s+course|"
-    r"ucas\s*(?:code|tariff|points?))\b",
+    r"ucas\s*(?:code|tariff|points?)|enrolments?)\b",
     re.IGNORECASE,
 )
 # Country names that sometimes appear as standalone comma-split parts in a

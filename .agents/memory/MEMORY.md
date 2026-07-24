@@ -1,3 +1,4 @@
+- [UC Canberra SPA + hidden-input fees](uc-canberra-fix.md) — Listing=SPA shell (0 links); sitemap at /services/wcm/site-map/course.xml has 184 courses; fees in id="N-eftsl-international" hidden inputs matched via id="current-year".
 - [MQ coursehandbook resolver](mq-coursehandbook-resolver.md) — Sitemap needs patchright (CF-guarded); resolver needs httpx (127→223/383); BFS seeds return 0 in dev (expected).
 - [La Trobe CF Enterprise fixes](latrobe-cf-enterprise.md) — Full fix stack: render+skip_fallbacks+skip_browser+skip_per_course_browser+skip_degree_qualifier; online_only off; max_parallel_fetch≥3.
 - [Phase 9B conflict resolution](phase9b-conflict-resolution.md) — T001-T004: repair order, confidence formula, field normalizer canon forms, schema (migration 028), KPI API shape, pre-existing test failures.

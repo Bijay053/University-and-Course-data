@@ -2,13 +2,37 @@
 # Hostname: www.canberra.edu.au
 # Country: Australia  |  Currency: AUD
 # Slug: canberra
-# Auto-generated: 2026-07-24
 #
-# This stub was created automatically on the first scrape of this university.
-# Review and expand it to improve discovery and extraction quality.
-# See scraper_config/defaults.yaml for all available options.
+# Root cause of zero discovery:
+#   The /study/degrees-and-courses listing page is a pure JS SPA that returns
+#   a 4-byte body via httpx and 39 bytes via Scrape.do render — completely empty.
+#   Wayback CDX returns 0 results for any canberra.edu.au/study/* paths.
+#
+# Fix: use the dedicated course sitemap listed in robots.txt:
+#   https://www.canberra.edu.au/services/wcm/site-map/course.xml
+#   Contains 366 entries across 2026/2027/2028 = 184 unique courses after year-dedup.
+#   Course detail pages at /course/CODE/VERSION/YEAR are full SSR HTML (~120KB,
+#   plain httpx returns 200 with IELTS + duration in static HTML).
+#
+# Fee extraction:
+#   The <span class="international-fee-value"> span is empty in static HTML.
+#   Fees are JS-loaded; the per-course browser-rescue pass (Playwright) fills them in.
+#
+# See also: robots.txt — Disallow: /coursesandunits/ (old URL scheme, not used here)
 
-discovery: {}
+discovery:
+  sitemap_url: https://www.canberra.edu.au/services/wcm/site-map/course.xml
+  seed_urls: []
+  bfs_page_budget: 1
+  use_wayback: false
+  allow_url_patterns:
+    - /course/
+  force_candidate_url_patterns:
+    - /course/
+  course_detail_url_patterns:
+    - /course/
+  year_dedup_mode: keep_preferred_year
+  year_dedup_preferred_year: 2027
 
 extraction:
   fees:

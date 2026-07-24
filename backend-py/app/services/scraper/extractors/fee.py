@@ -1133,6 +1133,7 @@ def _from_uwl_nationality_select(
 # pre-pass fires and finds nothing, the cascade returns [] (NULL fee) so the
 # scholarship amount never pollutes the staged record.
 _SHEFFIELD_HOST_RE = re.compile(r"sheffield\.ac\.uk", re.IGNORECASE)
+_UC_CANBERRA_HOST_RE = re.compile(r"(?:^|[./])canberra\.edu\.au(?:/|$)", re.IGNORECASE)
 _SHEFFIELD_PGT_CODE_RE = re.compile(
     r'"courseFees"\s*:\s*\{"pgt"\s*:\s*\{"code"\s*:\s*"([A-Z0-9]+)"\s*,'
     r'\s*"year"\s*:\s*"(\d{4})"',
@@ -1199,6 +1200,73 @@ async def _from_sheffield_pgt_api(html: str) -> "tuple[int, str] | None":
     except Exception:
         pass
     return None
+
+
+def _from_uc_hidden_inputs(html: str) -> "tuple[int, str] | None":
+    """University of Canberra fee pre-pass.
+
+    UC course pages embed annual fee history as hidden inputs in the static
+    (plain-httpx) HTML:
+
+        <input type="hidden" id="N-year"                 value="2026">
+        <input type="hidden" id="N-eftsl-international"  value="41500">
+        <input type="hidden" id="current-year"           value="2026">
+
+    The index N is arbitrary (not sorted by year).  We build a year→fee dict
+    from all present rows, then pick:
+      1. The row whose year == current-year (from id="current-year").
+      2. Fallback: the row with the latest year that is ≤ current-year.
+      3. Fallback: the row with the globally latest year.
+
+    Returns (amount_int, ctx_string) or None if no matching pair is found.
+    """
+    # Parse current-year from hidden input
+    _cy_m = re.search(r'id="current-year"\s+value="(\d{4})"', html)
+    _current_year = int(_cy_m.group(1)) if _cy_m else None
+
+    # Collect all {N}-year values
+    _year_by_idx: dict[str, int] = {}
+    for m in re.finditer(r'id="(\d+)-year"\s+value="(\d{4})"', html):
+        _year_by_idx[m.group(1)] = int(m.group(2))
+
+    # Collect all {N}-eftsl-international values (strip whitespace)
+    _fee_by_idx: dict[str, int] = {}
+    for m in re.finditer(
+        r'id="(\d+)-eftsl-international"\s+value="\s*(\d+)\s*"', html
+    ):
+        try:
+            _fee_by_idx[m.group(1)] = int(m.group(2))
+        except ValueError:
+            pass
+
+    if not _year_by_idx or not _fee_by_idx:
+        return None
+
+    # Build year→fee pairs (only indices that have both)
+    _pairs: dict[int, int] = {}  # year → fee
+    for idx, yr in _year_by_idx.items():
+        if idx in _fee_by_idx:
+            _pairs[yr] = _fee_by_idx[idx]
+
+    if not _pairs:
+        return None
+
+    # Pick the best year
+    if _current_year and _current_year in _pairs:
+        _best_year = _current_year
+    elif _current_year:
+        # Latest year that does not exceed current-year
+        _candidates = [y for y in _pairs if y <= _current_year]
+        _best_year = max(_candidates) if _candidates else max(_pairs)
+    else:
+        _best_year = max(_pairs)
+
+    _fee = _pairs[_best_year]
+    if _fee <= 0:
+        return None
+
+    _ctx = f"UC hidden-input fee: id={{N}}-year={_best_year}, eftsl-international={_fee}"
+    return _fee, _ctx
 
 
 def _from_roehampton_int_tab(
@@ -1464,6 +1532,37 @@ async def extract(
                 method="fee.roehampton_intl_tab",
             )
         ]
+
+    # ── Pre-pass UC Canberra: hidden-input fee table ─────────────────────────
+    # University of Canberra course pages at /course/CODE/VERSION/YEAR embed
+    # historical-fee rows as hidden inputs in the static HTML:
+    #   <input type="hidden" id="N-year" value="2026">
+    #   <input type="hidden" id="N-eftsl-international" value="41500">
+    #   <input type="hidden" id="current-year" value="2026">
+    # The matching N-year → N-eftsl-international gives the annual fee for
+    # each year.  We pick the row whose year == current-year (fallback: latest
+    # year ≤ current-year) and return it as the AUD international fee.
+    # The generic text cascade sees the International/domestic labelling in the
+    # fee table summary row but no dollar amount, so it returns NULL — this
+    # pre-pass is the ONLY reliable path to the fee for UC courses.
+    if _UC_CANBERRA_HOST_RE.search(url or ""):
+        _uc_fee = _from_uc_hidden_inputs(html)
+        if _uc_fee is not None:
+            _uc_amount, _uc_ctx = _uc_fee
+            return [
+                ExtractionResult(
+                    field_key="international_fee",
+                    value=_uc_amount,
+                    normalized={
+                        "international_fee": _uc_amount,
+                        "currency": "AUD",
+                        "fee_term": "Annual",
+                    },
+                    confidence=0.95,
+                    snippet=_uc_ctx[:120],
+                    method="fee.uc_hidden_input",
+                )
+            ]
 
     # ── Pre-pass BCU: tab-aware International Student fee panel ─────────────
     # BCU course pages expose two sibling div panels inside #fees_how_to_apply:
