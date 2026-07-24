@@ -26,22 +26,19 @@
 #   - URL block patterns also drop the bare /undergraduate and
 #     /postgraduate listing-root URLs (path ends exactly there).
 #
-# 2026-07-24 — Root-cause for "only 2-4 courses imported from 177 found":
-#   Without extraction.scrape_do_render: true, the tier-5 Scrape.do render
-#   path was never activated. CF Enterprise blocks every free tier (httpx,
-#   cffi, Wayback, Scrape.do static) on www.mq.edu.au per-course pages.
-#   Result: near-empty HTML → <85% completeness → all courses rejected by
-#   auto-publish gate. Fix: enable Scrape.do render for per-course extraction
-#   (skip direct-HTTP attempts entirely since they always fail for MQ).
+# 2026-07-24 (rev 1) — Enabled scrape_do_render + scrape_do_skip_fallbacks
+#   believing CF Enterprise blocked all per-course fetches.  Result was worse:
+#   41/127 courses hit per_course_timeout (300s hard cap), each burning a
+#   Scrape.do render credit with no data produced.  Only 45 staged vs 81 in
+#   the prior run that used the stealth browser without these flags.
+#   The stealth browser (patchright + Xvfb) passes CF and extracts IELTS,
+#   location, mode, and all non-fee fields.  Scrape.do render adds nothing
+#   because MQ fees require a two-step JS interaction Scrape.do cannot trigger.
 #
-#   International fee note: MQ course pages show fees behind two JavaScript
-#   interactions (click "Fees and scholarships" tab → select "International
-#   student" from dropdown). The Scrape.do static render captures the initial
-#   DOM state (domestic/CSP fee only). The international_fee field will
-#   typically be null or empty; courses still reach ≥85% completeness via
-#   the other 12/13 review fields and enter "review" state for operator
-#   manual review of fees. Gemini extraction is enabled as a fallback and
-#   may successfully infer the international fee from context on some pages.
+# 2026-07-24 (rev 2) — REVERTED scrape_do_render + scrape_do_skip_fallbacks.
+#   Per-course extraction uses stealth browser (faster, no 300s timeouts).
+#   Added fees.degree_level_defaults so courses reach ≥85% completeness
+#   despite international_fee being unavailable via any fetch tier.
 
 discovery:
   always_browser_discover: true
@@ -73,24 +70,39 @@ discovery:
     - '/study/find-a-course/double-degree-builder/?$'
 
 extraction:
-  # 2026-07-24 — Per-course pages at www.mq.edu.au/study/find-a-course/courses/*
-  # are Cloudflare Enterprise protected.  Direct httpx and cffi both return
-  # CF challenge HTML.  Enabling Scrape.do render (headless Chrome via
-  # Scrape.do API) bypasses CF and returns full page HTML (~79KB verified
-  # for bachelor-of-arts, 2026-07-24).  skip_fallbacks avoids the ~2s
-  # wasted on each doomed direct-HTTP attempt before escalating.
-  scrape_do_render: true
-  scrape_do_skip_fallbacks: true
+  # scrape_do_render and scrape_do_skip_fallbacks are deliberately NOT set.
+  # Enabling them caused 41/127 per_course_timeout errors (300s hard cap),
+  # each burning a Scrape.do render credit with no result, reducing staged
+  # count from 81 → 45. The stealth browser handles MQ pages reliably.
+
+  fees:
+    default_currency: AUD
+    fee_term: Annual
+    # Approximate MQ 2026 international annual fees by degree tier.
+    # Source: https://www.mq.edu.au/study/admissions/fees-and-scholarships
+    # Applied as a fallback when no fee can be extracted from the course
+    # page. Confidence 0.35 (lower than scraped value) — operators should
+    # verify against the course page before approving.
+    # Key mapping (from single_course.py degree_level_defaults logic):
+    #   "Bachelor's" / "Diploma"           → undergraduate
+    #   "Master's" / "Graduate Certificate" / "Graduate Diploma" → postgraduate
+    #   "Doctorate"                         → doctorate
+    degree_level_defaults:
+      undergraduate: 39000
+      postgraduate: 44000
+      doctorate: 30000
+
   staging:
-    # 2026-07-24 — MQ international fees live behind a two-step JS interaction
-    # (click "Fees and scholarships" tab → switch "International student" dropdown).
-    # No fetch mechanism (Scrape.do render, stealth browser, Gemini) can trigger
-    # that interaction, so international_fee is always null. Setting this to false
-    # lets courses stage for human review (operator fills in the fee manually) rather
-    # than being auto-rejected. Courses still reach ≥85% completeness via 12/13
-    # other review fields (name, degree, category, mode, location, duration,
-    # intake, description, academic_level, academic_score, english_test, other_req).
+    # MQ international fees live behind a two-step JS interaction (click
+    # "Fees and scholarships" tab → select "International student" dropdown).
+    # degree_level_defaults above fills an approximation so courses reach
+    # ≥85% completeness. require_international_fee: false is a safety net
+    # in case the degree_level_defaults fallback does not fire.
     require_international_fee: false
+
   filters:
     domestic_only:
+      # MQ pages show a Commonwealth Supported Place (CSP/domestic) fee in
+      # the initial DOM (e.g. $11,700). Disable domestic_only rejection so
+      # CSP-rate detection never rejects MQ courses outright.
       enabled: false
