@@ -3531,20 +3531,20 @@ export default function Scraping() {
               const isExpanded = expandedHistoryId === run.runtimeJobId;
               return (
                 <div key={run.runtimeJobId} className={`border rounded-xl bg-white overflow-hidden transition-shadow ${historySelected.has(run.runtimeJobId) ? "ring-2 ring-indigo-400" : ""}`}>
-                  <div className="p-3 sm:p-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-                    {/* Select checkbox */}
-                    <input
-                      type="checkbox"
-                      checked={historySelected.has(run.runtimeJobId)}
-                      onChange={() => toggleHistorySelect(run.runtimeJobId)}
-                      disabled={!historySelected.has(run.runtimeJobId) && historySelected.size >= 2}
-                      title={historySelected.size >= 2 && !historySelected.has(run.runtimeJobId) ? "Clear a selection first" : "Select to compare"}
-                      className="w-4 h-4 shrink-0 accent-indigo-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
-                    />
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      {historyStatusBadge(run.status)}
-                      <div className="min-w-0">
-                        <div className="font-medium text-gray-800 truncate">
+                  <div className="p-3 sm:p-4 space-y-2">
+                    {/* ── Row 1: checkbox + status badge + university name/date ── */}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={historySelected.has(run.runtimeJobId)}
+                        onChange={() => toggleHistorySelect(run.runtimeJobId)}
+                        disabled={!historySelected.has(run.runtimeJobId) && historySelected.size >= 2}
+                        title={historySelected.size >= 2 && !historySelected.has(run.runtimeJobId) ? "Clear a selection first" : "Select to compare"}
+                        className="w-4 h-4 shrink-0 accent-indigo-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                      />
+                      <div className="shrink-0">{historyStatusBadge(run.status)}</div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-gray-800 truncate leading-snug">
                           {run.universityName ?? "(unknown university)"}
                         </div>
                         <div className="text-xs text-gray-500 truncate">
@@ -3553,61 +3553,67 @@ export default function Scraping() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-gray-600 whitespace-nowrap flex-wrap">
-                      <span>Found: <span className="font-semibold text-gray-800">{run.totalFound ?? 0}</span></span>
-                      <span>Staged: <span className="font-semibold text-gray-800">{run.stagedCount}</span></span>
-                      <span>Approved: <span className="font-semibold text-green-700">{run.approvedCount}</span></span>
-                      <span>Rejected: <span className="font-semibold text-red-700">{run.rejectedCount}</span></span>
-                      {(run.requeueCount ?? 0) > 0 && (
-                        <span
-                          title={`Auto-recovered ${run.requeueCount} time${run.requeueCount === 1 ? "" : "s"} by the stale-job reaper`}
-                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono ${
-                            run.requeueCount >= 3 ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
-                          }`}
-                        >
-                          ↺ {run.requeueCount}
-                        </span>
-                      )}
-                      {/* Snapshot badge */}
-                      {(run.snapshotCount ?? 0) > 0 ? (
-                        <span
-                          title={`${run.snapshotCount} snapshot${run.snapshotCount !== 1 ? "s" : ""} saved · Latest: ${run.latestSnapshotAt ? new Date(run.latestSnapshotAt).toISOString().replace("T", " ").slice(0, 16) + " UTC" : "—"}`}
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium"
-                        >
-                          ⬡ {run.snapshotCount} snap{run.snapshotCount !== 1 ? "s" : ""} · Replay ready
-                        </span>
-                      ) : (
-                        <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-400 font-medium">
-                          No snapshots
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant={isExpanded && historyView === "logs" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => void openHistoryDetail(run.runtimeJobId, "logs")}
-                      >
-                        View Logs
-                      </Button>
-                      <Button
-                        variant={isExpanded && historyView === "courses" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => void openHistoryDetail(run.runtimeJobId, "courses")}
-                      >
-                        View Courses
-                      </Button>
-                      {(run.snapshotCount ?? 0) > 0 && (
+
+                    {/* ── Row 2: stats + snapshot badge + action buttons ── */}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pl-6">
+                      {/* Stats group */}
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600 flex-1 min-w-0">
+                        <span>Found: <span className="font-semibold text-gray-800">{run.totalFound ?? 0}</span></span>
+                        <span>Staged: <span className="font-semibold text-gray-800">{run.stagedCount}</span></span>
+                        <span>Approved: <span className="font-semibold text-green-700">{run.approvedCount}</span></span>
+                        <span>Rejected: <span className="font-semibold text-red-700">{run.rejectedCount}</span></span>
+                        {(run.requeueCount ?? 0) > 0 && (
+                          <span
+                            title={`Auto-recovered ${run.requeueCount} time${run.requeueCount === 1 ? "" : "s"} by the stale-job reaper`}
+                            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono ${
+                              run.requeueCount >= 3 ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
+                            }`}
+                          >
+                            ↺ {run.requeueCount}
+                          </span>
+                        )}
+                        {(run.snapshotCount ?? 0) > 0 ? (
+                          <span
+                            title={`${run.snapshotCount} snapshot${run.snapshotCount !== 1 ? "s" : ""} saved · Latest: ${run.latestSnapshotAt ? new Date(run.latestSnapshotAt).toISOString().replace("T", " ").slice(0, 16) + " UTC" : "—"}`}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium"
+                          >
+                            ⬡ {run.snapshotCount} snap{run.snapshotCount !== 1 ? "s" : ""} · Replay ready
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-400 font-medium text-xs">
+                            No snapshots
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Action buttons — wrap onto their own line on small screens */}
+                      <div className="flex flex-wrap items-center gap-2 shrink-0">
                         <Button
-                          variant="outline"
+                          variant={isExpanded && historyView === "logs" ? "default" : "outline"}
                           size="sm"
-                          className="text-emerald-700 border-emerald-300 hover:bg-emerald-50"
-                          onClick={() => void runReplay(run.runtimeJobId)}
+                          onClick={() => void openHistoryDetail(run.runtimeJobId, "logs")}
                         >
-                          <RotateCcw className="w-3.5 h-3.5 mr-1" />
-                          Replay from Snapshot
+                          View Logs
                         </Button>
-                      )}
+                        <Button
+                          variant={isExpanded && historyView === "courses" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => void openHistoryDetail(run.runtimeJobId, "courses")}
+                        >
+                          View Courses
+                        </Button>
+                        {(run.snapshotCount ?? 0) > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+                            onClick={() => void runReplay(run.runtimeJobId)}
+                          >
+                            <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                            Replay from Snapshot
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
 

@@ -1,121 +1,94 @@
-# Federation University Australia
 # Hostname: www.federation.edu.au
-# Country: Australia  |  Currency: AUD
-#
-# Discovery strategy:
-#   Primary: generic_search_api with fetch_via_browser=true
-#     The API is Optimizely CMS session-bound — external callers (raw HTTP) always get
-#     page 1 (20 items) regardless of currentPage param.  By launching a headless browser,
-#     navigating to /study/course-search first (triggers session cookie), then calling
-#     the API via JS fetch() from within the browser context (cookies included), pagination
-#     works correctly and returns all 84 international courses across ~5 pages of 20.
-#   Fallback: sitemap supplement stays on as a safety net in case the API misses any course.
-
 discovery:
   generic_search_api:
-    url: "https://www.federation.edu.au/api/CourseApi/course-search"
+    url: https://www.federation.edu.au/api/CourseApi/course-search
     params:
-      PageId: "12"
-      PageSize: "20"
+      PageId: '12'
+      PageSize: '20'
     page_size: 20
-    page_size_param: "PageSize"
-    page_number_param: "currentPage"
-    has_next_field: "result.hasNextPage"
-    root_path: "result.items"
+    page_size_param: PageSize
+    page_number_param: currentPage
+    has_next_field: result.hasNextPage
+    root_path: result.items
     url_fields:
-      - "link.href"
+    - link.href
     title_fields:
-      - "header"
+    - header
     normalize_relative_urls: true
-    base_url: "https://www.federation.edu.au"
+    base_url: https://www.federation.edu.au
     allow_url_patterns:
-      - "/courses/"
+    - /courses/
     max_pages: 20
-    # fetch_via_browser: navigate to seed URL first so Optimizely sets its session cookie,
-    # then call the API via page.evaluate(fetch(...)) — inherits cookie → pagination works.
     fetch_via_browser: true
-    browser_seed_url: "https://www.federation.edu.au/study/course-search"
-
+    browser_seed_url: https://www.federation.edu.au/study/course-search
+    offset_param: currentPage
   seed_urls:
-    - https://www.federation.edu.au/study/course-search
-
+  - https://www.federation.edu.au/study/course-search
   allow_url_patterns:
-    - "/courses/"
-
+  - /courses/
   block_url_patterns:
-    - "/study/intakes/"
-    - "/study/information/"
-    - "/study/skills"
-    - "/study/early-offer"
-    - "/study/atars"
-    - "/study/guaranteed-atars"
-    - "/study/free-tafe"
-    - "/study/college"
-    - "/study/mid-year"
-    - "/study/pathways"
-    - "/study/high-school"
-    - "/study/advance-to-university"
-    - "/study/federation-college"
-    - "/study/fees/"
-    - "/study/scholarships"
-    - "/study/how-to-apply"
-    - "/study/apply"
-    - "/study/search"
-    - "/study/entry-pathways"
-    - '\?'
-    - '\.pdf$'
-
+  - /study/intakes/
+  - /study/information/
+  - /study/skills
+  - /study/early-offer
+  - /study/atars
+  - /study/guaranteed-atars
+  - /study/free-tafe
+  - /study/college
+  - /study/mid-year
+  - /study/pathways
+  - /study/high-school
+  - /study/advance-to-university
+  - /study/federation-college
+  - /study/fees/
+  - /study/scholarships
+  - /study/how-to-apply
+  - /study/apply
+  - /study/search
+  - /study/entry-pathways
+  - \?
+  - \.pdf$
   bfs_page_budget: 80
   max_candidates: 500
   expected_min_courses: 200
-
-  # Sitemap is the reliable full-catalogue source (~200+ /courses/ entries)
   always_sitemap_supplement: true
   sitemap_url: https://www.federation.edu.au/sitemap.xml
-
-  # Browser discovery disabled — was causing a 90-second Playwright session with no benefit.
-  # BFS + sitemap discovers the full catalogue faster and more reliably.
   always_browser_discover: false
   skip_browser_discovery: true
   use_wayback: false
-
 extraction:
   fees:
     default_currency: AUD
-    fees_pdf_url: "https://www.federation.edu.au/siteassets/files/students/fees/2026_higher_ed_indicative_commencing_international_student_tuition_fee_schedule.pdf"
-    pdf_fee_term: "Annual"
-
+    fees_pdf_url: https://www.federation.edu.au/siteassets/files/students/fees/2026_higher_ed_indicative_commencing_international_student_tuition_fee_schedule.pdf
+    pdf_fee_term: Annual
   english:
     source_priority:
-      - section: "English language requirements"
-      - section: "Academic entry requirements"
-
-    overall_pattern: '(?i)overall\s+(?:academic\s+)?(?:ielts\s+)?(?:band\s+)?(?:score\s+)?(?:of\s+)?(?P<overall>\d(?:\.\d)?)'
-    min_band_pattern: '(?i)no\s+(?:individual\s+)?band\s+(?:score\s+)?(?:of\s+)?less\s+(?:than\s+)?(?P<min_band>\d(?:\.\d)?)'
-
+    - section: English language requirements
+    - section: Academic entry requirements
+    overall_pattern: (?i)overall\s+(?:academic\s+)?(?:ielts\s+)?(?:band\s+)?(?:score\s+)?(?:of\s+)?(?P<overall>\d(?:\.\d)?)
+    min_band_pattern: (?i)no\s+(?:individual\s+)?band\s+(?:score\s+)?(?:of\s+)?less\s+(?:than\s+)?(?P<min_band>\d(?:\.\d)?)
   filters:
     domestic_only:
       enabled: true
     online_only:
       enabled: true
-
   text_cleaning:
     location:
       strip_patterns:
-        - '(?:^|,)\s*online\s*(?=,|$)'
-        - '(?:^|,)\s*open\s+universities\s+australia\s*(?=,|$)'
-        - '\s*\(\s*(?:online|virtual|distance|external|flexible|blended|on[\s-]?campus|in[\s-]?person)\s*\)'
+      - (?:^|,)\s*online\s*(?=,|$)
+      - (?:^|,)\s*open\s+universities\s+australia\s*(?=,|$)
+      - \s*\(\s*(?:online|virtual|distance|external|flexible|blended|on[\s-]?campus|in[\s-]?person)\s*\)
       deduplicate: true
-
   course_name:
     strip_title_suffixes:
-      - " | Federation University Australia"
-      - " - Federation University Australia"
-      - " | Federation University"
-      - " - Federation University"
-
+    - ' | Federation University Australia'
+    - ' - Federation University Australia'
+    - ' | Federation University'
+    - ' - Federation University'
+  max_parallel_fetch: 4
   staging:
     reject_if_missing:
       - course_name
-
-  max_parallel_fetch: 4
+    skip_degree_qualifier_check: true   
+    require_international_fee: false    
+    dedup_use_full_url: true   
