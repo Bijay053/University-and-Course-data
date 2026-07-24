@@ -249,13 +249,24 @@ _TITLE_SUFFIX_RE = re.compile(
 # www.mq.edu.au URL shape (e.g. "Bachelor of Game Design and Development"
 # → "bachelor-of-game-design-and-development").
 _SLUG_NON_WORD_RE = re.compile(r"[^a-z0-9]+")
-# Restrict to current academic year + next-year previews.  The handbook
-# keeps prior-year offerings live (2020+) which would explode the harvest
-# to ~2K stale URLs; only the most recent two years are real catalogue.
+# Restrict to recent academic years.  The handbook keeps prior-year
+# offerings live (2020+) which would explode the harvest to ~2K stale
+# URLs; only the previous + current + next year are real catalogue.
+#
+# Including the previous year (2025) is intentional: the coursehandbook
+# sitemap has 205 entries for 2025 vs 177 for 2026 — many are the same
+# programs with different year prefixes, but ~50-80 are unique courses
+# only in 2025 (discontinued in 2026 or not yet re-published).  Since
+# all handbook URLs resolve to year-agnostic admissions URLs at
+# www.mq.edu.au/study/find-a-course/courses/<slug>, duplicates are
+# deduplicated by the resolver so stale-year entries never double-count.
+# Courses genuinely discontinued will either 404 (skipped) or show
+# "not currently available" (rejected by guards).  Net effect: ~+50-80
+# additional unique admissions URLs discovered per run.
 import datetime as _dt
 _THIS_YEAR = _dt.date.today().year
 _COURSEHANDBOOK_YEARS: frozenset[str] = frozenset({
-    str(_THIS_YEAR), str(_THIS_YEAR + 1),
+    str(_THIS_YEAR - 1), str(_THIS_YEAR), str(_THIS_YEAR + 1),
 })
 
 

@@ -25,6 +25,23 @@
 #     course detail pages — they have no fee/intake/IELTS data).
 #   - URL block patterns also drop the bare /undergraduate and
 #     /postgraduate listing-root URLs (path ends exactly there).
+#
+# 2026-07-24 — Root-cause for "only 2-4 courses imported from 177 found":
+#   Without extraction.scrape_do_render: true, the tier-5 Scrape.do render
+#   path was never activated. CF Enterprise blocks every free tier (httpx,
+#   cffi, Wayback, Scrape.do static) on www.mq.edu.au per-course pages.
+#   Result: near-empty HTML → <85% completeness → all courses rejected by
+#   auto-publish gate. Fix: enable Scrape.do render for per-course extraction
+#   (skip direct-HTTP attempts entirely since they always fail for MQ).
+#
+#   International fee note: MQ course pages show fees behind two JavaScript
+#   interactions (click "Fees and scholarships" tab → select "International
+#   student" from dropdown). The Scrape.do static render captures the initial
+#   DOM state (domestic/CSP fee only). The international_fee field will
+#   typically be null or empty; courses still reach ≥85% completeness via
+#   the other 12/13 review fields and enter "review" state for operator
+#   manual review of fees. Gemini extraction is enabled as a fallback and
+#   may successfully infer the international fee from context on some pages.
 
 discovery:
   always_browser_discover: true
@@ -36,6 +53,12 @@ discovery:
   # on the catalogue root).  Stealth-mode is opt-in per uni; see
   # backend-py/app/services/scraper/stealth_browser.py for the lifecycle.
   use_stealth_browser: true
+  # 2026-07-24 — Wayback Machine archives of mq.edu.au per-course pages
+  # are either absent (new 2026 URLs) or stale snapshots with no fee/IELTS
+  # data.  Skipping the Wayback tier makes the per-request fetch ladder
+  # proceed directly to Scrape.do static → render after cffi fails,
+  # saving ~5-10s per course on the Wayback round-trip.
+  use_wayback: false
   block_url_patterns:
     # MQ majors / specialisations: sub-degree pages, never full courses.
     - '/find-a-course/courses/major/'
@@ -50,6 +73,24 @@ discovery:
     - '/study/find-a-course/double-degree-builder/?$'
 
 extraction:
+  # 2026-07-24 — Per-course pages at www.mq.edu.au/study/find-a-course/courses/*
+  # are Cloudflare Enterprise protected.  Direct httpx and cffi both return
+  # CF challenge HTML.  Enabling Scrape.do render (headless Chrome via
+  # Scrape.do API) bypasses CF and returns full page HTML (~79KB verified
+  # for bachelor-of-arts, 2026-07-24).  skip_fallbacks avoids the ~2s
+  # wasted on each doomed direct-HTTP attempt before escalating.
+  scrape_do_render: true
+  scrape_do_skip_fallbacks: true
+  staging:
+    # 2026-07-24 — MQ international fees live behind a two-step JS interaction
+    # (click "Fees and scholarships" tab → switch "International student" dropdown).
+    # No fetch mechanism (Scrape.do render, stealth browser, Gemini) can trigger
+    # that interaction, so international_fee is always null. Setting this to false
+    # lets courses stage for human review (operator fills in the fee manually) rather
+    # than being auto-rejected. Courses still reach ≥85% completeness via 12/13
+    # other review fields (name, degree, category, mode, location, duration,
+    # intake, description, academic_level, academic_score, english_test, other_req).
+    require_international_fee: false
   filters:
     domestic_only:
       enabled: false
