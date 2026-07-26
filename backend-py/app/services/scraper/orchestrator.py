@@ -1663,6 +1663,40 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     "[SSR_PROP] provider returned 0 links — falling through to BFS"
                 )
 
+        # ── Algolia search-API discovery ──────────────────────────────────────
+        # When discovery.algolia is set in the per-uni YAML, query the
+        # configured Algolia index (paginated) to obtain all course URLs and
+        # return them as {name, url} discovery links.  Per-course HTML
+        # extraction runs normally on each URL.  Falls through to BFS if the
+        # provider returns 0 links.  See AlgoliaDiscoveryConfig in schema.py.
+        _algolia_cfg = getattr(_uni_cfg.discovery, "algolia", None)
+        if not links and _algolia_cfg is not None:
+            log.info(
+                "[ALGOLIA] discovery.algolia configured — index=%s facet=%s",
+                getattr(_algolia_cfg, "index_name", "?"),
+                getattr(_algolia_cfg, "facet_filter", None) or "(none)",
+            )
+            await emit(
+                "status",
+                "[DISCOVER] Algolia: querying course index...",
+                phase="discover",
+            )
+            try:
+                from app.services.scraper.algolia_provider import fetch_algolia_links
+                _algolia_links = await fetch_algolia_links(_algolia_cfg, emit=emit)
+            except Exception as _alg_exc:
+                log.error("[ALGOLIA] provider failed: %s", _alg_exc, exc_info=True)
+                _algolia_links = []
+            if _algolia_links:
+                links = _algolia_links
+                _always_browser = False
+                log.info(
+                    "[ALGOLIA] %d course links — skipping BFS/sitemap",
+                    len(links),
+                )
+            else:
+                log.warning("[ALGOLIA] provider returned 0 links — falling through to BFS")
+
         # ── Lancaster shorthand (legacy alias for ssr_prop_discovery) ─────────
         # lancaster_listing: true in the YAML is a convenience shorthand that
         # wires up Lancaster's two listing pages automatically.  New universities

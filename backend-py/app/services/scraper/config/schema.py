@@ -367,6 +367,43 @@ class ScrapyConfig(BaseModel):
     )
 
 
+class AlgoliaDiscoveryConfig(BaseModel):
+    """Algolia search-API discovery provider.
+
+    When present under ``discovery.algolia``, the orchestrator queries the
+    configured Algolia index (with an optional facet filter) to obtain all
+    course URLs and returns them as discovery links.  Per-course HTML
+    extraction then runs normally on each URL.
+
+    The Algolia public API key and app ID are embedded in the university's
+    search page HTML and are not server secrets.
+    """
+
+    app_id: str = Field(description="Algolia application ID (X-Algolia-Application-Id).")
+    api_key: str = Field(description="Algolia search-only API key (X-Algolia-API-Key).")
+    index_name: str = Field(description="Algolia index name (e.g. 'wsu_prod_courses').")
+    facet_filter: Optional[str] = Field(
+        default=None,
+        description=(
+            "Single Algolia facet filter string applied to restrict results, "
+            "e.g. 'tags:available-for:international-students'. "
+            "Passed as facetFilters: [[<filter>]] in the query body."
+        ),
+    )
+    url_field: str = Field(
+        default="coursePageUrl",
+        description="Hit field containing the absolute course page URL.",
+    )
+    name_field: str = Field(
+        default="title",
+        description="Hit field containing the course name.",
+    )
+    hits_per_page: int = Field(
+        default=100,
+        description="Results per Algolia page (max Algolia allows is 1000).",
+    )
+
+
 class GenericSearchApiConfig(BaseModel):
     """YAML-driven generic JSON/REST API discovery.
 
@@ -1109,6 +1146,15 @@ class DiscoveryConfig(BaseModel):
             "The API tier runs immediately after SearchStax — if it returns ≥1 "
             "link, BFS and browser tiers are skipped. Falls through to BFS if "
             "0 links returned. See GenericSearchApiConfig for full field docs."
+        ),
+    )
+    algolia: Optional[AlgoliaDiscoveryConfig] = Field(
+        default=None,
+        description=(
+            "When present, discover courses by querying an Algolia index directly. "
+            "Returns a list of {name, url} discovery links; per-course HTML "
+            "extraction runs normally on each URL. Falls through to BFS if the "
+            "provider returns 0 links. See AlgoliaDiscoveryConfig."
         ),
     )
     vuw_api: Optional[VuwApiConfig] = Field(

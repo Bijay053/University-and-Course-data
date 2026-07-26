@@ -1,7 +1,44 @@
-# Western Sydney University — stub created for Week 5 scale-up.
-# Hostname: www.westernsydney.edu.au  (course catalogue under /study)
-# Large international cohort.
-discovery: {}
+# Western Sydney University
+# Hostname: www.westernsydney.edu.au
+# DB id: 2238
+#
+# Discovery approach (2026-07-26):
+#   The course listing page at /future/study/courses is an AEM SPA powered by
+#   Algolia search (index: wsu_prod_courses, app: NY25AYQTZ8).  The page shows
+#   all courses for International Students when the "Available for: International
+#   Students" filter is active — 218 courses across 3 Algolia pages at 100/page.
+#
+#   There is a "Load More" button on the live page, but the Algolia API is
+#   queryable directly (keys are public, embedded in the page HTML), so we
+#   bypass the SPA entirely and query the index with the international-student
+#   facet filter.  Each hit carries: title, coursePageUrl, internationalFees,
+#   duration, intakeSessions, campuses, tags, cricosCode.
+#
+#   The AlgoliaDiscoveryConfig wires this in the orchestrator as a discovery-
+#   only provider: after obtaining all 218 course URLs from Algolia, the normal
+#   per-course HTML extraction pipeline runs on each URL.  WSU course pages
+#   return 200 via plain httpx (not CF-blocked), so no Scrape.do or browser
+#   automation is needed.
+#
+# Credentials:
+#   app_id and api_key are the PUBLIC search credentials embedded in the HTML
+#   of every WSU search page — they are not secrets and are safe to commit.
+
+discovery:
+  algolia:
+    app_id: NY25AYQTZ8
+    api_key: f2d29cc4698abf5c69879f010c26907d
+    index_name: wsu_prod_courses
+    # Filter to international-student courses only (218 of 276 total courses).
+    facet_filter: "tags:available-for:international-students"
+    url_field: coursePageUrl
+    name_field: title
+    hits_per_page: 100
+
+  # WSU pages are not CF-blocked — plain httpx works fine.
+  use_wayback: false
+  skip_sitemap_fallback: true
+
 extraction:
   filters:
     domestic_only:
