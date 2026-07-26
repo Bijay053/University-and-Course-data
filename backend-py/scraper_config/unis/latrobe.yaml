@@ -74,6 +74,14 @@ discovery:
   # ceil(40/4) × 35s = 350s — 600s gives 250s headroom for BFS cross-links.
   discovery_phase_timeout_s: 600
 
+  # La Trobe's Funnelback search results are AJAX-loaded after the initial
+  # page render. With the default 3000ms wait, Scrape.do captures the DOM
+  # before the AJAX completes — only the 9 navigation template links are
+  # present, not the 10 search result course links per page.
+  # 8000ms gives the AJAX call enough time to finish and populate the result
+  # cards. Budget: ceil(40/4) × (12s render + 8s wait) = 200s < 600s cap.
+  scrape_do_wait_for_ms: 8000
+
   # Must be >= number of seed pages (40). Each seed is a BFS depth-0 page.
   bfs_page_budget: 50
 
