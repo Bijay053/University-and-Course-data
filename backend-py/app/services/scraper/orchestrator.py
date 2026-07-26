@@ -1278,6 +1278,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         _c1_has_api_provider = (
             getattr(_uni_cfg.discovery, "searchstax", None) is not None
             or getattr(_uni_cfg.discovery, "generic_search_api", None) is not None
+            or getattr(_uni_cfg.discovery, "algolia", None) is not None
         )
         if not _c1_force and not _c1_has_api_provider:
             try:
