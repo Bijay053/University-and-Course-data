@@ -98,47 +98,48 @@ discovery:
   scrape_do_skip_fallbacks: true
   scrape_do_render: true
 
-  # 4 seeds / 4 concurrent = 1 batch × ~35s = ~35s — zero timeout risk.
+  # 7 seeds / 4 concurrent = 2 batches × ~35s normal / 90s worst-case = ~70–180s.
+  # Well under the 600s deadline even if Cloudflare blocks every IP on the first
+  # attempt (Scrape.do retries exhaust at 90s/call → 2 × 90s = 180s ≪ 600s).
   #
-  # WHY 4 seeds (num_ranks=100, On Campus filter) instead of 13 (num_ranks=50, all courses):
-  #   The original 13-seed config (605 total courses) failed with "Discovery phase
-  #   exceeded 300s deadline" — UTAS Cloudflare blocks ~60-70% of Scrape.do IPs,
-  #   causing those calls to timeout at Scrape.do's 90s per-call limit.
-  #   Switching to On Campus only (391 courses) needs just 4 seeds in a single
-  #   concurrent batch: worst case 1 × 90s = 90s — safe even if every IP is blocked.
-  bfs_page_budget: 8
+  # WHY 7 seeds (num_ranks=100, NO On Campus filter) — previous attempts:
+  #   Attempt 1 — On Campus filter, 4 seeds (start_rank=1/101/201/301):
+  #     Only 99 courses found total. The filter URL was wrong — "On Campus"
+  #     matched far fewer courses than expected (99, not ~391).
+  #     Reverted to no filter covering all 605 UG+PG courses.
+  #   Attempt 2 (current) — No filter, num_ranks=100, 7 seeds:
+  #     7 seeds / 4 concurrent = 2 batches. Worst-case 2 × 90s = 180s.
+  #     discovery_phase_timeout_s: 600 gives 3× headroom.
+  #
+  # Note: the original 13-seed config (num_ranks=50) timed out because
+  # 13/4 = 4 batches × 90s = 360s > 300s deadline. Switching to num_ranks=100
+  # halves the seed count to 7 (2 batches) and keeps within the 600s budget.
+  bfs_page_budget: 12
 
   # Per-page: wait 12 s after initial load so all 100 Funnelback cards lazy-load.
-  # Previously 8 s for 50 cards. Proportionally scaled up for 100-card pages.
   scrape_do_wait_for_ms: 12000
 
-  # Safety margin — 2 batches × worst-case 90s = 180s, but extra headroom for
-  # Scrape.do retry logic (2s + 8s backoff on the first retry per failed call).
+  # 2 batches × 90s worst-case = 180s. 600s gives 3× headroom for retries.
   discovery_phase_timeout_s: 600
 
   use_wayback: false
 
-  # Paginated Funnelback search — 100 results per page, 4 pages for 391 on-campus courses.
+  # Paginated Funnelback search — 100 results per page, 7 pages for 605 courses.
   #
   # URL decoded:
   #   query= (empty → all courses)
   #   f.Tabs|utas|ds-handbook-courses,utas|ds-short-courses = Courses
   #   f.Course Level|courseLevel = Undergraduate + Postgraduate
   #   collection = utas|sp-search
-  #   f.Delivery Mode|courseAvailabilityAttendance = On Campus  ← filters to 391 courses
-  #   num_ranks=100, start_rank=1…301 (4 pages × 100 = 400 slots → covers 391)
-  #
-  # WHY On Campus filter only:
-  #   UTAS total UG+PG = 605 courses but online-only programmes do not have
-  #   meaningful international-student pages (fees/IELTS not published per-course).
-  #   Filtering to On Campus gives 391 courses — all genuine international offerings.
-  #   This also cuts seeds from 7 → 4 (1 batch only), eliminating the 300s deadline
-  #   risk entirely (4 seeds / 4 concurrent = 1 batch ≈ 35s).
+  #   num_ranks=100, start_rank=1…601 (7 pages × 100 = 700 slots → covers 605)
   seed_urls:
-    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Undergraduate&f.Course+Level%7CcourseLevel=Postgraduate&collection=utas%7Esp-search&f.Delivery+Mode%7CcourseAvailabilityAttendance=On+Campus&num_ranks=100&start_rank=1"
-    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Undergraduate&f.Course+Level%7CcourseLevel=Postgraduate&collection=utas%7Esp-search&f.Delivery+Mode%7CcourseAvailabilityAttendance=On+Campus&num_ranks=100&start_rank=101"
-    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Undergraduate&f.Course+Level%7CcourseLevel=Postgraduate&collection=utas%7Esp-search&f.Delivery+Mode%7CcourseAvailabilityAttendance=On+Campus&num_ranks=100&start_rank=201"
-    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Undergraduate&f.Course+Level%7CcourseLevel=Postgraduate&collection=utas%7Esp-search&f.Delivery+Mode%7CcourseAvailabilityAttendance=On+Campus&num_ranks=100&start_rank=301"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Undergraduate&f.Course+Level%7CcourseLevel=Postgraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=1"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Undergraduate&f.Course+Level%7CcourseLevel=Postgraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=101"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Undergraduate&f.Course+Level%7CcourseLevel=Postgraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=201"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Undergraduate&f.Course+Level%7CcourseLevel=Postgraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=301"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Undergraduate&f.Course+Level%7CcourseLevel=Postgraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=401"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Undergraduate&f.Course+Level%7CcourseLevel=Postgraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=501"
+    - "https://www.utas.edu.au/search?query=&f.Tabs%7Cutas%7Eds-handbook-courses%2Cutas%7Eds-short-courses=Courses&f.Course+Level%7CcourseLevel=Undergraduate&f.Course+Level%7CcourseLevel=Postgraduate&collection=utas%7Esp-search&num_ranks=100&start_rank=601"
 
   # Mark Funnelback search pages as listing-only: BFS visits them to extract
   # course links but does NOT add them to the course candidate set.
