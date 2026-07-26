@@ -69,9 +69,14 @@ discovery:
     - https://latr-search.funnelback.squiz.cloud/s/search.html?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=301&num_ranks=50
     - https://latr-search.funnelback.squiz.cloud/s/search.html?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=351&num_ranks=50
 
-  # Accept any hyphenated course slug under /courses/.
+  # Accept any course slug under /courses/ (letter + more chars).
+  # Previously used "/courses/[a-z][a-z-]+-" which silently dropped ~170
+  # courses whose slugs have no hyphen (e.g. /courses/mba, /courses/jd,
+  # /courses/llb, /courses/nursing) — 43% of the 395 Funnelback results.
+  # Changed to require only ≥2 chars (letter, digit, or hyphen), no mandatory
+  # trailing hyphen. block_url_patterns handles known non-course pages.
   allow_url_patterns:
-    - "/courses/[a-z][a-z-]+-"
+    - "/courses/[a-z][a-z0-9-]"
 
   block_url_patterns:
     - "/courses/a-z"

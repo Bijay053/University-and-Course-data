@@ -2067,6 +2067,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         emit=_tracking_emit,
                         _blocked_fee_urls_sink=_discover_blocked_fee_urls,
                         discovery_config=_uni_cfg.discovery,
+                        scrape_url=scrape_url,
                     ),
                     timeout=_disc_timeout,
                 )

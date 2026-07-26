@@ -701,6 +701,7 @@ async def discover_course_links(
     emit=None,
     _blocked_fee_urls_sink: list | None = None,
     discovery_config=None,  # DiscoveryConfig | None — avoids circular import
+    scrape_url: str | None = None,  # university's main homepage URL; used for cross-domain Funnelback extraction
 ) -> list[dict]:
     """BFS crawl from ``start_url`` with rule-based page-type classification
     and a sitemap fallback when the crawl yields too few candidates.
@@ -822,6 +823,28 @@ async def discover_course_links(
             start_url = redirect
             parsed = urlparse(start_url)
             origin = f"{parsed.scheme}://{parsed.netloc}"
+
+    # ── Cross-origin Funnelback candidate origins ───────────────────────────
+    # When the BFS is seeded from a cross-domain search provider (e.g.
+    # Funnelback on latr-search.funnelback.squiz.cloud for La Trobe), scrape.do
+    # fetches each seed page and the full HTML contains 50 course links wrapped
+    # in Funnelback redirects (search.latrobe.edu.au/s/redirect?url=<latrobe>).
+    # _resolve() drops these because the unwrapped URL is on the university's
+    # own domain, not the BFS origin (squiz.cloud). Track the university's main
+    # domain as a secondary "candidate origin" so the BFS listing-page pass
+    # can extract those links directly to found without traversing latrobe.edu.au.
+    _extra_candidate_origins: tuple[str, ...] = ()
+    if scrape_url:
+        _su_parsed = urlparse(scrape_url)
+        _su_origin = f"{_su_parsed.scheme}://{_su_parsed.netloc}"
+        if _su_origin.rstrip("/") != origin.rstrip("/"):
+            _extra_candidate_origins = (_su_origin,)
+            log.info(
+                "[DISCOVER] cross-origin Funnelback extraction enabled: "
+                "BFS origin=%s, extra_candidate_origin=%s",
+                origin,
+                _su_origin,
+            )
 
     queue: list[tuple[str, int]] = [(start_url, 0)]
     visited: set[str] = set()
@@ -1562,6 +1585,49 @@ async def discover_course_links(
                             break
                     else:
                         queue.append((full, depth + 1))
+
+            # ── Cross-origin Funnelback candidate extraction ─────────────────
+            # When the BFS runs from a cross-domain search provider (e.g.
+            # Funnelback on squiz.cloud for La Trobe), scrape.do already fetched
+            # the full rendered HTML with all 50 course links per page, but every
+            # Funnelback-wrapped link (search.latrobe.edu.au/s/redirect?url=...)
+            # resolves to the university's own domain and fails _resolve()'s
+            # origin check.  Re-scan the same ext.links looking specifically for
+            # Funnelback redirects that unwrap to an extra_candidate_origin, and
+            # add those directly to found (never to the BFS queue — we do not
+            # need to crawl latrobe.edu.au pages here; that is the Playwright
+            # browser path's job).
+            if _extra_candidate_origins and len(found) < max_courses:
+                for _fbe_href, _fbe_text in ext.links:
+                    if len(found) >= max_courses:
+                        break
+                    if not _FUNNELBACK_REDIRECT_RE.search(_fbe_href):
+                        continue
+                    _fbe_full = urljoin(url, _fbe_href)
+                    _fbe_unwrapped = _unwrap_funnelback_redirect(_fbe_full)
+                    if _fbe_unwrapped == _fbe_full:
+                        continue  # unwrap had no effect
+                    if not any(_fbe_unwrapped.startswith(o) for o in _extra_candidate_origins):
+                        continue
+                    _fbe_clean = _fbe_unwrapped.split("#")[0]
+                    if _fbe_clean in found:
+                        continue
+                    if _yaml_block_compiled_early and any(
+                        _p.search(_fbe_clean) for _p in _yaml_block_compiled_early
+                    ):
+                        continue
+                    # allow_url_patterns as a must-match filter (consistent with
+                    # browser_discover_generic.py's behaviour for Playwright BFS)
+                    if _yaml_allow_compiled and not any(
+                        _cp.search(_fbe_clean) for _, _cp in _yaml_allow_compiled
+                    ):
+                        continue
+                    if not _looks_like_course(_fbe_clean, _fbe_text):
+                        continue
+                    if _JUNK_TEXT.match(_fbe_text or ""):
+                        continue
+                    _clean_fbe = _PROMO_PREFIX_RE.sub("", _fbe_text or "").strip()
+                    found[_fbe_clean] = _clean_fbe or _fbe_clean.rsplit("/", 1)[-1]
 
         added = len(found) - before
         if emit:

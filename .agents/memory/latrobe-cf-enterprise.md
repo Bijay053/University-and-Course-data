@@ -25,12 +25,44 @@ https://latr-search.funnelback.squiz.cloud/s/search.html?f.Tabs%7Clatr%7Eds-cour
 2. `scrape_do_wait_for_ms: 8000` on latrobe.edu.au/search? — unreliable, same 9 nav links every page
 3. Using latrobe.edu.au/search? at all — that page is AJAX-loaded, Squiz Cloud is server-side
 
+## Cross-origin BFS extraction (discovery.py _extra_candidate_origins)
+
+**The second bug:** even with the squiz.cloud seeds, the Python BFS in `discover_course_links()` was
+returning 0 candidates. Root cause: `_resolve(href, base=squiz_url, origin=squiz_origin)` drops any link
+whose resolved URL doesn't start with `squiz_origin`. Funnelback redirect hrefs like
+`/s/redirect?...&url=https%3A%2F%2Fwww.latrobe.edu.au%2Fcourses%2F...` unwrap to `www.latrobe.edu.au`
+— a DIFFERENT origin — so they were silently discarded.
+
+**Fix in discovery.py:**
+1. `discover_course_links()` now accepts `scrape_url` (the university's main domain URL).
+2. `_extra_candidate_origins` tuple is set when `scrape_url` origin ≠ BFS seed origin.
+3. After the normal `_resolve()` link-extraction pass, a second pass scans `ext.links` for
+   `/s/redirect` hrefs, unwraps them via `_unwrap_funnelback_redirect()`, checks the unwrapped
+   URL starts with an extra_candidate_origin, applies block/allow/looks_like_course filters,
+   then adds to `found` directly (never to BFS queue — no need to crawl latrobe.edu.au itself).
+4. `orchestrator.py` updated to pass `scrape_url=scrape_url` to `discover_course_links()`.
+
+**Result:** Python BFS finds 191 courses from 7/8 pages (page 8 had a transient scrape.do failure;
+if it succeeded, expected ~228). Previously found 0 from Python BFS.
+
+**Stale-code trap (Celery forked processes):** The fix was on disk but the first Celery restart still
+ran 0-course jobs. The second restart (after adding a diagnostic log emit) picked up fresh code.
+If a recently-edited fix still shows the old behaviour: check the Celery worker process start time vs
+commit/edit time before re-debugging the fix itself. A `restart_workflow` for the Celery worker must
+fully kill all forked workers — if the logs still show old behaviour after the first restart, do a
+second restart.
+
 ## Discovery YAML settings (latrobe.yaml)
 - `scrape_do_render: true` + `scrape_do_skip_fallbacks: true` — squiz.cloud also has CF
 - `discovery_phase_timeout_s: 600` — safety margin (actual: 8/4 concurrent × 30s = 60s)
 - `bfs_page_budget: 15` — only 8 seeds needed
 - `max_candidates: 450` — above 395
 - NO `scrape_do_wait_for_ms` override — default 3000ms fine for server-side HTML
+- `always_browser_discover` NOT set — defaults False; Python BFS finds ~191-228 courses
+
+## Per-page yield from Funnelback
+Each 50-course Funnelback page passes ~30-40 through `_looks_like_course()`. Non-qualifying links are
+discipline hub pages (e.g. `/courses/accounting`) — correct rejections, not bugs.
 
 ## Extraction fix stack (latrobe.yaml)
 - `scrape_do_render: true` + `scrape_do_skip_fallbacks: true` — CF Enterprise blocks all other transports on latrobe.edu.au
