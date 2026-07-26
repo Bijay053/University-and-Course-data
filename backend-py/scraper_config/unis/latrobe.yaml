@@ -3,150 +3,80 @@
 #
 # Bug history / rationale:
 #
-#   - 2026-05-12: scrape staged only ~6 rows, all category landing pages.
-#     Root cause: BFS classifier promoted marketing pages instead of real
-#     course pages.  Fix: allow_url_patterns + always_sitemap_supplement.
+#   - 2026-07-24: CLOUDFLARE ENTERPRISE BLOCK on latrobe.edu.au.
+#     Only Scrape.do render=true works for per-course extraction.
 #
-#   - 2026-07-24: CLOUDFLARE ENTERPRISE BLOCK.
-#     plain httpx / curl_cffi / Wayback / Scrape.do static → all fail (403/0B).
-#     Only Scrape.do render=true works (verified on sitemap + course pages).
-#     Fix: scrape_do_skip_fallbacks + scrape_do_render for both phases.
+#   - 2026-07-26 (attempt 1 — WRONG): num_ranks=20 added to seed URLs.
+#     Broke the latrobe.edu.au Funnelback result HTML format — server
+#     returned 0 /s/redirect? course links → discovered=1, staged=0.
 #
-#   - 2026-07-26: DISCOVERY UNDERCOUNTING — sitemap approach found only ~225
-#     of the 395 courses visible at the Funnelback course-search page:
-#       https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses
-#                                        &query=&searchtype=global
-#                                        &collection=latr%7Esp-latrobe
-#     Root cause: (1) sitemap.xml contains ~215 real course paths + ~177
-#     category pages — sitemap itself is an undercount vs the search index.
-#     (2) allow_url_patterns required a specific degree-type prefix
-#     (bachelor-/master-/...) missing for many valid courses.
+#   - 2026-07-26 (attempt 2 — WRONG): discovery_phase_timeout_s:600 +
+#     scrape_do_wait_for_ms:8000 on latrobe.edu.au/search? seeds.
+#     The latrobe.edu.au search page loads its Funnelback results via
+#     AJAX after the initial render. Even with 8s wait, results may not
+#     appear reliably (only 9 identical nav links per page, not results).
 #
-#     Fix: replace sitemap discovery entirely with pre-seeded Funnelback
-#     pagination URLs (same approach as ECU — see ecu.yaml).
-#     - 40 seed URLs @ 10 results/page cover all 400 slots (>= 395 courses).
-#     - Scrape.do render=true fetches each seed page.
-#     - _unwrap_funnelback_redirect() in discovery.py converts each search
-#       result's /s/redirect?...&url=<encoded> href to a direct /courses/<slug>
-#       URL before any allow/block filter runs.
-#     - allow_url_patterns broadened to /courses/[a-z][a-z-]+- so any
-#       hyphenated course slug is accepted; the existing guards (should_stage_course,
-#       _DEGREE_QUALIFIER_RE disabled via skip_degree_qualifier_check) handle
-#       quality filtering downstream.
-#     - skip_sitemap_fallback: true disables the sitemap supplement entirely.
-#     - bfs_page_budget: 50 (>= 40 seeds, each seed is a depth-0 BFS page).
-#     - max_candidates: 450 (headroom above 395).
-#     - block_url_patterns includes /search to prevent cross-linking from
-#       rendered search pages back into the BFS queue (seeds are depth=0 and
-#       bypass block checks; only cross-links from rendered seed pages are
-#       blocked, so seeds themselves are always fetched).
+#   - 2026-07-26 (CORRECT FIX): switch seed_urls to the direct Squiz
+#     Cloud Funnelback endpoint:
+#       https://latr-search.funnelback.squiz.cloud/s/search.html?...
+#     This IS the Funnelback search server itself — results are in the
+#     INITIAL HTML RESPONSE (server-side rendered), no AJAX needed.
+#     The latrobe.edu.au/search? page was a custom wrapper that uses JS
+#     to AJAX-load results from this endpoint.
 #
-#   - 2026-07-26 (2nd attempt — WRONG FIX): tried num_ranks=20 with step=20
-#     to halve seeds from 40 → 20.  Broke the Funnelback result page format:
-#     the server ignored num_ranks=20 or returned a different HTML template,
-#     yielding 0 /s/redirect? course links per page.  Discovered=1 (a single
-#     cross-link category page), staged=0.  REVERTED.
+#     Discovery flow:
+#     1. Scrape.do render=true fetches each squiz.cloud seed page.
+#     2. BFS extracts links using _resolve(href, base=squiz_url,
+#        origin=latrobe_origin). Funnelback result links are relative
+#        /s/redirect?...&url=https%3A%2F%2Fwww.latrobe.edu.au%2Fcourses%2F...
+#     3. _unwrap_funnelback_redirect() converts /s/redirect?url=<enc>
+#        → https://www.latrobe.edu.au/courses/<slug>
+#     4. Origin check passes (starts with latrobe.edu.au origin).
+#     5. allow_url_patterns matches /courses/<hyphenated-slug>.
+#     6. 395 course URLs accumulated across 8 pages (num_ranks=50).
 #
-#   - 2026-07-26 (correct fix): restore the original 40-seed @ 10/page approach
-#     (no num_ranks param — use server default of 10) and address the 300s
-#     timeout by overriding discovery_phase_timeout_s: 600 per-uni instead.
-#     Budget maths: ceil(40/4) × 35s/render = 350s → fits in 600s; 250s
-#     headroom remains for BFS cross-links.  No other university is affected.
-#
-#   - Per-course pages are JS-heavy (Adobe Target prehide shell on static fetch).
-#     extraction.scrape_do_render + skip_browser_rescue mirrors the Herts/
-#     Kingston/Cardiff pattern: residential browser pool serves full page;
-#     datacenter Playwright also 403s on CF Enterprise.
+#     Budget: 8 seeds / 4 concurrent × ~30s/render = ~60s discovery.
 
 discovery:
   # Route ALL fetches straight to Scrape.do render=true.
-  # Static / cffi / Wayback all fail on latrobe.edu.au (CF Enterprise).
+  # Squiz Cloud also has CF protection (plain httpx → 403).
   scrape_do_skip_fallbacks: true
   scrape_do_render: true
   use_wayback: false
 
-  # Disable sitemap — Funnelback seeds cover more courses than the sitemap.
+  # Disable sitemap — Funnelback covers 395 courses; sitemap undercounts.
   skip_sitemap_fallback: true
   always_sitemap_supplement: false
 
-  # La Trobe's 40 Funnelback seed pages, each fetched via Scrape.do
-  # render=true (~30s each), need more than the global 300s cap.
-  # ceil(40/4) × 35s = 350s — 600s gives 250s headroom for BFS cross-links.
+  # Safety margin — actual seed fetch takes ~60s (8/4 × 30s).
   discovery_phase_timeout_s: 600
 
-  # La Trobe's Funnelback search results are AJAX-loaded after the initial
-  # page render. With the default 3000ms wait, Scrape.do captures the DOM
-  # before the AJAX completes — only the 9 navigation template links are
-  # present, not the 10 search result course links per page.
-  # 8000ms gives the AJAX call enough time to finish and populate the result
-  # cards. Budget: ceil(40/4) × (12s render + 8s wait) = 200s < 600s cap.
-  scrape_do_wait_for_ms: 8000
+  # bfs_page_budget must be >= number of seeds (8) plus BFS margin.
+  bfs_page_budget: 15
 
-  # Must be >= number of seed pages (40). Each seed is a BFS depth-0 page.
-  bfs_page_budget: 50
-
-  # Funnelback course search — 395 courses @ 10 results/page = 40 pages.
-  # start_rank increments by 10 (standard Funnelback default, no num_ranks
-  # param — adding num_ranks=N to the URL breaks the result HTML format and
-  # yields 0 course links per page).
-  # Seeds are fetched via Scrape.do render=true; _unwrap_funnelback_redirect()
-  # converts /s/redirect?...&url=<enc> hrefs to direct /courses/<slug> URLs.
+  # Direct Squiz Cloud Funnelback endpoint — server-side rendered HTML,
+  # no AJAX. num_ranks=50 → 8 pages cover all 395 La Trobe courses.
+  # start_rank increments by 50 (num_ranks per page).
+  # DO NOT change the domain back to latrobe.edu.au/search? — that page
+  # AJAX-loads its results and needs waitFor time that is unreliable.
   seed_urls:
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=1
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=11
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=21
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=31
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=41
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=51
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=61
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=71
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=81
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=91
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=101
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=111
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=121
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=131
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=141
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=151
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=161
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=171
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=181
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=191
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=201
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=211
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=221
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=231
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=241
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=251
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=261
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=271
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=281
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=291
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=301
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=311
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=321
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=331
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=341
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=351
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=361
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=371
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=381
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=391
+    - https://latr-search.funnelback.squiz.cloud/s/search.html?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=1&num_ranks=50
+    - https://latr-search.funnelback.squiz.cloud/s/search.html?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=51&num_ranks=50
+    - https://latr-search.funnelback.squiz.cloud/s/search.html?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=101&num_ranks=50
+    - https://latr-search.funnelback.squiz.cloud/s/search.html?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=151&num_ranks=50
+    - https://latr-search.funnelback.squiz.cloud/s/search.html?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=201&num_ranks=50
+    - https://latr-search.funnelback.squiz.cloud/s/search.html?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=251&num_ranks=50
+    - https://latr-search.funnelback.squiz.cloud/s/search.html?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=301&num_ranks=50
+    - https://latr-search.funnelback.squiz.cloud/s/search.html?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=351&num_ranks=50
 
   # Accept any hyphenated course slug under /courses/.
   allow_url_patterns:
     - "/courses/[a-z][a-z-]+-"
 
   block_url_patterns:
-    - "/search"
     - "/courses/a-z"
     - "/courses/diplomas$"
     - "/courses/packages$"
-    - "/study/"
-    - "/international/study"
-    - "/news/"
-    - "/about-us/"
-    - "/events/"
 
   # Headroom above 395 courses.
   max_candidates: 450

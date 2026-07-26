@@ -1,44 +1,47 @@
 ---
-name: La Trobe CF Enterprise + Funnelback AJAX scraper fixes
-description: Full fix stack for La Trobe University (uni_id=21) — CF Enterprise, Adobe Target prehide, and Funnelback AJAX-loaded search results
+name: La Trobe CF Enterprise + Funnelback discovery fix
+description: Full fix stack for La Trobe University (uni_id=21) — CF Enterprise, Adobe Target prehide, and the correct Funnelback discovery endpoint
 ---
 
-## Fix stack (all in scraper_config/unis/latrobe.yaml)
+## Discovery fix — use Squiz Cloud direct endpoint (NOT latrobe.edu.au/search?)
 
-**Discovery:**
-- `scrape_do_render: true` + `scrape_do_skip_fallbacks: true` — CF Enterprise blocks all other transports
-- `scrape_do_wait_for_ms: 8000` — **CRITICAL**: La Trobe's Funnelback search results are AJAX-loaded AFTER the initial page render. Default 3000ms is too short; every seed page captures only the 9 navigation template links (same on all 40 pages → +0 new candidates per page). 8000ms gives the AJAX enough time to populate the result cards (~10 course links per page).
-- 40 Funnelback seed URLs (start_rank=1..391, step=10, NO `num_ranks` param)
-- `discovery_phase_timeout_s: 600` — 40 seeds at 4 concurrent × (12s render + 8s wait) ≈ 200s; 600s cap gives headroom
-- `skip_sitemap_fallback: true` — sitemap covers only ~215 of 395 courses (undercounts)
-- `bfs_page_budget: 50` — must be ≥ 40 (number of seeds)
+**The critical lesson:** La Trobe has TWO different Funnelback entry points:
 
-**Extraction:**
-- `scrape_do_render: true` + `scrape_do_skip_fallbacks: true` — same CF reason
-- `skip_browser_rescue: true` — datacenter Playwright = CF 403
-- `skip_per_course_browser: true` — per-course browser fee extraction path also CF blocked; without this flag every batch stalls 60-120s before saves
-- `skip_degree_qualifier_check: true` — La Trobe offers "Professional Certificate" / "Undergraduate Certificate" (not in `_DEGREE_QUALIFIER_RE`); Scrape.do also sometimes returns Adobe Target prehide shell with no H1, making even "Juris Doctor" trip the guard
-- `max_parallel_fetch: 3` — 1 is too slow (33+ min/batch); 3 gives ~22 min/batch
-- `online_only.enabled: false` — prehide shell has no location text → `no_location_online_override` stamps study_mode="Online" → online_only filter rejects all courses
-- `require_international_fee: false` — fees behind JS campus/student-type selector, not extractable automatically
+1. `https://www.latrobe.edu.au/search?...` — a CUSTOM PAGE that wraps Funnelback via JavaScript AJAX. Results load AFTER the initial render → scrape_do_wait_for_ms=8000 is unreliable → every seed page returns the same 9 nav template links, +0 new candidates from page 2 onwards.
 
-## Funnelback seed pagination — critical lessons
+2. `https://latr-search.funnelback.squiz.cloud/s/search.html?...` — the DIRECT Funnelback search server. Results are in the INITIAL HTML (server-side rendered), no AJAX. This is the correct endpoint.
 
-**The Funnelback AJAX wait is the #1 La Trobe discovery issue.**
-- La Trobe's `/search?...` page renders the template immediately but fires an AJAX call to populate result cards. With the default 3s wait, Scrape.do captures 0 result cards.
-- Evidence: "9 course links found" on EVERY seed page, ALL the same links (+0 new candidates from page 2 onwards) → those 9 are the navigation template, not results.
-- Fix: `scrape_do_wait_for_ms: 8000` in the discovery section.
+**Correct seed URL format:**
+```
+https://latr-search.funnelback.squiz.cloud/s/search.html?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=1&num_ranks=50
+```
+- 8 seeds × num_ranks=50 = 400 slots for 395 courses
+- step=50 (start_rank 1, 51, 101, ..., 351)
+- Funnelback redirect links: `/s/redirect?...&url=https%3A%2F%2Fwww.latrobe.edu.au%2Fcourses%2F...`
+  → `_unwrap_funnelback_redirect()` converts to La Trobe URLs → pass origin check ✓
 
-**Do NOT add `num_ranks=N` to Funnelback seed URLs.**
-- Adding `num_ranks=20` broke the La Trobe Funnelback result page format: the server returned 0 `/s/redirect?` course links → `discovered=1`, `staged=0`. Reverted.
-- The server default (10 results/page) is correct. Use more seed pages (step=10) instead of bigger pages.
+**Wrong approaches tried:**
+1. `num_ranks=20` on latrobe.edu.au/search? — broke Funnelback HTML format → 0 course links
+2. `scrape_do_wait_for_ms: 8000` on latrobe.edu.au/search? — unreliable, same 9 nav links every page
+3. Using latrobe.edu.au/search? at all — that page is AJAX-loaded, Squiz Cloud is server-side
 
-**Per-uni discovery timeout (`discovery_phase_timeout_s`):**
-- Added `DiscoveryConfig.discovery_phase_timeout_s: Optional[int]` to schema.py.
-- orchestrator.py uses `getattr(_uni_cfg.discovery, "discovery_phase_timeout_s", None) or settings.discovery_phase_timeout_s` for the `asyncio.wait_for()` call.
-- La Trobe sets 600 s.
+## Discovery YAML settings (latrobe.yaml)
+- `scrape_do_render: true` + `scrape_do_skip_fallbacks: true` — squiz.cloud also has CF
+- `discovery_phase_timeout_s: 600` — safety margin (actual: 8/4 concurrent × 30s = 60s)
+- `bfs_page_budget: 15` — only 8 seeds needed
+- `max_candidates: 450` — above 395
+- NO `scrape_do_wait_for_ms` override — default 3000ms fine for server-side HTML
 
-## Key timing insight
-`asyncio.gather` collects ALL results before the `for r in results:` staging loop runs. With `max_parallel_fetch: 1` and 100 courses/batch at ~40s each: saves=0 for 33+ minutes. Raise to ≥3 so batch completes in ~22 min.
+## Extraction fix stack (latrobe.yaml)
+- `scrape_do_render: true` + `scrape_do_skip_fallbacks: true` — CF Enterprise blocks all other transports on latrobe.edu.au
+- `skip_browser_rescue: true` + `skip_per_course_browser: true` — datacenter Playwright = CF 403; per-course browser path stalls 60-120s/batch
+- `skip_degree_qualifier_check: true` — Adobe Target prehide shell has no H1; "Professional Certificate" etc. not in `_DEGREE_QUALIFIER_RE`
+- `max_parallel_fetch: 3` — 1 is too slow; 3 ≈ 22 min/batch
+- `online_only.enabled: false` — prehide shell → no location text → online_only filter rejects all
+- `require_international_fee: false` — fees behind JS selector
+- `domestic_only.enabled: true` — filter domestic-only courses
 
-**Why:** CF Enterprise + Adobe Target are La Trobe's full JS rendering stack. No plain httpx/cffi/datacenter-Playwright transport works. Funnelback search results are AJAX-loaded and need `scrape_do_wait_for_ms: 8000` to appear in the Scrape.do capture.
+## Key timing insight for extraction
+`asyncio.gather` collects ALL results before staging loop. `max_parallel_fetch: 1` at 40s/course = 33+ min/batch before any saves. Must use ≥ 3.
+
+**Why squiz.cloud endpoint is correct:** The squiz.cloud domain IS the Funnelback search engine. La Trobe's own search page is just a JS wrapper that AJAX-loads from squiz.cloud — it doesn't have the results in its initial HTML.
