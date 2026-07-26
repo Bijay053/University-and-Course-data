@@ -915,7 +915,7 @@ export default function Scraping() {
     return <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-mono ${s.cls}`}>{s.label}</span>;
   };
 
-  const { data: uniData } = useListUniversities({ limit: 100 });
+  const { data: uniData } = useListUniversities({ limit: 250 });
 
   const fetchJobs = async () => {
     setLoadingJobs(true);
