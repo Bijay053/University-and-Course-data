@@ -97,7 +97,31 @@ extraction:
 
   skip_degree_qualifier_check: true
 
+  # La Trobe is a Next.js SPA with Adobe Target prehide that takes >3 s to
+  # reveal content. 8 s gives React enough time to hydrate the DOM fully so
+  # the text extraction returns non-zero content for Gemini.
+  scrape_do_wait_for_ms: 8000
+
+  # La Trobe uses hash-based SPA routing (#/overview, #/entry-requirements).
+  # Without a fragment, scrape.do renders the default (domestic) view with
+  # no fee/IELTS data. Two fragment fetches are configured:
+  #
+  #   Primary   — #/overview?studentType=int
+  #               Renders the Overview tab with: Annual tuition fee, Duration,
+  #               Start dates, Learning mode (all visible in the course summary
+  #               table on the international view).
+  #
+  #   Secondary — #/entry-requirements?studentType=int
+  #               Renders the Entry requirements tab with: IELTS overall + band
+  #               requirements ("6.5 IELTS (Academic) with no individual band
+  #               less than 6.0"). Text is appended to the Gemini context under
+  #               "[Secondary tab content — entry requirements]".
+  primary_fetch_fragment: "#/overview?studentType=int"
+  secondary_fetch_fragment: "#/entry-requirements?studentType=int"
+
   # 3 concurrent render calls balances throughput vs Scrape.do rate limits.
+  # Each course now makes 2 render calls (primary + secondary tab) so effective
+  # concurrency is 6 Scrape.do calls in flight at a time — still within limits.
   max_parallel_fetch: 3
 
   filters:

@@ -1262,6 +1262,23 @@ async def extract_course(
     _use_scrape_do_render: bool = bool(
         getattr(getattr(_uc, "extraction", None), "scrape_do_render", False)
     )
+    # Extraction-phase render wait time (ms). Increase for React/Next.js SPAs
+    # that hydrate slowly (e.g. La Trobe's Adobe Target prehide needs >3 s).
+    _extr_wait_ms: int = int(
+        getattr(getattr(_uc, "extraction", None), "scrape_do_wait_for_ms", 3000) or 3000
+    )
+    # Hash-routed SPA tab navigation (e.g. La Trobe). The primary fragment
+    # makes scrape.do render the fee/duration tab; the secondary fragment
+    # fetches the entry-requirements (IELTS) tab in a separate render call.
+    _primary_fragment: str = (
+        getattr(getattr(_uc, "extraction", None), "primary_fetch_fragment", None) or ""
+    ).strip()
+    _secondary_fragment: str = (
+        getattr(getattr(_uc, "extraction", None), "secondary_fetch_fragment", None) or ""
+    ).strip()
+    # Populated by the secondary tab render fetch below; merged into _gp_html
+    # before the Gemini extraction call so all tab data is visible in one pass.
+    _secondary_html: str | None = None
     # Geo-block bypass: SSR pages that serve country-welcome overlays for US
     # IPs (Lancaster).  Uses Scrape.do static proxy (~$0.0005/call), no JS.
     _use_scrape_do_static: bool = bool(
@@ -1320,6 +1337,14 @@ async def extract_course(
         _fee_suffix = ""
     if _fee_suffix and _fee_suffix not in url:
         url = url + _fee_suffix
+
+    # ── primary_fetch_fragment: hash-routed SPA tab navigation ──────────────
+    # For Next.js/React SPAs using hash routing (e.g. La Trobe), append the
+    # configured hash fragment so scrape.do headless Chrome renders the specific
+    # tab that shows international fee and duration data instead of the default
+    # domestic view.  Only appended when the URL has no '#' yet.
+    if _primary_fragment and "#" not in url:
+        url = url + _primary_fragment
 
     # JCU note: The "Domestic / International" Fast Facts toggle at jcu.edu.au
     # is JS-driven — appending ?international=true to the static HTTP request
@@ -1476,7 +1501,31 @@ async def extract_course(
             _http_attempted = True
             if _use_scrape_do_render:
                 with scrape_do_render_scope():
-                    html = await fetch_html(url)
+                    html = await fetch_html(url, wait_for_ms=_extr_wait_ms)
+                # Secondary tab fetch for hash-routed SPAs (e.g. La Trobe).
+                # Renders the entry-requirements (IELTS) tab separately and
+                # stores it in _secondary_html for merging into the Gemini
+                # context below.  Only runs when the primary fetch succeeds.
+                if _secondary_fragment and html:
+                    _sec_url = url.split("#")[0] + _secondary_fragment
+                    try:
+                        with scrape_do_render_scope():
+                            _secondary_html = await asyncio.wait_for(
+                                fetch_html(_sec_url, wait_for_ms=_extr_wait_ms),
+                                timeout=90.0,
+                            )
+                        if emit and _secondary_html:
+                            await emit(
+                                "status",
+                                f"[SECONDARY-FETCH] +{len(_secondary_html)}B from {_sec_url[-70:]}",
+                                phase="extract",
+                                kind="secondary_tab_fetched",
+                                url=_sec_url,
+                            )
+                    except Exception as _sec_exc:
+                        log.debug(
+                            "[SECONDARY-FETCH] %s failed: %s", _sec_url, _sec_exc
+                        )
             elif _use_scrape_do_static:
                 with scrape_do_static_scope():
                     html = await fetch_html(url)
@@ -3212,6 +3261,23 @@ async def extract_course(
             else:
                 # Full extraction needed — run the complete Gemini primary prompt.
                 _gp_html = rendered_html or html
+
+                # ── Secondary tab HTML merge (hash-routed SPA, e.g. La Trobe) ─
+                # When secondary_fetch_fragment is configured, the entry-
+                # requirements tab was rendered separately and stored in
+                # _secondary_html.  Convert it to plain text and append it
+                # under a labelled section so Gemini sees IELTS + fee data
+                # from both tabs in a single extraction call.
+                if _secondary_html:
+                    from app.services.scraper.extractors._text import (
+                        html_to_text as _h2t_sec,
+                    )
+                    _sec_text = (_h2t_sec(_secondary_html) or "").strip()
+                    if _sec_text:
+                        _gp_html = (_gp_html or "") + (
+                            "\n\n[Secondary tab content — entry requirements]\n"
+                            + _sec_text
+                        )
 
                 # ── Admission-only text filter ────────────────────────────────
                 # Strip non-admission sections (career outcomes, how-to-apply,

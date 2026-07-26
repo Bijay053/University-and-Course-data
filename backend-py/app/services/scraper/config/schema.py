@@ -3042,6 +3042,44 @@ class ExtractionConfig(BaseModel):
             "Leave empty to let Scrape.do choose the nearest residential IP."
         ),
     )
+    scrape_do_wait_for_ms: int = Field(
+        default=3000,
+        description=(
+            "Milliseconds passed as Scrape.do's waitFor parameter during "
+            "EXTRACTION-phase scrape_do_render calls.  Scrape.do waits this "
+            "long after the initial page-load event before snapshotting the DOM. "
+            "Increase for Next.js/React SPAs that hydrate slowly — e.g. La Trobe "
+            "uses Adobe Target prehide which needs >3 s to reveal content. "
+            "Has no effect unless scrape_do_render is True. Default: 3000."
+        ),
+    )
+    primary_fetch_fragment: Optional[str] = Field(
+        default=None,
+        description=(
+            "Hash fragment (including '#') appended to the course URL before the "
+            "primary scrape_do_render fetch.  Use for hash-routed SPAs (Next.js / "
+            "React Router) where the default route does not show international fee "
+            "and duration data.  Example for La Trobe: "
+            "'#/overview?studentType=int' routes headless Chrome to the overview "
+            "tab showing fee, duration, and start dates.  Only appended when the "
+            "URL does not already contain '#'. No effect unless scrape_do_render "
+            "is True."
+        ),
+    )
+    secondary_fetch_fragment: Optional[str] = Field(
+        default=None,
+        description=(
+            "Hash fragment (including '#') appended to the base course URL for a "
+            "SECOND scrape_do_render fetch whose text is merged into the Gemini "
+            "extraction context.  Use when critical fields (e.g. IELTS) live on a "
+            "separate SPA tab from the primary fetch.  Example for La Trobe: "
+            "'#/entry-requirements?studentType=int' fetches the entry-requirements "
+            "tab (IELTS score) while the primary fetch targets the overview tab "
+            "(fee + duration).  Only performed when scrape_do_render is True and "
+            "the primary fetch succeeds.  Text is appended under a "
+            "'[Secondary tab content]' label so Gemini sees all data in one pass."
+        ),
+    )
     skip_ai_when_text_empty: bool = Field(
         default=False,
         description=(
