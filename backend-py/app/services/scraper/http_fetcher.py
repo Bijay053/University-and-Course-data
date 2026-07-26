@@ -829,7 +829,7 @@ async def _client():
     yield _get_shared_client()
 
 
-async def fetch_html(url: str, *, retries: int = 2) -> str | None:
+async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> str | None:
     # Scrape.do render is only active inside scrape_do_render_scope() —
     # i.e. during per-course extraction in single_course.extract_course().
     # It is NEVER True during discovery / sitemap / central-page phases.
@@ -881,7 +881,7 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
                 "fetch %s: scrape_do_skip_fallbacks=True — going straight to Scrape.do render",
                 url,
             )
-            _rendered = await fetch_html_scrape_do(url, render=True)
+            _rendered = await fetch_html_scrape_do(url, render=True, wait_for_ms=wait_for_ms)
             if _rendered is not None:
                 return _rendered
             # Render returned 502 / None (e.g. Scrape.do rate-limited under
@@ -931,7 +931,10 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
                     "render" if _use_render else "static", _backoff,
                 )
                 await asyncio.sleep(_backoff)
-                _candidate = await fetch_html_scrape_do(url, render=_use_render)
+                _candidate = await fetch_html_scrape_do(
+                    url, render=_use_render,
+                    wait_for_ms=wait_for_ms if _use_render else 3000,
+                )
                 if _candidate is not None and (
                     _use_render or not _is_spa_shell(_candidate)
                 ):
@@ -1086,7 +1089,7 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
         if _fast is not None and not _is_spa_shell(_fast):
             return _fast
         if _scrape_do_render:
-            _fast_r = await fetch_html_scrape_do(url, render=True)
+            _fast_r = await fetch_html_scrape_do(url, render=True, wait_for_ms=wait_for_ms)
             return _fast_r
         return None
 
@@ -1172,7 +1175,7 @@ async def fetch_html(url: str, *, retries: int = 2) -> str | None:
                 "fetch %s -> 200 (scrape_do_render=True) — upgrading to Scrape.do headless render",
                 url,
             )
-            rendered = await fetch_html_scrape_do(url, render=True)
+            rendered = await fetch_html_scrape_do(url, render=True, wait_for_ms=wait_for_ms)
             if rendered is not None:
                 return rendered
             log.info(
