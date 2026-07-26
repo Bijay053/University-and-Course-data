@@ -1470,6 +1470,18 @@ class DiscoveryConfig(BaseModel):
             "Raise for sites with many listing pages (e.g. UOW ~62 pages)."
         ),
     )
+    discovery_phase_timeout_s: Optional[int] = Field(
+        default=None,
+        description=(
+            "Per-university override for the discovery-phase deadline (seconds). "
+            "When set, replaces the global settings.discovery_phase_timeout_s "
+            "(default 300 s) for this university only.  Use when seed prefetch "
+            "via Scrape.do render=true requires more than 300 s — e.g. La Trobe "
+            "has 40 Funnelback seeds at ~30 s each / 4 concurrent = ~300 s. "
+            "Setting 600 gives a safe 250 s headroom for the 40-seed prefetch "
+            "plus BFS cross-links.  Never lower than 120."
+        ),
+    )
     max_candidates: Optional[int] = Field(
         default=None,
         description=(

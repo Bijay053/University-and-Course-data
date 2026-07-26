@@ -24,10 +24,7 @@
 #
 #     Fix: replace sitemap discovery entirely with pre-seeded Funnelback
 #     pagination URLs (same approach as ECU — see ecu.yaml).
-#     - Funnelback seed URLs with num_ranks=20 return 20 results per page
-#       (standard Funnelback parameter; default is 10 per page).
-#     - 20 seed URLs with start_rank step of 20 cover all 400 slots
-#       (>= 395 courses).
+#     - 40 seed URLs @ 10 results/page cover all 400 slots (>= 395 courses).
 #     - Scrape.do render=true fetches each seed page.
 #     - _unwrap_funnelback_redirect() in discovery.py converts each search
 #       result's /s/redirect?...&url=<encoded> href to a direct /courses/<slug>
@@ -37,19 +34,24 @@
 #       _DEGREE_QUALIFIER_RE disabled via skip_degree_qualifier_check) handle
 #       quality filtering downstream.
 #     - skip_sitemap_fallback: true disables the sitemap supplement entirely.
-#     - bfs_page_budget: 25 (>= 20 seeds, each seed is a depth-0 BFS page).
+#     - bfs_page_budget: 50 (>= 40 seeds, each seed is a depth-0 BFS page).
 #     - max_candidates: 450 (headroom above 395).
 #     - block_url_patterns includes /search to prevent cross-linking from
 #       rendered search pages back into the BFS queue (seeds are depth=0 and
 #       bypass block checks; only cross-links from rendered seed pages are
 #       blocked, so seeds themselves are always fetched).
 #
-#   - 2026-07-26 (2nd fix): DISCOVERY TIMEOUT — 40 seeds × ~30s Scrape.do
-#     render / 4 concurrent = 10 batches × 30s = 300s, right at the budget
-#     limit.  Any slow render causes "Discovery phase exceeded 300s deadline".
-#     Fix: add num_ranks=20 to all seed URLs, step start_rank by 20 instead
-#     of 10 → 20 seeds / 4 concurrent = 5 batches × 30s = 150s.  Safe.
-#     Budget maths: ceil(20/4) × 30s = 150s → 150s headroom remaining for BFS.
+#   - 2026-07-26 (2nd attempt — WRONG FIX): tried num_ranks=20 with step=20
+#     to halve seeds from 40 → 20.  Broke the Funnelback result page format:
+#     the server ignored num_ranks=20 or returned a different HTML template,
+#     yielding 0 /s/redirect? course links per page.  Discovered=1 (a single
+#     cross-link category page), staged=0.  REVERTED.
+#
+#   - 2026-07-26 (correct fix): restore the original 40-seed @ 10/page approach
+#     (no num_ranks param — use server default of 10) and address the 300s
+#     timeout by overriding discovery_phase_timeout_s: 600 per-uni instead.
+#     Budget maths: ceil(40/4) × 35s/render = 350s → fits in 600s; 250s
+#     headroom remains for BFS cross-links.  No other university is affected.
 #
 #   - Per-course pages are JS-heavy (Adobe Target prehide shell on static fetch).
 #     extraction.scrape_do_render + skip_browser_rescue mirrors the Herts/
@@ -67,50 +69,67 @@ discovery:
   skip_sitemap_fallback: true
   always_sitemap_supplement: false
 
-  # Must be >= number of seed pages (20). Each seed is a BFS depth-0 page.
-  bfs_page_budget: 25
+  # La Trobe's 40 Funnelback seed pages, each fetched via Scrape.do
+  # render=true (~30s each), need more than the global 300s cap.
+  # ceil(40/4) × 35s = 350s — 600s gives 250s headroom for BFS cross-links.
+  discovery_phase_timeout_s: 600
 
-  # Funnelback course search — 395 courses @ 20 results/page = 20 pages.
-  # num_ranks=20 requests 20 results per page (standard Funnelback parameter).
-  # start_rank increments by 20 to match.
-  # Seed URLs are fetched via Scrape.do render=true; _unwrap_funnelback_redirect()
+  # Must be >= number of seed pages (40). Each seed is a BFS depth-0 page.
+  bfs_page_budget: 50
+
+  # Funnelback course search — 395 courses @ 10 results/page = 40 pages.
+  # start_rank increments by 10 (standard Funnelback default, no num_ranks
+  # param — adding num_ranks=N to the URL breaks the result HTML format and
+  # yields 0 course links per page).
+  # Seeds are fetched via Scrape.do render=true; _unwrap_funnelback_redirect()
   # converts /s/redirect?...&url=<enc> hrefs to direct /courses/<slug> URLs.
-  # Timing: 20 seeds / 4 concurrent = 5 batches × ~30s = 150s — well within
-  # the 300s discovery_phase_timeout_s budget (was 40 seeds = 10 batches ≈ 300s).
   seed_urls:
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&num_ranks=20&start_rank=1
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&num_ranks=20&start_rank=21
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&num_ranks=20&start_rank=41
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&num_ranks=20&start_rank=61
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&num_ranks=20&start_rank=81
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&num_ranks=20&start_rank=101
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&num_ranks=20&start_rank=121
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&num_ranks=20&start_rank=141
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&num_ranks=20&start_rank=161
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&num_ranks=20&start_rank=181
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&num_ranks=20&start_rank=201
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&num_ranks=20&start_rank=221
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&num_ranks=20&start_rank=241
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&num_ranks=20&start_rank=261
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&num_ranks=20&start_rank=281
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&num_ranks=20&start_rank=301
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&num_ranks=20&start_rank=321
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&num_ranks=20&start_rank=341
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&num_ranks=20&start_rank=361
-    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&num_ranks=20&start_rank=381
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=1
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=11
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=21
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=31
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=41
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=51
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=61
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=71
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=81
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=91
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=101
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=111
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=121
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=131
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=141
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=151
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=161
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=171
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=181
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=191
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=201
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=211
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=221
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=231
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=241
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=251
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=261
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=271
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=281
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=291
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=301
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=311
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=321
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=331
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=341
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=351
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=361
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=371
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=381
+    - https://www.latrobe.edu.au/search?f.Tabs%7Clatr%7Eds-courses=Courses&query=&searchtype=global&collection=latr%7Esp-latrobe&start_rank=391
 
   # Accept any hyphenated course slug under /courses/.
-  # Broader than the old prefix-list — lets guards handle quality filtering.
-  # /courses/[a-z][a-z-]+- requires at least one word + hyphen, which all
-  # named course pages have; bare category pages (/courses/engineering) are
-  # excluded naturally (no trailing hyphen word).
   allow_url_patterns:
     - "/courses/[a-z][a-z-]+-"
 
   block_url_patterns:
-    # Block search/listing/marketing pages from cross-linking into the BFS queue.
-    # Seeds are depth=0 and bypass this check; only cross-links from rendered
-    # seed pages are subject to blocking.
     - "/search"
     - "/courses/a-z"
     - "/courses/diplomas$"
@@ -133,10 +152,6 @@ extraction:
   skip_browser_rescue: true
   skip_per_course_browser: true
 
-  # La Trobe offers "Professional Certificate", "Undergraduate Certificate",
-  # "Juris Doctor" etc. whose titles may lack canonical degree words, and
-  # Scrape.do sometimes returns an Adobe Target prehide shell with no H1.
-  # Discovery already filtered to course URLs — guard is redundant here.
   skip_degree_qualifier_check: true
 
   # 3 concurrent render calls balances throughput vs Scrape.do rate limits.
@@ -145,10 +160,6 @@ extraction:
   filters:
     domestic_only:
       enabled: true
-    # La Trobe is a multi-campus on-campus university.  The prehide JS shell
-    # means no location/campus text is extractable, so no_location_online_override
-    # stamps study_mode=Online on every course.  Disabling online_only filter
-    # prevents mass rejection; operators correct study_mode post-staging.
     online_only:
       enabled: false
 
@@ -161,8 +172,4 @@ extraction:
     requirements_pdf_url: ""
 
   staging:
-    # International fees are not extractable automatically:
-    # - Central fee page JS table requires client-side interaction (0 records parsed).
-    # - Per-course pages also fail even with render=true.
-    # Operators review fee data manually after staging.
     require_international_fee: false

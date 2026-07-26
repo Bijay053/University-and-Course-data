@@ -2049,6 +2049,15 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
 
         if (not links or _yaml_api_partial) and not _always_browser:
             _pre_bfs_links = list(links)
+            # Per-uni YAML can override the global discovery_phase_timeout_s
+            # (default 300 s) via discovery.discovery_phase_timeout_s.
+            # Use case: La Trobe has 40 Funnelback seeds at ~30 s each via
+            # Scrape.do render=true / 4 concurrent = ~300 s, right at the
+            # global cap; setting 600 gives a safe 250 s headroom.
+            _disc_timeout = int(
+                getattr(_uni_cfg.discovery, "discovery_phase_timeout_s", None)
+                or settings.discovery_phase_timeout_s
+            )
             try:
                 links = await asyncio.wait_for(
                     discover_course_links(
@@ -2059,7 +2068,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         _blocked_fee_urls_sink=_discover_blocked_fee_urls,
                         discovery_config=_uni_cfg.discovery,
                     ),
-                    timeout=settings.discovery_phase_timeout_s,
+                    timeout=_disc_timeout,
                 )
             except asyncio.TimeoutError:
                 # Discovery-phase deadline (Ulster job_ec86dc5866cb,
@@ -2071,7 +2080,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 # reason, releasing the claim instead of blocking the queue
                 # for the full scrape_task_soft_time_limit_s ceiling.
                 _timeout_msg = (
-                    f"Discovery phase exceeded {settings.discovery_phase_timeout_s}s "
+                    f"Discovery phase exceeded {_disc_timeout}s "
                     "deadline — a BFS/sitemap fetch likely stuck on a blocked "
                     "transport (Cloudflare-block, rate limit, or hung retry "
                     "chain). Job marked failed so the worker slot is freed."
