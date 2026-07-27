@@ -61,7 +61,14 @@ def _is_valid_base(hit: dict) -> bool:
 
 def _expand_hit(hit: dict) -> list[dict[str, str]]:
     """Expand a single API hit into one or more (name, url_id, title_for_slug)
-    tuples, matching the SPA's package-expansion loop."""
+    tuples, matching the SPA's package-expansion loop.
+
+    Package IDs in the TAFE NSW API are always purely numeric (e.g. 1355, 1473).
+    These are study-pathway bundle placeholders — the TAFE NSW website has no
+    ``/international/courses/<slug>--<numeric-id>`` detail pages for them (all
+    return 404).  Only proper TAFE course codes (e.g. ICT50220, SIT50322) have
+    real detail pages.  Numeric packageIds are therefore skipped.
+    """
     src      = hit.get("_source", {})
     packages = src.get("coursePackage") or []
     results: list[dict[str, str]] = []
@@ -71,6 +78,9 @@ def _expand_hit(hit: dict) -> list[dict[str, str]]:
         for pkg in packages:
             pkg_id = pkg.get("packageId") or ""
             if not pkg_id or pkg_id in seen:
+                continue
+            # Numeric IDs are pathway-bundle placeholders with no detail page.
+            if re.match(r"^\d+$", pkg_id):
                 continue
             seen.add(pkg_id)
             csl   = pkg.get("courseSimpleList") or []
