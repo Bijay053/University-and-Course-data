@@ -1,0 +1,69 @@
+# TAFE NSW
+# Hostname: www.tafensw.edu.au
+# Country: Australia  |  Currency: AUD
+# uni_id: 2289 (dev)
+#
+# ── Discovery strategy ───────────────────────────────────────────────────────
+#
+# The international course catalogue lives at a single JS-rendered React SPA:
+#   https://www.tafensw.edu.au/international/course-search?keyword=
+#
+# With keyword= (empty), this page returns all 153 international courses as
+# rendered course cards. One seed is enough — all courses appear on this URL.
+#
+# Static HTML (httpx / curl_cffi) returns only the React shell with no cards.
+# Scrape.do render=True is required to execute the JS and render the cards.
+# scrape_do_wait_for_ms=10000 gives the React SPA enough time to fetch and
+# render all 153 course cards before Scrape.do snapshots the DOM.
+#
+# After BFS visits the seed (as listing_only), it follows the links on the
+# rendered page to discover the 153 individual course detail pages.
+# bfs_page_budget: 5 = 1 seed + 4 buffer (no deep BFS needed — all links
+# are surfaced on that single search page).
+#
+# If course detail pages are also SPA-rendered and require scrape.do, add
+#   extraction:
+#     scrape_do_render: true
+#     scrape_do_wait_for_ms: 6000
+# after verifying the first scrape results.
+
+discovery:
+  # TAFE NSW international search is a React SPA — static HTML returns no cards.
+  # Skip httpx/cffi entirely and go straight to Scrape.do headless Chrome.
+  scrape_do_skip_fallbacks: true
+  scrape_do_render: true
+
+  # 10 s wait: allows the React SPA to fetch the catalogue API and render all
+  # 153 course cards before Scrape.do snapshots the DOM.
+  scrape_do_wait_for_ms: 10000
+
+  # 1 seed covers all 153 international courses; budget of 5 gives BFS a small
+  # buffer for any course-detail pagination encountered during traversal.
+  bfs_page_budget: 5
+
+  use_wayback: false
+
+  seed_urls:
+    - "https://www.tafensw.edu.au/international/course-search?keyword="
+
+  # Mark the search page as listing-only: BFS extracts course links from it
+  # but does NOT add it to the course candidate set.
+  listing_only_patterns:
+    - "/international/course-search"
+
+  # Drop non-course TAFE NSW URLs that may appear in the rendered DOM:
+  # nav, hub, news, about, contact, policy, accessibility pages.
+  block_url_patterns:
+    - "/about(?:/|$)"
+    - "/news(?:/|$)"
+    - "/contact(?:/|$)"
+    - "/accessibility(?:/|$)"
+    - "/policies(?:/|$)"
+    - "/students(?:/|$)"
+    - "/staff(?:/|$)"
+    - "/faculty(?:/|$)"
+    - "/sitemap"
+
+extraction:
+  fees:
+    default_currency: AUD
