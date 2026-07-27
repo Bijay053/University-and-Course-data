@@ -5,59 +5,43 @@
 #
 # ── Discovery strategy ───────────────────────────────────────────────────────
 #
-# Problem: https://www.tafensw.edu.au/international/course-search?keyword=
-# lists all 153 international courses in a browser, but the SPA lazy-loads
-# course cards as the user scrolls — Scrape.do only snapshots the initial
-# DOM and captures the first ~22 cards. A second "Load More" click / scroll
-# is required for the rest, which Scrape.do render cannot perform.
+# Primary source: https://www.tafensw.edu.au/sitemap.xml (1346 URLs, 643 course
+# detail pages at /course-areas/<area>/courses/<slug>).
+# allow_url_patterns filters to those 643 course detail pages only.
+# The 153 international courses are a subset — extraction handles filtering.
 #
-# Fix: use TAFE NSW's XML sitemap as the primary course source.
-# The sitemap lists every course-areas detail page (typically 500+).
-# The 153 international courses are a subset of those pages; extraction
-# filters them later (the user confirmed "filter can happen later").
+# WHY NOT the international/course-search SPA seed:
+#   The SPA lazy-loads course cards as the user scrolls. Scrape.do render
+#   snapshots the initial DOM, which contains only category navigation tabs
+#   ("Certificate to Advanced Diploma", "English courses", "Living in NSW" …),
+#   not individual course links. Run attempts returned 8 wrong category pages
+#   regardless of waitFor value. The seed URL is unreliable for discovery.
 #
-# allow_url_patterns restricts the sitemap URLs to course detail pages only
-# (/course-areas/<area>/courses/<slug>) so nav/admin/blog pages are skipped.
+# WHY NOT scrape_do_skip_fallbacks on discovery:
+#   The sitemap fetcher calls fetch_html() internally. With
+#   scrape_do_skip_fallbacks:true ALL fetches including sitemap.xml are routed
+#   through Scrape.do headless Chrome — which returns HTML, not XML, so the
+#   XML parser silently gets 0 URLs. Removing the flag lets sitemap.xml be
+#   fetched by plain httpx (Status 200, text/xml confirmed).
 #
-# The international seed URL is kept as the BFS seed so any courses NOT in
-# the sitemap (new additions) can still be found via the rendered search page.
-#
-# Precedent: same pattern as UTAS Funnelback, UNE Wayback — when the primary
-# listing page can't surface all courses, use a secondary bulk source (sitemap
-# or API) and rely on allow_url_patterns to scope down to course pages only.
+# Extraction note: TAFE NSW course detail pages are Next.js SSR — they return
+# full HTML via plain httpx. No Scrape.do render needed for extraction.
 
 discovery:
-  # Sitemap is plain XML — httpx fetches it fine without Scrape.do.
-  # The course detail pages are SSR (Next.js) so Scrape.do render=True is
-  # needed for the BFS seed page and any BFS-traversed listing pages.
-  scrape_do_skip_fallbacks: true
-  scrape_do_render: true
-
-  # 10 s waitFor for the React international search SPA on the seed URL.
-  scrape_do_wait_for_ms: 10000
+  # Sitemap is the primary course source — 643 detail pages confirmed.
+  # No scrape_do flags: sitemap.xml is plain XML, fetched fine by httpx.
+  sitemap_url: "https://www.tafensw.edu.au/sitemap.xml"
+  always_sitemap_supplement: true
 
   use_wayback: false
 
-  # Sitemap primary source — lists all TAFE NSW course pages.
-  # Combined with allow_url_patterns this yields all /course-areas/ pages.
-  sitemap_url: "https://www.tafensw.edu.au/sitemap.xml"
+  # Small BFS budget — sitemap does the real work; BFS from homepage is a
+  # lightweight fallback only (avoids wasting time on the SPA listing page).
+  bfs_page_budget: 3
 
-  # Force sitemap to run even when BFS already found candidates from the seed.
-  always_sitemap_supplement: true
-
-  # 1 seed + 10 buffer for any BFS traversal from the rendered search page.
-  bfs_page_budget: 12
-
-  seed_urls:
-    - "https://www.tafensw.edu.au/international/course-search?keyword="
-
-  # Mark the international search page as listing-only: BFS extracts links
-  # from it but does not add it to the course candidate set.
-  listing_only_patterns:
-    - "/international/course-search"
-
-  # Only accept TAFE NSW course detail pages — /course-areas/<area>/courses/<slug>.
-  # This filters out the 5000+ non-course sitemap entries (news, staff, pages).
+  # Only keep course detail pages from the sitemap.
+  # Pattern matches: /course-areas/<area>/courses/<course-slug>
+  # Excludes: /course-areas/<area>  (category hubs, 30+ in sitemap)
   allow_url_patterns:
     - "/course-areas/[^/]+/courses/[^/]+"
 
@@ -66,12 +50,11 @@ discovery:
     - "/about(?:/|$)"
     - "/news(?:/|$)"
     - "/contact(?:/|$)"
-    - "/policies(?:/|$)"
-    - "/staff(?:/|$)"
-    - "/sitemap"
     - "/events(?:/|$)"
     - "/alumni(?:/|$)"
     - "/jobs(?:/|$)"
+    - "/sitemap"
+    - "/international(?:/|$)"
 
 extraction:
   fees:
