@@ -25,6 +25,7 @@ discovery:
   use_wayback: false
   allow_url_patterns:
   - /international/courses/[^/]+/?$
+  - /international/package/[^/]+/?$
   block_url_patterns:
   - /apply
   - /contact
