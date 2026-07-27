@@ -19,13 +19,29 @@
 #
 # This honours the user requirement: seed = international/course-search,
 # result = exactly the ~153 international courses, no domestic leakage.
-
 discovery:
   tafensw_api:
-    base_url: "https://www.tafensw.edu.au"
-
+    base_url: https://www.tafensw.edu.au
   use_wayback: false
-
+  allow_url_patterns:
+  - /international/courses/[^/]+/?$
+  block_url_patterns:
+  - /apply
+  - /contact
+  - /news
+  - /events
+  - /blog
+  - /about
+  - /research
+  - /alumni
+  - /outreach
+  - /parents
+  - /jobs
+  - /careers
+  - /accommodation
+  - /life-on-campus
+  - /fees-and-funding$
+  - /international/living
 extraction:
   fees:
     default_currency: AUD

@@ -1044,6 +1044,31 @@ class TafeNswApiConfig(BaseModel):
     )
 
 
+class MelbournePolytechnicApiConfig(BaseModel):
+    """Melbourne Polytechnic international course API provider.
+
+    The /search/?studentType=1 page is a React SPA that renders course cards
+    client-side via an Umbraco POST API.  Scrape.do render only returns nav
+    links — BFS finds 0 course pages.
+
+    This provider calls ``/umbraco/api/courseSearchApi/Search`` (POST) directly
+    with ``{"studentType": 1, "query": "", "page": 1, "pageSize": 200}``,
+    building full URLs from each item's ``url`` field.  Returns bare link dicts
+    so normal per-course HTML extraction runs on each detail page.
+
+    Example::
+
+        discovery:
+          melbournepolytechnic_api:
+            base_url: "https://www.melbournepolytechnic.edu.au"
+    """
+
+    base_url: str = Field(
+        default="https://www.melbournepolytechnic.edu.au",
+        description="Base URL for the Melbourne Polytechnic site and internal API.",
+    )
+
+
 class SrucApiConfig(BaseModel):
     """SRUC (Scotland's Rural College) — direct Umbraco JSON API provider.
 
@@ -1134,6 +1159,16 @@ class DiscoveryConfig(BaseModel):
             "each of the ~153 international courses.  Returns bare link dicts "
             "so normal per-course HTML extraction runs on every course page.  "
             "No BFS/sitemap required.  Set base_url to https://www.tafensw.edu.au."
+        ),
+    )
+    melbournepolytechnic_api: Optional["MelbournePolytechnicApiConfig"] = Field(
+        default=None,
+        description=(
+            "Melbourne Polytechnic international course API provider.  POSTs to "
+            "/umbraco/api/courseSearchApi/Search with studentType=1 to retrieve "
+            "exactly the 48 international courses, then builds full URLs from "
+            "each item's url field.  Returns bare link dicts so normal per-course "
+            "HTML extraction runs on every detail page.  No BFS/sitemap required."
         ),
     )
     ssr_prop_discovery: Optional[SsrPropDiscoveryConfig] = Field(

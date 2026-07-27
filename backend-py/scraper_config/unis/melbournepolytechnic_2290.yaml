@@ -1,14 +1,31 @@
 # Melbourne Polytechnic
 # Hostname: www.melbournepolytechnic.edu.au
 # Country: Australia  |  Currency: AUD
-# Slug: melbournepolytechnic
-# Auto-generated: 2026-07-27
+# uni_id: 2290 (dev)
 #
-# This stub was created automatically on the first scrape of this university.
-# Review and expand it to improve discovery and extraction quality.
-# See scraper_config/defaults.yaml for all available options.
+# ── Discovery strategy ───────────────────────────────────────────────────────
+#
+# The international course search page is a React SPA (single bundle.js).
+# Scrape.do render returns only navigation links — no course cards appear even
+# after 3 s wait.  The SPA populates results client-side by calling an Umbraco
+# POST API:
+#   POST /umbraco/api/courseSearchApi/Search
+#   Body: {"studentType": 1, "query": "", "page": 1, "pageSize": 200}
+#   Response: {"items": [...], "totalItems": 48, "totalPages": 1, ...}
+#
+# Each item has a "url" field (e.g. /study/diploma/auslan/) which is the
+# canonical course detail page.  The melbournepolytechnic_api provider calls
+# the API directly and returns 48 bare link dicts; normal per-course HTML
+# extraction then runs on each detail page.
+#
+# Seed reference (user-supplied): 
+#   https://www.melbournepolytechnic.edu.au/search/?studentType=1&query=&activeTab=0&page=1
 
-discovery: {}
+discovery:
+  melbournepolytechnic_api:
+    base_url: "https://www.melbournepolytechnic.edu.au"
+
+  use_wayback: false
 
 extraction:
   fees:

@@ -1280,6 +1280,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             or getattr(_uni_cfg.discovery, "generic_search_api", None) is not None
             or getattr(_uni_cfg.discovery, "algolia", None) is not None
             or getattr(_uni_cfg.discovery, "tafensw_api", None) is not None
+            or getattr(_uni_cfg.discovery, "melbournepolytechnic_api", None) is not None
         )
         if not _c1_force and not _c1_has_api_provider:
             try:
@@ -1644,6 +1645,32 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 log.error("[TAFENSW] provider failed: %s", _tn_exc, exc_info=True)
                 job.status = "failed"
                 job.error_message = f"TAFE NSW API provider failed: {_tn_exc}"
+                await db.commit()
+                return
+
+        # ── Melbourne Polytechnic internal API provider ───────────────────────
+        # discovery.melbournepolytechnic_api bypasses BFS/sitemap entirely:
+        # POSTs to /umbraco/api/courseSearchApi/Search with studentType=1 to
+        # get exactly the 48 international courses, builds full URLs from each
+        # item's url field, returns bare link dicts for normal extraction.
+        _melbpoly_cfg = getattr(_uni_cfg.discovery, "melbournepolytechnic_api", None)
+        if _melbpoly_cfg is not None:
+            from app.services.scraper.melbournepolytechnic import fetch_melbournepolytechnic_links
+            try:
+                _mp_links = await fetch_melbournepolytechnic_links(_melbpoly_cfg, emit=emit)
+                if _mp_links:
+                    links = _mp_links
+                    _always_browser = False
+                else:
+                    log.error("[MELBPOLY] provider returned 0 links — aborting")
+                    job.status = "failed"
+                    job.error_message = "Melbourne Polytechnic API provider returned 0 links."
+                    await db.commit()
+                    return
+            except Exception as _mp_exc:  # noqa: BLE001
+                log.error("[MELBPOLY] provider failed: %s", _mp_exc, exc_info=True)
+                job.status = "failed"
+                job.error_message = f"Melbourne Polytechnic API provider failed: {_mp_exc}"
                 await db.commit()
                 return
 
