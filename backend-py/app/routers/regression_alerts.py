@@ -34,7 +34,14 @@ def _row_to_dict(row: dict) -> dict:
         "previous_value": float(row["previous_value"]) if row["previous_value"] is not None else None,
         "current_value":  float(row["current_value"])  if row["current_value"]  is not None else None,
         "delta":          float(row["delta"])           if row["delta"]          is not None else None,
-        "probable_causes": row["probable_causes"] if isinstance(row["probable_causes"], list) else [],
+        "probable_causes": [
+            (
+                item["cause"]
+                if isinstance(item, dict) and "cause" in item
+                else str(item)
+            )
+            for item in (row["probable_causes"] if isinstance(row["probable_causes"], list) else [])
+        ],
         "status":         row["status"],
         "snapshot_date":  str(row["snapshot_date"]) if row["snapshot_date"] else None,
         "created_at":     row["created_at"].isoformat() if row["created_at"] else None,

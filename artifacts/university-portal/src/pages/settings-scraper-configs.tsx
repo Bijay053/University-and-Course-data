@@ -4423,7 +4423,7 @@ export default function SettingsScraperConfigs() {
                                 {alert.probable_causes.map((cause, i) => (
                                   <li key={i} className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
                                     <span className="flex-shrink-0 mt-0.5">•</span>
-                                    <span>{cause}</span>
+                                    <span>{typeof cause === "string" ? cause : (cause as { cause?: string }).cause ?? JSON.stringify(cause)}</span>
                                   </li>
                                 ))}
                               </ul>
