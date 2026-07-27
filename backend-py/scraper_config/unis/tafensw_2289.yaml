@@ -24,13 +24,18 @@
 # Total: 160 URL candidates → ~158 valid after 2 non-existent t2t bundles.
 # Deduplication at staging produces the ~153 unique international courses.
 #
-# DO NOT add allow_url_patterns here — the API already returns only
-# international course URLs; any URL filter will silently drop the 63
-# /international/package/ links and reduce the count to 97.
+# IMPORTANT: The CASCADE auto-probe writes auto_config.discovery.allow_url_patterns
+# = ["/courses/.+"] which drops all 63 /package/ URLs and reduces the count to 97.
+# The patterns below (YAML priority > auto_config) override that probe output.
+# admin_config.discovery.allow_url_patterns is also set identically in the DB
+# as the highest-priority override layer.
 discovery:
   tafensw_api:
     base_url: https://www.tafensw.edu.au
   use_wayback: false
+  allow_url_patterns:
+  - /international/courses/[^/]+/?$
+  - /international/package/[^/]+/?$
 
 extraction:
   fees:

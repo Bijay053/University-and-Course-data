@@ -24,7 +24,9 @@ extraction:
 
   filters:
     domestic_only:
-      enabled: true   # Preserve current prod behaviour: filter runs for all unis.
+      enabled: false   # Preserve current prod behaviour: filter runs for all unis.
+    online_only:
+      enabled: false
 
   fees:
     # Per-uni PDF parser override.
@@ -96,3 +98,9 @@ extraction:
       # of Design has no qualifier in the columnar parse, so no alias is
       # needed for it.
       "master of design": "Master of Design (Cognate)"
+
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false
