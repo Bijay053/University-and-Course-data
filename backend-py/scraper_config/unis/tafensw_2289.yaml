@@ -5,56 +5,26 @@
 #
 # ── Discovery strategy ───────────────────────────────────────────────────────
 #
-# Primary source: https://www.tafensw.edu.au/sitemap.xml (1346 URLs, 643 course
-# detail pages at /course-areas/<area>/courses/<slug>).
-# allow_url_patterns filters to those 643 course detail pages only.
-# The 153 international courses are a subset — extraction handles filtering.
+# The international course search page (https://www.tafensw.edu.au/international/
+# course-search?keyword=) is a Nuxt SPA.  Scrape.do render of the initial DOM
+# only captures category navigation tabs ("Certificate to Advanced Diploma",
+# "English courses" etc.) — never individual course cards.  Course cards are
+# loaded asynchronously via an internal Elasticsearch API after tab interaction.
 #
-# WHY NOT the international/course-search SPA seed:
-#   The SPA lazy-loads course cards as the user scrolls. Scrape.do render
-#   snapshots the initial DOM, which contains only category navigation tabs
-#   ("Certificate to Advanced Diploma", "English courses", "Living in NSW" …),
-#   not individual course links. Run attempts returned 8 wrong category pages
-#   regardless of waitFor value. The seed URL is unreliable for discovery.
+# The tafensw_api provider calls that internal API directly:
+#   GET /api/international/course/search?from=0&size=500&query_string=
+# It expands coursePackage arrays (mirroring the Nuxt composable in BhP9Tq1G.js)
+# and builds /international/courses/<slug>--<id> URLs for all ~153 international
+# courses.  Normal per-course HTML extraction then runs on each detail page.
 #
-# WHY NOT scrape_do_skip_fallbacks on discovery:
-#   The sitemap fetcher calls fetch_html() internally. With
-#   scrape_do_skip_fallbacks:true ALL fetches including sitemap.xml are routed
-#   through Scrape.do headless Chrome — which returns HTML, not XML, so the
-#   XML parser silently gets 0 URLs. Removing the flag lets sitemap.xml be
-#   fetched by plain httpx (Status 200, text/xml confirmed).
-#
-# Extraction note: TAFE NSW course detail pages are Next.js SSR — they return
-# full HTML via plain httpx. No Scrape.do render needed for extraction.
+# This honours the user requirement: seed = international/course-search,
+# result = exactly the ~153 international courses, no domestic leakage.
 
 discovery:
-  # Sitemap is the primary course source — 643 detail pages confirmed.
-  # No scrape_do flags: sitemap.xml is plain XML, fetched fine by httpx.
-  sitemap_url: "https://www.tafensw.edu.au/sitemap.xml"
-  always_sitemap_supplement: true
+  tafensw_api:
+    base_url: "https://www.tafensw.edu.au"
 
   use_wayback: false
-
-  # Small BFS budget — sitemap does the real work; BFS from homepage is a
-  # lightweight fallback only (avoids wasting time on the SPA listing page).
-  bfs_page_budget: 3
-
-  # Only keep course detail pages from the sitemap.
-  # Pattern matches: /course-areas/<area>/courses/<course-slug>
-  # Excludes: /course-areas/<area>  (category hubs, 30+ in sitemap)
-  allow_url_patterns:
-    - "/course-areas/[^/]+/courses/[^/]+"
-
-  # Drop clearly non-course URLs from BFS traversal.
-  block_url_patterns:
-    - "/about(?:/|$)"
-    - "/news(?:/|$)"
-    - "/contact(?:/|$)"
-    - "/events(?:/|$)"
-    - "/alumni(?:/|$)"
-    - "/jobs(?:/|$)"
-    - "/sitemap"
-    - "/international(?:/|$)"
 
 extraction:
   fees:

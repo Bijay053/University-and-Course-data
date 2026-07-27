@@ -1279,6 +1279,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             getattr(_uni_cfg.discovery, "searchstax", None) is not None
             or getattr(_uni_cfg.discovery, "generic_search_api", None) is not None
             or getattr(_uni_cfg.discovery, "algolia", None) is not None
+            or getattr(_uni_cfg.discovery, "tafensw_api", None) is not None
         )
         if not _c1_force and not _c1_has_api_provider:
             try:
@@ -1616,6 +1617,33 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 log.error(_failure_msg)
                 job.status = "failed"
                 job.error_message = _failure_msg
+                await db.commit()
+                return
+
+        # ── TAFE NSW internal API provider ────────────────────────────────────
+        # discovery.tafensw_api bypasses BFS/sitemap entirely: calls the Nuxt
+        # SPA's internal /api/international/course/search endpoint, expands
+        # coursePackage arrays (mirroring the JS composable), and builds
+        # /international/courses/<slug>--<id> URLs for all ~153 international
+        # courses.  Returns bare link dicts so normal extraction runs on each.
+        _tafensw_cfg = getattr(_uni_cfg.discovery, "tafensw_api", None)
+        if _tafensw_cfg is not None:
+            from app.services.scraper.tafensw import fetch_tafensw_links
+            try:
+                _tn_links = await fetch_tafensw_links(_tafensw_cfg, emit=emit)
+                if _tn_links:
+                    links = _tn_links
+                    _always_browser = False
+                else:
+                    log.error("[TAFENSW] provider returned 0 links — aborting")
+                    job.status = "failed"
+                    job.error_message = "TAFE NSW API provider returned 0 links."
+                    await db.commit()
+                    return
+            except Exception as _tn_exc:  # noqa: BLE001
+                log.error("[TAFENSW] provider failed: %s", _tn_exc, exc_info=True)
+                job.status = "failed"
+                job.error_message = f"TAFE NSW API provider failed: {_tn_exc}"
                 await db.commit()
                 return
 

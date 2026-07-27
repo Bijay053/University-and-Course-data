@@ -1019,6 +1019,31 @@ class VuwApiConfig(BaseModel):
     )
 
 
+class TafeNswApiConfig(BaseModel):
+    """TAFE NSW international course API provider.
+
+    The TAFE NSW international course search page is a Nuxt SPA that lazy-loads
+    courses via an internal Elasticsearch endpoint.  Scrape.do render only
+    captures category navigation tabs — BFS is useless for this site.
+
+    This provider calls ``/api/international/course/search`` directly,
+    expands ``coursePackage`` arrays (mirroring the SPA JS logic), builds
+    ``/international/courses/<slug>--<id>`` URLs, and returns bare link dicts
+    so the normal per-course extraction pipeline runs on each detail page.
+
+    Example::
+
+        discovery:
+          tafensw_api:
+            base_url: "https://www.tafensw.edu.au"
+    """
+
+    base_url: str = Field(
+        default="https://www.tafensw.edu.au",
+        description="Base URL for the TAFE NSW site and internal API.",
+    )
+
+
 class SrucApiConfig(BaseModel):
     """SRUC (Scotland's Rural College) — direct Umbraco JSON API provider.
 
@@ -1098,6 +1123,17 @@ class DiscoveryConfig(BaseModel):
             "Each Swiftype record carries structured metadata + full body text; "
             "fees and IELTS are extracted via regex — no per-course HTTP fetch. "
             "See SwiftypeConfig for full field docs."
+        ),
+    )
+    tafensw_api: Optional["TafeNswApiConfig"] = Field(
+        default=None,
+        description=(
+            "TAFE NSW international course API provider.  Calls the internal "
+            "/api/international/course/search endpoint, expands coursePackage "
+            "arrays, and builds /international/courses/<slug>--<id> URLs for "
+            "each of the ~153 international courses.  Returns bare link dicts "
+            "so normal per-course HTML extraction runs on every course page.  "
+            "No BFS/sitemap required.  Set base_url to https://www.tafensw.edu.au."
         ),
     )
     ssr_prop_discovery: Optional[SsrPropDiscoveryConfig] = Field(
