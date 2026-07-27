@@ -5,64 +5,73 @@
 #
 # ── Discovery strategy ───────────────────────────────────────────────────────
 #
-# The international course catalogue lives at a single JS-rendered React SPA:
-#   https://www.tafensw.edu.au/international/course-search?keyword=
+# Problem: https://www.tafensw.edu.au/international/course-search?keyword=
+# lists all 153 international courses in a browser, but the SPA lazy-loads
+# course cards as the user scrolls — Scrape.do only snapshots the initial
+# DOM and captures the first ~22 cards. A second "Load More" click / scroll
+# is required for the rest, which Scrape.do render cannot perform.
 #
-# With keyword= (empty), this page returns all 153 international courses as
-# rendered course cards. One seed is enough — all courses appear on this URL.
+# Fix: use TAFE NSW's XML sitemap as the primary course source.
+# The sitemap lists every course-areas detail page (typically 500+).
+# The 153 international courses are a subset of those pages; extraction
+# filters them later (the user confirmed "filter can happen later").
 #
-# Static HTML (httpx / curl_cffi) returns only the React shell with no cards.
-# Scrape.do render=True is required to execute the JS and render the cards.
-# scrape_do_wait_for_ms=10000 gives the React SPA enough time to fetch and
-# render all 153 course cards before Scrape.do snapshots the DOM.
+# allow_url_patterns restricts the sitemap URLs to course detail pages only
+# (/course-areas/<area>/courses/<slug>) so nav/admin/blog pages are skipped.
 #
-# After BFS visits the seed (as listing_only), it follows the links on the
-# rendered page to discover the 153 individual course detail pages.
-# bfs_page_budget: 5 = 1 seed + 4 buffer (no deep BFS needed — all links
-# are surfaced on that single search page).
+# The international seed URL is kept as the BFS seed so any courses NOT in
+# the sitemap (new additions) can still be found via the rendered search page.
 #
-# If course detail pages are also SPA-rendered and require scrape.do, add
-#   extraction:
-#     scrape_do_render: true
-#     scrape_do_wait_for_ms: 6000
-# after verifying the first scrape results.
+# Precedent: same pattern as UTAS Funnelback, UNE Wayback — when the primary
+# listing page can't surface all courses, use a secondary bulk source (sitemap
+# or API) and rely on allow_url_patterns to scope down to course pages only.
 
 discovery:
-  # TAFE NSW international search is a React SPA — static HTML returns no cards.
-  # Skip httpx/cffi entirely and go straight to Scrape.do headless Chrome.
+  # Sitemap is plain XML — httpx fetches it fine without Scrape.do.
+  # The course detail pages are SSR (Next.js) so Scrape.do render=True is
+  # needed for the BFS seed page and any BFS-traversed listing pages.
   scrape_do_skip_fallbacks: true
   scrape_do_render: true
 
-  # 10 s wait: allows the React SPA to fetch the catalogue API and render all
-  # 153 course cards before Scrape.do snapshots the DOM.
+  # 10 s waitFor for the React international search SPA on the seed URL.
   scrape_do_wait_for_ms: 10000
 
-  # 1 seed covers all 153 international courses; budget of 5 gives BFS a small
-  # buffer for any course-detail pagination encountered during traversal.
-  bfs_page_budget: 5
-
   use_wayback: false
+
+  # Sitemap primary source — lists all TAFE NSW course pages.
+  # Combined with allow_url_patterns this yields all /course-areas/ pages.
+  sitemap_url: "https://www.tafensw.edu.au/sitemap.xml"
+
+  # Force sitemap to run even when BFS already found candidates from the seed.
+  always_sitemap_supplement: true
+
+  # 1 seed + 10 buffer for any BFS traversal from the rendered search page.
+  bfs_page_budget: 12
 
   seed_urls:
     - "https://www.tafensw.edu.au/international/course-search?keyword="
 
-  # Mark the search page as listing-only: BFS extracts course links from it
-  # but does NOT add it to the course candidate set.
+  # Mark the international search page as listing-only: BFS extracts links
+  # from it but does not add it to the course candidate set.
   listing_only_patterns:
     - "/international/course-search"
 
-  # Drop non-course TAFE NSW URLs that may appear in the rendered DOM:
-  # nav, hub, news, about, contact, policy, accessibility pages.
+  # Only accept TAFE NSW course detail pages — /course-areas/<area>/courses/<slug>.
+  # This filters out the 5000+ non-course sitemap entries (news, staff, pages).
+  allow_url_patterns:
+    - "/course-areas/[^/]+/courses/[^/]+"
+
+  # Drop clearly non-course URLs from BFS traversal.
   block_url_patterns:
     - "/about(?:/|$)"
     - "/news(?:/|$)"
     - "/contact(?:/|$)"
-    - "/accessibility(?:/|$)"
     - "/policies(?:/|$)"
-    - "/students(?:/|$)"
     - "/staff(?:/|$)"
-    - "/faculty(?:/|$)"
     - "/sitemap"
+    - "/events(?:/|$)"
+    - "/alumni(?:/|$)"
+    - "/jobs(?:/|$)"
 
 extraction:
   fees:
