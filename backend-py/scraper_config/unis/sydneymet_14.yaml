@@ -1,0 +1,33 @@
+# Sydney Met (ID 14)
+# Hostname: sydneymet.edu.au
+# Country: Australia  |  Currency: AUD
+# Slug: sydneymet
+#
+# See sydneymet_2300.yaml for full architecture notes.
+# Both records share the same hostname; this stub mirrors the 2300 config.
+
+discovery:
+  sitemap_url: https://sydneymet.edu.au/sitemap.xml
+  allow_url_patterns:
+    - /courses/[^/]+/?$
+  block_url_patterns:
+    - /courses-all
+    - /student-course-guide
+  bfs_page_budget: 5
+  use_wayback: false
+
+extraction:
+  fees:
+    default_currency: AUD
+  course_name:
+    prefer_title_over_h1: true
+    strip_title_suffixes:
+      - " – Sydney Metropolitan Institute of Technology"
+      - " | Sydney Metropolitan Institute of Technology"
+      - " – Sydney Met"
+      - " | Sydney Met"
+  staging:
+    skip_degree_qualifier_check: true
+    require_international_fee: false
+    reject_if_missing:
+      - course_name

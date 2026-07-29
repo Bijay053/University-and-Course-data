@@ -1,0 +1,85 @@
+# Sydney Metropolitan Institute of Technology
+# Hostname: sydneymet.edu.au
+# Country: Australia  |  Currency: AUD
+# Slug: sydneymet
+#
+# ── Site architecture note ────────────────────────────────────────────────────
+#
+# sydneymet.edu.au runs a headless WordPress backend with a Vite/React SPA
+# frontend in development mode.  Nginx routes ALL URL paths (including WP
+# query strings like /?pagename=...) to the Vite dev server except:
+#   - /           → WordPress SSR (homepage only)
+#   - /wp-json/   → WordPress REST API root
+#   - /sitemap.xml, /robots.txt → static files
+#
+# Consequence: every course-detail page returns a Vite SPA shell with no
+# course content.  The WP REST API (/wp-json/wp/v2/*) is also intercepted by
+# Vite, so even browser rendering returns "Page not found" because the SPA
+# cannot fetch data from its own WP backend.
+#
+# ── Discovery fix ────────────────────────────────────────────────────────────
+#
+# sitemap.xml lists all 14 course detail pages at /courses/<slug>/.
+# BFS from the homepage finds /courses-all/ which is JS-rendered (0 links).
+# Use sitemap as primary source to bypass the JS listing page entirely.
+#
+# ── Extraction status ────────────────────────────────────────────────────────
+#
+# Course pages are SPA routes.  Even with browser/Scrape.do render they show
+# "Page not found" (WP REST API broken).  Only fields derivable without page
+# content can be extracted:
+#   - course_name  : from URL slug or OG tag (partial — abbreviations missing)
+#   - degree_level : derived from course name
+#   - country      : Australia
+#   - currency     : AUD
+# Fees, IELTS, duration, intake, mode cannot be scraped until the upstream
+# server misconfiguration is fixed.  Set require_international_fee: false
+# and accept low-completeness staging.
+#
+# ── Course inventory (14 courses, from sitemap) ──────────────────────────────
+#
+#   Social Work & Development (SWD):
+#     Master of Social Work (MSW (Q))
+#     Graduate Diploma in Human and Community Services (GradDipHCS)
+#     Graduate Certificate in Human and Community Services (GradCertHCS)
+#     Bachelor of Social Work (BSW)
+#
+#   Information Technology & Engineering (ITE):
+#     Master of Information Technology (MIT)
+#     Graduate Diploma in Information Technology (GradDipIT)
+#     Graduate Certificate in Information Technology (GradCertIT)
+#     Bachelor of Information Technology (BIT)
+#     Undergraduate Certificate in Information Technology (UCIT)
+#
+#   Business Management & Entrepreneurship (BME):
+#     Master of Business Administration (MBA)
+#     Graduate Diploma in Business Administration (GDBA)
+#     Graduate Certificate in Business Administration (GCBA)
+#     Bachelor of Business (Entrepreneurship) (BBus)
+#     Undergraduate Certificate in Business (UCB)
+
+discovery:
+  sitemap_url: https://sydneymet.edu.au/sitemap.xml
+  allow_url_patterns:
+    - /courses/[^/]+/?$
+  block_url_patterns:
+    - /courses-all
+    - /student-course-guide
+  bfs_page_budget: 5
+  use_wayback: false
+
+extraction:
+  fees:
+    default_currency: AUD
+  course_name:
+    prefer_title_over_h1: true
+    strip_title_suffixes:
+      - " – Sydney Metropolitan Institute of Technology"
+      - " | Sydney Metropolitan Institute of Technology"
+      - " – Sydney Met"
+      - " | Sydney Met"
+  staging:
+    skip_degree_qualifier_check: true
+    require_international_fee: false
+    reject_if_missing:
+      - course_name
