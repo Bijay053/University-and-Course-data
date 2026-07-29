@@ -7,6 +7,31 @@
 # This stub was created automatically on the first scrape of this university.
 # Review and expand it to improve discovery and extraction quality.
 # See scraper_config/defaults.yaml for all available options.
+#
+# ── Course name extraction ────────────────────────────────────────────────────
+#
+# CIHE pages are built on Elementor. H1 structure is inconsistent:
+#
+#   ALL pages: <h1 class="ch__mainheader__sitelogo__title"> — site logo
+#              ("Real skills Real impact Meaningful careers") — WRONG
+#
+#   Some pages also have:
+#     <h1 class="entry-title" itemprop="headline">Bachelor of Accounting</h1>
+#     (correct, proper case)
+#
+#   Other pages only have:
+#     <h2 class="elementor-heading-title">GRADUATE CERTIFICATE IN
+#      BUSINESS ADMINISTRATION</h2>  (correct content, uppercased — cleaned OK)
+#
+# soup.find("h1") always returns the logo H1 (first in DOM). The combined
+# CSS selector below targets entry-title first (preferred, already proper case),
+# then falls back to any Elementor H1/H2 heading title:
+#
+#   h1.entry-title                → "Bachelor of Accounting"  ✓
+#   h1.elementor-heading-title    → for pages where entry-title absent
+#   h2.elementor-heading-title    → "GRADUATE CERTIFICATE IN BUSINESS ADMIN" ✓
+#
+# Uppercased Elementor text is normalised to title-case by course_name_cleaner.
 discovery:
   allow_url_patterns:
   - /[^/]+/[^/]+/?$
@@ -28,11 +53,8 @@ discovery:
   - /fees-and-funding$
   - /international/living
 extraction:
-  # H1[0] is the site logo ("Real skills / Real impact / Meaningful careers").
-  # H1[1] class="entry-title" is the clean schema.org headline, e.g.
-  # "Bachelor of Accounting". H1[2] is the Elementor visual heading with
-  # split styled spans ("BACHELOR OF" + "ACCOUNTING"). Target H1[1].
-  h1_css_selector: "h1.entry-title"
+  course_name:
+    h1_css_selector: "h1.entry-title, h1.elementor-heading-title, h2.elementor-heading-title"
   fees:
     default_currency: AUD
   filters:
@@ -40,6 +62,6 @@ extraction:
       enabled: false
   staging:
     reject_if_missing:
-      - course_name
+    - course_name
     skip_degree_qualifier_check: true
     require_international_fee: false
