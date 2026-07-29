@@ -3,70 +3,73 @@
 # Country: Australia  |  Currency: AUD
 # Slug: sydneymet
 #
-# ── Site architecture note ────────────────────────────────────────────────────
+# ── Site architecture ─────────────────────────────────────────────────────────
 #
-# sydneymet.edu.au runs a headless WordPress backend with a Vite/React SPA
-# frontend in development mode.  Nginx routes ALL URL paths (including WP
-# query strings like /?pagename=...) to the Vite dev server except:
-#   - /           → WordPress SSR (homepage only)
-#   - /wp-json/   → WordPress REST API root
-#   - /sitemap.xml, /robots.txt → static files
+# Headless WordPress backend + Vite/React SPA frontend (dev mode).
+# Nginx routes all paths to the Vite dev server EXCEPT:
+#   /           → WordPress SSR (homepage only)
+#   /wp-json/   → WordPress REST API root (returns JSON)
 #
-# Consequence: every course-detail page returns a Vite SPA shell with no
-# course content.  The WP REST API (/wp-json/wp/v2/*) is also intercepted by
-# Vite, so even browser rendering returns "Page not found" because the SPA
-# cannot fetch data from its own WP backend.
+# The WordPress REST API for page content (/wp-json/wp/v2/*) is locked to
+# authenticated users only.  Unauthenticated requests return 404.
+# The SPA only renders course content when the visitor has WP admin cookies.
+# Scrape.do / Playwright therefore returns navigation-only shells.
 #
-# ── Discovery fix ────────────────────────────────────────────────────────────
+# ── Course URLs ───────────────────────────────────────────────────────────────
 #
-# sitemap.xml lists all 14 course detail pages at /courses/<slug>/.
-# BFS from the homepage finds /courses-all/ which is JS-rendered (0 links).
-# Use sitemap as primary source to bypass the JS listing page entirely.
-#
-# ── Extraction status ────────────────────────────────────────────────────────
-#
-# Course pages are SPA routes.  Even with browser/Scrape.do render they show
-# "Page not found" (WP REST API broken).  Only fields derivable without page
-# content can be extracted:
-#   - course_name  : from URL slug or OG tag (partial — abbreviations missing)
-#   - degree_level : derived from course name
-#   - country      : Australia
-#   - currency     : AUD
-# Fees, IELTS, duration, intake, mode cannot be scraped until the upstream
-# server misconfiguration is fixed.  Set require_international_fee: false
-# and accept low-completeness staging.
-#
-# ── Course inventory (14 courses, from sitemap) ──────────────────────────────
+# Real course pages live at root-level WordPress page slugs (NOT under
+# /courses/ which are broken SPA routes that return 404):
 #
 #   Social Work & Development (SWD):
-#     Master of Social Work (MSW (Q))
-#     Graduate Diploma in Human and Community Services (GradDipHCS)
-#     Graduate Certificate in Human and Community Services (GradCertHCS)
-#     Bachelor of Social Work (BSW)
+#     /master-of-social-work-q/
+#     /graduate-diploma-in-human-and-community-services/
+#     /graduate-certificate-in-human-and-community-services/
+#     /bachelor-of-social-work/
 #
 #   Information Technology & Engineering (ITE):
-#     Master of Information Technology (MIT)
-#     Graduate Diploma in Information Technology (GradDipIT)
-#     Graduate Certificate in Information Technology (GradCertIT)
-#     Bachelor of Information Technology (BIT)
-#     Undergraduate Certificate in Information Technology (UCIT)
+#     /master-of-information-technology/
+#     /graduate-diploma-in-information-technology/
+#     /graduate-certificate-in-information-technology/
+#     /bachelor-of-information-technology/
+#     /undergraduate-certificate-in-information-technology-ucit/
 #
 #   Business Management & Entrepreneurship (BME):
-#     Master of Business Administration (MBA)
-#     Graduate Diploma in Business Administration (GDBA)
-#     Graduate Certificate in Business Administration (GCBA)
-#     Bachelor of Business (Entrepreneurship) (BBus)
-#     Undergraduate Certificate in Business (UCB)
+#     /master-of-business-administration/
+#     /graduate-diploma-in-business-administration/
+#     /graduate-certificate-in-business-administration/
+#     /bachelor-of-business/
+#     /undergraduate-certificate-in-business-ucb/
+#
+# ── Discovery strategy ────────────────────────────────────────────────────────
+#
+# Pin all 14 course URLs as seed_urls.  BFS is disabled (budget=0) because:
+#   - courses-all listing page is JS-rendered (0 static links)
+#   - wp-sitemap has root-level pages but also 136 non-course pages
+#   - The 14 seeds below are the complete course inventory
+#
+# force_candidate_url_patterns marks them as course candidates immediately
+# without waiting for page content (which is an auth-gated SPA shell).
 
 discovery:
-  sitemap_url: https://sydneymet.edu.au/sitemap.xml
-  allow_url_patterns:
-    - /courses/[^/]+/?$
-  block_url_patterns:
-    - /courses-all
-    - /student-course-guide
-  bfs_page_budget: 5
+  bfs_page_budget: 0
   use_wayback: false
+  seed_urls:
+    - https://sydneymet.edu.au/master-of-social-work-q/
+    - https://sydneymet.edu.au/graduate-diploma-in-human-and-community-services/
+    - https://sydneymet.edu.au/graduate-certificate-in-human-and-community-services/
+    - https://sydneymet.edu.au/bachelor-of-social-work/
+    - https://sydneymet.edu.au/master-of-information-technology/
+    - https://sydneymet.edu.au/graduate-diploma-in-information-technology/
+    - https://sydneymet.edu.au/graduate-certificate-in-information-technology/
+    - https://sydneymet.edu.au/bachelor-of-information-technology/
+    - https://sydneymet.edu.au/undergraduate-certificate-in-information-technology-ucit/
+    - https://sydneymet.edu.au/master-of-business-administration/
+    - https://sydneymet.edu.au/graduate-diploma-in-business-administration/
+    - https://sydneymet.edu.au/graduate-certificate-in-business-administration/
+    - https://sydneymet.edu.au/bachelor-of-business/
+    - https://sydneymet.edu.au/undergraduate-certificate-in-business-ucb/
+  force_candidate_url_patterns:
+    - /(master|bachelor|graduate|undergraduate)-[^/]+/?$
 
 extraction:
   fees:

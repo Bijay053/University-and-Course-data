@@ -4,17 +4,28 @@
 # Slug: sydneymet
 #
 # See sydneymet_2300.yaml for full architecture notes.
-# Both records share the same hostname; this stub mirrors the 2300 config.
+# Both records share the same hostname; this config mirrors 2300.
 
 discovery:
-  sitemap_url: https://sydneymet.edu.au/sitemap.xml
-  allow_url_patterns:
-    - /courses/[^/]+/?$
-  block_url_patterns:
-    - /courses-all
-    - /student-course-guide
-  bfs_page_budget: 5
+  bfs_page_budget: 0
   use_wayback: false
+  seed_urls:
+    - https://sydneymet.edu.au/master-of-social-work-q/
+    - https://sydneymet.edu.au/graduate-diploma-in-human-and-community-services/
+    - https://sydneymet.edu.au/graduate-certificate-in-human-and-community-services/
+    - https://sydneymet.edu.au/bachelor-of-social-work/
+    - https://sydneymet.edu.au/master-of-information-technology/
+    - https://sydneymet.edu.au/graduate-diploma-in-information-technology/
+    - https://sydneymet.edu.au/graduate-certificate-in-information-technology/
+    - https://sydneymet.edu.au/bachelor-of-information-technology/
+    - https://sydneymet.edu.au/undergraduate-certificate-in-information-technology-ucit/
+    - https://sydneymet.edu.au/master-of-business-administration/
+    - https://sydneymet.edu.au/graduate-diploma-in-business-administration/
+    - https://sydneymet.edu.au/graduate-certificate-in-business-administration/
+    - https://sydneymet.edu.au/bachelor-of-business/
+    - https://sydneymet.edu.au/undergraduate-certificate-in-business-ucb/
+  force_candidate_url_patterns:
+    - /(master|bachelor|graduate|undergraduate)-[^/]+/?$
 
 extraction:
   fees:
