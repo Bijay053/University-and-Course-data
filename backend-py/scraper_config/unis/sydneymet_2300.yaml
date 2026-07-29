@@ -6,22 +6,27 @@
 # ── Site architecture ─────────────────────────────────────────────────────────
 #
 # Headless WordPress backend + Vite/React SPA frontend (dev mode).
-# Nginx routes all paths to the Vite dev server EXCEPT:
-#   /           → WordPress SSR (homepage only)
-#   /wp-json/   → WordPress REST API root (returns JSON)
+# Nginx routes all paths to Vite except:
+#   /           → WordPress SSR (homepage has ALL course links in nav)
+#   /wp-json/   → WordPress REST API root
 #
-# The WordPress REST API for page content (/wp-json/wp/v2/*) is locked to
-# authenticated users only.  Unauthenticated requests return 404.
-# The SPA only renders course content when the visitor has WP admin cookies.
-# Scrape.do / Playwright therefore returns navigation-only shells.
+# The WP REST API for page content is locked to authenticated users.
+# Scrape.do / Playwright returns navigation-only shells for course pages.
 #
-# ── Course URLs ───────────────────────────────────────────────────────────────
+# ── Discovery strategy ────────────────────────────────────────────────────────
 #
-# Real course pages live at root-level WordPress page slugs (NOT under
-# /courses/ which are broken SPA routes that return 404):
+# The WordPress-rendered homepage (https://sydneymet.edu.au/) contains all 15
+# course links in the navigation.  bfs_page_budget: 1 fetches the homepage,
+# and force_candidate_url_patterns marks root-level course URLs as candidates.
+#
+# seed_urls pins all 15 course URLs as a backup so none are missed if the
+# nav link structure changes.
+#
+# ── Course inventory (15 courses) ─────────────────────────────────────────────
 #
 #   Social Work & Development (SWD):
-#     /master-of-social-work-q/
+#     /master-of-social-work-q/         → Master of Social Work (Qualifying)
+#     /master-of-social-work/           → Master of Social Work
 #     /graduate-diploma-in-human-and-community-services/
 #     /graduate-certificate-in-human-and-community-services/
 #     /bachelor-of-social-work/
@@ -39,22 +44,13 @@
 #     /graduate-certificate-in-business-administration/
 #     /bachelor-of-business/
 #     /undergraduate-certificate-in-business-ucb/
-#
-# ── Discovery strategy ────────────────────────────────────────────────────────
-#
-# Pin all 14 course URLs as seed_urls.  BFS is disabled (budget=0) because:
-#   - courses-all listing page is JS-rendered (0 static links)
-#   - wp-sitemap has root-level pages but also 136 non-course pages
-#   - The 14 seeds below are the complete course inventory
-#
-# force_candidate_url_patterns marks them as course candidates immediately
-# without waiting for page content (which is an auth-gated SPA shell).
 
 discovery:
-  bfs_page_budget: 0
+  bfs_page_budget: 1
   use_wayback: false
   seed_urls:
     - https://sydneymet.edu.au/master-of-social-work-q/
+    - https://sydneymet.edu.au/master-of-social-work/
     - https://sydneymet.edu.au/graduate-diploma-in-human-and-community-services/
     - https://sydneymet.edu.au/graduate-certificate-in-human-and-community-services/
     - https://sydneymet.edu.au/bachelor-of-social-work/
@@ -70,6 +66,11 @@ discovery:
     - https://sydneymet.edu.au/undergraduate-certificate-in-business-ucb/
   force_candidate_url_patterns:
     - /(master|bachelor|graduate|undergraduate)-[^/]+/?$
+  block_url_patterns:
+    - /graduate-attributes
+    - /sydney-met-graduate-research-school
+    - /courses-all
+    - /student-course-guide
 
 extraction:
   fees:

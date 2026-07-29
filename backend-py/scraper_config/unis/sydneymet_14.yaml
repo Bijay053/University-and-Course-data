@@ -7,10 +7,11 @@
 # Both records share the same hostname; this config mirrors 2300.
 
 discovery:
-  bfs_page_budget: 0
+  bfs_page_budget: 1
   use_wayback: false
   seed_urls:
     - https://sydneymet.edu.au/master-of-social-work-q/
+    - https://sydneymet.edu.au/master-of-social-work/
     - https://sydneymet.edu.au/graduate-diploma-in-human-and-community-services/
     - https://sydneymet.edu.au/graduate-certificate-in-human-and-community-services/
     - https://sydneymet.edu.au/bachelor-of-social-work/
@@ -26,6 +27,11 @@ discovery:
     - https://sydneymet.edu.au/undergraduate-certificate-in-business-ucb/
   force_candidate_url_patterns:
     - /(master|bachelor|graduate|undergraduate)-[^/]+/?$
+  block_url_patterns:
+    - /graduate-attributes
+    - /sydney-met-graduate-research-school
+    - /courses-all
+    - /student-course-guide
 
 extraction:
   fees:
