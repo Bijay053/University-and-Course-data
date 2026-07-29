@@ -1,0 +1,20 @@
+# Australian Institute Of Technology And Commerce
+# Hostname: aitc.nsw.edu.au
+# Country: Australia  |  Currency: AUD
+# Slug: aitc
+# Auto-generated: 2026-07-29
+#
+# This stub was created automatically on the first scrape of this university.
+# Review and expand it to improve discovery and extraction quality.
+# See scraper_config/defaults.yaml for all available options.
+
+discovery: {}
+
+extraction:
+  fees:
+    default_currency: AUD
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false

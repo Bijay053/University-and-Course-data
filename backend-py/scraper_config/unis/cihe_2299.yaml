@@ -1,0 +1,45 @@
+# Crown Institute of Higher Education - CIHE
+# Hostname: www.cihe.edu.au
+# Country: Australia  |  Currency: AUD
+# Slug: cihe
+# Auto-generated: 2026-07-29
+#
+# This stub was created automatically on the first scrape of this university.
+# Review and expand it to improve discovery and extraction quality.
+# See scraper_config/defaults.yaml for all available options.
+discovery:
+  allow_url_patterns:
+  - /[^/]+/[^/]+/?$
+  block_url_patterns:
+  - /apply
+  - /contact
+  - /news
+  - /events
+  - /blog
+  - /about
+  - /research
+  - /alumni
+  - /outreach
+  - /parents
+  - /jobs
+  - /careers
+  - /accommodation
+  - /life-on-campus
+  - /fees-and-funding$
+  - /international/living
+extraction:
+  # H1[0] is the site logo ("Real skills / Real impact / Meaningful careers").
+  # H1[1] class="entry-title" is the clean schema.org headline, e.g.
+  # "Bachelor of Accounting". H1[2] is the Elementor visual heading with
+  # split styled spans ("BACHELOR OF" + "ACCOUNTING"). Target H1[1].
+  h1_css_selector: "h1.entry-title"
+  fees:
+    default_currency: AUD
+  filters:
+    online_only:
+      enabled: false
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false
