@@ -48,6 +48,8 @@
 discovery:
   bfs_page_budget: 1
   use_wayback: false
+  allow_url_patterns:
+    - /(master|bachelor|graduate|undergraduate)-[^/]+/?$
   seed_urls:
     - https://sydneymet.edu.au/master-of-social-work-q/
     - https://sydneymet.edu.au/master-of-social-work/
