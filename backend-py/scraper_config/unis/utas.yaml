@@ -164,14 +164,24 @@ discovery:
     - https://www.utas.edu.au/courses/arts-soc/courses/e7g-master-of-teaching
 
 extraction:
-  # When every extractor returns blank course_location (common on browser-fetched
-  # partial HTML from arts-soc / health faculties), fall back to "Hobart" so the
-  # UTAS-specific blank-location online guard does not reject valid on-campus courses.
+  # Use Scrape.do residential render for per-course pages instead of local Playwright.
+  # Evidence: M7D returned 139KB static HTML with full international fee + IELTS in
+  # the DOM (hidden CSS panel, not behind a JS tab-click). Gemini extracts all fields
+  # from the raw HTML text without needing the International tab to be clicked visually.
+  # Scrape.do render (~3s/call, residential IP) replaces Playwright (~18s/call,
+  # datacenter IP that Cloudflare rate-limits to 1 concurrent session).
+  scrape_do_render: true
+  scrape_do_skip_fallbacks: true
+  # 5s gives enough time for Funnelback panels / lazy CSS to fully load.
+  # Tab panels with domestic/international sections are SSR'd in the initial HTML
+  # but some CSS class toggling happens post-load; wait_for_ms ensures the final
+  # DOM state is captured.
+  scrape_do_wait_for_ms: 5000
+  # Scrape.do residential IPs are per-request (different IP each call), so
+  # multiple concurrent extractions don't share a rate-limit window. 8 concurrent
+  # gives ~3-4 min total for 358 courses (vs ~140 min sequential Playwright).
+  max_parallel_fetch: 8
   default_course_location: "Hobart"
-  # Cap concurrent browser sessions to 1 to avoid Cloudflare 429 rate-limiting.
-  # UTAS's Cloudflare blocks even 2 simultaneous browser sessions with 600s cooldowns;
-  # 1 sequential session eliminates 429s entirely at a modest speed cost.
-  max_parallel_fetch: 1
   fees:
     # UTAS publishes international fees on a central schedule, not on each course
     # page.  Without this flag, courses whose browser-rendered HTML does not

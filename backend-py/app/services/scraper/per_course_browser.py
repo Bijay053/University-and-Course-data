@@ -382,14 +382,15 @@ _FORCE_BROWSER_HOSTS: tuple[str, ...] = (
     # (even when english slots are filled from static) and override the fee
     # slot so the international fee replaces the domestic one.
     "vit.edu.au",
-    # UTAS: Cloudflare-protected. The Domestic tab is active by default so
-    # static HTML shows only CSP/HECS domestic fees. The browser must ALWAYS
-    # run (even if IELTS was somehow extracted from static HTML) and click the
-    # INTERNATIONAL tab to expose international fees, IELTS requirements and
-    # the correct campus/location list. The override flag ensures browser-
-    # rendered international values replace any domestic figures picked up
-    # during the static pass.
-    "utas.edu.au",
+    # UTAS: removed from _FORCE_BROWSER_HOSTS (2026-07-30).
+    # Evidence: M7D (Master of Occupational Therapy) returned 139KB static HTML
+    # via plain httpx from which Gemini correctly extracted international_fee=$51,923
+    # and IELTS=7.0 WITHOUT any browser tab-click. The international section IS
+    # server-rendered in the initial HTML (just in a hidden CSS panel); Gemini
+    # parses all text including hidden DOM nodes. Scrape.do render (residential IP,
+    # ~3s) now handles CF-blocked pages instead of local Playwright (~18s).
+    # extraction.scrape_do_render + scrape_do_skip_fallbacks in utas.yaml drives
+    # this. Browser path retained as last-resort fallback (not force-triggered).
     # University of Newcastle: Cloudflare-protected. Static HTML shows
     # the domestic student-type panel by default (domestic indicative
     # fee + domestic nominal duration for programs that differ between
