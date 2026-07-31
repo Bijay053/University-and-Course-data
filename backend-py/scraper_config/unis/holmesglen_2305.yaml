@@ -124,7 +124,9 @@ extraction:
   # only the course title span.
   course_name:
     h1_css_selector: ".cmp-teaser__courseTitle"
-
+  filters:
+    domestic_only:
+      enabled: false
   staging:
     skip_degree_qualifier_check: true
     require_international_fee: false

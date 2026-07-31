@@ -1,19 +1,96 @@
-# AMPA- Academy of Music and Performing Arts
+# AMPA – Academy of Music and Performing Arts
 # Hostname: ampa.edu.au
 # Country: Australia  |  Currency: AUD
-# Slug: ampa
-# Auto-generated: 2026-07-31
+# uni_id: 2306
 #
-# This stub was created automatically on the first scrape of this university.
-# Review and expand it to improve discovery and extraction quality.
-# See scraper_config/defaults.yaml for all available options.
+# ── Site architecture ─────────────────────────────────────────────────────────
+#
+# Small WordPress site (~7 degree pages + admin/info pages).
+# Course pages have non-standard slug patterns like:
+#   /classical-music-degree-sydney/
+#   /contemporary-music-degree-sydney/
+#   /dance-course-degree/
+#   /music-production-course-2/
+#   /music-theatre-degree/
+#   /music-composition-degree/
+#   /postgraduate-music-course/
+#
+# The BFS default heuristics pick up NON-course pages:
+#   /study-calendar/     → staged as "Study Calendar"    ← WRONG
+#   /course-fees/        → staged as "Course Fees"       ← WRONG
+#   /study-music-dance-sydney/ → staged as "Courses"     ← WRONG (listing)
+#
+# ── Fees ──────────────────────────────────────────────────────────────────────
+# Individual course pages say "Fee-Help: Available" with no dollar amount.
+# Fee amounts may require Gemini extraction from the surrounding prose.
+#
+# ── Discovery strategy ───────────────────────────────────────────────────────
+# All 7 real course URLs are pinned as seed_urls.
+# force_candidate_url_patterns marks /-degree-/ and /-course-/ root slugs as
+# course candidates. allow_url_patterns limits BFS to those shapes only.
+# block_url_patterns excludes all known non-course pages.
 
-discovery: {}
+discovery:
+  bfs_page_budget: 15
+  use_wayback: false
+
+  seed_urls:
+    # Undergraduate degrees (6)
+    - https://ampa.edu.au/classical-music-degree-sydney/
+    - https://ampa.edu.au/contemporary-music-degree-sydney/
+    - https://ampa.edu.au/dance-course-degree/
+    - https://ampa.edu.au/music-production-course-2/
+    - https://ampa.edu.au/music-theatre-degree/
+    - https://ampa.edu.au/music-composition-degree/
+    # Postgraduate (1)
+    - https://ampa.edu.au/postgraduate-music-course/
+
+  # Degree/course detail pages at root level: /{anything}-degree[-more]/ or /{anything}-course[-more]/
+  force_candidate_url_patterns:
+    - "ampa\\.edu\\.au/[^/]+-(?:degree|course)(?:-[a-z0-9]+)*/?$"
+
+  allow_url_patterns:
+    - "ampa\\.edu\\.au/[^/]+-(?:degree|course)(?:-[a-z0-9]+)*/?$"
+
+  block_url_patterns:
+    # Known non-course pages
+    - "/study-calendar"
+    - "/course-fees"
+    - "/study-music-dance-sydney"
+    - "/degrees-undergraduate-music"
+    - "/university-music-course-dance-degree"
+    - "/pathways-program"
+    - "/applying-for"
+    - "/how-to-apply"
+    - "/apply"
+    - "/faqs"
+    - "/degree-faqs"
+    - "/about"
+    - "/campus"
+    - "/contact"
+    - "/experience"
+    - "/events"
+    - "/handbook"
+    - "/international-students"
+    - "/mission"
+    - "/music-and-dance-staff"
+    - "/music-dance-degree-stories"
+    - "/music-dance-study-calendar"
+    - "/publications"
+    - "/student-forms"
+    - "/student-life"
+    - "/student-wellbeing"
+    - "/vacancies"
+    - "/xmlrpc"
+    - "elearning\\.ampa"
+    - "library\\.ampa"
+    - "oas\\.ampa"
 
 extraction:
   fees:
     default_currency: AUD
+
   staging:
-    skip_degree_qualifier_check: true   
-    require_international_fee: false    
-    dedup_use_full_url: true           
+    skip_degree_qualifier_check: true
+    require_international_fee: false
+    dedup_use_full_url: true
