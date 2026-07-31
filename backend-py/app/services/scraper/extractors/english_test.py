@@ -94,8 +94,8 @@ def _ielts(text: str) -> dict[str, float] | None:
         r"(?:academic\s+)?ielts(?:\s+academic)?[^a-z0-9]{0,20}overall\s*"
         r"(?:score\s+|band\s+|score\s+of\s+|of\s+)?"
         r"([0-9]+(?:\.[0-9]+)?)"
-        r"[^a-z0-9]{0,15}(?:with\s*)?(?:no\s+(?:individual\s+)?band\s+(?:below|less\s+than)|"
-        r"minimum\s+of|no\s+score\s+less\s+than)\s*([0-9]+(?:\.[0-9]+)?)",
+        r"[^a-z0-9]{0,15}(?:with\s*)?(?:no\s+(?:individual\s+)?band\s+(?:score\s+)?(?:below|less\s+than|lower\s+than)|"
+        r"minimum\s+of|no\s+score\s+(?:less\s+than|lower\s+than))\s*([0-9]+(?:\.[0-9]+)?)",
         text,
         re.I,
     )
@@ -114,7 +114,7 @@ def _ielts(text: str) -> dict[str, float] | None:
     m = re.search(
         r"(?:academic\s+)?ielts(?:\s+academic)?\s+"
         r"([0-9]+(?:\.[0-9]+)?)"
-        r"[^0-9\n]{0,50}?(?:no\s+(?:individual\s+)?(?:band|component|score|element)\s+(?:below|less\s+than|under)|"
+        r"[^0-9\n]{0,50}?(?:no\s+(?:individual\s+)?(?:band|component|score|element)\s+(?:score\s+)?(?:below|less\s+than|under|lower\s+than)|"
         r"not\s+less\s+than|minimum\s+(?:band\s+)?(?:of\s+)?)"
         r"\s*([0-9]+(?:\.[0-9]+)?)",
         text,
@@ -136,8 +136,8 @@ def _ielts(text: str) -> dict[str, float] | None:
         r"(?:\w+\s+){0,3}"
         r"overall\s*(?:band\s+)?(?:score\s+)?(?:of\s+)?"
         r"([0-9]+(?:\.[0-9]+)?)"
-        r"[^a-z0-9]{0,20}(?:with\s*)?(?:no\s+(?:individual\s+)?band\s+(?:below|less\s+than)|"
-        r"minimum\s+of|no\s+score\s+less\s+than)\s*([0-9]+(?:\.[0-9]+)?)",
+        r"[^a-z0-9]{0,20}(?:with\s*)?(?:no\s+(?:individual\s+)?band\s+(?:score\s+)?(?:below|less\s+than|lower\s+than)|"
+        r"minimum\s+of|no\s+score\s+(?:less\s+than|lower\s+than))\s*([0-9]+(?:\.[0-9]+)?)",
         text,
         re.I,
     )
