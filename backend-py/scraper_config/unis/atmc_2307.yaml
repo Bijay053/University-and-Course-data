@@ -1,0 +1,55 @@
+# ATMC – Australian Technical and Management College
+# Hostname: www.atmc.edu.au
+# Country: Australia  |  Currency: AUD
+# uni_id: 2307
+#
+# ── Site architecture ─────────────────────────────────────────────────────────
+# Next.js SPA. Static HTML shows only "Loading course details..." (570 chars
+# visible text, 2% ratio) → triggers _is_spa_shell() → Scrape.do render needed.
+#
+# API endpoint: GET /api/courses → JSON array with title, code, duration, mode,
+# fees.annual. Only 2 courses:
+#   /courses/diploma-it       → ICT50220 Diploma of Information Technology
+#   /courses/diploma-business → BSB50120 Diploma of Business
+#
+# ── Problem ───────────────────────────────────────────────────────────────────
+# BFS finds both course URLs from static HTML but rejects them with
+# category_landing_page_missing_degree_qualifier because the static render
+# has no H1 (just a loading spinner). Fix: scrape_do_render triggers Scrape.do
+# headless Chrome for SPA shells, getting the real Next.js-rendered content.
+
+discovery:
+  bfs_page_budget: 10
+  use_wayback: false
+
+  seed_urls:
+    - https://www.atmc.edu.au/courses/diploma-it
+    - https://www.atmc.edu.au/courses/diploma-business
+
+  force_candidate_url_patterns:
+    - "atmc\\.edu\\.au/courses/diploma-"
+
+  allow_url_patterns:
+    - "atmc\\.edu\\.au/courses/diploma-"
+
+  block_url_patterns:
+    - "/about"
+    - "/contact"
+    - "/students"
+    - "/legal"
+    - "/_next"
+    - "/api/"
+
+extraction:
+  fees:
+    default_currency: AUD
+
+  # Next.js SPA: static HTML is a loading-spinner shell (_is_spa_shell()=True).
+  # scrape_do_render retries via Scrape.do headless Chrome to get hydrated DOM.
+  scrape_do_render: true
+  browser_wait_strategy: "networkidle"
+
+  staging:
+    skip_degree_qualifier_check: true
+    require_international_fee: false
+    dedup_use_full_url: true
