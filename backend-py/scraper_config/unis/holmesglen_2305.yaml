@@ -1,15 +1,117 @@
 # Holmesglen Institute
 # Hostname: www.holmesglen.edu.au
 # Country: Australia  |  Currency: AUD
-# Slug: holmesglen
-# Auto-generated: 2026-07-31
+# uni_id: 2305
 #
-# This stub was created automatically on the first scrape of this university.
-# Review and expand it to improve discovery and extraction quality.
-# See scraper_config/defaults.yaml for all available options.
+# ── Site architecture ─────────────────────────────────────────────────────────
+#
+# AEM (Adobe Experience Manager) site. Listing pages are fully JS-rendered
+# (no static course links). Course links are discovered via a private API:
+#
+#   POST https://www.holmesglen.edu.au/bin/searchResults
+#   Body: {"q":"","isGlobalSearch":true,"isInternational":true,"searchFilter":"Courses",
+#          "theme":"holmesglen","pageNo":1,"limit":100,"sortBy":"ascending"}
+#   Response: {"Courses": "<json-encoded array>", "totalCount": 39, ...}
+#   Each item has "pagePath" and "pageTitle".
+#
+# International course pages all have an "-int" URL suffix and live at depth 4-5
+# under /explore-courses/.
+#
+# ── Discovery strategy ───────────────────────────────────────────────────────
+#
+# All 39 known international course URLs are pinned as seed_urls.
+# force_candidate_url_patterns marks /explore-courses/**-int paths as candidates
+# so BFS doesn't discard them as non-course pages.
+# allow_url_patterns limits traversal to the same shape.
+#
+# ── Full course inventory (39 international courses, from API 2026-07-31) ───
 
-discovery: {}
+discovery:
+  bfs_page_budget: 5
+  use_wayback: false
+
+  seed_urls:
+    # Higher Education — Bachelors (9)
+    - https://www.holmesglen.edu.au/explore-courses/sport-fitness-and-wellbeing/sport/higher-education/bachelor-of-sports-media-int
+    - https://www.holmesglen.edu.au/explore-courses/sport-fitness-and-wellbeing/sport/higher-education/bachelor-of-sport-business-int
+    - https://www.holmesglen.edu.au/explore-courses/nursing-community-and-health-sciences/dental/higher-education/bachelor-of-oral-health-therapy-and-hygiene-int
+    - https://www.holmesglen.edu.au/explore-courses/nursing-community-and-health-sciences/nursing/higher-education/bachelor-of-nursing-int
+    - https://www.holmesglen.edu.au/explore-courses/computing-and-it/information-systems/higher-education/bachelor-of-information-systems-int
+    - https://www.holmesglen.edu.au/explore-courses/hospitality-tourism-and-events/hospitality/higher-education/bachelor-of-hospitality-management-int
+    - https://www.holmesglen.edu.au/explore-courses/arts-and-design/fashion/higher-education/bachelor-of-fashion-design-int
+    - https://www.holmesglen.edu.au/explore-courses/english-education-and-teacher-training/early-childhood-education/higher-education/bachelor-of-early-childhood-education-int
+    - https://www.holmesglen.edu.au/explore-courses/building-and-construction/building-and-construction-management/higher-education/bachelor-of-digital-construction-and-management-int
+    - https://www.holmesglen.edu.au/explore-courses/business-and-finance/accounting-and-financial-services/higher-education/bachelor-of-business-accounting-int
+    # Vocational Education — Diplomas (12)
+    - https://www.holmesglen.edu.au/explore-courses/nursing-community-and-health-sciences/nursing/vocational-education/diploma-of-nursing-int
+    - https://www.holmesglen.edu.au/explore-courses/computing-and-it/game-design-and-development/vocational-education/diploma-of-information-technology-game-art-and-design-with-diploma-of-information-technology-game-programming-ict50220-int
+    - https://www.holmesglen.edu.au/explore-courses/computing-and-it/web-design-and-development/vocational-education/diploma-of-information-technology-front-end-web-development-with-diploma-of-information-technology-back-end-web-development-ict50220-int
+    - https://www.holmesglen.edu.au/explore-courses/computing-and-it/cyber-security/vocational-education/diploma-of-information-technology-cyber-security-int
+    - https://www.holmesglen.edu.au/explore-courses/computing-and-it/artificial-intelligence/vocational-education/diploma-of-information-technology-cloud-engineering-int
+    - https://www.holmesglen.edu.au/explore-courses/computing-and-it/programming/vocational-education/diploma-of-information-technology-advanced-programming-with-diploma-of-information-technology-back-end-web-development-ict50220-int
+    - https://www.holmesglen.edu.au/explore-courses/hospitality-tourism-and-events/hospitality/vocational-education/diploma-of-hospitality-management-int
+    - https://www.holmesglen.edu.au/explore-courses/english-education-and-teacher-training/early-childhood-education/vocational-education/diploma-of-early-childhood-education-and-care-int
+    - https://www.holmesglen.edu.au/explore-courses/nursing-community-and-health-sciences/dental/vocational-education/diploma-of-dental-technology-int
+    - https://www.holmesglen.edu.au/explore-courses/building-and-construction/building-and-construction-management/vocational-education/diploma-of-building-and-construction-building-int
+    - https://www.holmesglen.edu.au/explore-courses/business-and-finance/accounting-and-financial-services/vocational-education/diploma-of-accounting-int
+    - https://www.holmesglen.edu.au/explore-courses/building-and-construction/building-design-and-drafting/vocational-education/advanced-diploma-of-building-design-architectural-int
+    # Vocational Education — Certificate IV (10)
+    - https://www.holmesglen.edu.au/explore-courses/hospitality-tourism-and-events/bakery-and-pastry/vocational-education/certificate-iv-in-patisserie-non-apprenticeship-int
+    - https://www.holmesglen.edu.au/explore-courses/nursing-community-and-health-sciences/pathology-and-laboratory-testing/vocational-education/certificate-iv-in-laboratory-techniques-int
+    - https://www.holmesglen.edu.au/explore-courses/hospitality-tourism-and-events/cookery/vocational-education/certificate-iv-in-kitchen-management-int
+    - https://www.holmesglen.edu.au/explore-courses/computing-and-it/web-design-and-development/vocational-education/certificate-iv-in-information-technology-web-development-int
+    - https://www.holmesglen.edu.au/explore-courses/computing-and-it/programming/vocational-education/certificate-iv-in-information-technology-programming-int
+    - https://www.holmesglen.edu.au/explore-courses/computing-and-it/game-design-and-development/vocational-education/certificate-iv-in-information-technology-gaming-development-int
+    - https://www.holmesglen.edu.au/explore-courses/building-and-construction/furniture-and-upholstery/vocational-education/certificate-iv-in-furniture-design-and-manufacturing-int
+    - https://www.holmesglen.edu.au/explore-courses/computing-and-it/cyber-security/vocational-education/certificate-iv-in-cyber-security-int
+    - https://www.holmesglen.edu.au/explore-courses/building-and-construction/building-and-construction-management/vocational-education/certificate-iv-in-building-and-construction-building-int
+    - https://www.holmesglen.edu.au/explore-courses/business-and-finance/accounting-and-financial-services/vocational-education/certificate-iv-in-accounting-and-bookkeeping-int
+    # Vocational Education — Certificate III (6)
+    - https://www.holmesglen.edu.au/explore-courses/nursing-community-and-health-sciences/pathology-and-laboratory-testing/vocational-education/certificate-iii-in-pathology-collection-int
+    - https://www.holmesglen.edu.au/explore-courses/horticulture-and-environment/floristry/vocational-education/certificate-iii-in-floristry-int
+    - https://www.holmesglen.edu.au/explore-courses/english-education-and-teacher-training/early-childhood-education/vocational-education/certificate-iii-in-early-childhood-education-and-care-int
+    - https://www.holmesglen.edu.au/explore-courses/hospitality-tourism-and-events/cookery/vocational-education/certificate-iii-in-commercial-cookery-non-apprenticeship-int
+    - https://www.holmesglen.edu.au/explore-courses/building-and-construction/carpentry-and-joinery/vocational-education/certificate-iii-in-carpentry-int
+    - https://www.holmesglen.edu.au/explore-courses/building-and-construction/furniture-and-upholstery/vocational-education/certificate-iii-in-cabinet-making-and-timber-technology-int
+    # English / Other (1)
+    - https://www.holmesglen.edu.au/explore-courses/english-education-and-teacher-training/english-courses/others/pathway-english-int
+
+  # Only the -int suffixed course detail pages are course candidates.
+  # All /explore-courses/ intermediate pages (category/subcategory hubs) are listing-only.
+  force_candidate_url_patterns:
+    - "/explore-courses/[^/]+/[^/]+/[^/]+/[^/]+-int$"
+
+  allow_url_patterns:
+    - "/explore-courses/[^/]+/[^/]+/[^/]+/[^/]+-int$"
+
+  block_url_patterns:
+    - "/search"
+    - "/about-us"
+    - "/get-career-help"
+    - "/get-business-support"
+    - "/current-students"
+    - "/study-with-us"
+    - "/forms"
+    - "/news"
+    - "/events"
+    - "/authorisation"
+    - "/wp-content"
+    - "/wp-json"
+    - "my\\.holmesglen"
+    - "\\.css"
+    - "\\.js"
+    - "\\.pdf"
+    - "sitemap"
+
+  listing_only_patterns:
+    - "^/explore-courses/?$"
+    - "/explore-courses/[^/]+/?$"
+    - "/explore-courses/[^/]+/[^/]+/?$"
+    - "/explore-courses/[^/]+/[^/]+/[^/]+/?$"
 
 extraction:
   fees:
     default_currency: AUD
+  staging:
+    skip_degree_qualifier_check: true
+    require_international_fee: false
