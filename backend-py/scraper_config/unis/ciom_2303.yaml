@@ -1,15 +1,129 @@
 # Canterbury Institute of Management (CIM)
 # Hostname: ciom.edu.au
 # Country: Australia  |  Currency: AUD
-# Slug: ciom
-# Auto-generated: 2026-07-31
+# uni_id: 2303
 #
-# This stub was created automatically on the first scrape of this university.
-# Review and expand it to improve discovery and extraction quality.
-# See scraper_config/defaults.yaml for all available options.
+# ── Site architecture ─────────────────────────────────────────────────────────
+#
+# Standard WordPress site. Courses are at ROOT level URLs (not under /programs/):
+#   /master-of-business-administration/
+#   /bachelor-of-business/
+#   etc.
+#
+# Listing pages (BFS traversal seeds):
+#   /programs/                        → links to all courses
+#   /programs/postgraduate-programs/  → 8 postgrad courses
+#   /programs/undergraduate-programs/ → 6 undergrad courses
+#
+# ── Discovery strategy ───────────────────────────────────────────────────────
+#
+# BFS from homepage finds /programs/postgraduate-programs/ and
+# /programs/undergraduate-programs/ in the nav. Those listing pages contain
+# direct links to all 14 course pages at root level.
+#
+# force_candidate_url_patterns marks root-level degree URLs as course
+# candidates (otherwise the BFS classifier treats them as generic site pages).
+#
+# seed_urls pins all 14 known course URLs so none are missed if nav changes.
+#
+# ── Full course inventory (14 courses) ───────────────────────────────────────
+#
+# Postgraduate (8):
+#   /master-of-business-administration/
+#   /master-of-business-administration-accounting-major/
+#   /master-of-business-administration-information-systems-major/
+#   /master-of-business-administration-project-management-major/
+#   /master-of-business-research/
+#   /master-of-information-and-communication-technology/
+#   /graduate-diploma-of-business/
+#   /graduate-diploma-information-technology-communication-technology/
+#
+# Undergraduate (6):
+#   /bachelor-of-business/
+#   /bachelor-of-business-accounting-major/
+#   /bachelor-of-business-management-major/
+#   /bachelor-of-business-information-systems-major/
+#   /bachelor-of-business-hospitality-management-major/
+#   /bachelor-of-business-double-major/
 
-discovery: {}
+discovery:
+  bfs_page_budget: 5
+  use_wayback: false
+
+  # All 14 known course URLs pinned as seeds so BFS finds them even if
+  # nav structure changes. The listing pages are also seeded so BFS
+  # traverses them and discovers any new courses added in future.
+  seed_urls:
+    - https://ciom.edu.au/programs/postgraduate-programs/
+    - https://ciom.edu.au/programs/undergraduate-programs/
+    - https://ciom.edu.au/master-of-business-administration/
+    - https://ciom.edu.au/master-of-business-administration-accounting-major/
+    - https://ciom.edu.au/master-of-business-administration-information-systems-major/
+    - https://ciom.edu.au/master-of-business-administration-project-management-major/
+    - https://ciom.edu.au/master-of-business-research/
+    - https://ciom.edu.au/master-of-information-and-communication-technology/
+    - https://ciom.edu.au/graduate-diploma-of-business/
+    - https://ciom.edu.au/graduate-diploma-information-technology-communication-technology/
+    - https://ciom.edu.au/bachelor-of-business/
+    - https://ciom.edu.au/bachelor-of-business-accounting-major/
+    - https://ciom.edu.au/bachelor-of-business-management-major/
+    - https://ciom.edu.au/bachelor-of-business-information-systems-major/
+    - https://ciom.edu.au/bachelor-of-business-hospitality-management-major/
+    - https://ciom.edu.au/bachelor-of-business-double-major/
+
+  # Mark listing pages as listing-only so BFS traverses them for links
+  # without adding them to the course candidate set.
+  listing_only_patterns:
+    - "^/programs/"
+    - "ciom\\.edu\\.au/programs/"
+
+  # Root-level degree URLs: /master-of-*, /bachelor-of-*, /graduate-diploma-*
+  # The BFS classifier would otherwise treat these as generic info pages.
+  force_candidate_url_patterns:
+    - "/(master|bachelor|graduate)-(?:of-|diploma-)[^/]+/?$"
+
+  # Keep only root-level course pages; drop admin/info/campus pages.
+  allow_url_patterns:
+    - "/(master|bachelor|graduate)-(?:of-|diploma-)[^/]+/?$"
+
+  block_url_patterns:
+    - "/campus/"
+    - "/news-events/"
+    - "/testimonials/"
+    - "/forms-and-documents"
+    - "/policies"
+    - "/contact"
+    - "/apply"
+    - "/alumni"
+    - "/staff"
+    - "/student"
+    - "/library"
+    - "/governance"
+    - "/accreditation"
+    - "/academic-calendar"
+    - "/academic-staff"
+    - "/cim/"
+    - "/cim-"
+    - "/events"
+    - "/wp-content"
+    - "/wp-json"
+    - "/future-students"
+    - "/current-students"
+    - "/graduation"
+    - "/research$"
+    - "/privacy"
+    - "/disclaimer"
+    - "/terms"
+    - "/making-a-complaint"
+    - "/mervyn-"
+    - "/message-from"
+    - "/media"
+    - "/dr-ian"
+    - "/canvas-incident"
 
 extraction:
   fees:
     default_currency: AUD
+  staging:
+    skip_degree_qualifier_check: true
+    require_international_fee: false
