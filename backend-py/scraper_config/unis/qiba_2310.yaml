@@ -1,0 +1,108 @@
+# QIBA – Queensland International Business Academy
+# Hostname: qiba.edu.au
+# Country: Australia  |  Currency: AUD
+# uni_id: 2310
+#
+# ── Site architecture ─────────────────────────────────────────────────────────
+# WordPress site. All 14 course pages are statically rendered — fees, IELTS,
+# and durations visible in plain HTML. No SPA / no browser rendering needed.
+#
+# Listing page: https://qiba.edu.au/all-courses/  (all 14 course links present)
+#
+# ── Courses (14 total) ────────────────────────────────────────────────────────
+# ELICOS / English (3) — H1 has no degree qualifier word; skip_degree_qualifier_check: true
+#   022758e  English for Academic Study          ($360/week)
+#   080115d  General English Program             ($360/week)
+#   096939k  PTE Academic Exam Preparation Course
+#
+# VET / Business (4)
+#   BSB50120  Diploma of Business (Operations)    ($12,000)
+#   BSB50420  Diploma of Leadership & Management  ($12,000)
+#   BSB60420  Advanced Diploma of Leadership & Mgmt
+#   BSB80120  Graduate Diploma of Management Learning
+#
+# VET / IT (2)
+#   ICT50220  Diploma of Information Technology
+#   ICT60220  Advanced Diploma of Information Technology
+#
+# VET / Hospitality (3)
+#   SIT40521  Certificate IV in Kitchen Management
+#   SIT50422  Diploma of Hospitality Management
+#   SIT60322  Advanced Diploma of Hospitality Management
+#
+# Professional Year (1)
+#   Professional Year in Information Technology
+#
+# Corporate Training (1) — general service page, no fee; staged per user request
+
+discovery:
+  bfs_page_budget: 20
+  use_wayback: false
+
+  seed_urls:
+    # Listing page (discovers all 14 course links)
+    - https://qiba.edu.au/all-courses/
+    # Individual course pages pinned as direct seeds
+    - https://qiba.edu.au/courses/022758e-english-for-academic-study/
+    - https://qiba.edu.au/courses/080115d-general-english-program/
+    - https://qiba.edu.au/courses/096939k-pte-academic-exam-preparation-course/
+    - https://qiba.edu.au/courses/bsb50120-diploma-of-business-operations/
+    - https://qiba.edu.au/courses/bsb50420-diploma-of-leadership-and-management/
+    - https://qiba.edu.au/courses/bsb60420-advanced-diploma-of-leadership-and-management/
+    - https://qiba.edu.au/courses/bsb80120-graduate-diploma-of-management-learning/
+    - https://qiba.edu.au/courses/ict50220-diploma-of-information-technology/
+    - https://qiba.edu.au/courses/ict60220-advanced-diploma-of-information-technology/
+    - https://qiba.edu.au/courses/professional-year-in-information-technology/
+    - https://qiba.edu.au/courses/sit40521-certificate-iv-in-kitchen-management/
+    - https://qiba.edu.au/courses/sit50422-diploma-of-hospitality-management/
+    - https://qiba.edu.au/courses/sit60322-advanced-diploma-of-hospitality-management/
+    - https://qiba.edu.au/courses/corporate-training/
+
+  # All course detail pages live under /courses/
+  force_candidate_url_patterns:
+    - "qiba\\.edu\\.au/courses/[^/]+/?$"
+
+  allow_url_patterns:
+    - "qiba\\.edu\\.au/courses/[^/]+/?$"
+    - "qiba\\.edu\\.au/all-courses/"
+
+  # Listing/info pages that look like /courses/ but aren't course details
+  listing_only_patterns:
+    - "/all-courses/"
+    - "/course-category/"
+
+  block_url_patterns:
+    - "/about-us"
+    - "/agents-zone"
+    - "/all-testimonials"
+    - "/company-profile"
+    - "/contact"
+    - "/costs-and-payments"
+    - "/domestic-students"
+    - "/enrollment-process"
+    - "/entry-requirements"
+    - "/international-students"
+    - "/languagecert"
+    - "/news-events"
+    - "/orientation"
+    - "/our-"
+    - "/pathways-to-university"
+    - "/policies"
+    - "/privacy"
+    - "/py-host-employers"
+    - "/rpl-credit"
+    - "/sitemap"
+    - "/useful-links"
+    - "/why-qiba"
+    - "course-category/"
+
+extraction:
+  fees:
+    default_currency: AUD
+
+  staging:
+    # 3 ELICOS courses have no degree qualifier in H1 (e.g. "022758e – English for Academic Study")
+    skip_degree_qualifier_check: true
+    # Corporate-training page has no fee; all ELICOS fees are per-week (not lump sum)
+    require_international_fee: false
+    dedup_use_full_url: true

@@ -1,0 +1,15 @@
+# International College of Hotel Management(ICHM)
+# Hostname: www.ichm.edu.au
+# Country: Australia  |  Currency: AUD
+# Slug: ichm
+# Auto-generated: 2026-07-31
+#
+# This stub was created automatically on the first scrape of this university.
+# Review and expand it to improve discovery and extraction quality.
+# See scraper_config/defaults.yaml for all available options.
+
+discovery: {}
+
+extraction:
+  fees:
+    default_currency: AUD
