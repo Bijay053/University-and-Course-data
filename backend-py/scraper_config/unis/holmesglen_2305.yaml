@@ -27,7 +27,8 @@
 # ── Full course inventory (39 international courses, from API 2026-07-31) ───
 
 discovery:
-  bfs_page_budget: 5
+  # 39 course seeds + 2 listing pages = 41 queue entries; budget must exceed that
+  bfs_page_budget: 50
   use_wayback: false
 
   seed_urls:
@@ -112,6 +113,18 @@ discovery:
 extraction:
   fees:
     default_currency: AUD
+
+  # AEM page H1 contains sibling <span> elements for CRICOS code and course code:
+  #   <h1>
+  #     <span class="cmp-teaser__courseTitle">Bachelor of Nursing</span>
+  #     <span class="cmp-teaser__courseDesc-item">CRICOS 103159J</span>
+  #     <span class="cmp-teaser__courseDesc-item">Course Code BNURS20</span>
+  #   </h1>
+  # Without a selector, get_text() returns the full junk string. This pinpoints
+  # only the course title span.
+  course_name:
+    h1_css_selector: ".cmp-teaser__courseTitle"
+
   staging:
     skip_degree_qualifier_check: true
     require_international_fee: false

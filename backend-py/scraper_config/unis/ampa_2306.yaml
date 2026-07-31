@@ -1,0 +1,19 @@
+# AMPA- Academy of Music and Performing Arts
+# Hostname: ampa.edu.au
+# Country: Australia  |  Currency: AUD
+# Slug: ampa
+# Auto-generated: 2026-07-31
+#
+# This stub was created automatically on the first scrape of this university.
+# Review and expand it to improve discovery and extraction quality.
+# See scraper_config/defaults.yaml for all available options.
+
+discovery: {}
+
+extraction:
+  fees:
+    default_currency: AUD
+  staging:
+    skip_degree_qualifier_check: true   
+    require_international_fee: false    
+    dedup_use_full_url: true           
