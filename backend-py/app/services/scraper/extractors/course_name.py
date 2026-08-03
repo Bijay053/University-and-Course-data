@@ -120,12 +120,23 @@ _DEGREE_QUAL_IN_TITLE_RE = re.compile(
 _NON_COURSE_PREFIX = re.compile(
     r"^\s*(?:home|study|courses?|programs?)\s*[/>\\:|–-]\s*", re.I
 )
-# Issue 3a: AQF code prefixes on VIT vocational course names.
-# Pages set <h1>SIT40521 - Certificate IV in Kitchen Management</h1>.
+# Issue 3a: AQF code prefixes on VIT/SMIC vocational course names.
+# Pages set <h1>SIT40521 - Certificate IV in Kitchen Management</h1>
+# or (SMIC Template A h3) "BSB60120 : Advanced Diploma of Business - CRICOS 106813D"
+# or (SMIC Template B h1) "SIS30321 Certificate III in Fitness" (space separator only).
 # The code (3 uppercase letters + 5 digits) must be stripped before
 # _smart_case runs, otherwise it becomes "Sit40521 - " in the output.
-# Pattern matches: SIT40521 - , ICT40120 — , CPC30220 – etc.
-_AQF_PREFIX_RE = re.compile(r"^[A-Za-z]{3}\d{5}\s*[-–—]\s*")
+# Pattern matches:
+#   SIT40521 -   (dash, original case)
+#   BSB60120 :   (colon, SMIC Template A)
+#   SIS30321 C   (space + uppercase lookahead, SMIC Template B — no punctuation separator)
+_AQF_PREFIX_RE = re.compile(
+    r"^[A-Za-z]{3}\d{5}\s*(?:[-–—:]\s*|\s+(?=[A-Z]))"
+)
+# CRICOS codes appear as a trailing suffix on some Australian vocational
+# course pages, e.g. "Advanced Diploma of Business - CRICOS 106813D".
+# Strip them so the stage name is the clean course title.
+_CRICOS_SUFFIX_RE = re.compile(r"\s*[-–—]\s*CRICOS\s+\w+\s*$", re.IGNORECASE)
 
 
 _SLUG_LIKE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+){2,}$")
@@ -203,9 +214,12 @@ def _clean(raw: str) -> str | None:
     if not raw:
         return None
     txt = re.sub(r"\s+", " ", raw).strip()
-    # Issue 3a: strip AQF code prefix (e.g. "SIT40521 - ") before any
-    # other processing so _smart_case never sees the raw code token.
+    # Issue 3a: strip AQF code prefix (e.g. "SIT40521 - ", "BSB60120 : ",
+    # "SIS30321 Certificate…") before any other processing.
     txt = _AQF_PREFIX_RE.sub("", txt).strip()
+    # Strip trailing CRICOS code (e.g. "- CRICOS 106813D") that some Australian
+    # vocational colleges append to the course name in the h3 element.
+    txt = _CRICOS_SUFFIX_RE.sub("", txt).strip()
     txt = _NON_COURSE_PREFIX.sub("", txt)
     # Apply suffix strip iteratively. Some universities (Federation) emit
     # browser <title> tags with the institution name DUPLICATED, e.g.

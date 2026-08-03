@@ -2,34 +2,48 @@
 # Hostname: smic.edu.au
 # Country: Australia  |  Currency: AUD
 # Slug: smic
-# Auto-generated: 2026-08-03
 #
-# This stub was created automatically on the first scrape of this university.
-# Review and expand it to improve discovery and extraction quality.
-# See scraper_config/defaults.yaml for all available options.
+# Site: static HTML, no SPA/rendering needed.
+# Listing page: https://smic.edu.au/courses/ (21 real course pages + 6 non-course pages)
+#
+# Two page templates exist:
+#   Template A — diploma/graduate pages: course name in <h3> (no class),
+#     format "BSB60120 : Advanced Diploma of Business - CRICOS 106813D"
+#   Template B — cert-iii/cert-iv pages: course name in second <h1 class="display-4 fw-bold mb-2">,
+#     format "SIS30321 Certificate III in Fitness"
+# Both templates have H1 class="title mx-2 mt-2" = department name (WRONG).
+# h1_css_selector targets h1.display-4 first (Template B), then h3 (Template A).
+#
+# Discovery issue: cert-iii-* and cert-iv-* URL slugs fail the BFS degree-qualifier
+# URL filter. force_candidate_url_patterns overrides this so all /courses/<slug>/ URLs
+# are accepted as course candidates.
+
 discovery:
-  allow_url_patterns:
-  - /courses/[^/]+/?$
+  force_candidate_url_patterns:
+    - smic\.edu\.au/courses/[^/]+/?$
   block_url_patterns:
-  - /apply
-  - /contact
-  - /news
-  - /events
-  - /blog
-  - /about
-  - /research
-  - /alumni
-  - /outreach
-  - /parents
-  - /jobs
-  - /careers
-  - /accommodation
-  - /life-on-campus
-  - /fees-and-funding$
-  - /international/living
+    - /courses/academic-calendar
+    - /courses/tuition-fees
+    - /courses/entry-requirements
+    - /courses/refund-cancellation
+    - /courses/school-of-
+    - /current-students
+    - /future-students
+    - /about
+    - /contact
+    - /agents
+    - /news
+    - /events
+
 extraction:
   fees:
     default_currency: AUD
+  course_name:
+    # Template B (cert-iii/cert-iv): h1[class*="display-4"] is the real course name.
+    # Template A (diploma/graduate): no h1.display-4 exists, so CSS falls back to h3
+    # which holds the course code + name. The AQF prefix and CRICOS suffix are then
+    # stripped automatically by course_name.py (_AQF_PREFIX_RE + _CRICOS_SUFFIX_RE).
+    h1_css_selector: "h1[class*='display-4'], h3"
   staging:
     skip_degree_qualifier_check: true
     require_international_fee: false
