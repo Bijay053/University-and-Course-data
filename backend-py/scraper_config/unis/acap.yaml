@@ -24,7 +24,9 @@ extraction:
 
   filters:
     domestic_only:
-      enabled: true
+      enabled: false
+    online_only:
+      enabled: false
 
   text_cleaning:
     location:
@@ -37,3 +39,9 @@ extraction:
         # (e.g. "^ ^Available in Perth" with no leading city name → empty → null).
         - '\^\s*\^.*$'
         - '\(\s*domestic\s+only\s*\)'   # inline '(domestic only)' markers
+
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false

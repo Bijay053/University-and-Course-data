@@ -1,0 +1,91 @@
+# Excelsia College
+# Hostname: excelsia.edu.au
+# Country: Australia  |  Currency: AUD
+# Slug: excelsia
+#
+# Site is a pure JS SPA (every page returns 202 + ~200B empty shell via plain
+# httpx). Scrape.do render=true is required for both listing pages and per-course
+# extraction. Seed URLs are pinned to the 23 known course pages so discovery
+# is reliable even when the school listing pages don't surface all links.
+
+discovery:
+  seed_urls:
+    # School listing pages (BFS entry points)
+    - https://excelsia.edu.au/study/business/
+    - https://excelsia.edu.au/study/counselling/
+    - https://excelsia.edu.au/study/creative-and-performing-arts/
+    - https://excelsia.edu.au/study/education/
+    - https://excelsia.edu.au/study/elicos/
+    - https://excelsia.edu.au/study/social-work/
+    # Individual courses pinned as seeds (discovered from DB, depth-6 URLs)
+    - https://excelsia.edu.au/study/creative-and-performing-arts/bachelor-of-screen-production/
+    - https://excelsia.edu.au/study/creative-and-performing-arts/master-of-music/
+    - https://excelsia.edu.au/study/creative-and-performing-arts/bachelor-of-music-worship/
+    - https://excelsia.edu.au/study/creative-and-performing-arts/bachelor-of-music/
+    - https://excelsia.edu.au/study/creative-and-performing-arts/bachelor-of-dramatic-art/
+    - https://excelsia.edu.au/study/counselling/graduate-diploma-of-disability/
+    - https://excelsia.edu.au/study/counselling/graduate-diploma-of-counselling/
+    - https://excelsia.edu.au/study/counselling/master-of-counselling/
+    - https://excelsia.edu.au/study/counselling/graduate-certificate-in-disability/
+    - https://excelsia.edu.au/study/counselling/graduate-certificate-in-counselling/
+    - https://excelsia.edu.au/study/business/bachelor-of-information-technology/
+    - https://excelsia.edu.au/study/business/master-of-professional-accounting/
+    - https://excelsia.edu.au/study/business/bachelor-of-business-accounting/
+    - https://excelsia.edu.au/study/business/master-of-business-administration/
+    - https://excelsia.edu.au/study/business/graduate-diploma-of-business-administration/
+    - https://excelsia.edu.au/study/business/master-of-business-research/
+    - https://excelsia.edu.au/study/business/bachelor-of-management-and-entrepreneurship/
+    - https://excelsia.edu.au/study/business/phd-organisational-leadership/
+    - https://excelsia.edu.au/study/social-work/graduate-certificate-in-social-science/
+    - https://excelsia.edu.au/study/social-work/graduate-certificate-in-aged-care/
+    - https://excelsia.edu.au/study/education/graduate-certificate-in-educational-studies/
+    - https://excelsia.edu.au/study/education/graduate-certificate-in-classroom-and-curriculum-innovation/
+    - https://excelsia.edu.au/study/education/graduate-certificate-in-christian-leadership/
+  force_candidate_url_patterns:
+    # Course pages sit at exactly /study/<school>/<course-slug>/
+    - excelsia\.edu\.au/study/[^/]+/[^/]+/?$
+  block_url_patterns:
+    - /study/assessment
+    - /study/brochure
+    - /study/early-offer
+    - /study/excelsia-supported
+    - /study/faq
+    - /study/fees
+    - /study/future
+    - /study/how-to
+    - /study/international
+    - /study/media
+    - /study/open-day
+    - /study/oz-to-la
+    - /study/professional-dev
+    - /study/short-course
+    - /study/study-tour
+    - /study/the-career
+    - /study/why-study
+    - /about
+    - /alumni
+    - /current-students
+    - /research
+    - /partners
+    - /staff
+    - /contact
+    - /enquire
+    - /events
+    - /library
+    - /apply
+
+extraction:
+  # Site is a JS SPA — every page returns a 202 empty shell via plain httpx.
+  # scrape_do_render sends each course page through Scrape.do headless Chrome
+  # so the React app hydrates and the real H1/fee/IELTS/duration/delivery
+  # content becomes available to the extractors.
+  scrape_do_render: true
+  scrape_do_skip_fallbacks: true
+  fees:
+    default_currency: AUD
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false
+    dedup_use_full_url: true
