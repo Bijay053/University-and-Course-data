@@ -10,37 +10,53 @@
 
 discovery:
   seed_urls:
-    # School listing pages (BFS entry points)
-    - https://excelsia.edu.au/study/business/
-    - https://excelsia.edu.au/study/counselling/
-    - https://excelsia.edu.au/study/creative-and-performing-arts/
-    - https://excelsia.edu.au/study/education/
-    - https://excelsia.edu.au/study/elicos/
-    - https://excelsia.edu.au/study/social-work/
-    # Individual courses pinned as seeds (discovered from DB, depth-6 URLs)
-    - https://excelsia.edu.au/study/creative-and-performing-arts/bachelor-of-screen-production/
-    - https://excelsia.edu.au/study/creative-and-performing-arts/master-of-music/
-    - https://excelsia.edu.au/study/creative-and-performing-arts/bachelor-of-music-worship/
-    - https://excelsia.edu.au/study/creative-and-performing-arts/bachelor-of-music/
-    - https://excelsia.edu.au/study/creative-and-performing-arts/bachelor-of-dramatic-art/
-    - https://excelsia.edu.au/study/counselling/graduate-diploma-of-disability/
-    - https://excelsia.edu.au/study/counselling/graduate-diploma-of-counselling/
-    - https://excelsia.edu.au/study/counselling/master-of-counselling/
-    - https://excelsia.edu.au/study/counselling/graduate-certificate-in-disability/
-    - https://excelsia.edu.au/study/counselling/graduate-certificate-in-counselling/
-    - https://excelsia.edu.au/study/business/bachelor-of-information-technology/
-    - https://excelsia.edu.au/study/business/master-of-professional-accounting/
-    - https://excelsia.edu.au/study/business/bachelor-of-business-accounting/
-    - https://excelsia.edu.au/study/business/master-of-business-administration/
-    - https://excelsia.edu.au/study/business/graduate-diploma-of-business-administration/
-    - https://excelsia.edu.au/study/business/master-of-business-research/
+    # All 39 verified course pages — school listing pages use JS navigation
+    # (no <a href> to individual courses), so each course must be pinned explicitly.
+    # Business
     - https://excelsia.edu.au/study/business/bachelor-of-management-and-entrepreneurship/
+    - https://excelsia.edu.au/study/business/bachelor-of-information-technology/
+    - https://excelsia.edu.au/study/business/bachelor-of-business-accounting/
+    - https://excelsia.edu.au/study/business/master-of-professional-accounting/
+    - https://excelsia.edu.au/study/business/graduate-diploma-of-business-administration/
+    - https://excelsia.edu.au/study/business/master-of-business-administration/
+    - https://excelsia.edu.au/study/business/master-of-business-research/
     - https://excelsia.edu.au/study/business/phd-organisational-leadership/
-    - https://excelsia.edu.au/study/social-work/graduate-certificate-in-social-science/
-    - https://excelsia.edu.au/study/social-work/graduate-certificate-in-aged-care/
-    - https://excelsia.edu.au/study/education/graduate-certificate-in-educational-studies/
-    - https://excelsia.edu.au/study/education/graduate-certificate-in-classroom-and-curriculum-innovation/
+    - https://excelsia.edu.au/study/business/graduate-certificate-in-organisational-leadership/
+    # Creative & Performing Arts
+    - https://excelsia.edu.au/study/creative-and-performing-arts/associate-degree-of-dramatic-art/
+    - https://excelsia.edu.au/study/creative-and-performing-arts/bachelor-of-dramatic-art/
+    - https://excelsia.edu.au/study/creative-and-performing-arts/associate-degree-of-music/
+    - https://excelsia.edu.au/study/creative-and-performing-arts/bachelor-of-music/
+    - https://excelsia.edu.au/study/creative-and-performing-arts/bachelor-of-music-worship/
+    - https://excelsia.edu.au/study/creative-and-performing-arts/graduate-diploma-of-music/
+    - https://excelsia.edu.au/study/creative-and-performing-arts/master-of-music/
+    - https://excelsia.edu.au/study/creative-and-performing-arts/bachelor-of-screen-production/
+    # Counselling
+    - https://excelsia.edu.au/study/counselling/master-of-counselling/
+    - https://excelsia.edu.au/study/counselling/graduate-diploma-of-counselling/
+    - https://excelsia.edu.au/study/counselling/graduate-diploma-of-disability/
+    - https://excelsia.edu.au/study/counselling/graduate-certificate-in-counselling/
+    - https://excelsia.edu.au/study/counselling/graduate-certificate-in-disability/
+    # Education
+    - https://excelsia.edu.au/study/education/bachelor-of-early-childhood-education/
+    - https://excelsia.edu.au/study/education/graduate-diploma-of-early-childhood-teaching/
     - https://excelsia.edu.au/study/education/graduate-certificate-in-christian-leadership/
+    - https://excelsia.edu.au/study/education/master-of-teaching-primary/
+    - https://excelsia.edu.au/study/education/master-of-teaching-secondary/
+    - https://excelsia.edu.au/study/education/master-of-educational-leadership-online/
+    - https://excelsia.edu.au/study/education/master-of-education-research-stem/
+    - https://excelsia.edu.au/study/education/master-of-education-research/
+    - https://excelsia.edu.au/study/education/graduate-certificate-in-classroom-and-curriculum-innovation/
+    - https://excelsia.edu.au/study/education/graduate-certificate-in-educational-studies/
+    # ELICOS
+    - https://excelsia.edu.au/study/elicos/english-for-academic-purposes/
+    - https://excelsia.edu.au/study/elicos/general-english/
+    # Social Work
+    - https://excelsia.edu.au/study/social-work/graduate-certificate-in-aged-care/
+    - https://excelsia.edu.au/study/social-work/graduate-diploma-of-aged-care/
+    - https://excelsia.edu.au/study/social-work/graduate-certificate-in-social-science/
+    - https://excelsia.edu.au/study/social-work/graduate-diploma-of-social-science/
+    - https://excelsia.edu.au/study/social-work/master-of-social-work-qualifying/
   force_candidate_url_patterns:
     # Course pages sit at exactly /study/<school>/<course-slug>/
     - excelsia\.edu\.au/study/[^/]+/[^/]+/?$
@@ -57,9 +73,9 @@ discovery:
     - /study/media
     - /study/open-day
     - /study/oz-to-la
-    - /study/professional-dev
-    - /study/short-course
-    - /study/study-tour
+    - /study/professional-development
+    - /study/short-courses
+    - /study/study-tours
     - /study/the-career
     - /study/why-study
     - /about

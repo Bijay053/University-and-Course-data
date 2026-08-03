@@ -1,0 +1,80 @@
+# Stanley College
+# Hostname: www.stanleycollege.edu.au
+# Country: Australia  |  Currency: AUD
+# Slug: stanleycollege
+#
+# Two domains host course pages:
+#   www.stanleycollege.edu.au/courses/  — VET + bachelor-major pages (23 courses)
+#   highereducation.stanleycollege.edu.au/course/  — HE degrees (6 courses)
+# Search page (?s=) spans both and confirms 28 courses across 2 result pages.
+# Both domains serve static HTML (200, full content) — no SPA rendering needed.
+# All 29 course URLs pinned as seeds because BFS from scrape_url only sees page 1
+# of the search results and misses the 4 bachelor-major pages on page 2.
+
+discovery:
+  seed_urls:
+    # --- www.stanleycollege.edu.au VET courses ---
+    - https://www.stanleycollege.edu.au/courses/bsb50120-diploma-of-business/
+    - https://www.stanleycollege.edu.au/courses/bsb80120-graduate-diploma-of-management-learning/
+    - https://www.stanleycollege.edu.au/courses/chc30125-certificate-iii-in-early-childhood-education-and-care/
+    - https://www.stanleycollege.edu.au/courses/chc33021-certificate-iii-in-individual-support-ageing/
+    - https://www.stanleycollege.edu.au/courses/chc33021-certificate-iii-in-individual-support-disability/
+    - https://www.stanleycollege.edu.au/courses/chc50125-diploma-of-early-childhood-education-and-care/
+    - https://www.stanleycollege.edu.au/courses/chc52025-diploma-of-community-services/
+    - https://www.stanleycollege.edu.au/courses/diploma-of-nursing/
+    - https://www.stanleycollege.edu.au/courses/hltaid011-provide-first-aid/
+    - https://www.stanleycollege.edu.au/courses/ict50220-diploma-of-information-technology/
+    - https://www.stanleycollege.edu.au/courses/sit30622-certificate-iii-in-hospitality/
+    - https://www.stanleycollege.edu.au/courses/sit30821-certificate-iii-in-commercial-cookery/
+    - https://www.stanleycollege.edu.au/courses/sit40521-certificate-iv-in-kitchen-management/
+    - https://www.stanleycollege.edu.au/courses/sit50422-diploma-of-hospitality-management-commercial-cookery-pathway/
+    - https://www.stanleycollege.edu.au/courses/sit50422-diploma-of-hospitality-management-food-and-beverage-pathway/
+    - https://www.stanleycollege.edu.au/courses/sit60322-advanced-diploma-of-hospitality-management-commercial-cookery-pathway/
+    - https://www.stanleycollege.edu.au/courses/sit60322-advanced-diploma-of-hospitality-management-food-and-beverage-pathway/
+    - https://www.stanleycollege.edu.au/courses/sithfab021-provide-responsible-service-of-alcohol-rsa/
+    - https://www.stanleycollege.edu.au/courses/basic-barista-course/
+    # --- www.stanleycollege.edu.au bachelor-major pages (found on search page 2) ---
+    - https://www.stanleycollege.edu.au/courses/bachelor-of-business-with-a-major-in-accounting/
+    - https://www.stanleycollege.edu.au/courses/bachelor-of-business-with-a-major-in-digital-marketing/
+    - https://www.stanleycollege.edu.au/courses/bachelor-of-business-with-a-major-in-hospitality-and-events-management/
+    - https://www.stanleycollege.edu.au/courses/bachelor-of-business-with-a-major-in-management/
+    # --- highereducation.stanleycollege.edu.au HE degrees ---
+    - https://highereducation.stanleycollege.edu.au/course/bachelor-of-business/
+    - https://highereducation.stanleycollege.edu.au/course/bachelor-of-community-services/
+    - https://highereducation.stanleycollege.edu.au/course/bachelor-of-information-and-communications-technology/
+    - https://highereducation.stanleycollege.edu.au/course/graduate-certificate-of-business/
+    - https://highereducation.stanleycollege.edu.au/course/graduate-diploma-of-business/
+    - https://highereducation.stanleycollege.edu.au/course/master-of-business/
+  force_candidate_url_patterns:
+    - stanleycollege\.edu\.au/courses/[^/]+/?$
+    - highereducation\.stanleycollege\.edu\.au/course/[^/]+/?$
+  block_url_patterns:
+    - /courses/secondary-school-students
+    - /about-stanley
+    - /agent-portal
+    - /apply-now
+    - /blog
+    - /contact
+    - /domestic-student
+    - /education-agents
+    - /enquire
+    - /government-funded
+    - /international-student
+    - /student-portal
+    - /studying-with-us
+    - /fee-help
+    - /admissions
+    - /library
+    - /policies
+    - /news
+    - /events
+
+extraction:
+  fees:
+    default_currency: AUD
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false
+    dedup_use_full_url: true

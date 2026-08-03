@@ -10,9 +10,10 @@
 
 discovery:
   allow_url_patterns:
-    - '/courses/post-graduate/'
-    - '/courses/undergraduate/'
-    - '/courses/programs-pathways/'
+    # - '/courses/post-graduate/'
+    # - '/courses/undergraduate/'
+    # - '/courses/programs-pathways/'
+    - ''
 
 extraction:
   fees:
