@@ -125,6 +125,27 @@ def _ielts(text: str) -> dict[str, float] | None:
         if 4 <= ov <= 9 and 4 <= mn <= 9:
             return {"overall": ov, "listening": mn, "reading": mn, "writing": mn, "speaking": mn}
 
+    # Pattern 1b2: "IELTS score of a minimum of 6.5 with no band less than 6.0"
+    # — Ozford / Alpine.js-style phrasing where the overall score is preceded by
+    #   "score of a minimum of" (not a bare digit or an "overall" keyword).
+    #   Pattern 1b fails here because the score doesn't follow IELTS directly;
+    #   Pattern 1c fails because there's no "overall" keyword at all.
+    #   Bridge: [^\n0-9]{0,40}? crosses "score of a minimum of " safely.
+    m = re.search(
+        r"(?:academic\s+)?ielts(?:\s+academic)?\s+[^\n0-9]{0,40}?"
+        r"([0-9]+(?:\.[0-9]+)?)"
+        r"[^0-9\n]{0,60}?(?:no\s+(?:individual\s+)?(?:band|component|score|element)\s+"
+        r"(?:score\s+)?(?:below|less\s+than|lower\s+than|under)|"
+        r"not\s+less\s+than|minimum\s+(?:band\s+)?(?:of\s+)?)"
+        r"\s*([0-9]+(?:\.[0-9]+)?)",
+        text,
+        re.I,
+    )
+    if m:
+        ov, mn = float(m.group(1)), float(m.group(2))
+        if 4 <= ov <= 9 and 4 <= mn <= 9 and mn <= ov:
+            return {"overall": ov, "listening": mn, "reading": mn, "writing": mn, "speaking": mn}
+
     # Pattern 1c: "IELTS minimum overall band of 6.5 with no individual band below 6.0"
     # — extends Pattern 1 to handle 1-3 intervening words (e.g. "minimum",
     #   "academic minimum") between the test name and the "overall" keyword.

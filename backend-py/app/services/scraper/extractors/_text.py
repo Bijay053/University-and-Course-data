@@ -53,9 +53,18 @@ def _extract_hidden_component_html(html: str) -> str:
 
 
 class _Stripper(HTMLParser):
-    """Minimal HTML→text. Skips <script>, <style>, <noscript>."""
+    """Minimal HTML→text. Skips <script>, <style>, <noscript>.
 
-    SKIP_TAGS = {"script", "style", "noscript", "template"}
+    NOTE: <template> is intentionally NOT in SKIP_TAGS.  Alpine.js uses
+    ``<template x-if="...">`` to conditionally render real content (IELTS
+    requirements, fees, duration) that is structurally identical to the live
+    DOM once Alpine evaluates.  Skipping template elements silently drops
+    that data.  Plain-text noise from unrendered ``{{ var }}`` expressions
+    in client-only Vue/Handlebars templates is minor and does not cause
+    false positives in downstream regex extractors.
+    """
+
+    SKIP_TAGS = {"script", "style", "noscript"}
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
