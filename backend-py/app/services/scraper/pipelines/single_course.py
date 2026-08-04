@@ -1510,7 +1510,13 @@ async def extract_course(
                 # If H1 is absent/empty after the initial render, retry once
                 # with 2× the configured wait (capped at 12 000 ms).
                 if html and _use_scrape_do_render:
-                    _h1_present = _re.search(r"<h1[^>]*>\s*\S", html, _re.I)
+                    # Strip inner tags from every H1 and check for visible text.
+                    # A bare r"<h1[^>]*>\s*\S" would match the opening `<` of a
+                    # child <span> (e.g. <h1><span></span></h1>) and incorrectly
+                    # report H1 as populated.
+                    _h1_raw = _re.findall(r"<h1[^>]*>(.*?)</h1>", html, _re.S | _re.I)
+                    _h1_texts = [_re.sub(r"<[^>]+>", "", m).strip() for m in _h1_raw]
+                    _h1_present = any(_h1_texts)
                     if not _h1_present:
                         _retry_wait_ms = min(_extr_wait_ms * 2, 12000)
                         log.info(
