@@ -103,8 +103,12 @@ extraction:
   # scrape_do_render sends each course page through Scrape.do headless Chrome
   # so the React app hydrates and the real H1/fee/IELTS/duration/delivery
   # content becomes available to the extractors.
+  # wait_for_ms=5000: React needs >3s to hydrate on slower-loading pages.
+  # At the default 3000ms some pages snapshot mid-hydration: title="excelsia.edu.au"
+  # (bare domain before React sets it), H1 empty, no fee/IELTS content.
   scrape_do_render: true
   scrape_do_skip_fallbacks: true
+  scrape_do_wait_for_ms: 5000
   fees:
     default_currency: AUD
   staging:
