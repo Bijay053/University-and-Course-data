@@ -163,6 +163,15 @@ _HOST_CDX_URL_PREFIX: dict[str, str] = {
     # are returned.  Targeting the subtree directly fixes this.
     "www.lsbu.ac.uk": "www.lsbu.ac.uk/study/course-finder/*",
     "lsbu.ac.uk": "www.lsbu.ac.uk/study/course-finder/*",
+    # CSU (Charles Sturt University): course pages live at /courses/<slug>
+    # on study.csu.edu.au.  The site is fully Cloudflare Enterprise protected
+    # (HTTP 403 for httpx/cffi; Scrape.do static returns 0B/502).  The listing
+    # page /courses uses virtual scrolling — only 12 of 329 courses appear in
+    # the rendered DOM, so BFS is useless.  No sitemap (blocked transport).
+    # Wayback CDX with /courses/* prefix returns all 329 unique course URLs
+    # reliably; the default study.csu.edu.au/* wildcard would also work here
+    # (site is small) but targeting /courses/* is faster and avoids noise.
+    "study.csu.edu.au": "study.csu.edu.au/courses/*",
 }
 
 

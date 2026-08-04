@@ -1,31 +1,97 @@
-# Charles Sturt University
-# Hostname: www.csu.edu.au  (now possibly www.charlesturt.edu.au post-rebrand)
+# Charles Sturt University (CSU) — study.csu.edu.au  (uni_id=2325)
 #
-# Bug history / rationale:
-#   - SPA browser discovery: CSU's course listing is a React/Next.js SPA.
-#     BFS static HTML sees only the shell HTML; actual course links are loaded
-#     via XHR.  A browser discovery pass (playwright) is needed.
-#   - 'Actual rows mismatch' bug: the number of courses staged does not match
-#     the count shown on the CSU website.  Root cause may be pagination (BFS
-#     misses pages 2+) or the SPA rendering issue above.
-#   - CSU rebranded to 'Charles Sturt University' but domain may still use csu.
+# ── CLOUDFLARE ENTERPRISE BLOCK ──────────────────────────────────────────────
+# study.csu.edu.au blocks ALL static transports (plain httpx → 403,
+# Scrape.do static/residential-proxy → 0B / 502 ROTATION_FAILED).
+# Scrape.do render=True (headless Chrome via residential IP) is the only
+# transport that returns real content for both listing AND course pages.
 #
-# TODO: confirm current hostname (csu.edu.au vs charlesturt.edu.au).
-# TODO: investigate whether csu_browser_discover.py already handles the SPA.
+# ── DISCOVERY STRATEGY ───────────────────────────────────────────────────────
+# The listing page (https://study.csu.edu.au/courses) is a React SPA with
+# virtual scrolling.  Even with render=True + 4 s wait, only 12 of 329
+# courses appear in the rendered DOM.  BFS is useless for full coverage.
+# The sitemap (sitemap.xml / sitemap_index.xml) returns 0B from all
+# transports — CF blocks the XML files too.
+#
+# Wayback CDX (study.csu.edu.au/courses/*) returns all 329 unique course
+# URLs reliably (configured in wayback_discover._HOST_CDX_URL_PREFIX).
+# Flow: bfs_page_budget=0 + skip_browser_discovery=true + always_sitemap_supplement=false
+# → BFS yields 0 candidates → CDX fallback fires automatically (use_wayback=null default).
+#
+# ── EXTRACTION STRATEGY ──────────────────────────────────────────────────────
+# Per-course pages (e.g. /courses/bachelor-accounting): Scrape.do render=True
+# returns ~1MB of fully hydrated HTML with H1, fee JSON, and entry requirements.
+#
+# Fees: embedded as JSON in the page HTML.
+#   Domestic:      fund_source_type=CGS, annual_indicative_fee_ft (e.g. 15796)
+#   International: fund_source_type=FPOS, annual_indicative_fee_ft (e.g. 32000)
+# The visible fee section renders international fees; Gemini finds them directly.
+#
+# IELTS: course pages say "Standard English Language Proficiency (ELP)
+# requirements apply" — a generic statement linking to course-specific
+# requirements. Gemini extracts the IELTS score from the rendered
+# entry-requirements section when present.
 
 discovery:
-  always_sitemap_supplement: true   # Supplement BFS with sitemap to catch SPA-only URLs
+  seed_urls:
+    - https://study.csu.edu.au/courses
+
+  # CF Enterprise — skip httpx/cffi dead-end, go straight to Scrape.do render.
+  scrape_do_skip_fallbacks: true
+  scrape_do_render: true
+  scrape_do_wait_for_ms: 4000
+
+  # BFS virtual-scroll limitation: only ~12 courses appear per render.
+  # Set to 0 so we skip BFS entirely and fall through to Wayback CDX.
+  bfs_page_budget: 0
+
+  # Playwright browser also gets CF 403 from datacenter IPs — skip the
+  # 90-second timeout that would otherwise fire before Wayback CDX.
+  skip_browser_discovery: true
+
+  # Sitemap is transport-blocked (0B / 502 on all tiers).
+  # Disable the extra sitemap supplement pass; let the primary CDX path run.
+  always_sitemap_supplement: false
+
+  # Wayback CDX fires automatically when BFS+browser+sitemap all yield 0.
+  # _HOST_CDX_URL_PREFIX maps study.csu.edu.au → study.csu.edu.au/courses/*
+  # which returns 329 unique course URLs with collapse=urlkey.
+
+  allow_url_patterns:
+    - '/courses/[a-zA-Z0-9][a-zA-Z0-9_-]+$'
+
+  block_url_patterns:
+    - /international/
+    - /news
+    - /events
+    - /alumni
+    - /study-centres
+    - /about
+    - /scholarships
+    - /research
+
 extraction:
+  # Scrape.do headless Chrome (residential IP) bypasses CF Enterprise 403.
+  scrape_do_render: true
+  scrape_do_skip_fallbacks: true
+  scrape_do_wait_for_ms: 5000
+  skip_browser_rescue: true
+
+  # Render calls are ~5-8 s each via Scrape.do; lower parallelism to avoid
+  # Scrape.do account-wide rate-limit saturation.
+  max_parallel_fetch: 3
+
+  fees:
+    default_currency: AUD
+
   filters:
     domestic_only:
-      enabled: true   # Preserve current prod behaviour: filter runs for all unis.
+      # Preserve existing prod behaviour: domestic-only filter active.
+      enabled: true
 
     online_only:
-      # POLICY CHANGE 2026-05-30: online-only courses are excluded from the
-      # international student recruitment catalogue by default.  International
-      # students on student visas require on-campus delivery.  CSU's distance-
-      # education offerings (Criminology, Cyber Security, Project Management,
-      # etc.) are online-only and therefore excluded from the portal.
-      # Re-enable (set to false) ONLY if CSU adds a verified on-shore campus
-      # delivery option and admin confirms it is visa-eligible.
+      # POLICY 2026-05-30: online-only courses excluded from international
+      # recruitment portal — CSU distance-ed offerings (Criminology,
+      # Cyber Security, etc.) are online-only and not visa-eligible.
+      # Re-enable only if CSU adds verified on-shore campus delivery.
       enabled: true

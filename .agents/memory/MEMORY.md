@@ -83,3 +83,4 @@
 - [Adelaide University degree vs unit URL trap](adelaide-degree-unit-trap.md) — /study/degrees/ = 572 degree programs; /study/courses/ = 5523 unit pages (acct-1001 style); listing page is JS-rendered (0 links static); sitemap supplies all 571 degree URLs.
 - [UNE Wayback CDX discovery](une-wayback-discovery.md) — listing page is React SPA (0 links even with Scrape.do render); no sitemap; Wayback CDX with /study/courses/* prefix is the only discovery mechanism.
 - [MQ Scrape.do render false fix](mq-scrape-do-render-lesson.md) — scrape_do_render+skip_fallbacks caused 41/127 timeouts; stealth browser is correct for MQ; degree_level_defaults fills fees.
+- [CSU discovery fix](csu-discovery-fix.md) — CF Enterprise + virtual-scroll listing; Wayback CDX (329 URLs) via bfs_page_budget=0+skip_browser_discovery; IELTS not inline on course pages.
