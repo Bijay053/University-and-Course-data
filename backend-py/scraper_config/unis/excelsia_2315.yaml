@@ -9,6 +9,14 @@
 # is reliable even when the school listing pages don't surface all links.
 
 discovery:
+  # allow_url_patterns restricts BFS *traversal* to only course-detail URLs.
+  # Without this, each Scrape.do-rendered page exposes hundreds of nav links
+  # and BFS expands to 900+ URLs. Since all 39 courses are pinned as seeds,
+  # BFS never needs to follow links from them — allow_url_patterns enforces that.
+  allow_url_patterns:
+    - excelsia\.edu\.au/study/[^/]+/[^/]+/?$
+  # Hard ceiling: 39 seeds + a small buffer for any unforeseen redirects.
+  bfs_page_budget: 45
   seed_urls:
     # All 39 verified course pages — school listing pages use JS navigation
     # (no <a href> to individual courses), so each course must be pinned explicitly.

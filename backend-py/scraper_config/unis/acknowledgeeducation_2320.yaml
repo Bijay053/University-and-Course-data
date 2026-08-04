@@ -1,0 +1,15 @@
+# Stott’s College
+# Hostname: www.acknowledgeeducation.edu.au
+# Country: Australia  |  Currency: AUD
+# Slug: acknowledgeeducation
+# Auto-generated: 2026-08-03
+#
+# This stub was created automatically on the first scrape of this university.
+# Review and expand it to improve discovery and extraction quality.
+# See scraper_config/defaults.yaml for all available options.
+
+discovery: {}
+
+extraction:
+  fees:
+    default_currency: AUD
