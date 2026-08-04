@@ -1025,9 +1025,28 @@ def repair_extractor(
                 )
                 return {"ok": False, "reason": "no_samples", "fields_repaired": 0}
 
-            # 4. Ask Gemini to regenerate rules for each failing field
+            # 4. Ask Gemini to regenerate rules for each failing field.
+            # Fetch the university's URL and current extraction rules so
+            # repair_extraction_rules has the context it needs.
+            from sqlalchemy import text as _sql_repair
+            _uni_repair_row = await db.execute(
+                _sql_repair(
+                    "SELECT scrape_url, scrape_config FROM universities WHERE id = :id"
+                ),
+                {"id": university_id},
+            )
+            _uni_repair = _uni_repair_row.first()
+            _uni_url_for_repair: str = (_uni_repair[0] if _uni_repair else "") or ""
+            _current_rules: dict = (
+                ((_uni_repair[1] if _uni_repair else {}) or {})
+                .get("auto_config", {})
+                .get("extraction_rules", {})
+            )
             new_rules = await repair_extraction_rules(
-                failing_fields=failing, sample_pages=samples
+                failing_fields=failing,
+                current_rules=_current_rules,
+                samples=samples,
+                uni_url=_uni_url_for_repair,
             )
 
             # 5. Persist repaired rules into auto_config in the DB
