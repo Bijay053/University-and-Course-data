@@ -109,6 +109,16 @@ extraction:
   scrape_do_render: true
   scrape_do_skip_fallbacks: true
   scrape_do_wait_for_ms: 5000
+  course_name:
+    # Title format varies by page: some use a pipe, others a dash, and the
+    # institution name differs between new/old branding. Strip both so that
+    # the <title> fallback (triggered when React hasn't yet hydrated the H1)
+    # still produces the correct course name rather than "Excelsia.edu.au".
+    strip_title_suffixes:
+      - " | Excelsia College"
+      - " - Excelsia University College"
+      - " | Excelsia University College"
+      - " - Excelsia College"
   fees:
     default_currency: AUD
   staging:
