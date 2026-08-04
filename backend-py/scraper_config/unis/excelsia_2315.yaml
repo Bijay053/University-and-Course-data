@@ -108,7 +108,7 @@ extraction:
   # (bare domain before React sets it), H1 empty, no fee/IELTS content.
   scrape_do_render: true
   scrape_do_skip_fallbacks: true
-  scrape_do_wait_for_ms: 5000
+  scrape_do_wait_for_ms: 8000
   course_name:
     # Title format varies by page: some use a pipe, others a dash, and the
     # institution name differs between new/old branding. Strip both so that

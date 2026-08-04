@@ -1502,6 +1502,32 @@ async def extract_course(
             if _use_scrape_do_render:
                 with scrape_do_render_scope():
                     html = await fetch_html(url, wait_for_ms=_extr_wait_ms)
+                # Partial-hydration guard: React SPAs can return a page where
+                # SSR'd body text (e.g. IELTS paragraphs) is present but the
+                # H1 component hasn't finished rendering yet.  fetch_html
+                # accepts any non-None response, so a partial render slips
+                # through as valid HTML and produces course_name = domain.
+                # If H1 is absent/empty after the initial render, retry once
+                # with 2× the configured wait (capped at 12 000 ms).
+                if html and _use_scrape_do_render:
+                    _h1_present = _re.search(r"<h1[^>]*>\s*\S", html, _re.I)
+                    if not _h1_present:
+                        _retry_wait_ms = min(_extr_wait_ms * 2, 12000)
+                        log.info(
+                            "[RENDER-HYDRATION-RETRY] %s: H1 absent/empty after"
+                            " %dms — retrying with %dms",
+                            url, _extr_wait_ms, _retry_wait_ms,
+                        )
+                        with scrape_do_render_scope():
+                            _html_retry = await fetch_html(
+                                url, wait_for_ms=_retry_wait_ms
+                            )
+                        if _html_retry:
+                            html = _html_retry
+                            log.info(
+                                "[RENDER-HYDRATION-RETRY] %s: retry got %d chars",
+                                url, len(_html_retry),
+                            )
                 # Secondary tab fetch for hash-routed SPAs (e.g. La Trobe).
                 # Renders the entry-requirements (IELTS) tab separately and
                 # stores it in _secondary_html for merging into the Gemini
