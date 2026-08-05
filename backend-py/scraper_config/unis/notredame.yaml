@@ -5,53 +5,62 @@
 # ======================================================
 # www.notredame.edu.au blocks all cloud datacenter IPs (httpx, cffi,
 # Playwright) with 403.  Wayback archived HTML is used for per-course
-# extraction.  For discovery the sitemap is now used via Scrape.do render=True.
+# extraction.  For discovery the sitemap + Wayback CDX are used.
 #
-# ── DISCOVERY STRATEGY (updated) ─────────────────────────────────────────────
-# The sitemap at https://www.notredame.edu.au/sitemap.xml is accessible via
-# Scrape.do render=True and contains 436 /programs/ URLs.
-# Filtering to 3-segment paths (faculty/level/degree-slug) yields ~212 real
-# degree pages; /courses/ middle-segment paths are unit/subject listings and
-# are excluded via block_url_patterns.
+# ── DISCOVERY STRATEGY ────────────────────────────────────────────────────────
+# Notre Dame has THREE campuses: Fremantle (Perth), Sydney, and Broome.
+# Program URLs come in two shapes:
 #
-# Old approach (CDX): Wayback CDX prefix /programs/* was timing out —
-# the BFS homepage attempt consumed ~60-90s of the 300s budget going through
-# the full cf_ladder, leaving no time for CDX lookup to complete.
-# New approach: bfs_page_budget=0 + sitemap_url + scrape_do_skip_fallbacks
-# → discovery finishes in ~20-30s total.
+#   Non-campus (in sitemap):
+#     /programs/{faculty}/{level}/{degree-slug}        ← 3 path segments
+#     e.g. /programs/school-of-business/postgraduate/master-of-business-administration
+#
+#   Campus-prefixed (in Wayback CDX):
+#     /programs/{campus}/{faculty}/{level}/{degree-slug}   ← 4 path segments
+#     e.g. /programs/fremantle/school-of-arts-and-sciences/postgraduate/master-of-arts
+#     e.g. /programs/sydney/school-of-nursing-and-midwifery/postgraduate/doctor-of-nursing
+#
+# Wayback CDX analysis (2026-08):
+#   3-seg non-campus URLs:  ~350 (covered by sitemap + CDX)
+#   4-seg campus URLs:      ~357 (only in CDX — were ALL missed before this fix)
+#   Total expected:         ~700 course pages
+#
+# The old allow_url_patterns only matched 3-segment paths, missing every
+# campus-prefixed URL.  Adding the campus 4-seg pattern restores ~357 courses.
 #
 # ── EXTRACTION STRATEGY ───────────────────────────────────────────────────────
 # Per-course pages: httpx/cffi → 403.  Wayback archived HTML typically
 # 1-4 weeks old — acceptable for stable degree-catalogue content.
-#
-# Course URL pattern: /programs/<faculty>/<level>/<degree-slug>
-#   e.g. /programs/arts-and-sciences/postgraduate/master-of-architecture
 
 discovery:
-  # Point directly at the main sitemap — contains 436 /programs/ URLs.
+  # Point directly at the main sitemap — contains non-campus /programs/ URLs.
   sitemap_url: https://www.notredame.edu.au/sitemap.xml
 
   # REQUIRED — Scrape.do render=True is the only transport that fetches
   # Notre Dame content.  skip_fallbacks goes: static (may 502) → render=True.
   scrape_do_skip_fallbacks: true
 
-  # Skip BFS entirely — homepage is CF-blocked on all transports and
-  # consuming 60-90s of the 300s budget before the sitemap is ever tried.
+  # Skip BFS entirely — homepage is CF-blocked on all transports.
   bfs_page_budget: 0
 
-  # 3-segment /programs/{faculty}/{level}/{degree-slug} — actual degree pages.
-  # Sub-pages (4+ segments like /psychology-research-projects) are excluded
-  # by the $ anchor.
+  # Two URL shapes — both anchored with $ to exclude sub-pages:
+  #
+  #   Shape 1 (non-campus): /programs/{faculty}/{level}/{degree-slug}
+  #   Shape 2 (campus):     /programs/{campus}/{faculty}/{level}/{degree-slug}
+  #     campus ∈ {fremantle, sydney, broome}
+  #
+  # [^/]+ in the final segment allows degree slugs containing commas
+  # (e.g. bachelor-of-philosophy,-politics-and-economics).
   allow_url_patterns:
-    - '/programs/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+$'
+    - '/programs/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+/[^/]+$'
+    - '/programs/(?:fremantle|sydney|broome)/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+/[^/]+$'
 
-  # Exclude unit/subject listing pages that sit under /programs/.../courses/
+  # Exclude unit/subject listing pages (.../courses/) and CMS snippet pages.
   block_url_patterns:
     - '/programs/[^/]+/courses/'
+    - '/programs/re-usable-snippets/'
 
-  # CDX no longer needed for discovery (sitemap covers all degree pages).
-  # Keep use_wayback: true so per-request Wayback fallback still fires for
-  # per-course extraction fetches via http_fetcher.
+  # CDX provides the campus-prefixed URLs not in the sitemap.
   use_wayback: true
 
   # Already using sitemap_url directly — no supplement needed.
