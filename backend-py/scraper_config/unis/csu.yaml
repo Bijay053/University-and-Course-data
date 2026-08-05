@@ -90,8 +90,6 @@ extraction:
       enabled: true
 
     online_only:
-      # POLICY 2026-05-30: online-only courses excluded from international
-      # recruitment portal — CSU distance-ed offerings (Criminology,
-      # Cyber Security, etc.) are online-only and not visa-eligible.
-      # Re-enable only if CSU adds verified on-shore campus delivery.
-      enabled: true
+      # CSU has many legitimate online-only postgraduate and undergraduate
+      # courses open to international students.  Do NOT filter them out.
+      enabled: false

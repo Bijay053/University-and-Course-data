@@ -5879,7 +5879,7 @@ async def extract_course(
     # This prevents courses whose page incidentally says "available online"
     # in a side-bar from being staged with study_mode=Online while also
     # carrying a concrete campus location.
-    if payload.get("study_mode") == "Online" and payload.get("course_location", "").strip():
+    if payload.get("study_mode") == "Online" and (payload.get("course_location") or "").strip():
         try:
             from app.services.scraper.config.context import get_uni_config as _get_polok
             _polok_uc = _get_polok()
@@ -5922,7 +5922,7 @@ async def extract_course(
     # also extracted.  Oxford Brookes lists "Distance learning" alongside
     # physical campuses in the same Location section; the course is available
     # both online and in-person, so the correct mode is 'Blended'.
-    if payload.get("study_mode") == "Online" and payload.get("course_location", "").strip():
+    if payload.get("study_mode") == "Online" and (payload.get("course_location") or "").strip():
         try:
             from app.services.scraper.config.context import get_uni_config as _get_dlcb
             _dlcb_uc = _get_dlcb()
