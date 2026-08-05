@@ -479,6 +479,8 @@ async def _extract_only(
             extraction_rules=extraction_rules,
             seen_pdf_urls=seen_pdf_urls,
         )
+    except ScrapedoAccountError:
+        raise  # propagate — caller sets scrape_do_dead_flag to abort remaining courses
     except Exception as exc:  # noqa: BLE001
         return {"name": name, "url": url, "error": f"extract: {exc}"}
 
@@ -749,6 +751,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
     # also contribute their counts without any explicit plumbing.
     from app.services.scraper.http_fetcher import (
         _scrape_do_job_counters as _sd_cv,
+        ScrapedoAccountError,
     )
     _sd_job_ctrs: dict = {"render": 0, "static": 0}
     _sd_cv.set(_sd_job_ctrs)
@@ -883,6 +886,11 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
     # column; without this poller the worker never noticed and "Stop Scrape"
     # silently did nothing past flipping a DB flag.
     stop_flag: list[bool] = [False]
+    # Circuit-breaker for Scrape.do 401 (token invalid / credits exhausted).
+    # When the first ScrapedoAccountError is caught in the per-course loop,
+    # this flag is set so all remaining queued coroutines short-circuit
+    # immediately rather than each making a doomed fetch and failing one by one.
+    scrape_do_dead_flag: list[bool] = [False]
     stop_poll_task = asyncio.create_task(_stop_poller(runtime_job_id, stop_flag))
     # Dedicated heartbeat pulser — see ``_heartbeat_pulser`` docstring.
     # Spans extract + stage phases so /active never reaps a still-working
@@ -3885,6 +3893,16 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                             "url": link.get("url"),
                             "error": "stopped",
                         }
+                    # Scrape.do circuit-breaker: if any earlier course raised
+                    # ScrapedoAccountError (bad token / credits exhausted),
+                    # all remaining courses share the same fate — skip them
+                    # immediately rather than repeating the doomed fetch.
+                    if scrape_do_dead_flag[0]:
+                        return {
+                            "name": (link.get("name") or "").strip() or "?",
+                            "url": link.get("url"),
+                            "error": "extract: Scrape.do auth/credits error HTTP 401 — check SCRAPE_DO_TOKEN and account balance",
+                        }
                     progress[0] += 1
                     idx = progress[0]
                     nm = (link.get("name") or "").strip() or link.get("url", "?")
@@ -3942,6 +3960,27 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                             ),
                             timeout=300.0,
                         )
+                    except ScrapedoAccountError as _sd_auth_exc:
+                        _sd_url = (link.get("url") or "?")[:80]
+                        log.error(
+                            "[SCRAPE.DO DEAD] HTTP 401 for %s — setting circuit-breaker;"
+                            " all remaining courses will be skipped. Refresh SCRAPE_DO_TOKEN.",
+                            _sd_url,
+                        )
+                        scrape_do_dead_flag[0] = True
+                        await emit(
+                            "status",
+                            "[SCRAPE.DO DEAD] Scrape.do returned HTTP 401 (token invalid or"
+                            " credits exhausted) — aborting remaining extractions."
+                            " Refresh SCRAPE_DO_TOKEN and top up account balance.",
+                            phase="extract",
+                            kind="scrape_do_dead",
+                        )
+                        result = {
+                            "name": (link.get("name") or "").strip() or "?",
+                            "url": link.get("url"),
+                            "error": f"extract: {_sd_auth_exc}",
+                        }
                     except asyncio.TimeoutError:
                         _timed_url = (link.get("url") or "?")[:80]
                         log.warning(
