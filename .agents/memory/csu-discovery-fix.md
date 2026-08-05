@@ -1,26 +1,28 @@
 ---
-name: CSU discovery fix (study.csu.edu.au)
-description: study.csu.edu.au is CF Enterprise blocked; Wayback CDX is the only viable discovery path; per-course IELTS not inline.
+name: CSU discovery fix
+description: study.csu.edu.au is CF Enterprise — all transports dead except scrape_do_render; discovery must go straight to Wayback CDX; three YAML knobs skip the wasted probe phases
 ---
 
-## Rule
-`study.csu.edu.au` blocks all static transports (httpx → 403, Scrape.do static → 0B/502).
-Scrape.do render=True is the only working transport for both listing and per-course pages.
-The course listing (`/courses`) uses virtual scrolling — only 12 of 329 courses appear in the rendered DOM; BFS is useless.
-Sitemap is blocked at the transport level (0B from all fetch modes).
+## The problem
+Every CSU scrape was burning ~160 s before Wayback CDX fired:
+1. CSU-specific `browser_discover_csu_international` (orchestrator line ~1959): hits CF challenge → 20 s networkidle timeout before falling back. Triggered because DB `scrape_url` is `study.csu.edu.au/international/courses`.
+2. Alt listing path probes (discovery.py): 7 paths × 20 s each = up to 140 s. Only skipped when `_has_explicit_sitemap` is true.
 
-**Discovery fix:** `bfs_page_budget: 0` + `skip_browser_discovery: true` + `always_sitemap_supplement: false` → Wayback CDX fallback fires automatically. `study.csu.edu.au` added to `_HOST_CDX_URL_PREFIX` with `study.csu.edu.au/courses/*` (329 unique course URLs confirmed).
+## The fix (YAML knobs)
+```yaml
+discovery:
+  skip_browser_discovery: true   # skips BOTH generic browser AND csu_browser_discover (orchestrator was patched to check this flag)
+  sitemap_url: "https://study.csu.edu.au/sitemap.xml"  # makes _has_explicit_sitemap=True → alt probe loop is skipped
+  use_wayback: true              # CDX runs unconditionally (supplemental mode), not just as last resort
+  bfs_page_budget: 0
+  always_sitemap_supplement: false
+```
 
-**Why:** The default fallback chain (httpx → cffi → scrape.do static → timeout) consumed the entire 300s discovery deadline without returning anything.
+## Why `sitemap_url` skips alt probes
+`discovery.py` line 1782: alt probes only fire when `not _has_explicit_sitemap`. Setting any explicit `sitemap_url` in YAML makes `_resolved_sitemap_url` truthy → `_has_explicit_sitemap = True` → loop is skipped. The sitemap fetch itself still runs (and returns 0B, which is fine).
 
-**How to apply:** Any university behind CF Enterprise where both the listing page and sitemap are blocked needs this stack:
-1. `discovery.scrape_do_skip_fallbacks: true` + `discovery.scrape_do_render: true` (to prevent httpx dead-end)
-2. `discovery.bfs_page_budget: 0` if listing uses virtual scroll / JS-only pagination
-3. `discovery.skip_browser_discovery: true` (Playwright gets 403 from datacenter IPs)
-4. `discovery.always_sitemap_supplement: false` (sitemap blocked)
-5. Add host to `wayback_discover._HOST_CDX_URL_PREFIX` with targeted path prefix to avoid SURT-sort exhaustion
-6. `extraction.scrape_do_render: true` + `extraction.scrape_do_skip_fallbacks: true` + `skip_browser_rescue: true`
+## Orchestrator patch
+The CSU-specific `if not links and "study.csu.edu.au/international/courses" in scrape_url:` block in orchestrator.py was patched to check `skip_browser_discovery` before invoking `browser_discover_csu_international`.
 
-**IELTS gap:** Per-course pages show "Standard ELP requirements apply" (generic, no IELTS scores inline). Actual IELTS requirements link to a separate page. Need to investigate central IELTS page or per-course requirements URL pattern before IELTS data will extract reliably.
-
-**Fees:** Fees are embedded as JSON in the page: `fund_source_type=FPOS, annual_indicative_fee_ft=32000` (international). Gemini extracts these correctly from the rendered HTML.
+## Wayback CDX coverage
+`wayback_discover._HOST_CDX_URL_PREFIX["study.csu.edu.au"] = "study.csu.edu.au/courses/*"` returns ~329 unique course URLs. Sitemap-old-v2 (259 URLs) sometimes works too — use_wayback=True merges both.
