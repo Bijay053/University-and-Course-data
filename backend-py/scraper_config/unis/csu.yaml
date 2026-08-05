@@ -46,16 +46,24 @@ discovery:
   bfs_page_budget: 0
 
   # Playwright browser also gets CF 403 from datacenter IPs — skip the
-  # 90-second timeout that would otherwise fire before Wayback CDX.
+  # 20-second CF-challenge timeout that would otherwise fire before CDX.
+  # Also prevents csu_browser_discover from being invoked (orchestrator
+  # checks this flag for the CSU-specific international-listing branch too).
   skip_browser_discovery: true
 
   # Sitemap is transport-blocked (0B / 502 on all tiers).
-  # Disable the extra sitemap supplement pass; let the primary CDX path run.
+  # Set an explicit sitemap_url so the alt-listing-path probe loop (7 paths
+  # × 20 s each = up to 140 s wasted on CF-blocked paths) is skipped.
+  # The sitemap fetch itself will still time out / return 0B as expected,
+  # but the alt-probe guard fires only when sitemap_url is absent.
+  sitemap_url: "https://study.csu.edu.au/sitemap.xml"
   always_sitemap_supplement: false
 
-  # Wayback CDX fires automatically when BFS+browser+sitemap all yield 0.
+  # Wayback CDX: use_wayback=true runs CDX in supplemental mode so it fires
+  # reliably even if a sitemap or BFS somehow returns a few results.
   # _HOST_CDX_URL_PREFIX maps study.csu.edu.au → study.csu.edu.au/courses/*
-  # which returns 329 unique course URLs with collapse=urlkey.
+  # which returns ~329 unique course URLs with collapse=urlkey.
+  use_wayback: true
 
   allow_url_patterns:
     - '/courses/[a-zA-Z0-9][a-zA-Z0-9_-]+$'

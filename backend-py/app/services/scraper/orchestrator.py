@@ -1957,16 +1957,23 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 )
 
         if not links and "study.csu.edu.au/international/courses" in scrape_url:
-            try:
-                from app.services.scraper.csu_browser_discover import (
-                    browser_discover_csu_international,
+            _csu_skip_browser = getattr(_uni_cfg.discovery, "skip_browser_discovery", False)
+            if _csu_skip_browser:
+                log.info(
+                    "CSU browser discovery skipped — skip_browser_discovery=True in YAML "
+                    "(Cloudflare Enterprise; Wayback CDX will supply course URLs)"
                 )
-                links = await browser_discover_csu_international(
-                    emit=emit,
-                    max_courses=max_courses,
-                )
-            except Exception as _csu_disc_exc:  # noqa: BLE001
-                log.warning("CSU browser discovery failed: %s — falling back to BFS", _csu_disc_exc)
+            else:
+                try:
+                    from app.services.scraper.csu_browser_discover import (
+                        browser_discover_csu_international,
+                    )
+                    links = await browser_discover_csu_international(
+                        emit=emit,
+                        max_courses=max_courses,
+                    )
+                except Exception as _csu_disc_exc:  # noqa: BLE001
+                    log.warning("CSU browser discovery failed: %s — falling back to BFS", _csu_disc_exc)
 
         # Macquarie (mq.edu.au) — Cloudflare-protected + Svelte SPA whose
         # course URLs use /study/find-a-course/(undergraduate|postgraduate)/
