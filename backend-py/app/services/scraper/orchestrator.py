@@ -27,6 +27,7 @@ from app.services.scraper.per_course_vision import (
     VisionImageCache,
     new_vision_image_cache,
 )
+from app.services.scraper.http_fetcher import ScrapedoAccountError
 from app.services.scraper.pipelines.single_course import extract_course
 from app.services.scraper.pipelines.university_pdfs import load_university_pdf_data
 from app.services.scraper.stage_course import stage_course
@@ -751,7 +752,6 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
     # also contribute their counts without any explicit plumbing.
     from app.services.scraper.http_fetcher import (
         _scrape_do_job_counters as _sd_cv,
-        ScrapedoAccountError,
     )
     _sd_job_ctrs: dict = {"render": 0, "static": 0}
     _sd_cv.set(_sd_job_ctrs)
