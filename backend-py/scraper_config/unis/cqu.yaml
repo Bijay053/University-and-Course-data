@@ -78,6 +78,19 @@ discovery:
     # after 20 hops). Blocking both prevents the broken-URL pair from consuming
     # browser-fallback pool slots in every run.
     - "/courses/cd85/"
+    # co57 = Study Abroad / CQUGlobal Inbound Program — not a degree course
+    # enrollable by international students; it's an exchange program for
+    # inbound study-abroad participants. Appears in the sitemap with a 2L2D
+    # code but is not an international-eligible program. Blocking prevents
+    # a spurious "category_landing_page" rejection in every run.
+    - "/courses/co57/"
+    # cl03 = Skills for Tertiary Education Preparatory Studies (STEPS) —
+    # a bridging / preparatory program, not a degree-level qualification.
+    # No international fee is published and it regularly causes a
+    # category_landing_page guard rejection. Blocked to keep the count
+    # accurate (189 sitemap URLs − cd85 − co57 − cl03 = 186 university
+    # degree programs available to international students).
+    - "/courses/cl03/"
 
   # Sitemap supplement is essential here — CQU is a JS-heavy site and
   # the static BFS pass returns very few course URLs. The 723-entry
@@ -126,6 +139,13 @@ extraction:
     # still be filtered.
     domestic_only:
       enabled: true
+    online_only:
+      enabled: false
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false
 
   fees:
     # Per-course pages publish the international fee under "Fees &

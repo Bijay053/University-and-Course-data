@@ -33,6 +33,7 @@ Mirrors the structure of ``federation_json.py`` (Federation override,
 """
 from __future__ import annotations
 
+import html as _html_stdlib
 import json
 import logging
 import re
@@ -76,7 +77,10 @@ _IELTS_SUBSCORE_RE = re.compile(
     re.IGNORECASE,
 )
 _IELTS_NO_LOWER_RE = re.compile(
-    r"no\s+(?:individual\s+)?(?:band|skill|component|sub-?score)\s+(?:lower|less)\s+than\s+(?P<score>\d(?:\.\d)?)",
+    # (?!\d) prevents matching the first digit of a two-digit number like
+    # "46" (from "no sub-score less than 46" in the PTE section), which
+    # would otherwise set an IELTS floor of 4.0 instead of 5.5.
+    r"no\s+(?:individual\s+)?(?:band|skill|component|sub-?score)\s+(?:lower|less)\s+than\s+(?P<score>\d(?:\.\d)?)(?!\d)",
     re.IGNORECASE,
 )
 _SKILL_KEYS = ("listening", "reading", "speaking", "writing")
@@ -85,7 +89,7 @@ _SKILL_KEYS = ("listening", "reading", "speaking", "writing")
 # ENG-DEFAULT bug fix).  CQU's english_proficiency_text always lists
 # all three test minimums in the same paragraph, e.g.:
 #   "(IELTS Academic) overall band score of at least 6.0 ..."
-#   "(TOEFL) iBT overall score of at least 75 ..."
+#   "(TOEFL) iBT - Requires 75 or better overall ..."    ← score BEFORE "overall"
 #   "(PTE Academic) overall score of at least 54 ..."
 # Without per-test extraction every CQU course was getting the
 # institutional default (6.5/58/79) instead of the real per-course
@@ -95,9 +99,32 @@ _PTE_OVERALL_RE = re.compile(
     r"PTE[^.<>]{0,200}?overall(?:\s+score)?[^.<>]{0,80}?(?P<score>\d{2,3})",
     re.IGNORECASE,
 )
-_TOEFL_OVERALL_RE = re.compile(
-    r"TOEFL[^.<>]{0,200}?overall(?:\s+score)?[^.<>]{0,80}?(?P<score>\d{2,3})",
+# Primary: "X or better overall" — CQU's schema.org phrasing puts the score
+# BEFORE the word "overall" ("Requires 75 or better overall and no score
+# less than 17"), so the old regex matched "17" (the no-score-below) instead
+# of "75" (the required overall).  Secondary pattern keeps backward compat
+# for any course that uses "overall score of at least 75" ordering.
+_TOEFL_OR_BETTER_RE = re.compile(
+    r"TOEFL[^.<>]{0,200}?(?:requires?\s+)?(?P<score>\d{2,3})\s+or\s+better",
     re.IGNORECASE,
+)
+_TOEFL_OVERALL_RE = re.compile(
+    r"TOEFL[^.<>]{0,200}?overall(?:\s+(?:band\s+)?score)?[^.<>]{0,80}?(?P<score>\d{2,3})",
+    re.IGNORECASE,
+)
+# "minimum 5.5 in each subset/band/component" — CQU's schema.org
+# coursePrerequisites uses this phrasing for per-band floors rather than
+# the "no individual band lower than X" form that _IELTS_NO_LOWER_RE matches.
+_IELTS_MIN_PER_SUBSET_RE = re.compile(
+    r"minimum\s+(?P<score>\d(?:\.\d)?)\s+in\s+each",
+    re.IGNORECASE,
+)
+# Schema.org LD+JSON block — CQU embeds English requirements HTML-encoded
+# inside coursePrerequisites of the Course schema.  This is the canonical
+# source when AIMSData is absent from the __NEXT_DATA__ JSON tree.
+_LD_JSON_RE = re.compile(
+    r'<script[^>]*type\s*=\s*["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+    re.DOTALL | re.IGNORECASE,
 )
 
 
@@ -331,14 +358,24 @@ def extract_ielts(aims: dict[str, Any]) -> dict[str, float] | None:
     # "no individual band lower than 6.0" — apply as floor for any
     # subscore not yet set.
     nm = _IELTS_NO_LOWER_RE.search(text)
+    floor: float | None = None
     if nm:
         try:
             floor = float(nm.group("score"))
         except ValueError:
             floor = None
-        if floor is not None and 4.0 <= floor <= 9.0:
-            for skill in _SKILL_KEYS:
-                out.setdefault(f"ielts_{skill}", floor)
+    # "minimum 5.5 in each subset/band" — CQU's schema.org phrasing for the
+    # same concept.  Only used when the "no lower than" form was not found.
+    if floor is None:
+        mm = _IELTS_MIN_PER_SUBSET_RE.search(text)
+        if mm:
+            try:
+                floor = float(mm.group("score"))
+            except ValueError:
+                floor = None
+    if floor is not None and 4.0 <= floor <= 9.0:
+        for skill in _SKILL_KEYS:
+            out.setdefault(f"ielts_{skill}", floor)
     return out
 
 
@@ -369,12 +406,19 @@ def extract_toefl(aims: dict[str, Any]) -> float | None:
 
     Returns ``None`` when no TOEFL phrase is present or score is out of
     band (TOEFL iBT uses a 0–120 scale; CQU minimums are typically 70+).
+
+    CQU's schema.org phrasing puts the score BEFORE "overall":
+        "Requires 75 or better overall and no score less than 17"
+    The old ``_TOEFL_OVERALL_RE`` (score AFTER "overall") matched "17"
+    (the no-score-below) instead of "75" (the required overall).
+    We try ``_TOEFL_OR_BETTER_RE`` first so the correct value wins.
     """
     raw = aims.get("english_proficiency_text")
     if not isinstance(raw, str) or not raw.strip():
         return None
     text = _strip_html(raw)
-    m = _TOEFL_OVERALL_RE.search(text)
+    # Try "X or better overall" phrasing first (CQU schema.org format).
+    m = _TOEFL_OR_BETTER_RE.search(text) or _TOEFL_OVERALL_RE.search(text)
     if not m:
         return None
     try:
@@ -384,6 +428,47 @@ def extract_toefl(aims: dict[str, Any]) -> float | None:
     if not 0 <= score <= 120:
         return None
     return score
+
+
+def _parse_english_from_schema_org(html: str) -> str | None:
+    """Extract and normalise english proficiency text from schema.org LD+JSON.
+
+    CQU's ``<script type="application/ld+json">`` Course block stores the
+    English requirements as HTML-encoded HTML under ``coursePrerequisites``,
+    e.g.::
+
+        "coursePrerequisites": "&lt;ul&gt;&lt;li&gt;IELTS Academic …6.0…&lt;/li&gt;"
+
+    This is the reliable fallback when ``AIMSData.english_proficiency_text``
+    is absent from the NextJS ``__NEXT_DATA__`` tree (which is the case for
+    most CQU pages as of mid-2026 after a Sitecore schema update removed
+    the ``AIMSData`` key).
+
+    Returns the plain-text English requirements string, or ``None`` when the
+    page does not contain a Course LD+JSON block with a populated
+    ``coursePrerequisites`` field that mentions at least one test name.
+    """
+    for m in _LD_JSON_RE.finditer(html or ""):
+        try:
+            d = json.loads(m.group(1))
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if not isinstance(d, dict) or d.get("@type") != "Course":
+            continue
+        prereq = d.get("coursePrerequisites")
+        if not isinstance(prereq, str) or not prereq.strip():
+            continue
+        # coursePrerequisites is double-encoded in CQU's LD+JSON output
+        # (the entire HTML block is JSON-string-encoded AND HTML-entity-escaped).
+        decoded = _html_stdlib.unescape(prereq)
+        # Strip residual HTML tags so the regex extractors get plain text.
+        text = re.sub(r"<[^>]+>", " ", decoded)
+        text = re.sub(r"&nbsp;", " ", text, flags=re.IGNORECASE)
+        text = re.sub(r"\s+", " ", text).strip()
+        # Only return when the block is genuinely about language proficiency.
+        if any(kw in text for kw in ("IELTS", "TOEFL", "PTE", "Duolingo")):
+            return text
+    return None
 
 
 def is_domestic_only(aims: dict[str, Any]) -> bool:
@@ -483,19 +568,34 @@ def apply_overrides(
             "fee_year": fee_year,
         }
 
-    # IELTS / PTE / TOEFL (REPLACE only when JSON publishes a valid
-    # value — leaves existing values intact when english_proficiency_text
-    # is empty).  Evidence rows are appended for the *_overall slots so
+    # IELTS / PTE / TOEFL (REPLACE only when a source publishes a valid
+    # value — leaves existing values intact when neither source has text).
+    #
+    # Source priority (first non-empty wins):
+    #   1. AIMSData.english_proficiency_text  — present when __NEXT_DATA__
+    #      still uses the AIMSData schema (pre-mid-2026 Sitecore update)
+    #   2. Schema.org coursePrerequisites      — reliably present as of
+    #      mid-2026; HTML-encoded HTML blob decoded by
+    #      _parse_english_from_schema_org()
+    #
+    # Evidence rows are appended for the *_overall slots so
     # guards.enforce_source_evidence keeps the values at staging time —
     # without them every CQU course was getting nulled and then refilled
     # with the YAML institutional default (6.5/58/79) by the ENG-DEFAULT
-    # block, fleet-wide.  Snippet quotes the canonical CQU phrase from
-    # english_proficiency_text so reviewers can audit the source.
-    raw_eng_text = aims.get("english_proficiency_text") if isinstance(aims, dict) else None
+    # block, fleet-wide.
+    raw_eng_text = (
+        (aims.get("english_proficiency_text") if isinstance(aims, dict) else None)
+        or _parse_english_from_schema_org(html)
+    )
+    eng_source = (
+        "cqu_json:english_proficiency_text"
+        if (isinstance(aims, dict) and aims.get("english_proficiency_text"))
+        else "cqu_json:schema_org_coursePrerequisites"
+    )
     eng_snippet_base = (
         _strip_html(raw_eng_text)[:280].strip()
         if isinstance(raw_eng_text, str) and raw_eng_text.strip()
-        else "CQU AIMSData english_proficiency_text"
+        else "CQU english proficiency requirements"
     )
 
     def _emit_eng_evidence(field_key: str, value: float) -> None:
@@ -505,28 +605,37 @@ def apply_overrides(
             "field_key": field_key,
             "value": value,
             "confidence": 0.85,
-            "method": "cqu_json:english_proficiency_text",
+            "method": eng_source,
             "source_url": url or "",
             "snippet": eng_snippet_base,
         })
 
-    ielts = extract_ielts(aims)
+    # Build a fake aims-like dict keyed to english_proficiency_text so the
+    # extract_* functions (which read aims.get("english_proficiency_text"))
+    # work whether the source is AIMSData OR schema.org coursePrerequisites.
+    _eng_aims: dict[str, Any] = (
+        {"english_proficiency_text": raw_eng_text}
+        if isinstance(raw_eng_text, str) and raw_eng_text.strip()
+        else (aims or {})
+    )
+
+    ielts = extract_ielts(_eng_aims)
     if ielts:
         prev_overall = payload.get("ielts_overall")
         for k, v in ielts.items():
             payload[k] = v
-        applied["ielts"] = {"old_overall": prev_overall, "new": ielts}
+        applied["ielts"] = {"old_overall": prev_overall, "new": ielts, "source": eng_source}
         if "ielts_overall" in ielts:
             _emit_eng_evidence("ielts_overall", ielts["ielts_overall"])
 
-    pte = extract_pte(aims)
+    pte = extract_pte(_eng_aims)
     if pte is not None:
         prev_pte = payload.get("pte_overall")
         payload["pte_overall"] = pte
         applied["pte_overall"] = {"old": prev_pte, "new": pte}
         _emit_eng_evidence("pte_overall", pte)
 
-    toefl = extract_toefl(aims)
+    toefl = extract_toefl(_eng_aims)
     if toefl is not None:
         prev_toefl = payload.get("toefl_overall")
         payload["toefl_overall"] = toefl
