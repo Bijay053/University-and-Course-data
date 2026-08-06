@@ -1563,6 +1563,75 @@ async def extract_course(
                     html = await fetch_html(url)
             else:
                 html = await fetch_html(url)
+    # ── 404 + query-string domestic-skip ────────────────────────────────────
+    # When a URL rewrite (e.g. ?audience=INTERNATIONAL) appends a query param
+    # and the fetch returns nothing (includes HTTP 404), retry the bare URL
+    # BEFORE falling through to browser rescue.
+    #
+    # CQU pattern: /courses/<code>/<slug>?audience=INTERNATIONAL returns 404
+    # for domestic-only combined-degree programs (LLB+B.Acc etc.) while the
+    # bare URL also returns nothing — there is simply no international page.
+    # Previously these 89 courses all triggered browser rescue (browser also
+    # fails → 89 wasted browser slots, each ~30 s) and then became fetch_failed,
+    # pushing the failure-guard rate to 48 % and marking every run
+    # completed_with_warnings at the very last step.
+    #
+    # With this block:
+    #  • bare URL succeeds → use it (domestic-range fees blanked later via
+    #    _stripped_audience_retry, same as the broken-CMS retry path)
+    #  • bare URL also fails → return skipped:domestic_only_404 (counted as
+    #    summary["skipped"] by the orchestrator, not fetch_failed)
+    #
+    # Guarded by broken_cms_retry_strip_query (same per-uni opt-in already set
+    # for CQU; no new YAML knob needed).
+    _http_404_bare_retry: bool = False  # propagated to _stripped_audience_retry
+    if not html and "?" in url:
+        _uc_404q = get_uni_config()
+        if (
+            _uc_404q is not None
+            and getattr(
+                getattr(_uc_404q.extraction, "filters", None),
+                "broken_cms_retry_strip_query",
+                False,
+            )
+        ):
+            _pu_404q = urlparse(url)
+            _bare_404q = urlunparse(_pu_404q._replace(query=""))
+            try:
+                _bare_html_404 = await fetch_html(_bare_404q)
+            except Exception:
+                _bare_html_404 = None
+            if _bare_html_404:
+                # Bare URL returned content — continue extraction with it.
+                # Mark the flag so any domestic-range fees get blanked later.
+                html = _bare_html_404
+                _http_404_bare_retry = True
+                if emit:
+                    await emit(
+                        "status",
+                        f"[404→BARE] {url[:70]} — bare URL ok; extracting without audience param",
+                        phase="extract",
+                        kind="fetch_404_bare_ok",
+                        url=url,
+                    )
+            else:
+                # Bare URL also failed → no international page exists.
+                # Count as domestic skip, not fetch_failed — this is intentional
+                # domestic filtering, not a network/bot-protection failure.
+                if emit:
+                    await emit(
+                        "status",
+                        f"[404 SKIP] {url[:70]} — no international page; skipped as domestic-only",
+                        phase="extract",
+                        kind="fetch_404_domestic_skip",
+                        url=url,
+                    )
+                return {
+                    "url": url,
+                    "error": "skipped:domestic_only_404",
+                    "payload": {},
+                    "evidence": [],
+                }
     if not html:
         # HTTP fetch failed (Cloudflare, bot-protection, JS-gate, etc.).
         # Try a real Playwright browser before giving up — this handles any
@@ -2025,10 +2094,12 @@ async def extract_course(
             len(_broken_text) < 400
             and any(m in _lower for m in _BROKEN_MARKERS)
         )
-        # Tracks when a broken-CMS retry stripped an audience-related query
-        # string (e.g. ?audience=INTERNATIONAL) so the post-extractor gate
-        # can blank domestic-range fees extracted from the bare URL.
-        _stripped_audience_retry: bool = False
+        # Tracks when a broken-CMS retry (or a 404-bare-URL retry above)
+        # stripped an audience-related query string (e.g. ?audience=INTERNATIONAL)
+        # so the post-extractor gate can blank domestic-range fees extracted from
+        # the bare URL.  Seeded from _http_404_bare_retry so the two retry paths
+        # share a single fee-blanking gate downstream.
+        _stripped_audience_retry: bool = _http_404_bare_retry
         if _broken_visible or _broken_short:
             # Per-uni recovery: when ``broken_cms_retry_strip_query``
             # is enabled AND the URL carries a query string, refetch
