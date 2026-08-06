@@ -56,12 +56,29 @@ discovery:
   # proceed directly to Scrape.do static → render after cffi fails,
   # saving ~5-10s per course on the Wayback round-trip.
   use_wayback: false
+  # Discovery source overview (August 2026):
+  #   Tier 1  — coursehandbook sitemap (coursehandbook.mq.edu.au)
+  #             Stealth-fetches XML sitemap, resolves /YYYY/courses/CXXXXXX
+  #             entries to www.mq.edu.au/study/find-a-course/courses/<slug>
+  #             via parallel plain-httpx title extraction.  Gives ~223 UG/PG
+  #             courses.  Research degrees are NOT in the coursehandbook.
+  #   Tier 1.5 — /search page harvest (NEW August 2026)
+  #             Stealth browser paginates through
+  #             https://www.mq.edu.au/search?query=&category=courses using
+  #             start_rank + num_ranks URL params.  Yields 367+ courses
+  #             including research degrees (Doctor of Philosophy, Professional
+  #             Doctorates, etc.) at /study/find-a-course/research/<slug>.
+  #   Tier 2  — browser sweep of faculty catalogue pages
+  #             Retained as fallback; contributes 0 in CF-blocked dev/CI
+  #             and non-zero in production on specific faculty pages.
   block_url_patterns:
     # MQ majors / specialisations: sub-degree pages, never full courses.
     - '/find-a-course/courses/major/'
     - '/find-a-course/courses/specialisation/'
     - '/find-a-course/courses/specialization/'
     # MQ category-landing roots (the path ends here, no course slug follows).
+    # Note: these use /?$ anchors — research COURSE detail pages at
+    # /study/find-a-course/research/<slug> are deliberately NOT blocked.
     - '/study/find-a-course/?$'
     - '/study/find-a-course/undergraduate/?$'
     - '/study/find-a-course/postgraduate/?$'

@@ -92,17 +92,36 @@ _SEED_URLS: tuple[str, ...] = _FACULTY_SEED_URLS + _CATALOGUE_SEED_URLS
 _MQ_ORIGIN = "https://www.mq.edu.au"
 
 # Course-detail URL regex.  Allows one OPTIONAL faculty segment between the
-# UG/PG token and the course slug to cover MQ's combined-degree and co-op
+# level token and the course slug to cover MQ's combined-degree and co-op
 # listings (e.g. ``/undergraduate/combined-bachelor-master-degrees/
 # bachelor-of-laws-master-of-laws`` and ``/undergraduate/employability-
 # initiatives/cooperative-education-program-in-actuarial-studies``).
 #
-# Listing roots — ``/undergraduate``, ``/postgraduate``,
+# Listing roots — ``/undergraduate``, ``/postgraduate``, ``/research``,
 # ``/undergraduate/combined-bachelor-master-degrees`` (path ends here) —
 # deliberately do NOT match because they have no trailing slug segment.
+#
+# ``courses`` is the generic sub-path used by the coursehandbook resolver
+# when it constructs admissions URLs (``/study/find-a-course/courses/<slug>``).
+# ``research`` was omitted from the original regex, silently dropping all
+# research degrees (Doctor of Philosophy, Professional Doctorates, etc.)
+# from the browser-sweep harvest tier.
 _COURSE_PATH_RE = re.compile(
-    r"^/study/find-a-course/(?:undergraduate|postgraduate)"
+    r"^/study/find-a-course/"
+    r"(?:undergraduate|postgraduate|research|courses)"
     r"(?:/[^/]+){1,2}/?$"
+)
+
+# Search-result link regex — broader than _COURSE_PATH_RE because the
+# /search page links directly to the admissions URL for each course, which
+# may use any of the four level tokens above.  Does NOT require a trailing
+# slug segment count (the search page guarantees it's a real course page,
+# not a listing root).
+_SEARCH_COURSE_LINK_RE = re.compile(
+    r"^/study/find-a-course/"
+    r"(?:undergraduate|postgraduate|research|courses)"
+    r"/[^/?#]+",
+    re.IGNORECASE,
 )
 
 # Last-segment slugs that look like a course URL but are category /
@@ -157,9 +176,9 @@ _SCROLL_SETTLE_S = 1.5
 _INITIAL_SETTLE_S = 4.0
 
 # Discovery floor: when total deduped URLs across all seeds falls below
-# this we emit a [DISCOVER] MQ: WARNING.  Macquarie publishes ~300 UG+PG
-# courses in 2026; 150 is a generous half-catalogue cushion.
-_DISCOVERY_FLOOR = 150
+# this we emit a [DISCOVER] MQ: WARNING.  MQ publishes 367 international
+# courses as of August 2026; 300 is a reasonable two-thirds cushion.
+_DISCOVERY_FLOOR = 300
 
 # Hard cap mirrors the CSU module — guard against runaway harvests if MQ
 # ever exposes a duplicated link grid.  Capped well above _DISCOVERY_FLOOR
@@ -520,6 +539,251 @@ async def _resolve_to_study_urls(
     return sorted(out_by_url.values(), key=lambda d: d["url"])
 
 
+async def _discover_from_search_page(
+    emit_fn,
+    *,
+    max_courses: int,
+) -> list[dict]:
+    """Harvest MQ course URLs from the /search page via stealth browser.
+
+    MQ's search page (https://www.mq.edu.au/search?query=&category=courses)
+    is backed by Squiz Matrix / Funnelback and shows every course in the
+    catalogue.  As of August 2026 this includes 367 international courses
+    — including research degrees and combined degrees that are absent from
+    the coursehandbook sitemap.
+
+    The page is Cloudflare Enterprise-protected (same as the rest of
+    www.mq.edu.au); the stealth browser (patchright + Xvfb) passes it
+    cleanly.
+
+    Pagination strategy
+    -------------------
+    Squiz Matrix supports ``start_rank`` (1-based offset) and ``num_ranks``
+    (results per page) as URL parameters.  We load pages of 100 at a time
+    until either the page returns zero *new* course anchors (pagination
+    exhausted or params ignored + wrap-around detected) or ``max_courses``
+    is reached.  Hard cap: 10 pages × 100 = 1 000 >> 367, so runaway is
+    impossible.
+
+    Fallback: if URL-param pagination stalls after page 1 (same 10 results
+    on every page), we attempt click-based "next page" navigation as a
+    secondary approach before giving up.
+
+    Returns ``[{"url": str, "name": str}, ...]`` deduped, or ``[]`` on
+    any failure (caller's handbook + browser-sweep tiers still run).
+    """
+    try:
+        from app.services.scraper.stealth_browser import stealth_context
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "mq_search_discover: stealth_browser unavailable — %s", exc,
+        )
+        return []
+
+    await emit_fn(
+        "[DISCOVER] MQ: search-page tier — paginating "
+        "/search?query=&category=courses"
+    )
+
+    out: dict[str, dict] = {}
+    _PER_PAGE = 100    # num_ranks per request; Squiz Matrix cap is typically 100
+    _MAX_PAGES = 10    # hard cap: 10 × 100 = 1 000 > 367
+
+    # JS: extract all anchors pointing at /study/find-a-course/ paths.
+    _SEARCH_EXTRACT_JS = r"""
+() => {
+  const ORIGIN = 'https://www.mq.edu.au';
+  const PREFIX = '/study/find-a-course/';
+  const out = [];
+  document.querySelectorAll('a[href]').forEach(a => {
+    const raw = (a.getAttribute('href') || '').trim();
+    if (!raw) return;
+    let url;
+    try { url = new URL(raw, ORIGIN).href; } catch (_) { return; }
+    if (!url.startsWith(ORIGIN + PREFIX)) return;
+    const path = url.slice(ORIGIN.length);
+    const text = (a.innerText || a.textContent || '').replace(/\s+/g, ' ').trim();
+    out.push({ href: url, path, text });
+  });
+  return out;
+}
+"""
+
+    # Selectors for a "Next page" or "Load more" button — tried in order if
+    # the URL-param pagination stalls.
+    _NEXT_PAGE_SELECTORS = (
+        "a:has-text('Next')",
+        "button:has-text('Next')",
+        "a[rel='next']",
+        "a:has-text('Load more')",
+        "button:has-text('Load more')",
+        "a:has-text('Show more')",
+        "button:has-text('Show more')",
+    )
+
+    def _accept_search_url(href: str) -> str | None:
+        """Return the clean course URL if *href* matches a real course page."""
+        try:
+            from urllib.parse import urlparse as _up
+            p = _up(href).path
+        except Exception:  # noqa: BLE001
+            return None
+        if not _SEARCH_COURSE_LINK_RE.match(p):
+            return None
+        # Drop query-string / fragment; normalise trailing slash.
+        return f"https://www.mq.edu.au{p.rstrip('/')}"
+
+    try:
+        async with stealth_context() as ctx:
+            page = await ctx.new_page()
+
+            # ── URL-param pagination loop ──────────────────────────────────
+            url_pagination_stalled = False
+            for page_num in range(_MAX_PAGES):
+                start_rank = page_num * _PER_PAGE + 1
+                search_url = (
+                    f"https://www.mq.edu.au/search?query=&category=courses"
+                    f"&start_rank={start_rank}&num_ranks={_PER_PAGE}"
+                )
+                try:
+                    await page.goto(
+                        search_url,
+                        wait_until="domcontentloaded",
+                        timeout=30_000,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    log.warning(
+                        "mq_search_discover: goto page %d failed: %s",
+                        page_num + 1, exc,
+                    )
+                    break
+
+                # Wait for course-link anchors to materialise in the DOM.
+                try:
+                    await page.wait_for_selector(
+                        "a[href*='/study/find-a-course/']",
+                        timeout=14_000,
+                    )
+                except Exception:  # noqa: BLE001
+                    pass  # proceed with whatever is in the DOM
+
+                await asyncio.sleep(3.0)  # allow lazy-loading to settle
+
+                anchors = await page.evaluate(_SEARCH_EXTRACT_JS) or []
+                added_this_page = 0
+                for a in anchors:
+                    clean = _accept_search_url(a.get("href", ""))
+                    if not clean or clean in out:
+                        continue
+                    out[clean] = {
+                        "url": clean,
+                        "name": (a.get("text") or "").strip(),
+                    }
+                    added_this_page += 1
+                    if len(out) >= max_courses:
+                        break
+
+                await emit_fn(
+                    f"[DISCOVER] MQ: search page {page_num + 1} "
+                    f"(start_rank={start_rank}) → "
+                    f"+{added_this_page} new (total {len(out)})"
+                )
+
+                if added_this_page == 0:
+                    # Either pagination exhausted naturally, or start_rank is
+                    # ignored and the page always shows the same first batch.
+                    # Detect the latter: if we harvested ≥ 5 courses on page 1
+                    # but 0 on page 2, params are probably ignored — fall back
+                    # to click-based next-page navigation.
+                    if page_num == 1 and len(out) >= 5:
+                        url_pagination_stalled = True
+                    break
+
+                if len(out) >= max_courses:
+                    break
+
+            # ── Click-based "next page" fallback ──────────────────────────
+            # Only runs when URL-param pagination stalled after page 1, which
+            # means the search page ignores start_rank and we already have the
+            # first batch in ``out``.  Navigate back to page 1 and click "Next"
+            # repeatedly.
+            if url_pagination_stalled:
+                await emit_fn(
+                    "[DISCOVER] MQ: start_rank ignored — switching to "
+                    "click-based next-page navigation"
+                )
+                # Start fresh on page 1 to get the pagination widget rendered.
+                try:
+                    await page.goto(
+                        "https://www.mq.edu.au/search?query=&category=courses"
+                        f"&num_ranks={_PER_PAGE}",
+                        wait_until="domcontentloaded",
+                        timeout=30_000,
+                    )
+                    await asyncio.sleep(3.0)
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("mq_search_discover: fallback goto failed: %s", exc)
+
+                for _click_page in range(_MAX_PAGES):
+                    anchors = await page.evaluate(_SEARCH_EXTRACT_JS) or []
+                    added = 0
+                    for a in anchors:
+                        clean = _accept_search_url(a.get("href", ""))
+                        if not clean or clean in out:
+                            continue
+                        out[clean] = {
+                            "url": clean,
+                            "name": (a.get("text") or "").strip(),
+                        }
+                        added += 1
+                        if len(out) >= max_courses:
+                            break
+
+                    await emit_fn(
+                        f"[DISCOVER] MQ: search click-page {_click_page + 1} "
+                        f"→ +{added} new (total {len(out)})"
+                    )
+
+                    if len(out) >= max_courses:
+                        break
+
+                    # Try to click a "Next" button to load the next page.
+                    clicked = False
+                    for sel in _NEXT_PAGE_SELECTORS:
+                        try:
+                            loc = page.locator(sel).first
+                            if await loc.count() == 0 or not await loc.is_visible():
+                                continue
+                            await loc.click(timeout=4_000)
+                            await asyncio.sleep(3.0)
+                            clicked = True
+                            break
+                        except Exception:  # noqa: BLE001
+                            continue
+
+                    if not clicked:
+                        await emit_fn(
+                            "[DISCOVER] MQ: no next-page button found — "
+                            "click pagination complete"
+                        )
+                        break
+
+            try:
+                await page.close()
+            except Exception:  # noqa: BLE001
+                pass
+
+    except Exception as exc:  # noqa: BLE001
+        log.warning("mq_browser_discover: search-page harvest raised: %s", exc)
+
+    results = sorted(out.values(), key=lambda d: d["url"])
+    await emit_fn(
+        f"[DISCOVER] MQ: search-page harvest complete — "
+        f"{len(results)} unique course URL(s)"
+    )
+    return results[:max_courses]
+
+
 def _is_mq_course_url(url: str) -> bool:
     """Return True when *url* is a Macquarie course detail page.
 
@@ -668,7 +932,7 @@ async def _interactive_filter_harvest(
 async def browser_discover_mq(
     emit=None,
     *,
-    max_courses: int = 300,
+    max_courses: int = 500,
 ) -> list[dict]:
     """Discover Macquarie course URLs via Playwright across all catalogue seeds.
 
@@ -728,21 +992,53 @@ async def browser_discover_mq(
     # additions below de-duplicate on admissions URL.
     merged: dict[str, dict] = {d["url"]: d for d in ch_links}
 
-    # If handbook already produced a full catalogue, skip the expensive
-    # browser sweep.  The threshold is intentionally high (350) so the
-    # BFS also runs when the handbook is only partial, letting the two
-    # discovery tiers complement each other.  Empty handbook result (< 20)
-    # falls straight through to BFS-only mode.
-    if len(merged) >= 350:
+    # ── Tier 1.5: /search page harvest ──────────────────────────────
+    # MQ's search page (https://www.mq.edu.au/search?query=&category=courses)
+    # indexes the complete catalogue — 367 international courses as of
+    # August 2026 — including research degrees and combined degrees that
+    # are absent from the coursehandbook sitemap.
+    #
+    # The coursehandbook resolver is the RIGHT source for UG/PG courses
+    # (it resolves handbook → admissions URLs reliably); the search page
+    # is the ONLY reliable source for research degrees (Doctor of
+    # Philosophy, Professional Doctorates, etc.) whose URLs are at
+    # ``/study/find-a-course/research/<slug>`` — a path the handbook
+    # resolver never constructs (it always uses ``/courses/``).
+    #
+    # Run this tier even when the handbook succeeds so both sources
+    # contribute to the merged set.  Dedup on admissions URL is free.
+    try:
+        sp_links = await _discover_from_search_page(
+            _emit, max_courses=max_courses,
+        )
+    except Exception as _sp_exc:  # noqa: BLE001
+        log.warning(
+            "mq_browser_discover: search-page tier raised: %s", _sp_exc,
+        )
+        sp_links = []
+
+    for d in sp_links:
+        merged.setdefault(d["url"], d)
+
+    await _emit(
+        f"[DISCOVER] MQ: after handbook + search-page tiers: "
+        f"{len(merged)} unique course URL(s)"
+    )
+
+    # If the two structured tiers already produced a full catalogue, skip
+    # the expensive browser sweep.  The threshold is 450 (well above the
+    # 367 target) to allow for a small future catalogue growth before
+    # the sweep is wrongly skipped.
+    if len(merged) >= 450:
         await _emit(
-            f"[DISCOVER] MQ: handbook at {len(merged)} courses — skipping "
-            f"browser sweep (catalogue is complete)"
+            f"[DISCOVER] MQ: {len(merged)} courses from handbook + search — "
+            f"skipping browser sweep (catalogue is complete)"
         )
         return sorted(merged.values(), key=lambda d: d["url"])[:max_courses]
 
     await _emit(
         f"[DISCOVER] MQ: starting browser sweep across {len(_SEED_URLS)} "
-        f"catalogue seed(s) to supplement {len(merged)} handbook courses"
+        f"catalogue seed(s) to supplement {len(merged)} handbook+search courses"
     )
 
     try:
