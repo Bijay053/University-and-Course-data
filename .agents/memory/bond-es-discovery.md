@@ -1,20 +1,43 @@
 ---
 name: Bond University Elasticsearch discovery
-description: Bond's program finder is a React SPA; course URLs come from an internal Elasticsearch API, not BFS/browser crawling.
+description: Bond scraper uses the open ES API; sitemap 403s and program-finder SPA returns 0 links.
 ---
 
 ## Rule
-Use `discovery.generic_search_api` with POST to `https://bond.edu.au/api/v1/elasticsearch/bond_prod_default/_search`.
+Use `discovery.generic_search_api` with the Bond internal Elasticsearch endpoint.  
+Do NOT rely on sitemap supplement or program-finder BFS — both are broken.
 
-**Why:** The program finder (bond.edu.au/study/program-finder) is a React SPA that makes AJAX calls to the ES endpoint after page load. Plain HTTP BFS returns 0 links. Even browser-rendered scrape.do fetches return 0 links because the XHR fires after the initial render window.
+**Why:**
+- `bond.edu.au/sitemap.xml?page=N` (all child pages) returns HTTP 403 from datacenter IPs — supplement produces 0 URLs.  
+- `bond.edu.au/study/program-finder` is a React SPA; XHR fires after Scrape.do's render window, so even `scrape_do_render: true` returns 0 course-card anchors. Only ~13 static featured cards on the homepage were discovered → ~11 staged (observed in production August 2026).  
+- The ES index is open (no auth) and returns all 221 international courses in a single POST with a browser-like User-Agent. httpx with `Accept: application/json` header passes the CF check.
 
-## Key implementation details
-- ES response shape: `hits.hits[*]._source.url[0]` / `.title[0]` (array-valued fields)
-- Use `_source.url.0` in url_fields — `_dig()` handles numeric-index dot-paths to unwrap list[0]
-- Filter: `{"term": {"student_type": "International students"}}` — returns ~221 results (168 /program/ + 52 /microcredential/)
-- `size: 500` fetches all in one request; no pagination needed
-- `allow_url_patterns: ['^https://bond\.edu\.au/program/', '^https://bond\.edu\.au/microcredential/']`
-- Course pages (bond.edu.au/program/<slug>) are SSR-accessible via plain HTTP (~256KB each), so per-course extraction works normally
+**How to apply:**
+```yaml
+generic_search_api:
+  enabled: true
+  method: POST
+  url: "https://bond.edu.au/api/v1/elasticsearch/bond_prod_default/_search"
+  headers:
+    content-type: "application/json"
+  body:
+    query:
+      term:
+        student_type: "International students"
+    size: 500
+    _source: [url, title]
+  root_path: "hits.hits"
+  url_fields: ["_source.url.0"]       # url is a list; .0 unwraps first element
+  title_fields: ["_source.title.0"]
+  base_url: "https://bond.edu.au"
+  normalize_relative_urls: true
+  allow_url_patterns:
+    - '^https://bond\.edu\.au/program/[^/]+/?$'
+    - '^https://bond\.edu\.au/microcredential/[^/]+/?$'
+```
 
-## How to apply
-If Bond's ES index changes, query `https://bond.edu.au/api/v1/elasticsearch/bond_prod_default/_search` with `{"query":{"match_all":{}},"size":0}` to check the total doc count. If the index name changes, check the `data-` attribute in the program finder rendered HTML for the updated endpoint path.
+**Results as of August 2026:** 221 hits, 220 pass allow filter (168 `/program/` + 52 `/microcredential/`). One stray `/translational-simulation` URL is filtered by `allow_url_patterns`.
+
+**If the index name changes:** check for the updated endpoint path in the program-finder rendered HTML `data-` attributes.
+
+**If the ES API starts requiring auth:** fall back to the sitemap approach (if CF removes the 403 on child pages) or the program-finder seed approach with a longer wait_for.

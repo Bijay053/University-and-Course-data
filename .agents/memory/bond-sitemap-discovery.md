@@ -1,18 +1,21 @@
 ---
-name: Bond University discovery
-description: Bond program-finder is a React SPA; sitemap index is the only reliable discovery source.
+name: Bond University sitemap discovery (DEPRECATED)
+description: Bond sitemap child pages now 403; use ES API instead. Kept for historical reference.
 ---
 
-## Rule
-Use `discovery.sitemap_url: https://bond.edu.au/sitemap.xml` with `always_sitemap_supplement: true`. Do NOT rely on `generic_search_api` for Bond.
+## Status: DEPRECATED — use ES API
 
-**Why:** Bond's homepage exposes ~13 featured course cards in static HTML. The orchestrator's `generic_search_api` handler is gated by `if not links` (orchestrator.py line ~1710) — BFS fills `links` first so the API is never called. The Elasticsearch endpoint (`POST bond.edu.au/api/v1/elasticsearch/bond_prod_default/_search`) itself works and returns 220 URLs, but the orchestrator condition prevents it from running.
+As of August 2026, `bond.edu.au/sitemap.xml?page=N` returns HTTP 403 from datacenter IPs for ALL child pages.
+The sitemap index root resolves but its 13 child pages all 403, so the supplement produces 0 additional URLs.
 
-**How to apply:** The sitemap at `https://bond.edu.au/sitemap.xml` is a sitemap index listing 5 child pages. Sitemap discovery recurses one level into index files. Pages 1–4 have 247 total program+microcredential URLs (240 are depth-2 base course pages). `always_sitemap_supplement: true` ensures it runs even after BFS finds the 13 homepage courses.
+See `bond-es-discovery.md` for the current working approach (generic_search_api → ES endpoint).
 
-## URL patterns
+## Historical note (pre-August 2026)
+
+The sitemap at `https://bond.edu.au/sitemap.xml` was a sitemap index with 5 child pages.
+Pages 1–4 had 247 total program+microcredential URLs (240 depth-2 base course pages).
+`always_sitemap_supplement: true` ensured it ran even after BFS found the 13 homepage courses.
+
+URL patterns:
 - Keep: `/program/{slug}$` and `/microcredential/{slug}$` (depth-2 only)
-- Block: `/program/{slug}/{sub}` depth-3+ (7 sub-pages: FAQ, prerequisites, enquiry, entry-assessment)
-
-## If generic_search_api is ever needed for other unis
-The `if not links` gate means any university with even a few BFS-visible course links will skip the YAML API. Use `sitemap_url` + `always_sitemap_supplement` for those cases instead, OR set `seed_urls` to empty so BFS finds 0 links before the API runs.
+- Block: `/program/{slug}/{sub}` depth-3+ sub-pages

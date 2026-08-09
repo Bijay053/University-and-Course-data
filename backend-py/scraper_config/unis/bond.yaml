@@ -1,80 +1,95 @@
 # Bond University
 # Hostname: bond.edu.au  (no www prefix)
 #
-# Bug history / rationale:
-#   - Fees and IELTS requirements are JS-rendered (XHR-loaded).  Playwright and
-#     Gemini both see empty content for these fields on individual course pages.
-#   - Bond publishes a stable central English-requirements page.  Hard-coding it
-#     here ensures every Bond course stages with IELTS/PTE/TOEFL values.
-#   - Previously injected via hardcoded if-block in orchestrator.py lines ~836-845.
-#     YAML takes priority; the orchestrator if-block remains as a safety net
-#     until Week-2 migration removes it.
+# Discovery strategy: Bond's internal Elasticsearch index (open, no auth)
+#   POST https://bond.edu.au/api/v1/elasticsearch/bond_prod_default/_search
+#   with student_type filter → 221 international courses (168 /program/ + 52
+#   /microcredential/) in a single request.  No scraping or BFS needed.
 #
-# Discovery fix (2026-07-17 rev2):
-#   - Bond's program finder (bond.edu.au/study/program-finder) is a React SPA.
-#     BFS from the homepage finds only ~13 featured courses (static HTML).
-#     The sitemap approach (rev1) was also unreliable because the sitemap only
-#     indexes pages that have been crawled by the sitemap generator — it does not
-#     guarantee the International-student program list is complete.
-#   - Fix: pre-seed all 18 paginated pages of the International-student program
-#     finder and fetch each via Scrape.do render=true (residential + headless
-#     Chrome).  Each page is a listing-only source; course detail URLs extracted
-#     from it are queued as candidates.
-#   - Page count: 18 pages (page=1 … page=18) for International students.
-#     URL: /study/program-finder?student_type[]=International+students&page=N
-#   - Depth-3 sub-pages (FAQ, prerequisites, enquiry, entry-assessment) are
-#     blocked so only the main course overview pages enter the extraction queue.
-#   - Sitemap kept as supplement (always_sitemap_supplement: true) to catch any
-#     programs not surfaced in the paginated finder.
+# Why not sitemap: bond.edu.au/sitemap.xml?page=N returns HTTP 403 from
+#   datacenter IPs (Cloudflare IP-block on sitemap children).  The index
+#   root (sitemap.xml) resolves but its 13 child pages all 403, so the
+#   supplement produces 0 additional URLs.
+#
+# Why not program-finder BFS: bond.edu.au/study/program-finder is a React
+#   SPA that fires XHR *after* Scrape.do's render window closes.  Even with
+#   scrape_do_render: true the rendered HTML contains 0 course-card anchors.
+#   The only BFS-visible courses are ~13 static featured cards on the
+#   homepage — hence the previous "only 11 staged" symptom.
+#
+# Fees and IELTS: JS-rendered (XHR-loaded) on course pages; Playwright and
+#   Gemini both see empty content.  Bond publishes a stable central English-
+#   requirements page which is hard-coded below so every course stages with
+#   IELTS/PTE/TOEFL values.
 
 discovery:
-  scrape_do_render: true
-  scrape_do_skip_fallbacks: true  # skip httpx/cffi datacenter tiers (CF-blocked)
-  use_wayback: false
-  bfs_page_budget: 22             # 18 program-finder pages + 4 buffer
+  # ── Primary: Elasticsearch API ────────────────────────────────────────────
+  # generic_search_api runs BEFORE BFS (orchestrator line ~1815: "if not links").
+  # Returns all 221 international-student courses in a single POST.
+  generic_search_api:
+    enabled: true
+    method: POST
+    url: "https://bond.edu.au/api/v1/elasticsearch/bond_prod_default/_search"
+    headers:
+      content-type: "application/json"
 
-  # Paginated International-student program finder — 18 pages.
-  # Each page is rendered via Scrape.do (residential + headless Chrome) and
-  # treated as a listing-only page (not a course candidate itself).
+    # Body confirmed live 2026-08-09: 221 hits with student_type filter.
+    body:
+      query:
+        term:
+          student_type: "International students"
+      size: 500
+      _source:
+        - url
+        - title
+
+    # Response shape: hits.hits[*]._source.url (array) / .title (array)
+    root_path: "hits.hits"
+    url_fields:
+      - "_source.url.0"       # url is a list; .0 unwraps the first element
+    title_fields:
+      - "_source.title.0"     # title is a list; .0 unwraps the first element
+
+    # Relative URLs (e.g. "/program/bachelor-of-laws") → absolute.
+    base_url: "https://bond.edu.au"
+    normalize_relative_urls: true
+
+    # Keep only course overview pages; filter out the 1 stray
+    # /translational-simulation URL and any depth-3+ sub-pages.
+    allow_url_patterns:
+      - '^https://bond\.edu\.au/program/[^/]+/?$'
+      - '^https://bond\.edu\.au/microcredential/[^/]+/?$'
+
+  # ── BFS fallback (if ES index changes / returns 0) ────────────────────────
+  # The orchestrator falls through to BFS when generic_search_api returns 0.
+  # Keep scrape_do_render so the rendered program-finder pages are attempted
+  # (though XHR timing makes them unreliable; this is a last-resort only).
+  scrape_do_render: true
+  scrape_do_skip_fallbacks: true
+  use_wayback: false
+  bfs_page_budget: 22
+
   seed_urls:
     - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=1"
-    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=2"
-    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=3"
-    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=4"
-    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=5"
-    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=6"
-    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=7"
-    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=8"
-    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=9"
-    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=10"
-    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=11"
-    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=12"
-    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=13"
-    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=14"
-    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=15"
-    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=16"
-    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=17"
-    - "https://bond.edu.au/study/program-finder?student_type%5B%5D=International+students&page=18"
 
-  # Program finder pages are listing pages only — do not treat them as course candidates.
+  # Program finder pages are listing pages only — not course candidates.
   listing_only_patterns:
     - '/study/program-finder'
 
-  # Force course URLs extracted from the paginated listing into the candidate set.
   force_candidate_url_patterns:
     - '^https://bond\.edu\.au/program/[^/]+/?$'
     - '^https://bond\.edu\.au/microcredential/[^/]+/?$'
 
-  # Block depth-3+ sub-pages so only the main course overview page is extracted.
   block_url_patterns:
     - '/program/[^/]+/[^/]+'
     - '/microcredential/[^/]+/[^/]+'
 
-  # Sitemap supplement: catches any programs not surfaced in the paginated finder.
+  # Sitemap child pages return 403 from datacenter IPs — disable supplement.
+  # (sitemap.xml index resolves; sitemap.xml?page=N all 403.)
   sitemap_url: "https://bond.edu.au/sitemap.xml"
-  always_sitemap_supplement: true
+  always_sitemap_supplement: false
 
-  expected_min_courses: 150
+  expected_min_courses: 200
 
 extraction:
   english:
