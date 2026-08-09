@@ -5212,11 +5212,6 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         backfilled=_qi_backfilled,
                     )
         except Exception as _qi_exc:  # noqa: BLE001
-            # Rollback is mandatory — see comment in _dq_exc handler above.
-            try:
-                await db.rollback()
-            except Exception:  # noqa: BLE001
-                pass
             log.warning("[P6·QI] PDF quality gate failed: %s", _qi_exc)
 
         # T209: emit a single human-readable TIMING line + a typed DONE
@@ -5429,11 +5424,6 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 {"rid": runtime_job_id},
             )).scalar() or 0
         except Exception as exc:  # noqa: BLE001
-            # Rollback is mandatory — see comment in _dq_exc handler above.
-            try:
-                await db.rollback()
-            except Exception:  # noqa: BLE001
-                pass
             log.warning(
                 "post-run row-count check failed for %s: %s — "
                 "leaving counter as-is", runtime_job_id, exc,
@@ -5589,11 +5579,6 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     runtime_job_id, job.avg_verification_confidence,
                 )
         except Exception as _conf_exc:  # noqa: BLE001
-            # Rollback is mandatory — see comment in _dq_exc handler above.
-            try:
-                await db.rollback()
-            except Exception:  # noqa: BLE001
-                pass
             log.warning("[CONF_TREND] failed for run %s: %s", runtime_job_id, _conf_exc)
         if finished_cleanly:
             job.error_message = None  # clear any stale message
