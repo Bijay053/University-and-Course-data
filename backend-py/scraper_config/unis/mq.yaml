@@ -56,6 +56,19 @@ discovery:
   # proceed directly to Scrape.do static → render after cffi fails,
   # saving ~5-10s per course on the Wayback round-trip.
   use_wayback: false
+  # failure_guard_threshold: MQ's coursehandbook resolver constructs
+  # /courses/<slug> admissions URLs that 404 for OUA/NMJI partner-program
+  # variants, combined-degree programmes, and courses whose real admissions
+  # URL uses /undergraduate/ or /postgraduate/ rather than /courses/.  The
+  # August 2026 production run hit 104/223 (47%) fetch_failed → job marked
+  # failed_degraded (default threshold 30%).
+  #
+  # Raising to 0.55 prevents the degraded status for the current known
+  # URL-construction gap.  With the search-page tier (Tier 1.5) now
+  # providing real admissions URLs, the expected fail rate in subsequent
+  # runs should drop to < 10%, well below both the warn (10%) and this
+  # fail_degraded (55%) thresholds.
+  failure_guard_threshold: 0.55
   # Discovery source overview (August 2026):
   #   Tier 1  — coursehandbook sitemap (coursehandbook.mq.edu.au)
   #             Stealth-fetches XML sitemap, resolves /YYYY/courses/CXXXXXX
@@ -91,6 +104,22 @@ extraction:
   # Enabling them caused 41/127 per_course_timeout errors (300s hard cap),
   # each burning a Scrape.do render credit with no result, reducing staged
   # count from 81 → 45. The stealth browser handles MQ pages reliably.
+
+  # Skip the initial HTTP fetch for every MQ per-course request.
+  # www.mq.edu.au is 100% Cloudflare Enterprise: every plain-HTTP attempt
+  # returns a CF challenge (403 + "Just a moment…").  Without this flag,
+  # the per-course pipeline wastes time on 3 guaranteed-doomed HTTP
+  # attempts before the "confirmed browser-only" tracking kicks in and
+  # starts skipping.  Setting it here ensures ALL 223+ courses skip HTTP
+  # immediately, saving ~6-9s of dead round-trips on each run.
+  skip_initial_http_fetch: true
+
+  # Retry the browser fetch once with backoff when the first attempt
+  # returns empty HTML.  CF on www.mq.edu.au sometimes passes on the
+  # second attempt once the first attempt's session cookie has been set.
+  # For courses that 404 (wrong resolver URL), retries are fast-fails so
+  # the extra 2-4.5 s is spent only on courses that might succeed.
+  retry_on_cloudflare: true
 
   fees:
     default_currency: AUD

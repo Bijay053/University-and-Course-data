@@ -262,6 +262,24 @@ _RESOLVE_GOTO_TIMEOUT_MS = 15_000
 _TITLE_SUFFIX_RE = re.compile(
     r"\s*(?:\||\-|–|—)\s*Macquarie\s+University\s*$", re.I,
 )
+# Strip delivery-mode parenthetical suffixes that the coursehandbook
+# appends but that are ABSENT from the admissions URL slug on
+# www.mq.edu.au.  Without stripping, these produce dead slugs that
+# 404 on the admissions site and count as fetch_failed:
+#
+#   "Bachelor of Arts (OUA)"  → slug "bachelor-of-arts-oua"  → 404
+#   "Bachelor of Science (NMJI)" → slug "bachelor-of-science-nmji" → 404
+#
+# Stripping yields the real slug:
+#   "Bachelor of Arts"  → slug "bachelor-of-arts"  → valid admissions page
+#
+# OUA  = Open Universities Australia delivery mode
+# NMJI = Ningbo Nottingham JI / NMJ Institute partner program
+# These two account for 25 of the 104 persistent fetch_failed courses
+# observed in the August 2026 production run.
+_DELIVERY_SUFFIX_RE = re.compile(
+    r"\s*\(\s*(?:OUA|NMJI)\s*\)\s*$", re.IGNORECASE,
+)
 # Slug character whitelist: lowercase letters, digits, hyphen. Anything
 # else (parens, slashes, ampersands, apostrophes, commas) is replaced by
 # a hyphen, and runs of hyphens are collapsed. Matches the canonical
@@ -502,11 +520,18 @@ async def _resolve_to_study_urls(
         # /courses/handbook as a garbage admissions URL.
         if not raw_title or raw_title.lower() in ("handbook", "macquarie university handbook"):
             return None
-        slug = _slugify_course_name(raw_title)
+        # Strip delivery-mode suffixes (OUA, NMJI) before slugification.
+        # The coursehandbook appends "(OUA)" / "(NMJI)" to course titles but
+        # these are absent from the www.mq.edu.au admissions URL slug.
+        # Without stripping, "Bachelor of Arts (OUA)" → dead slug
+        # "bachelor-of-arts-oua" (404).  With stripping: "bachelor-of-arts".
+        display_title = raw_title  # keep original for the "name" field
+        slug_title = _DELIVERY_SUFFIX_RE.sub("", raw_title).strip()
+        slug = _slugify_course_name(slug_title)
         if not slug or len(slug) < 3:
             return None
         admissions_url = f"{_STUDY_URL_BASE}{slug}"
-        return (admissions_url, raw_title)
+        return (admissions_url, display_title)
 
     try:
         async with _httpx.AsyncClient(
