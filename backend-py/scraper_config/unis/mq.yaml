@@ -114,12 +114,12 @@ extraction:
   # immediately, saving ~6-9s of dead round-trips on each run.
   skip_initial_http_fetch: true
 
-  # Retry the browser fetch once with backoff when the first attempt
-  # returns empty HTML.  CF on www.mq.edu.au sometimes passes on the
-  # second attempt once the first attempt's session cookie has been set.
-  # For courses that 404 (wrong resolver URL), retries are fast-fails so
-  # the extra 2-4.5 s is spent only on courses that might succeed.
-  retry_on_cloudflare: true
+  # retry_on_cloudflare is deliberately NOT set for MQ.
+  # The 104 persistent fetch-failures are dead resolver URLs (404 on
+  # www.mq.edu.au) — retrying them burns 3× browser slot time with zero
+  # benefit (104 × 96s per-URL retry cost = 39-minute sweep).  The search-
+  # page tier (Tier 1.5) provides the real admissions URLs so the failure
+  # rate drops on subsequent runs without needing retry thrashing.
 
   fees:
     default_currency: AUD
