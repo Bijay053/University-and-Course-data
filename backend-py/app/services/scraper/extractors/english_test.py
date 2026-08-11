@@ -61,6 +61,16 @@ _PER_BAND_FLOOR_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Second floor idiom: "a minimum score of 5.5 in each of the four components"
+# (UniSQ and similar AU phrasings).  The number PRECEDES the "in each" clause,
+# unlike the "no band below" idiom where it follows.
+_PER_BAND_FLOOR_RE_EACH = re.compile(
+    r"(?:minimum|min\.?|at\s+least)\s+(?:score\s+of\s+|of\s+)?"
+    r"([0-9]+(?:\.[0-9]+)?)\s+"
+    r"in\s+each\s+(?:of\s+the\s+(?:four|4)\s+)?(?:components?|bands?|sections?|skills?)",
+    re.IGNORECASE,
+)
+
 
 def _try_floor(text: str, match_end: int, lo: float, hi: float) -> float | None:
     """Search for a per-band floor clause within 250 chars after *match_end*.
@@ -73,6 +83,13 @@ def _try_floor(text: str, match_end: int, lo: float, hi: float) -> float | None:
     m = _PER_BAND_FLOOR_RE.search(window)
     if m:
         v = float(m.group(1))
+        if lo <= v <= hi:
+            return v
+    # Also handle "minimum score of X in each [of the four] components/bands" —
+    # the number precedes the "in each" clause rather than following "no band below".
+    m2 = _PER_BAND_FLOOR_RE_EACH.search(window)
+    if m2:
+        v = float(m2.group(1))
         if lo <= v <= hi:
             return v
     return None
