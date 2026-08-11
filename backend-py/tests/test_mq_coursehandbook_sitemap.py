@@ -91,9 +91,12 @@ class TestYearFilter:
         import datetime as dt
         assert str(dt.date.today().year - 2) not in mq._COURSEHANDBOOK_YEARS
 
-    def test_only_two_years_total(self):
-        # Pin the window size: exactly current + next, no creep.
-        assert len(mq._COURSEHANDBOOK_YEARS) == 2
+    def test_only_three_years_total(self):
+        # Window: previous + current + next year.  Including the previous
+        # year recovers ~50-80 courses that are in the 2025 sitemap but
+        # not yet re-published for 2026; duplicates deduplicate in the
+        # resolver.  No further creep beyond these three years.
+        assert len(mq._COURSEHANDBOOK_YEARS) == 3
 
 
 class TestSitemapIndexUrl:
