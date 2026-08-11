@@ -72,6 +72,9 @@
 # 5. generic_category_page (1): handled by skip_degree_qualifier_check=true.
 
 discovery:
+  block_url_patterns:
+    - "/-/media/"          # PDF/ASHX guide downloads — not course pages
+    - "/short-courses/"    # professional-development micro-courses, not degree programmes
   allow_blocked_listing_patterns:
     - "/degrees-and-courses/online-study"
     - "/degrees-and-courses/short-courses"
@@ -85,6 +88,8 @@ extraction:
     require_international_fee: false    # fees on central page, not per-course; stage for human review
     stage_on_parser_error: true         # fee-missing-after-render is expected (central fee page); stage anyway
   filters:
+    broken_cms_retry_strip_query: true  # diploma/pathway pages 404 with ?studentType=international but 200 bare;
+                                        # retry bare URL so these courses stage rather than becoming fetch_failed
     domestic_only:
       enabled: false   # UniSQ has international offerings; suppress domestic-only text detection
     online_only:
