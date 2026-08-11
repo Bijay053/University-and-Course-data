@@ -500,25 +500,32 @@ async def _resolve_to_study_urls(
         "Accept-Language": "en-US,en;q=0.5",
     }
 
+    # Track failure reasons for diagnostics.
+    _fail_reasons: list[str] = []
+
     async def _resolve_one(client: "_httpx.AsyncClient", handbook_url: str) -> tuple[str, str] | None:
         async with sem:
             try:
                 r = await client.get(handbook_url, timeout=_HTTPX_TIMEOUT)
             except Exception as exc:  # noqa: BLE001
                 log.warning("mq resolver: httpx GET %s failed: %s", handbook_url, exc)
+                _fail_reasons.append(f"network_error:{handbook_url.rsplit('/', 1)[-1]}")
                 return None
             if r.status_code >= 400:
                 log.warning("mq resolver: %s → HTTP %s", handbook_url, r.status_code)
+                _fail_reasons.append(f"http_{r.status_code}:{handbook_url.rsplit('/', 1)[-1]}")
                 return None
             body = r.text
         m = re.search(r"<title>([^<]+)</title>", body, re.I)
         if not m:
+            _fail_reasons.append(f"no_title:{handbook_url.rsplit('/', 1)[-1]}")
             return None
         raw_title = m.group(1).strip()
         # "Handbook" is the fallback site-nav title when the SSR didn't
         # inject a per-course override; skip rather than emit
         # /courses/handbook as a garbage admissions URL.
         if not raw_title or raw_title.lower() in ("handbook", "macquarie university handbook"):
+            _fail_reasons.append(f"generic_title:{handbook_url.rsplit('/', 1)[-1]}")
             return None
         # Strip delivery-mode suffixes (OUA, NMJI) before slugification.
         # The coursehandbook appends "(OUA)" / "(NMJI)" to course titles but
@@ -529,6 +536,7 @@ async def _resolve_to_study_urls(
         slug_title = _DELIVERY_SUFFIX_RE.sub("", raw_title).strip()
         slug = _slugify_course_name(slug_title)
         if not slug or len(slug) < 3:
+            _fail_reasons.append(f"bad_slug({raw_title[:30]}):{handbook_url.rsplit('/', 1)[-1]}")
             return None
         admissions_url = f"{_STUDY_URL_BASE}{slug}"
         return (admissions_url, display_title)
@@ -557,9 +565,16 @@ async def _resolve_to_study_urls(
         log.warning("mq_browser_discover: httpx resolver pass raised: %s", exc)
 
     if skipped:
+        # Summarise failure reasons so operators can diagnose resolver gaps
+        # without reading raw logs.  Group by reason prefix, show counts.
+        reason_summary: dict[str, int] = {}
+        for r in _fail_reasons:
+            key = r.split(":")[0]
+            reason_summary[key] = reason_summary.get(key, 0) + 1
+        sample = "; ".join(f"{k}×{v}" for k, v in sorted(reason_summary.items()))
         await emit_fn(
-            f"[DISCOVER] MQ: resolver skipped {skipped} URL(s) with "
-            f"unparseable <title> or fetch error"
+            f"[DISCOVER] MQ: resolver skipped {skipped} URL(s) — "
+            f"reasons: {sample or 'unknown'}"
         )
     return sorted(out_by_url.values(), key=lambda d: d["url"])
 
@@ -658,6 +673,23 @@ async def _discover_from_search_page(
         # Drop query-string / fragment; normalise trailing slash.
         return f"https://www.mq.edu.au{p.rstrip('/')}"
 
+    # Broader JS extractor — pulls ALL anchors from the page so we can
+    # emit a diagnostic sample when course-specific extraction yields 0.
+    _ALL_ANCHORS_JS = r"""
+() => {
+  const out = [];
+  document.querySelectorAll('a[href]').forEach(a => {
+    const raw = (a.getAttribute('href') || '').trim();
+    if (!raw || raw.startsWith('javascript:') || raw.startsWith('mailto:')
+        || raw.startsWith('tel:') || raw.startsWith('#')) return;
+    const text = (a.innerText || a.textContent || '')
+      .replace(/\s+/g, ' ').trim().slice(0, 80);
+    out.push({ href: raw, text });
+  });
+  return out;
+}
+"""
+
     try:
         async with stealth_context() as ctx:
             page = await ctx.new_page()
@@ -674,7 +706,7 @@ async def _discover_from_search_page(
                     await page.goto(
                         search_url,
                         wait_until="domcontentloaded",
-                        timeout=30_000,
+                        timeout=35_000,
                     )
                 except Exception as exc:  # noqa: BLE001
                     log.warning(
@@ -684,15 +716,23 @@ async def _discover_from_search_page(
                     break
 
                 # Wait for course-link anchors to materialise in the DOM.
+                # Funnelback results are often XHR-rendered AFTER
+                # domcontentloaded; the selector wait gives results up to
+                # 20s to appear before we fall back to a longer sleep.
+                selector_found = False
                 try:
                     await page.wait_for_selector(
                         "a[href*='/study/find-a-course/']",
-                        timeout=14_000,
+                        timeout=20_000,
                     )
+                    selector_found = True
                 except Exception:  # noqa: BLE001
                     pass  # proceed with whatever is in the DOM
 
-                await asyncio.sleep(3.0)  # allow lazy-loading to settle
+                # Page 1: allow extra settle time (first CF interaction +
+                # XHR render is the slowest); subsequent pages warm-start.
+                settle_s = 6.0 if page_num == 0 else 3.0
+                await asyncio.sleep(settle_s)
 
                 anchors = await page.evaluate(_SEARCH_EXTRACT_JS) or []
                 added_this_page = 0
@@ -711,10 +751,31 @@ async def _discover_from_search_page(
                 await emit_fn(
                     f"[DISCOVER] MQ: search page {page_num + 1} "
                     f"(start_rank={start_rank}) → "
-                    f"+{added_this_page} new (total {len(out)})"
+                    f"+{added_this_page} new (total {len(out)}) "
+                    f"[selector_found={selector_found}]"
                 )
 
                 if added_this_page == 0:
+                    # Emit a diagnostic sample so the operator can see
+                    # what links the search page actually contains, which
+                    # helps debug when Funnelback changes its URL shape or
+                    # the CF bot check silently serves a shell page.
+                    try:
+                        all_a = await page.evaluate(_ALL_ANCHORS_JS) or []
+                        study_hrefs = [
+                            a["href"] for a in all_a
+                            if "/study/" in a.get("href", "")
+                            or "/find-a-course" in a.get("href", "")
+                        ][:10]
+                        sample_hrefs = [a["href"] for a in all_a[:8]]
+                        await emit_fn(
+                            f"[DISCOVER] MQ: search page {page_num + 1} "
+                            f"diagnostic — total_anchors={len(all_a)}, "
+                            f"study_hrefs={study_hrefs or sample_hrefs}"
+                        )
+                    except Exception:  # noqa: BLE001
+                        pass
+
                     # Either pagination exhausted naturally, or start_rank is
                     # ignored and the page always shows the same first batch.
                     # Detect the latter: if we harvested ≥ 5 courses on page 1
