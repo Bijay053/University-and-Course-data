@@ -563,6 +563,7 @@ async def _mark_failed(runtime_job_id: str, err: str) -> None:
         job = await db.get(ScrapeRuntimeJob, runtime_job_id)
         if job:
             job.status = "failed"
+            job.completed_at = datetime.now(timezone.utc)
             job.error_message = f"Scraping failed: {err[:200]}"
             await db.commit()
 

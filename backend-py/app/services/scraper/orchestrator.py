@@ -5970,6 +5970,18 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # /stop or reaper already finalized us, the exception was
         # likely caused by the cooperative cancel itself — don't
         # overwrite the user-facing 'stopped' with 'failed'.
+        #
+        # Rollback first: any DB error raised in the finalization
+        # phase (DQ check, PDF gate, row-count sanity, confidence
+        # trend) leaves the session in "pending rollback" state.
+        # Without an explicit rollback here, the subsequent
+        # db.refresh() and db.commit() calls raise
+        # "Can't reconnect until invalid transaction is rolled back"
+        # and the commit never lands — leaving completed_at = NULL.
+        try:
+            await db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
         try:
             await db.refresh(job, ["status"])
         except Exception:  # noqa: BLE001
@@ -5979,7 +5991,17 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         job.status = "failed"
         job.completed_at = datetime.now(timezone.utc)
         job.error_message = str(exc)[:1000]
-        await db.commit()
+        try:
+            await db.commit()
+        except Exception:  # noqa: BLE001
+            # Best-effort — if even this fails (e.g. DB unreachable),
+            # the Celery task wrapper's _mark_failed() fallback will
+            # write status=failed via a fresh session.
+            log.warning(
+                "Scrape job %s: final commit in exception handler failed "
+                "(status will be written by _mark_failed fallback)",
+                runtime_job_id,
+            )
         return {"ok": False, "reason": str(exc), **summary}
     finally:
         # ── Release the per-university Redis distributed lock ────────────────
