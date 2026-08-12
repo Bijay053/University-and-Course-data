@@ -1,156 +1,37 @@
 # Macquarie University (uni 277, slug "mq")
 # Hostname: www.mq.edu.au
-# Course catalogue: https://www.mq.edu.au/study/find-a-course
 #
-# 2026-05-18 — Replaced the auto-generated ACAP clone (which had ACAP-only
-# domestic_only filter, trust_vision_ocr override, and ^^ footnote strip
-# patterns that have zero relevance to Macquarie).  This file is the
-# canonical MQ config; macquarie.yaml has been deleted because the
-# slug computation in orchestrator.py (`uni_name.lower().replace(" ","")`)
-# resolves to "mq" for the DB row `id=277, name="mq"`.
+# Discovery: Scrapy spider (mq_spider.py) — two-step JSON approach
 #
-# Bug history / rationale:
-#   - Cloudflare blocks plain-HTTP fetches of www.mq.edu.au with a 403
-#     `cf-mitigated: challenge` response (verified 2026-05-18 via curl).
-#     BFS therefore yields 0 candidates and the browser fallback wanders
-#     6 nav links instead of the catalogue.  Forcing
-#     always_browser_discover: true bypasses the dead HTTP path and lets
-#     Playwright's TLS fingerprint pass Cloudflare's bot check.
-#   - The real catalogue lives under /study/find-a-course (A-Z), with
-#     /study/find-a-course/undergraduate and /postgraduate as the two
-#     primary listing roots.  Browser seeds are configured in
-#     _HOST_EXTRA_SEEDS (browser_discover_generic.py).
-#   - URL block patterns drop MQ's /courses/major/ and /courses/
-#     specialisation/ pages (those are sub-degree majors, not full
-#     course detail pages — they have no fee/intake/IELTS data).
-#   - URL block patterns also drop the bare /undergraduate and
-#     /postgraduate listing-root URLs (path ends exactly there).
+#   Step 1 — Funnelback search API (start_url)
+#     GET https://mqu-search.funnelback.squiz.cloud/s/search.json
+#         ?collection=mqu~sp-courses&profile=international
+#         &query=!padrenull&start_rank=1&num_ranks=338
+#     Returns all 338+ international courses with liveUrl, title, metaData.
 #
-# 2026-07-24 (rev 1) — Enabled scrape_do_render + scrape_do_skip_fallbacks
-#   believing CF Enterprise blocked all per-course fetches.  Result was worse:
-#   41/127 courses hit per_course_timeout (300s hard cap), each burning a
-#   Scrape.do render credit with no data produced.  Only 45 staged vs 81 in
-#   the prior run that used the stealth browser without these flags.
-#   The stealth browser (patchright + Xvfb) passes CF and extracts IELTS,
-#   location, mode, and all non-fee fields.  Scrape.do render adds nothing
-#   because MQ fees require a two-step JS interaction Scrape.do cannot trigger.
+#   Step 2 — Gatsby page-data.json per course
+#     URL: liveUrl.replace(".au/study/", ".au/study/page-data/") + "/page-data.json"
+#     Inner JSON contains fees, IELTS scores, description, admission requirements.
 #
-# 2026-07-24 (rev 2) — REVERTED scrape_do_render + scrape_do_skip_fallbacks.
-#   Per-course extraction uses stealth browser (faster, no 300s timeouts).
-#   Added fees.degree_level_defaults so courses reach ≥85% completeness
-#   despite international_fee being unavailable via any fetch tier.
+#   The spider yields rich items (payload + evidence) so the orchestrator
+#   short-circuits per-course HTML fetch + extraction entirely.
 
 discovery:
-  always_browser_discover: true
-  # 2026-05-25 — Cloudflare on www.mq.edu.au returns HTTP 403 + "Just a
-  # moment..." challenge to BOTH plain HTTP AND the regular headless
-  # playwright pool (verified end-to-end against /study/find-a-course).
-  # Routing browser discovery + per-course fetches through the patchright
-  # + Xvfb stealth stack passes the challenge cleanly (200 OK, 189 anchors
-  # on the catalogue root).  Stealth-mode is opt-in per uni; see
-  # backend-py/app/services/scraper/stealth_browser.py for the lifecycle.
-  use_stealth_browser: true
-  # 2026-07-24 — Wayback Machine archives of mq.edu.au per-course pages
-  # are either absent (new 2026 URLs) or stale snapshots with no fee/IELTS
-  # data.  Skipping the Wayback tier makes the per-request fetch ladder
-  # proceed directly to Scrape.do static → render after cffi fails,
-  # saving ~5-10s per course on the Wayback round-trip.
-  use_wayback: false
-  # failure_guard_threshold: Tier 0 (Funnelback API) returns the real
-  # admissions URL directly from liveUrl — no slug construction, no resolver
-  # 404s.  Expected fetch_failed rate is < 5%.  Resetting to the default
-  # 0.30 threshold; the 0.55 emergency raise is no longer needed.
-  # (The 0.55 was set in August 2026 to prevent failed_degraded status when
-  # the coursehandbook resolver was constructing /courses/<slug> URLs that
-  # 404'd for 40-47% of courses.)
-  failure_guard_threshold: 0.30
-  # Discovery source overview (August 2026 rev2):
-  #   Tier 0  — Funnelback JSON API (NEW August 2026 — primary)
-  #             GET https://mqu-search.funnelback.squiz.cloud/s/search.json
-  #             ?collection=mqu~sp-courses&profile=international
-  #             &query=!padrenull&start_rank=1&num_ranks=500
-  #             Returns all 338+ international courses with real liveUrl +
-  #             metaData (studyLevel, courseDuration).  Concurrent
-  #             page-data.json fetches add fees, IELTS, description.
-  #             Returns scrapy_result-shaped links → per-course HTML
-  #             extraction is bypassed.  No browser, no resolver, no CF.
-  #             If ≥300 courses returned, Tiers 1-2 are skipped entirely.
-  #   Tier 1  — coursehandbook sitemap (coursehandbook.mq.edu.au)
-  #             Stealth-fetches XML sitemap, resolves /YYYY/courses/CXXXXXX
-  #             entries to www.mq.edu.au/study/find-a-course/courses/<slug>
-  #             via parallel plain-httpx title extraction.  Gives ~223 UG/PG
-  #             courses.  Research degrees are NOT in the coursehandbook.
-  #             Used only as Tier 0 fallback.
-  #   Tier 1.5 — /search page harvest (browser-based)
-  #             Stealth browser paginates through /search?query=&category=courses.
-  #             Used only as Tier 0 fallback.
-  #   Tier 2  — browser sweep of faculty catalogue pages
-  #             Retained as last-resort fallback.
-  block_url_patterns:
-    # MQ majors / specialisations: sub-degree pages, never full courses.
-    - '/find-a-course/courses/major/'
-    - '/find-a-course/courses/specialisation/'
-    - '/find-a-course/courses/specialization/'
-    # MQ category-landing roots (the path ends here, no course slug follows).
-    # Note: these use /?$ anchors — research COURSE detail pages at
-    # /study/find-a-course/research/<slug> are deliberately NOT blocked.
-    - '/study/find-a-course/?$'
-    - '/study/find-a-course/undergraduate/?$'
-    - '/study/find-a-course/postgraduate/?$'
-    - '/study/find-a-course/research/?$'
-    - '/study/find-a-course/combined-bachelor-master-degrees/?$'
-    - '/study/find-a-course/double-degree-builder/?$'
+  scrapy:
+    spider: mq_spider
+    timeout_seconds: 900
+    settings:
+      DOWNLOAD_DELAY: 0.5
+      CONCURRENT_REQUESTS: 8
 
 extraction:
-  # scrape_do_render and scrape_do_skip_fallbacks are deliberately NOT set.
-  # Enabling them caused 41/127 per_course_timeout errors (300s hard cap),
-  # each burning a Scrape.do render credit with no result, reducing staged
-  # count from 81 → 45. The stealth browser handles MQ pages reliably.
-
-  # Skip the initial HTTP fetch for every MQ per-course request.
-  # www.mq.edu.au is 100% Cloudflare Enterprise: every plain-HTTP attempt
-  # returns a CF challenge (403 + "Just a moment…").  Without this flag,
-  # the per-course pipeline wastes time on 3 guaranteed-doomed HTTP
-  # attempts before the "confirmed browser-only" tracking kicks in and
-  # starts skipping.  Setting it here ensures ALL 223+ courses skip HTTP
-  # immediately, saving ~6-9s of dead round-trips on each run.
-  skip_initial_http_fetch: true
-
-  # retry_on_cloudflare is deliberately NOT set for MQ.
-  # The 104 persistent fetch-failures are dead resolver URLs (404 on
-  # www.mq.edu.au) — retrying them burns 3× browser slot time with zero
-  # benefit (104 × 96s per-URL retry cost = 39-minute sweep).  The search-
-  # page tier (Tier 1.5) provides the real admissions URLs so the failure
-  # rate drops on subsequent runs without needing retry thrashing.
-
   fees:
     default_currency: AUD
     fee_term: Annual
-    # Approximate MQ 2026 international annual fees by degree tier.
-    # Source: https://www.mq.edu.au/study/admissions/fees-and-scholarships
-    # Applied as a fallback when no fee can be extracted from the course
-    # page. Confidence 0.35 (lower than scraped value) — operators should
-    # verify against the course page before approving.
-    # Key mapping (from single_course.py degree_level_defaults logic):
-    #   "Bachelor's" / "Diploma"           → undergraduate
-    #   "Master's" / "Graduate Certificate" / "Graduate Diploma" → postgraduate
-    #   "Doctorate"                         → doctorate
-    degree_level_defaults:
-      undergraduate: 39000
-      postgraduate: 44000
-      doctorate: 30000
 
   staging:
-    # MQ international fees live behind a two-step JS interaction (click
-    # "Fees and scholarships" tab → select "International student" dropdown).
-    # degree_level_defaults above fills an approximation so courses reach
-    # ≥85% completeness. require_international_fee: false is a safety net
-    # in case the degree_level_defaults fallback does not fire.
     require_international_fee: false
 
   filters:
     domestic_only:
-      # MQ pages show a Commonwealth Supported Place (CSP/domestic) fee in
-      # the initial DOM (e.g. $11,700). Disable domestic_only rejection so
-      # CSP-rate detection never rejects MQ courses outright.
       enabled: false
