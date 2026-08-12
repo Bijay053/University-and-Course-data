@@ -56,34 +56,36 @@ discovery:
   # proceed directly to Scrape.do static → render after cffi fails,
   # saving ~5-10s per course on the Wayback round-trip.
   use_wayback: false
-  # failure_guard_threshold: MQ's coursehandbook resolver constructs
-  # /courses/<slug> admissions URLs that 404 for OUA/NMJI partner-program
-  # variants, combined-degree programmes, and courses whose real admissions
-  # URL uses /undergraduate/ or /postgraduate/ rather than /courses/.  The
-  # August 2026 production run hit 104/223 (47%) fetch_failed → job marked
-  # failed_degraded (default threshold 30%).
-  #
-  # Raising to 0.55 prevents the degraded status for the current known
-  # URL-construction gap.  With the search-page tier (Tier 1.5) now
-  # providing real admissions URLs, the expected fail rate in subsequent
-  # runs should drop to < 10%, well below both the warn (10%) and this
-  # fail_degraded (55%) thresholds.
-  failure_guard_threshold: 0.55
-  # Discovery source overview (August 2026):
+  # failure_guard_threshold: Tier 0 (Funnelback API) returns the real
+  # admissions URL directly from liveUrl — no slug construction, no resolver
+  # 404s.  Expected fetch_failed rate is < 5%.  Resetting to the default
+  # 0.30 threshold; the 0.55 emergency raise is no longer needed.
+  # (The 0.55 was set in August 2026 to prevent failed_degraded status when
+  # the coursehandbook resolver was constructing /courses/<slug> URLs that
+  # 404'd for 40-47% of courses.)
+  failure_guard_threshold: 0.30
+  # Discovery source overview (August 2026 rev2):
+  #   Tier 0  — Funnelback JSON API (NEW August 2026 — primary)
+  #             GET https://mqu-search.funnelback.squiz.cloud/s/search.json
+  #             ?collection=mqu~sp-courses&profile=international
+  #             &query=!padrenull&start_rank=1&num_ranks=500
+  #             Returns all 338+ international courses with real liveUrl +
+  #             metaData (studyLevel, courseDuration).  Concurrent
+  #             page-data.json fetches add fees, IELTS, description.
+  #             Returns scrapy_result-shaped links → per-course HTML
+  #             extraction is bypassed.  No browser, no resolver, no CF.
+  #             If ≥300 courses returned, Tiers 1-2 are skipped entirely.
   #   Tier 1  — coursehandbook sitemap (coursehandbook.mq.edu.au)
   #             Stealth-fetches XML sitemap, resolves /YYYY/courses/CXXXXXX
   #             entries to www.mq.edu.au/study/find-a-course/courses/<slug>
   #             via parallel plain-httpx title extraction.  Gives ~223 UG/PG
   #             courses.  Research degrees are NOT in the coursehandbook.
-  #   Tier 1.5 — /search page harvest (NEW August 2026)
-  #             Stealth browser paginates through
-  #             https://www.mq.edu.au/search?query=&category=courses using
-  #             start_rank + num_ranks URL params.  Yields 367+ courses
-  #             including research degrees (Doctor of Philosophy, Professional
-  #             Doctorates, etc.) at /study/find-a-course/research/<slug>.
+  #             Used only as Tier 0 fallback.
+  #   Tier 1.5 — /search page harvest (browser-based)
+  #             Stealth browser paginates through /search?query=&category=courses.
+  #             Used only as Tier 0 fallback.
   #   Tier 2  — browser sweep of faculty catalogue pages
-  #             Retained as fallback; contributes 0 in CF-blocked dev/CI
-  #             and non-zero in production on specific faculty pages.
+  #             Retained as last-resort fallback.
   block_url_patterns:
     # MQ majors / specialisations: sub-degree pages, never full courses.
     - '/find-a-course/courses/major/'

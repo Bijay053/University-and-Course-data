@@ -58,6 +58,7 @@ accepts (the user's local machine, the prod droplet, etc.)::
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
 from urllib.parse import urlparse
@@ -207,6 +208,528 @@ _EXTRACT_ANCHORS_JS = r"""
   return out;
 }
 """
+
+
+# ── Funnelback JSON API discovery (Tier 0) ────────────────────────────────
+# MQ exposes its full international course catalogue as a Funnelback/Squiz
+# search JSON endpoint.  A single HTTP GET returns all 338+ courses as a
+# structured JSON payload — no browser, no DOM parsing, no Cloudflare
+# challenge page (the JSON API endpoint passes Scrape.do's residential proxy
+# cleanly).  Each result includes:
+#   • ``liveUrl``            — the real admissions URL (correct path prefix)
+#   • ``title``              — course name
+#   • ``metaData.studyLevel``       — "Undergraduate" / "Postgraduate" / …
+#   • ``metaData.courseDuration``   — "1 year", "2 years", …
+#
+# After collecting the URL list we concurrently fetch each course's
+# Gatsby page-data.json endpoint, which is a structured JSON blob
+# containing fees, IELTS scores, description, and entry requirements.
+# The URL transform is:
+#   https://www.mq.edu.au/study/find-a-course/undergraduate/bachelor-of-arts
+#   → https://www.mq.edu.au/study/page-data/find-a-course/undergraduate/bachelor-of-arts/page-data.json
+#
+# Both Funnelback and page-data.json results are combined into a
+# ``scrapy_result``-shaped dict per course (matching the searchstax
+# short-circuit in orchestrator._extract_only) so the normal
+# per-course HTML fetch + extraction is bypassed entirely.
+#
+# Source reference: MU_AU Scrapy spider (provided by operator 2026-08-12).
+_FUNNELBACK_API_URL = (
+    "https://mqu-search.funnelback.squiz.cloud/s/search.json"
+    "?collection=mqu~sp-courses&profile=international"
+    "&query=!padrenull&start_rank=1&num_ranks=500"
+)
+# Minimum result count to trust the Funnelback API response (avoids
+# partial/error responses being treated as a real catalogue).
+_FUNNELBACK_MIN_RESULTS = 50
+
+# Concurrent page-data.json fetches — 20 parallel keeps a 338-course
+# fetch under ~30s at ~200ms/request.
+_PAGE_DATA_PARALLEL = 20
+_PAGE_DATA_TIMEOUT_S = 20.0
+
+# Scrape.do fetch UA — same as used by the resolver pass.
+_SCRAPE_DO_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/131.0.0.0 Safari/537.36"
+)
+
+
+def _page_data_url(live_url: str) -> str:
+    """Convert an MQ admissions URL to its Gatsby page-data.json endpoint.
+
+    ``https://www.mq.edu.au/study/find-a-course/undergraduate/bachelor-of-arts``
+    →
+    ``https://www.mq.edu.au/study/page-data/find-a-course/undergraduate/bachelor-of-arts/page-data.json``
+    """
+    # Strip query/fragment, normalise trailing slash.
+    base = live_url.split("?")[0].split("#")[0].rstrip("/")
+    # The transform inserts "page-data/" after the ".au/study" segment.
+    return base.replace(
+        "www.mq.edu.au/study/",
+        "www.mq.edu.au/study/page-data/",
+    ) + "/page-data.json"
+
+
+def _parse_study_level(raw: str) -> str:
+    """Map Funnelback studyLevel to a canonical degree_level prefix."""
+    lower = (raw or "").lower().strip()
+    if "undergraduate" in lower:
+        return "Undergraduate"
+    if "postgraduate" in lower or "postgrad" in lower:
+        return "Postgraduate"
+    if "research" in lower or "doctorate" in lower or "phd" in lower:
+        return "Doctorate"
+    return raw.strip() if raw else ""
+
+
+def _parse_duration_funnelback(raw: str) -> tuple[float | None, str]:
+    """Parse '2 years', '18 months', etc. → (value, term).
+
+    Returns (None, '') when the string is empty or unparseable.
+    """
+    raw = (raw or "").strip().lower()
+    if not raw:
+        return None, ""
+    m = re.search(r"(\d+(?:\.\d+)?)\s*(year|years|month|months|semester|semesters)", raw)
+    if not m:
+        return None, ""
+    val = float(m.group(1))
+    unit = m.group(2).rstrip("s")   # "year" / "month" / "semester"
+    return val, unit
+
+
+def _extract_program_from_page_data(body: str | None) -> dict:
+    """Extract ``program`` dict from a Gatsby page-data.json response body.
+
+    Returns ``{}`` on any parse failure.
+    """
+    if not body:
+        return {}
+    try:
+        outer = json.loads(body)
+        program_json = (
+            outer.get("result", {})
+                 .get("data", {})
+                 .get("current", {})
+                 .get("fields", {})
+                 .get("json")
+        )
+        if not program_json:
+            return {}
+        return json.loads(program_json) if isinstance(program_json, str) else program_json
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _build_scrapy_result(
+    name: str,
+    url: str,
+    funnelback_meta: dict,
+    program: dict,
+) -> dict:
+    """Combine Funnelback metadata + page-data.json program dict into a
+    ``scrapy_result``-compatible payload + evidence list.
+
+    Shape mirrors ``searchstax_hud._item_to_link`` so the orchestrator's
+    ``_extract_only`` short-circuit accepts it verbatim.
+    """
+    page_data_url_str = _page_data_url(url)
+
+    def _ev(field_key, value, method, source, page_type, snippet, confidence):
+        return {
+            "field_key": field_key,
+            "value": value,
+            "normalized": value,
+            "source_url": source,
+            "page_type": page_type,
+            "method": method,
+            "snippet": snippet,
+            "confidence": confidence,
+            "decision_status": "selected",
+        }
+
+    payload: dict = {
+        "course_name": name,
+        "course_website": url,
+        "has_central_fee_page": False,
+    }
+    evidence: list[dict] = []
+
+    evidence.append(_ev(
+        "course_name", name, "funnelback:title", url, "course",
+        f"Funnelback result title: {name}", 0.95,
+    ))
+
+    # ── Degree level from Funnelback studyLevel ────────────────────────
+    study_level_raw = funnelback_meta.get("studyLevel", "")
+    if study_level_raw:
+        payload["degree_level"] = study_level_raw
+        # academic_level mapping
+        sl_lower = study_level_raw.lower()
+        if "undergraduate" in sl_lower:
+            payload["academic_level"] = "Undergraduate"
+        elif "postgraduate" in sl_lower or "postgrad" in sl_lower:
+            payload["academic_level"] = "Postgraduate"
+        elif "research" in sl_lower or "doctorate" in sl_lower:
+            payload["academic_level"] = "Doctorate"
+        evidence.append(_ev(
+            "degree_level", study_level_raw, "funnelback:studyLevel", url, "course",
+            f"Funnelback metaData.studyLevel: {study_level_raw}", 0.85,
+        ))
+
+    # ── Duration from Funnelback courseDuration ────────────────────────
+    dur_raw = funnelback_meta.get("courseDuration", "")
+    dur_val, dur_term = _parse_duration_funnelback(dur_raw)
+    if dur_val is not None:
+        payload["duration"] = dur_val
+        payload["duration_term"] = dur_term
+        evidence.append(_ev(
+            "duration", dur_val, "funnelback:courseDuration", url, "course",
+            f"Funnelback metaData.courseDuration: {dur_raw}", 0.75,
+        ))
+
+    # ── Below: extract from program (Gatsby page-data.json) ───────────
+    if not program:
+        return {"name": name, "url": url, "payload": payload, "evidence": evidence}
+
+    # International fee
+    fees = program.get("fees") or []
+    for fee_item in fees:
+        fee_type_label = (
+            (fee_item.get("fee_type") or {}).get("label") or ""
+        ).lower()
+        if "international" in fee_type_label:
+            raw_fee = fee_item.get("estimated_annual_fee")
+            try:
+                fee_val = float(raw_fee)
+                payload["international_fee"] = fee_val
+                payload["fee_term"] = "Year"
+                payload["fee_year"] = "2026"
+                payload["currency"] = "AUD"
+                evidence.append(_ev(
+                    "international_fee", fee_val, "page_data:fees",
+                    page_data_url_str, "course",
+                    f"page-data.json fees[].estimated_annual_fee (international): {raw_fee}",
+                    0.90,
+                ))
+            except (TypeError, ValueError):
+                pass
+            break  # take the first matching international fee
+
+    # IELTS scores
+    ielts_fields = {
+        "ielts_overall_score": "ielts_overall",
+        "ielts_reading_score": "ielts_reading",
+        "ielts_writing_score": "ielts_writing",
+        "ielts_listening_score": "ielts_listening",
+        "ielts_speaking_score": "ielts_speaking",
+    }
+    for src_key, dst_key in ielts_fields.items():
+        raw_val = program.get(src_key)
+        if raw_val is not None:
+            try:
+                score = float(raw_val)
+                payload[dst_key] = score
+                evidence.append(_ev(
+                    dst_key, score, "page_data:ielts",
+                    page_data_url_str, "course",
+                    f"page-data.json {src_key}: {raw_val}", 0.90,
+                ))
+            except (TypeError, ValueError):
+                pass
+
+    # Description from marketing_items.descriptions
+    try:
+        descs = (program.get("marketing_items") or {}).get("descriptions") or []
+        desc_parts = [
+            d["long_description"]
+            for d in descs
+            if d.get("long_description")
+        ]
+        if desc_parts:
+            payload["description"] = "\n".join(desc_parts)
+            evidence.append(_ev(
+                "description", payload["description"][:80] + "…",
+                "page_data:marketing_descriptions",
+                page_data_url_str, "course",
+                "page-data.json marketing_items.descriptions", 0.80,
+            ))
+    except Exception:  # noqa: BLE001
+        pass
+
+    # Admission requirements / other_requirement
+    admission_req = program.get("admission_requirements")
+    if admission_req:
+        payload["other_requirement"] = admission_req
+        evidence.append(_ev(
+            "other_requirement", str(admission_req)[:80],
+            "page_data:admission_requirements",
+            page_data_url_str, "course",
+            "page-data.json admission_requirements", 0.80,
+        ))
+
+    # Study mode + location from offering[]
+    try:
+        offerings = program.get("offering") or []
+        locations: set[str] = set()
+        for of in offerings:
+            loc = (of.get("location") or "").strip()
+            if loc:
+                locations.add(loc)
+        if locations:
+            # Derive study_mode: "Off-campus" = online delivery
+            if "Off-campus" in locations and len(locations) == 1:
+                study_mode = "Online"
+            elif "Off-campus" not in locations:
+                study_mode = "On-Campus"
+            else:
+                study_mode = "Hybrid"
+            payload["study_mode"] = study_mode
+            evidence.append(_ev(
+                "study_mode", study_mode, "page_data:offering.location",
+                page_data_url_str, "course",
+                f"offering locations: {sorted(locations)}", 0.75,
+            ))
+            # Campus location (first non-Off-campus location)
+            on_campus = sorted(l for l in locations if l != "Off-campus")
+            if on_campus:
+                payload["course_location"] = on_campus[0]
+                evidence.append(_ev(
+                    "course_location", on_campus[0], "page_data:offering.location",
+                    page_data_url_str, "course",
+                    f"Offering campus location: {on_campus[0]}", 0.75,
+                ))
+    except Exception:  # noqa: BLE001
+        pass
+
+    # Study load from enrolment_patterns
+    try:
+        patterns = program.get("enrolment_patterns") or []
+        if "Full Time" in patterns and "Part Time" in patterns:
+            payload["study_load"] = "Full Time"
+        elif "Part Time" in patterns:
+            payload["study_load"] = "Part Time"
+        elif "Full Time" in patterns:
+            payload["study_load"] = "Full Time"
+    except Exception:  # noqa: BLE001
+        pass
+
+    return {"name": name, "url": url, "payload": payload, "evidence": evidence}
+
+
+async def _discover_from_funnelback_api(
+    emit_fn,
+    *,
+    max_courses: int = 500,
+) -> list[dict]:
+    """Fetch the MQ Funnelback search API and return fully-extracted link dicts.
+
+    Each returned link dict has the shape::
+
+        {
+            "name": str,
+            "url": str,
+            "scrapy_result": {name, url, payload, evidence},
+        }
+
+    The ``scrapy_result`` key causes ``orchestrator._extract_only`` to
+    return the pre-built payload verbatim without making any further HTTP
+    requests or running the HTML extraction pipeline.
+
+    Steps
+    -----
+    1. Fetch the Funnelback JSON API endpoint via Scrape.do (render=False,
+       residential proxy bypasses Cloudflare on the squiz.cloud host).
+       Falls back to plain httpx with a browser UA when Scrape.do is
+       unavailable.
+    2. Parse ``response.resultPacket.results`` → list of courses with
+       ``liveUrl``, ``title``, ``metaData``.
+    3. Concurrently fetch the Gatsby ``page-data.json`` endpoint for each
+       course (plain httpx, 20 parallel).  The page-data.json host is the
+       same www.mq.edu.au and may be CF-blocked from the Replit sandbox;
+       if a batch of plain-httpx fetches returns CF challenges, the
+       function retries via Scrape.do for the failed courses.
+    4. Build a ``scrapy_result`` payload per course from Funnelback metadata
+       + page-data.json program dict.
+
+    Returns ``[]`` on any unrecoverable error (caller falls through to
+    the coursehandbook sitemap + browser-sweep tiers).
+    """
+    import httpx as _httpx
+
+    await emit_fn("[DISCOVER] MQ: Tier 0 — Funnelback API fetch")
+
+    # ── Step 1: Fetch Funnelback search JSON ────────────────────────────
+    fb_body: str | None = None
+
+    # Try scrape.do first (residential proxy bypasses CF from any IP).
+    try:
+        from app.services.scraper.http_fetcher import fetch_html_scrape_do
+        fb_body = await fetch_html_scrape_do(
+            _FUNNELBACK_API_URL,
+            render=False,
+            rate_limit=False,  # discovery phase — exempt from fleet limiter
+            max_retries=1,
+        )
+    except Exception as _exc:  # noqa: BLE001
+        log.debug("mq funnelback: scrape.do fetch failed: %s", _exc)
+
+    # Fallback: plain httpx (works from prod server where IP isn't blocked).
+    if not fb_body:
+        try:
+            async with _httpx.AsyncClient(
+                headers={"User-Agent": _SCRAPE_DO_UA},
+                follow_redirects=True,
+                timeout=30.0,
+            ) as client:
+                r = await client.get(_FUNNELBACK_API_URL)
+                if r.status_code == 200:
+                    fb_body = r.text
+                else:
+                    log.warning(
+                        "mq funnelback: httpx fallback → HTTP %s", r.status_code
+                    )
+        except Exception as _exc:  # noqa: BLE001
+            log.warning("mq funnelback: httpx fallback failed: %s", _exc)
+
+    if not fb_body:
+        await emit_fn(
+            "[DISCOVER] MQ: Tier 0 — Funnelback API unreachable; "
+            "falling through to coursehandbook sitemap"
+        )
+        return []
+
+    # ── Step 2: Parse the JSON response ─────────────────────────────────
+    try:
+        fb_data = json.loads(fb_body)
+        results = (
+            fb_data
+            .get("response", {})
+            .get("resultPacket", {})
+            .get("results", [])
+        )
+    except Exception as _exc:  # noqa: BLE001
+        await emit_fn(
+            f"[DISCOVER] MQ: Tier 0 — Funnelback JSON parse error: {_exc}; "
+            "falling through"
+        )
+        return []
+
+    if len(results) < _FUNNELBACK_MIN_RESULTS:
+        await emit_fn(
+            f"[DISCOVER] MQ: Tier 0 — only {len(results)} results "
+            f"(expected ≥{_FUNNELBACK_MIN_RESULTS}); possible API error; "
+            "falling through"
+        )
+        return []
+
+    await emit_fn(
+        f"[DISCOVER] MQ: Tier 0 — Funnelback returned {len(results)} courses; "
+        "fetching page-data.json for each…"
+    )
+
+    # Build the (url, name, metaData) triples.
+    course_triples: list[tuple[str, str, dict]] = []
+    for r in results:
+        live_url = (r.get("liveUrl") or "").strip().rstrip("/")
+        title = (r.get("title") or "").strip()
+        meta = r.get("metaData") or {}
+        if not live_url or not title:
+            continue
+        # Only keep URLs that are real admissions course pages.
+        parsed_path = live_url.replace("https://www.mq.edu.au", "")
+        if not _SEARCH_COURSE_LINK_RE.match(parsed_path):
+            continue
+        course_triples.append((live_url, title, meta))
+
+    await emit_fn(
+        f"[DISCOVER] MQ: Tier 0 — {len(course_triples)} valid course URLs "
+        f"(filtered from {len(results)} Funnelback results)"
+    )
+
+    # ── Step 3: Concurrently fetch page-data.json ────────────────────────
+    sem = asyncio.Semaphore(_PAGE_DATA_PARALLEL)
+    programs: dict[str, dict] = {}  # url → program dict
+
+    async def _fetch_page_data(client: "_httpx.AsyncClient", url: str) -> None:
+        pd_url = _page_data_url(url)
+        async with sem:
+            try:
+                resp = await client.get(pd_url, timeout=_PAGE_DATA_TIMEOUT_S)
+                if resp.status_code == 200:
+                    prog = _extract_program_from_page_data(resp.text)
+                    if prog:
+                        programs[url] = prog
+                # Non-200: CF challenge or 404 — handled by scrape.do retry below.
+            except Exception:  # noqa: BLE001
+                pass
+
+    async with _httpx.AsyncClient(
+        headers={"User-Agent": _SCRAPE_DO_UA},
+        follow_redirects=True,
+        timeout=_PAGE_DATA_TIMEOUT_S,
+    ) as client:
+        await asyncio.gather(*[
+            _fetch_page_data(client, url)
+            for url, _, _ in course_triples
+        ])
+
+    plain_ok = len(programs)
+    await emit_fn(
+        f"[DISCOVER] MQ: Tier 0 — page-data.json via plain httpx: "
+        f"{plain_ok}/{len(course_triples)} succeeded"
+    )
+
+    # Retry CF-blocked courses via Scrape.do (render=False).
+    missing_urls = [
+        url for url, _, _ in course_triples if url not in programs
+    ]
+    if missing_urls:
+        try:
+            from app.services.scraper.http_fetcher import fetch_html_scrape_do
+            scrape_do_ok = 0
+            # Sequential to avoid burning Scrape.do credits in a parallel burst.
+            for url in missing_urls:
+                pd_url = _page_data_url(url)
+                try:
+                    body = await fetch_html_scrape_do(
+                        pd_url, render=False, rate_limit=False, max_retries=1,
+                    )
+                    if body:
+                        prog = _extract_program_from_page_data(body)
+                        if prog:
+                            programs[url] = prog
+                            scrape_do_ok += 1
+                except Exception:  # noqa: BLE001
+                    pass
+            if scrape_do_ok:
+                await emit_fn(
+                    f"[DISCOVER] MQ: Tier 0 — page-data.json via scrape.do retry: "
+                    f"+{scrape_do_ok} (total now {len(programs)}/{len(course_triples)})"
+                )
+        except Exception as _exc:  # noqa: BLE001
+            log.debug("mq funnelback: scrape.do page-data retry unavailable: %s", _exc)
+
+    # ── Step 4: Build scrapy_result links ───────────────────────────────
+    links: list[dict] = []
+    for url, name, meta in course_triples[:max_courses]:
+        program = programs.get(url, {})
+        scrapy_result = _build_scrapy_result(name, url, meta, program)
+        links.append({
+            "name": name,
+            "url": url,
+            "scrapy_result": scrapy_result,
+        })
+
+    await emit_fn(
+        f"[DISCOVER] MQ: Tier 0 — Funnelback API complete: "
+        f"{len(links)} course links "
+        f"({len(programs)} with full page-data.json, "
+        f"{len(links) - len(programs)} metadata-only)"
+    )
+    return links
 
 
 # ── Coursehandbook sitemap discovery ──────────────────────────────────────
@@ -1160,6 +1683,44 @@ async def browser_discover_mq(
         log.warning("mq_browser_discover: browser pool unavailable — %s", exc)
         return []
 
+    # ── Tier 0: Funnelback JSON API (fastest, most complete) ────────────
+    # Single HTTP request to squiz.cloud returns all 338+ courses with
+    # real admissions URLs (no resolver needed) + metaData (studyLevel,
+    # courseDuration).  Concurrent page-data.json fetches add fees, IELTS,
+    # description.  Returns scrapy_result-shaped links so per-course HTML
+    # extraction is bypassed entirely.
+    #
+    # If this tier returns a full catalogue (≥ 300 courses), skip the
+    # expensive Tier 1 (coursehandbook sitemap + stealth browser resolver),
+    # Tier 1.5 (search-page browser harvest), and Tier 2 (faculty BFS sweep).
+    try:
+        fb_links = await _discover_from_funnelback_api(
+            _emit, max_courses=max_courses,
+        )
+    except Exception as _fb_exc:  # noqa: BLE001
+        log.warning(
+            "mq_browser_discover: Funnelback API tier raised: %s", _fb_exc,
+        )
+        fb_links = []
+
+    if len(fb_links) >= 300:
+        await _emit(
+            f"[DISCOVER] MQ: Tier 0 success — {len(fb_links)} courses from "
+            "Funnelback API; skipping coursehandbook + browser tiers"
+        )
+        return fb_links[:max_courses]
+
+    if fb_links:
+        await _emit(
+            f"[DISCOVER] MQ: Tier 0 partial — {len(fb_links)} courses from "
+            "Funnelback API; supplementing with coursehandbook + search tiers"
+        )
+    else:
+        await _emit(
+            "[DISCOVER] MQ: Tier 0 returned 0 — falling through to "
+            "coursehandbook sitemap"
+        )
+
     # ── Tier 1: coursehandbook sitemap (real catalogue host) ────────
     # Try the structured handbook sitemap FIRST.  The www.mq.edu.au SPA
     # widget sweep below is fragile (Svelte mount, filter UI selectors,
@@ -1176,9 +1737,13 @@ async def browser_discover_mq(
             _ch_exc,
         )
         ch_links = []
-    # Seed the merged dict with handbook results immediately so BFS
+    # Seed the merged dict with Funnelback + handbook results so BFS
     # additions below de-duplicate on admissions URL.
-    merged: dict[str, dict] = {d["url"]: d for d in ch_links}
+    # Funnelback links carry scrapy_result; handbook links are URL-only.
+    # setdefault means Funnelback's richer form wins over handbook duplicates.
+    merged: dict[str, dict] = {d["url"]: d for d in fb_links}
+    for d in ch_links:
+        merged.setdefault(d["url"], d)
 
     # ── Tier 1.5: /search page harvest ──────────────────────────────
     # MQ's search page (https://www.mq.edu.au/search?query=&category=courses)
