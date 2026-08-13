@@ -3094,6 +3094,23 @@ class ExtractionConfig(BaseModel):
     #           text: "International Students"
     #
     # After clicking, the scraper waits for networkidle (up to 5s) + 1.2s settle.
+    force_wayback_first: bool = Field(
+        default=False,
+        description=(
+            "When True, fetch_html() tries the Wayback Machine snapshot for every "
+            "course URL BEFORE making any live scrape.do or httpx attempt. Use for "
+            "Cloudflare-Enterprise hosts where all live fetches (static and render) "
+            "reliably fail AND wayback_discover() pre-loads CDX timestamps during "
+            "discovery (use_wayback=True). In this configuration the Wayback path "
+            "takes ~1.4 s/course (CDX-cached snapshot, direct archive.org fetch) "
+            "vs ~80 s/course for the fallback scrape.do static (57 s ROTATION_FAILED "
+            "wait) + render (23 s). For a 700-course university that compresses a "
+            "2–3 h run to ~3 minutes. If Wayback has no archived copy for a URL, "
+            "fetch_html falls through to the normal live path. Notre Dame is the "
+            "canonical case. Has no effect unless use_wayback=True is set in "
+            "discovery so that CDX timestamps are loaded before extraction begins."
+        ),
+    )
     scrape_do_render: bool = Field(
         default=False,
         description=(

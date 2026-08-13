@@ -40,6 +40,11 @@ discovery:
   # Notre Dame content.  skip_fallbacks goes: static (may 502) → render=True.
   scrape_do_skip_fallbacks: true
 
+  # Skip the doomed ~57 s scrape.do static attempt on the sitemap and go
+  # straight to render=True (headless Chrome).  Sitemap via render=True
+  # returns 474 program URLs in ~9.6 s; static always gets ROTATION_FAILED.
+  scrape_do_render: true
+
   # Skip BFS entirely — homepage is CF-blocked on all transports.
   bfs_page_budget: 0
 
@@ -63,7 +68,7 @@ discovery:
   # CDX provides the campus-prefixed URLs not in the sitemap.
   use_wayback: true
 
-  # Already using sitemap_url directly — no supplement needed.
+  # Sitemap (render=true) gives non-campus URLs; CDX gives campus URLs.
   always_sitemap_supplement: false
 
   use_stealth_browser: false
@@ -86,6 +91,15 @@ extraction:
   # was adding ~30 s of wasted Playwright timeout per course, inflating a
   # 210-course job from ~6 min to 106 min with zero extra data recovered.
   skip_browser_rescue: true
+
+  # Skip all live scrape.do attempts per course and use Wayback Machine
+  # snapshots directly.  wayback_discover() pre-loads CDX timestamps for all
+  # discovered URLs during discovery so fetch_html_wayback hits the fast CDX-
+  # cached path (~1.4 s/course).  The alternative — discovery.scrape_do_
+  # skip_fallbacks firing during extraction — costs ~57 s (static ROTATION_
+  # FAILED) + ~23 s (render=True success) per course; at 700 courses / 5
+  # concurrency that is 2–3 hours.  With Wayback-first: 700 × 1.4 s / 5 ≈ 3 min.
+  force_wayback_first: true
 
   filters:
     domestic_only:

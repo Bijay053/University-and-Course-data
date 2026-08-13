@@ -971,6 +971,44 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
             )
             return None
 
+    # Force-Wayback-first: for CF-Enterprise hosts where all live scrape.do
+    # fetches reliably fail (ROTATION_FAILED) and Wayback CDX timestamps are
+    # pre-loaded by wayback_discover() during the discovery phase.  When True,
+    # fetch_html tries the Wayback Machine snapshot BEFORE making any live
+    # scrape.do attempt — skipping the ~57 s static ROTATION_FAILED wait and
+    # the ~23 s render call that would otherwise fire per course via the
+    # discovery fast-path below.  Notre Dame is the canonical case: 700 courses
+    # × ~80 s/course (static 57 s + render 23 s) ÷ 5 concurrency = 2.7 h;
+    # with force_wayback_first the CDX-cached snapshot returns in ~1.4 s so the
+    # same 700-course run completes in ~3 minutes.  If Wayback has no archived
+    # copy for a URL the code falls through to the normal live-fetch path below.
+    if not _scrape_do_render and not _scrape_do_static:
+        _force_wb = False
+        try:
+            from app.services.scraper.config.context import get_uni_config as _guc_fwb
+            _force_wb = bool(
+                getattr(_guc_fwb().extraction, "force_wayback_first", False)
+            )
+        except Exception:  # noqa: BLE001
+            pass
+        if _force_wb:
+            log.info(
+                "fetch %s: extraction.force_wayback_first=True"
+                " — trying Wayback before any live scrape.do attempt",
+                url,
+            )
+            _fwb_html = await fetch_html_wayback(url)
+            if _fwb_html is not None:
+                from app.services.scraper.snapshot_context import stage_snapshot as _stg_fwb
+                _stg_fwb(url, _fwb_html, "wayback")
+                return _fwb_html
+            log.info(
+                "fetch %s: force_wayback_first — Wayback returned nothing"
+                " (URL not archived); falling through to live fetch path",
+                url,
+            )
+            # Fall through: no Wayback copy → try live fetch as best-effort.
+
     # Discovery-phase fast-path: when discovery.scrape_do_skip_fallbacks=True,
     # skip httpx + curl_cffi for listing/sitemap pages and go straight to
     # Scrape.do static (residential proxy, render=False, ~$0.0005/call).
