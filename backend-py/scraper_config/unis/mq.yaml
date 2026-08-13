@@ -1,37 +1,39 @@
-# Macquarie University (uni 277, slug "mq")
-# Hostname: www.mq.edu.au
-#
-# Discovery: Scrapy spider (mq_spider.py) — two-step JSON approach
-#
-#   Step 1 — Funnelback search API (start_url)
-#     GET https://mqu-search.funnelback.squiz.cloud/s/search.json
-#         ?collection=mqu~sp-courses&profile=international
-#         &query=!padrenull&start_rank=1&num_ranks=338
-#     Returns all 338+ international courses with liveUrl, title, metaData.
-#
-#   Step 2 — Gatsby page-data.json per course
-#     URL: liveUrl.replace(".au/study/", ".au/study/page-data/") + "/page-data.json"
-#     Inner JSON contains fees, IELTS scores, description, admission requirements.
-#
-#   The spider yields rich items (payload + evidence) so the orchestrator
-#   short-circuits per-course HTML fetch + extraction entirely.
-
 discovery:
-  scrapy:
-    spider: mq_spider
-    timeout_seconds: 900
-    settings:
-      DOWNLOAD_DELAY: 0.5
-      CONCURRENT_REQUESTS: 8
-
+  generic_search_api:
+    enabled: true
+    url: https://mqu-search.funnelback.squiz.cloud/s/search.json?collection=mqu~sp-courses&profile=international&query=!padrenull&start_rank=1&num_ranks=338
+    params:
+      collection: mqu~sp-courses
+      profile: international
+      query: '!padrenull'
+      start_rank: '1'
+      num_ranks: '350'
+    root_path: response.resultPacket.results
+    url_fields:
+    - liveUrl
+    - url
+    - link
+    title_fields:
+    - title
+    - name
+    allow_url_patterns:
+    - /study/
+    normalize_relative_urls: true
+    base_url: https://www.mq.edu.au
+  always_sitemap_supplement: true
+  expected_min_courses: 350
 extraction:
   fees:
     default_currency: AUD
-    fee_term: Annual
-
-  staging:
-    require_international_fee: false
-
+    prefer_international: true
+    prefer_annual_over_total: true
+  course_name:
+    strip_title_suffixes:
+    - ' | Macquarie University'
+    - ' - Macquarie University'
+    - ' — Macquarie University'
   filters:
     domestic_only:
       enabled: false
+    online_only:
+      enabled: true

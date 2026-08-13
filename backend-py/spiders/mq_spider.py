@@ -52,11 +52,12 @@ _CURRENCY  = "AUD"
 _FEE_YEAR  = "2026"
 _LOCATION  = "North Ryde"   # default campus; overridden per course from offering[]
 
-_FUNNELBACK_URL = (
+_FUNNELBACK_BASE = (
     "https://mqu-search.funnelback.squiz.cloud/s/search.json"
     "?collection=mqu~sp-courses&profile=international"
-    "&query=!padrenull&start_rank=1&num_ranks=338"
+    "&query=!padrenull"
 )
+_PAGE_SIZE = 200   # server-side cap; request this many per page
 
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -66,8 +67,8 @@ class MQSpider(scrapy.Spider):
 
     name = "mq_spider"
 
-    # Scrapy will send a GET to this URL; we handle the JSON in parse().
-    start_urls = [_FUNNELBACK_URL]
+    # First page — Scrapy fetches this automatically; parse() handles pagination.
+    start_urls = [f"{_FUNNELBACK_BASE}&start_rank=1&num_ranks={_PAGE_SIZE}"]
 
     custom_settings = {
         "DOWNLOAD_DELAY": 0.5,
@@ -85,22 +86,35 @@ class MQSpider(scrapy.Spider):
         },
     }
 
-    # ── Step 1: parse Funnelback JSON response ────────────────────────────────
+    # ── Step 1: parse Funnelback JSON response (paginated) ───────────────────
 
     def parse(self, response):
-        """Parse Funnelback search API response → schedule page-data.json fetches."""
+        """Parse Funnelback search API response → schedule page-data.json fetches.
+
+        The endpoint caps results at 200 per request regardless of num_ranks.
+        We read resultsSummary.nextStart and follow subsequent pages until
+        nextStart is absent (last page).
+        """
         try:
             data = json.loads(response.text)
         except Exception as exc:
             self.logger.error("MQ: failed to parse Funnelback JSON: %s", exc)
             return
 
-        results = (
-            data.get("response", {})
-                .get("resultPacket", {})
-                .get("results", [])
+        packet = data.get("response", {}).get("resultPacket", {})
+        results = packet.get("results", [])
+        summary = packet.get("resultsSummary", {})
+
+        self.logger.info(
+            "MQ: Funnelback page start_rank=%s → %d results (fullyMatching=%s)",
+            summary.get("currStart"), len(results), summary.get("fullyMatching"),
         )
-        self.logger.info("MQ: Funnelback returned %d results", len(results))
+
+        # ── paginate: follow nextStart if present ─────────────────────────
+        next_start = summary.get("nextStart")
+        if next_start:
+            next_url = f"{_FUNNELBACK_BASE}&start_rank={next_start}&num_ranks={_PAGE_SIZE}"
+            yield scrapy.Request(next_url, callback=self.parse, dont_filter=True)
 
         for program in results:
             course_info: dict[str, Any] = {}
