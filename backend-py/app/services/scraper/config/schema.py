@@ -455,6 +455,38 @@ class GenericSearchApiConfig(BaseModel):
             "server-side session and ignores the page/offset params from external clients."
         ),
     )
+    fetch_via_scrape_do: bool = Field(
+        default=False,
+        description=(
+            "When True, route each API request through scrape.do to bypass Cloudflare "
+            "protection on the API endpoint itself. Uses the SCRAPE_DO_TOKEN secret. "
+            "By default uses render=false (residential proxy only, no JS). Set "
+            "scrape_do_render=True to use a real headless Chrome instance — required when "
+            "the endpoint itself enforces browser fingerprinting (e.g. Funnelback on "
+            "mqu-search.funnelback.squiz.cloud). When the JSON URL is rendered by Chrome "
+            "the response is wrapped in <html><body><pre>{json}</pre></body></html>; the "
+            "bridge automatically unwraps the <pre> content before JSON-parsing."
+        ),
+    )
+    scrape_do_render: bool = Field(
+        default=False,
+        description=(
+            "Only meaningful when fetch_via_scrape_do=True. When True, adds render=true "
+            "to the scrape.do call so a real headless Chrome instance fetches the URL. "
+            "Required for CF Enterprise targets that refuse residential-proxy static fetches "
+            "(ROTATION_FAILED 502). Chrome renders the JSON URL and wraps it in a <pre> "
+            "element; fetch_yaml_api_links unwraps it automatically. Costs more than "
+            "render=false — use only when static proxy fails."
+        ),
+    )
+    offset_start: int = Field(
+        default=0,
+        description=(
+            "Initial value sent for the offset_param on the very first paginated request. "
+            "Use 1 for 1-based APIs like Funnelback (start_rank=1 = first result). "
+            "Default 0 matches the existing behaviour for 0-based APIs (Solr, Algolia, etc.)."
+        ),
+    )
     browser_seed_url: Optional[str] = Field(
         default=None,
         description=(

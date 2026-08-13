@@ -1,27 +1,42 @@
 discovery:
   generic_search_api:
     enabled: true
-    url: https://mqu-search.funnelback.squiz.cloud/s/search.json?collection=mqu~sp-courses&profile=international&query=!padrenull&start_rank=1&num_ranks=338
+    # Funnelback JSON API — returns all 368 international courses in two pages.
+    # MQ's entire domain is behind Cloudflare Enterprise; every direct HTTP method
+    # (requests, httpx, curl_cffi, Scrapy/Twisted) gets CF 403 from datacenter IPs.
+    # fetch_via_scrape_do + scrape_do_render routes each API call through a real
+    # headless Chrome instance (scrape.do render=true) which bypasses the CF block.
+    # Static proxy (render=false) also fails (ROTATION_FAILED 502) on this domain.
+    url: https://mqu-search.funnelback.squiz.cloud/s/search.json
     params:
       collection: mqu~sp-courses
       profile: international
       query: '!padrenull'
-      start_rank: '1'
-      num_ranks: '350'
+      num_ranks: '200'        # server caps results at 200 per request
+    fetch_via_scrape_do: true
+    scrape_do_render: true    # render=false → ROTATION_FAILED; render=true → works
+    # Pagination: Funnelback is 1-based (start_rank=1 = first result).
+    # Page 1 → start_rank=1  → 200 results
+    # Page 2 → start_rank=201 → ~168 results  (total ~368)
+    page_size: 200
+    offset_param: start_rank
+    offset_start: 1
+    max_pages: 10
     root_path: response.resultPacket.results
     url_fields:
-    - liveUrl
-    - url
-    - link
+      - liveUrl
+      - url
     title_fields:
-    - title
-    - name
+      - title
+      - name
     allow_url_patterns:
-    - /study/
+      - /study/
     normalize_relative_urls: true
     base_url: https://www.mq.edu.au
-  always_sitemap_supplement: true
-  expected_min_courses: 350
+  expected_min_courses: 300
+  always_sitemap_supplement: false
+  skip_browser_discovery: true
+
 extraction:
   fees:
     default_currency: AUD
@@ -29,11 +44,13 @@ extraction:
     prefer_annual_over_total: true
   course_name:
     strip_title_suffixes:
-    - ' | Macquarie University'
-    - ' - Macquarie University'
-    - ' — Macquarie University'
+      - ' | Macquarie University'
+      - ' - Macquarie University'
+      - ' — Macquarie University'
+  # Per-course pages are also CF-protected; use scrape.do render=true for extraction.
+  scrape_do_render: true
   filters:
     domestic_only:
       enabled: false
     online_only:
-      enabled: true
+      enabled: false

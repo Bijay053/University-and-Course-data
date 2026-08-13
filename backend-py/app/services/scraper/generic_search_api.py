@@ -1086,15 +1086,46 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
     # Overrides query-string pagination when body_pagination is configured.
     use_body_pagination = bool(_body_tpl is not None and _body_pag is not None)
 
+    # scrape.do routing: used for CF-protected API endpoints (e.g. Funnelback on mq.edu.au).
+    # render=false → residential proxy only, no JS, much cheaper than render=true.
+    # render=true  → real headless Chrome; required when static proxy also gets ROTATION_FAILED.
+    #   When Chrome opens a JSON URL it wraps it in <html><body><pre>{…}</pre></body></html>;
+    #   _unwrap_chrome_json() strips that wrapper before JSON-parsing.
+    _use_scrape_do: bool = bool(getattr(cfg, "fetch_via_scrape_do", False))
+    _scrape_do_render: bool = _use_scrape_do and bool(getattr(cfg, "scrape_do_render", False))
+    _scrape_do_token: str = os.environ.get("SCRAPE_DO_TOKEN", "") if _use_scrape_do else ""
+    if _use_scrape_do and not _scrape_do_token:
+        await _emit(
+            "fetch_via_scrape_do=True but SCRAPE_DO_TOKEN is not set — "
+            "falling back to direct httpx (may get CF 403)"
+        )
+        _use_scrape_do = False
+        _scrape_do_render = False
+
+    def _unwrap_chrome_json(text: str) -> str:
+        """Strip Chrome's <html><body><pre>…</pre> wrapper when it renders a JSON URL.
+
+        When scrape.do render=true opens a bare JSON URL, Chrome displays it as:
+            <html><head>…</head><body><pre style="…">{…json…}</pre></body></html>
+        We extract only the <pre> content so the caller gets raw JSON.
+        Returns text unchanged if no <pre> wrapper is found.
+        """
+        import re as _re
+        m = _re.search(r"<pre[^>]*>([\s\S]*?)</pre>", text, _re.I)
+        if m:
+            return m.group(1).strip()
+        return text
+
     # additional_urls: call each URL in turn with the same config; merge results.
     _all_api_urls = [cfg.url] + list(getattr(cfg, "additional_urls", []))
 
-    async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+    async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
         for _api_url_idx, _api_url in enumerate(_all_api_urls):
             if len(_all_api_urls) > 1:
                 await _emit(f"URL {_api_url_idx + 1}/{len(_all_api_urls)}: {_api_url[:100]}")
             # Reset per-URL pagination state
-            offset = 0
+            # offset_start lets 1-based APIs (e.g. Funnelback start_rank=1) skip the 0 position.
+            offset = int(getattr(cfg, "offset_start", 0))
             current_page = 1
             for page_num in range(cfg.max_pages):
                 req_params = dict(cfg.params)
@@ -1112,9 +1143,29 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
                         req_params[cfg.offset_param] = str(offset)
 
                 # ── Make the HTTP request ────────────────────────────────────────
+                # When fetch_via_scrape_do=True, route through scrape.do as a
+                # residential proxy to bypass Cloudflare on the API endpoint itself.
                 resp = None
+                _used_scrape_do_render = False
                 try:
-                    if cfg.method.upper() == "POST":
+                    if _use_scrape_do:
+                        # Build the full target URL with all query params merged, then
+                        # wrap it in the scrape.do API call.
+                        _req_obj = httpx.Request(
+                            cfg.method.upper(), _api_url, params=req_params or None
+                        )
+                        _target_url = str(_req_obj.url)
+                        _sd_params: dict = {"token": _scrape_do_token, "url": _target_url}
+                        if _scrape_do_render:
+                            _sd_params["render"] = "true"
+                            _sd_params["waitFor"] = "3000"
+                            _used_scrape_do_render = True
+                        resp = await client.get(
+                            "https://api.scrape.do",
+                            params=_sd_params,
+                            headers=cfg.headers,
+                        )
+                    elif cfg.method.upper() == "POST":
                         if req_body is not None:
                             # Body-mode POST (Elastic App Search, Algolia JSON body)
                             resp = await client.post(_api_url, headers=cfg.headers, json=req_body)
@@ -1152,14 +1203,15 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
 
                 # ── Parse JSON ───────────────────────────────────────────────────
                 try:
+                    _raw_text = resp.text
+                    # When scrape.do render=true opens a JSON URL, Chrome wraps the
+                    # content in <html><body><pre>…</pre></body></html>.  Strip it.
+                    if _used_scrape_do_render:
+                        _raw_text = _unwrap_chrome_json(_raw_text)
                     _strip_prefix = getattr(cfg, "strip_response_prefix", None)
-                    if _strip_prefix:
-                        _raw_text = resp.text
-                        if _raw_text.startswith(_strip_prefix):
-                            _raw_text = _raw_text[len(_strip_prefix):]
-                        data = json.loads(_raw_text)
-                    else:
-                        data = resp.json()
+                    if _strip_prefix and _raw_text.startswith(_strip_prefix):
+                        _raw_text = _raw_text[len(_strip_prefix):]
+                    data = json.loads(_raw_text)
                 except Exception as exc:
                     snippet = resp.text[:200].replace("\n", " ")
                     await _emit(

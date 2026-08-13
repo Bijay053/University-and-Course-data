@@ -1,67 +1,48 @@
 ---
-name: MQ Funnelback API discovery
-description: MQ primary discovery is now Tier 0 — Funnelback JSON API returns all 338+ courses with real liveUrls + page-data.json for fees/IELTS. Replaces coursehandbook sitemap + search-page browser approach.
+name: MQ Funnelback discovery + CF bypass
+description: How Macquarie University course discovery works — Funnelback API endpoint, Cloudflare block, scrape.do render=true bypass, pagination.
 ---
 
-# MQ Discovery — Funnelback JSON API (Tier 0)
+## The working approach (as of Aug 2026)
 
-## What Changed (August 2026)
-The coursehandbook sitemap resolver (old Tier 1) constructed `/courses/<slug>` URLs that 404'd for
-40-47% of courses whose real paths are `/undergraduate/`, `/postgraduate/`, or `/research/`. This
-was fixed by replacing both tiers with a Funnelback JSON API call.
+**Discovery:** `generic_search_api` in mq.yaml with `fetch_via_scrape_do: true` + `scrape_do_render: true`.
 
-## Funnelback API (Tier 0)
-**URL**: `https://mqu-search.funnelback.squiz.cloud/s/search.json?collection=mqu~sp-courses&profile=international&query=!padrenull&start_rank=1&num_ranks=500`
+**Why:** Every part of `www.mq.edu.au` and both Funnelback endpoints are behind Cloudflare Enterprise.
+- Direct httpx / requests / curl_cffi / Scrapy → CF 403
+- scrape.do render=false (static proxy) → 502 ROTATION_FAILED for all MQ URLs
+- scrape.do render=true (real Chrome) → ✅ works for both homepage and Funnelback JSON endpoint
 
-Returns 338+ courses with:
-- `liveUrl` — real admissions URL (no slug construction or resolver needed)
-- `title` — course name
-- `metaData.studyLevel` — "Undergraduate" / "Postgraduate"
-- `metaData.courseDuration` — "2 years" etc.
+**Funnelback endpoint:**
+`https://mqu-search.funnelback.squiz.cloud/s/search.json?collection=mqu~sp-courses&profile=international&query=!padrenull`
 
-The endpoint is CF-protected from Replit's IP; fetched via `scrape.do render=False` (residential
-proxy), with httpx fallback for production IPs that aren't blocked.
+**Pagination:** 1-based (`start_rank=1` for first result). Server caps at 200 results per request.
+- Page 1: `start_rank=1&num_ranks=200` → 200 results
+- Page 2: `start_rank=201&num_ranks=200` → ~168 results
+- Total: ~368 courses (fullyMatching=368 per resultsSummary)
 
-## page-data.json Extraction
-Each `liveUrl` maps to a Gatsby page-data.json endpoint:
-- `https://www.mq.edu.au/study/find-a-course/undergraduate/bachelor-of-arts`
-- → `https://www.mq.edu.au/study/page-data/find-a-course/undergraduate/bachelor-of-arts/page-data.json`
-- Transform: replace `.au/study/` with `.au/study/page-data/`, append `/page-data.json`
+**YAML knobs used:**
+```yaml
+fetch_via_scrape_do: true
+scrape_do_render: true
+page_size: 200
+offset_param: start_rank
+offset_start: 1        # 1-based Funnelback
+```
 
-JSON path: `result.data.current.fields.json` (a JSON-encoded string → parse again).
+**Chrome wraps JSON in `<pre>` tag:** When scrape.do render=true opens a JSON URL,
+Chrome displays it as `<html><body><pre>{json}</pre></body></html>`.
+`fetch_yaml_api_links` calls `_unwrap_chrome_json()` to extract the raw JSON before parsing.
 
-Fields extracted:
-- `fees[].estimated_annual_fee` where `fee_type.label` contains "international" → `international_fee`
-- `ielts_overall_score`, `ielts_reading_score`, `ielts_writing_score`, `ielts_listening_score`, `ielts_speaking_score`
-- `marketing_items.descriptions[].long_description` → `description`
-- `admission_requirements` → `other_requirement`
-- `offering[].location` → `course_location` + `study_mode` ("Off-campus" = Online)
-- `enrolment_patterns` → `study_load` ("Full Time" / "Part Time")
+**Reference Python spider** (`macquarie_university_au_1786509801112.py`) uses `websearch.mq.edu.au`
+and works from non-datacenter IPs (local machines). From Replit servers that endpoint is also CF-blocked.
 
-## scrapy_result Short-circuit
-Each link returned by Tier 0 carries a `scrapy_result` key. `orchestrator._extract_only` returns
-this verbatim — no per-course HTTP fetch, no HTML extraction pipeline runs.
+**Discovery of alternate endpoints tested (all fail from server):**
+- `websearch.mq.edu.au` → CF 403 (httpx, requests, curl_cffi, Scrapy all blocked)
+- `mqu-search.funnelback.squiz.cloud` → CF 403 direct; ROTATION_FAILED via scrape.do static
+- `www.mq.edu.au` sitemap / page-data.json → CF 403 direct; ROTATION_FAILED via scrape.do static
+- Wayback CDX → only 73 current course URLs (not enough)
 
-## Flow in browser_discover_mq()
-- If Tier 0 returns ≥ 300 courses → return immediately, skip all other tiers
-- If Tier 0 returns < 300 → supplement with Tier 1 (coursehandbook sitemap) + Tier 1.5 (search page)
-- The Tier 0 links' `scrapy_result` wins over Tier 1's URL-only entries via `setdefault`
-
-## YAML Change
-`failure_guard_threshold` lowered from 0.55 → 0.30 (Funnelback provides real liveUrls; expected
-fetch_failed rate < 5% vs the old 40-47%).
-
-## Code Location
-`backend-py/app/services/scraper/mq_browser_discover.py`:
-- `_page_data_url()` — URL transform
-- `_extract_program_from_page_data()` — parse page-data.json body
-- `_build_scrapy_result()` — build payload + evidence from Funnelback meta + program dict
-- `_discover_from_funnelback_api()` — orchestrates the whole Tier 0 flow
-- `browser_discover_mq()` — wires Tier 0 before Tier 1
-
-## How to Apply
-If MQ staging count drops below 300 on the next run, check the job log for:
-- `[DISCOVER] MQ: Tier 0 — Funnelback returned N courses` — if N < 50, the API is unreachable
-- `[DISCOVER] MQ: Tier 0 — page-data.json via plain httpx: N/338` — if N is low, CF is blocking
-  page-data.json; the scrape.do retry path should cover the remainder
-- If Funnelback URL changes, check MQ's website search source to find the new collection name
+**Why:**
+`generic_search_api` with `fetch_via_scrape_do + scrape_do_render` gets all 368 courses cleanly
+in 2 API calls, far better than the old BFS crawl via scrape.do that was capped at ~200 courses
+(BFS page budget hit before all courses found).
