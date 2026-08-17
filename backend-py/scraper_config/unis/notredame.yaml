@@ -78,6 +78,13 @@ discovery:
 
   use_stealth_browser: false
 
+  # Notre Dame's Wayback-first strategy means courses with no archived snapshot
+  # are expected failures — Cloudflare blocks all live fetches, so if Wayback
+  # has no copy of a URL it cannot be fetched at all.  Raise the failure-guard
+  # threshold from the default 30% to 60% so a normal Wayback-miss rate (~35%)
+  # doesn't trigger failed_degraded and protect-live-data mode.
+  failure_guard_threshold: 0.60
+
 extraction:
   fees:
     default_currency: "AUD"
