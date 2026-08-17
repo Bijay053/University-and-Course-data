@@ -60,10 +60,15 @@ discovery:
     - '/programs/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+/[^/]+$'
     - '/programs/(?:fremantle|sydney|broome)/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+/[^/]+$'
 
-  # Exclude unit/subject listing pages (.../courses/) and CMS snippet pages.
+  # Exclude unit/subject listing pages (.../courses/), CMS snippet pages,
+  # and CPD/professional-development webinar registration pages (not degrees).
+  # Webinar URLs match the 4-segment campus pattern but are event pages, e.g.:
+  #   /programs/fremantle/school-of-nursing-and-midwifery/cpd-webinar-acdr
+  #   /programs/fremantle/school-of-nursing-and-midwifery/drcd-webinar-acdr
   block_url_patterns:
     - '/programs/[^/]+/courses/'
     - '/programs/re-usable-snippets/'
+    - '-webinar-'
 
   # CDX provides the campus-prefixed URLs not in the sitemap.
   use_wayback: true

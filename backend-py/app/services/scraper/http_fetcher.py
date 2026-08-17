@@ -780,6 +780,22 @@ async def fetch_html_wayback(url: str) -> str | None:
                     "filter": "statuscode:200",
                 },
             )
+            if cdx_r.status_code == 503:
+                # Wayback CDX is transiently overloaded — retry once after a
+                # short sleep rather than giving up and falling to the live path.
+                log.info(
+                    "wayback fetch: CDX search returned 503 for %s — retrying in 3 s",
+                    url,
+                )
+                await asyncio.sleep(3)
+                cdx_r = await c.get(
+                    _CDX_ENDPOINT,
+                    params={
+                        "url": url,
+                        "output": "json",
+                        "filter": "statuscode:200",
+                    },
+                )
             if cdx_r.status_code != 200:
                 log.info(
                     "wayback fetch: CDX search returned %s for %s",
@@ -1007,6 +1023,30 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
                 " (URL not archived); falling through to live fetch path",
                 url,
             )
+            # If scrape_do_skip_fallbacks is ALSO set this is a CF-Enterprise
+            # host where scrape.do render/static will fail with ROTATION_FAILED
+            # just as reliably as httpx.  Falling through would waste ~90 s per
+            # course (502 attempt + 2 s backoff + second 502/404) for zero gain.
+            # Return None immediately so the course is marked fetch_failed.
+            try:
+                from app.services.scraper.config.context import (
+                    get_uni_config as _guc_fwb2,
+                )
+                _cfg_fwb2 = _guc_fwb2()
+                if getattr(
+                    getattr(_cfg_fwb2, "discovery", None),
+                    "scrape_do_skip_fallbacks",
+                    False,
+                ):
+                    log.warning(
+                        "fetch %s: force_wayback_first miss + scrape_do_skip_fallbacks"
+                        " active — returning None immediately (CF-blocked host;"
+                        " live scrape.do will also fail)",
+                        url,
+                    )
+                    return None
+            except Exception:  # noqa: BLE001
+                pass
             # Fall through: no Wayback copy → try live fetch as best-effort.
 
     # Discovery-phase fast-path: when discovery.scrape_do_skip_fallbacks=True,
