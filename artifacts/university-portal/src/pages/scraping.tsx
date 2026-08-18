@@ -542,6 +542,8 @@ function EvidenceDialogContent({ reviewDetail }: { reviewDetail: CourseReviewPay
 export default function Scraping() {
   const { toast } = useToast();
   const [jobs, setJobs] = useState<ImportJob[]>([]);
+  const [importPage, setImportPage] = useState(1);
+  const [importPageSize, setImportPageSize] = useState(25);
   const [uniStats, setUniStats] = useState<UniStat[]>([]);
   const [uniCoveragePage, setUniCoveragePage] = useState(1);
   const [uniCoveragePageSize, setUniCoveragePageSize] = useState(25);
@@ -4026,42 +4028,101 @@ export default function Scraping() {
             <p>No import jobs yet.</p>
             <p className="text-sm mt-1">Use <Link href="/bulk" className="text-blue-500 underline">Bulk Upload</Link> or the AI Scraper above.</p>
           </div>
-        ) : (
-          <div className="border rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="text-left p-3 font-medium text-gray-600">University</th>
-                  <th className="text-left p-3 font-medium text-gray-600">File</th>
-                  <th className="text-center p-3 font-medium text-gray-600">Status</th>
-                  <th className="text-center p-3 font-medium text-gray-600">Imported</th>
-                  <th className="text-center p-3 font-medium text-gray-600">Skipped</th>
-                  <th className="text-left p-3 font-medium text-gray-600">Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {jobs.map((job) => (
-                  <tr key={job.id} className="hover:bg-gray-50">
-                    <td className="p-3 font-medium text-gray-800">{job.universityName}</td>
-                    <td className="p-3 text-gray-500 text-xs max-w-[180px] truncate">{job.fileName}</td>
-                    <td className="p-3 text-center">{statusBadge(job.status)}</td>
-                    <td className="p-3 text-center">
-                      {job.importedRows != null ? (
-                        <span className="font-semibold text-green-600">{job.importedRows}</span>
-                      ) : "\u2014"}
-                    </td>
-                    <td className="p-3 text-center">
-                      {job.skippedRows != null ? (
-                        <span className="text-amber-600">{job.skippedRows}</span>
-                      ) : "\u2014"}
-                    </td>
-                    <td className="p-3 text-gray-400 text-xs whitespace-nowrap">{fmtDate(job.createdAt)}</td>
+        ) : (() => {
+          const importTotalPages = Math.max(1, Math.ceil(jobs.length / importPageSize));
+          const importSafePage = Math.min(importPage, importTotalPages);
+          const pagedJobs = jobs.slice((importSafePage - 1) * importPageSize, importSafePage * importPageSize);
+          const importPageWindow = Array.from({ length: importTotalPages }, (_, i) => i + 1)
+            .filter(p => p === 1 || p === importTotalPages || Math.abs(p - importSafePage) <= 1);
+          return (
+            <div className="border rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="text-left p-3 font-medium text-gray-600">University</th>
+                    <th className="text-left p-3 font-medium text-gray-600">File</th>
+                    <th className="text-center p-3 font-medium text-gray-600">Status</th>
+                    <th className="text-center p-3 font-medium text-gray-600">Imported</th>
+                    <th className="text-center p-3 font-medium text-gray-600">Skipped</th>
+                    <th className="text-left p-3 font-medium text-gray-600">Date</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody className="divide-y">
+                  {pagedJobs.map((job) => (
+                    <tr key={job.id} className="hover:bg-gray-50">
+                      <td className="p-3 font-medium text-gray-800">{job.universityName}</td>
+                      <td className="p-3 text-gray-500 text-xs max-w-[180px] truncate">{job.fileName}</td>
+                      <td className="p-3 text-center">{statusBadge(job.status)}</td>
+                      <td className="p-3 text-center">
+                        {job.importedRows != null ? (
+                          <span className="font-semibold text-green-600">{job.importedRows}</span>
+                        ) : "\u2014"}
+                      </td>
+                      <td className="p-3 text-center">
+                        {job.skippedRows != null ? (
+                          <span className="text-amber-600">{job.skippedRows}</span>
+                        ) : "\u2014"}
+                      </td>
+                      <td className="p-3 text-gray-400 text-xs whitespace-nowrap">{fmtDate(job.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {/* Pagination footer */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-2.5 border-t bg-gray-50/60 text-xs text-gray-500">
+                <span>
+                  {(importSafePage - 1) * importPageSize + 1}–{Math.min(importSafePage * importPageSize, jobs.length)} of {jobs.length} records
+                </span>
+                <div className="flex-1" />
+                {/* Page-size selector */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-gray-400">Rows per page:</span>
+                  {([10, 25, 50, 100] as const).map(n => (
+                    <button
+                      key={n}
+                      onClick={() => { setImportPageSize(n); setImportPage(1); }}
+                      className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${importPageSize === n ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-100"}`}
+                    >{n}</button>
+                  ))}
+                </div>
+                {/* Prev / page numbers / next */}
+                {importTotalPages > 1 && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      className="px-2 py-0.5 rounded border bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                      onClick={() => setImportPage(1)}
+                      disabled={importSafePage === 1}
+                    >«</button>
+                    <button
+                      className="px-2 py-0.5 rounded border bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                      onClick={() => setImportPage(p => Math.max(1, p - 1))}
+                      disabled={importSafePage === 1}
+                    >‹</button>
+                    {importPageWindow[0] > 1 && <span className="px-1">…</span>}
+                    {importPageWindow.map((p) => (
+                      <button
+                        key={p}
+                        className={`px-2.5 py-0.5 rounded border ${p === importSafePage ? "bg-blue-600 text-white border-blue-600 font-semibold" : "bg-white hover:bg-gray-50"}`}
+                        onClick={() => setImportPage(p)}
+                      >{p}</button>
+                    ))}
+                    {importPageWindow[importPageWindow.length - 1] < importTotalPages && <span className="px-1">…</span>}
+                    <button
+                      className="px-2 py-0.5 rounded border bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                      onClick={() => setImportPage(p => Math.min(importTotalPages, p + 1))}
+                      disabled={importSafePage === importTotalPages}
+                    >›</button>
+                    <button
+                      className="px-2 py-0.5 rounded border bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                      onClick={() => setImportPage(importTotalPages)}
+                      disabled={importSafePage === importTotalPages}
+                    >»</button>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* ── Replay from Snapshot Dialog ────────────────────────────────────── */}

@@ -137,6 +137,8 @@ export default function CertDashboardPage() {
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [filterStatus, setFilterStatus] = useState<CertStatus | "all">("all");
+  const [pageSize, setPageSize] = useState<number>(25);
+  const [page, setPage] = useState<number>(1);
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery<DashboardData>({
     queryKey: ["cert-dashboard"],
@@ -171,7 +173,13 @@ export default function CertDashboardPage() {
   function handleSort(key: SortKey) {
     if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
     else { setSortKey(key); setSortDir(key === "score_drop" ? "desc" : "asc"); }
+    setPage(1);
   }
+
+  function handleSearch(v: string) { setSearch(v); setPage(1); }
+  function handleTab(v: "all" | "queue") { setTab(v); setPage(1); }
+  function handleFilter(v: CertStatus | "all") { setFilterStatus(v); setPage(1); }
+  function handlePageSize(v: number) { setPageSize(v); setPage(1); }
 
   const universities = useMemo(() => {
     if (!data) return [];
@@ -203,6 +211,11 @@ export default function CertDashboardPage() {
       return 0;
     });
   }, [data, tab, filterStatus, search, sortKey, sortDir]);
+
+  const totalFiltered = universities.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pagedUniversities = universities.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const summary = data?.summary ?? { certified: 0, testing: 0, needs_review: 0, failed: 0, draft: 0 };
   const total = Object.values(summary).reduce((s, n) => s + n, 0);
@@ -245,7 +258,7 @@ export default function CertDashboardPage() {
           return (
             <button
               key={st}
-              onClick={() => setFilterStatus(isFiltered ? "all" : st)}
+              onClick={() => handleFilter(isFiltered ? "all" : st)}
               className={`text-left p-4 rounded-xl border-2 transition-all ${cfg.cardBg} ${
                 isFiltered ? `${cfg.cardBorder} shadow-md ring-2 ring-offset-1 ring-current` : "border-transparent hover:border-gray-200"
               }`}
@@ -265,13 +278,13 @@ export default function CertDashboardPage() {
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1 self-start">
           <button
             className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${tab === "all" ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"}`}
-            onClick={() => setTab("all")}
+            onClick={() => handleTab("all")}
           >
             All Universities
           </button>
           <button
             className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-1.5 ${tab === "queue" ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"}`}
-            onClick={() => setTab("queue")}
+            onClick={() => handleTab("queue")}
           >
             Certification Queue
             {queueCount > 0 && (
@@ -287,7 +300,7 @@ export default function CertDashboardPage() {
           <Input
             placeholder="Search universities…"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => handleSearch(e.target.value)}
             className="pl-8 h-8 text-sm"
           />
         </div>
@@ -329,14 +342,14 @@ export default function CertDashboardPage() {
                     ))}
                   </tr>
                 ))
-              ) : universities.length === 0 ? (
+              ) : totalFiltered === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-4 py-12 text-center text-gray-400">
                     {tab === "queue" ? "No universities in the certification queue." : "No universities match your filter."}
                   </td>
                 </tr>
               ) : (
-                universities.map(uni => (
+                pagedUniversities.map(uni => (
                   <tr key={uni.id} className="hover:bg-gray-50/60 transition-colors group">
                     <td className="px-4 py-3 font-medium text-gray-900 max-w-[240px]">
                       <div className="truncate">{uni.name}</div>
@@ -404,9 +417,76 @@ export default function CertDashboardPage() {
             </tbody>
           </table>
         </div>
-        {!isLoading && universities.length > 0 && (
-          <div className="px-4 py-2 border-t bg-gray-50/40 text-xs text-gray-400">
-            Showing {universities.length} of {data?.universities.length ?? 0} universities
+        {!isLoading && totalFiltered > 0 && (
+          <div className="px-4 py-2.5 border-t bg-gray-50/40 flex flex-col sm:flex-row sm:items-center gap-3 text-xs text-gray-500">
+            {/* Left: row count info */}
+            <div className="flex items-center gap-2">
+              <span>
+                {totalFiltered === 0 ? "0" : `${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, totalFiltered)}`} of {totalFiltered} universities
+              </span>
+              {totalFiltered !== (data?.universities.length ?? 0) && (
+                <span className="text-gray-400">(filtered from {data?.universities.length ?? 0})</span>
+              )}
+            </div>
+            <div className="flex-1" />
+            {/* Centre: page-size selector */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-gray-400">Rows per page:</span>
+              {([10, 25, 50, 100] as const).map(n => (
+                <button
+                  key={n}
+                  onClick={() => handlePageSize(n)}
+                  className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                    pageSize === n
+                      ? "bg-blue-600 text-white"
+                      : "text-gray-500 hover:bg-gray-100"
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            {/* Right: prev / page numbers / next */}
+            <div className="flex items-center gap-1">
+              <button
+                disabled={safePage <= 1}
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                className="px-2 py-0.5 rounded text-xs font-medium text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                ‹ Prev
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+                .reduce<(number | "…")[]>((acc, p, idx, arr) => {
+                  if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push("…");
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, i) =>
+                  p === "…" ? (
+                    <span key={`ellipsis-${i}`} className="px-1 text-gray-300">…</span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p as number)}
+                      className={`min-w-[24px] px-1.5 py-0.5 rounded text-xs font-medium transition-colors ${
+                        safePage === p
+                          ? "bg-blue-600 text-white"
+                          : "text-gray-500 hover:bg-gray-100"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  )
+                )}
+              <button
+                disabled={safePage >= totalPages}
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                className="px-2 py-0.5 rounded text-xs font-medium text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                Next ›
+              </button>
+            </div>
           </div>
         )}
       </div>

@@ -281,6 +281,8 @@ export default function BulkRepairPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [markTesting, setMarkTesting] = useState(false);
   const [search, setSearch] = useState("");
+  const [repairPage, setRepairPage] = useState(1);
+  const [repairPageSize, setRepairPageSize] = useState(25);
   const [applyResult, setApplyResult] = useState<ApplyResult | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
@@ -332,6 +334,7 @@ export default function BulkRepairPage() {
 
   // Filtered universities for the table
   const filtered = useMemo(() => {
+    setRepairPage(1);
     if (!data) return [];
     let rows = data.universities.filter(u => u.has_any_issue);
     if (activeIssues.size > 0) {
@@ -343,6 +346,12 @@ export default function BulkRepairPage() {
     }
     return rows;
   }, [data, activeIssues, search]);
+
+  const repairTotalPages = Math.max(1, Math.ceil(filtered.length / repairPageSize));
+  const repairSafePage = Math.min(repairPage, repairTotalPages);
+  const pagedFiltered = filtered.slice((repairSafePage - 1) * repairPageSize, repairSafePage * repairPageSize);
+  const repairPageWindow = Array.from({ length: repairTotalPages }, (_, i) => i + 1)
+    .filter(p => p === 1 || p === repairTotalPages || Math.abs(p - repairSafePage) <= 1);
 
   // Select/deselect helpers
   function toggleAll() {
@@ -631,7 +640,7 @@ export default function BulkRepairPage() {
                       </td>
                     </tr>
                   ) : (
-                    filtered.map(uni => {
+                    pagedFiltered.map(uni => {
                       const isSelected = selected.has(uni.id);
                       return (
                         <tr
@@ -680,6 +689,40 @@ export default function BulkRepairPage() {
                 </tbody>
               </table>
             </div>
+            {/* Pagination footer */}
+            {filtered.length > 0 && (
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-2.5 border-t bg-gray-50/60 text-xs text-gray-500">
+                <span>
+                  {(repairSafePage - 1) * repairPageSize + 1}–{Math.min(repairSafePage * repairPageSize, filtered.length)} of {filtered.length} universities
+                </span>
+                <div className="flex-1" />
+                <div className="flex items-center gap-1.5">
+                  <span className="text-gray-400">Rows per page:</span>
+                  {([10, 25, 50, 100] as const).map(n => (
+                    <button key={n} onClick={() => { setRepairPageSize(n); setRepairPage(1); }}
+                      className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${repairPageSize === n ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-100"}`}>{n}</button>
+                  ))}
+                </div>
+                {repairTotalPages > 1 && (
+                  <div className="flex items-center gap-1">
+                    <button disabled={repairSafePage === 1} onClick={() => setRepairPage(1)}
+                      className="px-2 py-0.5 rounded border bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">«</button>
+                    <button disabled={repairSafePage === 1} onClick={() => setRepairPage(p => Math.max(1, p - 1))}
+                      className="px-2 py-0.5 rounded border bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">‹</button>
+                    {repairPageWindow[0] > 1 && <span className="px-1">…</span>}
+                    {repairPageWindow.map(p => (
+                      <button key={p} onClick={() => setRepairPage(p)}
+                        className={`px-2.5 py-0.5 rounded border ${p === repairSafePage ? "bg-blue-600 text-white border-blue-600 font-semibold" : "bg-white hover:bg-gray-50"}`}>{p}</button>
+                    ))}
+                    {repairPageWindow[repairPageWindow.length - 1] < repairTotalPages && <span className="px-1">…</span>}
+                    <button disabled={repairSafePage === repairTotalPages} onClick={() => setRepairPage(p => Math.min(repairTotalPages, p + 1))}
+                      className="px-2 py-0.5 rounded border bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">›</button>
+                    <button disabled={repairSafePage === repairTotalPages} onClick={() => setRepairPage(repairTotalPages)}
+                      className="px-2 py-0.5 rounded border bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">»</button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

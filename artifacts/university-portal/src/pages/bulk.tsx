@@ -214,6 +214,8 @@ export default function Bulk() {
 
   // ── Selection state (used when no session is active) ──────────────────────
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [scrapeListPage, setScrapeListPage] = useState(1);
+  const [scrapeListPageSize, setScrapeListPageSize] = useState(25);
 
   // ── Excel Import state ────────────────────────────────────────────────────
   const [file, setFile] = useState<File | null>(null);
@@ -683,58 +685,99 @@ export default function Bulk() {
                     <span className="ml-auto">{selectedIds.size} selected</span>
                   </div>
 
-                  {scrapeable.map((uni) => {
-                    const lr = lastRuns[uni.id];
+                  {(() => {
+                    const scrapeTotalPages = Math.max(1, Math.ceil(scrapeable.length / scrapeListPageSize));
+                    const scrapeSafePage = Math.min(scrapeListPage, scrapeTotalPages);
+                    const pagedScrapeable = scrapeable.slice((scrapeSafePage - 1) * scrapeListPageSize, scrapeSafePage * scrapeListPageSize);
+                    const scrapePageWindow = Array.from({ length: scrapeTotalPages }, (_, i) => i + 1)
+                      .filter(p => p === 1 || p === scrapeTotalPages || Math.abs(p - scrapeSafePage) <= 1);
                     return (
-                    <div key={uni.id} className="rounded-xl border border-gray-200 bg-white hover:border-gray-300 transition-all">
-                      <div className="flex items-center gap-3 p-3 pr-4">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(uni.id)}
-                          onChange={(e) => {
-                            const next = new Set(selectedIds);
-                            if (e.target.checked) next.add(uni.id); else next.delete(uni.id);
-                            setSelectedIds(next);
-                          }}
-                          className="w-4 h-4 accent-blue-600 shrink-0"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <span className="font-medium text-sm text-gray-900">{uni.name}</span>
-                          {uni.scrape_url && (
-                            <p className="text-xs text-gray-400 truncate mt-0.5">{uni.scrape_url}</p>
-                          )}
-                          {lr && (
-                            <p className="text-xs mt-0.5 flex items-center gap-2 flex-wrap">
-                              <span className={lr.status === "completed" ? "text-green-600 font-medium" : "text-amber-600 font-medium"}>
-                                {lr.status === "completed" ? "✓ Last scraped" : "⚠ Last stopped"}
-                              </span>
-                              {(lr.completed_at || lr.started_at) && (
-                                <>
-                                  <span className="text-gray-400">·</span>
-                                  <span className="text-gray-400">
-                                    {new Date(lr.completed_at ?? lr.started_at!).toLocaleString(undefined, {
-                                      day: "2-digit", month: "short", year: "numeric",
-                                      hour: "2-digit", minute: "2-digit",
-                                    })}
-                                  </span>
-                                </>
+                      <>
+                        {pagedScrapeable.map((uni) => {
+                          const lr = lastRuns[uni.id];
+                          return (
+                          <div key={uni.id} className="rounded-xl border border-gray-200 bg-white hover:border-gray-300 transition-all">
+                            <div className="flex items-center gap-3 p-3 pr-4">
+                              <input
+                                type="checkbox"
+                                checked={selectedIds.has(uni.id)}
+                                onChange={(e) => {
+                                  const next = new Set(selectedIds);
+                                  if (e.target.checked) next.add(uni.id); else next.delete(uni.id);
+                                  setSelectedIds(next);
+                                }}
+                                className="w-4 h-4 accent-blue-600 shrink-0"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <span className="font-medium text-sm text-gray-900">{uni.name}</span>
+                                {uni.scrape_url && (
+                                  <p className="text-xs text-gray-400 truncate mt-0.5">{uni.scrape_url}</p>
+                                )}
+                                {lr && (
+                                  <p className="text-xs mt-0.5 flex items-center gap-2 flex-wrap">
+                                    <span className={lr.status === "completed" ? "text-green-600 font-medium" : "text-amber-600 font-medium"}>
+                                      {lr.status === "completed" ? "✓ Last scraped" : "⚠ Last stopped"}
+                                    </span>
+                                    {(lr.completed_at || lr.started_at) && (
+                                      <>
+                                        <span className="text-gray-400">·</span>
+                                        <span className="text-gray-400">
+                                          {new Date(lr.completed_at ?? lr.started_at!).toLocaleString(undefined, {
+                                            day: "2-digit", month: "short", year: "numeric",
+                                            hour: "2-digit", minute: "2-digit",
+                                          })}
+                                        </span>
+                                      </>
+                                    )}
+                                    <span className="text-gray-400">·</span>
+                                    <span className="text-gray-500">{lr.imported} imported / {lr.total_found} found</span>
+                                  </p>
+                                )}
+                              </div>
+                              {lr ? (
+                                <Badge variant="outline" className={lr.status === "completed" ? "text-green-600 border-green-200 bg-green-50 shrink-0" : "text-amber-600 border-amber-200 bg-amber-50 shrink-0"}>
+                                  {lr.status === "completed" ? "Done" : "Stopped"}
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-gray-400 shrink-0">Never scraped</Badge>
                               )}
-                              <span className="text-gray-400">·</span>
-                              <span className="text-gray-500">{lr.imported} imported / {lr.total_found} found</span>
-                            </p>
+                            </div>
+                          </div>
+                          );
+                        })}
+                        {/* Pagination footer */}
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-1 pt-1 pb-0.5 text-xs text-gray-500">
+                          <span>{(scrapeSafePage - 1) * scrapeListPageSize + 1}–{Math.min(scrapeSafePage * scrapeListPageSize, scrapeable.length)} of {scrapeable.length} universities</span>
+                          <div className="flex-1" />
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-gray-400">Rows per page:</span>
+                            {([10, 25, 50, 100] as const).map(n => (
+                              <button key={n} onClick={() => { setScrapeListPageSize(n); setScrapeListPage(1); }}
+                                className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${scrapeListPageSize === n ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-100"}`}>{n}</button>
+                            ))}
+                          </div>
+                          {scrapeTotalPages > 1 && (
+                            <div className="flex items-center gap-1">
+                              <button disabled={scrapeSafePage === 1} onClick={() => setScrapeListPage(1)}
+                                className="px-2 py-0.5 rounded border bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">«</button>
+                              <button disabled={scrapeSafePage === 1} onClick={() => setScrapeListPage(p => Math.max(1, p - 1))}
+                                className="px-2 py-0.5 rounded border bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">‹</button>
+                              {scrapePageWindow[0] > 1 && <span className="px-1">…</span>}
+                              {scrapePageWindow.map(p => (
+                                <button key={p} onClick={() => setScrapeListPage(p)}
+                                  className={`px-2.5 py-0.5 rounded border ${p === scrapeSafePage ? "bg-blue-600 text-white border-blue-600 font-semibold" : "bg-white hover:bg-gray-50"}`}>{p}</button>
+                              ))}
+                              {scrapePageWindow[scrapePageWindow.length - 1] < scrapeTotalPages && <span className="px-1">…</span>}
+                              <button disabled={scrapeSafePage === scrapeTotalPages} onClick={() => setScrapeListPage(p => Math.min(scrapeTotalPages, p + 1))}
+                                className="px-2 py-0.5 rounded border bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">›</button>
+                              <button disabled={scrapeSafePage === scrapeTotalPages} onClick={() => setScrapeListPage(scrapeTotalPages)}
+                                className="px-2 py-0.5 rounded border bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">»</button>
+                            </div>
                           )}
                         </div>
-                        {lr ? (
-                          <Badge variant="outline" className={lr.status === "completed" ? "text-green-600 border-green-200 bg-green-50 shrink-0" : "text-amber-600 border-amber-200 bg-amber-50 shrink-0"}>
-                            {lr.status === "completed" ? "Done" : "Stopped"}
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-gray-400 shrink-0">Never scraped</Badge>
-                        )}
-                      </div>
-                    </div>
+                      </>
                     );
-                  })}
+                  })()}
                 </div>
               )}
             </>
