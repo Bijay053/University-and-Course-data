@@ -46,3 +46,18 @@ still come from Wayback CDX (38 s, keep `use_wayback: true`).
 Any CF-Enterprise host where static ALWAYS gets ROTATION_FAILED AND
 `discovery.scrape_do_skip_fallbacks=True` is set → each course extraction burns
 80 s on failed scrape.do before falling through. force_wayback_first skips this.
+
+## Additional fix: skip_per_course_browser + IELTS defaults
+
+**Problem:** Even with force_wayback_first working (690/690 completing in ~3 min),
+IELTS was null on all courses because:
+1. `maybe_browser_refetch()` in per_course_browser.py fires whenever IELTS is null
+   AND `skip_per_course_browser` is NOT set — it is SEPARATE from `skip_browser_rescue`
+   which only gates the sparse-static rescue path. Both flags must be set.
+2. Wayback-archived Notre Dame HTML never contains IELTS (it's JS-loaded).
+
+**Fix:** Added to notredame.yaml extraction:
+- `skip_per_course_browser: true` — stops wasted Playwright calls returning 0B
+- `english.degree_level_defaults: {UG: 6.0, PG/Doc: 6.5}` — Notre Dame published standard
+- `english.default_ielts: 6.0` — global fallback
+- `english.course_english_priority: true` — per-course value wins when found (some courses 7.0+)

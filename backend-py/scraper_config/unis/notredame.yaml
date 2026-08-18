@@ -98,11 +98,46 @@ extraction:
     force_central_fee_stage: true
     central_page: "https://www.notredame.edu.au/study/fees-costs-and-scholarships/tuition-fees"
 
+  english:
+    # Notre Dame IELTS requirements are loaded via JS on course pages and are
+    # absent from Wayback-archived HTML.  Degree-level defaults are sourced
+    # from the official English language requirements page:
+    # https://www.notredame.edu.au/study/admission-requirements/english-language-requirements
+    # UG standard: IELTS 6.0 overall, no band below 6.0
+    # PG standard: IELTS 6.5 overall, no band below 6.0
+    # Some health/education programs require 7.0 — those override per-course.
+    default_ielts: 6.0
+    degree_level_defaults:
+      undergraduate:
+        ielts: 6.0
+        pte: 50
+        toefl: 64
+      postgraduate:
+        ielts: 6.5
+        pte: 58
+        toefl: 79
+      doctorate:
+        ielts: 6.5
+        pte: 58
+        toefl: 79
+    # When the Wayback page DOES contain a per-course IELTS value (e.g. a
+    # nursing course with IELTS 7.0), keep it — don't let the default overwrite.
+    course_english_priority: true
+
   # Skip the sparse-static rescue browser refetch.
   # Cloudflare Enterprise blocks Playwright too (rendered=0B) — the rescue
   # was adding ~30 s of wasted Playwright timeout per course, inflating a
   # 210-course job from ~6 min to 106 min with zero extra data recovered.
   skip_browser_rescue: true
+
+  # Skip the per-course Playwright browser pass entirely.
+  # www.notredame.edu.au is Cloudflare Enterprise — the browser pool returns
+  # empty responses (0 B) for every course URL.  Without this flag,
+  # maybe_browser_refetch() fires on every course whose IELTS is null (all
+  # 690 of them), consuming ~10–30 s of Playwright timeout per course with
+  # zero benefit.  IELTS defaults are supplied by english.degree_level_defaults
+  # above, so the browser pass contributes nothing.
+  skip_per_course_browser: true
 
   # Skip all live scrape.do attempts per course and use Wayback Machine
   # snapshots directly.  wayback_discover() pre-loads CDX timestamps for all
