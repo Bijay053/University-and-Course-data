@@ -77,3 +77,23 @@ discipline hub pages (e.g. `/courses/accounting`) — correct rejections, not bu
 `asyncio.gather` collects ALL results before staging loop. `max_parallel_fetch: 1` at 40s/course = 33+ min/batch before any saves. Must use ≥ 3.
 
 **Why squiz.cloud endpoint is correct:** The squiz.cloud domain IS the Funnelback search engine. La Trobe's own search page is just a JS wrapper that AJAX-loads from squiz.cloud — it doesn't have the results in its initial HTML.
+
+## Rendered JSON and the sub-30-minute path
+
+Scrape.do `render=true` opens La Trobe's international detail JSON in Chromium,
+which returns an HTML document whose `<pre>` contains the HTML-escaped JSON.
+Treating the whole response as JSON makes every authoritative override fail even
+though fee, duration, intake, location, and English requirements are present.
+
+**Rule:** Unwrap and HTML-decode the `<pre>` payload before JSON parsing. Once
+that authoritative response works, do not fetch the separate entry-requirements
+SPA tab or repeat the primary render just because the template has no visible H1.
+
+**Why:** The old route made roughly four paid renders per course (primary,
+doomed H1 retry, English tab, detail JSON), yet rejected the only response with
+complete structured data. At three courses in flight, 232 courses projected at
+55–80 minutes.
+
+**How to apply:** Keep one short primary render to obtain the detail manifest,
+then one detail-JSON request. Eight courses in flight is the controlled target
+for this host; it removes redundant calls rather than relying only on more load.

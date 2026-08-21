@@ -97,10 +97,15 @@ extraction:
 
   skip_degree_qualifier_check: true
 
-  # La Trobe is a Next.js SPA with Adobe Target prehide that takes >3 s to
-  # reveal content. 8 s gives React enough time to hydrate the DOM fully so
-  # the text extraction returns non-zero content for Gemini.
-  scrape_do_wait_for_ms: 8000
+  # The authoritative fields come from the per-course international JSON
+  # document. The primary rendered page is only needed for its allDetailUrls
+  # manifest, which is available without waiting for the hidden SPA text.
+  scrape_do_wait_for_ms: 3000
+
+  # La Trobe's template has no visible H1 even after a longer render. Retrying
+  # every page at 12 s duplicated the most expensive request without improving
+  # the response. The Funnelback title + international JSON are authoritative.
+  skip_render_hydration_retry: true
 
   # La Trobe uses hash-based SPA routing (#/overview, #/entry-requirements).
   # Without a fragment, scrape.do renders the default (domestic) view with
@@ -111,18 +116,14 @@ extraction:
   #               Start dates, Learning mode (all visible in the course summary
   #               table on the international view).
   #
-  #   Secondary — #/entry-requirements?studentType=int
-  #               Renders the Entry requirements tab with: IELTS overall + band
-  #               requirements ("6.5 IELTS (Academic) with no individual band
-  #               less than 6.0"). Text is appended to the Gemini context under
-  #               "[Secondary tab content — entry requirements]".
+  # IELTS and band requirements are read from entryReq.engReq in the
+  # authoritative international JSON, so a second rendered tab is unnecessary.
   primary_fetch_fragment: "#/overview?studentType=int"
-  secondary_fetch_fragment: "#/entry-requirements?studentType=int"
 
-  # 3 concurrent render calls balances throughput vs Scrape.do rate limits.
-  # Each course now makes 2 render calls (primary + secondary tab) so effective
-  # concurrency is 6 Scrape.do calls in flight at a time — still within limits.
-  max_parallel_fetch: 3
+  # Eight courses in flight stays below the worker's hard ceiling and is already
+  # used safely for other Scrape.do-only hosts. With only one page render plus
+  # one short JSON request per course, 232 courses fit comfortably under 30 min.
+  max_parallel_fetch: 8
 
   filters:
     domestic_only:

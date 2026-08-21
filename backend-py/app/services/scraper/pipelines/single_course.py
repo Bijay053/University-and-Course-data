@@ -1267,6 +1267,13 @@ async def extract_course(
     _extr_wait_ms: int = int(
         getattr(getattr(_uc, "extraction", None), "scrape_do_wait_for_ms", 3000) or 3000
     )
+    _skip_render_hydration_retry: bool = bool(
+        getattr(
+            getattr(_uc, "extraction", None),
+            "skip_render_hydration_retry",
+            False,
+        )
+    )
     # Hash-routed SPA tab navigation (e.g. La Trobe). The primary fragment
     # makes scrape.do render the fee/duration tab; the secondary fragment
     # fetches the entry-requirements (IELTS) tab in a separate render call.
@@ -1509,7 +1516,11 @@ async def extract_course(
                 # through as valid HTML and produces course_name = domain.
                 # If H1 is absent/empty after the initial render, retry once
                 # with 2× the configured wait (capped at 12 000 ms).
-                if html and _use_scrape_do_render:
+                if (
+                    html
+                    and _use_scrape_do_render
+                    and not _skip_render_hydration_retry
+                ):
                     # Strip inner tags from every H1 and check for visible text.
                     # A bare r"<h1[^>]*>\s*\S" would match the opening `<` of a
                     # child <span> (e.g. <h1><span></span></h1>) and incorrectly

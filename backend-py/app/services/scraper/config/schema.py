@@ -3173,6 +3173,16 @@ class ExtractionConfig(BaseModel):
             "Has no effect unless scrape_do_render is True. Default: 3000."
         ),
     )
+    skip_render_hydration_retry: bool = Field(
+        default=False,
+        description=(
+            "When True, do not repeat a successful Scrape.do render solely "
+            "because the rendered HTML has no visible H1. Use for SPAs whose "
+            "authoritative data is read from embedded manifests or JSON APIs "
+            "and whose page template never exposes an H1 after hydration. "
+            "Default False preserves the generic partial-hydration safeguard."
+        ),
+    )
     primary_fetch_fragment: Optional[str] = Field(
         default=None,
         description=(

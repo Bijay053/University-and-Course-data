@@ -29,6 +29,7 @@ other uni in the fleet.
 """
 from __future__ import annotations
 
+import html as html_lib
 import json
 import logging
 import re
@@ -38,6 +39,29 @@ from urllib.parse import urlparse
 from app.services.scraper.http_fetcher import fetch_html
 
 log = logging.getLogger("uniportal.scraper.latrobe_json")
+
+
+def _decode_json_response(raw: str) -> dict[str, Any]:
+    """Decode either raw JSON or Chromium's HTML-wrapped JSON viewer output.
+
+    Scrape.do ``render=true`` opens JSON endpoints in Chromium. Chromium wraps
+    the response in ``<pre>...</pre>`` and HTML-escapes the JSON text, so a
+    direct ``json.loads(raw)`` fails even though the authoritative document is
+    present. La Trobe needs rendered requests to pass Cloudflare, so unwrap the
+    browser representation before giving up.
+    """
+    try:
+        doc = json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        match = re.search(r"<pre\b[^>]*>(.*?)</pre>", raw, re.IGNORECASE | re.DOTALL)
+        if not match:
+            raise
+        doc = json.loads(html_lib.unescape(match.group(1)))
+
+    if not isinstance(doc, dict):
+        raise ValueError("La Trobe detail response must be a JSON object")
+    return doc
+
 
 # ── Host gate ────────────────────────────────────────────────────────────
 def is_latrobe_host(url: str) -> bool:
@@ -559,7 +583,7 @@ async def apply_overrides(
         log.warning("[LATROBE JSON] %s — fetch of detail URL %s failed", url, intl_url)
         return applied
     try:
-        doc = json.loads(raw)
+        doc = _decode_json_response(raw)
     except (json.JSONDecodeError, ValueError) as exc:
         log.warning("[LATROBE JSON] %s — invalid JSON at %s: %s", url, intl_url, exc)
         return applied

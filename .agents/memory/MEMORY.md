@@ -2,7 +2,7 @@
 - [MQ coursehandbook resolver](mq-coursehandbook-resolver.md) — Sitemap needs patchright (CF-guarded); resolver needs httpx (127→223/383); BFS seeds return 0 in dev (expected).
 - [MQ Funnelback discovery + CF bypass](mq-search-page-tier.md) — entire mq.edu.au domain is CF Enterprise; scrape.do render=true on mqu-search.funnelback.squiz.cloud works (368 courses, 2 paginated API calls); static proxy and direct requests all fail.
 - [Notre Dame force_wayback_first extraction](notredame-force-wayback.md) — discovery.scrape_do_skip_fallbacks fires during extraction too; 80 s/course (57 s static + 23 s render) × 700 courses = 2-3 h; force_wayback_first skips to CDX-cached Wayback (1.4 s/course) → ~3 min.
-- [La Trobe CF Enterprise fixes](latrobe-cf-enterprise.md) — Full fix stack: render+skip_fallbacks+skip_browser+skip_per_course_browser+skip_degree_qualifier; online_only off; max_parallel_fetch≥3.
+- [La Trobe CF Enterprise fixes](latrobe-cf-enterprise.md) — Rendered JSON arrives in Chromium `<pre>` HTML; unwrap it, avoid redundant SPA renders, and use controlled concurrency for sub-30m runs.
 - [Phase 9B conflict resolution](phase9b-conflict-resolution.md) — T001-T004: repair order, confidence formula, field normalizer canon forms, schema (migration 028), KPI API shape, pre-existing test failures.
 - [QMUL fetch_failed visibility gap](qmul-fetch-failed-visibility.md) — DONE-line + DB persistence for scraper fetch losses already exist (run_summary.py, http_fetcher.py retry ladder); grep before re-adding.
 - [Cloudflare 429 vs block classification](cf-429-vs-block.md) — 429 rate-limit ≠ 403/503 challenge; per-uni use_wayback flag was wired at only one of two call sites.
