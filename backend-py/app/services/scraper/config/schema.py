@@ -511,6 +511,16 @@ class GenericSearchApiConfig(BaseModel):
             "UG and PG endpoints. Each URL gets its own full pagination cycle."
         ),
     )
+    require_all_urls: bool = Field(
+        default=False,
+        description=(
+            "When True, any network, HTTP, JSON, or empty-first-page failure from "
+            "url/additional_urls makes the provider return zero links. Use when each "
+            "URL is a required catalogue slice (for example separate UG, PG, research, "
+            "and other endpoints) so a partial API response cannot silently publish an "
+            "incomplete catalogue. Returning zero lets normal discovery fallbacks run."
+        ),
+    )
     headers: dict[str, str] = Field(
         default_factory=dict,
         description=(

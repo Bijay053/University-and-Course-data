@@ -1110,17 +1110,20 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
         We extract only the <pre> content so the caller gets raw JSON.
         Returns text unchanged if no <pre> wrapper is found.
         """
+        from html import unescape as _html_unescape
         import re as _re
         m = _re.search(r"<pre[^>]*>([\s\S]*?)</pre>", text, _re.I)
         if m:
-            return m.group(1).strip()
+            return _html_unescape(m.group(1)).strip()
         return text
 
     # additional_urls: call each URL in turn with the same config; merge results.
     _all_api_urls = [cfg.url] + list(getattr(cfg, "additional_urls", []))
+    _failed_api_urls: list[str] = []
 
     async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
         for _api_url_idx, _api_url in enumerate(_all_api_urls):
+            _api_url_failed = False
             if len(_all_api_urls) > 1:
                 await _emit(f"URL {_api_url_idx + 1}/{len(_all_api_urls)}: {_api_url[:100]}")
             # Reset per-URL pagination state
@@ -1146,25 +1149,36 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
                 # When fetch_via_scrape_do=True, route through scrape.do as a
                 # residential proxy to bypass Cloudflare on the API endpoint itself.
                 resp = None
+                _scrape_do_text: str | None = None
                 _used_scrape_do_render = False
                 try:
                     if _use_scrape_do:
                         # Build the full target URL with all query params merged, then
-                        # wrap it in the scrape.do API call.
+                        # use the shared Scrape.do client. This preserves the query
+                        # string and applies the same retry/concurrency controls as
+                        # per-course extraction.
                         _req_obj = httpx.Request(
                             cfg.method.upper(), _api_url, params=req_params or None
                         )
                         _target_url = str(_req_obj.url)
-                        _sd_params: dict = {"token": _scrape_do_token, "url": _target_url}
-                        if _scrape_do_render:
-                            _sd_params["render"] = "true"
-                            _sd_params["waitFor"] = "3000"
-                            _used_scrape_do_render = True
-                        resp = await client.get(
-                            "https://api.scrape.do",
-                            params=_sd_params,
-                            headers=cfg.headers,
+                        from app.services.scraper.http_fetcher import fetch_html_scrape_do
+
+                        _used_scrape_do_render = _scrape_do_render
+                        _scrape_do_text = await fetch_html_scrape_do(
+                            _target_url,
+                            render=_scrape_do_render,
+                            wait_for_ms=3000,
+                            rate_limit=False,
+                            max_retries=3,
+                            unescape_json_html=False,
                         )
+                        if _scrape_do_text is None:
+                            _api_url_failed = True
+                            await _emit(
+                                "scrape.do returned no usable response for "
+                                f"{_target_url[:100]}"
+                            )
+                            break
                     elif cfg.method.upper() == "POST":
                         if req_body is not None:
                             # Body-mode POST (Elastic App Search, Algolia JSON body)
@@ -1181,6 +1195,7 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
                             _api_url, headers=cfg.headers, params=req_params or None
                         )
                 except Exception as exc:
+                    _api_url_failed = True
                     await _emit(
                         f"request failed (page {page_num}, network error): {exc}"
                     )
@@ -1188,7 +1203,8 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
                     break
 
                 # ── Check HTTP status ────────────────────────────────────────────
-                if resp.status_code != 200:
+                if resp is not None and resp.status_code != 200:
+                    _api_url_failed = True
                     snippet = resp.text[:200].replace("\n", " ")
                     await _emit(
                         f"HTTP {resp.status_code} from {_api_url[:60]} — "
@@ -1203,7 +1219,11 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
 
                 # ── Parse JSON ───────────────────────────────────────────────────
                 try:
-                    _raw_text = resp.text
+                    _raw_text = (
+                        _scrape_do_text
+                        if _scrape_do_text is not None
+                        else resp.text
+                    )
                     # When scrape.do render=true opens a JSON URL, Chrome wraps the
                     # content in <html><body><pre>…</pre></body></html>.  Strip it.
                     if _used_scrape_do_render:
@@ -1213,7 +1233,13 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
                         _raw_text = _raw_text[len(_strip_prefix):]
                     data = json.loads(_raw_text)
                 except Exception as exc:
-                    snippet = resp.text[:200].replace("\n", " ")
+                    _response_text = (
+                        _scrape_do_text
+                        if _scrape_do_text is not None
+                        else (resp.text if resp is not None else "")
+                    )
+                    snippet = _response_text[:200].replace("\n", " ")
+                    _api_url_failed = True
                     await _emit(
                         f"JSON decode failed: {exc} — "
                         f"response snippet: {snippet!r}"
@@ -1258,6 +1284,7 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
 
                 if not items:
                     if page_num == 0:
+                        _api_url_failed = True
                         top_keys = list(data.keys())[:10] if isinstance(data, dict) else type(data).__name__
                         await _emit(
                             f"0 items found — response top-level keys: {top_keys}. "
@@ -1334,6 +1361,17 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
                     current_page += 1
                 else:
                     offset += page_size
+
+            if _api_url_failed:
+                _failed_api_urls.append(_api_url)
+
+    if getattr(cfg, "require_all_urls", False) and _failed_api_urls:
+        await _emit(
+            "required API slice failed — discarding partial catalogue so "
+            f"fallback discovery can run ({len(_failed_api_urls)}/"
+            f"{len(_all_api_urls)} URL(s) failed)"
+        )
+        return []
 
     # ── Deduplicate by URL (preserve order) ──────────────────────────────────
     seen_urls: set[str] = set()

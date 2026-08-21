@@ -6,6 +6,7 @@ URL change at cutover time.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -56,24 +57,39 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
     try:
         from app.routers.auth import ensure_admin_user
 
-        await ensure_admin_user()
+        await asyncio.wait_for(ensure_admin_user(), timeout=10)
+    except TimeoutError:
+        log.warning(
+            "ensure_admin_user timed out after 10s (skipping so API can start)"
+        )
     except Exception:  # noqa: BLE001 -- startup must never crash the API
         log.exception("ensure_admin_user failed (skipping)")
     try:
         from app.database import AsyncSessionLocal
         from sqlalchemy import text as _text
 
-        async with AsyncSessionLocal() as _s:
-            await _s.execute(_text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
-            await _s.commit()
+        async def _ensure_pg_trgm() -> None:
+            async with AsyncSessionLocal() as _s:
+                await _s.execute(_text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
+                await _s.commit()
+
+        await asyncio.wait_for(_ensure_pg_trgm(), timeout=10)
         log.info("pg_trgm extension ensured")
+    except TimeoutError:
+        log.warning(
+            "pg_trgm setup timed out after 10s (skipping so API can start)"
+        )
     except Exception:  # noqa: BLE001
         log.exception("pg_trgm setup failed (fuzzy search unavailable)")
     try:
         from app.services.snapshot_store import is_enabled as _snap_enabled, setup_lifecycle_rules
         if _snap_enabled():
-            import asyncio as _asyncio
-            ok = await _asyncio.get_event_loop().run_in_executor(None, setup_lifecycle_rules)
+            ok = await asyncio.wait_for(
+                asyncio.get_running_loop().run_in_executor(
+                    None, setup_lifecycle_rules
+                ),
+                timeout=15,
+            )
             if ok:
                 log.info("[SNAPSHOT] enabled — S3 lifecycle rules applied (html=90d, json/pdf=365d)")
             else:
@@ -84,6 +100,11 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
             )
         else:
             log.info("[SNAPSHOT] disabled (set AWS_* env vars to enable; SNAPSHOT_ENABLED=false to suppress)")
+    except TimeoutError:
+        log.warning(
+            "[SNAPSHOT] startup check timed out after 15s "
+            "(skipping so API can start)"
+        )
     except Exception:  # noqa: BLE001
         log.exception("[SNAPSHOT] startup check failed (non-fatal)")
     yield

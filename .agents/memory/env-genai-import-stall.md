@@ -9,6 +9,9 @@ that load:
   (heavy pydantic-model compilation) does NOT finish within 75s.
 - `pytest` collection via `tests/conftest.py` (`from app.main import app`) pulls
   the whole app incl. google.genai and blows past the 120s tool budget.
+- A cold uvicorn restart can stall in FastAPI/Pydantic imports before the
+  application lifespan runs, so adding timeouts around lifespan startup work
+  does not solve this particular failure-to-open-port symptom.
 
 **This is CPU starvation, not a deadlock or a code bug** — the live workers
 already have everything imported and serve fine. It clears when a big scrape
@@ -30,3 +33,5 @@ finishes (observed load fall 36 -> 4 within minutes).
 
 **Why:** repeated 120s tool-timeouts on cold imports waste turns; the fix is to
 bypass conftest and stub the lazy SDK, or just wait for scrape load to drop.
+For a service restart, first stop the high-contention scrape workers/jobs, start
+FastAPI while resources are clear, verify health, and only then start Celery.

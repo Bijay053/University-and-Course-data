@@ -4,9 +4,10 @@
 # Sitemap lists /handbook/handbook-YYYY/course/<slug> which _dedup_year_variants
 # rewrites to /course/<slug> — no extra YAML needed for that rewrite.
 #
-# Cloudflare Enterprise blocks plain httpx on ALL fetches (BFS listing, sitemaps).
-# scrape_do_skip_fallbacks: true routes sitemap probes through Scrape.do static
-# (residential proxy, ~$0.0005/call) which bypasses Cloudflare.
+# Cloudflare Enterprise blocks plain httpx on ALL fetches (API, course pages,
+# BFS listing, and sitemaps). On 2026-08-21 Scrape.do static also returned
+# ROTATION_FAILED, while Scrape.do render returned complete API JSON and course
+# HTML. Discovery and extraction therefore both use the rendered proxy.
 # www.acu.edu.au is already in _ALWAYS_SITEMAP_SUPPLEMENT_HOSTS in discovery.py
 # so the sitemap is always probed regardless of BFS outcome.
 #
@@ -20,20 +21,25 @@ discovery:
   # never see the catalogue.  The grid's Vue app (coursesearchresult.js) reads
   # data-dataURL="/webapi/GetCourseResult/get" from #courses-search-results
   # and axios-GETs it with CourseType + sr (Sitecore search-root GUID, from
-  # the sr="..." attribute on the same element).  We call that JSON API
-  # directly — one request per CourseType slice, ~248 unique courses total
-  # (UG 118, PG 111, Research 5, Other 23; ResultCount=248 on every slice).
-  # Empty CourseType returns only 223 URLs, so we enumerate all 4 slices.
+  # the sr="..." attribute on the same element). We call that JSON API
+  # directly — one request per CourseType slice. Live verification on
+  # 2026-08-21 returned 109 UG + 109 PG + 5 Research + 18 Other rows,
+  # filtered/deduplicated to 197 eligible course URLs.
   # NOT paginated — each call returns the full slice (the grid's "show more"
   # is client-side batching of already-fetched rows).
-  # The /webapi/ endpoint is NOT Cloudflare-blocked for plain httpx (verified
-  # 2026-07-08: direct httpx 200 in 1s) — only page/sitemap fetches are.
+  # Direct /webapi/ requests now return Cloudflare 403. Rendered Scrape.do
+  # still returns the complete JSON catalogue.
   generic_search_api:
     url: "https://www.acu.edu.au/webapi/GetCourseResult/get?CourseType=Undergraduate&sr=%7B8E9AA42C-FDB2-49CE-AE29-7B34CBD33CAB%7D"
     additional_urls:
       - "https://www.acu.edu.au/webapi/GetCourseResult/get?CourseType=Postgraduate&sr=%7B8E9AA42C-FDB2-49CE-AE29-7B34CBD33CAB%7D"
       - "https://www.acu.edu.au/webapi/GetCourseResult/get?CourseType=Research&sr=%7B8E9AA42C-FDB2-49CE-AE29-7B34CBD33CAB%7D"
       - "https://www.acu.edu.au/webapi/GetCourseResult/get?CourseType=Other&sr=%7B8E9AA42C-FDB2-49CE-AE29-7B34CBD33CAB%7D"
+    fetch_via_scrape_do: true
+    scrape_do_render: true
+    # Every endpoint is a distinct catalogue slice. If one provider call
+    # exhausts retries, discard the partial list and let sitemap fallback run.
+    require_all_urls: true
     root_path: "CoursesResults"
     url_fields: ["URL"]
     title_fields: ["CourseName", "PageTitle"]
@@ -66,6 +72,27 @@ discovery:
   expected_min_courses: 80
 
 extraction:
+  # Direct HTTP and local datacenter Playwright are both blocked. Go straight
+  # to the verified residential browser tier, and never repeat a 60-second
+  # local browser rescue after that provider path has already failed.
+  scrape_do_render: true
+  scrape_do_skip_fallbacks: true
+  scrape_do_wait_for_ms: 1500
+  # ACU's template intentionally has no H1 (course_name comes from <title>).
+  # Do not mistake that known template shape for incomplete hydration and
+  # issue a second paid render at 3000 ms.
+  skip_render_hydration_retry: true
+  scrape_do_local_concurrency: 8
+  max_parallel_fetch: 8
+  skip_browser_rescue: true
+  skip_per_course_browser: true
+  skip_ai_when_text_empty: true
+
+  english:
+    # Fee + IELTS are visible text in rendered ACU pages. Avoid image OCR once
+    # those two core fields have already been extracted.
+    skip_vision_when_core_found: true
+
   # Static course pages have NO <h1>; the only name candidate is the page
   # <title>, which carries the CMS suffix "… | ACU courses" (verified live
   # 2026-07-08). Strip it before cleaning so staged names are pure degree
