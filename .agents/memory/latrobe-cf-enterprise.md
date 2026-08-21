@@ -64,36 +64,46 @@ second restart.
 Each 50-course Funnelback page passes ~30-40 through `_looks_like_course()`. Non-qualifying links are
 discipline hub pages (e.g. `/courses/accounting`) — correct rejections, not bugs.
 
-## Extraction fix stack (latrobe.yaml)
-- `scrape_do_render: true` + `scrape_do_skip_fallbacks: true` — CF Enterprise blocks all other transports on latrobe.edu.au
-- `skip_browser_rescue: true` + `skip_per_course_browser: true` — datacenter Playwright = CF 403; per-course browser path stalls 60-120s/batch
-- `skip_degree_qualifier_check: true` — Adobe Target prehide shell has no H1; "Professional Certificate" etc. not in `_DEGREE_QUALIFIER_RE`
-- `max_parallel_fetch: 3` — 1 is too slow; 3 ≈ 22 min/batch
-- `online_only.enabled: false` — prehide shell → no location text → online_only filter rejects all
-- `require_international_fee: false` — fees behind JS selector
-- `domestic_only.enabled: true` — filter domestic-only courses
+## One-session extraction through Cloudflare
 
-## Key timing insight for extraction
-`asyncio.gather` collects ALL results before staging loop. `max_parallel_fetch: 1` at 40s/course = 33+ min/batch before any saves. Must use ≥ 3.
+**Rule:** Use one rendered Scrape.do browser session per course. Preserve the
+course shell, read its `allDetailUrls` manifest, then top-level-navigate that same
+browser to the canonical international JSON. Decode Chromium's HTML-escaped
+`<pre>` response without running the generic embedded-HTML unescaper over the
+combined wrapper.
 
-**Why squiz.cloud endpoint is correct:** The squiz.cloud domain IS the Funnelback search engine. La Trobe's own search page is just a JS wrapper that AJAX-loads from squiz.cloud — it doesn't have the results in its initial HTML.
+**Why:** Direct/static requests fail, and an in-page `fetch()` from the rendered
+course returns 403. A top-level browser navigation succeeds. Separate course and
+JSON renders double provider traffic, while the generic unescaper corrupts JSON
+that contains a full HTML document.
 
-## Rendered JSON and the sub-30-minute path
+**How to apply:** Preserve the shell across navigation, return the selected
+detail URL with the prefetched document, and trust it only when it exactly
+matches the Python authority selector. Any missing, malformed, or mismatched
+prefetch must use a rendered canonical-detail fallback, never plain HTTP.
 
-Scrape.do `render=true` opens La Trobe's international detail JSON in Chromium,
-which returns an HTML document whose `<pre>` contains the HTML-escaped JSON.
-Treating the whole response as JSON makes every authoritative override fail even
-though fee, duration, intake, location, and English requirements are present.
+## Canonical variant selection
 
-**Rule:** Unwrap and HTML-decode the `<pre>` payload before JSON parsing. Once
-that authoritative response works, do not fetch the separate entry-requirements
-SPA tab or repeat the primary render just because the template has no visible H1.
+**Rule:** Browser and Python selectors must use the same order: earliest
+published numeric year, then campus `CI` > `BU` > `ON` > `SY` > first available.
 
-**Why:** The old route made roughly four paid renders per course (primary,
-doomed H1 retry, English tab, detail JSON), yet rejected the only response with
-complete structured data. At three courses in flight, 232 courses projected at
-55–80 minutes.
+**Why:** Different year/campus choices can carry different fees, durations, and
+entry requirements; silently pairing a later-year prefetched document with an
+earlier-year canonical URL stages incorrect data.
 
-**How to apply:** Keep one short primary render to obtain the detail manifest,
-then one detail-JSON request. Eight courses in flight is the controlled target
-for this host; it removes redundant calls rather than relying only on more load.
+**How to apply:** Keep selector-parity tests and URL-equality validation. Treat
+any mismatch as a fallback condition rather than accepting the prefetched JSON.
+
+## Concurrency for the sub-30-minute target
+
+**Rule:** Keep the shared Scrape.do default at five slots, but allow La Trobe
+eight in-flight provider requests with enough queued course tasks to saturate
+them.
+
+**Why:** Five slots measured about seven courses/minute and missed the target.
+Eight slots measured roughly 9–11 courses/minute, projecting 232-course
+extraction around 22–27 minutes without raising the global limit for other
+universities.
+
+**How to apply:** Scope the higher semaphore to La Trobe's validated config.
+Do not increase the global default or remove retry/backoff protections.

@@ -17,6 +17,17 @@
 discovery:
   always_sitemap_supplement: true
 
+  # Torrens publishes both real awards and faculty/topic landing pages under
+  # /courses/. The generic discovery hint deliberately crawls all of them so
+  # category pages can reveal their child courses, but only award-qualified
+  # detail URLs should reach extraction. The current sitemap shape is:
+  #   /courses/<discipline>/<award-qualified-slug>
+  # This gate keeps Bachelor/Master/Diploma/Certificate/Doctorate pages while
+  # dropping pages such as nursing-school, cloud-computing, hotel-management,
+  # faculty-of-education, and future unqualified topic slugs automatically.
+  course_detail_url_patterns:
+    - '^https?://(?:www\.)?torrens\.edu\.au/courses/[^/?#]+/(?:advanced-diploma|associate-degree|bachelor|certificate|diploma|doctor|doctorate|graduate-certificate|graduate-diploma|master|mba|phd|professional-doctorate|undergraduate-certificate)(?:-|(?:[/?#]|$))'
+
 extraction:
   text_cleaning:
     duration:

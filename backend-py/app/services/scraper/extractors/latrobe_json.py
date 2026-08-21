@@ -36,9 +36,73 @@ import re
 from typing import Any
 from urllib.parse import urlparse
 
-from app.services.scraper.http_fetcher import fetch_html
+from app.services.scraper.http_fetcher import fetch_html_scrape_do
 
 log = logging.getLogger("uniportal.scraper.latrobe_json")
+
+
+_CAPTURE_MANIFEST_AND_NAVIGATE = r"""(() => {
+  const source = document.documentElement.outerHTML;
+  const key = source.indexOf('"allDetailUrls"');
+  if (key < 0) {
+    window.name = JSON.stringify({courseHtml: source, error: "manifest_missing"});
+    return;
+  }
+  const start = source.indexOf("{", key);
+  let depth = 0, inString = false, escaped = false, end = -1;
+  for (let i = start; i < source.length; i++) {
+    const char = source[i];
+    if (escaped) { escaped = false; continue; }
+    if (char === "\\") { escaped = true; continue; }
+    if (char === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (char === "{") depth++;
+    else if (char === "}" && --depth === 0) { end = i + 1; break; }
+  }
+  if (end < 0) {
+    window.name = JSON.stringify({courseHtml: source, error: "manifest_unbalanced"});
+    return;
+  }
+  const allDetailUrls = JSON.parse(source.slice(start, end));
+  let detailUrl = "";
+  const campusPriority = ["CI", "BU", "ON", "SY"];
+  for (const year of Object.keys(allDetailUrls).sort()) {
+    const international = allDetailUrls[year] && allDetailUrls[year].international;
+    if (international && Object.keys(international).length) {
+      for (const campus of campusPriority) {
+        if (typeof international[campus] === "string") {
+          detailUrl = international[campus];
+          break;
+        }
+      }
+      if (!detailUrl) {
+        detailUrl = Object.values(international).find(
+          value => typeof value === "string"
+        ) || "";
+      }
+      break;
+    }
+  }
+  window.name = JSON.stringify({courseHtml: source, allDetailUrls, detailUrl});
+  if (detailUrl) window.location.assign(detailUrl);
+})()"""
+
+_COMBINE_COURSE_AND_DETAIL = r"""(() => {
+  try {
+    const result = JSON.parse(window.name || "{}");
+    result.detailText = result.detailUrl
+      ? ((document.querySelector("pre") || document.body).textContent || "")
+      : "";
+    const encoded = JSON.stringify(result)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    document.body.innerHTML = '<pre id="__latrobe_combined">' + encoded + "</pre>";
+  } catch (error) {
+    document.body.innerHTML = '<pre id="__latrobe_combined">' +
+      JSON.stringify({error: String(error)}) + "</pre>";
+  }
+})()"""
 
 
 def _decode_json_response(raw: str) -> dict[str, Any]:
@@ -61,6 +125,73 @@ def _decode_json_response(raw: str) -> dict[str, Any]:
     if not isinstance(doc, dict):
         raise ValueError("La Trobe detail response must be a JSON object")
     return doc
+
+
+async def fetch_course_bundle(
+    url: str,
+    *,
+    wait_for_ms: int = 3000,
+    local_concurrency_limit: int | None = None,
+) -> tuple[str | None, dict[str, Any] | None, str | None]:
+    """Fetch the course shell and international JSON in one browser request.
+
+    La Trobe blocks direct and in-page XHR access to the detail endpoint, but a
+    top-level navigation in the already-rendered Scrape.do browser succeeds.
+    The browser actions preserve the original course HTML in ``window.name``,
+    navigate to the authoritative JSON URL, then return both documents in one
+    ``<pre>`` wrapper. The selected detail URL is returned with the document so
+    :func:`apply_overrides` can verify it matches Python's canonical selector.
+    Any malformed/partial result returns ``(None, None, None)`` so the caller
+    can use the established rendered fallback.
+    """
+    actions: list[dict[str, object]] = [
+        {"Action": "Execute", "Execute": _CAPTURE_MANIFEST_AND_NAVIGATE},
+        {"Action": "Wait", "Timeout": 8000},
+        {"Action": "Execute", "Execute": _COMBINE_COURSE_AND_DETAIL},
+        {"Action": "Wait", "Timeout": 200},
+    ]
+    raw = await fetch_html_scrape_do(
+        url,
+        render=True,
+        wait_for_ms=wait_for_ms,
+        play_with_browser=actions,
+        unescape_json_html=False,
+        local_concurrency_limit=local_concurrency_limit,
+    )
+    if not raw:
+        return None, None, None
+    try:
+        bundle = _decode_json_response(raw)
+    except (json.JSONDecodeError, ValueError):
+        log.warning("[LATROBE BUNDLE] %s — combined browser response was invalid", url)
+        return None, None, None
+
+    course_html = bundle.get("courseHtml")
+    if not isinstance(course_html, str) or not course_html:
+        log.warning("[LATROBE BUNDLE] %s — original course HTML was not preserved", url)
+        return None, None, None
+
+    detail_doc: dict[str, Any] | None = None
+    detail_url = bundle.get("detailUrl")
+    if not isinstance(detail_url, str) or not detail_url:
+        detail_url = None
+    detail_text = bundle.get("detailText")
+    if isinstance(detail_text, str) and detail_text.strip():
+        try:
+            detail_doc = _decode_json_response(detail_text)
+        except (json.JSONDecodeError, ValueError):
+            log.warning(
+                "[LATROBE BUNDLE] %s — navigated detail response was invalid; "
+                "the normal detail fetch will retry",
+                url,
+            )
+    log.info(
+        "[LATROBE BUNDLE] %s — one browser request preserved %dB course HTML; detail=%s",
+        url,
+        len(course_html),
+        "ready" if detail_doc else "fallback",
+    )
+    return course_html, detail_doc, detail_url
 
 
 # ── Host gate ────────────────────────────────────────────────────────────
@@ -537,6 +668,9 @@ async def apply_overrides(
     *,
     url: str = "",
     evidence: list[dict[str, Any]] | None = None,
+    prefetched_doc: dict[str, Any] | None = None,
+    prefetched_url: str | None = None,
+    local_concurrency_limit: int | None = None,
 ) -> dict[str, Any]:
     """Async — fetches the per-course international JSON and overrides.
 
@@ -578,15 +712,38 @@ async def apply_overrides(
             log.info("[LATROBE JSON] %s — no international detail URL in allDetailUrls", url)
         return applied
 
-    raw = await fetch_html(intl_url)
-    if not raw:
-        log.warning("[LATROBE JSON] %s — fetch of detail URL %s failed", url, intl_url)
-        return applied
-    try:
-        doc = _decode_json_response(raw)
-    except (json.JSONDecodeError, ValueError) as exc:
-        log.warning("[LATROBE JSON] %s — invalid JSON at %s: %s", url, intl_url, exc)
-        return applied
+    doc: dict[str, Any] | None = None
+    if prefetched_doc is not None and prefetched_url == intl_url:
+        doc = prefetched_doc
+        log.info("[LATROBE JSON] %s — using detail prefetched in course browser", url)
+    elif prefetched_doc is not None:
+        log.warning(
+            "[LATROBE JSON] %s — prefetched detail URL mismatch "
+            "(browser=%s canonical=%s); using rendered canonical fallback",
+            url,
+            prefetched_url,
+            intl_url,
+        )
+
+    if doc is None:
+        raw = await fetch_html_scrape_do(
+            intl_url,
+            render=True,
+            wait_for_ms=0,
+            local_concurrency_limit=local_concurrency_limit,
+        )
+        if not raw:
+            log.warning(
+                "[LATROBE JSON] %s — rendered fetch of detail URL %s failed",
+                url,
+                intl_url,
+            )
+            return applied
+        try:
+            doc = _decode_json_response(raw)
+        except (json.JSONDecodeError, ValueError) as exc:
+            log.warning("[LATROBE JSON] %s — invalid JSON at %s: %s", url, intl_url, exc)
+            return applied
 
     data = (doc or {}).get("data") or {}
     if not data:

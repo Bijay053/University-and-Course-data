@@ -3173,6 +3173,17 @@ class ExtractionConfig(BaseModel):
             "Has no effect unless scrape_do_render is True. Default: 3000."
         ),
     )
+    scrape_do_local_concurrency: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=16,
+        description=(
+            "Optional per-university override for the in-process Scrape.do "
+            "request semaphore during extraction. Leave unset to keep the "
+            "global max_scrape_do_concurrency safety default. Use only for "
+            "network-bound hosts whose provider plan has verified headroom."
+        ),
+    )
     skip_render_hydration_retry: bool = Field(
         default=False,
         description=(

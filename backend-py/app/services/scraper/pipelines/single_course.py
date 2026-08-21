@@ -1267,6 +1267,11 @@ async def extract_course(
     _extr_wait_ms: int = int(
         getattr(getattr(_uc, "extraction", None), "scrape_do_wait_for_ms", 3000) or 3000
     )
+    _scrape_do_local_concurrency: int | None = getattr(
+        getattr(_uc, "extraction", None),
+        "scrape_do_local_concurrency",
+        None,
+    )
     _skip_render_hydration_retry: bool = bool(
         getattr(
             getattr(_uc, "extraction", None),
@@ -1286,6 +1291,12 @@ async def extract_course(
     # Populated by the secondary tab render fetch below; merged into _gp_html
     # before the Gemini extraction call so all tab data is visible in one pass.
     _secondary_html: str | None = None
+    # La Trobe can preserve the course shell and top-level-navigate to its
+    # authoritative JSON inside one Scrape.do browser request. The decoded
+    # detail document is passed to the late authority override so no second
+    # provider request is needed.
+    _latrobe_prefetched_doc: dict | None = None
+    _latrobe_prefetched_url: str | None = None
     # Geo-block bypass: SSR pages that serve country-welcome overlays for US
     # IPs (Lancaster).  Uses Scrape.do static proxy (~$0.0005/call), no JS.
     _use_scrape_do_static: bool = bool(
@@ -1508,7 +1519,28 @@ async def extract_course(
             _http_attempted = True
             if _use_scrape_do_render:
                 with scrape_do_render_scope():
-                    html = await fetch_html(url, wait_for_ms=_extr_wait_ms)
+                    from app.services.scraper.extractors import (
+                        latrobe_json as _latrobe_fetch,
+                    )
+                    if _latrobe_fetch.is_latrobe_host(url):
+                        (
+                            html,
+                            _latrobe_prefetched_doc,
+                            _latrobe_prefetched_url,
+                        ) = (
+                            await _latrobe_fetch.fetch_course_bundle(
+                                url,
+                                wait_for_ms=_extr_wait_ms,
+                                local_concurrency_limit=_scrape_do_local_concurrency,
+                            )
+                        )
+                        if not html:
+                            html = await fetch_html(
+                                url,
+                                wait_for_ms=_extr_wait_ms,
+                            )
+                    else:
+                        html = await fetch_html(url, wait_for_ms=_extr_wait_ms)
                 # Partial-hydration guard: React SPAs can return a page where
                 # SSR'd body text (e.g. IELTS paragraphs) is present but the
                 # H1 component hasn't finished rendering yet.  fetch_html
@@ -5698,7 +5730,13 @@ async def extract_course(
         if _latrobe_json.is_latrobe_host(url):
             try:
                 await _latrobe_json.apply_overrides(
-                    payload, html, url=url, evidence=evidence
+                    payload,
+                    html,
+                    url=url,
+                    evidence=evidence,
+                    prefetched_doc=_latrobe_prefetched_doc,
+                    prefetched_url=_latrobe_prefetched_url,
+                    local_concurrency_limit=_scrape_do_local_concurrency,
                 )
             except Exception as _ltu_exc:  # noqa: BLE001 — never break a scrape
                 log.warning("latrobe_json override failed on %s: %s", url, _ltu_exc)

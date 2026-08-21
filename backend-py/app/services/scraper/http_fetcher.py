@@ -23,6 +23,7 @@ Cloudflare bypass — three-tier fallback (cheapest first):
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import time
@@ -140,7 +141,9 @@ def _get_sem() -> asyncio.Semaphore:
     return _loop_sem("http", settings.max_http_concurrency)
 
 
-def _get_scrape_do_sem() -> asyncio.Semaphore:
+def _get_scrape_do_sem(
+    local_concurrency_limit: int | None = None,
+) -> asyncio.Semaphore:
     """In-process cap on concurrent Scrape.do requests (current loop).
 
     See config.py `max_scrape_do_concurrency` for the QMUL burst-failure
@@ -150,7 +153,14 @@ def _get_scrape_do_sem() -> asyncio.Semaphore:
     window, producing genuine fetch_failed results for URLs that fetch fine
     in isolation.
     """
-    return _loop_sem("scrape_do", settings.max_scrape_do_concurrency)
+    limit = (
+        settings.max_scrape_do_concurrency
+        if local_concurrency_limit is None
+        else max(1, int(local_concurrency_limit))
+    )
+    # Include the limit in the key so a per-university override cannot reuse a
+    # semaphore that was already created with the global default in this loop.
+    return _loop_sem(f"scrape_do:{limit}", limit)
 
 # ---------------------------------------------------------------------------
 # Per-process Cloudflare fast-path cache
@@ -428,6 +438,9 @@ async def fetch_html_scrape_do(
     geo_code: str | None = None,
     rate_limit: bool = True,
     max_retries: int | None = None,
+    play_with_browser: list[dict[str, object]] | None = None,
+    unescape_json_html: bool = True,
+    local_concurrency_limit: int | None = None,
 ) -> str | None:
     """Fetch via Scrape.do residential proxy — paid tier-4/5 Cloudflare bypass.
 
@@ -481,6 +494,11 @@ async def fetch_html_scrape_do(
     if render:
         params["render"] = "true"
         params["waitFor"] = str(wait_for_ms)
+    if play_with_browser:
+        params["playWithBrowser"] = json.dumps(
+            play_with_browser,
+            separators=(",", ":"),
+        )
     if geo_code:
         params["geoCode"] = geo_code.upper()
     # T03: Exponential-backoff retry for transient Scrape.do failures.
@@ -527,7 +545,7 @@ async def fetch_html_scrape_do(
             # rest of the fleet.  account_slot() is a no-op unless
             # scrape_do_account_concurrency > 0 and fails open on any Redis error.
             from app.services.scraper.scrape_do_semaphore import account_slot
-            async with _get_scrape_do_sem():
+            async with _get_scrape_do_sem(local_concurrency_limit):
                 async with account_slot():
                     async with httpx.AsyncClient(timeout=90, follow_redirects=True) as c:
                         _last_sd_r = await c.get("https://api.scrape.do", params=params)
@@ -544,7 +562,11 @@ async def fetch_html_scrape_do(
                         _sd_ctrs["render"] += 1
                     else:
                         _sd_ctrs["static"] += 1
-                html_result = _unescape_json_html(_last_sd_r.text)
+                html_result = (
+                    _unescape_json_html(_last_sd_r.text)
+                    if unescape_json_html
+                    else _last_sd_r.text
+                )
                 # Stage the final fetched HTML so _extract_only() can save it
                 # to S3 *after* extract_course() completes.  This ensures only
                 # the winning fetch (not retries or intermediate fallbacks) is

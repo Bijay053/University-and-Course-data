@@ -197,7 +197,7 @@ class TestScrapeDoSemaphore:
         # a coroutine must never hold a scarce account slot while merely
         # queueing behind its own process's semaphore.
         src = (_SCRAPER_DIR / "http_fetcher.py").read_text(encoding="utf-8")
-        i = src.index("async with _get_scrape_do_sem():")
+        i = src.index("async with _get_scrape_do_sem(")
         assert "async with account_slot():" in src[i : i + 120], (
             "account_slot must be nested INSIDE the local Scrape.do semaphore"
         )

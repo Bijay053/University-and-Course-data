@@ -102,28 +102,26 @@ extraction:
   # manifest, which is available without waiting for the hidden SPA text.
   scrape_do_wait_for_ms: 3000
 
+  # The shared Scrape.do safety default is five in-flight requests, which
+  # measured at ~7 courses/minute for this one-request browser bundle and still
+  # missed the 30-minute SLA. Eight stays below Scrape.do's rendered-request
+  # plan ceiling while leaving the global five-slot default unchanged.
+  scrape_do_local_concurrency: 8
+
   # La Trobe's template has no visible H1 even after a longer render. Retrying
   # every page at 12 s duplicated the most expensive request without improving
   # the response. The Funnelback title + international JSON are authoritative.
   skip_render_hydration_retry: true
 
-  # La Trobe uses hash-based SPA routing (#/overview, #/entry-requirements).
-  # Without a fragment, scrape.do renders the default (domestic) view with
-  # no fee/IELTS data. Two fragment fetches are configured:
-  #
-  #   Primary   — #/overview?studentType=int
-  #               Renders the Overview tab with: Annual tuition fee, Duration,
-  #               Start dates, Learning mode (all visible in the course summary
-  #               table on the international view).
-  #
-  # IELTS and band requirements are read from entryReq.engReq in the
-  # authoritative international JSON, so a second rendered tab is unnecessary.
+  # The overview route exposes allDetailUrls. A browser action preserves that
+  # page, selects the same year/campus variant as the Python authority resolver,
+  # and top-level-navigates to its international JSON in the same request.
+  # English requirements are read from entryReq.engReq in that JSON.
   primary_fetch_fragment: "#/overview?studentType=int"
 
-  # Eight courses in flight stays below the worker's hard ceiling and is already
-  # used safely for other Scrape.do-only hosts. With only one page render plus
-  # one short JSON request per course, 232 courses fit comfortably under 30 min.
-  max_parallel_fetch: 8
+  # Keep enough course tasks queued to saturate the eight provider slots while
+  # staying inside the orchestrator's explicit per-university hard ceiling.
+  max_parallel_fetch: 16
 
   filters:
     domestic_only:
