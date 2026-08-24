@@ -21,6 +21,11 @@ class StartScrapeBody(BaseModel):
     # C1 (fetch-layer brief): bypass the 7-day discovery URL cache and force a
     # full fresh discovery crawl for this run.
     force_discovery: bool = Field(default=False, alias="forceDiscovery")
+    # A focused retry/re-extract job supplies the already-known course pages
+    # here. The orchestrator bypasses all catalogue discovery when this is
+    # non-empty, but still uses the ordinary extraction and staging pipeline.
+    course_urls: list[str] = Field(default_factory=list, alias="courseUrls")
+    retry_source_job_id: str | None = Field(default=None, alias="retrySourceJobId")
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
 

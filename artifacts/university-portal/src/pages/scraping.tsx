@@ -705,6 +705,20 @@ export default function Scraping() {
   // (matches the live Review table). Keep it loose here — the component
   // owns the strict typing.
   type HistoryStagedCourse = ReviewStagedCourse & { evidence: ReviewEvidenceItem[] };
+  type UnresolvedCourseUrl = {
+    url: string;
+    courseName: string | null;
+    reason: string;
+    detail: string | null;
+    sourceError: string | null;
+    retryError: string | null;
+    createdAt: string | null;
+  };
+  type HistoryDetail = {
+    logs: HistoryLogEntry[];
+    stagedCourses: HistoryStagedCourse[];
+    unresolvedCourses: UnresolvedCourseUrl[];
+  };
   type RecoverySummary = {
     coursesWithRecovery: number;
     pending: number;
@@ -749,10 +763,12 @@ export default function Scraping() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
   const [historyDetailLoading, setHistoryDetailLoading] = useState(false);
-  const [historyDetail, setHistoryDetail] = useState<{ logs: HistoryLogEntry[]; stagedCourses: HistoryStagedCourse[] } | null>(null);
+  const [historyDetail, setHistoryDetail] = useState<HistoryDetail | null>(null);
   const [historyView, setHistoryView] = useState<"logs" | "courses">("logs");
   const [historyLogFilter, setHistoryLogFilter] = useState("");
   const [recoverySummaries, setRecoverySummaries] = useState<Record<string, RecoverySummary>>({});
+  const [selectedUnresolvedUrls, setSelectedUnresolvedUrls] = useState<Record<string, Set<string>>>({});
+  const [retryingUnresolvedJob, setRetryingUnresolvedJob] = useState<string | null>(null);
   // Compare / Restore state
   const [historySelected, setHistorySelected] = useState<Set<string>>(new Set());
   const [comparing, setComparing] = useState(false);
@@ -846,8 +862,17 @@ export default function Scraping() {
         fetch(`/api/scrape/history/${runtimeJobId}`),
         fetch(`/api/scrape/recovery/summary/${runtimeJobId}`),
       ]);
-      const data = await readResponseJson<{ logs: HistoryLogEntry[]; stagedCourses: HistoryStagedCourse[] }>(detailRes);
-      setHistoryDetail({ logs: data?.logs ?? [], stagedCourses: data?.stagedCourses ?? [] });
+      const data = await readResponseJson<HistoryDetail>(detailRes);
+      const unresolvedCourses = data?.unresolvedCourses ?? [];
+      setHistoryDetail({
+        logs: data?.logs ?? [],
+        stagedCourses: data?.stagedCourses ?? [],
+        unresolvedCourses,
+      });
+      setSelectedUnresolvedUrls((prev) => ({
+        ...prev,
+        [runtimeJobId]: new Set(unresolvedCourses.map((course) => course.url)),
+      }));
       try {
         const summary = await readResponseJson<RecoverySummary>(summaryRes);
         if (summary) {
@@ -857,11 +882,54 @@ export default function Scraping() {
         // non-fatal — recovery summary is an enhancement
       }
     } catch {
-      setHistoryDetail({ logs: [], stagedCourses: [] });
+      setHistoryDetail({ logs: [], stagedCourses: [], unresolvedCourses: [] });
     } finally {
       setHistoryDetailLoading(false);
     }
   }, [expandedHistoryId, historyView]);
+
+  const toggleUnresolvedUrl = useCallback((jobId: string, url: string) => {
+    setSelectedUnresolvedUrls((prev) => {
+      const next = new Set(prev[jobId] ?? []);
+      if (next.has(url)) next.delete(url); else next.add(url);
+      return { ...prev, [jobId]: next };
+    });
+  }, []);
+
+  const retrySelectedUnresolvedUrls = useCallback(async (jobId: string) => {
+    const urls = [...(selectedUnresolvedUrls[jobId] ?? [])];
+    if (urls.length === 0) {
+      toast({ title: "Select at least one unresolved URL", variant: "destructive" });
+      return;
+    }
+    setRetryingUnresolvedJob(jobId);
+    try {
+      const res = await fetch(`/api/scrape/history/${jobId}/retry-unresolved`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ urls }),
+      });
+      if (!res.ok) {
+        toast({
+          title: "Could not queue retry",
+          description: await getFetchErrorMessage(res),
+          variant: "destructive",
+        });
+        return;
+      }
+      const data = await readResponseJson<{ jobId: string }>(res);
+      toast({
+        title: `Retry queued for ${urls.length} URL${urls.length === 1 ? "" : "s"}`,
+        description: data?.jobId ? `Focused job: ${data.jobId}` : "Only the selected course pages will be retried.",
+      });
+      await fetchHistory();
+    } catch {
+      toast({ title: "Could not queue retry", description: "Network error", variant: "destructive" });
+    } finally {
+      setRetryingUnresolvedJob(null);
+    }
+  }, [fetchHistory, selectedUnresolvedUrls, toast]);
 
   useEffect(() => {
     void fetchHistory();
@@ -3656,6 +3724,81 @@ export default function Scraping() {
 
                   {isExpanded && (
                     <div className="border-t bg-gray-50 p-3 sm:p-4">
+                      {/* ── Unresolved recovery URLs ─────────────────────────── */}
+                      {(() => {
+                        const unresolved = historyDetail?.unresolvedCourses ?? [];
+                        if (unresolved.length === 0) return null;
+                        const selected = selectedUnresolvedUrls[run.runtimeJobId] ?? new Set<string>();
+                        const allSelected = selected.size === unresolved.length;
+                        return (
+                          <div className="mb-3 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3">
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                              <AlertTriangle className="w-4 h-4 text-orange-600 shrink-0" />
+                              <span className="text-sm font-semibold text-orange-900">Unresolved course URLs</span>
+                              <span className="text-xs text-orange-700">
+                                {unresolved.length} still need{unresolved.length === 1 ? "s" : ""} review after recovery
+                              </span>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="ml-auto h-7 border-orange-300 bg-white text-orange-800 hover:bg-orange-100"
+                                onClick={() => {
+                                  setSelectedUnresolvedUrls((prev) => ({
+                                    ...prev,
+                                    [run.runtimeJobId]: allSelected
+                                      ? new Set<string>()
+                                      : new Set(unresolved.map((course) => course.url)),
+                                  }));
+                                }}
+                              >
+                                {allSelected ? "Clear selection" : "Select all"}
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="h-7 bg-orange-600 text-white hover:bg-orange-700"
+                                disabled={selected.size === 0 || retryingUnresolvedJob === run.runtimeJobId}
+                                onClick={() => void retrySelectedUnresolvedUrls(run.runtimeJobId)}
+                              >
+                                {retryingUnresolvedJob === run.runtimeJobId
+                                  ? <><Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />Queueing…</>
+                                  : <><Play className="mr-1 h-3.5 w-3.5" />Retry selected ({selected.size})</>}
+                              </Button>
+                            </div>
+                            <p className="mb-2 text-xs text-orange-800">
+                              This starts a focused job for only the selected URLs. It does not rediscover the university catalogue.
+                            </p>
+                            <div className="max-h-56 overflow-auto rounded border border-orange-100 bg-white">
+                              {unresolved.map((course) => (
+                                <label
+                                  key={course.url}
+                                  className="flex cursor-pointer items-start gap-2 border-b border-orange-50 px-3 py-2 last:border-b-0 hover:bg-orange-50/60"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={selected.has(course.url)}
+                                    onChange={() => toggleUnresolvedUrl(run.runtimeJobId, course.url)}
+                                    className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-orange-600"
+                                  />
+                                  <span className="min-w-0 text-xs">
+                                    <span className="block break-all font-mono text-slate-700">{course.url}</span>
+                                    <span className="mt-0.5 block text-orange-800">
+                                      Reason: <strong>{course.reason}</strong>
+                                      {course.detail ? ` — ${course.detail}` : ""}
+                                    </span>
+                                    {(course.retryError || course.sourceError) && (
+                                      <span className="mt-0.5 block break-words text-slate-500">
+                                        {course.retryError || course.sourceError}
+                                      </span>
+                                    )}
+                                  </span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
                       {/* ── Recovery Summary ─────────────────────────────────── */}
                       {(() => {
                         const rs = recoverySummaries[run.runtimeJobId];

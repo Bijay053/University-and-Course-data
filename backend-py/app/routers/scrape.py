@@ -58,6 +58,31 @@ def _nan_to_none(v):
     return v
 
 
+def _unresolved_history_entries(logs: list[dict]) -> list[dict]:
+    """Extract the latest actionable recovery-sweep failure for each URL."""
+    by_url: dict[str, dict] = {}
+    for entry in logs:
+        payload = entry.get("payload")
+        if not isinstance(payload, dict):
+            payload = {}
+        if (payload.get("kind") or entry.get("kind")) != "sweep_unresolved":
+            continue
+        url = payload.get("url") or entry.get("url")
+        if not isinstance(url, str) or not url.strip():
+            continue
+        url = url.strip()
+        by_url[url] = {
+            "url": url,
+            "courseName": payload.get("course_name") or entry.get("course_name"),
+            "reason": payload.get("reason") or entry.get("reason") or "unresolved",
+            "detail": payload.get("detail") or entry.get("detail"),
+            "sourceError": payload.get("source_error") or entry.get("source_error"),
+            "retryError": payload.get("retry_error") or entry.get("retry_error"),
+            "createdAt": entry.get("createdAt"),
+        }
+    return list(by_url.values())
+
+
 def _staged_row_to_dict(r) -> dict:
     """Build complete UI-friendly dict from a ScrapedCourse row.
 
@@ -458,7 +483,7 @@ async def start_scrape(
         university_id=uni.id,
         university_name=uni.name,
         url=discovery_url,
-        job_type="single",
+        job_type="targeted" if body.course_urls else "single",
         status="queued",
         fast_mode=body.fast_mode,
         request_payload={
@@ -480,6 +505,11 @@ async def start_scrape(
             "defaultStudyMode": body.default_study_mode or None,
             # C1: bypass the 7-day discovery URL cache for this run.
             "forceDiscovery": bool(body.force_discovery),
+            # Focused retries use these links directly and never rediscover the
+            # university catalogue. Keep both casings for mixed worker support.
+            "courseUrls": body.course_urls,
+            "course_urls": body.course_urls,
+            "retrySourceJobId": body.retry_source_job_id,
         },
     )
     db.add(job)
@@ -1270,6 +1300,7 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
     # use negative sequence numbers so they naturally precede real log lines
     # recorded at the same second.
     logs.sort(key=_ts_sort_key)
+    unresolved_courses = _unresolved_history_entries(logs)
 
     # Staged courses for this job — return full ReviewStagedCourse shape so
     # ReviewScrapedCoursesTable renders correctly in the history "View Courses" panel.
@@ -1326,7 +1357,70 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
         },
         "logs": logs,
         "stagedCourses": staged,
+        "unresolvedCourses": unresolved_courses,
     }
+
+
+class RetryUnresolvedBody(BaseModel):
+    """Selected URLs from one scrape run's unresolved recovery-sweep records."""
+
+    urls: list[str] = Field(min_length=1, max_length=200)
+
+
+@router.post("/history/{job_id}/retry-unresolved", response_model=ScrapeStartResponse, status_code=status.HTTP_202_ACCEPTED)
+async def retry_unresolved_history_urls(
+    job_id: str,
+    body: RetryUnresolvedBody,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ScrapeStartResponse:
+    """Queue a focused retry using only URLs recorded unresolved by this run."""
+    job = await db.get(ScrapeRuntimeJob, job_id)
+    if not job or not job.university_id:
+        raise HTTPException(status_code=404, detail="Scrape job not found")
+
+    rows = (await db.execute(
+        text(
+            "SELECT payload, created_at FROM scrape_runtime_logs "
+            "WHERE runtime_job_id = :job_id ORDER BY sequence"
+        ),
+        {"job_id": job_id},
+    )).all()
+    unresolved = _unresolved_history_entries([
+        {
+            "payload": payload,
+            "createdAt": created_at.isoformat() if created_at else None,
+        }
+        for payload, created_at in rows
+    ])
+    known_urls = {entry["url"] for entry in unresolved}
+    selected_urls: list[str] = []
+    seen: set[str] = set()
+    for raw_url in body.urls:
+        url = raw_url.strip()
+        if url in known_urls and url not in seen:
+            selected_urls.append(url)
+            seen.add(url)
+
+    if not selected_urls:
+        raise HTTPException(
+            status_code=400,
+            detail="Select one or more URLs still unresolved by this scrape run",
+        )
+    if len(selected_urls) != len({url.strip() for url in body.urls}):
+        raise HTTPException(
+            status_code=400,
+            detail="One or more selected URLs are not unresolved URLs for this scrape run",
+        )
+
+    return await start_scrape(
+        StartScrapeBody(
+            url=job.url,
+            universityId=job.university_id,
+            courseUrls=selected_urls,
+            retrySourceJobId=job_id,
+        ),
+        db,
+    )
 
 
 @router.get("/export")
@@ -1517,15 +1611,10 @@ async def rescrape_courses(
         ).scalars().all()
         target_urls = [r.course_website for r in rows if r.course_website]
 
-    scrape_url = (
-        target_urls[0]
-        if len(target_urls) == 1
-        else (uni.scrape_url or uni.website or "")
-    )
-
     scrape_body = StartScrapeBody(
-        url=scrape_url,
+        url=uni.scrape_url or uni.website or "",
         universityId=body.university_id,
+        courseUrls=target_urls,
     )
     return await start_scrape(scrape_body, db)
 

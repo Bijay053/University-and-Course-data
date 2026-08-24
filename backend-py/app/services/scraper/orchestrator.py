@@ -852,6 +852,69 @@ async def _already_staged_urls(
     return {_normalize_course_url(u) for u in rows if u}
 
 
+def _target_course_urls_from_payload(payload: dict | None) -> list[str]:
+    """Return a bounded, deduplicated list of explicitly requested course URLs.
+
+    Focused retries are deliberately carried through the normal scrape worker
+    instead of using a shortcut extractor.  This helper only decides whether
+    discovery should be skipped; all timeout, circuit-breaker, staging, and
+    delivery-filter safeguards remain on the regular execution path.
+    """
+    from urllib.parse import urlparse
+
+    raw_urls = (payload or {}).get("courseUrls") or (payload or {}).get("course_urls") or []
+    if not isinstance(raw_urls, list):
+        return []
+
+    urls: list[str] = []
+    seen: set[str] = set()
+    for raw_url in raw_urls[:200]:
+        if not isinstance(raw_url, str):
+            continue
+        url = raw_url.strip()
+        parsed = urlparse(url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            continue
+        key = _normalize_course_url(url)
+        if key in seen:
+            continue
+        seen.add(key)
+        urls.append(url)
+    return urls
+
+
+def _inject_extra_course_urls(
+    links: list[dict],
+    extra_urls: list[str],
+    *,
+    targeted_retry: bool,
+) -> tuple[int, int]:
+    """Apply the YAML discovery override, never expanding a focused retry."""
+    if targeted_retry:
+        return 0, 0
+
+    insert_pos = max(0, len(links) // 3)
+    injected = 0
+    moved = 0
+    for extra_url in extra_urls:
+        existing_idx = next(
+            (i for i, item in enumerate(links) if item["url"] == extra_url), None
+        )
+        if existing_idx is not None:
+            item = links.pop(existing_idx)
+            adjusted_pos = (
+                insert_pos
+                if existing_idx >= insert_pos
+                else max(0, insert_pos - 1)
+            )
+            links.insert(adjusted_pos, item)
+            moved += 1
+        else:
+            links.insert(insert_pos, {"url": extra_url, "name": ""})
+            injected += 1
+    return injected, moved
+
+
 async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
     """Execute one scrape job.
 
@@ -1386,9 +1449,25 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # summary line — Discovery / Extraction / Sweep / Staging.  The 30-min
         # budget can't be managed without seeing where the time goes.
         _ph_marks: dict[str, float] = {"disc_start": time.monotonic()}
-        log.info("Discovering course links from %s (fast_mode=%s)", scrape_url, job.fast_mode)
-        await emit("status", f"Fetching {scrape_url}...", phase="fetch")
-        await emit("status", "Discovering candidate course pages...", phase="discover")
+        _target_course_urls = _target_course_urls_from_payload(job.request_payload)
+        _targeted_retry = bool(_target_course_urls)
+        if _targeted_retry:
+            log.info(
+                "Targeted retry for %s selected course URL(s) (fast_mode=%s)",
+                len(_target_course_urls), job.fast_mode,
+            )
+            await emit(
+                "status",
+                f"[TARGETED RETRY] retrying {len(_target_course_urls)} selected course URL(s) without discovery",
+                phase="discover",
+                kind="targeted_retry",
+                count=len(_target_course_urls),
+                retry_source_job_id=(job.request_payload or {}).get("retrySourceJobId"),
+            )
+        else:
+            log.info("Discovering course links from %s (fast_mode=%s)", scrape_url, job.fast_mode)
+            await emit("status", f"Fetching {scrape_url}...", phase="fetch")
+            await emit("status", "Discovering candidate course pages...", phase="discover")
 
         # CSU international listing is a React SPA — plain HTTP returns 0 links
         # and the sitemap only has domestic /courses/ URLs.  Use Playwright to
@@ -1398,7 +1477,10 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # pages, just not course pages — we want to send them to the central fee
         # parser later instead of discarding them).
         _discover_blocked_fee_urls: list[str] = []
-        links: list[dict] = []
+        links: list[dict] = [
+            {"url": url, "name": "Targeted retry"}
+            for url in _target_course_urls
+        ]
 
         # Read browser-first flag early so we can skip BFS when configured.
         # When always_browser_discover=True, the browser discovery step below
@@ -1407,7 +1489,10 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # time, triggers sitemap + 7 alt-path probes that all fail, and may
         # extend the Cloudflare rate-limit window — all for zero gain since
         # browser discovery subsumes the BFS result set.
-        _always_browser = getattr(_uni_cfg.discovery, "always_browser_discover", False)
+        _always_browser = (
+            False if _targeted_retry
+            else getattr(_uni_cfg.discovery, "always_browser_discover", False)
+        )
 
         # ── C1 (fetch-layer brief): 7-day discovery URL cache ────────────────
         # A fresh discovery pass (BFS crawl + sitemap probes + browser + Wayback)
@@ -1436,7 +1521,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             or getattr(_uni_cfg.discovery, "tafensw_api", None) is not None
             or getattr(_uni_cfg.discovery, "melbournepolytechnic_api", None) is not None
         )
-        if not _c1_force and not _c1_has_api_provider:
+        if not _targeted_retry and not _c1_force and not _c1_has_api_provider:
             try:
                 from app.models import DiscoveryUrlCache as _DUC
                 _c1_row = await db.get(_DUC, uni_id)
@@ -1515,7 +1600,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 len(_recipe_seeds), len(_merged_seeds),
             )
 
-        if _recipe.get("discovery_strategy") == "json_api" and _recipe.get("api"):
+        if not _targeted_retry and _recipe.get("discovery_strategy") == "json_api" and _recipe.get("api"):
             _api_endpoint = (_recipe.get("api") or {}).get("endpoint", "")
             log.info(
                 "[RECIPE] discovery_strategy=json_api endpoint=%s — "
@@ -1561,7 +1646,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # individual course links. Per-course HTML extraction still runs
         # normally on each qualification's own page (links-only provider).
         _sruc_api_cfg = getattr(_uni_cfg.discovery, "sruc_api", None)
-        if _sruc_api_cfg is not None and getattr(_sruc_api_cfg, "enabled", True):
+        if not _targeted_retry and _sruc_api_cfg is not None and getattr(_sruc_api_cfg, "enabled", True):
             from app.services.scraper.sruc_api import fetch_sruc_links
             log.info("[SRUC_API] sruc_api discovery configured — querying CourseApi ...")
             _sruc_error: str | None = None
@@ -1592,7 +1677,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # provider).  Per-course pages are Cloudflare-protected; the extractor
         # must route via scrape.do (extraction.use_scrape_do: true in YAML).
         _manchester_xml_cfg = getattr(_uni_cfg.discovery, "manchester_xml", None)
-        if _manchester_xml_cfg is not None and getattr(_manchester_xml_cfg, "enabled", True):
+        if not _targeted_retry and _manchester_xml_cfg is not None and getattr(_manchester_xml_cfg, "enabled", True):
             from app.services.scraper.manchester_xml import fetch_manchester_xml_links
             log.info("[MANCHESTER-XML] XML discovery configured — fetching feeds …")
             _mx_error: str | None = None
@@ -1623,7 +1708,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # IELTS are extracted by regex in swiftype_mmu.py. The prebuilt result
         # is returned verbatim by _extract_only (same short-circuit as SearchStax).
         _swiftype_cfg = getattr(_uni_cfg.discovery, "swiftype", None)
-        if _swiftype_cfg is not None and getattr(_swiftype_cfg, "enabled", True):
+        if not _targeted_retry and _swiftype_cfg is not None and getattr(_swiftype_cfg, "enabled", True):
             from app.services.scraper.swiftype_mmu import fetch_swiftype_links
             log.info("[SWIFTYPE] swiftype discovery configured — querying API ...")
             _sw_error: str | None = None
@@ -1651,7 +1736,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # and build pre-populated results. The course pages are a React SPA that
         # returns a loading shell — this provider bypasses them entirely.
         _vuw_api_cfg = getattr(_uni_cfg.discovery, "vuw_api", None)
-        if _vuw_api_cfg is not None and getattr(_vuw_api_cfg, "enabled", True):
+        if not _targeted_retry and _vuw_api_cfg is not None and getattr(_vuw_api_cfg, "enabled", True):
             from app.services.scraper.vuw_api import fetch_vuw_links
             log.info("[VUW_API] vuw_api discovery configured — querying 4 endpoints ...")
             _vuw_error: str | None = None
@@ -1717,7 +1802,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # returned verbatim by _extract_only). See searchstax_hud.py.
         _searchstax_cfg = getattr(_uni_cfg.discovery, "searchstax", None)
         _ss_filter_stats: dict = {}  # populated only when links_only SearchStax runs
-        if _searchstax_cfg is not None:
+        if not _targeted_retry and _searchstax_cfg is not None:
             from app.services.scraper.searchstax_hud import fetch_searchstax_links
             # Extract fee/IELTS defaults from UniConfig and pass directly so
             # fetch_searchstax_links never needs to touch the ContextVar.
@@ -1782,7 +1867,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # /international/courses/<slug>--<id> URLs for all ~153 international
         # courses.  Returns bare link dicts so normal extraction runs on each.
         _tafensw_cfg = getattr(_uni_cfg.discovery, "tafensw_api", None)
-        if _tafensw_cfg is not None:
+        if not _targeted_retry and _tafensw_cfg is not None:
             from app.services.scraper.tafensw import fetch_tafensw_links
             try:
                 _tn_links = await fetch_tafensw_links(_tafensw_cfg, emit=emit)
@@ -1808,7 +1893,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # get exactly the 48 international courses, builds full URLs from each
         # item's url field, returns bare link dicts for normal extraction.
         _melbpoly_cfg = getattr(_uni_cfg.discovery, "melbournepolytechnic_api", None)
-        if _melbpoly_cfg is not None:
+        if not _targeted_retry and _melbpoly_cfg is not None:
             from app.services.scraper.melbournepolytechnic import fetch_melbournepolytechnic_links
             try:
                 _mp_links = await fetch_melbournepolytechnic_links(_melbpoly_cfg, emit=emit)
@@ -2263,7 +2348,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 _filter_funnel_stats["after_block"] = int(kwargs.get("kept", 0))
             await _emit_for_discover(type_, message, **kwargs)
 
-        if (not links or _yaml_api_partial) and not _always_browser:
+        if not _targeted_retry and (not links or _yaml_api_partial) and not _always_browser:
             _pre_bfs_links = list(links)
             # Per-uni YAML can override the global discovery_phase_timeout_s
             # (default 300 s) via discovery.discovery_phase_timeout_s.
@@ -2357,7 +2442,12 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # tier would only re-harvest junk nav pages (the original symptom
         # of Task #85 before this fix).
         _skip_browser_discovery = getattr(_uni_cfg.discovery, "skip_browser_discovery", False)
-        if (not links or _always_browser) and not (_is_mq_host and links) and not _skip_browser_discovery:
+        if (
+            not _targeted_retry
+            and (not links or _always_browser)
+            and not (_is_mq_host and links)
+            and not _skip_browser_discovery
+        ):
             try:
                 from app.services.scraper.browser_discover_generic import (
                     browser_discover_generic,
@@ -2434,7 +2524,13 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Short-circuit for MQ: when MQ-specific sweep produced links, skip
         # Wayback — archive.org has shallow coverage of this Cloudflare-
         # walled host and the tier would just add latency / noise.
-        if _use_wayback is not False and (not links or _use_wayback) and not (_is_mq_host and links) and not _disc_cache_hit:
+        if (
+            not _targeted_retry
+            and _use_wayback is not False
+            and (not links or _use_wayback)
+            and not (_is_mq_host and links)
+            and not _disc_cache_hit
+        ):
             try:
                 from app.services.scraper.wayback_discover import wayback_discover
                 if links and _use_wayback:
@@ -2520,7 +2616,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         #   4. Persist discovered endpoint to auto_config for future scrapes.
         _auto_api_enabled = getattr(_uni_cfg.discovery, "auto_api_discovery", False)
         _AUTO_API_THRESHOLD = 10
-        if _auto_api_enabled and len(links) < _AUTO_API_THRESHOLD:
+        if not _targeted_retry and _auto_api_enabled and len(links) < _AUTO_API_THRESHOLD:
             log.info(
                 "[AUTO_API] auto_api_discovery=True and only %d links so far — "
                 "running XHR intercept on %s",
@@ -2582,23 +2678,9 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             # arts-soc pages become accessible — matching the timing of other
             # arts-soc courses (e7h, e6j, e5n) that successfully stage.
             _insert_pos = max(0, len(links) // 3)
-            _injected = 0
-            _moved = 0
-            for _eurl in _extra_urls:
-                existing_idx = next(
-                    (i for i, item in enumerate(links) if item["url"] == _eurl), None
-                )
-                if existing_idx is not None:
-                    # Already discovered — move to 1/3 position
-                    _item = links.pop(existing_idx)
-                    # Adjust insert pos if pop shifted items before it
-                    _adj = _insert_pos if existing_idx >= _insert_pos else max(0, _insert_pos - 1)
-                    links.insert(_adj, _item)
-                    _moved += 1
-                else:
-                    # Not yet discovered — inject at 1/3 position
-                    links.insert(_insert_pos, {"url": _eurl, "name": ""})
-                    _injected += 1
+            _injected, _moved = _inject_extra_course_urls(
+                links, _extra_urls, targeted_retry=_targeted_retry,
+            )
             if _injected or _moved:
                 log.info(
                     "extra_course_urls: injected %d new + moved %d existing URL(s) "
@@ -2614,7 +2696,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Angular search at /courses/search?query=&page=N, 37 results per page).
         # Runs AFTER all other tiers so it supplements rather than replaces BFS.
         _render_pages = list(getattr(_uni_cfg.discovery, "render_listing_pages", None) or [])
-        if _render_pages:
+        if not _targeted_retry and _render_pages:
             # When render_listing_pages_static is set, the listing pages are
             # server-side rendered and the course links are present in the raw
             # HTML without JS — use the cheaper render=False call (~1 credit vs ~5).
@@ -2641,7 +2723,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # be served stale and are huge).  Written at end-of-run only if the
         # run stayed healthy (>=5 links, fetch-fail rate <30%).
         _c1_links_for_cache: list[dict] = []
-        if not _disc_cache_hit and links:
+        if not _targeted_retry and not _disc_cache_hit and links:
             _c1_payload_keys = ("searchstax_result", "swiftype_result", "payload")
             _c1_has_payload = any(
                 any(_k in _lk for _k in _c1_payload_keys) for _lk in links[:20]
@@ -4150,7 +4232,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # ``_MAX_COURSES_PER_JOB`` (and its per-uni YAML override via
         # ``max_candidates``) is applied to sitemap-sourced links just as it
         # is for BFS links.
-        if len(links) > max_courses:
+        if not _targeted_retry and len(links) > max_courses:
             log.info(
                 "[EXTRACT] capping %d discovered links to max_courses=%d for %s",
                 len(links), max_courses, uni_name,
@@ -5102,16 +5184,20 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                             "account circuit is open",
                             _remaining_sweeps,
                         )
-                        await emit(
-                            "status",
-                            f"[SWEEP] skipped {_remaining_sweeps} replay(s): "
-                            "Scrape.do account circuit is open — operator review required",
-                            phase="sweep",
-                            kind="sweep_skipped_circuit_open",
-                            reason="scrape_do_circuit_open",
-                            remaining=_remaining_sweeps,
-                            next_action="operator review",
-                        )
+                        for _remaining_lk in _sweep_links[_sweep_index:]:
+                            await emit(
+                                "status",
+                                f"[SWEEP] unresolved — operator review required: "
+                                f"{_remaining_lk.get('name', '?')} (scrape_do_circuit_open)",
+                                phase="sweep",
+                                kind="sweep_unresolved",
+                                url=_remaining_lk.get("url"),
+                                course_name=_remaining_lk.get("name"),
+                                reason="scrape_do_circuit_open",
+                                detail="Scrape.do account circuit is open.",
+                                source_error=_remaining_lk.get("source_error"),
+                                next_action="operator review",
+                            )
                         break
                     await asyncio.sleep(2.0)  # brief pause between sweep retries
                     _sw_r = await _extract_for_recovery_sweep(
@@ -5144,6 +5230,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                             phase="sweep",
                             kind="sweep_unresolved",
                             url=_sweep_url,
+                            course_name=_sweep_lk.get("name"),
                             reason=_sw_details["reason"],
                             detail=_sw_details["detail"],
                             source_error=_sweep_lk.get("source_error"),
@@ -5188,6 +5275,20 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     log.warning(
                         "[SWEEP] extraction/stage failed for %s: %s",
                         _sweep_url[:80], _sw_exc,
+                    )
+                    await emit(
+                        "status",
+                        f"[SWEEP] unresolved — operator review required: "
+                        f"{_sweep_lk.get('name', '?')} (sweep_exception)",
+                        phase="sweep",
+                        kind="sweep_unresolved",
+                        url=_sweep_url,
+                        course_name=_sweep_lk.get("name"),
+                        reason="sweep_exception",
+                        detail="The recovery replay raised an unexpected exception.",
+                        source_error=_sweep_lk.get("source_error"),
+                        retry_error=str(_sw_exc),
+                        next_action="operator review",
                     )
             log.info(
                 "[SWEEP] recovered %d/%d failed URL(s)",
