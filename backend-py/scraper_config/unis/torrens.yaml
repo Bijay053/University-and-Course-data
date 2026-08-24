@@ -35,9 +35,14 @@ extraction:
 
   filters:
     domestic_only:
-      enabled: false   # Preserve current prod behaviour: filter runs for all unis.
+      # Torrens marks some awards as Domestic-only in its audience component.
+      # Keep those out even if a central PDF or generic English page happened
+      # to populate other fields.
+      enabled: true
     online_only:
-      enabled: false
+      # International applicants need an on-campus or genuinely blended option.
+      # Do not stage awards offered only online.
+      enabled: true
 
   fees:
     # Per-uni PDF parser override.
