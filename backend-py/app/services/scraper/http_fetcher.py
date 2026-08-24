@@ -26,6 +26,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import time
 import urllib.parse
 import weakref
@@ -38,6 +39,58 @@ from app.config import settings
 from app.services.scraper.extractors.curtin_session import cookies_for_url
 
 log = logging.getLogger(__name__)
+
+
+_SCRAPE_DO_TOKEN_QUERY_RE = re.compile(
+    r"(?i)([?&]token=)[^&#\s'\"<>]+"
+)
+_REDACTED_TOKEN = "[REDACTED]"
+
+
+def _redact_scrape_do_log_text(value: object, *, token: str | None = None) -> str:
+    """Remove Scrape.do credentials from text destined for worker logs.
+
+    HTTPX includes the complete request URL in its automatic request log, and
+    provider exceptions can include that URL too.  Keep every other diagnostic
+    (including the encoded target URL) so operators can still diagnose the
+    failing fetch without gaining access to a reusable provider credential.
+    """
+    text = str(value)
+    if token:
+        text = text.replace(token, _REDACTED_TOKEN)
+    return _SCRAPE_DO_TOKEN_QUERY_RE.sub(rf"\1{_REDACTED_TOKEN}", text)
+
+
+class _RedactScrapeDoHttpxLogFilter(logging.Filter):
+    """Sanitize HTTPX's automatic request line before it reaches a handler."""
+
+    _scrape_do_token_redactor = True
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            message = record.getMessage()
+            redacted = _redact_scrape_do_log_text(message)
+            if redacted != message:
+                # Rendering first, then clearing args, supports HTTPX's
+                # ``logger.info(..., request.url, ...)`` structured message.
+                record.msg = redacted
+                record.args = ()
+        except Exception:  # pragma: no cover - logging must never break fetches
+            pass
+        return True
+
+
+def _install_scrape_do_httpx_log_filter() -> None:
+    """Install the provider-credential filter once on HTTPX's own logger."""
+    httpx_log = logging.getLogger("httpx")
+    if not any(
+        getattr(existing, "_scrape_do_token_redactor", False)
+        for existing in httpx_log.filters
+    ):
+        httpx_log.addFilter(_RedactScrapeDoHttpxLogFilter())
+
+
+_install_scrape_do_httpx_log_filter()
 
 
 class ScrapedoAccountError(RuntimeError):
@@ -630,37 +683,38 @@ async def fetch_html_scrape_do(
                     "[FETCH FAIL] scrape.do %s render=%s → status=%s attempt %d/%d "
                     "body=%r — scheduling retry with backoff",
                     url, render, _status, _sd_attempt + 1, len(_SD_BACKOFFS) + 1,
-                    _last_sd_r.text[:300],
+                    _redact_scrape_do_log_text(_last_sd_r.text[:300], token=token),
                 )
                 continue
             # Final attempt or non-retryable non-200.
             log.warning(
                 "[FETCH FAIL] scrape.do %s render=%s → status=%s attempt %d/%d body=%r",
                 url, render, _status, _sd_attempt + 1, len(_SD_BACKOFFS) + 1,
-                _last_sd_r.text[:300],
+                _redact_scrape_do_log_text(_last_sd_r.text[:300], token=token),
             )
             _record_fetch_error(
                 url, status=_status, tier="scrape_do",
-                detail=_last_sd_r.text[:200],
+                detail=_redact_scrape_do_log_text(_last_sd_r.text[:200], token=token),
             )
             return None
         except ScrapedoAccountError:
             raise  # always propagate — orchestrator must abort the job
         except Exception as _sd_exc:
+            _redacted_exception = _redact_scrape_do_log_text(_sd_exc, token=token)
             if _sd_attempt < len(_SD_BACKOFFS):
                 log.warning(
                     "[FETCH FAIL] scrape.do %s render=%s → exception attempt %d/%d: %s"
                     " — scheduling retry",
-                    url, render, _sd_attempt + 1, len(_SD_BACKOFFS) + 1, _sd_exc,
+                    url, render, _sd_attempt + 1, len(_SD_BACKOFFS) + 1, _redacted_exception,
                 )
                 continue
             log.warning(
                 "[FETCH FAIL] scrape.do %s render=%s → exception final attempt %d/%d: %s",
-                url, render, _sd_attempt + 1, len(_SD_BACKOFFS) + 1, _sd_exc,
+                url, render, _sd_attempt + 1, len(_SD_BACKOFFS) + 1, _redacted_exception,
             )
             _record_fetch_error(
                 url, status=None, tier="scrape_do",
-                detail=f"exception: {_sd_exc}",
+                detail=f"exception: {_redacted_exception}",
             )
             return None
     # All retries exhausted — should not reach here in practice.

@@ -12,6 +12,7 @@ All network calls are mocked — no real Scrape.do traffic.
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -308,6 +309,120 @@ class TestRetryAfterHeader:
         assert result == good_html
         # The first backoff sleep should be >= the Retry-After value (25 s)
         assert sleep_calls[0] >= 25.0
+
+
+# ---------------------------------------------------------------------------
+# Scrape.do credential redaction
+# ---------------------------------------------------------------------------
+
+class TestScrapeDoCredentialRedaction:
+    """Worker diagnostics must never reveal the provider token."""
+
+    @pytest.fixture(autouse=True)
+    def _set_token(self, monkeypatch):
+        monkeypatch.setenv("SCRAPE_DO_TOKEN", "scrape-do-secret-for-log-test")
+
+    def test_httpx_request_and_failure_logs_redact_provider_token(self, caplog):
+        """HTTPX access lines and provider failures retain diagnostics, not secrets."""
+        import app.services.scraper.http_fetcher as m
+
+        token = os.environ["SCRAPE_DO_TOKEN"]
+        target_url = "https://example.edu/course"
+        provider_url = (
+            "https://api.scrape.do?token="
+            f"{token}&url=https%3A%2F%2Fexample.edu%2Fcourse&render=true"
+        )
+
+        async def _mock_enter(self_):
+            return self_
+
+        async def _mock_exit(self_, *a):
+            return False
+
+        async def _mock_get(url, params=None):
+            # Match HTTPX's normal automatic request line, which is emitted
+            # after every real request and previously exposed the token.
+            logging.getLogger("httpx").info(
+                'HTTP Request: %s %s "%s %d %s"',
+                "GET",
+                provider_url,
+                "HTTP/1.1",
+                503,
+                "Service Unavailable",
+            )
+            return _make_response(
+                503,
+                f"provider overloaded; request was {provider_url}",
+            )
+
+        mock_client = MagicMock()
+        mock_client.__aenter__ = _mock_enter
+        mock_client.__aexit__ = _mock_exit
+        mock_client.get = _mock_get
+
+        with patch("httpx.AsyncClient", return_value=mock_client), \
+             caplog.at_level(logging.INFO):
+            result = asyncio.run(
+                m.fetch_html_scrape_do(
+                    target_url,
+                    render=True,
+                    rate_limit=False,
+                    max_retries=0,
+                )
+            )
+
+        assert result is None
+        assert token not in caplog.text
+        assert "token=[REDACTED]" in caplog.text
+        assert target_url in caplog.text
+        assert "render=True" in caplog.text
+        assert "status=503" in caplog.text
+        assert "provider overloaded" in caplog.text
+
+    def test_exception_logs_and_saved_diagnostics_redact_provider_token(self, caplog):
+        """Request URLs embedded in transport exceptions are also sanitized."""
+        import app.services.scraper.http_fetcher as m
+
+        token = os.environ["SCRAPE_DO_TOKEN"]
+        target_url = "https://example.edu/another-course"
+        provider_url = (
+            "https://api.scrape.do?token="
+            f"{token}&url=https%3A%2F%2Fexample.edu%2Fanother-course"
+        )
+
+        async def _mock_enter(self_):
+            return self_
+
+        async def _mock_exit(self_, *a):
+            return False
+
+        async def _mock_get(url, params=None):
+            raise RuntimeError(f"provider transport failed for {provider_url}")
+
+        mock_client = MagicMock()
+        mock_client.__aenter__ = _mock_enter
+        mock_client.__aexit__ = _mock_exit
+        mock_client.get = _mock_get
+
+        with patch("httpx.AsyncClient", return_value=mock_client), \
+             caplog.at_level(logging.INFO):
+            result = asyncio.run(
+                m.fetch_html_scrape_do(
+                    target_url,
+                    render=False,
+                    rate_limit=False,
+                    max_retries=0,
+                )
+            )
+
+        saved_diagnostic = m.format_fetch_error(target_url)
+        assert result is None
+        assert token not in caplog.text
+        assert token not in saved_diagnostic
+        assert target_url in caplog.text
+        assert "render=False" in caplog.text
+        assert "provider transport failed" in caplog.text
+        assert "provider transport failed" in saved_diagnostic
 
 
 # ---------------------------------------------------------------------------
