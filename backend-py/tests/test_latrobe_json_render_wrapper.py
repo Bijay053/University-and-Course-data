@@ -126,6 +126,46 @@ def test_apply_overrides_uses_prefetched_document_without_fetch(monkeypatch):
     assert payload["duration"] == 3
 
 
+def test_apply_overrides_restores_on_campus_from_authoritative_delivery_code(monkeypatch):
+    """An OC JSON variant must override the SPA shell's weak Online guess."""
+    detail_url = "https://www.latrobe.edu.au/courses/data/2026/international/ci/test"
+    course_html = (
+        '<script>{"allDetailUrls":{"2026":{"international":{"CI":'
+        f'"{detail_url}"'
+        "}}}}</script>"
+    )
+    payload = {"study_mode": "Online"}
+    evidence: list[dict] = []
+    detail_doc = {
+        "data": {
+            "duration": "3 years full-time",
+            "deliveryModeCode": "OC",
+            "deliveryModeDescription": "On Campus",
+            "entryReq": {"engReq": "IELTS 6.5"},
+        }
+    }
+
+    async def forbidden_fetch(_url, **_kwargs):
+        raise AssertionError("prefetched detail must avoid a second provider request")
+
+    monkeypatch.setattr(latrobe_json, "fetch_html_scrape_do", forbidden_fetch)
+    applied = asyncio.run(
+        latrobe_json.apply_overrides(
+            payload,
+            course_html,
+            url="https://www.latrobe.edu.au/courses/test",
+            evidence=evidence,
+            prefetched_doc=detail_doc,
+            prefetched_url=detail_url,
+        )
+    )
+
+    assert applied["study_mode"] == {"old": "Online", "new": "On Campus"}
+    assert payload["study_mode"] == "On Campus"
+    assert evidence[-1]["method"] == "latrobe_json"
+    assert evidence[-1]["value"] == "On Campus"
+
+
 def test_pick_international_url_prefers_earliest_year_and_canonical_campus():
     manifest = {
         "2027": {

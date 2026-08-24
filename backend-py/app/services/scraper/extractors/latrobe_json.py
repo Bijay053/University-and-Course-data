@@ -789,25 +789,38 @@ async def apply_overrides(
         payload["duration_term"] = dur_term
         applied["duration"] = {"old": prev, "new": (dur_val, dur_term)}
 
-    # ── 2026-05-17: study_mode override for Online-only intl variants ─
-    # When the chosen international detail JSON publishes
-    # ``deliveryModeCode="OL"`` (or the long-form ``deliveryModeDescription``
-    # ="Online"), the course's international offering is delivered fully
-    # online.  Without this override the pipeline kept the static-pass
-    # default ``study_mode="On Campus"`` even though the JSON unambiguously
-    # says otherwise — leaving rows like Master of Business Administration
-    # 2026/intl/ON staged as "On Campus" with a blank course_location after
-    # ``_sanitise_for_display`` stripped the "Online" location value
-    # via ``_REMOVE_VIRTUAL``.  Use the canonical JSON value as the
-    # authoritative study_mode.  Blended/mixed delivery (codes ``OC`` =
-    # On Campus, ``MX`` = Mixed) is intentionally NOT touched here so
-    # the standard extractor keeps responsibility for those.
+    # ── Authoritative study mode from the international detail JSON ─────
+    # The SPA shell regularly contains generic "online" marketing copy and
+    # no usable per-course location. Its weak rule result can therefore be
+    # downgraded to Online before this JSON override runs. At La Trobe, the
+    # selected international detail variant explicitly identifies both Online
+    # (OL) and On Campus (OC) delivery, so both must override that weak result.
+    # Mixed delivery stays with the generic extractor because it needs the
+    # wider page context to distinguish Blended from a multi-campus offering.
     _dmc = (data.get("deliveryModeCode") or "").strip().upper()
     _dmd = (data.get("deliveryModeDescription") or "").strip().lower()
+    _authoritative_mode: str | None = None
     if _dmc == "OL" or _dmd == "online":
+        _authoritative_mode = "Online"
+    elif _dmc == "OC" or _dmd in {"on campus", "on-campus"}:
+        _authoritative_mode = "On Campus"
+    if _authoritative_mode:
         prev_mode = payload.get("study_mode")
-        payload["study_mode"] = "Online"
-        applied["study_mode"] = {"old": prev_mode, "new": "Online"}
+        payload["study_mode"] = _authoritative_mode
+        applied["study_mode"] = {"old": prev_mode, "new": _authoritative_mode}
+        if evidence is not None:
+            evidence.append({
+                "field_key": "study_mode",
+                "value": _authoritative_mode,
+                "confidence": 0.95,
+                "method": "latrobe_json",
+                "source_url": intl_url,
+                "snippet": (
+                    "latrobe_json "
+                    f"deliveryModeCode={_dmc or '—'} "
+                    f"deliveryModeDescription={_dmd or '—'}"
+                ),
+            })
 
     # Intake months from startDates.
     months = parse_intake_months(data.get("startDates"))
