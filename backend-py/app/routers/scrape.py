@@ -1996,24 +1996,13 @@ async def staged_one(
     # ``Array.isArray(payload)`` as the legacy branch.
     if not sc_id_or_job.isdigit():
         job = await db.get(ScrapeRuntimeJob, sc_id_or_job)
-        # Large scrapes can resume across multiple ``scrape_runtime_jobs`` rows
-        # (see ``_clear_stale_dedup`` / task229 resume checkpoint): a worker
-        # restart or timeout leaves a partial job's staged courses behind
-        # (status stays 'pending'), and the *next* run for the same
-        # university picks up where it left off under a NEW job_id, skipping
-        # URLs already staged. Those earlier-job rows are never re-tagged
-        # with the new job_id, so filtering strictly by ``scrape_job_id``
-        # here made the review screen show only the latest run's slice
-        # (e.g. 122 of 409 for QMUL) while the rest sat invisible-but-still
-        # 'pending' under stale job_ids from the interrupted runs. Reviewers
-        # need every currently-pending course for the university, regardless
-        # of which run staged it, so scope by university_id when we can
-        # resolve one. Fall back to the old job_id-only filter if the job_id
-        # doesn't resolve to a job row (e.g. a stale/unknown id).
-        if job is not None:
-            where_clause = ScrapedCourse.university_id == job.university_id
-        else:
-            where_clause = ScrapedCourse.scrape_job_id == sc_id_or_job
+        # The Review button represents one completed scrape, so it must return
+        # only rows written by that job.  Older pending rows can belong to a
+        # failed/resumed attempt and must not inflate the current run's review
+        # count or appear alongside its fresh values.  They remain stored for
+        # recovery/resume handling, but the current-job review is always an
+        # exact replacement view.
+        where_clause = ScrapedCourse.scrape_job_id == sc_id_or_job
         rows = (await db.execute(
             select(ScrapedCourse).where(where_clause, ScrapedCourse.status == "pending")
             .order_by(ScrapedCourse.created_at.desc())
