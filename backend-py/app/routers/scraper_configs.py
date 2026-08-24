@@ -1674,19 +1674,16 @@ async def ai_diagnose_scraper_config(
         extr_cfg = admin_config_json.get("extraction", {}) or {}
         filters_cfg = extr_cfg.get("filters", {}) or {}
         online_only = filters_cfg.get("online_only", {}) or {}
-        if online_only.get("enabled"):
+        if online_only.get("enabled") is False:
             admin_config_issues.append(
-                "CRITICAL: online_only filter is ENABLED in the DB admin config — "
-                "only online/distance courses are kept; ALL on-campus courses are silently discarded. "
-                "This is the most common cause of a suspiciously low staged count. "
-                "Fix: go to the university's admin config and set online_only.enabled to false."
+                "INFO: DB admin config contains legacy online_only.enabled=false. "
+                "Online-only courses are globally excluded, so this setting has no effect."
             )
         domestic_only = filters_cfg.get("domestic_only", {}) or {}
-        if domestic_only.get("enabled"):
+        if domestic_only.get("enabled") is False:
             admin_config_issues.append(
-                "WARNING: domestic_only filter is ENABLED in the DB admin config — "
-                "international course variants are being filtered out. "
-                "Fix: set domestic_only.enabled to false unless this is intentional."
+                "INFO: DB admin config contains legacy domestic_only.enabled=false. "
+                "Domestic-only courses are globally excluded, so this setting has no effect."
             )
         # Warn if _min_expected_courses far exceeds actual staged count
         min_expected = admin_config_json.get("_min_expected_courses", 0) or 0

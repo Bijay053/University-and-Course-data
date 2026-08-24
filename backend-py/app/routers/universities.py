@@ -3303,14 +3303,14 @@ async def get_rejection_log(
     REASON_LABELS: dict[str, dict] = {
         "online_only": {
             "label": "Online-only filter",
-            "description": "Study mode was detected as 'Online'. If this is wrong, add the host to _STUDY_MODE_RULE_SUPPRESSED_HOSTS or set extraction.filters.online_only.enabled: false.",
-            "config_key": "extraction.filters.online_only.enabled",
+            "description": "Study mode was detected as 'Online'. Online-only courses are globally excluded; if this is wrong, improve the study-mode extraction evidence instead of disabling the filter.",
+            "config_key": "extraction.study_mode.online_only_requires_strong_evidence",
             "severity": "warning",
         },
         "domestic_only": {
             "label": "Domestic-only course",
-            "description": "The course was flagged as domestic-only (no international pricing). Set extraction.filters.domestic_only.enabled: false to disable this filter.",
-            "config_key": "extraction.filters.domestic_only.enabled",
+            "description": "The course was flagged as domestic-only. Domestic-only courses are globally excluded; correct the detection evidence rather than disabling the filter.",
+            "config_key": "global_policy.international_audience_filters",
             "severity": "warning",
         },
         "category_landing_page": {

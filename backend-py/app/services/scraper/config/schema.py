@@ -2299,12 +2299,9 @@ class DomesticOnlyFilter(BaseModel):
     enabled: bool = Field(
         default=True,
         description=(
-            "When true, courses detected as domestic-only are dropped during staging. "
-            "Default: True (fail-open — the filter ran for every university before the "
-            "per-uni YAML gate was added; changing this default to False broke that "
-            "behaviour for any uni with a YAML config that does not explicitly opt in). "
-            "Set to false ONLY for universities where _DOMESTIC_ONLY_RE produces "
-            "confirmed false positives (see: adelaide.yaml, anu.yaml, auckland.yaml)."
+            "Legacy compatibility field. Confirmed domestic-only courses are always "
+            "dropped during staging for every university. A stored false value is "
+            "ignored by the global international-audience safety policy."
         ),
     )
     require_international_evidence: bool = Field(
@@ -2340,11 +2337,9 @@ class OnlineOnlyFilter(BaseModel):
     enabled: bool = Field(
         default=True,
         description=(
-            "When true, courses with all-online delivery are dropped during "
-            "staging.  Default true mirrors the historical hard-coded reject "
-            "in guards.should_stage_course.  Distance-education-heavy unis "
-            "(e.g. CSU, OUA) opt out by setting this to false in their "
-            "per-uni YAML."
+            "Legacy compatibility field. Courses offered only online are always "
+            "dropped during staging for every university. A stored false value is "
+            "ignored by the global international-audience safety policy."
         ),
     )
     reject_if_mode_is_exactly: list[str] = Field(

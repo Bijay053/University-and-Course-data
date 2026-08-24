@@ -694,19 +694,14 @@ def _federation_domestic_only_signal(rendered_html: str, url: str) -> str | None
 
 
 def _domestic_only_filter_enabled() -> bool:
-    """Phase 3 gate: return True when the domestic-only filter should run.
+    """Return True because domestic-only courses are globally ineligible.
 
-    Reads ``extraction.filters.domestic_only.enabled`` from the current
-    per-university config contextvar.
-
-    Fail-open policy: if the contextvar is not set (no uni context — e.g. a
-    direct CLI call or test that hasn't called set_uni_config), the function
-    returns True so that _is_domestic_only_page() still runs.  This matches
-    current prod behaviour (filter always ran before this gate was added) and
-    prevents a missing contextvar from silently bypassing the filter.
+    Historical YAML and admin settings may still contain
+    ``filters.domestic_only.enabled: false``.  They are retained for backward
+    compatibility only and must not let a confirmed domestic-only programme
+    enter any university's international review queue.
     """
-    uc = get_uni_config()
-    return uc is None or uc.extraction.filters.domestic_only.enabled
+    return True
 
 
 def _vision_ocr_trusted() -> bool:
@@ -2014,24 +2009,8 @@ async def extract_course(
     # See _is_unisq_online_only_page docstring for full rationale.
     # Reuses domestic_only payload key so guards.py:394 rejects with
     # reason "domestic_only"; also sets online_only_unisq=True for metrics.
-    # Gated on the extraction.filters.online_only.enabled config so that
-    # setting it to false in the per-uni YAML also suppresses this
-    # UniSQ-specific hardcoded check (mirrors guards.py's _online_filter_enabled
-    # logic; _online_filter_enabled is a local variable there, not importable).
-    try:
-        _uc_olsc = get_uni_config()
-        _unisq_ol_filter_on = (
-            _uc_olsc is None
-            or _uc_olsc.extraction is None
-            or _uc_olsc.extraction.filters is None
-            or _uc_olsc.extraction.filters.online_only is None
-            or bool(_uc_olsc.extraction.filters.online_only.enabled)
-        )
-    except Exception:  # noqa: BLE001
-        _unisq_ol_filter_on = True  # fail safe: keep historical reject behaviour
     if (
         "unisq.edu.au" in (url or "").lower()
-        and _unisq_ol_filter_on
         and _is_unisq_online_only_page(html)
     ):
         payload["domestic_only"] = True
