@@ -34,6 +34,143 @@ from app.services.scraper.stage_course import stage_course
 
 log = logging.getLogger(__name__)
 
+_PER_COURSE_EXTRACTION_TIMEOUT_SECONDS = 300.0
+
+
+def _extraction_failure_details(error: object) -> dict[str, object]:
+    """Classify a failed extraction for recovery and operator diagnostics.
+
+    The per-course pipeline intentionally returns error sentinels rather than
+    letting one bad page abort the scrape.  Keep the original sentinel for
+    backwards-compatible counters, but attach a stable reason/action so the
+    runtime log is useful without reading worker stdout.
+    """
+    raw = str(error or "unknown_extraction_error").strip()
+    normalized = raw.lower()
+
+    if normalized == "per_course_timeout":
+        return {
+            "reason": "per_course_timeout",
+            "detail": (
+                "Extraction exceeded the 300-second per-course safety cap; "
+                "the provider/browser fallback chain did not settle in time."
+            ),
+            "retryable": True,
+        }
+    if normalized.startswith("fetch") or "fetch_failed" in normalized:
+        return {
+            "reason": "fetch_failed",
+            "detail": (
+                "No usable course content was returned after the configured "
+                "transport fallback chain."
+            ),
+            "retryable": True,
+        }
+    if normalized.startswith("extract:"):
+        return {
+            "reason": "extract_exception",
+            "detail": raw.removeprefix("extract:").strip() or raw,
+            # Extractor exceptions include deterministic parser errors, shared
+            # PDF dedup sentinels, and the Scrape.do account circuit-breaker.
+            # Unlike explicit transient fetch/timeout sentinels, retrying
+            # them can repeat a known-dead provider request or duplicate work.
+            "retryable": False,
+        }
+    return {
+        "reason": "non_retryable_extraction_error",
+        "detail": raw,
+        "retryable": False,
+    }
+
+
+def _per_course_timeout_result(link: dict) -> dict:
+    """Return the stable sentinel used when an extraction exceeds its cap."""
+    return {
+        "name": (link.get("name") or "").strip() or "?",
+        "url": link.get("url"),
+        "error": "per_course_timeout",
+        "error_type": "TimeoutError",
+        "error_reason": (
+            f"Extraction exceeded the {_PER_COURSE_EXTRACTION_TIMEOUT_SECONDS:.0f}-second "
+            "per-course safety cap"
+        ),
+        "retryable": True,
+        "fetch_failed": True,
+        "_timed_out": True,
+    }
+
+
+async def _extract_with_hard_timeout(
+    link: dict,
+    country: str | None,
+    uni_pdf_data: dict | None = None,
+    emit=None,
+    vision_image_cache: VisionImageCache | None = None,
+    central_data: dict | None = None,
+    extraction_rules: dict | None = None,
+    seen_pdf_urls: set[str] | None = None,
+    *,
+    timeout_seconds: float = _PER_COURSE_EXTRACTION_TIMEOUT_SECONDS,
+) -> dict:
+    """Run one extraction with the cap used by both normal and recovery passes."""
+    try:
+        return await asyncio.wait_for(
+            _extract_only(
+                link,
+                country,
+                uni_pdf_data,
+                emit=emit,
+                vision_image_cache=vision_image_cache,
+                central_data=central_data,
+                extraction_rules=extraction_rules,
+                seen_pdf_urls=seen_pdf_urls,
+            ),
+            timeout=timeout_seconds,
+        )
+    except asyncio.TimeoutError:
+        return _per_course_timeout_result(link)
+
+
+async def _extract_for_recovery_sweep(
+    link: dict,
+    country: str | None,
+    *,
+    scrape_do_dead_flag: list[bool],
+    uni_pdf_data: dict | None = None,
+    emit=None,
+    vision_image_cache: VisionImageCache | None = None,
+    central_data: dict | None = None,
+    extraction_rules: dict | None = None,
+    seen_pdf_urls: set[str] | None = None,
+) -> dict | None:
+    """Run one replay only while the shared provider circuit remains healthy."""
+    if scrape_do_dead_flag[0]:
+        return None
+    try:
+        return await _extract_with_hard_timeout(
+            link,
+            country,
+            uni_pdf_data,
+            emit=emit,
+            vision_image_cache=vision_image_cache,
+            central_data=central_data,
+            extraction_rules=extraction_rules,
+            seen_pdf_urls=seen_pdf_urls,
+        )
+    except ScrapedoAccountError as exc:
+        # A bad token or exhausted account discovered during the sweep is just
+        # as terminal as one discovered during the primary pass.  Open the
+        # shared circuit so every remaining queued URL short-circuits.
+        scrape_do_dead_flag[0] = True
+        return {
+            "name": (link.get("name") or "").strip() or "?",
+            "url": link.get("url"),
+            "error": f"extract: {exc}",
+            "error_type": type(exc).__name__,
+            "error_reason": str(exc) or type(exc).__name__,
+            "_scrape_do_auth_error": True,
+        }
+
 
 def _strip_provider_name_from_title(
     course_name: str,
@@ -483,7 +620,16 @@ async def _extract_only(
     except ScrapedoAccountError:
         raise  # propagate — caller sets scrape_do_dead_flag to abort remaining courses
     except Exception as exc:  # noqa: BLE001
-        return {"name": name, "url": url, "error": f"extract: {exc}"}
+        # Preserve the exception type as well as its text.  The former is
+        # searchable and actionable when a provider returns an unhelpful empty
+        # message, while the latter remains compatible with existing logs.
+        return {
+            "name": name,
+            "url": url,
+            "error": f"extract: {type(exc).__name__}: {exc}",
+            "error_type": type(exc).__name__,
+            "error_reason": str(exc) or type(exc).__name__,
+        }
 
     # Save the final HTML snapshot + original extraction result.
     # Fires after extract_course() succeeds — only the winning HTML is saved,
@@ -3943,22 +4089,18 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     # 300 s (e.g. browser fallback + Scrape.do chain stalled on a
                     # broken URL), the batch never completes and the job stays
                     # in_progress permanently when the Celery worker is restarted.
-                    # asyncio.wait_for cancels the inner coroutine; the semaphore
-                    # slot is released here in the outer `async with sem:` so pool
-                    # capacity is never starved.
+                    # The shared wrapper is also used by the sequential recovery
+                    # sweep so a retry cannot undo this liveness guarantee.
                     try:
-                        result = await asyncio.wait_for(
-                            _extract_only(
-                                link,
-                                uni_country,
-                                uni_pdf_data or None,
-                                emit=emit,
-                                vision_image_cache=vision_image_cache,
-                                central_data=central_data,
-                                extraction_rules=_ac_ext_rules,
-                                seen_pdf_urls=seen_pdf_urls,
-                            ),
-                            timeout=300.0,
+                        result = await _extract_with_hard_timeout(
+                            link,
+                            uni_country,
+                            uni_pdf_data or None,
+                            emit=emit,
+                            vision_image_cache=vision_image_cache,
+                            central_data=central_data,
+                            extraction_rules=_ac_ext_rules,
+                            seen_pdf_urls=seen_pdf_urls,
                         )
                     except ScrapedoAccountError as _sd_auth_exc:
                         _sd_url = (link.get("url") or "?")[:80]
@@ -3981,19 +4123,13 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                             "url": link.get("url"),
                             "error": f"extract: {_sd_auth_exc}",
                         }
-                    except asyncio.TimeoutError:
+                    if result.get("_timed_out"):
                         _timed_url = (link.get("url") or "?")[:80]
                         log.warning(
                             "[BOUNDED] per-course extraction exceeded 300s"
                             " for %s — marking fetch_failed and moving on",
                             _timed_url,
                         )
-                        result = {
-                            "name": (link.get("name") or "").strip() or "?",
-                            "url": link.get("url"),
-                            "error": "per_course_timeout",
-                            "fetch_failed": True,
-                        }
                 # ── semaphore released here ──────────────────────────────────
                 # Check for 429-cooldown retry sentinel AFTER exiting `async
                 # with sem:` so the slot is free during the sleep.
@@ -4131,12 +4267,37 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Collect non-error result dicts across all batches for the data-quality
         # check that runs after staging (it reads payloads, not the DB).
         _all_staged_dicts: list[dict] = []
-        # T04 recovery sweep: links whose fetch failed in the main batch pass.
-        # Populated during result processing below; swept sequentially after all
-        # batches complete so burst-rate-limited Scrape.do accounts have had time
-        # to recover.  Counters are adjusted in-place so the T05 failure-rate
-        # guard below sees the post-sweep (recovered) numbers.
+        # T04 recovery sweep: retryable fetch/extraction failures from the
+        # main batch pass.  The sequential replay lets transient provider
+        # contention clear while preserving the primary pass's concurrency and
+        # per-course timeout safeguards.  A normalized-URL set makes repeated
+        # error sentinels harmless and prevents duplicate staging attempts.
         _sweep_links: list[dict] = []
+        _sweep_url_keys: set[str] = set()
+
+        def _queue_recovery_sweep(
+            result: dict,
+            *,
+            counter: str,
+            details: dict[str, object],
+        ) -> bool:
+            sweep_url = (result.get("url") or "").strip()
+            if not sweep_url:
+                return False
+            key = _normalize_course_url(sweep_url)
+            if key in _sweep_url_keys:
+                return False
+            _sweep_url_keys.add(key)
+            _sweep_links.append(
+                {
+                    "url": sweep_url,
+                    "name": result.get("name", "?"),
+                    "counter": counter,
+                    "source_error": result.get("error"),
+                    "reason": details["reason"],
+                }
+            )
+            return True
 
         # ── Batch extraction + staging ────────────────────────────────────────
         # Allow per-uni YAML to tune the batch size via `extraction.batch_size`.
@@ -4543,7 +4704,15 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     summary["fetch_failed"] += 1
                     # Queue for T04 sweep so the URL gets a second chance after
                     # all batches have run and the account rate-limit has cleared.
-                    _sweep_links.append({"url": r.get("url"), "name": r.get("name", "?")})
+                    _queue_recovery_sweep(
+                        r,
+                        counter="fetch_failed",
+                        details={
+                            "reason": "rate_limit_exhausted",
+                            "detail": "All in-pass 429 cooldown retries were exhausted.",
+                            "retryable": True,
+                        },
+                    )
                     log.warning(
                         "[429-EXHAUSTED] all retries used up for %s — queued for sweep",
                         r.get("url", "?")[:80],
@@ -4557,10 +4726,11 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     )
                     continue
                 if r.get("error"):
+                    _error_details = _extraction_failure_details(r["error"])
+                    _counter: str | None = None
                     if r["error"].startswith("fetch") or "fetch_failed" in r.get("error", ""):
                         summary["fetch_failed"] += 1
-                        # Queue for T04 sweep — sequential retry after all batches.
-                        _sweep_links.append({"url": r.get("url"), "name": r.get("name", "?")})
+                        _counter = "fetch_failed"
                     elif r["error"] == "rejected: duplicate_name_deduplicated":
                         # Dedup rejections are correct behaviour (same course from
                         # multiple URLs — best version kept).  Count as skipped, not
@@ -4575,12 +4745,33 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                             _cpd_skipped_count += 1
                     else:
                         summary["errors"] += 1
+                        _counter = "errors"
+                    _queued_for_sweep = bool(
+                        _counter
+                        and _error_details["retryable"]
+                        and _queue_recovery_sweep(
+                            r,
+                            counter=_counter,
+                            details=_error_details,
+                        )
+                    )
+                    _next_action = (
+                        "sequential recovery sweep"
+                        if _queued_for_sweep
+                        else "operator review"
+                    )
                     await emit(
                         "status",
-                        f"[STAGE] skipped {r.get('name','?')}: {r['error']}",
+                        f"[STAGE] extraction failed for {r.get('name','?')}: "
+                        f"{_error_details['reason']} — {_next_action}",
                         phase="stage",
                         kind="extract_error",
                         url=r.get("url"),
+                        error=r["error"],
+                        reason=_error_details["reason"],
+                        detail=_error_details["detail"],
+                        retryable=_error_details["retryable"],
+                        next_action=_next_action,
                     )
                     continue
                 payload = dict(r.get("payload") or {})
@@ -4884,31 +5075,50 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             del results
 
         # ── T04: End-of-batch recovery sweep ─────────────────────────────────
-        # Re-extract URLs that returned fetch_failed during the main parallel
-        # batch pass.  Sequential (concurrency=1, 2 s gap) so a recovering
-        # Scrape.do account is not hit with another burst.  Summary counters
-        # are updated in-place so the T05 failure-rate guard sees post-sweep
-        # numbers (recovered courses reduce the effective failure rate).
+        # Re-extract retryable URLs after the main parallel batch pass.
+        # Sequential (concurrency=1, 2 s gap) so a recovering provider is not
+        # hit with another burst. Summary counters are updated in-place so
+        # recovered timeouts and fetch failures no longer look unrecovered.
         _ph_marks["sweep_start"] = time.monotonic()  # C4 phase timing
         if _sweep_links:
             log.info(
-                "[SWEEP] %d fetch-failed URL(s) queued for sequential recovery pass",
+                "[SWEEP] %d retryable URL(s) queued for sequential recovery pass",
                 len(_sweep_links),
             )
             await emit(
                 "status",
-                f"[SWEEP] {len(_sweep_links)} fetch-failed URL(s) → sequential recovery",
+                f"[SWEEP] {len(_sweep_links)} retryable extraction failure(s) "
+                "→ sequential recovery",
                 phase="sweep", kind="sweep_start", count=len(_sweep_links),
             )
             _sweep_recovered = 0
-            for _sweep_lk in _sweep_links:
+            for _sweep_index, _sweep_lk in enumerate(_sweep_links):
                 _sweep_url = (_sweep_lk.get("url") or "?")
                 try:
+                    if scrape_do_dead_flag[0]:
+                        _remaining_sweeps = len(_sweep_links) - _sweep_index
+                        log.warning(
+                            "[SWEEP] skipped %d recovery replay(s): Scrape.do "
+                            "account circuit is open",
+                            _remaining_sweeps,
+                        )
+                        await emit(
+                            "status",
+                            f"[SWEEP] skipped {_remaining_sweeps} replay(s): "
+                            "Scrape.do account circuit is open — operator review required",
+                            phase="sweep",
+                            kind="sweep_skipped_circuit_open",
+                            reason="scrape_do_circuit_open",
+                            remaining=_remaining_sweeps,
+                            next_action="operator review",
+                        )
+                        break
                     await asyncio.sleep(2.0)  # brief pause between sweep retries
-                    _sw_r = await _extract_only(
+                    _sw_r = await _extract_for_recovery_sweep(
                         _sweep_lk,
                         uni_country,
-                        uni_pdf_data or None,
+                        scrape_do_dead_flag=scrape_do_dead_flag,
+                        uni_pdf_data=uni_pdf_data or None,
                         emit=emit,
                         vision_image_cache=vision_image_cache,
                         central_data=central_data,
@@ -4916,10 +5126,29 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         seen_pdf_urls=seen_pdf_urls,
                     )
                     if not isinstance(_sw_r, dict) or _sw_r.get("error"):
+                        _sw_error = (
+                            _sw_r.get("error")
+                            if isinstance(_sw_r, dict)
+                            else type(_sw_r).__name__
+                        )
+                        _sw_details = _extraction_failure_details(_sw_error)
                         log.info(
-                            "[SWEEP] %s still failed after retry: %s",
-                            _sweep_url[:80],
-                            _sw_r.get("error") if isinstance(_sw_r, dict) else type(_sw_r).__name__,
+                            "[SWEEP] %s still failed after retry: %s (%s)",
+                            _sweep_url[:80], _sw_details["reason"], _sw_error,
+                        )
+                        await emit(
+                            "status",
+                            f"[SWEEP] unresolved — operator review required: "
+                            f"{_sweep_lk.get('name', '?')} "
+                            f"({_sw_details['reason']})",
+                            phase="sweep",
+                            kind="sweep_unresolved",
+                            url=_sweep_url,
+                            reason=_sw_details["reason"],
+                            detail=_sw_details["detail"],
+                            source_error=_sweep_lk.get("source_error"),
+                            retry_error=_sw_error,
+                            next_action="operator review",
                         )
                         continue
                     _sw_payload = dict(_sw_r.get("payload") or {})
@@ -4935,7 +5164,9 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         )
                     if _sw_res.saved:
                         summary["staged"] += 1
-                        summary["fetch_failed"] = max(0, summary["fetch_failed"] - 1)
+                        _counter = _sweep_lk.get("counter")
+                        if _counter in ("fetch_failed", "errors"):
+                            summary[_counter] = max(0, summary[_counter] - 1)
                         _sweep_recovered += 1
                         await emit(
                             "status",
@@ -4944,7 +5175,9 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         )
                     else:
                         summary["skipped"] += 1
-                        summary["fetch_failed"] = max(0, summary["fetch_failed"] - 1)
+                        _counter = _sweep_lk.get("counter")
+                        if _counter in ("fetch_failed", "errors"):
+                            summary[_counter] = max(0, summary[_counter] - 1)
                         _sweep_recovered += 1
                         await emit(
                             "status",
