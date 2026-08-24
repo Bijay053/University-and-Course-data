@@ -1137,7 +1137,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
         pollFailRef.current = 0;
         const data = await readResponseJson<{
           universityName?: string; url?: string; logs?: ScrapeLog[]; logIndex?: number;
-          status?: string; imported?: number;
+          status?: string; imported?: number; skipped?: number; errors?: number;
         }>(res);
         if (!data) { schedule(POLL_BASE); return; }
 
@@ -1232,10 +1232,24 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
 
         const terminal = data.status && !["queued", "running", "awaiting_approval"].includes(data.status);
         if (terminal) {
+          // A reconnect can poll after the one-off DONE event was already
+          // consumed. The status endpoint still includes final counters, so use
+          // them as a durable fallback for the completion card and Review button.
+          if (!data.logs?.some((l) => l.event === "done")) {
+            setResultSummary({
+              imported: data.imported ?? 0,
+              skipped: data.skipped ?? 0,
+              errors: data.errors ?? 0,
+            });
+          }
           setScraping(false);
           setStopping(false);
           setCompletedJobId(jobId);
-          setPhase(data.status === "completed" || data.status === "completed_with_errors" ? "done" : "error");
+          setPhase(
+            ["completed", "completed_with_errors", "completed_with_warnings"].includes(data.status ?? "")
+              ? "done"
+              : "error",
+          );
           if (pollRef.current) clearTimeout(pollRef.current);
           return;
         }

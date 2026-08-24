@@ -66,6 +66,9 @@ type ScrapeStatusResponse = {
   logIndex?: number;
   status?: string;
   imported?: number;
+  skipped?: number;
+  errors?: number;
+  totalFound?: number;
   awaitingApproval?: ApprovalSummary;
 };
 
@@ -91,6 +94,30 @@ type ScrapeLog = {
   rejectedExamples?: string[];
   estimatedMinutes?: number;
 };
+
+const REVIEWABLE_TERMINAL_STATUSES = new Set([
+  "completed",
+  "completed_with_errors",
+  "completed_with_warnings",
+  "stopped",
+]);
+
+function resultFromCompletedStatus(data: ScrapeStatusResponse): ScrapeLog {
+  const imported = data.imported ?? 0;
+  const skipped = data.skipped ?? 0;
+  const errors = data.errors ?? 0;
+  const totalFound = data.totalFound ?? imported + skipped + errors;
+
+  return {
+    event: "done",
+    message: `══ DONE ══ Found:${totalFound} | Staged:${imported} | Skipped:${skipped} | Errors:${errors}`,
+    totalFound,
+    imported,
+    skipped,
+    errors,
+    phase: "complete",
+  };
+}
 
 type StagedCourse = {
   id: number;
@@ -1160,11 +1187,12 @@ export default function Scraping() {
 
         let nextAwaitingApproval: ApprovalSummary | null = null;
         const logs = data.logs;
+        let doneLog: ScrapeLog | undefined;
         if (logs && logs.length > 0) {
           setScrapeLogs((prev) => [...prev, ...logs].slice(-MAX_SCRAPE_LOG_LINES));
           if (data.logIndex !== undefined) logIndexRef.current = data.logIndex;
 
-          const doneLog = logs.find((l: ScrapeLog) => l.event === "done");
+          doneLog = logs.find((l: ScrapeLog) => l.event === "done");
           if (doneLog) setScrapeResult(doneLog);
 
           const approvalLog = logs.find((l: ScrapeLog) => l.event === "approval_required");
@@ -1179,6 +1207,13 @@ export default function Scraping() {
               estimatedMinutes: approvalLog.estimatedMinutes ?? 1,
             };
           }
+        }
+
+        if (!doneLog && data.status && REVIEWABLE_TERMINAL_STATUSES.has(data.status)) {
+          // The job row is authoritative. A polling reconnect can begin after
+          // the transient DONE event, so never leave a completed scrape without
+          // its result summary merely because that one log row was not received.
+          setScrapeResult(resultFromCompletedStatus(data));
         }
 
         const fetchAlreadyStarted =
@@ -1201,7 +1236,7 @@ export default function Scraping() {
           setStopping(false);
           setAwaitingApproval(null);
           if (pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null; }
-          if ((data.status === "completed" || data.status === "completed_with_errors" || data.status === "stopped") && (data.imported ?? 0) > 0) {
+          if (data.status && REVIEWABLE_TERMINAL_STATUSES.has(data.status) && (data.imported ?? 0) > 0) {
             // BEHAVIOUR CONTRACT (mirrors handleReviewReady above):
             // Background polling must NEVER replace an already open review
             // panel for a different job. Only a deliberate user action with
