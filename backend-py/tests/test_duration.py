@@ -96,6 +96,56 @@ def test_duration_label_does_not_misfire_on_unrelated_strong_tags():
     assert out[0].method != "duration.structural"
 
 
+def test_duration_meta_beats_uow_courses_you_might_like_cards():
+    """UOW's canonical meta value must beat larger recommendation durations."""
+    html = """
+        <head>
+          <meta name="duration"
+                content="2 years full-time, or part-time equivalent">
+        </head>
+        <body>
+          <section id="course-search-favourites-related-courses">
+            <h2>Courses you might like</h2>
+            <div class="cf-course-item">
+              <span>Duration</span>
+              <span>4 years full-time, or part-time equivalent</span>
+            </div>
+          </section>
+        </body>
+    """
+
+    out = _run(
+        duration.extract(
+            html,
+            "https://www.uow.edu.au/study/courses/master-of-teaching-secondary/",
+        )
+    )
+
+    assert out
+    assert out[0].normalized == {"duration": 2.0, "duration_term": "Year"}
+    assert out[0].method == "duration.meta"
+
+
+def test_related_course_section_cannot_win_duration_tournament():
+    """Generic pages without meta tags must ignore sibling-course fact boxes."""
+    html = """
+        <main>
+          <p>Course duration: 2 years full-time.</p>
+        </main>
+        <section class="related-courses">
+          <h2>Related courses</h2>
+          <article>
+            <p>Duration: 4 years full-time.</p>
+          </article>
+        </section>
+    """
+
+    out = _run(duration.extract(html, "https://example.edu/courses/test"))
+
+    assert out
+    assert out[0].normalized == {"duration": 2.0, "duration_term": "Year"}
+
+
 def test_dt_dd_duration_rejects_accelerated_in_value_cell():
     """If the dd cell describes an accelerated/fast-track variant,
     the structural pre-pass must NOT short-circuit with that value —

@@ -45,6 +45,34 @@ _PATTERNS = (
         re.I,
     ),
 )
+
+# Recommendation widgets repeat other courses' fact boxes on the current
+# course page. Their explicit "Duration" labels look just as authoritative as
+# the real course summary after HTML is flattened, and the tournament then
+# prefers the largest value (e.g. UOW Master of Teaching = 2 years, while a
+# "Courses you might like" Bachelor card says 4 years). Strip only containers
+# with high-precision related/recommended-course markers.
+_RELATED_COURSE_CONTAINER_RE = re.compile(
+    r"(?:"
+    r"related[-_ ]?courses?|"
+    r"recommended[-_ ]?courses?|"
+    r"similar[-_ ]?courses?|"
+    r"courses?[-_ ]?you[-_ ]?might[-_ ]?like|"
+    r"course[-_ ]?recommendations?|"
+    r"course__like"
+    r")",
+    re.IGNORECASE,
+)
+_RELATED_COURSE_HEADING_RE = re.compile(
+    r"^(?:"
+    r"courses?\s+you\s+might\s+like|"
+    r"you\s+may\s+also\s+like|"
+    r"related\s+courses?|"
+    r"similar\s+courses?|"
+    r"recommended\s+courses?"
+    r")$",
+    re.IGNORECASE,
+)
 _ACCELERATED = re.compile(
     r"\b(accelerat(?:ed|ion)|fast[- ]?track|condensed|intensive\s+(?:mode|stream|study)|"
     r"advanced\s+standing|recognition\s+of\s+prior\s+learning|RPL|"
@@ -571,6 +599,76 @@ def _extract_strong_label_value(
     return None, None
 
 
+def _from_duration_meta(html: str) -> tuple[tuple[float, str], str] | None:
+    """Read canonical course duration from a dedicated meta tag.
+
+    UOW's static HTML publishes the current course's value as
+    ``<meta name="duration" content="2 years full-time, ...">`` even when the
+    visible summary panel needs JavaScript. Recommendation cards later in the
+    same HTML contain other courses' durations, so this machine-readable value
+    must take precedence over every DOM/text fallback.
+    """
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:  # pragma: no cover - defensive
+        return None
+
+    for tag in soup.find_all("meta"):
+        name = str(tag.get("name") or "").strip().lower()
+        if name != "duration":
+            continue
+        content = compact(str(tag.get("content") or ""))
+        if not content:
+            continue
+        parsed = _classify_duration_value(content)
+        if parsed is not None:
+            return parsed, f'meta[name="duration"]: {content[:120]}'
+    return None
+
+
+def _strip_related_course_sections(html: str) -> str:
+    """Remove high-confidence sibling-course recommendation containers."""
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:  # pragma: no cover - defensive
+        return html
+
+    matched_containers = []
+    for tag in soup.find_all(True):
+        marker = " ".join(
+            [
+                str(tag.get("id") or ""),
+                *[str(value) for value in (tag.get("class") or [])],
+            ]
+        )
+        if not marker or not _RELATED_COURSE_CONTAINER_RE.search(marker):
+            continue
+        matched_containers.append(tag)
+
+    # Decompose only after discovery. Decomposing while iterating invalidates
+    # descendant Tag objects (their attrs become None) and can make a later
+    # ``tag.get(...)`` call fail.
+    for tag in matched_containers:
+        if tag.parent is not None:
+            tag.decompose()
+
+    for heading in list(soup.find_all(("h2", "h3", "h4", "h5", "h6"))):
+        if heading.parent is None:
+            continue
+        label = compact(heading.get_text(" ", strip=True))
+        if not _RELATED_COURSE_HEADING_RE.fullmatch(label):
+            continue
+        container = heading.find_parent(("section", "aside"))
+        if container is not None:
+            container.decompose()
+
+    return str(soup)
+
+
 # ── QUT structural reader (qut.edu.au) ─────────────────────────────────────
 # QUT's per-course pages are Cloudflare-walled and JS-rendered.  The rendered
 # sidebar "Explore this course" panel exposes the international duration in
@@ -659,6 +757,28 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
         _prefer_fulltime = _dcfg.prefer_fulltime
     except Exception:
         pass  # contextvar not set or config missing — treat as empty list
+
+    # Canonical machine-readable page metadata wins before any recommendation
+    # cards or flattened prose can enter the duration tournament.
+    meta = _from_duration_meta(html)
+    if meta is not None:
+        (amount, unit), snippet = meta
+        amount, unit = _convert_weeks(amount, unit)
+        return [
+            ExtractionResult(
+                field_key="duration",
+                value=amount,
+                normalized={"duration": amount, "duration_term": unit},
+                confidence=0.95,
+                snippet=snippet,
+                method="duration.meta",
+            )
+        ]
+
+    # Generic safety net for pages without canonical metadata. Intake and
+    # study-mode extraction already exclude sibling-course widgets for the same
+    # reason; duration must not let those cards participate either.
+    html = _strip_related_course_sections(html)
 
     # QUT structural pre-pass — see _from_qut_quickbox above.  Runs BEFORE
     # the generic structural/regex cascade because QUT pages have no
