@@ -307,6 +307,12 @@ def _normalize_fee_term(ctx: str, *, prefer_year_one: bool = False) -> str:
         return "Trimester"
     if re.search(r"per\s*semester", ctx, re.I):
         return "Semester"
+    # UOW labels the per-period amount as "Session fee" and places the
+    # full-programme amount beside it as "Course fee".  The session label is
+    # sometimes in a table header rather than next to the value, so callers
+    # that preserve the header in the context must classify it explicitly.
+    if re.search(r"\bsession\s+fee\b", ctx, re.I):
+        return "Session"
     if re.search(r"per\s*term\b", ctx, re.I):
         return "Term"
     if re.search(r"per\s*session\b", ctx, re.I):
@@ -1269,6 +1275,89 @@ def _from_uc_hidden_inputs(html: str) -> "tuple[int, str] | None":
     return _fee, _ctx
 
 
+_UOW_HOST_RE = re.compile(r"(?:^|[./])uow\.edu\.au(?:/|$)", re.IGNORECASE)
+_UOW_SESSION_FEE_RE = re.compile(r"\bsession\s+fee\b", re.IGNORECASE)
+_UOW_COURSE_FEE_RE = re.compile(r"\bcourse\s+fee\b", re.IGNORECASE)
+
+
+def _from_uow_session_fee_table(
+    html: str, url: str
+) -> "tuple[int, str] | None":
+    """Read UOW's session fee instead of its adjacent full-course total.
+
+    UOW course pages publish a compact table like::
+
+        Campus | Delivery method | Session fee* | Course fee*
+        Wollongong | On Campus | $22032 (2026) | $88128 (2026)
+
+    The generic amount scanner sees both values in one short text window and
+    breaks the tie by choosing the larger course total, which is then
+    incorrectly labelled Annual.  This pre-pass is deliberately host-gated
+    and requires both headers so it cannot reinterpret unrelated Australian
+    fee tables.
+    """
+    if not _UOW_HOST_RE.search(url or "") or not html:
+        return None
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:  # pragma: no cover
+        return None
+
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:  # pragma: no cover
+        return None
+
+    for table in soup.find_all("table"):
+        rows = [
+            [cell.get_text(" ", strip=True) for cell in tr.find_all(["th", "td"])]
+            for tr in table.find_all("tr")
+        ]
+        rows = [row for row in rows if row]
+        if not rows:
+            continue
+
+        header_index: int | None = None
+        session_index: int | None = None
+        course_index: int | None = None
+        for row_index, row in enumerate(rows):
+            for cell_index, cell in enumerate(row):
+                if _UOW_SESSION_FEE_RE.search(cell):
+                    session_index = cell_index
+                if _UOW_COURSE_FEE_RE.search(cell):
+                    course_index = cell_index
+            if session_index is not None and course_index is not None:
+                header_index = row_index
+                break
+        if header_index is None or session_index is None:
+            continue
+
+        best: tuple[int, int, str] | None = None
+        for row in rows[header_index + 1:]:
+            if len(row) <= session_index:
+                continue
+            match = _AMOUNT_RE.search(row[session_index])
+            if not match:
+                continue
+            raw = match.group(2) or match.group(3) or ""
+            amount = _parse_amount(raw)
+            if amount is None or not 1_000 <= amount <= 200_000:
+                continue
+            row_text = " | ".join(row)
+            year = _extract_year(row_text) or -1
+            if best is None or year > best[0]:
+                best = (
+                    year,
+                    amount,
+                    f"UOW fee table: Session fee {row[session_index]}"
+                    f" | Course fee {row[course_index] if len(row) > course_index else ''}",
+                )
+
+        if best is not None:
+            return best[1], best[2]
+    return None
+
+
 def _from_roehampton_int_tab(
     html: str, url: str
 ) -> "tuple[int, str] | None":
@@ -1563,6 +1652,33 @@ async def extract(
                     method="fee.uc_hidden_input",
                 )
             ]
+
+    # ── Pre-pass UOW: session fee column ──────────────────────────────────────
+    # UOW places the per-session amount beside a larger full-course total.
+    # The latter must never be treated as the annual international fee.
+    _uow_fee = _from_uow_session_fee_table(html, url)
+    if _uow_fee is not None:
+        _uow_amount, _uow_ctx = _uow_fee
+        _uow_currency = _detect_currency(_uow_ctx, country)
+        if _uow_currency == "AUD":
+            _url_cur = _infer_currency_from_url(url)
+            if _url_cur:
+                _uow_currency = _url_cur
+        return [
+            ExtractionResult(
+                field_key="international_fee",
+                value=_uow_amount,
+                normalized={
+                    "international_fee": _uow_amount,
+                    "currency": _uow_currency,
+                    "fee_term": "Session",
+                    "fee_year": _extract_year(_uow_ctx),
+                },
+                confidence=0.98,
+                snippet=_uow_ctx[:160],
+                method="fee.uow_session_table",
+            )
+        ]
 
     # ── Pre-pass BCU: tab-aware International Student fee panel ─────────────
     # BCU course pages expose two sibling div panels inside #fees_how_to_apply:

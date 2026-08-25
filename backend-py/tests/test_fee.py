@@ -157,6 +157,47 @@ def test_first_year_fee_only_still_extracted():
     assert n["international_fee"] == 38_000
 
 
+def test_uow_session_fee_wins_over_full_course_fee():
+    """UOW publishes the session amount beside the full-programme amount.
+
+    The session fee is the operator-facing periodic tuition figure:
+    $22,032/session, while $88,128 is the total course fee.  A flattened text
+    scan used to choose the larger number and incorrectly label it Annual.
+    """
+    html = """
+    <table>
+      <thead>
+        <tr>
+          <th>Campus</th>
+          <th>Delivery method</th>
+          <th>Session fee*</th>
+          <th>Course fee*</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Wollongong</td>
+          <td>On Campus</td>
+          <td>$22032 (2026)</td>
+          <td>$88128 (2026)</td>
+        </tr>
+      </tbody>
+    </table>
+    """
+    out = _run(fee.extract(
+        html,
+        "https://www.uow.edu.au/study/courses/master-of-research-smah",
+        country="Australia",
+    ))
+    assert out
+    n = out[0].normalized
+    assert n["international_fee"] == 22_032
+    assert n["currency"] == "AUD"
+    assert n["fee_term"] == "Session"
+    assert n["fee_year"] == 2026
+    assert out[0].method == "fee.uow_session_table"
+
+
 # ── Structured fee table tests ─────────────────────────────────────────────
 # These test the new _extract_fee_table_row pre-pass (Pre-pass 0) which must
 # run before the label/keyword extractors so that UK Home / Part-time rows

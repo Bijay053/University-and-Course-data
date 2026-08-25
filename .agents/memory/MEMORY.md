@@ -88,3 +88,4 @@
 - [CSU discovery fix](csu-discovery-fix.md) — CF Enterprise; 3 YAML knobs (skip_browser_discovery+sitemap_url+use_wayback) skip 160s of dead probes; CDX→329 course URLs.
 - [payload.get(key, default) None trap](payload-get-none-trap.md) — key present with None value → get() returns None not default; use `(payload.get(key) or "").strip()` always.
 - [Global international-audience filters](global-international-audience-filters.md) — confirmed domestic-only and online-only courses are never staged, regardless of per-university YAML or admin overrides.
+- [UOW session-fee table](uow-session-fee.md) — UOW’s adjacent Course fee is a full-programme total; select and retain the Session fee column instead.
