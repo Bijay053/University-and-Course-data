@@ -5707,8 +5707,9 @@ async def extract_course(
         # it issues one extra HTTP request per course page.
         from app.services.scraper.extractors import latrobe_json as _latrobe_json
         if _latrobe_json.is_latrobe_host(url):
+            _ltu_applied: dict[str, Any] = {}
             try:
-                await _latrobe_json.apply_overrides(
+                _ltu_applied = await _latrobe_json.apply_overrides(
                     payload,
                     html,
                     url=url,
@@ -5719,6 +5720,35 @@ async def extract_course(
                 )
             except Exception as _ltu_exc:  # noqa: BLE001 — never break a scrape
                 log.warning("latrobe_json override failed on %s: %s", url, _ltu_exc)
+            if _latrobe_json.international_authority_missing(html, _ltu_applied):
+                _message = (
+                    "[LATROBE JSON] authoritative international detail was "
+                    f"unavailable — queueing recovery for {url}"
+                )
+                log.warning(_message)
+                if emit:
+                    await emit(
+                        "status",
+                        _message,
+                        phase="extract",
+                        kind="latrobe_authority_missing",
+                        url=url,
+                    )
+                return {
+                    "name": payload.get("course_name") or "?",
+                    "url": url,
+                    "error": "fetch_failed_latrobe_authority",
+                    "error_type": "LatrobeAuthorityUnavailable",
+                    "error_reason": (
+                        "The course shell listed an international detail URL, "
+                        "but the authoritative JSON returned no usable fields."
+                    ),
+                    "retryable": True,
+                    "fetch_failed": True,
+                    "payload": {},
+                    "evidence": [],
+                    "_perf": _perf_flags,
+                }
         # MIT (Melbourne Institute of Technology) per-course fee table
         # override.  MIT's per-course page genuinely contains no
         # international fee — Gemini sees the "DomesticInternational"

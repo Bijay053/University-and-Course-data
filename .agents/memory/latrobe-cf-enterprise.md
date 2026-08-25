@@ -107,3 +107,23 @@ universities.
 
 **How to apply:** Scope the higher semaphore to La Trobe's validated config.
 Do not increase the global default or remove retry/backoff protections.
+
+## Current detail envelope and hollow-shell recovery
+
+**Rule:** Read authoritative values from the detail document's `data` object.
+For fees, select only the `fees.rawFees` row explicitly labelled
+`Fee_Type=International`; the same array also contains a domestic amount.
+A course shell that advertises an international detail URL but produces no
+authoritative overrides is a retryable fetch failure, not a successful scrape.
+
+**Why:** La Trobe removed the legacy fee description in favour of unformatted
+numeric `rawFees` rows. Under concurrent Scrape.do 429/502 contention, the
+course shell can still be returned while the detail navigation fails. Treating
+that non-empty SPA shell as success caused zero fetch errors, prevented the
+recovery sweep, and allowed weak generic Online/domestic guesses to reject
+every course.
+
+**How to apply:** Normalize the unformatted international amount before parsing.
+After the La Trobe override, require at least one authoritative result whenever
+the manifest has an international variant. If none applied, emit a stable
+fetch-failed sentinel so the sequential recovery sweep retries the URL.

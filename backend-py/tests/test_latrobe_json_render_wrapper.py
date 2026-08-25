@@ -126,6 +126,48 @@ def test_apply_overrides_uses_prefetched_document_without_fetch(monkeypatch):
     assert payload["duration"] == 3
 
 
+def test_parse_international_fee_supports_current_raw_fees_schema():
+    fees = {
+        "rawFees": [
+            {
+                "Fee_Type": "Domestic",
+                "Fee_Amount": "14968.00",
+                "Fee_Currency": "",
+            },
+            {
+                "Fee_Type": "International",
+                "Fee_Amount": "43000.00",
+                "Fee_Currency": "",
+            },
+        ]
+    }
+
+    assert latrobe_json.parse_international_fee(fees) == (43000, "Annual")
+
+
+def test_missing_authority_is_retryable_only_when_manifest_has_international_url():
+    international_html = (
+        '<script>{"allDetailUrls":{"2026":{"international":{"BU":'
+        '"https://www.latrobe.edu.au/courses/data/2026/international/bu/test"}}}'
+        "}}</script>"
+    )
+    domestic_html = (
+        '<script>{"allDetailUrls":{"2026":{"domestic":{"BU":'
+        '"https://www.latrobe.edu.au/courses/data/2026/domestic/bu/test"}}}'
+        "}}</script>"
+    )
+
+    assert latrobe_json.international_authority_missing(international_html, {}) is True
+    assert (
+        latrobe_json.international_authority_missing(
+            international_html,
+            {"duration": {"new": (3, "Year")}},
+        )
+        is False
+    )
+    assert latrobe_json.international_authority_missing(domestic_html, {}) is False
+
+
 def test_apply_overrides_restores_on_campus_from_authoritative_delivery_code(monkeypatch):
     """An OC JSON variant must override the SPA shell's weak Online guess."""
     detail_url = "https://www.latrobe.edu.au/courses/data/2026/international/ci/test"

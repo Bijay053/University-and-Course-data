@@ -387,6 +387,36 @@ def parse_international_fee(fees: dict[str, Any] | None) -> tuple[int | None, st
         return None, None
     text = (fees.get("amountDescription") or fees.get("overview") or "").strip()
     if not text:
+        # La Trobe's current international detail response exposes both the
+        # domestic and international rates in ``fees.rawFees`` instead of the
+        # legacy ``amountDescription`` field. Select the explicitly-labelled
+        # International row only; falling back to the first row would silently
+        # publish the Domestic amount.
+        raw_fees = fees.get("rawFees")
+        if isinstance(raw_fees, list):
+            for row in raw_fees:
+                if not isinstance(row, dict):
+                    continue
+                fee_type = str(row.get("Fee_Type") or "").strip().lower()
+                if "international" not in fee_type:
+                    continue
+                amount = str(row.get("Fee_Amount") or "").strip()
+                if not amount:
+                    continue
+                try:
+                    numeric_amount = int(
+                        float(re.sub(r"[\s\u00a0,]", "", amount))
+                    )
+                except (TypeError, ValueError):
+                    continue
+                if numeric_amount <= 0:
+                    continue
+                description = str(
+                    row.get("Advertised_Fee_Description") or ""
+                ).strip()
+                text = f"A${numeric_amount:,} {description}".strip()
+                break
+    if not text:
         return None, None
     m = _FEE_AMOUNT_RE.search(text)
     if not m:
@@ -419,6 +449,22 @@ def parse_international_fee(fees: dict[str, Any] | None) -> tuple[int | None, st
     if "full course" in low or "total" in low:
         return amt, "Full Course"
     return amt, "Annual"  # safe default for La Trobe per-year publishing
+
+
+def international_authority_missing(
+    html: str,
+    applied: dict[str, Any] | None,
+) -> bool:
+    """Return True when an international detail exists but yielded no fields.
+
+    A rendered La Trobe SPA shell is non-empty HTML even when the authoritative
+    detail navigation fails under provider contention. Without this check, the
+    pipeline treats that shell as a successful fetch, applies weak generic
+    Online/domestic classifications, and never queues the URL for recovery.
+    """
+    if applied:
+        return False
+    return bool(pick_international_url(parse_all_detail_urls(html)))
 
 
 # ── English requirement parser (entryReq.engReq) ─────────────────────────
@@ -840,11 +886,26 @@ async def apply_overrides(
         payload.setdefault("currency", "AUD")
         applied["international_fee"] = {"old": prev_fee, "new": amt, "fee_term": fee_term}
         if evidence is not None:
+            _fees = data.get("fees") or {}
             _raw = (
-                (data.get("fees") or {}).get("amountDescription")
-                or (data.get("fees") or {}).get("overview")
+                _fees.get("amountDescription")
+                or _fees.get("overview")
                 or ""
             )
+            if not _raw:
+                for _row in _fees.get("rawFees") or []:
+                    if not isinstance(_row, dict):
+                        continue
+                    if "international" not in str(
+                        _row.get("Fee_Type") or ""
+                    ).lower():
+                        continue
+                    _raw = (
+                        f"{_row.get('Fee_Type') or 'International'} "
+                        f"{_row.get('Fee_Currency') or 'AUD'} "
+                        f"{_row.get('Fee_Amount') or ''}"
+                    ).strip()
+                    break
             evidence.append({
                 "field_key": "international_fee",
                 "value": amt,
