@@ -1581,6 +1581,28 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         _disc_cache_hit = False
         _c1_rp = job.request_payload or {}
         _c1_force = bool(_c1_rp.get("forceDiscovery") or _c1_rp.get("force_discovery"))
+        from app.services.scraper.discovery_cache_scope import (
+            discovery_cache_coverage_sufficient as _discovery_cache_coverage_sufficient,
+            discovery_cache_scope_key as _discovery_cache_scope_key,
+        )
+        _c1_scope_key: str | None = None
+        try:
+            _c1_scope_key = _discovery_cache_scope_key(
+                scrape_url=scrape_url,
+                discovery_config=_uni_cfg.discovery,
+                recipe=(uni_scrape_config or {}).get("recipe") or {},
+            )
+        except Exception as _c1_scope_exc:  # noqa: BLE001 — cache is optional
+            log.warning(
+                "[DISCOVER] cache scope fingerprint failed (cache disabled, "
+                "full discovery continues): %s",
+                _c1_scope_exc,
+            )
+        _c1_expected_min = getattr(
+            _uni_cfg.discovery,
+            "expected_min_courses",
+            None,
+        )
         _c1_has_api_provider = (
             getattr(_uni_cfg.discovery, "searchstax", None) is not None
             or getattr(_uni_cfg.discovery, "generic_search_api", None) is not None
@@ -1588,11 +1610,23 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             or getattr(_uni_cfg.discovery, "tafensw_api", None) is not None
             or getattr(_uni_cfg.discovery, "melbournepolytechnic_api", None) is not None
         )
-        if not _targeted_retry and not _c1_force and not _c1_has_api_provider:
+        if (
+            not _targeted_retry
+            and not _c1_force
+            and not _c1_has_api_provider
+            and _c1_scope_key
+        ):
             try:
                 from app.models import DiscoveryUrlCache as _DUC
                 _c1_row = await db.get(_DUC, uni_id)
                 if _c1_row is not None and _c1_row.links:
+                    _c1_meta = next(
+                        (
+                            _lk for _lk in _c1_row.links
+                            if isinstance(_lk, dict) and _lk.get("cache_meta")
+                        ),
+                        None,
+                    )
                     _c1_age_s = (
                         datetime.now(timezone.utc) - _c1_row.discovered_at
                     ).total_seconds()
@@ -1600,16 +1634,39 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     # Rows persist two entry kinds: course links, and BFS-blocked
                     # fee-page URLs (marked fee_page=True) so the Bug-7 central-
                     # fee-page fallback still works on cached runs where BFS is
-                    # skipped.  The >=5 freshness gate counts COURSE links only.
+                    # skipped. Cache coverage counts COURSE links only and uses
+                    # max(5, discovery.expected_min_courses).
                     _c1_course = [
                         dict(_lk) for _lk in _c1_row.links
-                        if _lk.get("url") and not _lk.get("fee_page")
+                        if (
+                            isinstance(_lk, dict)
+                            and _lk.get("url")
+                            and not _lk.get("fee_page")
+                            and not _lk.get("cache_meta")
+                        )
                     ]
-                    if _c1_age_d < 7.0 and len(_c1_course) >= 5:
+                    _c1_scope_matches = bool(
+                        _c1_meta
+                        and _c1_meta.get("scope_version") == 1
+                        and _c1_meta.get("scope_key") == _c1_scope_key
+                    )
+                    _c1_coverage_ok = _discovery_cache_coverage_sufficient(
+                        course_count=len(_c1_course),
+                        expected_min_courses=_c1_expected_min,
+                    )
+                    if (
+                        _c1_scope_matches
+                        and _c1_age_d < 7.0
+                        and _c1_coverage_ok
+                    ):
                         links = _c1_course
                         _discover_blocked_fee_urls.extend(
                             _lk["url"] for _lk in _c1_row.links
-                            if _lk.get("url") and _lk.get("fee_page")
+                            if (
+                                isinstance(_lk, dict)
+                                and _lk.get("url")
+                                and _lk.get("fee_page")
+                            )
                         )
                         _disc_cache_hit = True
                         _always_browser = False
@@ -1626,6 +1683,42 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                             kind="discovery_cache_hit",
                             count=len(links),
                             age_days=round(_c1_age_d, 1),
+                        )
+                    elif not _c1_scope_matches:
+                        _c1_cached_scope = (
+                            "legacy/unscoped"
+                            if not _c1_meta
+                            else "different start URL or discovery config"
+                        )
+                        log.info(
+                            "[DISCOVER] cache scope mismatch (%s) — full discovery",
+                            _c1_cached_scope,
+                        )
+                        await emit(
+                            "status",
+                            f"[DISCOVER] cache ignored — {_c1_cached_scope}; "
+                            "running full discovery",
+                            phase="discover",
+                            kind="discovery_cache_scope_miss",
+                        )
+                    elif not _c1_coverage_ok:
+                        _c1_required = max(5, int(_c1_expected_min or 0))
+                        log.warning(
+                            "[DISCOVER] cache coverage insufficient (%d < %d) "
+                            "— full discovery",
+                            len(_c1_course),
+                            _c1_required,
+                        )
+                        await emit(
+                            "status",
+                            f"[DISCOVER] cache ignored — only "
+                            f"{len(_c1_course)} course URLs, expected "
+                            f"{_c1_required}+; running full discovery",
+                            phase="discover",
+                            kind="discovery_cache_coverage_miss",
+                            count=len(_c1_course),
+                            expected_min=_c1_required,
+                            level="warning",
                         )
                     elif _c1_age_d >= 7.0:
                         log.info(
@@ -2788,7 +2881,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # from the cache, or when link dicts embed provider payloads
         # (SearchStax/Swiftype prebuilt results must never be cached — they'd
         # be served stale and are huge).  Written at end-of-run only if the
-        # run stayed healthy (>=5 links, fetch-fail rate <30%).
+        # run stayed healthy (configured coverage floor, fetch-fail rate <30%).
         _c1_links_for_cache: list[dict] = []
         if not _targeted_retry and not _disc_cache_hit and links:
             _c1_payload_keys = ("searchstax_result", "swiftype_result", "payload")
@@ -2811,6 +2904,24 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 {"url": _u, "fee_page": True}
                 for _u in dict.fromkeys(_discover_blocked_fee_urls)
             )
+        if _c1_links_for_cache and _c1_scope_key:
+            from app.services.scraper.discovery_cache_scope import (
+                discovery_cache_metadata as _discovery_cache_metadata,
+            )
+            _c1_links_for_cache.append(
+                _discovery_cache_metadata(
+                    scrape_url=scrape_url,
+                    scope_key=_c1_scope_key,
+                )
+            )
+        elif _c1_links_for_cache:
+            # A cache row without scope metadata would be intentionally
+            # unreadable. Avoid writing one when fingerprinting failed.
+            log.warning(
+                "[DISCOVER] cache snapshot discarded — scope fingerprint "
+                "unavailable; full discovery result remains usable"
+            )
+            _c1_links_for_cache = []
         log.info(
             "Discovered %d raw candidate course link(s) for %s",
             len(links), uni_name,
@@ -5891,13 +6002,18 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         _skip_parts = [f"{k}={v}" for k, v in sorted(skip_reasons.items(), key=lambda x: -x[1])]
         _skip_detail = f" ({', '.join(_skip_parts)})" if _skip_parts else ""
         # ── C1 write-through: persist discovered URLs for 7-day reuse ────────
-        # Only a healthy run may (over)write the cache: >=5 sanitized links AND
-        # a post-sweep fetch-fail rate under 30%.  A degraded run (Scrape.do
-        # outage, CF storm) must not poison the cache with a partial URL list.
+        # Only a healthy run may (over)write the cache: enough sanitized links
+        # for max(5, discovery.expected_min_courses) AND a post-sweep fetch-fail
+        # rate under 30%. A degraded run (Scrape.do outage, CF storm) must not
+        # poison the cache with a partial URL list.
         # Best-effort: any DB error is logged and ignored.
         _c1_cacheable = locals().get("_c1_links_for_cache") or []
         _c1_course_n = locals().get("_c1_course_link_n") or 0
-        if _c1_course_n >= 5:
+        _c1_cache_coverage_ok = _discovery_cache_coverage_sufficient(
+            course_count=_c1_course_n,
+            expected_min_courses=locals().get("_c1_expected_min"),
+        )
+        if _c1_cacheable and _c1_cache_coverage_ok:
             _c1_attempted = max(1, summary.get("discovered", 0))
             _c1_fail_rate = summary.get("fetch_failed", 0) / _c1_attempted
             if _c1_fail_rate < 0.30:
@@ -5935,6 +6051,17 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     "%.0f%% >= 30%% (degraded run must not poison the cache)",
                     _c1_fail_rate * 100,
                 )
+        elif _c1_course_n:
+            _c1_required = max(
+                5,
+                int(locals().get("_c1_expected_min") or 0),
+            )
+            log.warning(
+                "[DISCOVER] not caching discovery URLs — coverage %d < %d "
+                "(partial discovery must not poison the cache)",
+                _c1_course_n,
+                _c1_required,
+            )
         # QMUL "no traces" bug (2026-07-06): summary["fetch_failed"] (courses
         # whose initial HTTP/Scrape.do fetch came back empty and — because
         # skip_browser_rescue/skip_per_course_browser was set for that uni —

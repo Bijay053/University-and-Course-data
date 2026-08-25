@@ -1728,9 +1728,10 @@ class DiscoveryConfig(BaseModel):
         description=(
             "Minimum number of courses expected from discovery.  When set, the "
             "orchestrator emits a WARNING if the discovered count falls below this "
-            "threshold (e.g. 'Discovery incomplete: expected 100+, found 12').  "
-            "Does not block the job — use it as an early-warning signal that "
-            "seed_urls or config changes are needed."
+            "threshold (e.g. 'Discovery incomplete: expected 100+, found 12') and "
+            "will neither reuse nor overwrite the discovery cache below this floor. "
+            "It does not abort extraction of a fresh partial result; use it as an "
+            "early-warning and cache-safety threshold."
         ),
     )
     render_listing_pages: list[str] = Field(

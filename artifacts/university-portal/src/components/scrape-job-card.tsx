@@ -11,6 +11,7 @@ import {
 import { getFetchErrorMessage, readResponseJson } from "@/lib/readResponseJson";
 import { CountrySelect } from "@/components/country-select";
 import { useToast } from "@/hooks/use-toast";
+import { countPendingReviewCourses } from "@/utils/pending-review-count";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type UniOption = { id: number; name: string; scrapeUrl?: string | null; feePageUrl?: string | null; requirementsPageUrl?: string | null };
@@ -340,6 +341,10 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   const [now, setNow] = useState(Date.now());
   const [resultSummary, setResultSummary] = useState<{ imported: number; skipped: number; errors: number } | null>(null);
   const [completedJobId, setCompletedJobId] = useState<string | null>(null);
+  // `imported` is the total staged by the scrape. The Review screen only shows
+  // rows still awaiting a decision, so keep its count independently.
+  const [pendingReviewCount, setPendingReviewCount] = useState<number | null>(null);
+  const pendingReviewCountJobRef = useRef<string | null>(null);
   const [continuingUnresolved, setContinuingUnresolved] = useState(false);
 
   // Snapshot badge state — loaded after job completes
@@ -592,6 +597,8 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     setJobStatus(null);
     setLogs([]);
     setResultSummary(null);
+    pendingReviewCountJobRef.current = null;
+    setPendingReviewCount(null);
     setPerformanceSavings(null);
     setCompletedJobId(null);
     setSnapshotSummary(null);
@@ -1259,6 +1266,26 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
           setScraping(false);
           setStopping(false);
           setCompletedJobId(jobId);
+          // The completion counter is total staged, but the Review action opens
+          // the pending-only endpoint. Fetch that endpoint now so its button
+          // count always matches the review table rather than overstating work.
+          pendingReviewCountJobRef.current = jobId;
+          setPendingReviewCount(null);
+          void fetch(`/api/scrape/staged/${jobId}`, {
+            cache: "no-store",
+            headers: { "Cache-Control": "no-cache" },
+          })
+            .then(async (response) => {
+              if (!response.ok) return;
+              const payload = await readResponseJson<unknown>(response);
+              const count = countPendingReviewCourses(payload);
+              if (count !== null && pendingReviewCountJobRef.current === jobId) {
+                setPendingReviewCount(count);
+              }
+            })
+            .catch(() => {
+              // Keep the label generic if the count request is interrupted.
+            });
           setPhase(
             ["completed", "completed_with_errors", "completed_with_warnings"].includes(data.status ?? "")
               ? "done"
@@ -1325,6 +1352,8 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
     setLogs([]);
     setProgress(null);
     setResultSummary(null);
+    pendingReviewCountJobRef.current = null;
+    setPendingReviewCount(null);
     setPerformanceSavings(null);
     extractionStartRef.current = null;
     const t0 = Date.now();
@@ -1405,6 +1434,8 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
       setActiveJobId(data.jobId);
       setCompletedJobId(null);
       setResultSummary(null);
+      pendingReviewCountJobRef.current = null;
+      setPendingReviewCount(null);
       setPerformanceSavings(null);
       setProgress(null);
       extractionStartRef.current = null;
@@ -3418,13 +3449,16 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                     : `Continue ${resultSummary.errors} unresolved`}
                 </Button>
               )}
-              {completedJobId && resultSummary && resultSummary.imported > 0 && (
+              {completedJobId && resultSummary && resultSummary.imported > 0 && pendingReviewCount !== 0 && (
                 <Button
                   onClick={() => completedJobId && onReviewReady(completedJobId, uniName, true)}
                   className="flex-1 bg-green-600 hover:bg-green-700 h-9"
                   size="sm"
                 >
-                  <Eye className="w-3.5 h-3.5 mr-1.5" />Review {resultSummary.imported} Courses
+                  <Eye className="w-3.5 h-3.5 mr-1.5" />
+                  {pendingReviewCount === null
+                    ? "Review pending courses"
+                    : `Review ${pendingReviewCount} Course${pendingReviewCount === 1 ? "" : "s"}`}
                 </Button>
               )}
               <Button onClick={resetToIdle} variant="outline" size="sm" className="h-9">

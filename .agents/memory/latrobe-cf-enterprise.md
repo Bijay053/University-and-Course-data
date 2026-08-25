@@ -127,3 +127,18 @@ every course.
 After the La Trobe override, require at least one authoritative result whenever
 the manifest has an international variant. If none applied, emit a stable
 fetch-failed sentinel so the sequential recovery sweep retries the URL.
+
+## Delivery mode semantics
+
+**Rule:** Treat the detail document's compact delivery code as authoritative:
+online, on-campus, and multi-modal are distinct. Multi-modal physical-campus
+courses belong in the blended category. Only fall back to the international
+campus manifest when the detail omits or does not recognize delivery mode.
+
+**Why:** La Trobe commonly publishes physical courses as Multi-Modal. Leaving
+that code unhandled preserved the SPA shell's weak Online guess and caused the
+global international-audience gate to reject valid Melbourne/Bendigo courses.
+
+**How to apply:** Explicit codes outrank contradictory descriptions. A genuinely
+online detail remains online even if its manifest contains a physical campus;
+manifest-only inference is reserved for missing/unknown detail semantics.

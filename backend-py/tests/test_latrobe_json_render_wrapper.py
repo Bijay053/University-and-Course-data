@@ -6,6 +6,9 @@ import pytest
 
 from app.services.scraper.extractors import latrobe_json
 from app.services.scraper.extractors.latrobe_json import _decode_json_response
+from app.services.scraper.discovery_cache_scope import (
+    discovery_cache_coverage_sufficient,
+)
 
 
 def test_decode_json_response_accepts_raw_json():
@@ -206,6 +209,172 @@ def test_apply_overrides_restores_on_campus_from_authoritative_delivery_code(mon
     assert payload["study_mode"] == "On Campus"
     assert evidence[-1]["method"] == "latrobe_json"
     assert evidence[-1]["value"] == "On Campus"
+
+
+def test_apply_overrides_maps_multimodal_physical_course_to_blended(monkeypatch):
+    detail_url = "https://www.latrobe.edu.au/courses/data/2027/international/bu/arts"
+    course_html = (
+        '<script>{"allDetailUrls":{"2027":{"international":{"BU":'
+        f'"{detail_url}"'
+        "}}}}</script>"
+    )
+    payload = {"study_mode": "Online"}
+    evidence: list[dict] = []
+    detail_doc = {
+        "data": {
+            "duration": "3 years full-time",
+            "deliveryModeCode": "MM",
+            "deliveryModeDescription": "Multi-Modal",
+            "locationDisplayName": "Melbourne",
+            "entryReq": {"engReq": "IELTS 6.5"},
+        }
+    }
+
+    async def forbidden_fetch(_url, **_kwargs):
+        raise AssertionError("prefetched detail must avoid a second provider request")
+
+    monkeypatch.setattr(latrobe_json, "fetch_html_scrape_do", forbidden_fetch)
+    applied = asyncio.run(
+        latrobe_json.apply_overrides(
+            payload,
+            course_html,
+            url="https://www.latrobe.edu.au/courses/bachelor-of-arts",
+            evidence=evidence,
+            prefetched_doc=detail_doc,
+            prefetched_url=detail_url,
+        )
+    )
+
+    assert applied["study_mode"] == {"old": "Online", "new": "Blended"}
+    assert payload["study_mode"] == "Blended"
+    assert payload["course_location"] == "Melbourne"
+    assert evidence[-1]["confidence"] == 0.95
+    assert "multi-modal" in evidence[-1]["snippet"]
+
+
+def test_apply_overrides_uses_physical_manifest_when_detail_mode_missing(monkeypatch):
+    detail_url = "https://www.latrobe.edu.au/courses/data/2027/international/bu/test"
+    course_html = (
+        '<script>{"allDetailUrls":{"2027":{"international":{"BU":'
+        f'"{detail_url}"'
+        "}}}}</script>"
+    )
+    payload = {"study_mode": "Online"}
+    evidence: list[dict] = []
+    detail_doc = {
+        "data": {
+            "duration": "3 years full-time",
+            "locationDisplayName": "Melbourne",
+            "entryReq": {"engReq": "IELTS 6.5"},
+        }
+    }
+
+    async def forbidden_fetch(_url, **_kwargs):
+        raise AssertionError("prefetched detail must avoid a second provider request")
+
+    monkeypatch.setattr(latrobe_json, "fetch_html_scrape_do", forbidden_fetch)
+    asyncio.run(
+        latrobe_json.apply_overrides(
+            payload,
+            course_html,
+            evidence=evidence,
+            prefetched_doc=detail_doc,
+            prefetched_url=detail_url,
+        )
+    )
+
+    assert payload["study_mode"] == "On Campus"
+    assert evidence[-1]["confidence"] == 0.85
+    assert "manifest fallback physical" in evidence[-1]["snippet"]
+
+
+def test_explicit_online_detail_remains_online_with_physical_manifest():
+    mode, confidence, snippet = latrobe_json.classify_study_mode(
+        {
+            "deliveryModeCode": "OL",
+            "deliveryModeDescription": "Online",
+        },
+        {
+            "2027": {
+                "international": {
+                    "BU": "https://example.test/bu",
+                }
+            }
+        },
+    )
+    assert mode == "Online"
+    assert confidence == 0.95
+    assert "deliveryModeCode=OL" in snippet
+
+
+def test_explicit_oc_code_outranks_contradictory_online_description():
+    mode, confidence, _snippet = latrobe_json.classify_study_mode(
+        {
+            "deliveryModeCode": "OC",
+            "deliveryModeDescription": "Online",
+        },
+        {"2027": {"international": {"BU": "https://example.test/bu"}}},
+    )
+    assert mode == "On Campus"
+    assert confidence == 0.95
+
+
+def test_explicit_mm_code_outranks_contradictory_online_description():
+    mode, confidence, _snippet = latrobe_json.classify_study_mode(
+        {
+            "deliveryModeCode": "MM",
+            "deliveryModeDescription": "Online",
+        },
+        {"2027": {"international": {"BU": "https://example.test/bu"}}},
+    )
+    assert mode == "Blended"
+    assert confidence == 0.95
+
+
+def test_latrobe_config_rejects_92_course_discovery_cache():
+    from app.services.scraper.config.loader import get_config_for_host
+
+    cfg = get_config_for_host(
+        hostname="www.latrobe.edu.au",
+        name="La Trobe University",
+        scrape_url="https://www.latrobe.edu.au/",
+        university_id=21,
+    )
+    assert cfg.discovery.expected_min_courses == 180
+    assert not discovery_cache_coverage_sufficient(
+        course_count=92,
+        expected_min_courses=cfg.discovery.expected_min_courses,
+    )
+
+
+def test_latrobe_modes_integrate_with_global_delivery_gate():
+    from app.services.scraper.guards import should_stage_course
+
+    base_payload = {
+        "course_name": "Bachelor of Arts",
+        "course_location": "Melbourne",
+        "international_fee": 39000,
+    }
+    accepted, reason = should_stage_course(
+        "Bachelor of Arts",
+        {**base_payload, "study_mode": "Blended"},
+        "https://www.latrobe.edu.au/courses/bachelor-of-arts",
+    )
+    assert accepted is True
+    assert reason == "accepted"
+
+    accepted, reason = should_stage_course(
+        "Master of Business Administration",
+        {
+            **base_payload,
+            "course_name": "Master of Business Administration",
+            "course_location": "Online",
+            "study_mode": "Online",
+        },
+        "https://www.latrobe.edu.au/courses/master-of-business-administration",
+    )
+    assert accepted is False
+    assert reason == "online_only"
 
 
 def test_pick_international_url_prefers_earliest_year_and_canonical_campus():

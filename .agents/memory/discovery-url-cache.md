@@ -1,6 +1,6 @@
 ---
 name: Discovery URL cache (C1) design lessons
-description: 7-day per-university discovery link cache — gates, side-channel outputs, and provider-payload exclusions
+description: Discovery link cache — scope identity, gates, side-channel outputs, and provider-payload exclusions
 ---
 
 # Discovery URL cache lessons
@@ -18,11 +18,24 @@ the same JSONB list marked `fee_page: true` and split back out on read.
 sink/out-param the skipped code writes to (`_sink`, `.extend(`, `.append(`)
 and either persist those too or document why they're safe to lose.
 
+**Rule:** Discovery links are reusable only when both the normalized start URL
+and the effective discovery configuration match the run that produced them.
+Treat legacy cache entries without scope identity as misses.
+
+**Why:** A narrow category crawl can produce a healthy-looking partial result
+with no fetch failures. When the cache was keyed only by university, Deakin's
+18 Education URLs were later reused for a root-domain scrape that should have
+covered every configured discipline seed.
+
+**How to apply:** Bind each entry to a stable fingerprint of the start URL,
+discovery config, and recipe inputs. A scope mismatch must fail open to full
+discovery and then replace the old entry; repeated identical runs may still hit.
+
 Other gates that must stay in sync:
-- Read: age < 7d, ≥5 *course* links (fee entries excluded from count),
-  bypassed by `forceDiscovery` request flag and for SearchStax-provider unis.
-- Write: only healthy runs (≥5 course links AND fetch-fail rate < 30%) may
-  overwrite; provider-payload links (`searchstax_result`/`swiftype_result`/
-  `payload` keys) are never cached — they'd be served stale and are huge.
+- Read and write must use the same configured course-coverage floor, excluding
+  fee-page metadata, so a plausible-looking partial discovery is never reused
+  or allowed to replace a healthy result.
+- Forced discovery bypasses reads; stale, mismatched, degraded, unscoped, and
+  provider-payload results remain ineligible for reuse.
 - Cache hit must also disable browser discovery (`_always_browser=False`) and
   the Wayback supplement — everything else is `if not links`-gated naturally.

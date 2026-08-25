@@ -604,6 +604,99 @@ def _collect_intl_locations(all_detail_urls: dict[str, Any]) -> list[str]:
     return ordered
 
 
+def _collect_intl_campus_codes(all_detail_urls: dict[str, Any]) -> set[str]:
+    """Return normalized campus codes from every international variant."""
+    codes: set[str] = set()
+    for year_block in (all_detail_urls or {}).values():
+        if not isinstance(year_block, dict):
+            continue
+        intl = year_block.get("international") or {}
+        if not isinstance(intl, dict):
+            continue
+        for code, detail_url in intl.items():
+            if isinstance(code, str) and isinstance(detail_url, str) and detail_url:
+                codes.add(code.strip().upper())
+    return codes
+
+
+def classify_study_mode(
+    data: dict[str, Any],
+    all_detail_urls: dict[str, Any],
+) -> tuple[str | None, float, str]:
+    """Classify La Trobe delivery without trusting SPA marketing copy.
+
+    Explicit OL/OC detail codes are authoritative. Multi-Modal is mapped to
+    Blended when a physical campus is published. When the detail omits a mode,
+    the international manifest provides a conservative fallback: physical-only
+    campuses mean On Campus, a physical+ON mix means Blended, and ON-only means
+    Online.
+    """
+    dmc = str(data.get("deliveryModeCode") or "").strip().upper()
+    dmd = str(data.get("deliveryModeDescription") or "").strip().lower()
+    campus_codes = _collect_intl_campus_codes(all_detail_urls)
+    has_online = "ON" in campus_codes
+    physical_codes = campus_codes - {"ON"}
+    campus_summary = ",".join(sorted(campus_codes)) or "—"
+
+    # The compact code is the authoritative field. Descriptions are consulted
+    # only when the code is absent or unrecognized, because stale upstream
+    # descriptions have occasionally contradicted the code.
+    if dmc == "OL":
+        return "Online", 0.95, (
+            f"detail deliveryModeCode={dmc or '—'} "
+            f"deliveryModeDescription={dmd or '—'} campuses={campus_summary}"
+        )
+    if dmc == "OC":
+        return "On Campus", 0.95, (
+            f"detail deliveryModeCode={dmc or '—'} "
+            f"deliveryModeDescription={dmd or '—'} campuses={campus_summary}"
+        )
+
+    if dmc in {"MM", "BL"}:
+        mode = "Blended" if physical_codes else ("Online" if has_online else "Blended")
+        return mode, 0.95, (
+            f"detail multi-modal deliveryModeCode={dmc or '—'} "
+            f"deliveryModeDescription={dmd or '—'} campuses={campus_summary}"
+        )
+
+    if dmd == "online":
+        return "Online", 0.90, (
+            f"detail description fallback deliveryModeDescription={dmd} "
+            f"campuses={campus_summary}"
+        )
+    if dmd in {"on campus", "on-campus"}:
+        return "On Campus", 0.90, (
+            f"detail description fallback deliveryModeDescription={dmd} "
+            f"campuses={campus_summary}"
+        )
+    if dmd in {
+            "multi-modal",
+            "multimodal",
+            "multi modal",
+            "blended",
+            "hybrid",
+    }:
+        mode = "Blended" if physical_codes else ("Online" if has_online else "Blended")
+        return mode, 0.90, (
+            f"detail description fallback multi-modal "
+            f"deliveryModeDescription={dmd} campuses={campus_summary}"
+        )
+
+    if physical_codes and has_online:
+        return "Blended", 0.85, (
+            f"manifest fallback physical+online campuses={campus_summary}"
+        )
+    if physical_codes:
+        return "On Campus", 0.85, (
+            f"manifest fallback physical campuses={campus_summary}"
+        )
+    if has_online:
+        return "Online", 0.85, (
+            f"manifest fallback online-only campuses={campus_summary}"
+        )
+    return None, 0.0, "no delivery evidence"
+
+
 def _strip_html(s: str) -> str:
     """Remove HTML tags + collapse whitespace; sufficient for engReq."""
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", s or "")).strip()
@@ -843,13 +936,10 @@ async def apply_overrides(
     # (OL) and On Campus (OC) delivery, so both must override that weak result.
     # Mixed delivery stays with the generic extractor because it needs the
     # wider page context to distinguish Blended from a multi-campus offering.
-    _dmc = (data.get("deliveryModeCode") or "").strip().upper()
-    _dmd = (data.get("deliveryModeDescription") or "").strip().lower()
-    _authoritative_mode: str | None = None
-    if _dmc == "OL" or _dmd == "online":
-        _authoritative_mode = "Online"
-    elif _dmc == "OC" or _dmd in {"on campus", "on-campus"}:
-        _authoritative_mode = "On Campus"
+    _authoritative_mode, _mode_confidence, _mode_snippet = classify_study_mode(
+        data,
+        all_detail,
+    )
     if _authoritative_mode:
         prev_mode = payload.get("study_mode")
         payload["study_mode"] = _authoritative_mode
@@ -858,14 +948,10 @@ async def apply_overrides(
             evidence.append({
                 "field_key": "study_mode",
                 "value": _authoritative_mode,
-                "confidence": 0.95,
+                "confidence": _mode_confidence,
                 "method": "latrobe_json",
                 "source_url": intl_url,
-                "snippet": (
-                    "latrobe_json "
-                    f"deliveryModeCode={_dmc or '—'} "
-                    f"deliveryModeDescription={_dmd or '—'}"
-                ),
+                "snippet": f"latrobe_json {_mode_snippet}",
             })
 
     # Intake months from startDates.

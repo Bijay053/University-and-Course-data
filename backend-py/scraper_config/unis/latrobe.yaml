@@ -86,6 +86,11 @@ discovery:
   # Headroom above 395 courses.
   max_candidates: 450
 
+  # Full Funnelback discovery currently yields roughly 190–230 true course
+  # detail URLs after category hubs are removed. Never reuse or write a cache
+  # below this floor; the previous 92-link cache produced a zero-stage run.
+  expected_min_courses: 180
+
 extraction:
   # Scrape.do headless Chrome (residential IP) bypasses CF Enterprise 403.
   scrape_do_render: true

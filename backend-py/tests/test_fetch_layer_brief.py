@@ -311,16 +311,18 @@ class TestDiscoveryUrlCacheC1:
     # worker load).
     def test_orchestrator_cache_read_gates(self):
         assert '_c1_rp.get("forceDiscovery")' in _ORCH_SRC
-        assert 'getattr(_uni_cfg.discovery, "searchstax", None) is None' in _ORCH_SRC
-        assert "_c1_age_d < 7.0 and len(_c1_course) >= 5" in _ORCH_SRC
+        assert "_c1_has_api_provider = (" in _ORCH_SRC
+        assert "not _c1_has_api_provider" in _ORCH_SRC
+        assert "_c1_scope_matches" in _ORCH_SRC
+        assert "_c1_coverage_ok" in _ORCH_SRC
+        assert "_c1_age_d < 7.0" in _ORCH_SRC
         # Cache hit must disable browser discovery.
         i = _ORCH_SRC.index("_disc_cache_hit = True")
         assert "_always_browser = False" in _ORCH_SRC[i : i + 120]
 
     def test_orchestrator_wayback_gate_respects_cache_hit(self):
-        assert (
-            "and not (_is_mq_host and links) and not _disc_cache_hit" in _ORCH_SRC
-        )
+        i = _ORCH_SRC.index("_use_wayback =")
+        assert "and not _disc_cache_hit" in _ORCH_SRC[i : i + 800]
 
     def test_orchestrator_capture_skips_provider_payloads(self):
         assert (
@@ -329,23 +331,29 @@ class TestDiscoveryUrlCacheC1:
         )
         i = _ORCH_SRC.index("_c1_links_for_cache: list[dict] = []")
         block = _ORCH_SRC[i : i + 700]
-        assert "if not _disc_cache_hit and links:" in block
+        assert "not _targeted_retry and not _disc_cache_hit and links" in block
 
     def test_orchestrator_write_through_health_gates(self):
         # Gate counts COURSE links only (fee-page entries excluded).
-        assert "if _c1_course_n >= 5:" in _ORCH_SRC
         assert "_c1_fail_rate < 0.30" in _ORCH_SRC
+        assert "_c1_cache_coverage_ok" in _ORCH_SRC
         assert "on_conflict_do_update" in _ORCH_SRC
 
     def test_orchestrator_persists_and_restores_blocked_fee_urls(self):
         # Capture side: BFS-blocked fee URLs stored with fee_page=True marker.
         assert '{"url": _u, "fee_page": True}' in _ORCH_SRC
         # Read side: fee entries split back into _discover_blocked_fee_urls
-        # and excluded from the course-link freshness count.
-        assert 'if _lk.get("url") and not _lk.get("fee_page")' in _ORCH_SRC
+        # and metadata is excluded from the course-link freshness count.
+        assert 'and not _lk.get("fee_page")' in _ORCH_SRC
+        assert 'and not _lk.get("cache_meta")' in _ORCH_SRC
         i = _ORCH_SRC.index("_disc_cache_hit = True")
         pre = _ORCH_SRC[max(0, i - 800) : i]
         assert "_discover_blocked_fee_urls.extend(" in pre
+
+    def test_orchestrator_requires_matching_cache_scope(self):
+        assert "discovery_cache_scope_key as _discovery_cache_scope_key" in _ORCH_SRC
+        assert '_c1_meta.get("scope_key") == _c1_scope_key' in _ORCH_SRC
+        assert "legacy/unscoped" in _ORCH_SRC
 
     def test_migration_script_creates_table(self):
         src = Path("scripts/apply_migration_046.py").read_text(encoding="utf-8")
