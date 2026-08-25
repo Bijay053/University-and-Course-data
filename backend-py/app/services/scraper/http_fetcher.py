@@ -37,6 +37,7 @@ import httpx
 
 from app.config import settings
 from app.services.scraper.extractors.curtin_session import cookies_for_url
+from app.services.scraper.url_identity import canonical_course_url_key
 
 log = logging.getLogger(__name__)
 
@@ -394,31 +395,122 @@ def scrape_do_static_scope():
     finally:
         _scrape_do_static_active.reset(token)
 
-# Per-job Wayback timestamp cache: normalised-url → CDX timestamp string.
+# Per-job Wayback timestamp cache:
+# canonical identity key → (CDX timestamp, exact captured original URL).
 # Populated by wayback_discover() during the discovery phase so that
 # fetch_html_wayback() can use the exact timestamp from the CDX index
 # instead of re-querying the Availability API (which is inconsistent —
 # it returns the "closest to now" snapshot, which may be a 404/301,
 # even when the CDX has a valid 200 snapshot at an older timestamp).
-_wayback_ts_cache: dict[str, str] = {}
+_wayback_ts_cache: dict[str, tuple[str, str]] = {}
+_wayback_authoritative_prefixes: set[str] = set()
+_last_fetch_failure: ContextVar[dict[str, object] | None] = ContextVar(
+    "last_fetch_failure",
+    default=None,
+)
+
+
+def _record_fetch_failure(
+    *,
+    kind: str,
+    reason: str,
+    retryable: bool,
+    transport: str,
+    status_code: int | None = None,
+    terminal: bool = False,
+) -> None:
+    info: dict[str, object] = {
+        "kind": kind,
+        "reason": reason,
+        "retryable": retryable,
+        "transport": transport,
+        "terminal": terminal,
+    }
+    if status_code is not None:
+        info["status_code"] = status_code
+    _last_fetch_failure.set(info)
+
+
+def _mark_last_fetch_failure_terminal() -> None:
+    info = _last_fetch_failure.get()
+    if info:
+        terminal_info = dict(info)
+        terminal_info["terminal"] = True
+        _last_fetch_failure.set(terminal_info)
+
+
+def get_last_fetch_failure() -> dict[str, object] | None:
+    """Return task-local metadata for the most recent failed fetch."""
+    info = _last_fetch_failure.get()
+    return dict(info) if info else None
 
 
 
-def set_wayback_timestamps(url_timestamps: dict[str, str]) -> None:
+def set_wayback_timestamps(
+    url_timestamps: dict[str, str | tuple[str, str]],
+    *,
+    authoritative_prefixes: list[str] | None = None,
+) -> None:
     """Register Wayback CDX timestamps found during discovery.
 
-    Called by ``wayback_discover()`` once per scrape job.  The mapping
-    is *url → timestamp* where *url* is already in normalised
-    ``https://host/path`` form (as returned by ``_normalise_wayback_url``)
-    and *timestamp* is the 14-digit CDX timestamp string (e.g.
-    ``"20251207034443"``).
+    New callers pass ``identity-key → (timestamp, original_url)`` so replay
+    uses the exact scheme/host/port captured by CDX. For compatibility, callers
+    may still pass ``url → timestamp``; that URL is then used as the original.
     """
-    _wayback_ts_cache.update(url_timestamps)
+    for url, value in url_timestamps.items():
+        if isinstance(value, tuple):
+            timestamp, original_url = value
+        else:
+            timestamp, original_url = value, url
+        key = canonical_course_url_key(url)
+        if key:
+            _wayback_ts_cache[key] = (timestamp, original_url)
+    for prefix in authoritative_prefixes or []:
+        prefix_key = _wayback_archive_scope_key(prefix)
+        if prefix_key:
+            _wayback_authoritative_prefixes.add(prefix_key)
 
 
 def clear_wayback_timestamps() -> None:
     """Discard the per-job timestamp cache after the scrape finishes."""
     _wayback_ts_cache.clear()
+    _wayback_authoritative_prefixes.clear()
+
+
+def _wayback_archive_scope_key(url: str) -> str:
+    """Return a host-preserving key for one CDX wildcard scope.
+
+    Unlike course deduplication, archive completeness must not collapse
+    ``www`` and apex hosts: CDX indexes them as distinct captured originals.
+    CDX queries without an explicit scheme cover both HTTP and HTTPS, so the
+    key is host/port/path rather than scheme/host/path.
+    """
+    raw = str(url or "").strip().rstrip("*").rstrip("/")
+    if not raw:
+        return ""
+    target = raw if "://" in raw else f"//{raw}"
+    try:
+        parsed = urllib.parse.urlsplit(target)
+        host = (parsed.hostname or "").lower().rstrip(".")
+        if not host:
+            return ""
+        port = f":{parsed.port}" if parsed.port else ""
+        path = re.sub(
+            r"/+",
+            "/",
+            urllib.parse.unquote(parsed.path or ""),
+        ).rstrip("/")
+        return f"{host}{port}{path}"
+    except (TypeError, ValueError):
+        return ""
+
+
+def _wayback_scope_is_authoritative(url: str) -> bool:
+    url_key = _wayback_archive_scope_key(url)
+    return any(
+        url_key == prefix or url_key.startswith(f"{prefix}/")
+        for prefix in _wayback_authoritative_prefixes
+    )
 
 _BROWSER_UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5) "
@@ -649,6 +741,16 @@ async def fetch_html_scrape_do(
                     url, status=_status, tier="scrape_do",
                     detail="page not found",
                 )
+                _record_fetch_failure(
+                    kind="origin_not_found",
+                    reason=(
+                        f"The live rendered origin returned HTTP {_status}; "
+                        "retrying will not restore a removed page."
+                    ),
+                    retryable=False,
+                    transport="scrape_do_render" if render else "scrape_do_static",
+                    status_code=_status,
+                )
                 return None
             # ROTATION_FAILED (ErrorCode 90, "cannot connect target url") on a
             # STATIC call is a proxy-level connect failure: the target host is
@@ -696,6 +798,13 @@ async def fetch_html_scrape_do(
                 url, status=_status, tier="scrape_do",
                 detail=_redact_scrape_do_log_text(_last_sd_r.text[:200], token=token),
             )
+            _record_fetch_failure(
+                kind="scrape_do_unavailable",
+                reason=f"Scrape.do returned HTTP {_status}.",
+                retryable=_status in _SD_RETRY_STATUSES,
+                transport="scrape_do_render" if render else "scrape_do_static",
+                status_code=_status,
+            )
             return None
         except ScrapedoAccountError:
             raise  # always propagate — orchestrator must abort the job
@@ -715,6 +824,12 @@ async def fetch_html_scrape_do(
             _record_fetch_error(
                 url, status=None, tier="scrape_do",
                 detail=f"exception: {_redacted_exception}",
+            )
+            _record_fetch_failure(
+                kind="scrape_do_unavailable",
+                reason=f"Scrape.do request failed: {_redacted_exception}",
+                retryable=True,
+                transport="scrape_do_render" if render else "scrape_do_static",
             )
             return None
     # All retries exhausted — should not reach here in practice.
@@ -808,13 +923,20 @@ async def fetch_html_wayback(url: str) -> str | None:
     # earlier timestamp.  The cache is populated with the exact timestamps
     # that the CDX wildcard query returned, so they are guaranteed to be
     # real 200 snapshots.
-    cached_ts = _wayback_ts_cache.get(url)
+    url_key = canonical_course_url_key(url)
+    cached_entry = _wayback_ts_cache.get(url_key)
+    cached_ts = cached_entry[0] if cached_entry else ""
+    cached_original_url = cached_entry[1] if cached_entry else ""
     if cached_ts:
-        raw_url = f"https://web.archive.org/web/{cached_ts}id_/{url}"
+        raw_url = (
+            f"https://web.archive.org/web/{cached_ts}id_/"
+            f"{cached_original_url}"
+        )
         try:
             async with httpx.AsyncClient(timeout=25, follow_redirects=True) as c:
                 r = await c.get(raw_url, headers={"User-Agent": _BROWSER_UA})
                 if r.status_code == 200:
+                    _last_fetch_failure.set(None)
                     log.info(
                         "wayback fetch %s -> 200 (CDX-cached snapshot %s, %d chars)",
                         url, cached_ts, len(r.text),
@@ -825,12 +947,43 @@ async def fetch_html_wayback(url: str) -> str | None:
                     "falling through to Availability API",
                     url, r.status_code, cached_ts,
                 )
+                _record_fetch_failure(
+                    kind="wayback_snapshot_unavailable",
+                    reason=(
+                        f"Cached Wayback snapshot returned HTTP {r.status_code}."
+                    ),
+                    retryable=r.status_code not in (404, 410),
+                    transport="wayback_snapshot",
+                    status_code=r.status_code,
+                )
         except Exception as exc:
             log.warning(
                 "wayback fetch %s (CDX-cached snapshot %s) failed: %s — "
                 "falling through to Availability API",
                 url, cached_ts, exc,
             )
+            _record_fetch_failure(
+                kind="wayback_transient",
+                reason=f"Cached Wayback snapshot fetch failed: {exc}",
+                retryable=True,
+                transport="wayback_snapshot",
+            )
+
+    if not cached_entry and _wayback_scope_is_authoritative(url):
+        log.info(
+            "wayback fetch: no snapshot for %s in complete discovery CDX scope",
+            url,
+        )
+        _record_fetch_failure(
+            kind="wayback_no_snapshot",
+            reason=(
+                "No 200-status Wayback snapshot exists in the complete "
+                "discovery CDX result for this URL."
+            ),
+            retryable=False,
+            transport="wayback_cdx_cache",
+        )
+        return None
 
     # Slow path: live CDX search for URLs not in the CDX cache (e.g. PDF
     # central pages, fee pages, or non-Wayback-discovered URLs).
@@ -877,6 +1030,13 @@ async def fetch_html_wayback(url: str) -> str | None:
                     "wayback fetch: CDX search returned %s for %s",
                     cdx_r.status_code, url,
                 )
+                _record_fetch_failure(
+                    kind="wayback_cdx_unavailable",
+                    reason=f"Wayback CDX returned HTTP {cdx_r.status_code}.",
+                    retryable=True,
+                    transport="wayback_cdx",
+                    status_code=cdx_r.status_code,
+                )
                 return None
             rows = cdx_r.json()
             # First row is the header (["urlkey","timestamp",...]); real
@@ -884,6 +1044,21 @@ async def fetch_html_wayback(url: str) -> str | None:
             # usable archive exists for this URL.
             if not rows or len(rows) < 2:
                 log.info("wayback fetch: no 200-status snapshot found for %s", url)
+                _record_fetch_failure(
+                    kind=(
+                        "wayback_transient"
+                        if cached_ts
+                        else "wayback_no_snapshot"
+                    ),
+                    reason=(
+                        "A cached snapshot exists but the archive could not "
+                        "resolve it."
+                        if cached_ts
+                        else "No 200-status Wayback snapshot exists for this URL."
+                    ),
+                    retryable=bool(cached_ts),
+                    transport="wayback_cdx",
+                )
                 return None
             snapshot_rows = rows[1:]
             snapshot_rows.sort(key=lambda r: r[1])
@@ -892,6 +1067,12 @@ async def fetch_html_wayback(url: str) -> str | None:
             snapshot_url = f"https://web.archive.org/web/{timestamp}/{original}"
     except Exception as exc:
         log.warning("wayback fetch: CDX search failed for %s: %s", url, exc)
+        _record_fetch_failure(
+            kind="wayback_cdx_unavailable",
+            reason=f"Wayback CDX request failed: {exc}",
+            retryable=True,
+            transport="wayback_cdx",
+        )
         return None
 
     raw_url = snapshot_url.replace(f"/web/{timestamp}/", f"/web/{timestamp}id_/", 1)
@@ -899,6 +1080,7 @@ async def fetch_html_wayback(url: str) -> str | None:
         async with httpx.AsyncClient(timeout=25, follow_redirects=True) as c:
             r = await c.get(raw_url, headers={"User-Agent": _BROWSER_UA})
             if r.status_code == 200:
+                _last_fetch_failure.set(None)
                 log.info(
                     "wayback fetch %s -> 200 (Availability snapshot %s, %d chars)",
                     url, timestamp, len(r.text),
@@ -908,9 +1090,22 @@ async def fetch_html_wayback(url: str) -> str | None:
                 "wayback fetch %s -> %s (Availability snapshot %s)",
                 url, r.status_code, timestamp,
             )
+            _record_fetch_failure(
+                kind="wayback_snapshot_unavailable",
+                reason=f"Wayback snapshot returned HTTP {r.status_code}.",
+                retryable=r.status_code not in (404, 410),
+                transport="wayback_snapshot",
+                status_code=r.status_code,
+            )
             return None
     except Exception as exc:
         log.warning("wayback fetch %s failed: %s", url, exc)
+        _record_fetch_failure(
+            kind="wayback_transient",
+            reason=f"Wayback snapshot request failed: {exc}",
+            retryable=True,
+            transport="wayback_snapshot",
+        )
         return None
 
 
@@ -922,6 +1117,7 @@ async def _client():
 
 
 async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> str | None:
+    _last_fetch_failure.set(None)
     # Scrape.do render is only active inside scrape_do_render_scope() —
     # i.e. during per-course extraction in single_course.extract_course().
     # It is NEVER True during discovery / sitemap / central-page phases.
@@ -1063,17 +1259,10 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
             )
             return None
 
-    # Force-Wayback-first: for CF-Enterprise hosts where all live scrape.do
-    # fetches reliably fail (ROTATION_FAILED) and Wayback CDX timestamps are
-    # pre-loaded by wayback_discover() during the discovery phase.  When True,
-    # fetch_html tries the Wayback Machine snapshot BEFORE making any live
-    # scrape.do attempt — skipping the ~57 s static ROTATION_FAILED wait and
-    # the ~23 s render call that would otherwise fire per course via the
-    # discovery fast-path below.  Notre Dame is the canonical case: 700 courses
-    # × ~80 s/course (static 57 s + render 23 s) ÷ 5 concurrency = 2.7 h;
-    # with force_wayback_first the CDX-cached snapshot returns in ~1.4 s so the
-    # same 700-course run completes in ~3 minutes.  If Wayback has no archived
-    # copy for a URL the code falls through to the normal live-fetch path below.
+    # Force-Wayback-first: use CDX-cached snapshots as the cheap primary
+    # transport, then apply the configured miss policy for current-only URLs.
+    # This avoids paying the doomed ~57 s static-proxy cost before a rendered
+    # live fallback on mixed archive/current catalogues.
     if not _scrape_do_render and not _scrape_do_static:
         _force_wb = False
         try:
@@ -1095,20 +1284,81 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
                 _stg_fwb(url, _fwb_html, "wayback")
                 return _fwb_html
             log.info(
-                "fetch %s: force_wayback_first — Wayback returned nothing"
-                " (URL not archived); falling through to live fetch path",
+                "fetch %s: force_wayback_first — Wayback returned no usable "
+                "page; applying configured miss policy",
                 url,
             )
+            _cfg_fwb2 = None
+            try:
+                from app.services.scraper.config.context import (
+                    get_uni_config as _guc_fwb2,
+                )
+                _cfg_fwb2 = _guc_fwb2()
+            except Exception:  # noqa: BLE001
+                pass
+            _wayback_miss_fallback = str(
+                getattr(
+                    getattr(_cfg_fwb2, "extraction", None),
+                    "wayback_miss_fallback",
+                    "none",
+                )
+                or "none"
+            ).lower()
+            if _wayback_miss_fallback == "scrape_do_render":
+                log.info(
+                    "fetch %s: Wayback miss — trying configured Scrape.do "
+                    "render fallback",
+                    url,
+                )
+                if not _has_scrape_do:
+                    _record_fetch_failure(
+                        kind="provider_account_failure",
+                        reason=(
+                            "Wayback had no snapshot and the configured "
+                            "Scrape.do render fallback is unavailable."
+                        ),
+                        retryable=False,
+                        transport="scrape_do_render",
+                    )
+                    _mark_last_fetch_failure_terminal()
+                    return None
+                _live_fallback = await fetch_html_scrape_do(
+                    url,
+                    render=True,
+                    wait_for_ms=wait_for_ms,
+                    max_retries=1,
+                    local_concurrency_limit=getattr(
+                        getattr(_cfg_fwb2, "extraction", None),
+                        "scrape_do_local_concurrency",
+                        None,
+                    ),
+                )
+                if _live_fallback is not None:
+                    from app.services.scraper.snapshot_context import (
+                        stage_snapshot as _stg_live_fwb,
+                    )
+                    _stg_live_fwb(url, _live_fallback, "scrape_do_render")
+                    _last_fetch_failure.set(None)
+                    return _live_fallback
+                _live_failure = get_last_fetch_failure()
+                if not _live_failure or bool(_live_failure.get("retryable", True)):
+                    _record_fetch_failure(
+                        kind="scrape_do_render_unavailable",
+                        reason=(
+                            "Wayback had no usable page and the configured live "
+                            "render fallback returned no usable content."
+                        ),
+                        retryable=True,
+                        transport="scrape_do_render",
+                    )
+                _mark_last_fetch_failure_terminal()
+                return None
             # If scrape_do_skip_fallbacks is ALSO set this is a CF-Enterprise
             # host where scrape.do render/static will fail with ROTATION_FAILED
             # just as reliably as httpx.  Falling through would waste ~90 s per
             # course (502 attempt + 2 s backoff + second 502/404) for zero gain.
             # Return None immediately so the course is marked fetch_failed.
             try:
-                from app.services.scraper.config.context import (
-                    get_uni_config as _guc_fwb2,
-                )
-                _cfg_fwb2 = _guc_fwb2()
                 if getattr(
                     getattr(_cfg_fwb2, "discovery", None),
                     "scrape_do_skip_fallbacks",
@@ -1120,6 +1370,7 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
                         " live scrape.do will also fail)",
                         url,
                     )
+                    _mark_last_fetch_failure_terminal()
                     return None
             except Exception:  # noqa: BLE001
                 pass

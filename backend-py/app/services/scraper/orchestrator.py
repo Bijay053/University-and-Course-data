@@ -31,13 +31,18 @@ from app.services.scraper.http_fetcher import ScrapedoAccountError
 from app.services.scraper.pipelines.single_course import extract_course
 from app.services.scraper.pipelines.university_pdfs import load_university_pdf_data
 from app.services.scraper.stage_course import stage_course
+from app.services.scraper.url_identity import canonical_course_url_key
 
 log = logging.getLogger(__name__)
 
 _PER_COURSE_EXTRACTION_TIMEOUT_SECONDS = 300.0
 
 
-def _extraction_failure_details(error: object) -> dict[str, object]:
+def _extraction_failure_details(
+    error: object,
+    *,
+    result: dict | None = None,
+) -> dict[str, object]:
     """Classify a failed extraction for recovery and operator diagnostics.
 
     The per-course pipeline intentionally returns error sentinels rather than
@@ -47,6 +52,37 @@ def _extraction_failure_details(error: object) -> dict[str, object]:
     """
     raw = str(error or "unknown_extraction_error").strip()
     normalized = raw.lower()
+    result = result or {}
+
+    error_type = str(result.get("error_type") or "").lower()
+    if result.get("_scrape_do_auth_error") or "scrapedoaccount" in error_type:
+        return {
+            "reason": "provider_account_failure",
+            "detail": str(
+                result.get("error_reason")
+                or "The configured provider account is unavailable or unauthorized."
+            ),
+            "retryable": False,
+        }
+    if "challenge" in normalized or "challenge" in error_type:
+        return {
+            "reason": "challenge_page",
+            "detail": str(
+                result.get("error_reason")
+                or "The configured transport returned a bot-protection challenge."
+            ),
+            "retryable": bool(result.get("retryable", False)),
+        }
+    explicit_kind = str(result.get("fetch_failure_kind") or "").strip()
+    if explicit_kind:
+        return {
+            "reason": explicit_kind,
+            "detail": str(
+                result.get("error_reason")
+                or "The configured fetch transport returned no usable content."
+            ),
+            "retryable": bool(result.get("retryable", False)),
+        }
 
     if normalized == "per_course_timeout":
         return {
@@ -80,6 +116,44 @@ def _extraction_failure_details(error: object) -> dict[str, object]:
         "reason": "non_retryable_extraction_error",
         "detail": raw,
         "retryable": False,
+    }
+
+
+def _select_recovery_work(
+    links: list[dict],
+    max_items: int,
+) -> tuple[list[dict], list[dict]]:
+    """Split transient failures into attempted work and item-budget overflow."""
+    limit = max(0, int(max_items))
+    return links[:limit], links[limit:]
+
+
+def _recovery_time_remaining(
+    started_at: float,
+    budget_seconds: float,
+    *,
+    now: float | None = None,
+) -> float:
+    """Return the non-negative wall-clock budget left for recovery."""
+    current = time.monotonic() if now is None else now
+    return max(0.0, float(budget_seconds) - (current - started_at))
+
+
+def _recovery_accounting(
+    *,
+    total: int,
+    attempted: int,
+    recovered: int,
+) -> dict[str, int]:
+    """Build counter-conserving recovery summary values."""
+    safe_total = max(0, int(total))
+    safe_attempted = min(safe_total, max(0, int(attempted)))
+    safe_recovered = min(safe_attempted, max(0, int(recovered)))
+    return {
+        "recovery_queued": safe_total,
+        "recovery_attempted": safe_attempted,
+        "recovery_recovered": safe_recovered,
+        "recovery_unresolved": safe_total - safe_recovered,
     }
 
 
@@ -142,6 +216,7 @@ async def _extract_for_recovery_sweep(
     central_data: dict | None = None,
     extraction_rules: dict | None = None,
     seen_pdf_urls: set[str] | None = None,
+    timeout_seconds: float = _PER_COURSE_EXTRACTION_TIMEOUT_SECONDS,
 ) -> dict | None:
     """Run one replay only while the shared provider circuit remains healthy."""
     if scrape_do_dead_flag[0]:
@@ -156,6 +231,7 @@ async def _extract_for_recovery_sweep(
             central_data=central_data,
             extraction_rules=extraction_rules,
             seen_pdf_urls=seen_pdf_urls,
+            timeout_seconds=timeout_seconds,
         )
     except ScrapedoAccountError as exc:
         # A bad token or exhausted account discovered during the sweep is just
@@ -784,16 +860,7 @@ def _normalize_course_url(url: str | None) -> str:
     international-fee view off a query param (``?international=true``) and those
     pages are genuinely distinct course views.
     """
-    if not url:
-        return ""
-    u = url.strip().lower()
-    for _scheme in ("https://", "http://"):
-        if u.startswith(_scheme):
-            u = u[len(_scheme):]
-            break
-    if u.startswith("www."):
-        u = u[4:]
-    return u.rstrip("/")
+    return canonical_course_url_key(url)
 
 
 async def _already_staged_urls(
@@ -4808,7 +4875,10 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     )
                     continue
                 if r.get("error"):
-                    _error_details = _extraction_failure_details(r["error"])
+                    _error_details = _extraction_failure_details(
+                        r["error"],
+                        result=r,
+                    )
                     _counter: str | None = None
                     if r["error"].startswith("fetch") or "fetch_failed" in r.get("error", ""):
                         summary["fetch_failed"] += 1
@@ -5157,49 +5227,169 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             del results
 
         # ── T04: End-of-batch recovery sweep ─────────────────────────────────
-        # Re-extract retryable URLs after the main parallel batch pass.
-        # Sequential (concurrency=1, 2 s gap) so a recovering provider is not
-        # hit with another burst. Summary counters are updated in-place so
-        # recovered timeouts and fetch failures no longer look unrecovered.
+        # Re-extract only transient failures after the main parallel batch pass.
+        # Concurrency stays at one so a recovering provider is never hit with
+        # another burst, while per-university item/time/delay limits prevent an
+        # unbounded tail from making a job appear stuck after primary extraction.
+        # Summary counters are updated in-place so recovered failures no longer
+        # look unresolved.
         _ph_marks["sweep_start"] = time.monotonic()  # C4 phase timing
         if _sweep_links:
+            _sweep_max_items = max(
+                0,
+                int(getattr(_uni_cfg.extraction, "recovery_sweep_max_items", 100)),
+            )
+            _sweep_budget_seconds = max(
+                0.0,
+                float(
+                    getattr(
+                        _uni_cfg.extraction,
+                        "recovery_sweep_time_budget_seconds",
+                        300.0,
+                    )
+                ),
+            )
+            _sweep_delay_seconds = max(
+                0.0,
+                float(
+                    getattr(
+                        _uni_cfg.extraction,
+                        "recovery_sweep_delay_seconds",
+                        1.0,
+                    )
+                ),
+            )
+            _sweep_total_queued = len(_sweep_links)
+            _sweep_work, _sweep_overflow = _select_recovery_work(
+                _sweep_links,
+                _sweep_max_items,
+            )
+            summary.update(
+                _recovery_accounting(
+                    total=_sweep_total_queued,
+                    attempted=0,
+                    recovered=0,
+                )
+            )
             log.info(
-                "[SWEEP] %d retryable URL(s) queued for sequential recovery pass",
-                len(_sweep_links),
+                "[SWEEP] %d transient URL(s) queued; attempting at most %d "
+                "within %.1fs (concurrency=1, delay=%.1fs)",
+                _sweep_total_queued,
+                len(_sweep_work),
+                _sweep_budget_seconds,
+                _sweep_delay_seconds,
             )
             await emit(
                 "status",
-                f"[SWEEP] {len(_sweep_links)} retryable extraction failure(s) "
-                "→ sequential recovery",
-                phase="sweep", kind="sweep_start", count=len(_sweep_links),
+                f"[SWEEP] {_sweep_total_queued} transient failure(s) → "
+                f"bounded recovery (max {len(_sweep_work)}, "
+                f"{_sweep_budget_seconds:.0f}s budget)",
+                phase="sweep",
+                kind="sweep_start",
+                count=_sweep_total_queued,
+                max_items=len(_sweep_work),
+                time_budget_seconds=_sweep_budget_seconds,
+                concurrency=1,
             )
+            if _sweep_overflow:
+                log.warning(
+                    "[SWEEP] %d transient failure(s) exceed the configured item "
+                    "budget and remain unresolved",
+                    len(_sweep_overflow),
+                )
+                await emit(
+                    "status",
+                    f"[SWEEP] {len(_sweep_overflow)} transient failure(s) "
+                    "left unresolved by item budget",
+                    phase="sweep",
+                    kind="sweep_budget_unresolved",
+                    reason="sweep_item_budget",
+                    count=len(_sweep_overflow),
+                    sample_urls=[
+                        lk.get("url") for lk in _sweep_overflow[:5]
+                    ],
+                    next_action="operator review",
+                )
             _sweep_recovered = 0
-            for _sweep_index, _sweep_lk in enumerate(_sweep_links):
+            _sweep_attempted = 0
+            _sweep_budget_exhausted = 0
+            _sweep_started_at = time.monotonic()
+            for _sweep_index, _sweep_lk in enumerate(_sweep_work):
                 _sweep_url = (_sweep_lk.get("url") or "?")
+                _remaining_before = _recovery_time_remaining(
+                    _sweep_started_at,
+                    _sweep_budget_seconds,
+                )
+                if _remaining_before <= 0:
+                    _sweep_budget_exhausted = len(_sweep_work) - _sweep_index
+                    log.warning(
+                        "[SWEEP] %.1fs time budget reached; %d transient "
+                        "failure(s) remain unresolved",
+                        _sweep_budget_seconds,
+                        _sweep_budget_exhausted,
+                    )
+                    await emit(
+                        "status",
+                        f"[SWEEP] time budget reached — "
+                        f"{_sweep_budget_exhausted} transient failure(s) unresolved",
+                        phase="sweep",
+                        kind="sweep_budget_unresolved",
+                        reason="sweep_time_budget",
+                        count=_sweep_budget_exhausted,
+                        processed=_sweep_attempted,
+                        total=_sweep_total_queued,
+                        next_action="operator review",
+                    )
+                    break
                 try:
                     if scrape_do_dead_flag[0]:
-                        _remaining_sweeps = len(_sweep_links) - _sweep_index
+                        _remaining_sweeps = len(_sweep_work) - _sweep_index
                         log.warning(
                             "[SWEEP] skipped %d recovery replay(s): Scrape.do "
                             "account circuit is open",
                             _remaining_sweeps,
                         )
-                        for _remaining_lk in _sweep_links[_sweep_index:]:
-                            await emit(
-                                "status",
-                                f"[SWEEP] unresolved — operator review required: "
-                                f"{_remaining_lk.get('name', '?')} (scrape_do_circuit_open)",
-                                phase="sweep",
-                                kind="sweep_unresolved",
-                                url=_remaining_lk.get("url"),
-                                course_name=_remaining_lk.get("name"),
-                                reason="scrape_do_circuit_open",
-                                detail="Scrape.do account circuit is open.",
-                                source_error=_remaining_lk.get("source_error"),
-                                next_action="operator review",
-                            )
+                        await emit(
+                            "status",
+                            f"[SWEEP] {_remaining_sweeps} failure(s) unresolved — "
+                            "Scrape.do account circuit is open",
+                            phase="sweep",
+                            kind="sweep_budget_unresolved",
+                            reason="scrape_do_circuit_open",
+                            count=_remaining_sweeps,
+                            next_action="operator review",
+                        )
                         break
-                    await asyncio.sleep(2.0)  # brief pause between sweep retries
+                    _remaining_budget = _recovery_time_remaining(
+                        _sweep_started_at,
+                        _sweep_budget_seconds,
+                    )
+                    if _sweep_delay_seconds:
+                        await asyncio.sleep(
+                            min(_sweep_delay_seconds, _remaining_budget)
+                        )
+                    _remaining_budget = _recovery_time_remaining(
+                        _sweep_started_at,
+                        _sweep_budget_seconds,
+                    )
+                    if _remaining_budget <= 0:
+                        _sweep_budget_exhausted = (
+                            len(_sweep_work) - _sweep_index
+                        )
+                        await emit(
+                            "status",
+                            f"[SWEEP] time budget reached — "
+                            f"{_sweep_budget_exhausted} transient failure(s) unresolved",
+                            phase="sweep",
+                            kind="sweep_budget_unresolved",
+                            reason="sweep_time_budget",
+                            count=_sweep_budget_exhausted,
+                            processed=_sweep_attempted,
+                            total=_sweep_total_queued,
+                            next_action="operator review",
+                        )
+                        break
+                    _sweep_attempted += 1
                     _sw_r = await _extract_for_recovery_sweep(
                         _sweep_lk,
                         uni_country,
@@ -5210,6 +5400,10 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         central_data=central_data,
                         extraction_rules=_ac_ext_rules,
                         seen_pdf_urls=seen_pdf_urls,
+                        timeout_seconds=min(
+                            _PER_COURSE_EXTRACTION_TIMEOUT_SECONDS,
+                            _remaining_budget,
+                        ),
                     )
                     if not isinstance(_sw_r, dict) or _sw_r.get("error"):
                         _sw_error = (
@@ -5217,7 +5411,10 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                             if isinstance(_sw_r, dict)
                             else type(_sw_r).__name__
                         )
-                        _sw_details = _extraction_failure_details(_sw_error)
+                        _sw_details = _extraction_failure_details(
+                            _sw_error,
+                            result=_sw_r if isinstance(_sw_r, dict) else None,
+                        )
                         log.info(
                             "[SWEEP] %s still failed after retry: %s (%s)",
                             _sweep_url[:80], _sw_details["reason"], _sw_error,
@@ -5237,40 +5434,64 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                             retry_error=_sw_error,
                             next_action="operator review",
                         )
-                        continue
-                    _sw_payload = dict(_sw_r.get("payload") or {})
-                    async with AsyncSessionLocal() as _sw_stage_db:
-                        _sw_res = await stage_course(
-                            _sw_stage_db,
-                            scrape_job_id=runtime_job_id,
-                            university_id=uni_id,
-                            course_name=_sw_r["name"],
-                            payload=_sw_payload,
-                            evidence=_sw_r.get("evidence") or [],
-                            source_url=_sweep_url,
-                        )
-                    if _sw_res.saved:
-                        summary["staged"] += 1
-                        _counter = _sweep_lk.get("counter")
-                        if _counter in ("fetch_failed", "errors"):
-                            summary[_counter] = max(0, summary[_counter] - 1)
-                        _sweep_recovered += 1
-                        await emit(
-                            "status",
-                            f"[SWEEP] recovered: {_sw_r.get('name', '?')}",
-                            phase="sweep", kind="sweep_recovered", url=_sweep_url,
-                        )
                     else:
-                        summary["skipped"] += 1
-                        _counter = _sweep_lk.get("counter")
-                        if _counter in ("fetch_failed", "errors"):
-                            summary[_counter] = max(0, summary[_counter] - 1)
-                        _sweep_recovered += 1
-                        await emit(
-                            "status",
-                            f"[SWEEP] skipped (staging gate rejected): {_sw_r.get('name', '?')}",
-                            phase="sweep", kind="sweep_skipped", url=_sweep_url,
+                        _sw_payload = dict(_sw_r.get("payload") or {})
+                        _remaining_stage_budget = _recovery_time_remaining(
+                            _sweep_started_at,
+                            _sweep_budget_seconds,
                         )
+                        if _remaining_stage_budget <= 0:
+                            _sweep_budget_exhausted = (
+                                len(_sweep_work) - _sweep_index
+                            )
+                            await emit(
+                                "status",
+                                f"[SWEEP] time budget reached before staging — "
+                                f"{_sweep_budget_exhausted} failure(s) unresolved",
+                                phase="sweep",
+                                kind="sweep_budget_unresolved",
+                                reason="sweep_time_budget",
+                                count=_sweep_budget_exhausted,
+                                processed=_sweep_attempted,
+                                total=_sweep_total_queued,
+                                next_action="operator review",
+                            )
+                            break
+                        async with AsyncSessionLocal() as _sw_stage_db:
+                            _sw_res = await asyncio.wait_for(
+                                stage_course(
+                                    _sw_stage_db,
+                                    scrape_job_id=runtime_job_id,
+                                    university_id=uni_id,
+                                    course_name=_sw_r["name"],
+                                    payload=_sw_payload,
+                                    evidence=_sw_r.get("evidence") or [],
+                                    source_url=_sweep_url,
+                                ),
+                                timeout=_remaining_stage_budget,
+                            )
+                        if _sw_res.saved:
+                            summary["staged"] += 1
+                            _counter = _sweep_lk.get("counter")
+                            if _counter in ("fetch_failed", "errors"):
+                                summary[_counter] = max(0, summary[_counter] - 1)
+                            _sweep_recovered += 1
+                            await emit(
+                                "status",
+                                f"[SWEEP] recovered: {_sw_r.get('name', '?')}",
+                                phase="sweep", kind="sweep_recovered", url=_sweep_url,
+                            )
+                        else:
+                            summary["skipped"] += 1
+                            _counter = _sweep_lk.get("counter")
+                            if _counter in ("fetch_failed", "errors"):
+                                summary[_counter] = max(0, summary[_counter] - 1)
+                            _sweep_recovered += 1
+                            await emit(
+                                "status",
+                                f"[SWEEP] skipped (staging gate rejected): {_sw_r.get('name', '?')}",
+                                phase="sweep", kind="sweep_skipped", url=_sweep_url,
+                            )
                 except Exception as _sw_exc:  # noqa: BLE001 — sweep must never abort the job
                     log.warning(
                         "[SWEEP] extraction/stage failed for %s: %s",
@@ -5290,15 +5511,59 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         retry_error=str(_sw_exc),
                         next_action="operator review",
                     )
+                finally:
+                    _sweep_elapsed = time.monotonic() - _sweep_started_at
+                    _sweep_remaining = (
+                        _sweep_total_queued - _sweep_attempted
+                    )
+                    _avg_seconds = (
+                        _sweep_elapsed / _sweep_attempted
+                        if _sweep_attempted
+                        else 0.0
+                    )
+                    await emit(
+                        "status",
+                        f"[SWEEP] progress {_sweep_attempted}/"
+                        f"{_sweep_total_queued}; "
+                        f"{_sweep_remaining} remaining",
+                        phase="sweep",
+                        kind="sweep_progress",
+                        processed=_sweep_attempted,
+                        total=_sweep_total_queued,
+                        remaining=_sweep_remaining,
+                        recovered=_sweep_recovered,
+                        elapsed_seconds=round(_sweep_elapsed, 1),
+                        estimated_remaining_seconds=round(
+                            _avg_seconds * _sweep_remaining,
+                            1,
+                        ),
+                    )
+            summary.update(
+                _recovery_accounting(
+                    total=_sweep_total_queued,
+                    attempted=_sweep_attempted,
+                    recovered=_sweep_recovered,
+                )
+            )
             log.info(
-                "[SWEEP] recovered %d/%d failed URL(s)",
-                _sweep_recovered, len(_sweep_links),
+                "[SWEEP] recovered %d/%d queued transient URL(s); attempted %d; "
+                "item-budget overflow=%d; time-budget remainder=%d",
+                _sweep_recovered,
+                _sweep_total_queued,
+                _sweep_attempted,
+                len(_sweep_overflow),
+                _sweep_budget_exhausted,
             )
             await emit(
                 "status",
-                f"[SWEEP] recovered {_sweep_recovered}/{len(_sweep_links)} failed URL(s)",
+                f"[SWEEP] recovered {_sweep_recovered}/"
+                f"{_sweep_total_queued} transient failure(s); "
+                f"attempted {_sweep_attempted}",
                 phase="sweep", kind="sweep_done",
-                recovered=_sweep_recovered, total=len(_sweep_links),
+                recovered=_sweep_recovered,
+                attempted=_sweep_attempted,
+                unresolved=summary["recovery_unresolved"],
+                total=_sweep_total_queued,
             )
 
         _ph_marks["sweep_end"] = time.monotonic()  # C4 phase timing

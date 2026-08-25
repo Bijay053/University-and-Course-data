@@ -24,12 +24,15 @@ from app.models import ScrapeRuntimeJob, University
 class _FakeSession:
     def __init__(self, uni: University):
         self._uni = uni
+        self.jobs: dict[str, ScrapeRuntimeJob] = {}
         self.added: list[ScrapeRuntimeJob] = []
         self.committed = False
 
     async def get(self, model, pk):  # noqa: ARG002
         if model is University and pk == self._uni.id:
             return self._uni
+        if model is ScrapeRuntimeJob:
+            return self.jobs.get(pk)
         return None
 
     async def execute(self, stmt, *args, **kwargs):  # noqa: ARG002
@@ -156,3 +159,35 @@ def test_bulk_scrape_payload_is_node_compatible(client_with_uni, monkeypatch):
     assert payload.get("url") == "https://test.example.edu/"
     assert payload.get("universityId") == 42
     assert payload.get("bulkMode") is True
+
+
+def test_status_returns_options_needed_to_continue_after_reload(client_with_uni):
+    client, fake = client_with_uni
+    job_id = "job_interrupted"
+    fake.jobs[job_id] = ScrapeRuntimeJob(
+        runtime_job_id=job_id,
+        university_id=42,
+        university_name="Test University",
+        url="https://test.example.edu/courses",
+        job_type="single",
+        status="stopped",
+        fast_mode=True,
+        request_payload={
+            "url": "https://test.example.edu/courses",
+            "universityId": 42,
+            "fastMode": True,
+            "feePage": "https://test.example.edu/fees",
+            "requirementsPage": "https://test.example.edu/requirements",
+        },
+    )
+
+    response = client.get(f"/api/scrape/status/{job_id}")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "stopped"
+    assert body["universityId"] == 42
+    assert body["url"] == "https://test.example.edu/courses"
+    assert body["fastMode"] is True
+    assert body["feePageUrl"] == "https://test.example.edu/fees"
+    assert body["requirementsPageUrl"] == "https://test.example.edu/requirements"

@@ -1,63 +1,44 @@
 ---
-name: Notre Dame force_wayback_first extraction
-description: Why Notre Dame scrapes took 2-3 hours and the fix — force_wayback_first flag skips all scrape.do per course.
+name: Notre Dame hybrid blocked-site transport
+description: Durable rules for mixing complete CDX coverage, exact archive replay, live rendering, and bounded recovery.
 ---
 
-## Root cause of 2–3 hour Notre Dame scrapes
+## Rule
 
-`discovery.scrape_do_skip_fallbacks: true` fires for BOTH discovery AND extraction
-(it's a host-level check in fetch_html, not scoped to discovery only).
+Use CDX-cached Wayback snapshots as the cheap first transport, but treat the
+archive as one source rather than the whole catalogue. When the current sitemap
+contains URLs absent from a complete CDX result, route those current-only pages
+directly to the one live transport that has passed a representative probe. Never
+put known permanent archive misses into the sequential recovery queue.
 
-For each of ~700 Notre Dame course pages during extraction:
-1. scrape.do static → 57 s ROTATION_FAILED (fast-fail, but scrape.do still takes 57 s to respond)
-2. scrape.do render=True → 23 s → HTTP 200, real course HTML ✓
+**Why:** The static proxy tier can spend about a minute returning
+ROTATION_FAILED before rendered fetching succeeds. Wayback is much faster for
+captured pages, but the current catalogue has many valid pages with no capture.
+Archive-only mode therefore finishes quickly with incomplete data, while the
+old static-then-render chain is complete but takes hours.
 
-57 s + 23 s = 80 s/course × 700 courses ÷ 5 concurrency = **2.7 hours**.
+**How to apply:** Enable Wayback-first only after CDX discovery preloads
+timestamps. Configure a direct rendered miss fallback only after a live probe
+succeeds. Keep primary concurrency conservative and cap recovery by both item
+count and wall-clock time.
 
-## The fix: `extraction.force_wayback_first: true`
+## Archive identity and completeness
 
-New field added to `ExtractionConfig` (schema.py) and wired into `fetch_html`
-(http_fetcher.py, before the discovery fast-path at the `not _scrape_do_render and
-not _scrape_do_static` block). When True, tries Wayback Machine BEFORE any live
-scrape.do attempt. Falls through to live path if Wayback returns None.
+Course deduplication identity and archive-scope identity are different:
 
-**Why Wayback is fast here:** `wayback_discover()` pre-loads CDX timestamps into
-`_wayback_ts_cache` during discovery. `fetch_html_wayback` hits the CDX-cached fast
-path: direct `https://web.archive.org/web/{ts}id_/{url}` fetch = ~1.4 s/course.
+- Course identity may collapse transport noise such as HTTP/HTTPS, `www`, and
+  known tracking parameters.
+- Archive completeness must preserve the exact queried host and optional port.
+  A complete wildcard query for `www` does not prove that an apex-host URL is
+  absent.
+- Only a successful, non-truncated wildcard CDX response is authoritative.
+- Cached replay must retain the exact CDX original URL, including HTTP scheme
+  and legacy port; replaying a timestamp against a rewritten HTTPS URL can fail.
 
-**Result:** 700 × 1.4 s ÷ 5 concurrency ≈ **3 minutes** (vs 2.7 hours).
+**Why:** Reusing the aggressive course-dedup key for archive authority can create
+false permanent misses across host aliases. Rewriting the original replay URL
+can likewise turn a valid historical capture into a false fetch failure.
 
-## discovery.scrape_do_render: true also needed
-
-The sitemap fetch during discovery was ALSO using the 57 s static (ROTATION_FAILED).
-`discovery.scrape_do_render: true` (field on DiscoveryConfig, wired at
-http_fetcher.py:990) skips the static call and goes straight to render=True.
-
-Sitemap via render=True: 9.6 s, 474 program URLs. Campus URLs (not in sitemap)
-still come from Wayback CDX (38 s, keep `use_wayback: true`).
-
-## Tested values (Aug 2026)
-- scrape.do static on notredame.edu.au → 57 s, 502 ROTATION_FAILED
-- scrape.do render=True on sitemap → 9.6 s, 1.5 MB, 474 /programs/ URLs
-- scrape.do render=True on course page → 23 s, 272 KB, real course HTML
-- Wayback CDX-cached fetch → 1.4 s, 74 KB archived HTML
-
-**Why:**
-Any CF-Enterprise host where static ALWAYS gets ROTATION_FAILED AND
-`discovery.scrape_do_skip_fallbacks=True` is set → each course extraction burns
-80 s on failed scrape.do before falling through. force_wayback_first skips this.
-
-## Additional fix: skip_per_course_browser + IELTS defaults
-
-**Problem:** Even with force_wayback_first working (690/690 completing in ~3 min),
-IELTS was null on all courses because:
-1. `maybe_browser_refetch()` in per_course_browser.py fires whenever IELTS is null
-   AND `skip_per_course_browser` is NOT set — it is SEPARATE from `skip_browser_rescue`
-   which only gates the sparse-static rescue path. Both flags must be set.
-2. Wayback-archived Notre Dame HTML never contains IELTS (it's JS-loaded).
-
-**Fix:** Added to notredame.yaml extraction:
-- `skip_per_course_browser: true` — stops wasted Playwright calls returning 0B
-- `english.degree_level_defaults: {UG: 6.0, PG/Doc: 6.5}` — Notre Dame published standard
-- `english.default_ielts: 6.0` — global fallback
-- `english.course_english_priority: true` — per-course value wins when found (some courses 7.0+)
+**How to apply:** Use the broad identity only for discovery/resume/recovery
+deduplication. Use a separate host-preserving key for authoritative CDX scopes,
+and cache each timestamp with its exact captured original URL.

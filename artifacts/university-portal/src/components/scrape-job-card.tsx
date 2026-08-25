@@ -1136,7 +1136,9 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
         }
         pollFailRef.current = 0;
         const data = await readResponseJson<{
-          universityName?: string; url?: string; logs?: ScrapeLog[]; logIndex?: number;
+          universityId?: number; universityName?: string; url?: string;
+          fastMode?: boolean; feePageUrl?: string | null; requirementsPageUrl?: string | null;
+          logs?: ScrapeLog[]; logIndex?: number;
           status?: string; imported?: number; skipped?: number; errors?: number;
         }>(res);
         if (!data) { schedule(POLL_BASE); return; }
@@ -1145,6 +1147,17 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
           setJobStatus(data.status as "queued" | "running" | "awaiting_approval");
         }
         if (data.universityName) setUniName(data.universityName);
+        if (data.universityId != null) setSelectedUni(String(data.universityId));
+        if (data.url) setScrapeUrl(data.url);
+        if (typeof data.fastMode === "boolean") setFastMode(data.fastMode);
+        if (data.feePageUrl) {
+          setFeePageUrl(data.feePageUrl);
+          setShowAdvanced(true);
+        }
+        if (data.requirementsPageUrl) {
+          setRequirementsPageUrl(data.requirementsPageUrl);
+          setShowAdvanced(true);
+        }
         if (data.logs && data.logs.length > 0) {
           setLogs((prev) => [...prev, ...data.logs!].slice(-MAX_LOGS));
           if (data.logIndex !== undefined) logIndexRef.current = data.logIndex;
@@ -1341,25 +1354,38 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   const handleStop = useCallback(async () => {
     if (!activeJobId) return;
     setStopping(true);
-    // Cancel the poll FIRST so it cannot race and override the idle reset
-    // with a terminal "stopped" status (which would set phase="error").
+    // Cancel the poll first so it cannot race the explicit interrupted state.
+    // Keep the job ID, URL, progress, and logs: the operator can continue this
+    // scrape and the backend will skip URLs already saved by the stopped job.
     if (pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null; }
     pollInFlightRef.current = false;
     pollFailRef.current = 0;
     logIndexRef.current = 0;
-    try { await fetch(`/api/scrape/stop/${activeJobId}`, { method: "POST" }); } catch {}
-    sessionStorage.removeItem(slotKey);
-    sessionStorage.removeItem(startTimeKey);
-    setScraping(false);
-    setStopping(false);
-    setActiveJobId(null);
-    setPhase("idle");
-    setLogs([]);
-    setProgress(null);
-    setJobStatus(null);
-    setUniName("");
-    setStartTime(null);
-  }, [activeJobId, slotKey, startTimeKey]);
+    try {
+      const response = await fetch(`/api/scrape/stop/${activeJobId}`, { method: "POST" });
+      if (!response.ok) throw new Error(await getFetchErrorMessage(response));
+      setScraping(false);
+      setStopping(false);
+      setJobStatus(null);
+      setPhase("error");
+      setLogs((previous) => [
+        ...previous,
+        {
+          event: "stopped",
+          message: "Scrape stopped. Click Continue to resume from the courses already saved.",
+        },
+      ].slice(-MAX_LOGS));
+    } catch (error) {
+      setStopping(false);
+      setLogs((previous) => [
+        ...previous,
+        { event: "error", message: `Could not stop scrape: ${String(error)}` },
+      ].slice(-MAX_LOGS));
+      setScraping(true);
+      setPhase("running");
+      pollJobStatus(activeJobId);
+    }
+  }, [activeJobId, pollJobStatus]);
 
   // Force-reset when the parent's "Cancel All" fires (forceResetKey increments)
   useEffect(() => {
@@ -1735,11 +1761,27 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
                 </Button>
               )}
               {phase === "error" && (
-                <Button onClick={resetToIdle} variant="outline" size="sm" className="flex-1">
-                  <RefreshCw className="w-3.5 h-3.5 mr-1.5" />New Scrape
-                </Button>
+                <>
+                  <Button
+                    onClick={handleStart}
+                    disabled={!activeJobId || !scrapeUrl.trim()}
+                    size="sm"
+                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                    title="Start a new run and skip course URLs already saved by the interrupted run"
+                  >
+                    <Play className="w-3.5 h-3.5 mr-1.5" />Continue
+                  </Button>
+                  <Button onClick={resetToIdle} variant="outline" size="sm" className="flex-1">
+                    <RefreshCw className="w-3.5 h-3.5 mr-1.5" />New Scrape
+                  </Button>
+                </>
               )}
             </div>
+            {phase === "error" && activeJobId && (
+              <p className="text-[11px] text-gray-500 text-center">
+                Continue keeps saved courses and resumes the remaining URLs.
+              </p>
+            )}
           </>
         )}
 

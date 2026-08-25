@@ -42,6 +42,11 @@ from urllib.parse import urlparse
 
 import httpx
 
+from app.services.scraper.url_identity import (
+    canonical_course_url_key,
+    normalize_course_fetch_url,
+)
+
 log = logging.getLogger(__name__)
 
 _CDX_URL = "http://web.archive.org/cdx/search/cdx"
@@ -265,35 +270,25 @@ def _interleave_by_degree_level(
 
 
 def _normalise_wayback_url(url: str) -> str:
-    """Strip noise that bloats the dedup set on Wayback CDX results.
+    """Normalize transport/noise variants in Wayback CDX results.
 
     The CDX index returns the URL as it was originally crawled, which means:
       - http:// and https:// variants of the same path appear as separate
         rows;
       - legacy ``:80`` ports survive (e.g. ``http://www.qut.edu.au:80/courses/``);
-      - audience-toggle query strings (``?domestic``, ``?international``)
-        explode each canonical course URL into 2-3 rows.
+      - tracking and non-semantic audience-toggle query strings can explode
+        each canonical course URL into several rows.
 
     Without normalisation, QUT's CDX returns the same Bachelor of Architectural
     Design course as four separate rows (http+:80 / https / https?domestic /
     https?international), eating four slots out of the 10 000-row CDX cap and
     pushing the dedup set well past the post-filter ``max_courses`` cap.
 
-    This helper rewrites every URL to the canonical ``https://<host><path>``
-    form before insertion into the dedup set so each course is counted once.
+    Semantic query parameters are retained because some sites use them for a
+    genuinely distinct international course view. Shared URL identity logic
+    removes only known noise and handles deduplication consistently.
     """
-    from urllib.parse import urlsplit, urlunsplit
-
-    try:
-        parts = urlsplit(url)
-    except Exception:
-        return url
-    netloc = parts.netloc
-    if ":" in netloc:
-        host, _, port = netloc.partition(":")
-        if port in ("80", "443", ""):
-            netloc = host
-    return urlunsplit(("https", netloc, parts.path, "", ""))
+    return normalize_course_fetch_url(url)
 
 
 async def wayback_discover(
@@ -423,9 +418,10 @@ async def wayback_discover(
     # from the staged catalogue.
     seen: set[str] = set()
     all_results: list[dict] = []
-    # url → CDX timestamp for all 200-OK rows (used by fetch_html_wayback to
-    # skip the Availability API — see http_fetcher.set_wayback_timestamps).
-    ts_map: dict[str, str] = {}
+    # identity key → (CDX timestamp, exact captured original URL) for all 200-OK
+    # rows. The original must be retained because an HTTP capture timestamp
+    # cannot reliably be replayed against a rewritten HTTPS target.
+    ts_map: dict[str, tuple[str, str]] = {}
 
     for row in rows[1:]:
         if not row:
@@ -435,13 +431,19 @@ async def wayback_discover(
         if not raw_url:
             continue
         norm_url = _normalise_wayback_url(raw_url)
+        url_key = canonical_course_url_key(norm_url)
+        if not url_key:
+            continue
         # Keep the most-recent timestamp when the same URL appears more than
         # once (should be rare after collapse=urlkey, but defensive).
-        if norm_url not in ts_map or (timestamp and timestamp > ts_map[norm_url]):
-            ts_map[norm_url] = timestamp or ""
-        if norm_url in seen:
+        if (
+            url_key not in ts_map
+            or (timestamp and timestamp > ts_map[url_key][0])
+        ):
+            ts_map[url_key] = (timestamp or "", raw_url)
+        if url_key in seen:
             continue
-        seen.add(norm_url)
+        seen.add(url_key)
         if _looks_like_course(norm_url, ""):
             all_results.append({"url": norm_url, "name": ""})
 
@@ -450,10 +452,19 @@ async def wayback_discover(
     # Availability API (which has a known inconsistency for old snapshots).
     try:
         from app.services.scraper.http_fetcher import set_wayback_timestamps
-        set_wayback_timestamps(ts_map)
+        _authoritative_prefixes = (
+            [f"https://{cdx_prefix}"]
+            if total_urls < _CDX_MAX_RESULTS
+            else []
+        )
+        set_wayback_timestamps(
+            ts_map,
+            authoritative_prefixes=_authoritative_prefixes,
+        )
         log.info(
-            "wayback_discover: populated Wayback timestamp cache with %d URLs for %s",
-            len(ts_map), host,
+            "wayback_discover: populated Wayback timestamp cache with %d URLs "
+            "for %s (authoritative_scope=%s)",
+            len(ts_map), host, bool(_authoritative_prefixes),
         )
     except Exception as _cache_exc:
         log.warning("wayback_discover: could not populate timestamp cache: %s", _cache_exc)

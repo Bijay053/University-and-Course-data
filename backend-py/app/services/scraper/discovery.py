@@ -20,6 +20,7 @@ from urllib.parse import urljoin, urlparse, urlunparse, urlencode, parse_qsl, pa
 
 from app.config import settings
 from app.services.scraper.http_fetcher import fetch_html, format_fetch_error
+from app.services.scraper.url_identity import canonical_course_url_key
 
 log = logging.getLogger(__name__)
 
@@ -423,22 +424,8 @@ def _is_known_non_course_url(url: str) -> bool:
 
 
 def _normalize_url_for_dedup(url: str) -> str:
-    """Strip non-essential query parameters for URL deduplication.
-
-    Keeps path-essential params (e.g. pagination ?page=N) but drops
-    audience-filter params like ``?studentType=international`` that cause
-    the same page to appear twice in the BFS queue — once with the param
-    (pre-seeded) and once without (from a link on another page).
-    """
-    _STRIP_PARAMS = frozenset(
-        {"studentType", "studenttype", "student_type", "_ga", "_gl", "_gid"}
-    )
-    try:
-        p = urlparse(url)
-        qs = [(k, v) for k, v in parse_qsl(p.query) if k not in _STRIP_PARAMS]
-        return urlunparse(p._replace(query=urlencode(qs)))
-    except Exception:
-        return url
+    """Return the shared identity key used by every scraper phase."""
+    return canonical_course_url_key(url)
 
 
 def _is_category_landing(url: str) -> bool:

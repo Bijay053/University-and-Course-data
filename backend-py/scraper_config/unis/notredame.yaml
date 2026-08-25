@@ -139,14 +139,26 @@ extraction:
   # above, so the browser pass contributes nothing.
   skip_per_course_browser: true
 
-  # Skip all live scrape.do attempts per course and use Wayback Machine
-  # snapshots directly.  wayback_discover() pre-loads CDX timestamps for all
-  # discovered URLs during discovery so fetch_html_wayback hits the fast CDX-
-  # cached path (~1.4 s/course).  The alternative — discovery.scrape_do_
-  # skip_fallbacks firing during extraction — costs ~57 s (static ROTATION_
-  # FAILED) + ~23 s (render=True success) per course; at 700 courses / 5
-  # concurrency that is 2–3 hours.  With Wayback-first: 700 × 1.4 s / 5 ≈ 3 min.
+  # Use CDX-cached Wayback snapshots first. The current sitemap also contains
+  # hundreds of active non-campus URLs with no archive snapshot, so those pages
+  # fall back directly to the one live transport proven to work: Scrape.do
+  # render=True. This skips the doomed ~57 s static attempt and does not use
+  # Playwright/httpx/cffi.
   force_wayback_first: true
+  wayback_miss_fallback: scrape_do_render
+
+  # Archive.org becomes unreliable when a large primary batch opens too many
+  # snapshot requests at once. Keep this host below the shared default so the
+  # CDX-cached fast path succeeds during the primary pass instead of creating a
+  # large transient recovery queue.
+  max_parallel_fetch: 4
+
+  # Only transient archive/network failures enter recovery. URLs with no
+  # 200-status snapshot are permanent misses and are reported immediately.
+  # These limits are a final safety net if Archive.org degrades mid-run.
+  recovery_sweep_max_items: 80
+  recovery_sweep_time_budget_seconds: 300
+  recovery_sweep_delay_seconds: 0.5
 
   filters:
     domestic_only:

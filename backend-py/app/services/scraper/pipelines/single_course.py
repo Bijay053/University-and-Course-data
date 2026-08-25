@@ -35,7 +35,12 @@ from app.services.scraper.extractors import (
     study_mode,
 )
 from app.services.scraper.extractors.base import ExtractionResult
-from app.services.scraper.http_fetcher import fetch_html, scrape_do_render_scope, scrape_do_static_scope
+from app.services.scraper.http_fetcher import (
+    fetch_html,
+    get_last_fetch_failure,
+    scrape_do_render_scope,
+    scrape_do_static_scope,
+)
 from app.services.scraper.provenance import build_course_page_provenance_footer
 
 log = logging.getLogger(__name__)
@@ -1821,7 +1826,37 @@ async def extract_course(
             log.warning("browser fallback failed for %s: %s", url, _exc)
 
     if not html:
-        return {"url": url, "error": "fetch_failed", "payload": {}, "evidence": []}
+        _fetch_failure = get_last_fetch_failure()
+        _terminal_failure = bool(
+            _fetch_failure and _fetch_failure.get("terminal")
+        )
+        if _terminal_failure:
+            _kind = str(_fetch_failure.get("kind") or "unknown")
+            return {
+                "url": url,
+                "error": f"fetch_failed_{_kind}",
+                "error_type": "FetchTransportFailure",
+                "error_reason": str(
+                    _fetch_failure.get("reason")
+                    or "The configured transport returned no usable content."
+                ),
+                "retryable": bool(_fetch_failure.get("retryable")),
+                "fetch_failure_kind": _kind,
+                "fetch_transport": _fetch_failure.get("transport"),
+                "payload": {},
+                "evidence": [],
+            }
+        return {
+            "url": url,
+            "error": "fetch_failed",
+            "error_type": "FetchTransportFailure",
+            "error_reason": (
+                "No usable content was returned after the configured transport chain."
+            ),
+            "retryable": True,
+            "payload": {},
+            "evidence": [],
+        }
 
     # ── Federation stub-page guard (2026-05-10) ──────────────────────────
     # Federation pages such as Cert II in Furniture Making are content

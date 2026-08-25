@@ -21,7 +21,7 @@ hallucinations from polluting a brand-new university's scrape).
 """
 from __future__ import annotations
 
-from typing import List, Optional, Union
+from typing import List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -3074,6 +3074,31 @@ class ExtractionConfig(BaseModel):
             "cooldown penalties, typically making the overall run faster."
         ),
     )
+    recovery_sweep_max_items: int = Field(
+        default=100,
+        description=(
+            "Maximum number of transient extraction failures replayed after the "
+            "primary batches finish. Permanent failures never enter the sweep. "
+            "The default of 100 prevents a bad discovery/transport combination "
+            "from creating an unbounded end-of-job retry storm."
+        ),
+    )
+    recovery_sweep_time_budget_seconds: float = Field(
+        default=300.0,
+        description=(
+            "Wall-clock budget for the end-of-job recovery sweep. Remaining "
+            "transient failures are left unresolved with an explicit budget "
+            "reason when this limit is reached. Default: 300 seconds."
+        ),
+    )
+    recovery_sweep_delay_seconds: float = Field(
+        default=1.0,
+        description=(
+            "Pause between transient recovery attempts. This keeps provider "
+            "recovery traffic bounded without the former fixed two-second delay. "
+            "Default: 1 second."
+        ),
+    )
     # ── YAML-driven browser interaction actions ───────────────────────────────
     # Allows clients to configure interactive browser behaviour without code changes.
     # Executed in order after the initial page load and settle delay, before
@@ -3110,10 +3135,21 @@ class ExtractionConfig(BaseModel):
             "takes ~1.4 s/course (CDX-cached snapshot, direct archive.org fetch) "
             "vs ~80 s/course for the fallback scrape.do static (57 s ROTATION_FAILED "
             "wait) + render (23 s). For a 700-course university that compresses a "
-            "2–3 h run to ~3 minutes. If Wayback has no archived copy for a URL, "
-            "fetch_html falls through to the normal live path. Notre Dame is the "
-            "canonical case. Has no effect unless use_wayback=True is set in "
-            "discovery so that CDX timestamps are loaded before extraction begins."
+            "2–3 h run to ~3 minutes when archive coverage is complete. The "
+            "wayback_miss_fallback setting controls how current-only URLs are "
+            "handled. Has no effect unless use_wayback=True is set in discovery "
+            "so that CDX timestamps are loaded before extraction begins."
+        ),
+    )
+    wayback_miss_fallback: Literal["none", "scrape_do_render"] = Field(
+        default="none",
+        description=(
+            "Transport used when force_wayback_first is enabled but no archived "
+            "snapshot exists. 'none' returns an explicit permanent archive miss; "
+            "'scrape_do_render' makes one bounded live rendered attempt (plus the "
+            "shared Scrape.do retry policy). Use the rendered fallback only when "
+            "a representative live probe succeeds and current-only catalogue "
+            "pages must be included."
         ),
     )
     scrape_do_render: bool = Field(

@@ -739,6 +739,7 @@ async def get_status(
             entry[k] = v
         logs.append(entry)
 
+    request_payload = job.request_payload if isinstance(job.request_payload, dict) else {}
     return {
         "id": job.runtime_job_id,
         "runtimeJobId": job.runtime_job_id,
@@ -759,6 +760,14 @@ async def get_status(
         "total": job.total_found or 0,
         "universityId": job.university_id,
         "universityName": job.university_name,
+        "url": job.url,
+        # Return only the run options the scrape card needs to faithfully
+        # continue an interrupted job after a page reload. The new job still
+        # goes through /start, where normal university locking and resume
+        # checkpoint filtering apply.
+        "fastMode": bool(job.fast_mode),
+        "feePageUrl": request_payload.get("feePage"),
+        "requirementsPageUrl": request_payload.get("requirementsPage"),
         "startedAt": job.started_at.isoformat() if job.started_at else None,
         "completedAt": job.completed_at.isoformat() if job.completed_at else None,
         "errorMessage": job.error_message,
