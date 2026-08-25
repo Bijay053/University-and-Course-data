@@ -340,6 +340,7 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
   const [now, setNow] = useState(Date.now());
   const [resultSummary, setResultSummary] = useState<{ imported: number; skipped: number; errors: number } | null>(null);
   const [completedJobId, setCompletedJobId] = useState<string | null>(null);
+  const [continuingUnresolved, setContinuingUnresolved] = useState(false);
 
   // Snapshot badge state — loaded after job completes
   type SnapshotSummary = {
@@ -1386,6 +1387,47 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
       pollJobStatus(activeJobId);
     }
   }, [activeJobId, pollJobStatus]);
+
+  const handleContinueUnresolved = useCallback(async () => {
+    if (!completedJobId || continuingUnresolved) return;
+    setContinuingUnresolved(true);
+    try {
+      const response = await fetch(`/api/scrape/history/${completedJobId}/continue`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error(await getFetchErrorMessage(response));
+      const data = await readResponseJson<{ jobId: string }>(response);
+      if (!data?.jobId) throw new Error("Server did not return a job ID.");
+
+      const unresolvedCount = resultSummary?.errors ?? 0;
+      const t0 = Date.now();
+      setActiveJobId(data.jobId);
+      setCompletedJobId(null);
+      setResultSummary(null);
+      setPerformanceSavings(null);
+      setProgress(null);
+      extractionStartRef.current = null;
+      setStartTime(t0);
+      setLogs([{
+        event: "status",
+        message: `Continuing ${unresolvedCount} unresolved course${unresolvedCount === 1 ? "" : "s"} from ${completedJobId}.`,
+      }]);
+      setScraping(true);
+      setPhase("running");
+      sessionStorage.setItem(slotKey, data.jobId);
+      sessionStorage.setItem(startTimeKey, String(t0));
+      pollJobStatus(data.jobId);
+    } catch (error) {
+      toast({
+        title: "Could not continue scrape",
+        description: String(error),
+        variant: "destructive",
+      });
+    } finally {
+      setContinuingUnresolved(false);
+    }
+  }, [completedJobId, continuingUnresolved, pollJobStatus, resultSummary?.errors, slotKey, startTimeKey, toast]);
 
   // Force-reset when the parent's "Cancel All" fires (forceResetKey increments)
   useEffect(() => {
@@ -3360,6 +3402,22 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
             </div>
 
             <div className="flex gap-2">
+              {completedJobId && resultSummary && resultSummary.errors > 0 && (
+                <Button
+                  onClick={handleContinueUnresolved}
+                  disabled={continuingUnresolved}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 h-9"
+                  size="sm"
+                  title="Retry only the course URLs that this run left unresolved"
+                >
+                  {continuingUnresolved
+                    ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    : <Play className="w-3.5 h-3.5 mr-1.5" />}
+                  {continuingUnresolved
+                    ? "Continuing…"
+                    : `Continue ${resultSummary.errors} unresolved`}
+                </Button>
+              )}
               {completedJobId && resultSummary && resultSummary.imported > 0 && (
                 <Button
                   onClick={() => completedJobId && onReviewReady(completedJobId, uniName, true)}

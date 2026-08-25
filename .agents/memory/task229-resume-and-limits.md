@@ -33,6 +33,27 @@ work can be verified end-to-end against the live site.
   slash, but **preserve the query string** — some unis key the international-fee
   view off `?international=true` and those are genuinely distinct pages.
 
+## Interrupted resume vs completed-error continuation
+Treat these as two different operations:
+
+- A stopped or failed run resumes through full discovery plus the staged-URL
+  checkpoint, because everything after the interruption point still needs work.
+- A run that reaches a completed status but retains course errors continues with
+  only its unresolved retryable URLs. Do not restart the whole catalogue.
+- Recovery budget exhaustion may emit only a remaining count. Reconstruct those
+  URLs from retryable extraction failures, then subtract URLs explicitly recovered
+  or skipped by the bounded sweep.
+
+**Why:** completed runs are intentionally excluded from inferred checkpoint
+eligibility. Including them would preserve stale catalogue rows indefinitely, and
+restarting their whole catalogue would repeat accepted skip decisions. A targeted
+continuation preserves the intended cleanup rules while retrying exactly the
+course failures the operator sees.
+
+**How to apply:** any Continue UI or API must select its path from the source
+run's terminal state. Keep bounded-sweep summary counts and per-URL terminal
+outcomes consistent so the unresolved set can be reconstructed after reload.
+
 ## Contention bounding (all default-OFF, all fail-open)
 - `rate_limiter.py` — Redis fixed-window token bucket. `acquire(resource, rate)`
   returns True immediately when rate<=0 (disabled) or on any Redis error

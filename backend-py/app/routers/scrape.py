@@ -59,22 +59,37 @@ def _nan_to_none(v):
 
 
 def _unresolved_history_entries(logs: list[dict]) -> list[dict]:
-    """Extract the latest actionable recovery-sweep failure for each URL."""
+    """Extract every retryable URL that remained unresolved at run completion.
+
+    A bounded recovery sweep emits one ``sweep_unresolved`` record for each URL
+    it actually retries, but emits only a count when its wall-clock budget is
+    exhausted.  Start with retryable extraction failures, then remove URLs
+    resolved by the sweep so budget-exhausted items remain actionable.
+    """
     by_url: dict[str, dict] = {}
     for entry in logs:
         payload = entry.get("payload")
         if not isinstance(payload, dict):
             payload = {}
-        if (payload.get("kind") or entry.get("kind")) != "sweep_unresolved":
-            continue
+        kind = payload.get("kind") or entry.get("kind")
         url = payload.get("url") or entry.get("url")
         if not isinstance(url, str) or not url.strip():
             continue
         url = url.strip()
+
+        if kind in {"sweep_recovered", "sweep_skipped"}:
+            by_url.pop(url, None)
+            continue
+
+        if kind == "extract_error" and payload.get("retryable") is not True:
+            continue
+        if kind not in {"extract_error", "sweep_unresolved"}:
+            continue
+
         by_url[url] = {
             "url": url,
             "courseName": payload.get("course_name") or entry.get("course_name"),
-            "reason": payload.get("reason") or entry.get("reason") or "unresolved",
+            "reason": payload.get("reason") or payload.get("error") or entry.get("reason") or "unresolved",
             "detail": payload.get("detail") or entry.get("detail"),
             "sourceError": payload.get("source_error") or entry.get("source_error"),
             "retryError": payload.get("retry_error") or entry.get("retry_error"),
@@ -1419,6 +1434,48 @@ async def retry_unresolved_history_urls(
         raise HTTPException(
             status_code=400,
             detail="One or more selected URLs are not unresolved URLs for this scrape run",
+        )
+
+    return await start_scrape(
+        StartScrapeBody(
+            url=job.url,
+            universityId=job.university_id,
+            courseUrls=selected_urls,
+            retrySourceJobId=job_id,
+        ),
+        db,
+    )
+
+
+@router.post("/history/{job_id}/continue", response_model=ScrapeStartResponse, status_code=status.HTTP_202_ACCEPTED)
+async def continue_unresolved_history_urls(
+    job_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ScrapeStartResponse:
+    """Queue a focused continuation for all retryable URLs left unresolved."""
+    job = await db.get(ScrapeRuntimeJob, job_id)
+    if not job or not job.university_id:
+        raise HTTPException(status_code=404, detail="Scrape job not found")
+
+    rows = (await db.execute(
+        text(
+            "SELECT payload, created_at FROM scrape_runtime_logs "
+            "WHERE runtime_job_id = :job_id ORDER BY sequence"
+        ),
+        {"job_id": job_id},
+    )).all()
+    unresolved = _unresolved_history_entries([
+        {
+            "payload": payload,
+            "createdAt": created_at.isoformat() if created_at else None,
+        }
+        for payload, created_at in rows
+    ])
+    selected_urls = [entry["url"] for entry in unresolved[:200]]
+    if not selected_urls:
+        raise HTTPException(
+            status_code=409,
+            detail="This scrape run has no retryable unresolved course URLs",
         )
 
     return await start_scrape(

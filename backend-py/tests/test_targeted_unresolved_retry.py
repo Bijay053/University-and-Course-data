@@ -84,6 +84,51 @@ def test_unresolved_history_entries_keep_latest_reason_per_url() -> None:
     }]
 
 
+def test_unresolved_history_entries_include_budget_exhausted_failures() -> None:
+    entries = scrape._unresolved_history_entries([
+        {
+            "payload": {
+                "kind": "extract_error",
+                "url": "https://example.edu/resolved",
+                "reason": "per_course_timeout",
+                "retryable": True,
+            },
+        },
+        {
+            "payload": {
+                "kind": "extract_error",
+                "url": "https://example.edu/budget-exhausted",
+                "reason": "per_course_timeout",
+                "retryable": True,
+            },
+        },
+        {
+            "payload": {
+                "kind": "extract_error",
+                "url": "https://example.edu/permanent",
+                "reason": "not_found",
+                "retryable": False,
+            },
+        },
+        {
+            "payload": {
+                "kind": "sweep_recovered",
+                "url": "https://example.edu/resolved",
+            },
+        },
+        {
+            "payload": {
+                "kind": "sweep_budget_unresolved",
+                "count": 1,
+            },
+        },
+    ])
+
+    assert [entry["url"] for entry in entries] == [
+        "https://example.edu/budget-exhausted",
+    ]
+
+
 def test_retry_endpoint_passes_only_selected_recorded_urls(monkeypatch) -> None:
     captured: dict = {}
 
@@ -125,3 +170,63 @@ def test_retry_endpoint_passes_only_selected_recorded_urls(monkeypatch) -> None:
     assert captured["body"].course_urls == ["https://example.edu/course/a"]
     assert captured["body"].retry_source_job_id == "job_source"
     assert captured["body"].university_id == 12
+
+
+def test_continue_endpoint_retries_every_unresolved_url(monkeypatch) -> None:
+    captured: dict = {}
+
+    class _Rows:
+        def all(self):
+            return [
+                (
+                    {
+                        "kind": "extract_error",
+                        "url": "https://example.edu/course/a",
+                        "reason": "per_course_timeout",
+                        "retryable": True,
+                    },
+                    None,
+                ),
+                (
+                    {
+                        "kind": "extract_error",
+                        "url": "https://example.edu/course/b",
+                        "reason": "per_course_timeout",
+                        "retryable": True,
+                    },
+                    None,
+                ),
+                (
+                    {
+                        "kind": "sweep_recovered",
+                        "url": "https://example.edu/course/a",
+                    },
+                    None,
+                ),
+            ]
+
+    class _Db:
+        async def get(self, _model, _job_id):
+            return SimpleNamespace(
+                university_id=12,
+                url="https://example.edu/courses",
+            )
+
+        async def execute(self, _statement, _params):
+            return _Rows()
+
+    async def _fake_start(body, db):
+        captured["body"] = body
+        captured["db"] = db
+        return ScrapeStartResponse(job_id="job_continued", runtime_job_id="job_continued")
+
+    monkeypatch.setattr(scrape, "start_scrape", _fake_start)
+
+    result = asyncio.run(scrape.continue_unresolved_history_urls(
+        "job_source",
+        _Db(),
+    ))
+
+    assert result.job_id == "job_continued"
+    assert captured["body"].course_urls == ["https://example.edu/course/b"]
+    assert captured["body"].retry_source_job_id == "job_source"
