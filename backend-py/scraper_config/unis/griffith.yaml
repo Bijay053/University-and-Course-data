@@ -100,6 +100,10 @@ extraction:
   scrape_do_skip_fallbacks: true
   skip_browser_rescue: true
   skip_per_course_browser: true
+  url_rewrites:
+    - host: www.griffith.edu.au
+      path_contains: /study/degrees/
+      append_query: location=intl
 
   # Conservative parallelism — Scrape.do calls have account-wide concurrency
   # limits and Griffith's CF WAF may rate-limit bursts even through residential.

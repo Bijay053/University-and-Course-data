@@ -1584,6 +1584,23 @@ async def extract_course(
     # *rescue* when HTTP was genuinely attempted and failed.
     _http_attempted = False
     _fetch_host = (urlparse(url).netloc or "").lower()
+    # Griffith's HTML is only a Vue shell; its public program API is the same
+    # authority used to hydrate the page. Prefetch that document directly and
+    # present it to the common pipeline as substantive HTML. This avoids one
+    # slow paid browser render and one unnecessary Gemini call per degree.
+    from app.services.scraper.extractors import griffith_api as _griffith_prefetch
+    if html is None and _griffith_prefetch.is_griffith_degree_url(url):
+        try:
+            _griffith_doc = await _griffith_prefetch.fetch_program(url)
+            html = _griffith_prefetch.program_document_html(_griffith_doc)
+            use_ai_fallback = False
+            _perf_flags["http_skipped"] = True
+        except Exception as _griffith_prefetch_exc:  # noqa: BLE001
+            log.warning(
+                "griffith program API prefetch failed on %s: %s",
+                url,
+                _griffith_prefetch_exc,
+            )
     if html is None:
         # ── skip_initial_http_fetch gate ──────────────────────────────────────
         # For 100%-Cloudflare-protected universities (e.g. UEL), every plain
@@ -6292,6 +6309,33 @@ async def extract_course(
     # ── Study-mode field trace ────────────────────────────────────────────────
     # Emits a single diagnostic event so operators can follow the mode value
     # through the full pipeline without trawling the evidence table.
+    # Griffith degree pages are empty Vue shells. Their visible course name,
+    # international fee, campus, duration, intakes, IELTS and CRICOS values
+    # come from the public program API used by Griffith's own frontend. This is
+    # outside the AI branch so it also runs when AI extraction is disabled.
+    from app.services.scraper.extractors import griffith_api as _griffith_api
+    if _griffith_api.is_griffith_degree_url(url):
+        try:
+            await _griffith_api.apply_overrides(
+                payload, url=url, evidence=evidence
+            )
+        except Exception as _griffith_exc:  # noqa: BLE001
+            log.warning(
+                "griffith program API failed on %s: %s", url, _griffith_exc
+            )
+            return {
+                "name": payload.get("course_name") or "?",
+                "url": url,
+                "error": "fetch_failed_griffith_authority",
+                "error_type": "GriffithAuthorityUnavailable",
+                "error_reason": str(_griffith_exc),
+                "retryable": True,
+                "fetch_failed": True,
+                "payload": {},
+                "evidence": [],
+                "_perf": _perf_flags,
+            }
+
     if emit:
         _mode_ev = [e for e in evidence if e.get("field_key") == "study_mode"]
         _mode_method = _mode_ev[-1].get("method", "none") if _mode_ev else "none"
