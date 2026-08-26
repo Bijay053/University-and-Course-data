@@ -1013,6 +1013,17 @@ export default function Scraping() {
   };
 
   const { data: uniData } = useListUniversities({ limit: 250 });
+  const selectedUniversityName = useMemo(() => {
+    const stagedUniversityId = stagedCourses[0]?.universityId;
+    const stagedName = stagedUniversityId
+      ? uniData?.data?.find((u) => u.id === stagedUniversityId)?.name ?? ""
+      : "";
+    if (stagedName) return stagedName;
+    if (selectedUni && selectedUni !== ALL) {
+      return uniData?.data?.find((u) => String(u.id) === selectedUni)?.name ?? "";
+    }
+    return scrapeUniName.trim();
+  }, [scrapeUniName, selectedUni, stagedCourses, uniData]);
 
   const fetchJobs = async () => {
     setLoadingJobs(true);
@@ -2422,6 +2433,16 @@ export default function Scraping() {
                   <Eye className="w-5 h-5 text-green-600" />
                   Review Scraped Courses
                   <Badge className="bg-blue-100 text-blue-700">{stagedCourses.length} pending</Badge>
+                  {selectedUniversityName && (
+                    <Badge
+                      variant="outline"
+                      className="max-w-[280px] truncate border-green-200 bg-green-50 text-green-800 font-medium"
+                      title={`University: ${selectedUniversityName}`}
+                    >
+                      <Globe className="w-3 h-3 mr-1 shrink-0" />
+                      <span className="truncate">{selectedUniversityName}</span>
+                    </Badge>
+                  )}
                 </CardTitle>
                 {lastScrapeInfo && (
                   <p className="text-xs text-gray-500 mt-1">
@@ -3911,6 +3932,7 @@ export default function Scraping() {
                           <div className="max-h-[600px] overflow-auto bg-white">
                             <ReviewScrapedCoursesTable
                               courses={historyDetail?.stagedCourses ?? []}
+                              universityName={run.universityName}
                               readOnly
                               showEvidence
                             />

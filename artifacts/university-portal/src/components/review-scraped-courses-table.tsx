@@ -73,6 +73,8 @@ type RecoveryResult = {
 
 interface Props {
   courses: ReviewStagedCourse[];
+  /** University owning the staged courses, shown to keep review context visible. */
+  universityName?: string | null;
   /** When true, hides Approve / Reject / Edit / selection controls. */
   readOnly?: boolean;
   /** When true, exposes a "Sources" toggle on each row that reveals
@@ -827,7 +829,7 @@ function RecoveryPanel({ courseId, readOnly, onAction }: { courseId: number; rea
 // Main table
 // ---------------------------------------------------------------------------
 
-export function ReviewScrapedCoursesTable({ courses, readOnly, showEvidence, universityId, onRescrape, onCourseUpdated }: Props) {
+export function ReviewScrapedCoursesTable({ courses, universityName, readOnly, showEvidence, universityId, onRescrape, onCourseUpdated }: Props) {
   const [rescraping, setRescraping] = useState<Set<number>>(new Set());
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [recoveryOpen, setRecoveryOpen] = useState<Set<number>>(new Set());
@@ -868,6 +870,12 @@ export function ReviewScrapedCoursesTable({ courses, readOnly, showEvidence, uni
 
   return (
     <div className="border rounded-lg overflow-hidden">
+      {universityName ? (
+        <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 border-b text-xs">
+          <span className="font-semibold text-slate-500">University</span>
+          <span className="font-medium text-slate-800 truncate" title={universityName}>{universityName}</span>
+        </div>
+      ) : null}
       {readOnly ? (
         <div className="px-3 py-1.5 bg-amber-50 border-b border-amber-200 text-xs text-amber-800">
           Read-only (historical record) — actions are disabled. Click <span className="font-semibold">Sources</span> to inspect evidence per field.
