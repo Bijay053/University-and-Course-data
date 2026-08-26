@@ -29,6 +29,32 @@
 # (all datacenter IPs are CF-enterprise blocked at IP/ASN level).
 
 discovery:
+  # The React degree finder reads its catalogue from this public Funnelback
+  # endpoint. Querying it directly is deterministic and returns the exact 281
+  # degrees shown for international students commencing in 2027.
+  generic_search_api:
+    url: https://dxp-au-search.funnelback.squiz.cloud/s/search.json
+    params:
+      collection: griff~sp-degrees-api
+      profile: degrees
+      'f.Available to|studentType': intl
+      smeta_intlCohortYears_orsand: '2027'
+    root_path: response.resultPacket.results
+    url_fields:
+      - liveUrl
+    title_fields:
+      - title
+    page_size: 500
+    page_size_param: num_ranks
+    offset_param: start_rank
+    offset_start: 1
+    require_all_urls: true
+    allow_url_patterns:
+      - '^https://www\.griffith\.edu\.au/study/degrees/[a-z0-9-]+-[0-9]+/?$'
+
+  expected_min_courses: 281
+  max_candidates: 350
+
   # Go straight to Scrape.do residential proxy — skip doomed datacenter tiers.
   scrape_do_skip_fallbacks: true
   scrape_do_render: true
@@ -51,6 +77,9 @@ discovery:
     - '/degrees-and-programmes'
     - '/undergraduate'
     - '/postgraduate'
+
+  course_detail_url_patterns:
+    - '^https://www\.griffith\.edu\.au/study/degrees/[a-z0-9-]+-[0-9]+/?$'
 
   block_url_patterns:
     - '/news'
