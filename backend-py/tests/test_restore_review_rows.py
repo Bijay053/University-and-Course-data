@@ -1,12 +1,22 @@
 import asyncio
 from datetime import datetime, timezone
 from types import SimpleNamespace
+import uuid
 
+import pytest
+import pytest_asyncio
+from sqlalchemy import func, select, text
+
+from app.database import AsyncSessionLocal, engine
 from app.models.course import Course
 from app.models.page_snapshot import PageSnapshot
 from app.models.scrape_runtime import ScrapeRuntimeJob
 from app.models.scraped_course import ScrapedCourse
-from app.services.scraper.replay_extraction import restore_review_rows
+from app.services.scraper.approve_course import approve_scraped_course
+from app.services.scraper.replay_extraction import (
+    restore_review_rows,
+    review_restore_lock_scope,
+)
 from app.services.scraper.snapshot_save import _extraction_fields, staged_row_backup_payload
 
 
@@ -304,3 +314,234 @@ def test_exact_staged_row_backup_round_trips_final_review_values():
         "status",
     ):
         assert getattr(restored, field) == getattr(original, field), field
+
+
+@pytest_asyncio.fixture(loop_scope="session")
+async def postgres_review_restore_db():
+    """Give concurrency tests a fresh asyncpg pool on the session event loop."""
+    await engine.dispose()
+    yield
+    await engine.dispose()
+
+
+async def _seed_postgres_restore_case(*, with_staged: bool) -> dict[str, object]:
+    token = uuid.uuid4().hex
+    job_id = f"restore_lock_{token}"
+    course_name = f"Master of Restore Lock {token}"
+    course_url = f"https://restore-lock-{token}.test/course"
+
+    async with AsyncSessionLocal() as db:
+        university_id = (
+            await db.execute(
+                text(
+                    "INSERT INTO universities (name, country, city) "
+                    "VALUES (:name, 'Australia', 'Sydney') RETURNING id"
+                ),
+                {"name": f"Restore Lock University {token}"},
+            )
+        ).scalar_one()
+        await db.execute(
+            text(
+                "INSERT INTO scrape_runtime_jobs "
+                "(runtime_job_id, university_id, university_name, url, "
+                "job_type, status, request_payload) "
+                "VALUES (:job_id, :university_id, :name, :url, "
+                "'scrape', 'completed', CAST('{}' AS jsonb))"
+            ),
+            {
+                "job_id": job_id,
+                "university_id": university_id,
+                "name": f"Restore Lock University {token}",
+                "url": course_url,
+            },
+        )
+        db.add(
+            PageSnapshot(
+                university_id=university_id,
+                scrape_job_id=job_id,
+                course_url=course_url,
+                url_hash=token[:16],
+                snapshot_type="staged_row",
+                original_extraction={
+                    "_snapshot_schema": "staged_row_v1",
+                    "course_name": course_name,
+                    "course_website": course_url,
+                    "degree_level": "Master's",
+                    "status": "pending",
+                },
+            )
+        )
+        staged_id = None
+        if with_staged:
+            staged = ScrapedCourse(
+                scrape_job_id=job_id,
+                university_id=university_id,
+                course_name=course_name,
+                course_website=course_url,
+                degree_level="Master's",
+                status="pending",
+            )
+            db.add(staged)
+            await db.flush()
+            staged_id = staged.id
+        await db.commit()
+
+    return {
+        "university_id": university_id,
+        "job_id": job_id,
+        "course_name": course_name,
+        "course_url": course_url,
+        "staged_id": staged_id,
+    }
+
+
+async def _cleanup_postgres_restore_cases(*cases: dict[str, object]) -> None:
+    university_ids = [case["university_id"] for case in cases]
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("DELETE FROM scrape_runtime_jobs WHERE university_id = ANY(:ids)"),
+            {"ids": university_ids},
+        )
+        await db.execute(
+            text("DELETE FROM universities WHERE id = ANY(:ids)"),
+            {"ids": university_ids},
+        )
+        await db.commit()
+
+
+class _PauseAfterAdvisoryLock:
+    """AsyncSession proxy that pauses approval immediately after taking its lock."""
+
+    def __init__(
+        self,
+        session,
+        lock_acquired: asyncio.Event,
+        continue_approval: asyncio.Event,
+    ):
+        self._session = session
+        self._lock_acquired = lock_acquired
+        self._continue_approval = continue_approval
+
+    async def execute(self, statement, params=None, **kwargs):
+        result = await self._session.execute(statement, params, **kwargs)
+        if "pg_advisory_xact_lock" in str(statement):
+            self._lock_acquired.set()
+            await self._continue_approval.wait()
+        return result
+
+    def __getattr__(self, name):
+        return getattr(self._session, name)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_postgres_restore_cannot_race_with_course_approval(
+    postgres_review_restore_db,
+):
+    case = await _seed_postgres_restore_case(with_staged=True)
+    lock_acquired = asyncio.Event()
+    continue_approval = asyncio.Event()
+
+    try:
+        async with AsyncSessionLocal() as approval_db:
+            staged = await approval_db.get(ScrapedCourse, case["staged_id"])
+            pausing_db = _PauseAfterAdvisoryLock(
+                approval_db,
+                lock_acquired,
+                continue_approval,
+            )
+            approval_task = asyncio.create_task(
+                approve_scraped_course(pausing_db, staged, actor="integration-test")
+            )
+            await asyncio.wait_for(lock_acquired.wait(), timeout=2)
+
+            async def _restore():
+                async with AsyncSessionLocal() as restore_db:
+                    return await restore_review_rows(
+                        case["job_id"],
+                        commit=True,
+                        db=restore_db,
+                    )
+
+            restore_task = asyncio.create_task(_restore())
+            await asyncio.sleep(0.1)
+            assert not restore_task.done(), (
+                "restore did not wait for the in-flight approval transaction"
+            )
+
+            continue_approval.set()
+            approval_result, restore_result = await asyncio.wait_for(
+                asyncio.gather(approval_task, restore_task),
+                timeout=5,
+            )
+
+        assert approval_result["ok"] is True
+        assert restore_result["restored"] == 0
+        async with AsyncSessionLocal() as db:
+            published_count = (
+                await db.execute(
+                    select(func.count(Course.id)).where(
+                        Course.university_id == case["university_id"],
+                        func.lower(Course.name) == str(case["course_name"]).lower(),
+                    )
+                )
+            ).scalar_one()
+            pending_count = (
+                await db.execute(
+                    select(func.count(ScrapedCourse.id)).where(
+                        ScrapedCourse.university_id == case["university_id"],
+                        func.lower(ScrapedCourse.course_name)
+                        == str(case["course_name"]).lower(),
+                        ScrapedCourse.status == "pending",
+                    )
+                )
+            ).scalar_one()
+
+        assert published_count == 1
+        assert pending_count == 0
+    finally:
+        continue_approval.set()
+        await _cleanup_postgres_restore_cases(case)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_postgres_restores_for_different_universities_do_not_block(
+    postgres_review_restore_db,
+):
+    case_a = await _seed_postgres_restore_case(with_staged=False)
+    case_b = await _seed_postgres_restore_case(with_staged=False)
+
+    try:
+        async with AsyncSessionLocal() as blocker:
+            await blocker.execute(
+                text("SELECT pg_advisory_xact_lock(hashtext(:scope))"),
+                {
+                    "scope": review_restore_lock_scope(
+                        int(case_a["university_id"])
+                    )
+                },
+            )
+
+            async def _restore(case):
+                async with AsyncSessionLocal() as db:
+                    return await restore_review_rows(
+                        case["job_id"],
+                        commit=True,
+                        db=db,
+                    )
+
+            restore_a = asyncio.create_task(_restore(case_a))
+            restore_b = asyncio.create_task(_restore(case_b))
+            result_b = await asyncio.wait_for(restore_b, timeout=2)
+
+            assert result_b["restored"] == 1
+            assert not restore_a.done(), (
+                "same-university restore should still be waiting on the held lock"
+            )
+
+            await blocker.commit()
+            result_a = await asyncio.wait_for(restore_a, timeout=2)
+            assert result_a["restored"] == 1
+    finally:
+        await _cleanup_postgres_restore_cases(case_a, case_b)
