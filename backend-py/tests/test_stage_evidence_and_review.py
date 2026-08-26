@@ -14,12 +14,16 @@ import uuid
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import select, text
+from sqlalchemy import delete, select, text
 
 from app.database import AsyncSessionLocal, engine
 from app.main import app
 from app.models import ScrapedCourse, ScrapedFieldEvidence, University
+from app.models.page_snapshot import PageSnapshot
+from app.models.scrape_runtime import ScrapeRuntimeJob
+from app.services.scraper.snapshot_save import staged_row_backup_payload
 from app.services.scraper.stage_course import stage_course
+from app.services.scraper.replay_extraction import restore_review_rows
 
 
 @pytest.fixture(autouse=True)
@@ -44,6 +48,10 @@ async def _cleanup(prefix: str) -> None:
             text("DELETE FROM scraped_courses WHERE scrape_job_id LIKE :p"),
             {"p": f"{prefix}%"},
         )
+        await db.execute(
+            text("DELETE FROM scrape_runtime_jobs WHERE runtime_job_id LIKE :p"),
+            {"p": f"{prefix}%"},
+        )
         await db.commit()
 
 
@@ -52,6 +60,19 @@ async def test_stage_course_persists_completeness_and_evidence():
     uni_id = await _pick_university()
     job_id = f"test_bugcd_{uuid.uuid4().hex[:10]}"
     try:
+        async with AsyncSessionLocal() as db:
+            db.add(
+                ScrapeRuntimeJob(
+                    runtime_job_id=job_id,
+                    university_id=uni_id,
+                    university_name="Snapshot Integration Test",
+                    url="https://example.edu/cs",
+                    job_type="scrape",
+                    status="running",
+                    request_payload={},
+                )
+            )
+            await db.commit()
         evidence = [
             {
                 "field_key": "course_name",
@@ -135,6 +156,17 @@ async def test_stage_course_persists_completeness_and_evidence():
             assert sc.category == "Computer Science & IT"
             assert sc.eligibility_status == "ready"
             assert sc.auto_publish_status == "ready"
+            snapshot = (
+                await db.execute(
+                    select(PageSnapshot).where(
+                        PageSnapshot.scrape_job_id == job_id,
+                        PageSnapshot.snapshot_type == "staged_row",
+                    )
+                )
+            ).scalar_one()
+            assert snapshot.storage_path is None
+            expected_backup = staged_row_backup_payload(sc)
+            assert snapshot.original_extraction == expected_backup
 
         # ----- Bug D assertions: evidence rows exist -----
         async with AsyncSessionLocal() as db:
@@ -195,6 +227,25 @@ async def test_stage_course_persists_completeness_and_evidence():
         # Snake_case keys must NOT leak into `course`.
         assert "course_name" not in course
         assert "auto_publish_status" not in course
+
+        # Delete the live review row, then reconstruct it exclusively from the
+        # DB-only final staged-row backup. The restored persisted values and
+        # source-job linkage must match the original row exactly.
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(ScrapedCourse).where(ScrapedCourse.id == sc_id))
+            await db.commit()
+            restore_result = await restore_review_rows(job_id, commit=True, db=db)
+            assert restore_result["restored"] == 1
+            restored = (
+                await db.execute(
+                    select(ScrapedCourse).where(
+                        ScrapedCourse.scrape_job_id == job_id,
+                        ScrapedCourse.course_website == payload["course_website"],
+                    )
+                )
+            ).scalar_one()
+            assert restored.status == "pending"
+            assert staged_row_backup_payload(restored) == expected_backup
     finally:
         await _cleanup(job_id)
 

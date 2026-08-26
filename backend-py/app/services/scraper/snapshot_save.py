@@ -27,8 +27,12 @@ import json
 import logging
 import os
 import subprocess
+from decimal import Decimal
 from datetime import datetime, timezone
 from typing import Any
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 log = logging.getLogger(__name__)
 
@@ -63,15 +67,103 @@ def _yaml_version() -> str | None:
 
 
 def _extraction_fields(result: dict[str, Any]) -> dict[str, Any]:
-    """Extract only the diffable fields from an extraction result."""
-    fields = [
-        "course_name", "degree_level", "international_fee", "study_mode",
-        "course_location", "duration", "intake_months", "ielts_overall",
-        "ielts_reading", "ielts_writing", "ielts_speaking", "ielts_listening",
-        "pte_overall", "academic_level", "academic_score", "other_requirement",
-        "description", "category",
-    ]
-    return {f: result.get(f) for f in fields if f in result or result.get(f) is not None}
+    """Keep every extraction field that can be restored into a staged row.
+
+    Snapshot baselines are also the durable backup for the review queue.  Do
+    not restrict them to the smaller replay-diff field set: doing so makes an
+    interrupted continuation impossible to reconstruct exactly.
+    """
+    from app.models.scraped_course import ScrapedCourse
+
+    # Normal HTML extraction returns an envelope:
+    # {"url": ..., "payload": {course fields...}, "evidence": [...]}.  API
+    # provider callers may still pass the course-field mapping directly.
+    nested = result.get("payload")
+    source = nested if isinstance(nested, dict) else result
+    excluded = {
+        "id", "scrape_job_id", "university_id", "course_id", "status",
+        "reviewed_at", "created_at",
+    }
+    fields = [column.key for column in ScrapedCourse.__table__.columns if column.key not in excluded]
+    extraction = {f: source.get(f) for f in fields if f in source}
+    extraction["_snapshot_schema"] = "extractor_payload_v1"
+    return extraction
+
+
+def staged_row_backup_payload(sc: Any) -> dict[str, Any]:
+    """Serialize the final persisted review-row values for exact restoration."""
+    from app.models.scraped_course import ScrapedCourse
+
+    excluded = {"id", "scrape_job_id", "university_id", "course_id", "created_at"}
+    payload: dict[str, Any] = {}
+    for column in ScrapedCourse.__table__.columns:
+        if column.key in excluded:
+            continue
+        value = getattr(sc, column.key, None)
+        if isinstance(value, Decimal):
+            value = float(value)
+        elif isinstance(value, datetime):
+            value = value.isoformat()
+        payload[column.key] = value
+    payload["_snapshot_schema"] = "staged_row_v1"
+    return payload
+
+
+async def persist_staged_row_backup(
+    db: AsyncSession,
+    sc: Any,
+    *,
+    source_url: str | None = None,
+) -> bool:
+    """Upsert the final staged row into page_snapshots in the same transaction.
+
+    Direct unit-test staging may use a synthetic scrape_job_id with no runtime
+    job. Such rows cannot belong to a continuation chain, so no backup is
+    needed; production scrape jobs always have the parent runtime row.
+    """
+    from app.models.page_snapshot import PageSnapshot
+    from app.models.scrape_runtime import ScrapeRuntimeJob
+
+    job = await db.get(ScrapeRuntimeJob, sc.scrape_job_id)
+    if job is None:
+        return False
+    course_url = str(sc.course_website or source_url or "").strip()
+    if not course_url:
+        return False
+
+    result = await db.execute(
+        select(PageSnapshot)
+        .where(
+            PageSnapshot.scrape_job_id == sc.scrape_job_id,
+            PageSnapshot.snapshot_type == "staged_row",
+            PageSnapshot.course_url == course_url,
+        )
+        .order_by(PageSnapshot.id.desc())
+        .limit(1)
+    )
+    snapshot = result.scalar_one_or_none()
+    backup = staged_row_backup_payload(sc)
+    now = datetime.now(timezone.utc)
+    if snapshot is None:
+        snapshot = PageSnapshot(
+            university_id=sc.university_id,
+            scrape_job_id=sc.scrape_job_id,
+            course_url=course_url,
+            url_hash=hashlib.sha256(course_url.encode("utf-8")).hexdigest()[:16],
+            snapshot_type="staged_row",
+            storage_path=None,
+            status_code=None,
+            content_length=len(json.dumps(backup, default=str)),
+            fetch_method="staged_row",
+            original_extraction=backup,
+            fetched_at=now,
+        )
+        db.add(snapshot)
+    else:
+        snapshot.original_extraction = backup
+        snapshot.content_length = len(json.dumps(backup, default=str))
+        snapshot.fetched_at = now
+    return True
 
 
 async def save_extraction_snapshot(extraction_result: dict[str, Any]) -> None:

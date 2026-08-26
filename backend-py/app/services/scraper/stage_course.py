@@ -959,6 +959,12 @@ async def stage_course(
             )
 
     try:
+        # Durable, post-transform backup of the exact review row.  This is
+        # written in the same transaction as ScrapedCourse so an interrupted
+        # continuation can reconstruct the row without re-fetching the page.
+        from app.services.scraper.snapshot_save import persist_staged_row_backup
+
+        await persist_staged_row_backup(db, sc, source_url=source_url)
         await db.commit()
     except Exception as exc:  # noqa: BLE001
         await db.rollback()

@@ -5319,6 +5319,12 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                                         _ve_sc.avg_verification_confidence = _vr[
                                             "avg_confidence"
                                         ]
+                                        from app.services.scraper.snapshot_save import (
+                                            persist_staged_row_backup as _refresh_staged_backup,
+                                        )
+                                        await _refresh_staged_backup(
+                                            stage_db, _ve_sc, source_url=r.get("url"),
+                                        )
                                         await stage_db.commit()
                             except Exception as _ve_exc:  # noqa: BLE001
                                 log.warning(

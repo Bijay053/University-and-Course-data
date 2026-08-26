@@ -37,10 +37,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import AsyncSessionLocal
 from app.models.page_snapshot import PageSnapshot
+from app.models.course import Course
+from app.models.scrape_runtime import ScrapeRuntimeJob
 from app.models.scraped_course import ScrapedCourse
 from app.services.snapshot_store import download_snapshot
+from app.services.scraper.url_identity import canonical_course_url_key
 
 log = logging.getLogger(__name__)
+
+_RESTORE_EXCLUDED_FIELDS = {
+    "id", "scrape_job_id", "university_id", "course_id", "status",
+    "reviewed_at", "created_at",
+}
+_RESTORABLE_FIELDS = {
+    column.key for column in ScrapedCourse.__table__.columns
+} - _RESTORE_EXCLUDED_FIELDS
+
+
+def review_restore_lock_scope(university_id: int) -> str:
+    """Shared transaction-lock identity for restore and publish operations."""
+    return f"restore-review:{university_id}"
 
 # Fields compared in the diff
 _DIFF_FIELDS = [
@@ -77,6 +93,210 @@ def _diff_course(old: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
         if ov_s != nv_s:
             changes[field] = {"old": ov, "new": nv}
     return changes
+
+
+async def _continuation_chain(
+    db: AsyncSession,
+    job_id: str,
+    *,
+    max_depth: int = 20,
+) -> tuple[list[str], int | None]:
+    """Return current→ancestor job IDs from explicit retrySourceJobId links."""
+    job = await db.get(ScrapeRuntimeJob, job_id)
+    if job is None:
+        return [], None
+    university_id = job.university_id
+    chain = [job_id]
+    seen = {job_id}
+    current = job
+    for _ in range(max_depth):
+        payload = current.request_payload or {}
+        parent_id = payload.get("retrySourceJobId")
+        if not isinstance(parent_id, str):
+            break
+        parent_id = parent_id.strip()
+        if not parent_id or parent_id in seen:
+            break
+        parent = await db.get(ScrapeRuntimeJob, parent_id)
+        if parent is None or parent.university_id != university_id:
+            break
+        chain.append(parent_id)
+        seen.add(parent_id)
+        current = parent
+    return chain, university_id
+
+
+async def restore_review_rows(
+    job_id: str,
+    *,
+    commit: bool = False,
+    db: AsyncSession | None = None,
+) -> dict[str, Any]:
+    """Restore missing pending review rows from stored original extractions.
+
+    This deliberately does not download or re-extract page content.  The
+    snapshot's ``original_extraction`` is the historical value set and its
+    ``scrape_job_id`` remains the restored row's source linkage.
+    """
+    own_db = db is None
+    if own_db:
+        db = AsyncSessionLocal()
+    try:
+        chain, university_id = await _continuation_chain(db, job_id)
+        if not chain:
+            return {
+                "job_id": job_id, "chain_job_ids": [], "candidates": 0,
+                "restored": 0, "skipped_existing": 0, "skipped_unusable": 0,
+                "commit": commit, "message": f"Scrape job not found: {job_id}",
+            }
+
+        if commit:
+            # Serialize restores for the same university.  This closes the
+            # read-then-insert race between two operator requests without
+            # requiring a broad uniqueness constraint on historic staged data.
+            await db.execute(
+                text("SELECT pg_advisory_xact_lock(hashtext(:scope))"),
+                {"scope": review_restore_lock_scope(university_id)},
+            )
+
+        snapshots = list((await db.execute(
+            select(PageSnapshot)
+            .where(PageSnapshot.scrape_job_id.in_(chain))
+            .order_by(PageSnapshot.fetched_at.desc(), PageSnapshot.id.desc())
+        )).scalars().all())
+        snapshots.sort(
+            key=lambda snap: (
+                snap.snapshot_type == "staged_row",
+                snap.fetched_at or datetime.min.replace(tzinfo=timezone.utc),
+                snap.id,
+            ),
+            reverse=True,
+        )
+
+        # Newest snapshot per source-job/URL wins, while ancestry order remains
+        # meaningful for provenance.
+        unique: dict[tuple[str, str], PageSnapshot] = {}
+        for snap in snapshots:
+            extraction = snap.original_extraction
+            if not isinstance(extraction, dict) or not extraction.get("course_name"):
+                continue
+            unique.setdefault((snap.scrape_job_id, snap.course_url), snap)
+
+        staged_rows = list((await db.execute(
+            select(ScrapedCourse).where(ScrapedCourse.university_id == university_id)
+        )).scalars().all())
+        occupied_urls = {
+            canonical_course_url_key(row.course_website)
+            for row in staged_rows if row.course_website
+        }
+        occupied_names = {
+            (row.course_name or "").strip().casefold()
+            for row in staged_rows
+            if row.course_name
+        }
+
+        published_rows = list((await db.execute(
+            select(Course).where(Course.university_id == university_id)
+        )).scalars().all())
+        occupied_urls.update(
+            canonical_course_url_key(row.course_website)
+            for row in published_rows if row.course_website
+        )
+        occupied_names.update(
+            (row.name or "").strip().casefold()
+            for row in published_rows if row.name
+        )
+
+        restored = skipped_existing = skipped_unusable = 0
+        legacy_candidates = 0
+        restored_rows: list[dict[str, Any]] = []
+        # Ancestors first makes the original source win if two chain jobs
+        # snapshotted the same URL but no staged row currently survives. Within
+        # one source job, exact post-stage backups must beat legacy extractor
+        # payloads even when the legacy URL happens to sort first.
+        rank = {source_id: index for index, source_id in enumerate(reversed(chain))}
+        def _restore_order(snap: PageSnapshot) -> tuple[int, int, str]:
+            extraction = snap.original_extraction or {}
+            exact = (
+                snap.snapshot_type == "staged_row"
+                and extraction.get("_snapshot_schema") == "staged_row_v1"
+            )
+            return (rank[snap.scrape_job_id], 0 if exact else 1, snap.course_url)
+
+        for snap in sorted(unique.values(), key=_restore_order):
+            data = dict(snap.original_extraction or {})
+            is_exact_backup = (
+                snap.snapshot_type == "staged_row"
+                and data.get("_snapshot_schema") == "staged_row_v1"
+            )
+            if not is_exact_backup:
+                legacy_candidates += 1
+            name = str(data.get("course_name") or "").strip()
+            restored_url = str(data.get("course_website") or snap.course_url or "").strip()
+            normalized_url = canonical_course_url_key(restored_url)
+            if not name:
+                skipped_unusable += 1
+                continue
+            if normalized_url in occupied_urls or name.casefold() in occupied_names:
+                skipped_existing += 1
+                continue
+
+            values = {
+                key: value for key, value in data.items()
+                if key in _RESTORABLE_FIELDS
+            }
+            values["course_website"] = restored_url
+            values["status"] = "pending"
+            values["reviewed_at"] = None
+            row = ScrapedCourse(
+                scrape_job_id=snap.scrape_job_id,
+                university_id=university_id,
+                course_name=name,
+                **{key: value for key, value in values.items() if key != "course_name"},
+            )
+            if commit:
+                db.add(row)
+            occupied_urls.add(normalized_url)
+            occupied_names.add(name.casefold())
+            restored += 1
+            restored_rows.append({
+                "source_job_id": snap.scrape_job_id,
+                "course_url": restored_url,
+                "snapshot_url": snap.course_url,
+                "course_name": name,
+            })
+
+        if commit:
+            await db.commit()
+
+        return {
+            "job_id": job_id,
+            "chain_job_ids": chain,
+            "candidates": len(unique),
+            "restored": restored,
+            "skipped_existing": skipped_existing,
+            "skipped_unusable": skipped_unusable,
+            "legacy_candidates": legacy_candidates,
+            "full_fidelity": legacy_candidates == 0,
+            "commit": commit,
+            "rows": restored_rows,
+            "message": (
+                f"{'Restored' if commit else 'Can restore'} {restored} pending review "
+                f"row(s) from stored extraction snapshots."
+                + (
+                    f" {legacy_candidates} row(s) use legacy snapshots that contain "
+                    "only the extraction fields captured at the time."
+                    if legacy_candidates else ""
+                )
+            ),
+        }
+    except Exception:
+        if commit:
+            await db.rollback()
+        raise
+    finally:
+        if own_db:
+            await db.close()
 
 
 async def replay_job(

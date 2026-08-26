@@ -1,8 +1,8 @@
 """SQLAlchemy model for page_snapshots table.
 
-Records metadata about every HTML/JSON/PDF snapshot saved to S3 during a
-scrape job.  The actual content lives in S3; this table is a lightweight
-index for lookup, replay, and audit.
+Records metadata about HTML/JSON/PDF snapshots saved to S3 and DB-only final
+staged-row backups. The table is the index for lookup, replay, restoration,
+and audit.
 """
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ class PageSnapshot(Base):
     # SHA-256 hex digest of course_url (first 16 chars) — used as S3 path segment
     url_hash: Mapped[str] = mapped_column(Text, nullable=False)
 
-    # html | json | pdf | repair | failed
+    # html | json | pdf | repair | failed | staged_row
     snapshot_type: Mapped[str] = mapped_column(Text, nullable=False, default="html")
 
     # Full S3 object key — e.g. universities/42/job_abc/a1b2c3d4/rendered.html

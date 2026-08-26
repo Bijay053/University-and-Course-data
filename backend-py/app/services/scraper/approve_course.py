@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
@@ -97,6 +97,16 @@ async def approve_scraped_course(
         raise ValueError(
             f"scraped_course id={sc.id} has empty course_name; cannot promote"
         )
+
+    # Synchronize promotion with offline review-row restoration.  Otherwise a
+    # restore could check for approved/published rows immediately before this
+    # transaction creates one, leaving a duplicate pending row behind.
+    from app.services.scraper.replay_extraction import review_restore_lock_scope
+
+    await db.execute(
+        text("SELECT pg_advisory_xact_lock(hashtext(:scope))"),
+        {"scope": review_restore_lock_scope(sc.university_id)},
+    )
 
     existing = (
         await db.execute(

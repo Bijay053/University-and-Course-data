@@ -774,6 +774,7 @@ export default function Scraping() {
   const [recoverySummaries, setRecoverySummaries] = useState<Record<string, RecoverySummary>>({});
   const [selectedUnresolvedUrls, setSelectedUnresolvedUrls] = useState<Record<string, Set<string>>>({});
   const [retryingUnresolvedJob, setRetryingUnresolvedJob] = useState<string | null>(null);
+  const [restoringReviewJob, setRestoringReviewJob] = useState<string | null>(null);
   // Compare / Restore state
   const [historySelected, setHistorySelected] = useState<Set<string>>(new Set());
   const [comparing, setComparing] = useState(false);
@@ -935,6 +936,83 @@ export default function Scraping() {
       setRetryingUnresolvedJob(null);
     }
   }, [fetchHistory, selectedUnresolvedUrls, toast]);
+
+  type RestoreReviewResult = {
+    restored: number;
+    candidates: number;
+    skipped_existing: number;
+    legacy_candidates: number;
+    full_fidelity: boolean;
+    message: string;
+  };
+
+  const restoreMissingReviewRows = useCallback(async (jobId: string) => {
+    setRestoringReviewJob(jobId);
+    try {
+      const previewRes = await fetch(`/api/scrape/restore-review/${jobId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ commit: false }),
+      });
+      if (!previewRes.ok) {
+        toast({
+          title: "Could not check review backups",
+          description: await getFetchErrorMessage(previewRes),
+          variant: "destructive",
+        });
+        return;
+      }
+      const preview = await readResponseJson<RestoreReviewResult>(previewRes);
+      if (!preview || preview.restored === 0) {
+        toast({
+          title: "No missing review rows",
+          description: preview?.candidates
+            ? "Every backed-up course already has a review or published row."
+            : "This scrape chain has no usable staged-row backups.",
+        });
+        return;
+      }
+
+      const fidelityNote = preview.full_fidelity
+        ? "All candidates have exact post-staging backups."
+        : `${preview.legacy_candidates} candidate(s) only have older extraction snapshots and may contain fewer review fields.`;
+      if (!window.confirm(
+        `Restore ${preview.restored} missing pending review row${preview.restored === 1 ? "" : "s"}?\n\n${fidelityNote}\n\nExisting approved, published, and pending courses will not be duplicated.`,
+      )) return;
+
+      const commitRes = await fetch(`/api/scrape/restore-review/${jobId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ commit: true }),
+      });
+      if (!commitRes.ok) {
+        toast({
+          title: "Review restore failed",
+          description: await getFetchErrorMessage(commitRes),
+          variant: "destructive",
+        });
+        return;
+      }
+      const result = await readResponseJson<RestoreReviewResult>(commitRes);
+      toast({
+        title: `Restored ${result?.restored ?? 0} review row${result?.restored === 1 ? "" : "s"}`,
+        description: result?.full_fidelity
+          ? "Original staged values and source-job links were restored."
+          : result?.message,
+      });
+      await fetchHistory();
+    } catch {
+      toast({
+        title: "Review restore failed",
+        description: "Network error",
+        variant: "destructive",
+      });
+    } finally {
+      setRestoringReviewJob(null);
+    }
+  }, [fetchHistory, toast]);
 
   useEffect(() => {
     void fetchHistory();
@@ -3733,15 +3811,31 @@ export default function Scraping() {
                           View Courses
                         </Button>
                         {(run.snapshotCount ?? 0) > 0 && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-emerald-700 border-emerald-300 hover:bg-emerald-50"
-                            onClick={() => void runReplay(run.runtimeJobId)}
-                          >
-                            <RotateCcw className="w-3.5 h-3.5 mr-1" />
-                            Replay from Snapshot
-                          </Button>
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+                              onClick={() => void runReplay(run.runtimeJobId)}
+                            >
+                              <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                              Replay from Snapshot
+                            </Button>
+                            <Can permission="staged.approve">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={restoringReviewJob === run.runtimeJobId}
+                                className="text-indigo-700 border-indigo-300 hover:bg-indigo-50"
+                                onClick={() => void restoreMissingReviewRows(run.runtimeJobId)}
+                              >
+                                {restoringReviewJob === run.runtimeJobId
+                                  ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                                  : <Database className="w-3.5 h-3.5 mr-1" />}
+                                Restore Review Rows
+                              </Button>
+                            </Can>
+                          </>
                         )}
                       </div>
                     </div>

@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import json as _json
 import logging
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -21,7 +22,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.page_snapshot import PageSnapshot
-from app.services.scraper.replay_extraction import replay_job
+from app.permissions import require_permission
+from app.services.scraper.replay_extraction import replay_job, restore_review_rows
 from app.services.snapshot_store import (
     get_snapshot_bytes,
     is_enabled,
@@ -76,6 +78,10 @@ class ReplayResponse(BaseModel):
 class ReplayRequest(BaseModel):
     use_ai_fallback: bool = False
     max_courses: int = 500
+
+
+class RestoreReviewRequest(BaseModel):
+    commit: bool = False
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
@@ -262,6 +268,26 @@ async def replay_scrape_job(
         return ReplayResponse(**result)
     except Exception as exc:
         log.exception("replay failed for job %s", job_id)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post("/restore-review/{job_id}")
+async def restore_scrape_review_rows(
+    job_id: str,
+    _user: Annotated[dict, Depends(require_permission("staged.approve"))],
+    body: RestoreReviewRequest = RestoreReviewRequest(),
+    db: AsyncSession = Depends(get_db),
+):
+    """Preview or restore deleted review rows without fetching course pages."""
+    try:
+        result = await restore_review_rows(job_id, commit=body.commit, db=db)
+        if not result["chain_job_ids"]:
+            raise HTTPException(status_code=404, detail=result["message"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.exception("review-row restore failed for job %s", job_id)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 

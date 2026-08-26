@@ -7,7 +7,7 @@
 - [QMUL fetch_failed visibility gap](qmul-fetch-failed-visibility.md) — DONE-line + DB persistence for scraper fetch losses already exist (run_summary.py, http_fetcher.py retry ladder); grep before re-adding.
 - [Cloudflare 429 vs block classification](cf-429-vs-block.md) — 429 rate-limit ≠ 403/503 challenge; per-uni use_wayback flag was wired at only one of two call sites.
 - [Staged-review resume-chain visibility](staged-review-resume-chain-visibility.md) — per-job_id staged-course filters hide pending rows from earlier resumed jobs; scope by university_id+status instead.
-- [Targeted continuation review scope](targeted-continuation-review-scope.md) — review explicit retrySourceJobId chains as one set; latest-job-only filtering hides earlier successful batches.
+- [Targeted continuation review scope](targeted-continuation-review-scope.md) — retrySourceJobId chains are one review set; exact recovery requires post-staging row backups, not extractor payloads.
 - [HUD SearchStax provider](hud-searchstax.md) — Huddersfield scrapes Solr directly (SPA bypass); completeness hit 85.1% after adding academic_level + entry-req extractors.
 - [Leeds Trinity degree-qualifier guard](leeds-trinity-degree-qualifier-guard.md) — plain subject-only course titles (no "BA (Hons)" prefix) trip category-landing-page guard; fix via skip_degree_qualifier_check YAML, not the shared guard.
 - [Phase 2 autonomous pipeline](phase2-pipeline.md) — Stage 0 CSS/XPath/regex rules injected before heuristics; evidence key is `field_key` not `field`; `attribute="text"` is inner-text sentinel in _apply_css
