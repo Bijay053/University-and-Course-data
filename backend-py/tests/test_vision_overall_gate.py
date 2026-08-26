@@ -101,3 +101,114 @@ def test_gate_proceeds_when_tier0_image_present(monkeypatch) -> None:
                 _all_overalls_filled(),
             )
         )
+
+
+def test_vision_download_and_gemini_timeout_use_remaining_course_budget(
+    monkeypatch,
+) -> None:
+    from app.services.ai.gemini_client import GeminiResponse
+    from app.services.scraper.course_deadline import (
+        reset_course_deadline,
+        set_course_deadline,
+    )
+
+    image_url = "https://e.edu/english.png"
+    monkeypatch.setattr(
+        pcv,
+        "_extract_img_candidates",
+        lambda _html, _url: (
+            [(image_url, "English requirements")],
+            frozenset({image_url}),
+        ),
+    )
+    # This test exercises the remote-call path, not the earlier page-text
+    # tripwire used by the three gate tests above.
+    monkeypatch.setattr(pcv, "_extract_page_text", lambda _html: "IELTS PTE")
+    captured: dict[str, float | None] = {}
+
+    async def _download(_url, *, timeout_seconds=None):  # noqa: ANN001
+        captured["download"] = timeout_seconds
+        return b"\x89PNG\r\n\x1a\nfake"
+
+    async def _vision(_prompt, _images, **kwargs):  # noqa: ANN001
+        captured["vision"] = kwargs.get("timeout_s")
+        return GeminiResponse(
+            "",
+            1,
+            0,
+            0.0,
+            skipped=True,
+            skip_reason="test",
+        )
+
+    monkeypatch.setattr(pcv, "_download", _download)
+    monkeypatch.setattr(pcv.gemini_client, "generate_with_images", _vision)
+
+    token = set_course_deadline(0.08)
+    try:
+        result = _run(
+            pcv.maybe_vision_refetch(
+                "https://e.edu/course",
+                "<h2>English requirements</h2><img src='english.png'>",
+                {},
+            )
+        )
+    finally:
+        reset_course_deadline(token)
+
+    assert result == ({}, [])
+    assert 0 < float(captured["download"] or 0) <= 0.08
+    assert 0 < float(captured["vision"] or 0) <= 0.08
+
+
+@pytest.mark.asyncio
+async def test_cancelled_vision_cache_leader_does_not_cancel_waiter(
+    monkeypatch,
+) -> None:
+    image_url = "https://e.edu/shared-english.png"
+    monkeypatch.setattr(
+        pcv,
+        "_extract_img_candidates",
+        lambda _html, _url: (
+            [(image_url, "English requirements")],
+            frozenset({image_url}),
+        ),
+    )
+    monkeypatch.setattr(pcv, "_extract_page_text", lambda _html: "IELTS PTE")
+
+    download_started = asyncio.Event()
+    release_download = asyncio.Event()
+
+    async def _blocked_download(_url, *, timeout_seconds=None):  # noqa: ANN001
+        download_started.set()
+        await release_download.wait()
+        return b"\x89PNG\r\n\x1a\nfake"
+
+    monkeypatch.setattr(pcv, "_download", _blocked_download)
+    shared_cache: pcv.VisionImageCache = {}
+    html = "<h2>English requirements</h2><img src='shared-english.png'>"
+
+    leader = asyncio.create_task(
+        pcv.maybe_vision_refetch(
+            "https://e.edu/course-a",
+            html,
+            {},
+            image_cache=shared_cache,
+        )
+    )
+    await download_started.wait()
+    waiter = asyncio.create_task(
+        pcv.maybe_vision_refetch(
+            "https://e.edu/course-b",
+            html,
+            {},
+            image_cache=shared_cache,
+        )
+    )
+    await asyncio.sleep(0)
+
+    leader.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await leader
+
+    assert await asyncio.wait_for(waiter, timeout=0.2) == ({}, [])

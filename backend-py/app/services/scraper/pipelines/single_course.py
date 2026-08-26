@@ -11,6 +11,8 @@ import logging
 from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
+from app.config import settings
+
 if TYPE_CHECKING:
     # Type-checking-only import to avoid pulling per_course_vision (and
     # its heavy gemini_client transitive imports) at module load time.
@@ -42,6 +44,12 @@ from app.services.scraper.http_fetcher import (
     scrape_do_static_scope,
 )
 from app.services.scraper.provenance import build_course_page_provenance_footer
+from app.services.scraper.course_deadline import (
+    clamp_timeout,
+    has_budget,
+    remaining_seconds,
+    required_course_fields_complete,
+)
 
 log = logging.getLogger(__name__)
 
@@ -1027,6 +1035,29 @@ _VISION_SANITY_THRESHOLDS: dict[str, float] = {
 # room to finish a multi-field extract on a heavy page (typical 10–25s,
 # worst-case 60–90s during a model-side queueing event).
 _AI_FALLBACK_TIMEOUT_SEC = 120
+
+
+def _should_force_sparse_browser(
+    payload: dict[str, Any],
+    static_html: str | None,
+    *,
+    min_visible_chars: int = 2000,
+) -> tuple[bool, int]:
+    """Whether missing fee+duration plausibly indicates a real SPA shell.
+
+    Missing fields alone are not evidence of sparse HTML: Murdoch research and
+    postgraduate pages can contain hundreds of KB of useful server-rendered
+    text while legitimately omitting one or both values.  Only force Playwright
+    when both critical values are absent *and* visible static content is small.
+    """
+    from app.services.scraper.extractors._text import html_to_text
+
+    visible_len = len((html_to_text(static_html or "") or "").strip())
+    missing_critical = (
+        payload.get("international_fee") in (None, "", 0)
+        and payload.get("duration") in (None, "", 0)
+    )
+    return missing_critical and visible_len < min_visible_chars, visible_len
 
 
 # PR-5 Bug 1 was a postgrad-IELTS bump heuristic against the uni-PDF
@@ -3159,6 +3190,7 @@ async def extract_course(
     # For SPA-only sites the static HTML is sparse — but those are handled by
     # university-specific pre-seeds; the browser fills any remaining gaps.
     rendered_html: str | None = None
+    _gp_stage_timeout_s = float(_AI_FALLBACK_TIMEOUT_SEC)
 
     # ── Gemini Flash PRIMARY (Phase A, step 2) ───────────────────────────────
     # Runs on static HTML; rendered_html is not yet available (browser is
@@ -3248,7 +3280,32 @@ async def extract_course(
                             from app.services.scraper.per_course_browser import (
                                 _browser_config_for as _bcfg_et,
                             )
-                            _wait_et, _settle_et, _, _goto_et = _bcfg_et(url)
+                            _wait_et, _settle_et, _outer_et, _goto_et = _bcfg_et(url)
+                            _empty_browser_timeout = clamp_timeout(_outer_et)
+                            if (
+                                _empty_browser_timeout is not None
+                                and _empty_browser_timeout <= 0
+                            ):
+                                raise asyncio.TimeoutError
+                            if _empty_browser_timeout is not None:
+                                _cleanup_reserve_et = min(
+                                    4.0,
+                                    max(0.05, _empty_browser_timeout * 0.20),
+                                )
+                                _goto_et = min(
+                                    _goto_et,
+                                    max(
+                                        1,
+                                        int(
+                                            max(
+                                                0.001,
+                                                _empty_browser_timeout
+                                                - _cleanup_reserve_et,
+                                            )
+                                            * 1000
+                                        ),
+                                    ),
+                                )
                             if emit:
                                 await emit(
                                     "status",
@@ -3257,11 +3314,14 @@ async def extract_course(
                                     kind="browser_retry_empty_text",
                                     url=url,
                                 )
-                            _br_html = await _bpet.fetch_html(
-                                url,
-                                wait_until=_wait_et,
-                                timeout=_goto_et,
-                                settle_ms=_settle_et,
+                            _br_html = await asyncio.wait_for(
+                                _bpet.fetch_html(
+                                    url,
+                                    wait_until=_wait_et,
+                                    timeout=_goto_et,
+                                    settle_ms=_settle_et,
+                                ),
+                                timeout=_empty_browser_timeout or _outer_et,
                             )
                             _br_text = (
                                 (_h2t_gate(_br_html or "") or "").strip()
@@ -3321,6 +3381,14 @@ async def extract_course(
                     _gate_skip, _gate_reason = _gate_check(payload, evidence)
             else:
                 _gate_skip, _gate_reason = _gate_check(payload, evidence)
+
+            # Once every required staging field is present, no remote
+            # enrichment can improve publishability. Local taxonomy fallback
+            # later in this function can still classify without an API call.
+            if required_course_fields_complete(payload):
+                _gate_skip = True
+                _gate_reason = "all_required_fields_complete"
+                use_ai_fallback = False
 
             # ── Early content-based staging skip (skip_staging_keywords) ──────────
             # Check BEFORE any Gemini call. CPD/short-course pages identified by
@@ -3388,12 +3456,28 @@ async def extract_course(
                     payload.get("course_name") or "",
                     _class_text,
                 )
-                _class_resp = await _gc.generate(
-                    _class_prompt,
-                    max_output_tokens=120,
-                    call_type="classification_only",
-                    course_url=url,
+                _class_timeout = clamp_timeout(
+                    float(getattr(settings, "gemini_primary_timeout_s", 20.0))
                 )
+                if not has_budget(0.05) or (
+                    _class_timeout is not None and _class_timeout <= 0
+                ):
+                    _class_resp = _gc.GeminiResponse(
+                        "",
+                        0,
+                        0,
+                        0.0,
+                        skipped=True,
+                        skip_reason="course_deadline_exhausted",
+                    )
+                else:
+                    _class_resp = await _gc.generate(
+                        _class_prompt,
+                        max_output_tokens=120,
+                        call_type="classification_only",
+                        course_url=url,
+                        timeout_s=_class_timeout,
+                    )
                 _gemini_primary_cost = _class_resp.cost_usd
                 _gp_in_tok = _class_resp.input_tokens
                 _gp_out_tok = _class_resp.output_tokens
@@ -3488,15 +3572,22 @@ async def extract_course(
                         )
                     )
                     try:
-                        _linked_text = await asyncio.wait_for(
-                            _fetch_linked(
-                                url,
-                                html or "",
-                                max_pages=_max_linked,
-                                emit=emit,
-                            ),
-                            timeout=60.0,
-                        )
+                        _linked_timeout = clamp_timeout(60.0)
+                        if not has_budget(0.05) or (
+                            _linked_timeout is not None
+                            and _linked_timeout <= 0
+                        ):
+                            _linked_text = ""
+                        else:
+                            _linked_text = await asyncio.wait_for(
+                                _fetch_linked(
+                                    url,
+                                    html or "",
+                                    max_pages=_max_linked,
+                                    emit=emit,
+                                ),
+                                timeout=_linked_timeout or 60.0,
+                            )
                         if _linked_text:
                             _gp_html = (_gp_html or "") + "\n\n" + _linked_text
                     except Exception as _lp_exc:
@@ -3504,12 +3595,44 @@ async def extract_course(
                             "[LINKED-PAGES] skipped for %s: %s", url, _lp_exc
                         )
 
-                _gp_filled, _gp_cost, _gp_in_tok, _gp_out_tok, _gp_dbg = await asyncio.wait_for(
-                    _gp.extract_primary(_gp_html, url),
-                    timeout=_AI_FALLBACK_TIMEOUT_SEC,
+                _gp_inner_timeout = clamp_timeout(
+                    float(getattr(settings, "gemini_primary_timeout_s", 20.0))
                 )
+                _gp_stage_timeout = clamp_timeout(_AI_FALLBACK_TIMEOUT_SEC)
+                _gp_stage_timeout_s = float(
+                    _gp_stage_timeout
+                    if _gp_stage_timeout is not None
+                    else _AI_FALLBACK_TIMEOUT_SEC
+                )
+                if (
+                    not has_budget(0.05)
+                    or (
+                        _gp_inner_timeout is not None
+                        and _gp_inner_timeout <= 0
+                    )
+                    or _gp_stage_timeout_s <= 0
+                ):
+                    _gp_dbg = {
+                        "skipped": True,
+                        "skip_reason": "course_deadline_exhausted",
+                    }
+                else:
+                    (
+                        _gp_filled,
+                        _gp_cost,
+                        _gp_in_tok,
+                        _gp_out_tok,
+                        _gp_dbg,
+                    ) = await asyncio.wait_for(
+                        _gp.extract_primary(
+                            _gp_html,
+                            url,
+                            timeout=_gp_inner_timeout,
+                        ),
+                        timeout=_gp_stage_timeout_s,
+                    )
                 _gemini_primary_cost = _gp_cost
-                _gp_full_ran = True
+                _gp_full_ran = not bool(_gp_dbg.get("skipped"))
 
                 # ── DEBUG: emit via the SSE/Celery log path so it appears in journalctl
                 if emit and _gp_dbg:
@@ -3904,7 +4027,11 @@ async def extract_course(
                     url=url,
                 )
     except asyncio.TimeoutError:
-        log.warning("gemini_primary: timed out after %ss on %s — continuing without", _AI_FALLBACK_TIMEOUT_SEC, url)
+        log.warning(
+            "gemini_primary: timed out after %.3fs on %s — continuing without",
+            _gp_stage_timeout_s,
+            url,
+        )
     except Exception as _gp_exc:
         log.warning("gemini_primary: failed on %s — %s", url, _gp_exc)
 
@@ -3949,11 +4076,16 @@ async def extract_course(
             _uc_rescue is not None
             and getattr(_uc_rescue.extraction, "skip_browser_rescue", False)
         )
+        _static_is_sparse, _static_visible_text_len = _should_force_sparse_browser(
+            payload,
+            html,
+        )
         if (
             not _force
             and not _skip_rescue
             and payload.get("international_fee") in (None, "", 0)
             and payload.get("duration") in (None, "", 0)
+            and _static_is_sparse
         ):
             _force = True
             log.info(
@@ -3969,6 +4101,18 @@ async def extract_course(
                     kind="sparse_static_rescue",
                     url=url,
                 )
+        elif (
+            not _force
+            and payload.get("international_fee") in (None, "", 0)
+            and payload.get("duration") in (None, "", 0)
+            and not _static_is_sparse
+        ):
+            log.info(
+                "[SPARSE STATIC RESCUE] %s — skipped: static page has %d "
+                "visible chars, so missing fee+duration does not prove an SPA shell",
+                url,
+                _static_visible_text_len,
+            )
         elif _skip_rescue and payload.get("international_fee") in (None, "", 0) and payload.get("duration") in (None, "", 0):
             log.debug(
                 "[SPARSE STATIC RESCUE] %s — skipped (skip_browser_rescue=true in YAML)",
@@ -5239,6 +5383,21 @@ async def extract_course(
                     "evidence": [],
                 }
 
+    if use_ai_fallback and required_course_fields_complete(payload):
+        use_ai_fallback = False
+        log.info(
+            "[FALLBACK SKIP] all required fields already complete on %s",
+            url,
+        )
+        if emit:
+            await emit(
+                "status",
+                f"[FALLBACK] skipped — all required fields complete for {url}",
+                phase="extract",
+                kind="ai_fallback_skipped_complete",
+                url=url,
+            )
+
     # ── Content-based AI-fallback skip (skip_ai_fallback_keywords) ───────────
     # If the YAML lists keyword phrases and ANY appears in the page text, skip
     # the fallback Gemini enrichment (ai_fallback.fill_missing).  The pre-
@@ -5430,24 +5589,56 @@ async def extract_course(
             # underlying SDK call is cancelled and we fall through to
             # the existing "AI failure" path — extraction proceeds
             # without AI fill, which is the same UX as a model error.
-            ai_filled = await asyncio.wait_for(
-                ai_fallback.fill_missing(payload, html=html, url=url, fields=_af_fields_override),
-                timeout=_AI_FALLBACK_TIMEOUT_SEC,
-            )
+            _ai_timeout = clamp_timeout(_AI_FALLBACK_TIMEOUT_SEC)
+            if not has_budget(0.05) or (
+                _ai_timeout is not None and _ai_timeout <= 0
+            ):
+                if emit:
+                    await emit(
+                        "status",
+                        f"[COURSE DEADLINE] AI fallback skipped — no extraction "
+                        f"budget left for {url}",
+                        phase="extract",
+                        kind="per_course_deadline_skip",
+                        stage="ai_fallback",
+                        url=url,
+                        remaining_seconds=remaining_seconds() or 0.0,
+                    )
+                ai_filled = {}
+            else:
+                _effective_ai_timeout = (
+                    _ai_timeout
+                    if _ai_timeout is not None
+                    else float(_AI_FALLBACK_TIMEOUT_SEC)
+                )
+                ai_filled = await asyncio.wait_for(
+                    ai_fallback.fill_missing(
+                        payload,
+                        html=html,
+                        url=url,
+                        fields=_af_fields_override,
+                        timeout_s=_effective_ai_timeout,
+                    ),
+                    timeout=_effective_ai_timeout,
+                )
         except asyncio.TimeoutError:
+            _logged_ai_timeout = locals().get(
+                "_effective_ai_timeout",
+                float(_AI_FALLBACK_TIMEOUT_SEC),
+            )
             log.warning(
                 "AI fallback exceeded %ss on %s — aborting this course's AI pass",
-                _AI_FALLBACK_TIMEOUT_SEC,
+                _logged_ai_timeout,
                 url,
             )
             if emit:
                 await emit(
                     "status",
                     f"[FALLBACK] AI fallback exceeded "
-                    f"{_AI_FALLBACK_TIMEOUT_SEC}s on {url} — moving on without AI fill",
+                    f"{_logged_ai_timeout}s on {url} — moving on without AI fill",
                     phase="extract",
                     kind="ai_fallback_timeout",
-                    timeout_seconds=_AI_FALLBACK_TIMEOUT_SEC,
+                    timeout_seconds=_logged_ai_timeout,
                     level="warn",
                 )
             ai_filled = {}

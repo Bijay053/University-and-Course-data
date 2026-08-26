@@ -32,10 +32,16 @@ from app.services.scraper.pipelines.single_course import extract_course
 from app.services.scraper.pipelines.university_pdfs import load_university_pdf_data
 from app.services.scraper.stage_course import stage_course
 from app.services.scraper.url_identity import canonical_course_url_key
+from app.services.scraper.course_deadline import (
+    reset_course_deadline,
+    set_course_deadline,
+)
 
 log = logging.getLogger(__name__)
 
-_PER_COURSE_EXTRACTION_TIMEOUT_SECONDS = 300.0
+_PER_COURSE_EXTRACTION_TIMEOUT_SECONDS = float(
+    getattr(settings, "per_course_extraction_timeout_s", 90.0)
+)
 
 
 def _extraction_failure_details(
@@ -88,7 +94,9 @@ def _extraction_failure_details(
         return {
             "reason": "per_course_timeout",
             "detail": (
-                "Extraction exceeded the 300-second per-course safety cap; "
+                f"Extraction exceeded the "
+                f"{_PER_COURSE_EXTRACTION_TIMEOUT_SECONDS:.0f}-second "
+                "per-course safety cap; "
                 "the provider/browser fallback chain did not settle in time."
             ),
             "retryable": True,
@@ -157,7 +165,10 @@ def _recovery_accounting(
     }
 
 
-def _per_course_timeout_result(link: dict) -> dict:
+def _per_course_timeout_result(
+    link: dict,
+    timeout_seconds: float = _PER_COURSE_EXTRACTION_TIMEOUT_SECONDS,
+) -> dict:
     """Return the stable sentinel used when an extraction exceeds its cap."""
     return {
         "name": (link.get("name") or "").strip() or "?",
@@ -165,7 +176,7 @@ def _per_course_timeout_result(link: dict) -> dict:
         "error": "per_course_timeout",
         "error_type": "TimeoutError",
         "error_reason": (
-            f"Extraction exceeded the {_PER_COURSE_EXTRACTION_TIMEOUT_SECONDS:.0f}-second "
+            f"Extraction exceeded the {float(timeout_seconds):.0f}-second "
             "per-course safety cap"
         ),
         "retryable": True,
@@ -187,6 +198,8 @@ async def _extract_with_hard_timeout(
     timeout_seconds: float = _PER_COURSE_EXTRACTION_TIMEOUT_SECONDS,
 ) -> dict:
     """Run one extraction with the cap used by both normal and recovery passes."""
+    deadline_token = set_course_deadline(timeout_seconds)
+    timed_out = False
     try:
         return await asyncio.wait_for(
             _extract_only(
@@ -202,7 +215,22 @@ async def _extract_with_hard_timeout(
             timeout=timeout_seconds,
         )
     except asyncio.TimeoutError:
-        return _per_course_timeout_result(link)
+        timed_out = True
+    finally:
+        reset_course_deadline(deadline_token)
+
+    if timed_out and emit:
+        await emit(
+            "status",
+            f"[COURSE TIMEOUT] {link.get('url') or '?'} exceeded the shared "
+            f"{float(timeout_seconds):.0f}s extraction deadline",
+            phase="extract",
+            kind="per_course_timeout",
+            url=link.get("url"),
+            timeout_seconds=float(timeout_seconds),
+            level="warn",
+        )
+    return _per_course_timeout_result(link, timeout_seconds)
 
 
 async def _extract_for_recovery_sweep(
@@ -4345,12 +4373,13 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     # stream "[FALLBACK] AI enriching ... (missing: ...)" lines.
                     # central_data is the pre-fetched central-pages payload (Bug 2).
                     #
-                    # Hard 5-minute cap per course: if a course takes longer than
-                    # 300 s (e.g. browser fallback + Scrape.do chain stalled on a
+                    # Shared per-course cap: if a course exceeds the configured
+                    # deadline (e.g. browser fallback + Scrape.do chain stalled on a
                     # broken URL), the batch never completes and the job stays
                     # in_progress permanently when the Celery worker is restarted.
-                    # The shared wrapper is also used by the sequential recovery
-                    # sweep so a retry cannot undo this liveness guarantee.
+                    # Every nested remote stage also clamps itself to the time
+                    # remaining here. The same wrapper is used by the sequential
+                    # recovery sweep so a retry cannot undo this liveness guarantee.
                     try:
                         result = await _extract_with_hard_timeout(
                             link,

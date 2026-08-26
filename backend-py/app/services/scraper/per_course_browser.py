@@ -35,6 +35,12 @@ from app.services.scraper.extractors import (
 from app.services.scraper.extractors import course_name as course_name_extractor
 from app.services.scraper.extractors.base import ExtractionResult
 from app.services.scraper.extractors._text import compact, html_to_text
+from app.services.scraper.course_deadline import (
+    clamp_timeout,
+    has_budget,
+    remaining_seconds,
+    required_course_fields_complete,
+)
 
 log = logging.getLogger(__name__)
 
@@ -853,6 +859,13 @@ async def maybe_browser_refetch(
     All four are empty / ``None`` / False when the slots were already
     populated (and ``force`` is False), or the browser fetch failed.
     """
+    # Even force-browser hosts must not re-render a course whose complete
+    # required field set is already available from structured/static sources.
+    if required_course_fields_complete(payload):
+        log.info(
+            "per_course_browser: complete required fields — skipping %s", url
+        )
+        return {}, [], None, False
     if not _all_english_empty(payload) and not force:
         return {}, [], None, False
     # For force-browser hosts (e.g. UniSQ, UOW), the browser ALWAYS runs so
@@ -895,6 +908,34 @@ async def maybe_browser_refetch(
             url=url,
         )
     wait_until, settle_ms, outer_sec, goto_ms = _browser_config_for(url)
+    bounded_outer = clamp_timeout(outer_sec)
+    if bounded_outer is not None:
+        outer_sec = bounded_outer
+    if not has_budget(0.05) or outer_sec <= 0:
+        left = remaining_seconds()
+        log.info(
+            "[COURSE DEADLINE] skipping browser for %s (remaining=%.3fs)",
+            url,
+            left or 0.0,
+        )
+        if emit:
+            await emit(
+                "status",
+                f"[COURSE DEADLINE] browser skipped — no extraction budget left for {url}",
+                phase="fallback",
+                kind="per_course_deadline_skip",
+                stage="browser",
+                url=url,
+                remaining_seconds=left or 0.0,
+            )
+        return {}, [], None, False
+    # page.goto must finish early enough for browser_pool to inspect partial
+    # HTML (up to 3s) and close the page cleanly before the outer wait_for
+    # cancels the Playwright protocol future. Equal inner/outer deadlines can
+    # otherwise race and produce "Future exception was never retrieved".
+    cleanup_reserve_s = min(4.0, max(0.05, outer_sec * 0.20))
+    goto_budget_s = max(0.001, outer_sec - cleanup_reserve_s)
+    goto_ms = min(goto_ms, max(1, int(goto_budget_s * 1000)))
     _uc_for_actions = get_uni_config()
     _browser_actions = (
         _uc_for_actions.extraction.actions or None

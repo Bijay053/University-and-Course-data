@@ -189,6 +189,13 @@ class Settings(BaseSettings):
     # the GEMINI_PRIMARY_TIMEOUT_S env var on prod.
     gemini_primary_timeout_s: float = 20.0
 
+    # One wall-clock budget for the complete per-course extraction pipeline.
+    # Nested HTTP/browser/Gemini/vision stages clamp their own ceilings to this
+    # remaining budget instead of stacking independent 20/30/120-second waits.
+    # Ninety seconds still accommodates a slow 60-second browser-only page while
+    # reducing the previous 300-second worst case by 70%.
+    per_course_extraction_timeout_s: float = 90.0
+
     # Auto-publish thresholds (Bug #6 — looser than Node defaults)
     min_completeness_for_auto_publish: int = 75
     rejection_block_days: int = 7  # Bug #7: was 30 in Node

@@ -476,6 +476,7 @@ async def generate_with_images(
     max_output_tokens: int = 2048,
     call_type: str = "vision",
     course_url: str | None = None,
+    timeout_s: float | None = None,
 ) -> GeminiResponse:
     """Multimodal generate — text prompt + 1-N inline images.
 
@@ -487,7 +488,13 @@ async def generate_with_images(
     error or budget exhaustion, ``text`` is empty and ``skipped`` is True.
     """
     if not images:
-        return await generate(prompt, max_output_tokens=max_output_tokens, call_type=call_type, course_url=course_url)
+        return await generate(
+            prompt,
+            max_output_tokens=max_output_tokens,
+            call_type=call_type,
+            course_url=course_url,
+            timeout_s=timeout_s,
+        )
 
     started = datetime.now(timezone.utc)
     model_name = settings.gemini_model
@@ -527,11 +534,15 @@ async def generate_with_images(
     try:
         for attempt in range(_MAX_RETRIES + 1):
             try:
-                resp = await c.aio.models.generate_content(
+                _gen_coro = c.aio.models.generate_content(
                     model=model_name,
                     contents=parts,
                     config=_gtypes.GenerateContentConfig(max_output_tokens=max_output_tokens),
                 )
+                if timeout_s is not None and timeout_s > 0:
+                    resp = await asyncio.wait_for(_gen_coro, timeout=timeout_s)
+                else:
+                    resp = await _gen_coro
                 text = (getattr(resp, "text", "") or "").strip()
                 out_tok = _estimate_tokens(text)
                 cost = (in_tok * _INPUT_USD_PER_M + out_tok * _OUTPUT_USD_PER_M) / 1_000_000
@@ -539,6 +550,38 @@ async def generate_with_images(
                 duration_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
                 _append_call_log(call_type, model_name, in_tok, out_tok, cost, duration_ms, True, None, course_url)
                 return GeminiResponse(text, in_tok, out_tok, cost, call_type=call_type, model=model_name)
+            except asyncio.TimeoutError:
+                _quota_tracker.record_timeout(timeout_s)
+                duration_ms = int(
+                    (datetime.now(timezone.utc) - started).total_seconds() * 1000
+                )
+                log.warning(
+                    "[GEMINI TIMEOUT] %s vision timed out after %ss",
+                    model_name,
+                    timeout_s,
+                )
+                _append_call_log(
+                    call_type,
+                    model_name,
+                    in_tok,
+                    0,
+                    0.0,
+                    duration_ms,
+                    False,
+                    f"timeout after {timeout_s}s",
+                    course_url,
+                )
+                _note_skip("gemini_timeout")
+                return GeminiResponse(
+                    "",
+                    in_tok,
+                    0,
+                    0.0,
+                    skipped=True,
+                    skip_reason=f"timeout after {timeout_s}s",
+                    call_type=call_type,
+                    model=model_name,
+                )
             except Exception as exc:
                 err_str = str(exc)
                 err_code = getattr(exc, "code", None) or getattr(exc, "status_code", None)

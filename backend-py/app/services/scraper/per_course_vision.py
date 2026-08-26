@@ -35,6 +35,11 @@ from app.config import settings
 from app.services.ai import gemini_client
 from app.services.scraper.extractors import english_test
 from app.services.scraper.extractors.base import ExtractionResult
+from app.services.scraper.course_deadline import (
+    clamp_timeout,
+    has_budget,
+    remaining_seconds,
+)
 
 log = logging.getLogger(__name__)
 
@@ -696,14 +701,19 @@ def _extract_img_candidates(
     return combined[:_MAX_IMAGES], frozenset(tier0_urls)
 
 
-async def _download(url: str) -> bytes | None:
+async def _download(
+    url: str,
+    *,
+    timeout_seconds: float | None = None,
+) -> bytes | None:
     """Best-effort image download. ``None`` on any failure (timeout,
     404, oversized payload).
     """
     try:
-        async with httpx.AsyncClient(
-            timeout=15, follow_redirects=True
-        ) as client:
+        timeout = 15.0 if timeout_seconds is None else max(
+            0.001, min(15.0, float(timeout_seconds))
+        )
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
             resp = await client.get(url)
         if resp.status_code >= 400 or not resp.content:
             return None
@@ -796,6 +806,24 @@ async def maybe_vision_refetch(
             "[VISION SKIP] GEMINI_API_KEY not configured — vision OCR will "
             "never run until the key is set. url=%s", url
         )
+        return {}, []
+    if not has_budget(0.05):
+        left = remaining_seconds()
+        log.info(
+            "[COURSE DEADLINE] skipping vision for %s (remaining=%.3fs)",
+            url,
+            left or 0.0,
+        )
+        if emit:
+            await emit(
+                "status",
+                f"[COURSE DEADLINE] vision skipped — no extraction budget left for {url}",
+                phase="fallback",
+                kind="per_course_deadline_skip",
+                stage="vision",
+                url=url,
+                remaining_seconds=left or 0.0,
+            )
         return {}, []
 
     candidates, tier0_url_set = _extract_img_candidates(rendered_html, url)
@@ -903,6 +931,11 @@ async def maybe_vision_refetch(
     )
 
     for img_url, alt in candidates:
+        if not has_budget(0.05):
+            log.info(
+                "[COURSE DEADLINE] stopping vision image loop for %s", url
+            )
+            break
         # Stop early once the vision pass ITSELF has found every overall
         # slot — saves Gemini calls on extra images once the requirements
         # image has already been read.
@@ -972,7 +1005,18 @@ async def maybe_vision_refetch(
                 # this image. Await the Future (resolves instantly if
                 # already set) and treat the result as a cache hit.
                 try:
-                    normalized = await existing
+                    waiter_timeout = clamp_timeout(None)
+                    if waiter_timeout is not None and waiter_timeout <= 0:
+                        normalized = {}
+                    elif waiter_timeout is None:
+                        normalized = await existing
+                    else:
+                        # A timed-out sibling must not cancel the leader's
+                        # shared Future for every other course.
+                        normalized = await asyncio.wait_for(
+                            asyncio.shield(existing),
+                            timeout=waiter_timeout,
+                        )
                 except Exception:  # noqa: BLE001 — leader's error already logged
                     normalized = {}
                 # Infer missing sub-bands in case the leader's OCR was
@@ -988,7 +1032,21 @@ async def maybe_vision_refetch(
             # Leader (or no cache at all) actually does the work.
             try:
                 log.info("[VISION] attempting OCR on %s", img_url)
-                img_bytes = await _download(img_url)
+                download_timeout = clamp_timeout(15.0)
+                if download_timeout is not None and download_timeout <= 0:
+                    if leader_future is not None:
+                        leader_future.set_result({})
+                    break
+                if remaining_seconds() is None:
+                    # Preserve the historical direct-call shape for standalone
+                    # callers and lightweight test doubles. Orchestrated course
+                    # scrapes always have an active shared deadline.
+                    img_bytes = await _download(img_url)
+                else:
+                    img_bytes = await _download(
+                        img_url,
+                        timeout_seconds=download_timeout,
+                    )
                 if not img_bytes:
                     # Negative-cache: a 404 / oversized image must not
                     # be re-downloaded per sibling course. Resolve the
@@ -999,8 +1057,18 @@ async def maybe_vision_refetch(
                     continue
                 images_consumed += 1
                 try:
+                    vision_timeout = clamp_timeout(
+                        float(getattr(settings, "gemini_primary_timeout_s", 20.0))
+                    )
+                    if vision_timeout is not None and vision_timeout <= 0:
+                        if leader_future is not None:
+                            leader_future.set_result({})
+                        break
                     resp = await gemini_client.generate_with_images(
-                        _VISION_PROMPT, [img_bytes]
+                        _VISION_PROMPT,
+                        [img_bytes],
+                        timeout_s=vision_timeout,
+                        course_url=url,
                     )
                 except Exception as exc:  # noqa: BLE001
                     _fail_msg = (
@@ -1116,6 +1184,14 @@ async def maybe_vision_refetch(
                     log.info("[VISION] %s: Gemini returned text but no English scores parsed", img_url)
                 if leader_future is not None:
                     leader_future.set_result(dict(normalized))
+            except asyncio.CancelledError:
+                # The course that owns this image request may hit its outer
+                # deadline while sibling courses are awaiting the shared
+                # Future. Resolve siblings with an empty result rather than
+                # propagating cross-course cancellation through the cache.
+                if leader_future is not None and not leader_future.done():
+                    leader_future.set_result({})
+                raise
             except BaseException as exc:
                 # Propagate the leader failure to any waiters so they
                 # don't await forever. Re-raise so existing exception

@@ -52,6 +52,11 @@ discovery:
       - "^https://www\\.murdoch\\.edu\\.au/course/"
 
 extraction:
+  # Course pages are fully server-rendered. Missing course-specific English
+  # scores should fall back to the central requirements page, not trigger a
+  # 30-second Playwright networkidle attempt that returns no additional data.
+  skip_per_course_browser: true
+
   fees:
     default_currency: AUD
     prefer_year_one_over_total: true   # Murdoch shows both "First year fee" and

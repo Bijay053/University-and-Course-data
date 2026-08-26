@@ -95,3 +95,107 @@ async def test_browser_fallback_skipped_when_already_filled(monkeypatch):
     )
     assert called == []
     assert filled == {} and evidence == [] and rendered is None and override is False
+
+
+@pytest.mark.asyncio
+async def test_force_browser_skips_uow_shape_when_all_required_fields_complete(
+    monkeypatch,
+):
+    called = []
+
+    async def _track(url: str, **kw):  # noqa: ANN001
+        called.append(url)
+        return "<html></html>"
+
+    monkeypatch.setattr(per_course_browser.browser_pool, "fetch_html", _track)
+    payload = {
+        "international_fee": 19_488,
+        "ielts_overall": 6.5,
+        "duration": 3,
+        "intake_months": ["March", "July"],
+        "course_location": "Wollongong",
+        "study_mode": "On Campus",
+    }
+
+    result = await per_course_browser.maybe_browser_refetch(
+        "https://www.uow.edu.au/study/courses/example/",
+        payload,
+        force=True,
+    )
+
+    assert called == []
+    assert result == ({}, [], None, False)
+
+
+@pytest.mark.asyncio
+async def test_uow_fee_missing_still_runs_force_browser(monkeypatch):
+    called = []
+
+    async def _track(url: str, **kw):  # noqa: ANN001
+        called.append(url)
+        return "<html><body><h1>Example course</h1></body></html>"
+
+    monkeypatch.setattr(per_course_browser.browser_pool, "fetch_html", _track)
+    payload = {
+        "international_fee": None,
+        "ielts_overall": 6.5,
+        "duration": 3,
+        "intake_months": ["March", "July"],
+        "course_location": "Wollongong",
+        "study_mode": "On Campus",
+    }
+
+    await per_course_browser.maybe_browser_refetch(
+        "https://www.uow.edu.au/study/courses/example/",
+        payload,
+        force=True,
+    )
+
+    assert called == ["https://www.uow.edu.au/study/courses/example/"]
+
+
+@pytest.mark.asyncio
+async def test_browser_timeout_is_clamped_to_shared_course_deadline(
+    monkeypatch,
+):
+    from app.services.scraper.course_deadline import (
+        reset_course_deadline,
+        set_course_deadline,
+    )
+
+    fetch_kwargs = {}
+
+    async def _hang_forever(url: str, **kw):  # noqa: ANN001
+        fetch_kwargs.update(kw)
+        await asyncio.sleep(3600)
+
+    monkeypatch.setattr(per_course_browser.browser_pool, "fetch_html", _hang_forever)
+    monkeypatch.setattr(
+        per_course_browser,
+        "_browser_config_for",
+        lambda url: ("domcontentloaded", 0, 0.5, 500),
+    )
+    emitted = []
+
+    async def _emit(event, message, **kw):  # noqa: ANN001
+        emitted.append({"event": event, "message": message, **kw})
+
+    token = set_course_deadline(0.08)
+    try:
+        started = __import__("time").monotonic()
+        await per_course_browser.maybe_browser_refetch(
+            "https://example.test/course",
+            {},
+            emit=_emit,
+        )
+        elapsed = __import__("time").monotonic() - started
+    finally:
+        reset_course_deadline(token)
+
+    assert elapsed < 0.2
+    assert 0 < fetch_kwargs["timeout"] < 80
+    timeout_event = next(
+        event for event in emitted
+        if event.get("kind") == "per_course_browser_timeout"
+    )
+    assert 0 < timeout_event["timeout_seconds"] <= 0.08

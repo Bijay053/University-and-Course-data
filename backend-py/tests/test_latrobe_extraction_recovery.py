@@ -11,13 +11,19 @@ import pytest
 
 
 def test_timeout_is_retryable_with_an_actionable_reason() -> None:
-    from app.services.scraper.orchestrator import _extraction_failure_details
+    from app.services.scraper.orchestrator import (
+        _PER_COURSE_EXTRACTION_TIMEOUT_SECONDS,
+        _extraction_failure_details,
+    )
 
     details = _extraction_failure_details("per_course_timeout")
 
     assert details["reason"] == "per_course_timeout"
     assert details["retryable"] is True
-    assert "300-second" in str(details["detail"])
+    assert (
+        f"{_PER_COURSE_EXTRACTION_TIMEOUT_SECONDS:.0f}-second"
+        in str(details["detail"])
+    )
 
 
 def test_fetch_failures_retry_but_extract_errors_stay_for_review() -> None:

@@ -286,6 +286,7 @@ async def fill_missing(
     html: str,
     url: str,
     fields: list[str] | None = None,
+    timeout_s: float | None = None,
 ) -> dict[str, Any]:
     """Return ``{field_key: value}`` for fields the rule-based pass missed.
 
@@ -318,7 +319,17 @@ async def fill_missing(
     except Exception:
         pass
 
-    resp = await gemini_client.generate(prompt, max_output_tokens=2048)
+    generate_kwargs: dict[str, Any] = {"max_output_tokens": 2048}
+    # Preserve the historical standalone call shape when no shared deadline
+    # was supplied. This keeps direct callers and lightweight test doubles
+    # backwards-compatible; orchestrated scrapes always pass a bounded value.
+    if timeout_s is not None:
+        generate_kwargs.update(
+            timeout_s=timeout_s,
+            call_type="fallback",
+            course_url=url,
+        )
+    resp = await gemini_client.generate(prompt, **generate_kwargs)
     if resp.skipped:
         log.info("AI fallback skipped for %s: %s", url, resp.skip_reason)
         return {}
