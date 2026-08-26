@@ -154,6 +154,7 @@ async def test_stage_course_persists_completeness_and_evidence():
             assert sc.degree_level == "Bachelor's"
             assert sc.study_mode == "On Campus"
             assert sc.category == "Computer Science & IT"
+            assert sc.sub_category == "Computer Science"
             assert sc.eligibility_status == "ready"
             assert sc.auto_publish_status == "ready"
             snapshot = (
@@ -177,9 +178,16 @@ async def test_stage_course_persists_completeness_and_evidence():
                     )
                 )
             ).scalars().all()
-            assert len(ev_rows) == 5
+            assert len(ev_rows) == 6
             keys = {r.field_key for r in ev_rows}
-            assert keys == {"course_name", "degree_level", "study_mode", "international_fee", "ielts_overall"}
+            assert keys == {
+                "course_name",
+                "degree_level",
+                "study_mode",
+                "international_fee",
+                "ielts_overall",
+                "sub_category",
+            }
             for r in ev_rows:
                 # Defaults must land for the operator-decision columns.
                 assert r.validation_status == "pending"
@@ -199,7 +207,7 @@ async def test_stage_course_persists_completeness_and_evidence():
         assert body["eligibilityStatus"] == "ready"
         assert body["autoPublishStatus"] == "ready"
         assert isinstance(body["evidence"], list)
-        assert len(body["evidence"]) == 5
+        assert len(body["evidence"]) == 6
         # Per-field grouping must include each key we wrote.
         assert set(body["evidenceByField"].keys()) == {
             "course_name",
@@ -207,6 +215,7 @@ async def test_stage_course_persists_completeness_and_evidence():
             "study_mode",
             "international_fee",
             "ielts_overall",
+            "sub_category",
         }
         # camelCase aliases the React UI expects.
         sample = body["evidence"][0]

@@ -149,3 +149,26 @@ def test_classification_only_prompt_is_short():
     assert len(prompt) < 3000, "classification_only prompt is unexpectedly large"
     assert "category" in prompt
     assert "Bachelor of Commerce" in prompt
+
+
+def test_classification_only_prompt_constrains_known_parent_subcategories():
+    from app.services.scraper.gemini_gate import build_classification_only_prompt
+
+    prompt = build_classification_only_prompt(
+        "Bachelor of Media and Communication",
+        "Study media, communication and contemporary culture.",
+        "Media & Communications",
+    )
+    assert "MUST be exactly: Media & Communications" in prompt
+    assert "Choose sub_category ONLY from:" in prompt
+    assert "Communications" in prompt
+    assert "Computer Science" not in prompt
+
+
+def test_single_course_gemini_merge_keeps_nonblank_taxonomy_fill_only():
+    import inspect
+    from app.services.scraper.pipelines import single_course
+
+    source = inspect.getsource(single_course.extract_course)
+    assert '_gp_k in {"category", "sub_category"}' in source
+    assert "payload.get(_gp_k)" in source

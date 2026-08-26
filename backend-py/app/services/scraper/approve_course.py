@@ -20,6 +20,7 @@ from app.models import (
     ScrapedCourse,
 )
 from app.services.auto_publish import should_auto_publish
+from app.services.scraper.category import infer_course_taxonomy
 from app.services.sub_category_matcher import resolve_sub_category
 
 import re
@@ -182,13 +183,26 @@ async def approve_scraped_course(
             "health sciences": "Medicine & Health",
             "engineering": "Engineering & Technology",
             "education": "Education & Social Work",
-            "science": "Maths & Sciences",
+            "science": "Science & Mathematics",
             "social sciences": "Arts, Humanities & Social Sciences",
             "accounting & finance": "Business & Management",
         }
         course.category = _CAT_MAP.get(_cat.strip().lower(), _cat)
     else:
         course.category = None
+
+    # Approval is the final consistency boundary before the public catalogue.
+    # Direct/imported staged rows can predate the staging safety net, so infer
+    # a missing taxonomy field here as well.  The helper preserves every
+    # nonblank value and keeps the generic-doctorate guard authoritative.
+    if not (_is_generic_phd and not _has_real_discipline):
+        _inferred = infer_course_taxonomy(
+            sc.course_name,
+            category=course.category,
+            sub_category=_raw_sub,
+        )
+        course.category = _inferred["category"]
+        _raw_sub = _inferred["sub_category"]
 
     # Resolve sub_category via fuzzy matcher — tries to match an existing
     # option for this category; inserts a new row if no match is found so the

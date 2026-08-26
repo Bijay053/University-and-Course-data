@@ -3526,6 +3526,7 @@ async def extract_course(
                 _class_prompt = _build_class_prompt(
                     payload.get("course_name") or "",
                     _class_text,
+                    payload.get("category"),
                 )
                 _class_timeout = clamp_timeout(
                     float(getattr(settings, "gemini_primary_timeout_s", 20.0))
@@ -3883,6 +3884,15 @@ async def extract_course(
                 # returned "On Campus" or "Online".
                 if _gp_k == "mode":
                     _gp_k = "study_mode"
+
+                # Taxonomy fields are fill-only. Deterministic extractors,
+                # imported operator values, and the shared title mapper outrank
+                # free-text AI; once either field is nonblank Gemini must not
+                # replace it before the staging safety net sees it.
+                if _gp_k in {"category", "sub_category"} and str(
+                    payload.get(_gp_k) or ""
+                ).strip():
+                    continue
 
                 # Bug A.2 (KBS grad certs — atomic duration tuple guard):
                 # `duration` and `duration_term` are an atomic pair — they must

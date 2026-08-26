@@ -30,7 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.models import ScrapedCourse, ScrapedFieldEvidence
 from app.services.auto_publish import should_auto_publish
-from app.services.scraper.category import map_course_to_category
+from app.services.scraper.category import infer_course_taxonomy
 from app.services.scraper.completeness import compute_completeness, decide_eligibility
 from app.services.scraper.guards import (
     enforce_source_evidence,
@@ -460,23 +460,38 @@ async def stage_course(
     except Exception as _pex:  # noqa: BLE001 — never abort staging on preservation failure
         log.warning("stage_course: existing-data preservation query failed for %r: %s", name, _pex)
 
-    # Diff item R (MIGRATION_AUDIT.md §6): category safety net. The
-    # single_course pipeline runs map_course_to_category before staging,
-    # but courses that arrive via other code paths (or future paths) can
-    # still land with an empty category. Re-run the keyword pre-map here
-    # so every staged row has the best category we can compute from the
-    # course name alone — the body-text classifier and AI fallbacks
-    # already ran upstream and don't re-run here.
-    if not payload.get("category"):
+    # Shared taxonomy safety net.  Run whenever EITHER field is blank: several
+    # extractors populate the broad parent category but not the sub-category,
+    # which previously bypassed this block and left blank review/live rows.
+    # Existing nonblank extractor/operator values always win.
+    _category_before = (payload.get("category") or "").strip()
+    _sub_before = (payload.get("sub_category") or "").strip()
+    if not _category_before or not _sub_before:
         try:
-            det = map_course_to_category(name)
+            inferred_taxonomy = infer_course_taxonomy(
+                name,
+                category=_category_before or None,
+                sub_category=_sub_before or None,
+            )
         except Exception as exc:  # noqa: BLE001 — never let categorisation abort staging
             log.warning("category safety-net failed for %s: %s", name, exc)
-            det = None
-        if det:
-            payload["category"] = det.get("category")
-            if not payload.get("sub_category"):
-                payload["sub_category"] = det.get("sub_category")
+            inferred_taxonomy = {}
+
+        for _field in ("category", "sub_category"):
+            _old = (payload.get(_field) or "").strip()
+            _new = inferred_taxonomy.get(_field)
+            if not _old and _new:
+                payload[_field] = _new
+                evidence.append(
+                    {
+                        "field_key": _field,
+                        "value": _new,
+                        "confidence": 0.9,
+                        "method": "category:deterministic_safety_net",
+                        "snippet": f"Inferred from course title: {name}",
+                        "needs_review": False,
+                    }
+                )
 
     # ── DB taxonomy canonicalisation ─────────────────────────────────────────
     # Last line of defence: if a sub_category survived to this point with a

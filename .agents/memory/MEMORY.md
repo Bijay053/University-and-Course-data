@@ -94,3 +94,4 @@
 - [UOW IELTS skill table](uow-ielts-skill-table.md) — course pages put band labels in the header before the IELTS row; parse DOM columns or flattened prose drops every sub-band.
 - [UOW international study load](uow-international-study-load.md) — “N years, or part-time equivalent” means the primary full-time route; part-time-only courses are ineligible.
 - [SSR courses with missing English](ssr-missing-english-browser-skip.md) — “English missing” can still trigger generic Playwright; proven SSR hosts need skip_per_course_browser and central English fallback.
+- [Evidence dedup schema drift](evidence-dedup-schema-drift.md) — long-lived DBs may lack the model-declared evidence unique constraint; verify pg_indexes before named ON CONFLICT.

@@ -149,6 +149,7 @@ def should_skip_gemini_primary(
 def build_classification_only_prompt(
     course_name: str,
     page_text: str,
+    known_category: str | None = None,
 ) -> str:
     """Build a cheap classification-only prompt for Gemini.
 
@@ -160,16 +161,30 @@ def build_classification_only_prompt(
     The JSON schema matches what ``gemini_primary.extract_primary`` returns for
     those two fields so the calling code can process it uniformly.
     """
+    from app.services.scraper.category import (
+        CATEGORIES,
+        subcategory_options_for_category,
+    )
+
     snippet = (page_text or "")[:1500]
+    category_options = ", ".join(CATEGORIES)
+    subcategory_options = subcategory_options_for_category(known_category)
+    taxonomy_constraint = (
+        f"\nThe category is already known and MUST be exactly: {known_category}\n"
+        f"Choose sub_category ONLY from: {', '.join(subcategory_options)}\n"
+        if known_category and subcategory_options
+        else (
+            f"\nChoose category ONLY from: {category_options}\n"
+            "Use a concise discipline sub_category supported by the course title; "
+            "do not repeat the degree name.\n"
+        )
+    )
     return (
         f"Given this Australian university course, classify it into a "
         f"taxonomy category and sub-category.\n\n"
         f"Course name: {course_name}\n"
         f"Page excerpt:\n{snippet}\n\n"
+        f"{taxonomy_constraint}"
         f"Respond with ONLY valid JSON, no markdown fences:\n"
         f'{{"category": "...", "sub_category": "..."}}\n'
-        f"\nExamples for category:\n"
-        f"  Business & Management, Engineering & Technology, Health Sciences,\n"
-        f"  IT & Computer Science, Arts & Humanities, Law & Legal Studies,\n"
-        f"  Education & Teaching, Science & Environment, Architecture & Design."
     )

@@ -224,9 +224,16 @@ _SUB_CATEGORY_MAP: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     # "Culinary Arts" so "commercial cookery" matches Cookery not Culinary Arts.
     ("Hospitality, Tourism & Events", "Cookery",                ("commercial cookery", "kitchen management", "patisserie", "cookery")),
     ("Hospitality, Tourism & Events", "Culinary Arts",          ("culinary arts", "culinary", "restaurant")),
+    # Cross-category precedence: this specific media phrase must beat the
+    # generic Business & Management "marketing" rule below.
+    ("Media & Communications",    "Media Marketing",        ("media marketing", "marketing communication", "marketing communications")),
     ("Business & Management",     "MBA",                    ("mba", "master of business administration")),
+    ("Business & Management",     "Business Administration", ("business administration",)),
     ("Business & Management",     "Accounting",             ("accounting", "accountancy")),
+    ("Business & Management",     "Actuarial Science",      ("actuarial science", "actuarial studies")),
     ("Business & Management",     "Finance",                ("finance", "banking", "actuarial")),
+    ("Business & Management",     "Commerce",               ("commerce",)),
+    ("Business & Management",     "Economics",              ("economics",)),
     ("Business & Management",     "Marketing",              ("marketing",)),
     ("Business & Management",     "Project Management",     ("project management",)),
     ("Business & Management",     "International Business", ("international business",)),
@@ -249,21 +256,31 @@ _SUB_CATEGORY_MAP: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("Computer Science & IT",     "Artificial Intelligence", ("artificial intelligence", "machine learning")),
     ("Computer Science & IT",     "Software Engineering",   ("software engineering", "software development", "software application development", "application development")),
     ("Computer Science & IT",     "Information Systems",    ("information systems", "information technology", "it management")),
-    ("Engineering & Technology",  "Mechanical Engineering", ("mechanical engineering", "mechatronic")),
+    ("Computer Science & IT",     "Computer Science",       ("computer science", "computing science", "applied computing", "bsc computing", "master of computing", "graduate diploma in computing", "graduate certificate in computing")),
+    ("Engineering & Technology",  "Mechatronics",           ("mechatronic", "mechatronics")),
+    ("Engineering & Technology",  "Robotics",               ("robotics",)),
+    ("Engineering & Technology",  "Automotive Engineering", ("automotive engineering", "motorsport engineering", "motorsports engineering")),
+    ("Engineering & Technology",  "Engineering Management", ("engineering management",)),
+    ("Engineering & Technology",  "Mechanical Engineering", ("mechanical engineering",)),
     ("Engineering & Technology",  "Civil Engineering",      ("civil engineering",)),
-    ("Engineering & Technology",  "Electrical Engineering", ("electrical engineering",)),
+    ("Engineering & Technology",  "Electrical Engineering", ("electrical engineering", "electronic engineering", "electrical and electronic engineering", "electrical & electronic engineering")),
     ("Engineering & Technology",  "Biomedical Engineering", ("biomedical engineering",)),
     ("Engineering & Technology",  "Chemical Engineering",   ("chemical engineering",)),
+    ("Engineering & Technology",  "General Engineering & Technology", ("engineering technology", "general engineering", "bachelor of engineering", "master of engineering", "associate degree of engineering", "engineering (honours)")),
     ("Medicine & Health",     "Nursing",                ("nursing", "midwifery")),
     ("Medicine & Health",     "Pharmacy",               ("pharmacy",)),
     ("Medicine & Health",     "Physiotherapy",          ("physiotherapy",)),
     ("Medicine & Health",     "Public Health",          ("public health",)),
     ("Medicine & Health",     "Health Sciences",        ("digital health", "health sciences", "health science")),
+    ("Medicine & Health",     "Biomedical Sciences",    ("medical sciences", "medical science", "biomedical sciences")),
+    ("Medicine & Health",     "Veterinary Medicine",    ("veterinary medicine", "veterinary science", "veterinary technology")),
+    ("Medicine & Health",     "Nutrition & Dietetics",  ("clinical nutrition", "nutrition", "dietetics")),
     # Clinical Psychology stays in Medicine & Health (matches DB taxonomy).
     # Plain "psychology" is mapped to the Arts/Humanities bucket below.
     ("Medicine & Health",     "Clinical Psychology",    ("clinical psychology",)),
     ("Arts, Humanities & Social Sciences", "Psychology", ("psychology",)),
     ("Medicine & Health",     "Dentistry",              ("dentistry", "dental")),
+    ("Medicine & Health",     "Human Medicine",         ("doctor of medicine", "bachelor of medicine", "medicine and surgery")),
     ("Education & Social Work",   "Early Childhood",        ("early childhood",)),
     ("Education & Social Work",   "Social Work",            ("social work",)),
     ("Education & Social Work",   "Teaching",               ("teaching",)),
@@ -272,19 +289,31 @@ _SUB_CATEGORY_MAP: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("Architecture, Building & Design", "Interior Design",  ("interior design",)),
     ("Architecture, Building & Design", "Construction",     ("construction",)),
     ("Architecture, Building & Design", "Graphic Design",   ("graphic design",)),
+    ("Architecture, Building & Design", "Fashion Design",   ("fashion design",)),
+    ("Architecture, Building & Design", "Industrial Design", ("industrial design", "product design")),
+    ("Architecture, Building & Design", "User Experience Design", ("user experience", "ux design")),
+    ("Architecture, Building & Design", "Design",           ("design studies", "design innovation", "bachelor of design", "master of design", "art and design", "art & design")),
     ("Media & Communications",    "Journalism",             ("journalism",)),
     ("Media & Communications",    "Public Relations",       ("public relations",)),
     ("Media & Communications",    "Film & Screen",          ("film", "screen")),
     ("Media & Communications",    "Digital Media",          ("digital media", "broadcasting")),
+    ("Media & Communications",    "Film Photography & Media", ("animation", "media production", "creative media", "television production", "visual effects")),
+    ("Media & Communications",    "Media Studies & Mass Media", ("publishing",)),
+    ("Media & Communications",    "Media Management",       ("media management",)),
+    # General media/communication titles must come after every more-specific
+    # media rule.  The canonical DB taxonomy calls this discipline
+    # "Communications"; without this fallback titles such as "Bachelor of Media
+    # and Communication" received the parent category but a blank sub-category.
+    ("Media & Communications",    "Communications",          ("communication", "communications", "media studies", "mass media")),
     ("Law & Legal Studies",       "Juris Doctor",           ("juris doctor", "jd ")),
     ("Law & Legal Studies",       "Criminal Justice",       ("criminal justice", "criminology")),
     ("Science & Mathematics",     "Biotechnology",          ("biotechnology", "genetics")),
     ("Science & Mathematics",     "Physics",                ("physics",)),
     ("Science & Mathematics",     "Chemistry",              ("chemistry", "biochemistry")),
     ("Science & Mathematics",     "Mathematics",            ("mathematics", "statistics")),
-    ("Agriculture & Environmental Science", "Sustainability", ("sustainability",)),
+    ("Agriculture & Environmental Science", "Sustainability", ("sustainability", "sustainable environment")),
     ("Agriculture & Environmental Science", "Agriculture",   ("agriculture", "agribusiness", "horticulture")),
-    ("Agriculture & Environmental Science", "Environmental Science", ("environmental science", "environmental management", "environmental studies", "ecology", "conservation")),
+    ("Agriculture & Environmental Science", "Environmental Science", ("environmental science", "environmental management", "environmental studies", "ecology", "conservation", "wildlife management", "forestry", "environmental protection")),
     ("Agriculture & Environmental Science", "Marine Science", ("marine science", "marine biology", "ocean", "aquaculture")),
     # Issue 2: Trades & Construction sub-categories for AQF vocational courses.
     ("Trades & Construction", "Carpentry",           ("carpentry",)),
@@ -303,7 +332,7 @@ _SUB_CATEGORY_MAP: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("Arts, Humanities & Social Sciences", "History",                 ("history", "historical",)),
     ("Arts, Humanities & Social Sciences", "English & Literature",    ("english literature", "creative writing", "writing", "linguistics", "english language")),
     ("Arts, Humanities & Social Sciences", "Geography",               ("geography", "urban planning", "regional planning")),
-    ("Arts, Humanities & Social Sciences", "Economics",               ("economics",)),
+    ("Arts, Humanities & Social Sciences", "Arts",                    ("bachelor of arts", "master of arts", "liberal arts")),
     # ── Medicine & Health additional sub-categories ──────────────────────────
     ("Medicine & Health", "Occupational Therapy",  ("occupational therapy",)),
     ("Medicine & Health", "Speech Pathology",      ("speech pathology", "speech language", "audiology")),
@@ -322,9 +351,9 @@ _SUB_CATEGORY_MAP: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("Engineering & Technology", "Telecommunications",        ("telecommunications", "telecom",)),
     # ── Business & Management general catchall ───────────────────────────────
     # Listed last in its category so more-specific entries win first.
-    ("Business & Management", "Business",           ("bachelor of business", "graduate certificate of business", "graduate diploma of business")),
+    ("Business & Management", "Business",           ("bachelor of business", "master of business", "graduate certificate of business", "graduate diploma of business", "graduate certificate in business", "graduate diploma in business", "diploma of business", "diploma in business")),
     # ── Law & Legal Studies sub-categories ───────────────────────────────────
-    ("Law & Legal Studies", "Laws",                 ("bachelor of laws", "juris doctor", "llb",)),
+    ("Law & Legal Studies", "Laws",                 ("bachelor of laws", "master of laws", "juris doctor", "llb", "llm", "law phd")),
     ("Law & Legal Studies", "Legal Practice",       ("legal practice", "legal studies", "paralegal")),
     # ── Science & Mathematics additional sub-categories ──────────────────────
     ("Science & Mathematics", "Biology",            ("biology", "biological sciences", "microbiology", "molecular biology", "genetics")),
@@ -336,6 +365,10 @@ _SUB_CATEGORY_MAP: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("Education & Social Work", "Educational Leadership", ("educational leadership", "school leadership", "principal",)),
     ("Education & Social Work", "Special Education",      ("special education", "inclusive education", "disability studies")),
     ("Education & Social Work", "Counselling",            ("counselling", "counseling", "guidance counselling")),
+    ("Education & Social Work", "Education",               ("bachelor of education", "master of education", "graduate certificate in education", "graduate diploma in education")),
+    # A bare hospitality title still belongs to the canonical Hospitality
+    # Management branch; specific tourism/events/cookery rules appear first.
+    ("Hospitality, Tourism & Events", "Hospitality Management", ("bachelor of hospitality", "master of hospitality", "hospitality studies")),
 )
 
 
@@ -410,3 +443,87 @@ def classify_category(course_name: str) -> str | None:
     # the same category for the same course on a re-scrape.
     best = max(scores.items(), key=lambda kv: (kv[1], -list(c for c, _ in _KEYWORDS).index(kv[0])))
     return best[0]
+
+
+def _category_key(value: str | None) -> str:
+    """Return a comparison key for parent-category labels.
+
+    Extractors sometimes use ``and`` while the controlled taxonomy uses ``&``.
+    This helper is deliberately comparison-only: it never rewrites a stored
+    category or turns a non-canonical source label into a new taxonomy value.
+    """
+    if not value:
+        return ""
+    key = re.sub(r"[^a-z0-9]+", " ", value.lower().replace("&", " and ")).strip()
+    aliases = {
+        "engineering": "engineering and technology",
+        "health sciences": "medicine and health",
+        "education": "education and social work",
+        "science": "science and mathematics",
+        "maths and sciences": "science and mathematics",
+        "arts and humanities": "arts humanities and social sciences",
+        "it and computer science": "computer science and it",
+    }
+    return aliases.get(key, key)
+
+
+def infer_course_taxonomy(
+    course_name: str,
+    category: str | None = None,
+    sub_category: str | None = None,
+) -> dict[str, str | None]:
+    """Fill missing taxonomy fields from the shared deterministic mapper.
+
+    Non-blank caller values always win.  A deterministic sub-category is used
+    only when its parent agrees with the existing/inferred parent category, so
+    a broad title keyword cannot silently cross category boundaries.
+
+    This is the single pure helper used by extraction, staging, approval, and
+    the historical backfill.  Keeping the decision here prevents those paths
+    from drifting and makes the backfill idempotent.
+    """
+    clean_category = category.strip() if category and category.strip() else None
+    clean_sub = sub_category.strip() if sub_category and sub_category.strip() else None
+
+    # A bare research-degree title contains no discipline signal.  Keep any
+    # real caller-supplied taxonomy, but never let the broad classifier turn
+    # "Doctor of Philosophy" / "MPhil" into a guessed parent category.
+    if course_name and _GENERIC_DOCTORATE_RE.match(course_name.strip()):
+        return {
+            "category": clean_category,
+            "sub_category": clean_sub,
+        }
+
+    deterministic = map_course_to_category(course_name)
+    resolved_category = clean_category
+    if not resolved_category:
+        resolved_category = (
+            deterministic.get("category")
+            if deterministic
+            else classify_category(course_name)
+        )
+
+    resolved_sub = clean_sub
+    if (
+        not resolved_sub
+        and deterministic
+        and _category_key(resolved_category) == _category_key(deterministic.get("category"))
+    ):
+        resolved_sub = deterministic.get("sub_category")
+
+    return {
+        "category": resolved_category,
+        "sub_category": resolved_sub,
+    }
+
+
+def subcategory_options_for_category(category: str | None) -> tuple[str, ...]:
+    """Return deterministic controlled-vocabulary options for one parent."""
+    key = _category_key(category)
+    if not key:
+        return ()
+    options: list[str] = []
+    for parent, sub_category, _keywords in _SUB_CATEGORY_MAP:
+        if _category_key(parent) == key and sub_category not in options:
+            options.append(sub_category)
+    return tuple(options)

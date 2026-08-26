@@ -8,7 +8,12 @@ from __future__ import annotations
 
 import pytest
 
-from app.services.scraper.category import CATEGORIES, classify_category, map_course_to_category
+from app.services.scraper.category import (
+    CATEGORIES,
+    classify_category,
+    infer_course_taxonomy,
+    map_course_to_category,
+)
 
 
 @pytest.mark.parametrize(
@@ -79,3 +84,98 @@ def test_vocational_sub_categories(name: str, expected_cat: str, expected_sub: s
     assert result is not None, f"No category returned for: {name}"
     assert result["category"] == expected_cat, f"Category mismatch for: {name}"
     assert result["sub_category"] == expected_sub, f"Sub-category mismatch for: {name}"
+
+
+@pytest.mark.parametrize(
+    "name,expected_sub",
+    [
+        ("Bachelor of Media and Communication", "Communications"),
+        ("Bachelor of Communication and Media Studies", "Communications"),
+        ("Master of Communications", "Communications"),
+        ("Bachelor of Journalism and Communication", "Journalism"),
+        ("Master of Public Relations and Communication", "Public Relations"),
+        ("Master of Digital Media and Communication", "Digital Media"),
+        ("Master of Media Management", "Media Management"),
+        ("Master of Marketing Communications", "Media Marketing"),
+    ],
+)
+def test_media_communication_subcategory_and_specific_precedence(
+    name: str, expected_sub: str
+):
+    result = map_course_to_category(name)
+    assert result == {
+        "category": "Media & Communications",
+        "sub_category": expected_sub,
+    }
+
+
+@pytest.mark.parametrize(
+    "name,expected_category,expected_sub",
+    [
+        ("Bachelor of Business", "Business & Management", "Business"),
+        ("Bachelor of Computer Science", "Computer Science & IT", "Computer Science"),
+        ("Bachelor of Mechanical Engineering", "Engineering & Technology", "Mechanical Engineering"),
+        ("Doctor of Medicine", "Medicine & Health", "Human Medicine"),
+        ("Bachelor of Arts", "Arts, Humanities & Social Sciences", "Arts"),
+        ("Bachelor of Education", "Education & Social Work", "Education"),
+        ("Bachelor of Architecture", "Architecture, Building & Design", "Architecture"),
+        ("Bachelor of Media and Communication", "Media & Communications", "Communications"),
+        ("Bachelor of Laws", "Law & Legal Studies", "Laws"),
+        ("Bachelor of Hospitality", "Hospitality, Tourism & Events", "Hospitality Management"),
+        ("Bachelor of Physics", "Science & Mathematics", "Physics"),
+        ("Bachelor of Agriculture", "Agriculture & Environmental Science", "Agriculture"),
+        ("Certificate III in Carpentry", "Trades & Construction", "Carpentry"),
+    ],
+)
+def test_all_parent_categories_have_representative_subcategory_inference(
+    name: str, expected_category: str, expected_sub: str
+):
+    result = map_course_to_category(name)
+    assert result == {
+        "category": expected_category,
+        "sub_category": expected_sub,
+    }
+
+
+def test_inference_fills_blank_subcategory_when_parent_already_exists():
+    assert infer_course_taxonomy(
+        "Bachelor of Media and Communication",
+        category="Media & Communications",
+        sub_category=" ",
+    ) == {
+        "category": "Media & Communications",
+        "sub_category": "Communications",
+    }
+
+
+def test_inference_preserves_nonblank_manual_subcategory():
+    assert infer_course_taxonomy(
+        "Bachelor of Media and Communication",
+        category="Media & Communications",
+        sub_category="Operator Chosen Discipline",
+    ) == {
+        "category": "Media & Communications",
+        "sub_category": "Operator Chosen Discipline",
+    }
+
+
+def test_inference_recognizes_legacy_parent_alias_without_rewriting_it():
+    assert infer_course_taxonomy(
+        "Bachelor of Mechanical Engineering",
+        category="Engineering",
+        sub_category=None,
+    ) == {
+        "category": "Engineering",
+        "sub_category": "Mechanical Engineering",
+    }
+
+
+@pytest.mark.parametrize(
+    "title",
+    ["Doctor of Philosophy", "PhD", "Master of Philosophy", "MPhil"],
+)
+def test_shared_inference_does_not_guess_generic_doctorate_taxonomy(title: str):
+    assert infer_course_taxonomy(title) == {
+        "category": None,
+        "sub_category": None,
+    }
