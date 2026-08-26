@@ -2151,13 +2151,40 @@ async def staged_one(
     # ``Array.isArray(payload)`` as the legacy branch.
     if not sc_id_or_job.isdigit():
         job = await db.get(ScrapeRuntimeJob, sc_id_or_job)
-        # The Review button represents one completed scrape, so it must return
-        # only rows written by that job.  Older pending rows can belong to a
-        # failed/resumed attempt and must not inflate the current run's review
-        # count or appear alongside its fresh values.  They remain stored for
-        # recovery/resume handling, but the current-job review is always an
-        # exact replacement view.
-        where_clause = ScrapedCourse.scrape_job_id == sc_id_or_job
+        # A targeted "Continue unresolved" run is a child of the completed run
+        # whose unresolved URLs it retries.  The review screen must show the
+        # union of that explicit continuation chain (e.g. 120 original + 50
+        # recovered = 170), not only the newest child's rows.  Walk backwards
+        # through retrySourceJobId, bounded and cycle-safe.  Unrelated older
+        # scrapes remain excluded, preserving the exact-job scope for normal
+        # standalone runs.
+        review_job_ids = [sc_id_or_job]
+        seen_job_ids = {sc_id_or_job}
+        chain_job = job
+        for _ in range(20):
+            payload = getattr(chain_job, "request_payload", None) or {}
+            parent_job_id = payload.get("retrySourceJobId")
+            if not isinstance(parent_job_id, str):
+                break
+            parent_job_id = parent_job_id.strip()
+            if not parent_job_id or parent_job_id in seen_job_ids:
+                break
+            parent_job = await db.get(ScrapeRuntimeJob, parent_job_id)
+            if parent_job is None:
+                break
+            # Never aggregate across universities even if malformed request
+            # metadata points at an unrelated job.
+            if (
+                job is not None
+                and job.university_id is not None
+                and parent_job.university_id != job.university_id
+            ):
+                break
+            review_job_ids.append(parent_job_id)
+            seen_job_ids.add(parent_job_id)
+            chain_job = parent_job
+
+        where_clause = ScrapedCourse.scrape_job_id.in_(review_job_ids)
         rows = (await db.execute(
             select(ScrapedCourse).where(where_clause, ScrapedCourse.status == "pending")
             .order_by(ScrapedCourse.created_at.desc())
