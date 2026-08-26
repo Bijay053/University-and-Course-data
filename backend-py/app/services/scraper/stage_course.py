@@ -460,38 +460,36 @@ async def stage_course(
     except Exception as _pex:  # noqa: BLE001 — never abort staging on preservation failure
         log.warning("stage_course: existing-data preservation query failed for %r: %s", name, _pex)
 
-    # Shared taxonomy safety net.  Run whenever EITHER field is blank: several
-    # extractors populate the broad parent category but not the sub-category,
-    # which previously bypassed this block and left blank review/live rows.
-    # Existing nonblank extractor/operator values always win.
+    # Shared taxonomy safety net. Always run so known legacy/AI parent labels
+    # are canonicalized at the staging boundary. Unknown nonblank values remain
+    # untouched, preserving manual classifications.
     _category_before = (payload.get("category") or "").strip()
     _sub_before = (payload.get("sub_category") or "").strip()
-    if not _category_before or not _sub_before:
-        try:
-            inferred_taxonomy = infer_course_taxonomy(
-                name,
-                category=_category_before or None,
-                sub_category=_sub_before or None,
-            )
-        except Exception as exc:  # noqa: BLE001 — never let categorisation abort staging
-            log.warning("category safety-net failed for %s: %s", name, exc)
-            inferred_taxonomy = {}
+    try:
+        inferred_taxonomy = infer_course_taxonomy(
+            name,
+            category=_category_before or None,
+            sub_category=_sub_before or None,
+        )
+    except Exception as exc:  # noqa: BLE001 — never let categorisation abort staging
+        log.warning("category safety-net failed for %s: %s", name, exc)
+        inferred_taxonomy = {}
 
-        for _field in ("category", "sub_category"):
-            _old = (payload.get(_field) or "").strip()
-            _new = inferred_taxonomy.get(_field)
-            if not _old and _new:
-                payload[_field] = _new
-                evidence.append(
-                    {
-                        "field_key": _field,
-                        "value": _new,
-                        "confidence": 0.9,
-                        "method": "category:deterministic_safety_net",
-                        "snippet": f"Inferred from course title: {name}",
-                        "needs_review": False,
-                    }
-                )
+    for _field in ("category", "sub_category"):
+        _old = (payload.get(_field) or "").strip()
+        _new = inferred_taxonomy.get(_field)
+        if _new and _new != _old:
+            payload[_field] = _new
+            evidence.append(
+                {
+                    "field_key": _field,
+                    "value": _new,
+                    "confidence": 0.9,
+                    "method": "category:deterministic_safety_net",
+                    "snippet": f"Inferred or canonicalized from course title: {name}",
+                    "needs_review": False,
+                }
+            )
 
     # ── DB taxonomy canonicalisation ─────────────────────────────────────────
     # Last line of defence: if a sub_category survived to this point with a

@@ -22,6 +22,7 @@ from typing import Any
 
 from app.services.ai import gemini_client
 from app.services.scraper.extractors._text import html_to_text
+from app.services.scraper.taxonomy import CATEGORIES
 
 log = logging.getLogger(__name__)
 
@@ -124,10 +125,8 @@ _HARD_FIELDS: dict[str, str] = {
     ),
     "category": (
         "Broad academic field. Pick the BEST match from: "
-        "'Business & Management', 'Computer Science & IT', 'Engineering', "
-        "'Health Sciences', 'Education', 'Arts & Humanities', 'Law', "
-        "'Science', 'Social Sciences', 'Built Environment', "
-        "'Hospitality, Tourism & Events', 'Accounting & Finance'. "
+        + ", ".join(f"'{category}'" for category in CATEGORIES)
+        + ". "
         "If the course title is a generic 'Doctor of Philosophy' / 'PhD' / "
         "'Master of Philosophy' AND the page does not name a specific "
         "research discipline (e.g. Psychology, Physics, Education), "

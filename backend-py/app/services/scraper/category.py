@@ -16,20 +16,10 @@ from __future__ import annotations
 
 import re
 
-CATEGORIES = (
-    "Business & Management",
-    "Computer Science & IT",
-    "Engineering & Technology",
-    "Medicine & Health",
-    "Arts, Humanities & Social Sciences",
-    "Education & Social Work",
-    "Architecture, Building & Design",
-    "Media & Communications",
-    "Law & Legal Studies",
-    "Hospitality, Tourism & Events",
-    "Science & Mathematics",
-    "Agriculture & Environmental Science",
-    "Trades & Construction",
+from app.services.scraper.taxonomy import (
+    CATEGORIES,
+    LEGACY_PARENT_ALIASES,
+    canonical_parent,
 )
 
 # Each tuple: (category, keywords). Keywords are matched as whole-word
@@ -460,10 +450,19 @@ def _category_key(value: str | None) -> str:
         "health sciences": "medicine and health",
         "education": "education and social work",
         "science": "science and mathematics",
-        "maths and sciences": "science and mathematics",
         "arts and humanities": "arts humanities and social sciences",
         "it and computer science": "computer science and it",
     }
+    aliases.update(
+        {
+            re.sub(
+                r"[^a-z0-9]+", " ", legacy.lower().replace("&", " and ")
+            ).strip(): re.sub(
+                r"[^a-z0-9]+", " ", canonical.lower().replace("&", " and ")
+            ).strip()
+            for legacy, canonical in LEGACY_PARENT_ALIASES.items()
+        }
+    )
     return aliases.get(key, key)
 
 
@@ -482,7 +481,7 @@ def infer_course_taxonomy(
     the historical backfill.  Keeping the decision here prevents those paths
     from drifting and makes the backfill idempotent.
     """
-    clean_category = category.strip() if category and category.strip() else None
+    clean_category = canonical_parent(category)
     clean_sub = sub_category.strip() if sub_category and sub_category.strip() else None
 
     # A bare research-degree title contains no discipline signal.  Keep any

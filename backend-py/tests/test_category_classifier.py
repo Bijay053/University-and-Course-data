@@ -159,13 +159,13 @@ def test_inference_preserves_nonblank_manual_subcategory():
     }
 
 
-def test_inference_recognizes_legacy_parent_alias_without_rewriting_it():
+def test_inference_canonicalizes_legacy_parent_alias():
     assert infer_course_taxonomy(
         "Bachelor of Mechanical Engineering",
         category="Engineering",
         sub_category=None,
     ) == {
-        "category": "Engineering",
+        "category": "Engineering & Technology",
         "sub_category": "Mechanical Engineering",
     }
 

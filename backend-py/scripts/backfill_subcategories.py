@@ -70,9 +70,10 @@ def plan_change(row: CandidateRow) -> PlannedChange | None:
     )
     new_category = inferred.get("category")
     new_sub = inferred.get("sub_category")
-    # A historical alias such as "Engineering" can compare equal for safe
-    # inference, but the backfill must not create a noncanonical parent/child
-    # pair or rewrite a nonblank parent while repairing a sub-category.
+    # Historical/manual nonblank parents are outside this blank-subcategory
+    # repair's scope. Even a known legacy alias must not be rewritten here.
+    if row.category and row.category.strip() and new_category != row.category.strip():
+        return None
     if not new_category or new_category not in CATEGORIES or not new_sub:
         return None
     return PlannedChange(

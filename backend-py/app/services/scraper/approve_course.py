@@ -21,6 +21,7 @@ from app.models import (
 )
 from app.services.auto_publish import should_auto_publish
 from app.services.scraper.category import infer_course_taxonomy
+from app.services.scraper.taxonomy import canonical_parent
 from app.services.sub_category_matcher import resolve_sub_category
 
 import re
@@ -179,15 +180,7 @@ async def approve_scraped_course(
         # Generic PhD with no real discipline → null both for reviewer.
         course.category = None
     elif _cat:
-        _CAT_MAP = {
-            "health sciences": "Medicine & Health",
-            "engineering": "Engineering & Technology",
-            "education": "Education & Social Work",
-            "science": "Science & Mathematics",
-            "social sciences": "Arts, Humanities & Social Sciences",
-            "accounting & finance": "Business & Management",
-        }
-        course.category = _CAT_MAP.get(_cat.strip().lower(), _cat)
+        course.category = canonical_parent(_cat)
     else:
         course.category = None
 
