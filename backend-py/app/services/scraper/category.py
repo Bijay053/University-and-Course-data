@@ -258,6 +258,7 @@ _SUB_CATEGORY_MAP: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("Medicine & Health",     "Pharmacy",               ("pharmacy",)),
     ("Medicine & Health",     "Physiotherapy",          ("physiotherapy",)),
     ("Medicine & Health",     "Public Health",          ("public health",)),
+    ("Medicine & Health",     "Health Sciences",        ("digital health", "health sciences", "health science")),
     # Clinical Psychology stays in Medicine & Health (matches DB taxonomy).
     # Plain "psychology" is mapped to the Arts/Humanities bucket below.
     ("Medicine & Health",     "Clinical Psychology",    ("clinical psychology",)),

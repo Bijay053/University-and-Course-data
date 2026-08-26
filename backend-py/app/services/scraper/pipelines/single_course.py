@@ -530,8 +530,105 @@ _PARTTIME_ONLY_FT_RE = _re.compile(r"\bfull[- ]?time\b", _re.IGNORECASE)
 _BROWSER_RESCUE_MIN_HTML_LEN = 2000
 
 
+def _duration_labeled_values(html: str) -> list[str]:
+    """Return values paired with a duration/course-length label in the DOM."""
+    if not html:
+        return []
+    values: list[str] = []
+    try:
+        from bs4 import BeautifulSoup as _BS4_pt
+
+        soup = _BS4_pt(html, "html.parser")
+        for label_tag in soup.find_all(("dt", "th", "strong", "b", "span", "div", "p")):
+            label_text = label_tag.get_text(" ", strip=True).rstrip(":").strip()
+            if not _DURATION_LABEL_PAT_RE.fullmatch(label_text):
+                continue
+
+            value_text = ""
+            if label_tag.name == "dt":
+                sibling = label_tag.find_next_sibling("dd")
+                value_text = sibling.get_text(" ", strip=True) if sibling else ""
+            elif label_tag.name == "th":
+                sibling = label_tag.find_next_sibling("td")
+                value_text = sibling.get_text(" ", strip=True) if sibling else ""
+            else:
+                # Covers both simple "<strong>Duration:</strong> 2 years" markup
+                # and UOW's left/right row structure:
+                #   <div class=left><span>Duration</span></div>
+                #   <div class=right>2 years full-time or part-time equivalent</div>
+                containers = [label_tag]
+                parent = label_tag.parent
+                for _ in range(3):
+                    if parent is None or getattr(parent, "name", None) in ("body", "html"):
+                        break
+                    containers.append(parent)
+                    parent = parent.parent
+                for container in containers:
+                    sibling = container.find_next_sibling()
+                    if sibling is not None:
+                        candidate = sibling.get_text(" ", strip=True)
+                        if candidate:
+                            value_text = candidate
+                            break
+                    if container is label_tag and label_tag.next_sibling is not None:
+                        candidate = str(label_tag.next_sibling).strip()
+                        if candidate:
+                            value_text = candidate
+                            break
+
+                # Last resort for list-based fact panels where the label and
+                # value are wrapped in one <li> without sibling elements.
+                if not value_text:
+                    row = label_tag.find_parent(("li", "tr"))
+                    if row is not None:
+                        row_text = row.get_text(" ", strip=True)
+                        value_text = _DURATION_LABEL_PAT_RE.sub(
+                            "", row_text, count=1
+                        ).lstrip(" :")
+
+            value_text = _re.sub(r"\s+", " ", value_text).strip()
+            if value_text and value_text not in values:
+                values.append(value_text)
+    except Exception:
+        return []
+    return values
+
+
+def _infer_study_load_from_text(text: str) -> str | None:
+    """Prefer Full Time whenever the course explicitly offers that option."""
+    if not text:
+        return None
+    # An equivalent full-time duration is sometimes quoted only as a workload
+    # measure even though the course itself is explicitly part-time-only.
+    if _re.search(
+        r"(?:"
+        r"\bpart[- ]?time\s+only\b|"
+        r"\bonly\s+(?:available|offered|delivered)\s+(?:as\s+)?part[- ]?time\b|"
+        r"\bavailable\s+only\s+(?:as\s+)?part[- ]?time\b|"
+        r"\bsolely\s+part[- ]?time\b"
+        r")",
+        text,
+        _re.IGNORECASE,
+    ):
+        return "Part Time"
+    if _PARTTIME_ONLY_FT_RE.search(text):
+        return "Full Time"
+    # "3 years, or part-time equivalent" states the primary (full-time)
+    # duration first and offers part-time only as an equivalent alternative.
+    if _re.search(
+        r"\b(?:years?|months?|weeks?|sessions?)\b"
+        r"(?:\s*\([^)]*\))?\s*,?\s*(?:or\s+)?part[- ]?time\s+equivalent\b",
+        text,
+        _re.IGNORECASE,
+    ):
+        return "Full Time"
+    if _PARTTIME_ONLY_PT_RE.search(text):
+        return "Part Time"
+    return None
+
+
 def _is_parttime_only_page(html: str) -> bool:
-    """Return True when the course-length cell contains Part-time but not Full-time.
+    """Return True when labelled duration values offer Part-time but not Full-time.
 
     Detects WLV-style pages where the duration label/value pair reads
     "Course length: Part-time (1 year)" with no Full-time option listed.
@@ -542,44 +639,18 @@ def _is_parttime_only_page(html: str) -> bool:
     occurrences of "part-time" in page prose (e.g. a footer note) don't
     produce false positives.
     """
-    if not html:
-        return False
-    try:
-        from bs4 import BeautifulSoup as _BS4_pt
-
-        soup = _BS4_pt(html, "html.parser")
-        for label_tag in soup.find_all(("dt", "th", "strong", "b")):
-            label_text = label_tag.get_text(" ", strip=True).rstrip(":").strip()
-            if not _DURATION_LABEL_PAT_RE.search(label_text):
-                continue
-            # Retrieve the associated value cell
-            if label_tag.name == "dt":
-                sibling = label_tag.find_next_sibling("dd")
-                value_text = sibling.get_text(" ", strip=True) if sibling else ""
-            elif label_tag.name == "th":
-                sibling = label_tag.find_next_sibling("td")
-                value_text = sibling.get_text(" ", strip=True) if sibling else ""
-            else:
-                nxt = label_tag.next_sibling
-                value_text = str(nxt).strip() if nxt else ""
-            if not value_text:
-                continue
-            # Part-time present AND Full-time absent → reject
-            if _PARTTIME_ONLY_PT_RE.search(value_text) and not _PARTTIME_ONLY_FT_RE.search(value_text):
-                return True
-    except Exception:
-        pass
-    return False
+    inferred = [_infer_study_load_from_text(value) for value in _duration_labeled_values(html)]
+    return "Part Time" in inferred and "Full Time" not in inferred
 
 
 def _parttime_only_filter_enabled() -> bool:
-    """Return True when extraction.filters.reject_parttime_only is set in uni config.
+    """Part-time-only courses are globally ineligible for this portal.
 
-    Fail-closed: returns False when the contextvar is unset (no per-uni context),
-    so the filter never fires for universities that haven't explicitly opted in.
+    International students studying onshore generally require full-time
+    enrolment. Per-university settings must not silently admit a course whose
+    labelled duration offers only part-time study.
     """
-    uc = get_uni_config()
-    return uc is not None and uc.extraction.filters.reject_parttime_only
+    return True
 
 
 _FEDERATION_HOSTS: frozenset[str] = frozenset(
@@ -7562,37 +7633,47 @@ async def extract_course(
             )
 
     # ── Study load (Full Time / Part Time) ───────────────────────────────────
-    # Only runs when no extractor (including Gemini primary) has set it yet.
-    # Checks duration_text first (most reliable signal: "2 years full-time"),
-    # then scans the first 3 KB of page text for explicit phrases.
-    if not payload.get("study_load"):
-        _sl_sources = [
-            (payload.get("duration_text") or "").lower(),
-            (rendered_html or html or "")[:3000].lower(),
-        ]
-        _sl_text = " ".join(_sl_sources)
-        if _re.search(r"\bpart[- ]time\b", _sl_text):
-            payload["study_load"] = "Part Time"
-            evidence.append({
-                "field_key": "study_load",
-                "value": "Part Time",
-                "confidence": 0.75,
-                "method": "regex:study_load",
-                "snippet": next(
-                    (s for s in _sl_sources if _re.search(r"\bpart[- ]time\b", s)), ""
-                )[:120],
-            })
-        elif _re.search(r"\bfull[- ]time\b", _sl_text):
-            payload["study_load"] = "Full Time"
-            evidence.append({
-                "field_key": "study_load",
-                "value": "Full Time",
-                "confidence": 0.70,
-                "method": "regex:study_load",
-                "snippet": next(
-                    (s for s in _sl_sources if _re.search(r"\bfull[- ]time\b", s)), ""
-                )[:120],
-            })
+    # Authoritative duration wording wins over earlier AI/fallback guesses.
+    # When both options are shown ("2 years full-time or part-time equivalent"),
+    # this international-course portal always records the eligible Full Time
+    # option. A genuinely part-time-only course was rejected by the early gate.
+    _sl_html = rendered_html or html or ""
+    if (payload.get("study_load") or "").strip().lower() == "both":
+        payload["study_load"] = "Full Time"
+        evidence.append({
+            "field_key": "study_load",
+            "value": "Full Time",
+            "confidence": 0.90,
+            "method": "normalize:international_full_time",
+            "snippet": "Both includes a full-time study option",
+        })
+    _sl_sources = [
+        (payload.get("duration_text") or "").lower(),
+        *[value.lower() for value in _duration_labeled_values(_sl_html)],
+    ]
+    if not any(_sl_sources):
+        _sl_sources.append(_sl_html[:3000].lower())
+    _sl_text = " ".join(_sl_sources)
+    _inferred_study_load = _infer_study_load_from_text(_sl_text)
+    if _inferred_study_load and (
+        not payload.get("study_load") or _inferred_study_load == "Full Time"
+    ):
+        payload["study_load"] = _inferred_study_load
+        evidence.append({
+            "field_key": "study_load",
+            "value": _inferred_study_load,
+            "confidence": 0.82 if len(_sl_sources) > 1 else 0.75,
+            "method": "regex:study_load",
+            "snippet": next(
+                (
+                    source
+                    for source in _sl_sources
+                    if _PARTTIME_ONLY_FT_RE.search(source)
+                    or _PARTTIME_ONLY_PT_RE.search(source)
+                ),
+                "",
+            )[:120],
+        })
 
     # ── Host-specific fee_term correction ────────────────────────────────────
     # Some universities publish a FULL COURSE total on their course pages

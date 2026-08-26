@@ -978,6 +978,11 @@ def _target_course_urls_from_payload(payload: dict | None) -> list[str]:
     return urls
 
 
+def _is_targeted_retry_payload(payload: dict | None) -> bool:
+    """Return whether this job must preserve its parent review rows."""
+    return bool(_target_course_urls_from_payload(payload))
+
+
 def _inject_extra_course_urls(
     links: list[dict],
     extra_urls: list[str],
@@ -1151,30 +1156,43 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
 
     await emit("status", f"Worker claimed queued scrape job (job_id={runtime_job_id})", phase="queue")
 
+    _targeted_retry = _is_targeted_retry_payload(job.request_payload)
+
     # Wipe stale pending/rejected scraped_courses rows for this university so
     # a previous failed run cannot block dedup on this attempt. Done before
     # discovery so the cleared count is visible early in the live log.
-    try:
-        cleared = await _clear_stale_dedup(
-            db, job.university_id, current_job_id=runtime_job_id
-        )
+    # Explicit course-URL retries are continuations, not replacement scrapes:
+    # preserve every pending row from their source review chain.
+    if _targeted_retry:
         await emit(
             "status",
-            f"Cleared {cleared} stale pending/rejected scraped_courses rows "
-            f"(>{_STALE_DEDUP_MINUTES}m old) for university {job.university_id}",
+            "Targeted retry: preserved pending review rows from the source job",
             phase="cleanup",
-            cleared=cleared,
-            window_minutes=_STALE_DEDUP_MINUTES,
+            cleared=0,
+            kind="targeted_retry_preserve_review",
         )
-    except Exception as exc:  # noqa: BLE001
-        # Cleanup is best-effort — a failure here must never abort the scrape.
-        log.warning("stale dedup cleanup failed for uni %s: %s", job.university_id, exc)
-        await emit(
-            "status",
-            f"Stale-dedup cleanup failed (continuing): {exc}",
-            phase="cleanup",
-            error=str(exc)[:200],
-        )
+    else:
+        try:
+            cleared = await _clear_stale_dedup(
+                db, job.university_id, current_job_id=runtime_job_id
+            )
+            await emit(
+                "status",
+                f"Cleared {cleared} stale pending/rejected scraped_courses rows "
+                f"(>{_STALE_DEDUP_MINUTES}m old) for university {job.university_id}",
+                phase="cleanup",
+                cleared=cleared,
+                window_minutes=_STALE_DEDUP_MINUTES,
+            )
+        except Exception as exc:  # noqa: BLE001
+            # Cleanup is best-effort — a failure here must never abort the scrape.
+            log.warning("stale dedup cleanup failed for uni %s: %s", job.university_id, exc)
+            await emit(
+                "status",
+                f"Stale-dedup cleanup failed (continuing): {exc}",
+                phase="cleanup",
+                error=str(exc)[:200],
+            )
 
     summary = {"discovered": 0, "staged": 0, "skipped": 0, "errors": 0, "fetch_failed": 0}
     # Track why courses were skipped: {guard_name: count}
@@ -1545,7 +1563,6 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # budget can't be managed without seeing where the time goes.
         _ph_marks: dict[str, float] = {"disc_start": time.monotonic()}
         _target_course_urls = _target_course_urls_from_payload(job.request_payload)
-        _targeted_retry = bool(_target_course_urls)
         if _targeted_retry:
             log.info(
                 "Targeted retry for %s selected course URL(s) (fast_mode=%s)",

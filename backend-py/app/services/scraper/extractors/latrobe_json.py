@@ -928,6 +928,36 @@ async def apply_overrides(
         payload["duration_term"] = dur_term
         applied["duration"] = {"old": prev, "new": (dur_val, dur_term)}
 
+    # The same authoritative duration string carries attendance load, e.g.
+    # "0.5 years full-time" or "1 year part-time".  The generic study-load
+    # fallback cannot see this because it receives the SPA shell and the
+    # numeric duration parser intentionally discards qualifier text.
+    _dur_lower = _dur_raw.lower()
+    _has_full_time = bool(re.search(r"\bfull[- ]time\b", _dur_lower))
+    _has_part_time = bool(re.search(r"\bpart[- ]time\b", _dur_lower))
+    _study_load = (
+        "Both"
+        if _has_full_time and _has_part_time
+        else "Full Time"
+        if _has_full_time
+        else "Part Time"
+        if _has_part_time
+        else None
+    )
+    if _study_load:
+        prev_load = payload.get("study_load")
+        payload["study_load"] = _study_load
+        applied["study_load"] = {"old": prev_load, "new": _study_load}
+        if evidence is not None:
+            evidence.append({
+                "field_key": "study_load",
+                "value": _study_load,
+                "confidence": 0.95,
+                "method": "latrobe_json",
+                "source_url": intl_url,
+                "snippet": f"latrobe_json duration: {_dur_raw}",
+            })
+
     # ── Authoritative study mode from the international detail JSON ─────
     # The SPA shell regularly contains generic "online" marketing copy and
     # no usable per-course location. Its weak rule result can therefore be

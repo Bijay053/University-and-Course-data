@@ -67,6 +67,7 @@ def test_taxonomy_size_matches_node():
         ("Certificate IV in Kitchen Management",  "Hospitality, Tourism & Events", "Cookery"),
         ("Certificate III in Patisserie",         "Hospitality, Tourism & Events", "Cookery"),
         ("Certificate IV in Patisserie",          "Hospitality, Tourism & Events", "Cookery"),
+        ("Graduate Certificate in Digital Health", "Medicine & Health", "Health Sciences"),
         # Issue 2: trades sub-categories
         ("Certificate III in Carpentry",  "Trades & Construction", "Carpentry"),
         # Existing hospitality sub-categories should still work

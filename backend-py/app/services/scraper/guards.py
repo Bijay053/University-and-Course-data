@@ -579,6 +579,8 @@ def should_stage_course(
                                      Only on-campus or blended courses are ingested.
                                      Marked transient so courses re-stage if campus
                                      options are later added by the institution.
+    * ``"part_time_only"``        — final study_load is Part Time. International
+                                     review accepts courses with a full-time route.
 
     Callers must invoke this AFTER all extractors + AI fallback have run (i.e.
     just before the DB write in ``stage_course``) so Bug B and C have settled
@@ -668,6 +670,21 @@ def should_stage_course(
     # states "this course is not available to international students" etc.
     if payload.get("domestic_only"):
         return (False, "domestic_only")
+
+    # Global full-time policy: all page-specific and AI normalization has
+    # already run by the time this final staging gate is called. If the final
+    # value is still Part Time, no eligible full-time route was confirmed.
+    _study_load = re.sub(
+        r"[-_]+", " ", str(payload.get("study_load") or "")
+    ).strip().lower()
+    if _study_load == "part time":
+        log.info(
+            "[REJECT CHECK] course=%r study_load=%r "
+            "decision=reject (part_time_only) global_policy=true",
+            effective_name,
+            payload.get("study_load"),
+        )
+        return (False, "part_time_only")
 
     # Slug-name + empty-data rejection: catches pages that silently redirected
     # to a "course not found" 404 during extraction.  When that happens the

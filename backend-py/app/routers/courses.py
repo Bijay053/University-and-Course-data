@@ -57,8 +57,13 @@ async def list_courses(
         stmt = stmt.where(Course.category == category)
     if sub_category:
         stmt = stmt.where(Course.sub_category == sub_category)
-    if status_filter:
+    if status_filter and status_filter.lower() != "all":
         stmt = stmt.where(Course.status == status_filter)
+    elif not status_filter:
+        # Public/admin course lists show only currently eligible catalogue rows
+        # by default. Callers that explicitly need quarantined/history rows can
+        # request ?status=all.
+        stmt = stmt.where(Course.status == "active")
 
     total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
     stmt = stmt.order_by(desc(Course.updated_at)).offset((page - 1) * limit).limit(limit)

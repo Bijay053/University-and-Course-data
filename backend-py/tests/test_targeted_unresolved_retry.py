@@ -13,6 +13,7 @@ from app.routers import scrape
 from app.schemas.scrape import ScrapeStartResponse, StartScrapeBody
 from app.services.scraper.orchestrator import (
     _inject_extra_course_urls,
+    _is_targeted_retry_payload,
     _target_course_urls_from_payload,
 )
 
@@ -43,6 +44,14 @@ def test_targeted_urls_are_http_only_deduplicated_and_bounded() -> None:
         "https://example.edu/course/a",
         "https://example.edu/course/c",
     ]
+
+
+def test_targeted_retry_payload_preserves_parent_review_rows() -> None:
+    assert _is_targeted_retry_payload({
+        "courseUrls": ["https://example.edu/course/a"],
+        "retrySourceJobId": "job_parent",
+    })
+    assert not _is_targeted_retry_payload({"retrySourceJobId": "job_parent"})
 
 
 def test_targeted_retry_does_not_expand_with_yaml_extra_urls() -> None:

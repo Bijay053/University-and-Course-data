@@ -127,6 +127,8 @@ def test_apply_overrides_uses_prefetched_document_without_fetch(monkeypatch):
 
     assert "duration" in applied
     assert payload["duration"] == 3
+    assert applied["study_load"]["new"] == "Full Time"
+    assert payload["study_load"] == "Full Time"
 
 
 def test_parse_international_fee_supports_current_raw_fees_schema():

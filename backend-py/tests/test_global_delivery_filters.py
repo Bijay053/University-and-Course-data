@@ -6,6 +6,10 @@ from app.services.scraper.config.schema import UniConfig
 from app.services.scraper.guards import should_stage_course
 from app.services.scraper.pipelines.single_course import (
     _domestic_only_filter_enabled,
+    _duration_labeled_values,
+    _infer_study_load_from_text,
+    _is_parttime_only_page,
+    _parttime_only_filter_enabled,
 )
 
 
@@ -55,3 +59,76 @@ def test_disabled_legacy_overrides_cannot_bypass_global_delivery_filters() -> No
         assert domestic_reason == "domestic_only"
     finally:
         current_uni_config.reset(token)
+
+
+def test_full_time_wins_when_duration_also_mentions_part_time_equivalent() -> None:
+    assert (
+        _infer_study_load_from_text("2 years full-time or part-time equivalent")
+        == "Full Time"
+    )
+    assert (
+        _infer_study_load_from_text("3 years, or part-time equivalent")
+        == "Full Time"
+    )
+
+
+def test_explicit_part_time_only_wording_overrides_equivalent_full_time_measure() -> None:
+    assert (
+        _infer_study_load_from_text(
+            "Duration 1 year equivalent full-time study. Only available part-time."
+        )
+        == "Part Time"
+    )
+
+
+def test_uow_duration_row_is_not_part_time_only_when_full_time_is_offered() -> None:
+    html = """
+    <div class="cf-college-info__row">
+      <div class="cf-college-info__left"><span>Duration</span></div>
+      <div class="cf-college-info__right">
+        2 years full-time or part-time equivalent
+      </div>
+    </div>
+    """
+    assert _is_parttime_only_page(html) is False
+
+
+def test_nested_duration_label_reads_its_list_item_value() -> None:
+    html = """
+    <ul class="details-listing">
+      <li>
+        <span class="details-listing__title"><strong>Duration</strong></span>
+        <span class="details-listing__value">
+          3 years full-time or equivalent part-time
+        </span>
+      </li>
+    </ul>
+    """
+    assert (
+        _infer_study_load_from_text(" ".join(_duration_labeled_values(html)))
+        == "Full Time"
+    )
+
+
+def test_part_time_only_duration_is_globally_rejected() -> None:
+    html = """
+    <div class="cf-college-info__row">
+      <div class="cf-college-info__left"><span>Duration</span></div>
+      <div class="cf-college-info__right">2 years part-time</div>
+    </div>
+    """
+    assert _parttime_only_filter_enabled() is True
+    assert _is_parttime_only_page(html) is True
+
+    accepted, reason = should_stage_course(
+        "Master of Part-Time Study",
+        {
+            "course_name": "Master of Part-Time Study",
+            "international_fee": 30000,
+            "study_mode": "On Campus",
+            "study_load": "Part Time",
+        },
+        source_url="https://example.edu/master-of-part-time-study",
+    )
+    assert accepted is False
+    assert reason == "part_time_only"

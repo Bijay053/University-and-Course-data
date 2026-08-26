@@ -27,6 +27,11 @@ import {
   type ReviewEvidenceItem,
 } from "@/components/review-scraped-courses-table";
 import { ScrapeJobCard } from "@/components/scrape-job-card";
+import { DEGREE_LEVELS, STUDY_LOADS, STUDY_MODES } from "@/lib/course-constants";
+
+function optionsIncludingCurrent(options: string[], current: string | null): string[] {
+  return current && !options.includes(current) ? [current, ...options] : options;
+}
 
 type ImportJob = {
   id: number;
@@ -3332,13 +3337,9 @@ export default function Scraping() {
                 <Select value={editingCourse.degreeLevel || ""} onValueChange={(v) => setEditingCourse({ ...editingCourse, degreeLevel: v || null })}>
                   <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Bachelor">Bachelor</SelectItem>
-                    <SelectItem value="Master">Master</SelectItem>
-                    <SelectItem value="PhD">PhD</SelectItem>
-                    <SelectItem value="Certificate & Diploma">Certificate & Diploma</SelectItem>
-                    <SelectItem value="Graduate Certificate & Diploma">Graduate Certificate & Diploma</SelectItem>
-                    <SelectItem value="Associate Degree">Associate Degree</SelectItem>
-                    <SelectItem value="Equivalent">Equivalent</SelectItem>
+                    {optionsIncludingCurrent(DEGREE_LEVELS, editingCourse.degreeLevel).map((level) => (
+                      <SelectItem key={level} value={level}>{level}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -3347,7 +3348,9 @@ export default function Scraping() {
                 <Select value={editingCourse.studyMode || ""} onValueChange={(v) => setEditingCourse({ ...editingCourse, studyMode: v || null })}>
                   <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="On Campus">On Campus</SelectItem>
+                    {optionsIncludingCurrent(STUDY_MODES, editingCourse.studyMode).map((mode) => (
+                      <SelectItem key={mode} value={mode}>{mode}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -3376,8 +3379,9 @@ export default function Scraping() {
                 <Select value={editingCourse.studyLoad || ""} onValueChange={(v) => setEditingCourse({ ...editingCourse, studyLoad: v || null })}>
                   <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Full Time">Full Time</SelectItem>
-                    <SelectItem value="Part Time">Part Time</SelectItem>
+                    {optionsIncludingCurrent(STUDY_LOADS, editingCourse.studyLoad).map((load) => (
+                      <SelectItem key={load} value={load}>{load}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

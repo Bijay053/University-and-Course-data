@@ -42,7 +42,7 @@ discovery:
   # Seed directly from the course catalogue — avoids the home page redirect
   # overhead (home page → /study/degrees redirect costs one extra Scrape.do call).
   seed_urls:
-    - https://www.griffith.edu.au/study/degrees
+    - https://www.griffith.edu.au/study/degrees?term=
 
   use_wayback: false
 

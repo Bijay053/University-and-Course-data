@@ -1440,10 +1440,19 @@ export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove
       setProgress(null);
       extractionStartRef.current = null;
       setStartTime(t0);
-      setLogs([{
-        event: "status",
-        message: `Continuing ${unresolvedCount} unresolved course${unresolvedCount === 1 ? "" : "s"} from ${completedJobId}.`,
-      }]);
+      // A continuation uses a separate runtime job internally so retries remain
+      // auditable, but it is one operator workflow. Keep the completed parent
+      // log visible and append the child job below a clear separator instead of
+      // making the card look like an unrelated brand-new scrape.
+      setLogs((previous) => [
+        ...previous,
+        {
+          event: "status",
+          message:
+            `══ CONTINUING ${unresolvedCount} UNRESOLVED COURSE${unresolvedCount === 1 ? "" : "S"} ` +
+            `FROM ${completedJobId} AS ${data.jobId} ══`,
+        },
+      ].slice(-MAX_LOGS));
       setScraping(true);
       setPhase("running");
       sessionStorage.setItem(slotKey, data.jobId);

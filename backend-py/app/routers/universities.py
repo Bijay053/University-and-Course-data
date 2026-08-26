@@ -240,8 +240,10 @@ async def get_university_courses(
     if not u:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="University not found")
     stmt = select(Course).where(Course.university_id == uni_id)
-    if status_filter:
+    if status_filter and status_filter.lower() != "all":
         stmt = stmt.where(Course.status == status_filter)
+    elif not status_filter:
+        stmt = stmt.where(Course.status == "active")
     total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
     stmt = stmt.order_by(desc(Course.updated_at)).offset((page - 1) * limit).limit(limit)
     rows = (await db.execute(stmt)).scalars().all()
