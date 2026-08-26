@@ -970,6 +970,86 @@ _PROG_LEVEL_PRIORITY: list[tuple[re.Pattern[str], int]] = [
 _TEST_ROW_LABELS = re.compile(r"\b(ielts|pte|toefl|cambridge|cae|duolingo|det)\b", re.I)
 
 
+def _parse_ielts_skill_table(soup: BeautifulSoup) -> dict[str, float]:
+    """Parse explicit IELTS tables with one column per language skill.
+
+    UOW course pages use:
+
+        English Test | Overall Score | Reading | Writing | Listening | Speaking
+        IELTS Academic | 7.5 | 7.0 | 7.0 | 8.0 | 8.0
+
+    Flattening that table to prose puts the labels before ``IELTS Academic``.
+    The prose regexes intentionally look near/after the IELTS token, so they
+    retain the overall but miss every sub-band. Reading the DOM columns by
+    header is both more precise and independent of column order.
+    """
+    field_for_header = {
+        "overall": "ielts_overall",
+        "overall score": "ielts_overall",
+        "reading": "ielts_reading",
+        "writing": "ielts_writing",
+        "listening": "ielts_listening",
+        "speaking": "ielts_speaking",
+    }
+
+    for table in soup.find_all("table"):
+        try:
+            rows = table.find_all("tr")
+            if len(rows) < 2:
+                continue
+
+            header_cells = rows[0].find_all(["th", "td"])
+            headers = [
+                re.sub(r"\s+", " ", cell.get_text(" ", strip=True)).strip().lower()
+                for cell in header_cells
+            ]
+            column_fields = {
+                index: field_for_header[header]
+                for index, header in enumerate(headers)
+                if header in field_for_header
+            }
+            if "ielts_overall" not in column_fields.values():
+                continue
+
+            for row in rows[1:]:
+                cells = row.find_all(["th", "td"])
+                if not cells or not re.search(
+                    r"\bielts(?:\s+academic)?\b",
+                    cells[0].get_text(" ", strip=True),
+                    re.I,
+                ):
+                    continue
+
+                parsed: dict[str, float] = {}
+                for index, field_key in column_fields.items():
+                    if index >= len(cells):
+                        continue
+                    match = re.search(
+                        r"\b([4-9](?:\.[0-9]+)?)\b",
+                        cells[index].get_text(" ", strip=True),
+                    )
+                    if not match:
+                        continue
+                    value = float(match.group(1))
+                    if 4 <= value <= 9:
+                        parsed[field_key] = value
+
+                subband_count = sum(
+                    key in parsed
+                    for key in (
+                        "ielts_reading",
+                        "ielts_writing",
+                        "ielts_listening",
+                        "ielts_speaking",
+                    )
+                )
+                if "ielts_overall" in parsed and subband_count >= 2:
+                    return parsed
+        except Exception as exc:  # noqa: BLE001
+            log.debug("_parse_ielts_skill_table row error: %s", exc)
+    return {}
+
+
 def _parse_program_level_table(soup: BeautifulSoup) -> dict[str, float]:
     """Parse tables where COLUMN HEADERS are program levels and ROW LABELS are
     test names (e.g. KBS English Entry Requirements page):
@@ -1194,6 +1274,28 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
         *_emit("cambridge", _cambridge(text), snippet),
         *_emit("duolingo", _duolingo(text), snippet),
     ]
+    # Explicit per-skill tables are more authoritative than flattened prose.
+    # In particular, UOW places the header row before the IELTS data row, so
+    # the prose parser sees the overall but cannot associate the four scores
+    # with their labels.
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+        skill_data = _parse_ielts_skill_table(soup)
+        if skill_data:
+            results = [r for r in results if r.field_key != "ielts_overall"]
+            results.append(
+                ExtractionResult(
+                    field_key="ielts_overall",
+                    value=skill_data["ielts_overall"],
+                    normalized=skill_data,
+                    confidence=0.98,
+                    snippet=f"IELTS skill table → {skill_data}",
+                    method="ielts_skill_table",
+                )
+            )
+    except Exception as exc:  # noqa: BLE001
+        log.debug("ielts_skill_table failed: %s", exc)
+
     # ── Program-level table: override prose results when the page has a table
     # with program-level column headers (Foundation | Diploma | Bachelor |
     # Postgraduate).  Prose extraction on such pages picks the first/lowest

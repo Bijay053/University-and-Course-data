@@ -113,6 +113,56 @@ def test_english_ielts_overall_with_no_band_below():
     assert n["ielts_overall"] == 6.5 and n["ielts_listening"] == 6.0
 
 
+# --- UOW regression: explicit course-level IELTS skill table -----------------
+def test_english_uow_skill_table_maps_bands_by_column_header():
+    html = """
+    <section>
+      <h3>English Language Requirements</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>English Test</th>
+            <th>Overall Score</th>
+            <th>Reading</th>
+            <th>Writing</th>
+            <th>Listening</th>
+            <th>Speaking</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>IELTS Academic</td>
+            <td>7.5</td>
+            <td>7.0</td>
+            <td>7.0</td>
+            <td>8.0</td>
+            <td>8.0</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+    """
+    out = {
+        r.field_key: r
+        for r in _run(
+            english_test.extract(
+                html,
+                "https://www.uow.edu.au/study/courses/master-of-teaching-secondary/",
+            )
+        )
+    }
+    result = out["ielts_overall"]
+    assert result.method == "ielts_skill_table"
+    assert result.confidence == 0.98
+    assert result.normalized == {
+        "ielts_overall": 7.5,
+        "ielts_reading": 7.0,
+        "ielts_writing": 7.0,
+        "ielts_listening": 8.0,
+        "ielts_speaking": 8.0,
+    }
+
+
 # --- UWL regression: split overall (banner) + per-band floor (prose) ---------
 # https://www.uwl.ac.uk/course/undergraduate/forensic-science states the overall
 # in a banner ("6.0 IELTS or above") and the per-band floor in body prose

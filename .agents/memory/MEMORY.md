@@ -89,4 +89,5 @@
 - [payload.get(key, default) None trap](payload-get-none-trap.md) — key present with None value → get() returns None not default; use `(payload.get(key) or "").strip()` always.
 - [Global international-audience filters](global-international-audience-filters.md) — confirmed domestic-only and online-only courses are never staged, regardless of per-university YAML or admin overrides.
 - [UOW session-fee table](uow-session-fee.md) — UOW’s adjacent Course fee is a full-programme total; select and retain the Session fee column instead.
+- [UOW IELTS skill table](uow-ielts-skill-table.md) — course pages put band labels in the header before the IELTS row; parse DOM columns or flattened prose drops every sub-band.
 - [SSR courses with missing English](ssr-missing-english-browser-skip.md) — “English missing” can still trigger generic Playwright; proven SSR hosts need skip_per_course_browser and central English fallback.
