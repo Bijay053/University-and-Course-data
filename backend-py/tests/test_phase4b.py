@@ -199,14 +199,26 @@ class TestApiClassifierGraphQL:
 class TestApiClassifierRestJson:
     def test_top_level_array(self):
         from app.services.scraper.api_classifier import classify_capture
-        cap = _make_capture("https://example.com/courses.json", _REST_BODY)
+        body = [
+            {"title": "Course F", "link": "/courses/course-f"},
+            {"title": "Course G", "link": "/courses/course-g"},
+            {"title": "Course H", "link": "/courses/course-h"},
+        ]
+        cap = _make_capture("https://example.com/courses.json", body)
         result = classify_capture(cap)
         assert result is not None
         assert result.api_type == "rest_json"
 
     def test_object_with_list(self):
         from app.services.scraper.api_classifier import classify_capture
-        body = {"data": [{"name": "C1"}, {"name": "C2"}], "total": 2}
+        body = {
+            "data": [
+                {"name": "C1", "url": "/courses/c1"},
+                {"name": "C2", "url": "/courses/c2"},
+                {"name": "C3", "url": "/courses/c3"},
+            ],
+            "total": 3,
+        }
         cap = _make_capture("https://example.com/api/courses", body)
         result = classify_capture(cap)
         assert result is not None

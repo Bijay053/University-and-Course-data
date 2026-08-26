@@ -55,6 +55,7 @@ asyncio_default_fixture_loop_scope = "session"
 asyncio_default_test_loop_scope = "session"
 testpaths = ["tests"]
 # Skip integration tests (real Playwright/network) by default.
+# Full non-integration scraper regression: PYTHONPATH=. python -m pytest -q
 # Run them explicitly with: pytest -m integration
 addopts = "-m 'not integration'"
 markers = [

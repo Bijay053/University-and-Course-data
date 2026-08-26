@@ -48,6 +48,10 @@ args = "task235-skip-counters"
 task = "workflow.run"
 args = "task237-flaky-tests"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "full-scraper-regression"
+
 [[workflows.workflow]]
 name = "backend-py: FastAPI"
 author = "agent"
@@ -133,6 +137,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd backend-py && PYTHONPATH=. python -m pytest tests/test_gemini_gate.py tests/test_browser_international_toggle.py -q -c /dev/null -p no:cacheprovider"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "full-scraper-regression"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend-py && PYTHONPATH=. python -m pytest -q"
 
 [workflows.workflow.metadata]
 isValidation = true

@@ -76,7 +76,7 @@ class TestScorePdfLink:
 
 class TestFindLinkedPdfs:
     def _run(self, coro):
-        return asyncio.get_event_loop().run_until_complete(coro)
+        return asyncio.run(coro)
 
     def setup_method(self):
         from app.services.scraper.recovery.extractor import _find_linked_pdfs
@@ -149,7 +149,7 @@ class TestFindLinkedPdfs:
 
 class TestExtractFromPdf:
     def _run(self, coro):
-        return asyncio.get_event_loop().run_until_complete(coro)
+        return asyncio.run(coro)
 
     def test_uses_download_pdf_text_not_fetch_pdf_text(self):
         """Ensure _extract_from_pdf calls the correct function name."""
@@ -325,7 +325,7 @@ class TestSearcherHomepagePdf:
     _SEED_URL = "https://uni.edu.au"
 
     def _run(self, coro):
-        return asyncio.get_event_loop().run_until_complete(coro)
+        return asyncio.run(coro)
 
     def _seed_html(self, extra_links: list[tuple[str, str]] | None = None) -> str:
         """Build a seed page HTML containing the gap PDF link."""
@@ -506,7 +506,7 @@ class TestBroadScorerSummaryCount:
     dict, and results from broad-scorer PDFs must have source_type='pdf_broad'."""
 
     def _run(self, coro):
-        return asyncio.get_event_loop().run_until_complete(coro)
+        return asyncio.run(coro)
 
     def test_summary_includes_pdfs_via_broad_scorer_key(self):
         """run_recovery_pass returns a summary dict that always contains the
@@ -606,7 +606,7 @@ class TestRunRecoveryPassFallbackPdf:
     _SCRAPE_RUN_ID = "test-run-fallback-pdf-001"
 
     def _run(self, coro):
-        return asyncio.get_event_loop().run_until_complete(coro)
+        return asyncio.run(coro)
 
     def _fake_course(self) -> dict:
         return {
@@ -946,7 +946,7 @@ class TestSingleCourseRecoveryBroadPdf:
     _SCRAPE_RUN_ID = "single-course-test-run-001"
 
     def _run(self, coro):
-        return asyncio.get_event_loop().run_until_complete(coro)
+        return asyncio.run(coro)
 
     def _mock_sc(self) -> MagicMock:
         """Return a MagicMock that looks like a ScrapedCourse ORM row."""
@@ -1543,7 +1543,7 @@ class TestMakePdfBudgetCallSites:
     )
 
     def _run(self, coro):
-        return asyncio.get_event_loop().run_until_complete(coro)
+        return asyncio.run(coro)
 
     # ------------------------------------------------------------------ #
     # Helpers shared by both call-site tests                              #

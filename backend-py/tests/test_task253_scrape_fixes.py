@@ -60,6 +60,7 @@ def _cardiff_cfg():
         slug="cardiff",
         name="Cardiff University",
         scrape_url="https://www.cardiff.ac.uk",
+        university_id=2194,
     )
 
 
@@ -67,7 +68,7 @@ def _raw(slug: str) -> dict:
     """Load the raw YAML dict for a given slug (handles _2182 suffix)."""
     base_dir = os.path.join(os.path.dirname(__file__), "..", "scraper_config", "unis")
     # Try exact slug first, then slug with numeric suffix
-    for candidate in [f"{slug}.yaml", f"{slug}_2182.yaml"]:
+    for candidate in [f"{slug}_2182.yaml", f"{slug}_2194.yaml", f"{slug}.yaml"]:
         path = os.path.join(base_dir, candidate)
         if os.path.exists(path):
             with open(path) as fh:
@@ -157,8 +158,9 @@ def test_tees_bfs_page_budget():
 def test_tees_expected_min_courses():
     """Teesside expected_min_courses alert threshold."""
     cfg = _tees_cfg()
-    assert cfg.discovery.expected_min_courses == 80, (
-        "expected_min_courses must be 80 to alert when discovery unexpectedly drops"
+    assert cfg.discovery.expected_min_courses == 600, (
+        "expected_min_courses must be 600 now that the search API returns the "
+        "full taught-course catalogue"
     )
 
 

@@ -18,18 +18,10 @@ import time
 from pathlib import Path
 
 import pytest
+import pytest_asyncio
 
 _SCRAPER_DIR = Path(__file__).resolve().parent.parent / "app" / "services" / "scraper"
 _ORCH_SRC = (_SCRAPER_DIR / "orchestrator.py").read_text(encoding="utf-8")
-
-
-def _run(coro):
-    """Run a coroutine on a fresh event loop (session-loop isolation)."""
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -97,8 +89,8 @@ class TestFetchErrorRegistry:
 # B — account-wide Scrape.do semaphore
 # ═══════════════════════════════════════════════════════════════════════════
 
-@pytest.fixture()
-def _sem_env(monkeypatch):
+@pytest_asyncio.fixture(loop_scope="session")
+async def _sem_env(monkeypatch):
     """Enable the semaphore (cap=2) against local dev Redis; clean key."""
     from app.config import settings
     from app.services.scraper import scrape_do_semaphore as sem
@@ -113,19 +105,19 @@ def _sem_env(monkeypatch):
         finally:
             await c.aclose()
 
-    _run(_clean())
+    await _clean()
     yield sem
-    _run(_clean())
+    await _clean()
 
 
 class TestScrapeDoSemaphore:
-    def test_disabled_returns_none_without_redis(self, monkeypatch):
+    async def test_disabled_returns_none_without_redis(self, monkeypatch):
         from app.config import settings
         from app.services.scraper import scrape_do_semaphore as sem
         monkeypatch.setattr(settings, "scrape_do_account_concurrency", 0)
-        assert _run(sem.acquire_slot()) is None
+        assert await sem.acquire_slot() is None
 
-    def test_acquire_release_cycle(self, _sem_env):
+    async def test_acquire_release_cycle(self, _sem_env):
         sem = _sem_env
 
         async def flow():
@@ -143,9 +135,9 @@ class TestScrapeDoSemaphore:
             await sem.release_slot(t2)
             await sem.release_slot(t4)
 
-        _run(flow())
+        await flow()
 
-    def test_stale_holder_reaped(self, _sem_env):
+    async def test_stale_holder_reaped(self, _sem_env):
         sem = _sem_env
         from app.config import settings
 
@@ -163,16 +155,25 @@ class TestScrapeDoSemaphore:
             assert t is not None
             await sem.release_slot(t)
 
-        _run(flow())
+        await flow()
 
-    def test_fail_open_on_unreachable_redis(self, monkeypatch):
+    async def test_fail_open_on_unreachable_redis(self, monkeypatch):
         from app.config import settings
         from app.services.scraper import scrape_do_semaphore as sem
         monkeypatch.setattr(settings, "scrape_do_account_concurrency", 2)
         monkeypatch.setattr(settings, "redis_url", "redis://127.0.0.1:1/0")
-        assert _run(sem.acquire_slot()) is None  # no exception — fail open
+        loop = asyncio.get_running_loop()
+        previous = sem._clients.pop(loop, None)
+        if previous is not None:
+            await previous.aclose()
+        try:
+            assert await sem.acquire_slot() is None  # no exception — fail open
+        finally:
+            unreachable = sem._clients.pop(loop, None)
+            if unreachable is not None:
+                await unreachable.aclose()
 
-    def test_account_slot_context_manager_releases(self, _sem_env):
+    async def test_account_slot_context_manager_releases(self, _sem_env):
         sem = _sem_env
         from app.config import settings
 
@@ -186,11 +187,11 @@ class TestScrapeDoSemaphore:
             finally:
                 await c.aclose()
 
-        _run(flow())
+        await flow()
 
-    def test_release_none_token_is_noop(self):
+    async def test_release_none_token_is_noop(self):
         from app.services.scraper import scrape_do_semaphore as sem
-        _run(sem.release_slot(None))  # must not raise
+        await sem.release_slot(None)  # must not raise
 
     def test_http_fetcher_nests_account_slot_inside_local_sem(self):
         # Local per-process semaphore FIRST, fleet-wide Redis slot second —
@@ -240,7 +241,7 @@ class TestScrapeDoSemaphore:
             )
             assert not bad, f"{mod} still has module-level asyncio primitives: {bad}"
 
-    def test_semaphore_reuses_per_loop_client(self):
+    async def test_semaphore_reuses_per_loop_client(self):
         from app.services.scraper import scrape_do_semaphore as sem
 
         async def flow():
@@ -248,7 +249,7 @@ class TestScrapeDoSemaphore:
             c2 = sem._get_client()
             assert c1 is c2, "same loop must reuse one Redis client"
 
-        _run(flow())
+        await flow()
 
     def test_config_alias_choices(self):
         from app.config import Settings
@@ -272,7 +273,7 @@ class TestDiscoveryUrlCacheC1:
         src = Path("app/routers/scrape.py").read_text(encoding="utf-8")
         assert '"forceDiscovery": bool(body.force_discovery)' in src
 
-    def test_model_roundtrip_dev_db(self):
+    async def test_model_roundtrip_dev_db(self):
         from datetime import datetime, timezone
         from sqlalchemy import delete
         from app.database import AsyncSessionLocal
@@ -304,7 +305,7 @@ class TestDiscoveryUrlCacheC1:
                 await db.delete(row)
                 await db.commit()
 
-        _run(flow())
+        await flow()
 
     # Orchestrator gate wiring (source-level, mirrors the parity-test pattern —
     # importing orchestrator pulls the full genai chain, which stalls under

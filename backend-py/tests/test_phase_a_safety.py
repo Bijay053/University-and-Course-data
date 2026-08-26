@@ -195,9 +195,9 @@ def test_blocks_undergraduate_postgraduate_landing_urls():
     """Last-segment match: /undergraduate-study, /postgraduate-study."""
     cases = [
         ("https://www.unisq.edu.au/study/degrees-and-courses/undergraduate-study?studentType=international",
-         "category_landing_page"),
+         "category_landing_page_url_block"),
         ("https://www.unisq.edu.au/study/degrees-and-courses/postgraduate-study",
-         "category_landing_page"),
+         "category_landing_page_url_block"),
     ]
     for url, expect in cases:
         b, r = is_blocked_page(url)
@@ -208,11 +208,11 @@ def test_blocks_undergraduate_postgraduate_landing_urls():
 def test_blocks_study_online_and_pathway_urls():
     cases = [
         ("https://www.unisq.edu.au/study/degrees-and-courses/study-online",
-         "category_landing_page"),
+         "category_landing_page_url_block"),
         ("https://www.unisq.edu.au/study/pathways-to-uni",
          "pathway_page"),
         ("https://www.uow.edu.au/study-at-uow", "marketing_page"),
-        ("https://www.uow.edu.au/study-online/", "category_landing_page"),
+        ("https://www.uow.edu.au/study-online/", "category_landing_page_url_block"),
     ]
     for url, expect in cases:
         b, r = is_blocked_page(url)
@@ -252,13 +252,13 @@ def test_blocks_pathways_to_uni_title():
     for title, expect in [
         ("Pathways to uni",         "pathway_page"),
         ("Pathways to UNE",         "pathway_page"),
-        ("Undergraduate study",     "category_landing_page"),
-        ("Postgraduate study",      "category_landing_page"),
-        ("Undergraduate degrees",   "category_landing_page"),
-        ("Postgraduate courses",    "category_landing_page"),
-        ("Undergraduate programs",  "category_landing_page"),
-        ("Postgraduate programmes", "category_landing_page"),
-        ("Study online",            "category_landing_page"),
+        ("Undergraduate study",     "category_landing_page_title_block"),
+        ("Postgraduate study",      "category_landing_page_title_block"),
+        ("Undergraduate degrees",   "category_landing_page_title_block"),
+        ("Postgraduate courses",    "category_landing_page_title_block"),
+        ("Undergraduate programs",  "category_landing_page_title_block"),
+        ("Postgraduate programmes", "category_landing_page_title_block"),
+        ("Study online",            "category_landing_page_title_block"),
         ("Study at UOW",            "marketing_page"),
         ("Saved courses",           "ui_page"),
         ("Favourites",              "ui_page"),
@@ -268,10 +268,10 @@ def test_blocks_pathways_to_uni_title():
         ("Year 12 entry",           "info_page"),
         ("Why study at UNE",        "marketing_page"),
         ("Why choose UOW",          "marketing_page"),
-        ("Explore courses",         "category_landing_page"),
-        ("Browse courses",          "category_landing_page"),
-        ("Our courses",             "category_landing_page"),
-        ("Study areas",             "category_landing_page"),
+        ("Explore courses",         "category_landing_page_title_block"),
+        ("Browse courses",          "category_landing_page_title_block"),
+        ("Our courses",             "category_landing_page_title_block"),
+        ("Study areas",             "category_landing_page_title_block"),
         ("Information for international students", "info_page"),
     ]:
         b, r = is_blocked_page(
@@ -529,6 +529,8 @@ def _make(**overrides) -> ScrapedCourse:
     sc.completeness = 90
     sc.decision_score = 0.9
     sc.ielts_overall = 6.5
+    sc.duration = 3
+    sc.intake_months = [2]
     for k, v in overrides.items():
         setattr(sc, k, v)
     return sc
@@ -633,7 +635,7 @@ def test_phase_a6_uow_production_examples_blocked():
     # Legacy index.php router must be blocked
     b, r = is_blocked_page("https://www.uow.edu.au/study/index.php?id=42")
     assert b is True
-    assert r == "category_landing_page"
+    assert r == "category_landing_page_url_block"
 
 
 def test_phase_a6_flinders_production_examples_blocked():
@@ -658,9 +660,9 @@ def test_phase_a6_flinders_production_examples_blocked():
     # test_phase_a6_postgrad_path_does_not_block_postgraduate_slug).
     for url, expect_reason in [
         ("https://www.flinders.edu.au/study/postgrad/",
-         "category_landing_page"),
+         "category_landing_page_url_block"),
         ("https://www.flinders.edu.au/study/postgrad/master-of-x",
-         "category_landing_page"),
+         "category_landing_page_url_block"),
         ("https://www.flinders.edu.au/study/pathways/",
          "pathway_page"),
         ("https://www.flinders.edu.au/study/pathways-to-medicine",
@@ -708,7 +710,7 @@ def test_phase_a6_index_php_block_scoped_to_uow_router():
     # Blocked: UOW category-router pattern
     b, r = is_blocked_page("https://www.uow.edu.au/study/index.php?id=42")
     assert b is True
-    assert r == "category_landing_page"
+    assert r == "category_landing_page_url_block"
     # NOT blocked: an arbitrary index.php under /courses/ — until we
     # confirm it as a leak, we leave it allowed.
     b, _ = is_blocked_page("https://www.uni.edu.au/courses/index.php?id=99")

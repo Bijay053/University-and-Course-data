@@ -201,14 +201,14 @@ async def test_stage_course_persists_completeness_and_evidence():
 
 @pytest.mark.asyncio
 async def test_stage_course_review_status_when_blockers_present():
-    """A course missing degree_level + english test must land as 'review'
+    """A course missing its English test must land as 'review'
     with auto_publish_status='review' and a human-readable reason.
 
     The staging gate requires (a) a degree-qualified name and (b) an
     international_fee before a row can be staged.  Both are supplied here
     so the gate passes and the completeness / eligibility step runs.
-    The missing degree_level + english-test fields then trigger both
-    hard blockers and force the row into 'review' status.
+    Degree level is derived from the qualified course name, while the missing
+    English-test field remains a hard blocker and forces review status.
     """
     uni_id = await _pick_university()
     job_id = f"test_bugcd_blk_{uuid.uuid4().hex[:10]}"
@@ -219,7 +219,7 @@ async def test_stage_course_review_status_when_blockers_present():
                 scrape_job_id=job_id,
                 university_id=uni_id,
                 # "Master of Science" passes the degree-qualifier name gate.
-                # No degree_level or english-test fields → both hard blockers fire.
+                # Degree level is derived; no English-test field → blocker fires.
                 course_name="Master of Science",
                 payload={
                     "course_name": "Master of Science",
@@ -238,8 +238,7 @@ async def test_stage_course_review_status_when_blockers_present():
             assert sc.eligibility_reason and sc.eligibility_reason.startswith(
                 "Publish blocked: "
             )
-            # Both hard blockers should be named so the modal can show them.
-            assert "degreeLevel" in sc.eligibility_reason
+            assert "degreeLevel" not in sc.eligibility_reason
             assert "englishTest" in sc.eligibility_reason
     finally:
         await _cleanup(job_id)

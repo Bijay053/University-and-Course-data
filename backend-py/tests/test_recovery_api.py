@@ -12,6 +12,7 @@ triggered — the trigger endpoint is tested with run_single_course_recovery moc
 """
 from __future__ import annotations
 
+import uuid
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -24,7 +25,7 @@ from app.main import app
 _TRANSPORT = httpx.ASGITransport(app=app)
 _BASE = "http://testserver"
 
-RUN_ID = "test-recovery-api-run-001"
+pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 
 # ---------------------------------------------------------------------------
@@ -32,6 +33,7 @@ RUN_ID = "test-recovery-api-run-001"
 # ---------------------------------------------------------------------------
 
 async def _seed() -> dict:
+    run_id = f"test-recovery-api-{uuid.uuid4().hex}"
     async with AsyncSessionLocal() as db:
         uni_id = (await db.execute(
             text("INSERT INTO universities (name, country, city) VALUES (:n, 'Australia', 'Sydney') RETURNING id"),
@@ -44,7 +46,7 @@ async def _seed() -> dict:
                 "(scrape_job_id, university_id, course_name, degree_level, status) "
                 "VALUES (:run, :u, 'Recovery API Test Course', 'Bachelor''s', 'pending') RETURNING id"
             ),
-            {"run": RUN_ID, "u": uni_id},
+            {"run": run_id, "u": uni_id},
         )).scalar_one()
 
         pending_id = (await db.execute(
@@ -56,7 +58,7 @@ async def _seed() -> dict:
                 " 'https://uni.edu.au/fees', 'html', 'International fee: $32,000', 0.82, "
                 " 'snippet matches undergraduate', 'pending') RETURNING id"
             ),
-            {"sc": sc_id, "run": RUN_ID},
+            {"sc": sc_id, "run": run_id},
         )).scalar_one()
 
         trace_id = (await db.execute(
@@ -68,7 +70,7 @@ async def _seed() -> dict:
                 " 'https://uni.edu.au/english', 'trace', NULL, NULL, "
                 " 'BFS domain search found no candidate pages', 'no_source') RETURNING id"
             ),
-            {"sc": sc_id, "run": RUN_ID},
+            {"sc": sc_id, "run": run_id},
         )).scalar_one()
 
         applied_id = (await db.execute(
@@ -80,11 +82,12 @@ async def _seed() -> dict:
                 " 'https://uni.edu.au/course', 'html', 'Study at Sydney', 0.90, "
                 " 'high confidence html match', 'applied') RETURNING id"
             ),
-            {"sc": sc_id, "run": RUN_ID},
+            {"sc": sc_id, "run": run_id},
         )).scalar_one()
 
         await db.commit()
         return {
+            "run_id": run_id,
             "uni_id": uni_id,
             "sc_id": sc_id,
             "pending_id": pending_id,
@@ -97,7 +100,7 @@ async def _teardown(ids: dict) -> None:
     async with AsyncSessionLocal() as db:
         await db.execute(
             text("DELETE FROM agent_recovery_results WHERE scrape_run_id = :r"),
-            {"r": RUN_ID},
+            {"r": ids["run_id"]},
         )
         await db.execute(
             text("DELETE FROM scraped_courses WHERE id = :i"), {"i": ids["sc_id"]}
@@ -382,7 +385,7 @@ async def test_summary_returns_correct_counts():
     ids = await _seed()
     try:
         async with httpx.AsyncClient(transport=_TRANSPORT, base_url=_BASE) as ac:
-            r = await ac.get(f"/api/scrape/recovery/summary/{RUN_ID}")
+            r = await ac.get(f"/api/scrape/recovery/summary/{ids['run_id']}")
         assert r.status_code == 200
         body = r.json()
         required_keys = {
@@ -405,7 +408,7 @@ async def test_summary_excludes_trace_rows():
     ids = await _seed()
     try:
         async with httpx.AsyncClient(transport=_TRANSPORT, base_url=_BASE) as ac:
-            r = await ac.get(f"/api/scrape/recovery/summary/{RUN_ID}")
+            r = await ac.get(f"/api/scrape/recovery/summary/{ids['run_id']}")
         body = r.json()
         total = body["pending"] + body["applied"] + body["rejected"]
         # 3 rows seeded: 1 pending + 1 trace + 1 applied → trace excluded → total=2

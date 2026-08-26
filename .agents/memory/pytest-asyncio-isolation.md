@@ -1,27 +1,25 @@
 ---
 name: pytest asyncio isolation
-description: How to write sync test helpers that call async code without conflicting with pytest-asyncio's session-scoped event loop
+description: Keep pytest async resources on the configured session loop and isolate synchronous helpers
 ---
 
 ## The rule
-When writing synchronous test methods (class-based tests) that need to call `async` functions, never use `asyncio.get_event_loop().run_until_complete(coro)`. Use a fresh loop instead:
+Keep fully async tests and fixtures on pytest-asyncio's configured session loop, especially when they share asyncpg engines, Redis clients, or other loop-bound pools. When synchronous tests need to call isolated async functions, never rely on ambient `asyncio.get_event_loop()` state; use `asyncio.run()`:
 
 ```python
 def _run(coro):
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
+    return asyncio.run(coro)
 ```
 
 ## Why
-pytest-asyncio with `mode=Mode.AUTO` and `asyncio_default_fixture_loop_scope=session` creates a session-scoped event loop. When `asyncio.get_event_loop()` is called from a sync test method, it may return the session loop (which is running) or a closed loop, depending on test ordering. This causes:
+pytest-asyncio with session-scoped test and fixture loops lets shared async pools remain bound to one loop. Creating private loops inside async tests or fixtures makes pooled connections cross loop boundaries; using ambient loop state in sync helpers can instead return a running session loop or a loop closed by an earlier test. Both patterns create order-dependent failures:
 - `RuntimeError: This event loop is already running`
 - `DeprecationWarning: There is no current event loop`
 - Intermittent failures that pass in isolation but fail in the full suite
 
 ## How to apply
-- Always use `asyncio.new_event_loop()` in sync `_run()` helpers
-- Tests that are fully async should use `async def test_...()` — pytest-asyncio AUTO mode picks them up automatically without any decorator
+- Use `asyncio.run()` only in synchronous helpers whose coroutine does not touch session-loop-bound resources
+- Fully async tests should await directly and explicitly use the configured pytest-asyncio loop scope
+- Async fixtures should use `pytest_asyncio.fixture` and the same loop scope as their tests
+- Never create a private loop around shared asyncpg engines, Redis clients, or other pooled async resources
 - The symptom of the bug: tests pass in isolation (`pytest tests/test_foo.py`) but fail in the full suite

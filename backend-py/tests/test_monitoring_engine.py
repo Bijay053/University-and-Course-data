@@ -1,7 +1,6 @@
 """Phase 13: Autonomous Monitoring Engine — unit tests."""
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -15,14 +14,6 @@ from app.services.monitoring_engine import (
     get_or_create_watcher,
     next_check_interval_hours,
 )
-
-
-def _run(coro):
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
 
 
 def _make_watcher(**kwargs) -> MagicMock:
@@ -185,44 +176,44 @@ class TestDetectChange:
 # ── apply_probe_result ────────────────────────────────────────────────────────
 
 class TestApplyProbeResult:
-    def test_error_sets_error_result(self):
+    async def test_error_sets_error_result(self):
         w = _make_watcher()
         db = AsyncMock()
-        _run(apply_probe_result(w, {"error": "timeout", "status_code": None, "etag": None, "page_hash": None, "sitemap_hash": None}, False, db))
+        await apply_probe_result(w, {"error": "timeout", "status_code": None, "etag": None, "page_hash": None, "sitemap_hash": None}, False, db)
         assert w.last_probe_result == "error"
         assert w.total_checks == 1
 
-    def test_unchanged_increments_consecutive(self):
+    async def test_unchanged_increments_consecutive(self):
         w = _make_watcher(consecutive_unchanged=3)
         db = AsyncMock()
-        _run(apply_probe_result(w, {"status_code": 200, "etag": None, "page_hash": None, "sitemap_hash": None}, False, db))
+        await apply_probe_result(w, {"status_code": 200, "etag": None, "page_hash": None, "sitemap_hash": None}, False, db)
         assert w.last_probe_result == "unchanged"
         assert w.consecutive_unchanged == 4
 
-    def test_changed_resets_consecutive(self):
+    async def test_changed_resets_consecutive(self):
         w = _make_watcher(consecutive_unchanged=5, last_changed_at=None)
         db = AsyncMock()
-        _run(apply_probe_result(w, {"status_code": 200, "etag": '"new"', "page_hash": None, "sitemap_hash": None}, True, db))
+        await apply_probe_result(w, {"status_code": 200, "etag": '"new"', "page_hash": None, "sitemap_hash": None}, True, db)
         assert w.last_probe_result == "changed"
         assert w.consecutive_unchanged == 0
         assert w.total_changes_detected == 1
 
-    def test_new_etag_stored(self):
+    async def test_new_etag_stored(self):
         w = _make_watcher(etag='"old"')
         db = AsyncMock()
-        _run(apply_probe_result(w, {"status_code": 200, "etag": '"new"', "page_hash": None, "sitemap_hash": None}, False, db))
+        await apply_probe_result(w, {"status_code": 200, "etag": '"new"', "page_hash": None, "sitemap_hash": None}, False, db)
         assert w.etag == '"new"'
 
-    def test_new_page_hash_stored(self):
+    async def test_new_page_hash_stored(self):
         w = _make_watcher()
         db = AsyncMock()
-        _run(apply_probe_result(w, {"status_code": 200, "etag": None, "page_hash": "abc123", "sitemap_hash": None}, False, db))
+        await apply_probe_result(w, {"status_code": 200, "etag": None, "page_hash": "abc123", "sitemap_hash": None}, False, db)
         assert w.page_hash == "abc123"
 
-    def test_next_check_at_updated(self):
+    async def test_next_check_at_updated(self):
         w = _make_watcher()
         db = AsyncMock()
-        _run(apply_probe_result(w, {"status_code": 200, "etag": None, "page_hash": None, "sitemap_hash": None}, False, db))
+        await apply_probe_result(w, {"status_code": 200, "etag": None, "page_hash": None, "sitemap_hash": None}, False, db)
         assert w.next_check_at is not None
         assert w.next_check_at > datetime.now(timezone.utc)
 
@@ -230,16 +221,16 @@ class TestApplyProbeResult:
 # ── get_or_create_watcher ─────────────────────────────────────────────────────
 
 class TestGetOrCreateWatcher:
-    def test_returns_existing(self):
+    async def test_returns_existing(self):
         existing = _make_watcher()
         db = AsyncMock()
         r = MagicMock()
         r.scalar_one_or_none.return_value = existing
         db.execute.return_value = r
-        result = _run(get_or_create_watcher(42, db))
+        result = await get_or_create_watcher(42, db)
         assert result is existing
 
-    def test_creates_new_when_missing(self):
+    async def test_creates_new_when_missing(self):
         db = AsyncMock()
         r1 = MagicMock(); r1.scalar_one_or_none.return_value = None  # watcher lookup
         uni = MagicMock()
@@ -255,7 +246,7 @@ class TestGetOrCreateWatcher:
             created.append(obj)
         db.add = capture_add
 
-        result = _run(get_or_create_watcher(42, db))
+        result = await get_or_create_watcher(42, db)
         assert len(created) == 1
         assert isinstance(created[0], UniversityWatcher)
         assert created[0].probe_url == "https://example.edu/courses"
@@ -274,17 +265,17 @@ class TestGetMonitoringStats:
         db.execute.side_effect = results
         return db
 
-    def test_returns_dict_with_all_keys(self):
+    async def test_returns_dict_with_all_keys(self):
         # 6 db.execute calls: total, enabled, changed_today, triggered_today, due_now, avg_freq
         db = self._make_db_with_counts([10, 8, 2, 3, 1, 5.5])
-        result = _run(get_monitoring_stats(db))
+        result = await get_monitoring_stats(db)
         assert "total_watchers" in result
         assert "enabled" in result
         assert "changed_today" in result
         assert "scrapes_triggered_today" in result
         assert "due_for_check" in result
 
-    def test_disabled_computed_from_total_minus_enabled(self):
+    async def test_disabled_computed_from_total_minus_enabled(self):
         db = self._make_db_with_counts([10, 7, 0, 0, 0, None])
-        result = _run(get_monitoring_stats(db))
+        result = await get_monitoring_stats(db)
         assert result["disabled"] == 3

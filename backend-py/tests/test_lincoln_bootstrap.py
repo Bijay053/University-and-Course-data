@@ -108,7 +108,7 @@ class TestSeedPageClickPaginationConfig:
 
 
 class TestLincolnYamlConfig:
-    """lincoln.yaml must use seed_page_click_pagination, NOT elastic_api_bootstrap."""
+    """lincoln.yaml must use the snapshot search API, not browser pagination."""
 
     def _load_discovery(self) -> DiscoveryConfig:
         import yaml
@@ -117,24 +117,21 @@ class TestLincolnYamlConfig:
             raw = yaml.safe_load(f)
         return DiscoveryConfig(**raw.get("discovery", {}))
 
-    def test_seed_page_click_pagination_configured(self) -> None:
+    def test_generic_search_api_configured(self) -> None:
         disc = self._load_discovery()
-        assert disc.seed_page_click_pagination is not None, (
-            "lincoln.yaml must have seed_page_click_pagination configured"
-        )
+        assert disc.generic_search_api is not None
+        assert disc.seed_page_click_pagination is None
 
-    def test_max_pages_is_8(self) -> None:
+    def test_search_api_uses_one_snapshot_page(self) -> None:
         disc = self._load_discovery()
-        assert disc.seed_page_click_pagination is not None
-        assert disc.seed_page_click_pagination.max_pages == 8, (
-            "Lincoln has 8 pagination pages — max_pages must be 8"
-        )
+        assert disc.generic_search_api is not None
+        assert disc.generic_search_api.max_pages == 1
 
-    def test_settle_s_at_least_2(self) -> None:
-        """SPA needs enough time to re-render — settle must be ≥ 2s."""
+    def test_search_api_normalizes_relative_urls(self) -> None:
         disc = self._load_discovery()
-        assert disc.seed_page_click_pagination is not None
-        assert disc.seed_page_click_pagination.settle_s >= 2.0
+        assert disc.generic_search_api is not None
+        assert disc.generic_search_api.normalize_relative_urls is True
+        assert disc.generic_search_api.base_url == ORIGIN
 
     def test_elastic_api_bootstrap_removed(self) -> None:
         """elastic_api_bootstrap must be absent — it never worked for Lincoln."""
@@ -144,45 +141,32 @@ class TestLincolnYamlConfig:
             "it was replaced by seed_page_click_pagination"
         )
 
-    def test_programme_search_seed_present(self) -> None:
-        """programme-search/ is the confirmed 8-page listing URL."""
+    def test_snapshot_search_endpoint_present(self) -> None:
         disc = self._load_discovery()
-        seeds = disc.seed_urls or []
-        assert any("programme-search" in s for s in seeds), (
-            "programme-search seed URL must be present — "
-            "that is the confirmed 118-course listing (8 pages)"
-        )
+        assert disc.generic_search_api is not None
+        assert "jsonkeeper.com" in disc.generic_search_api.url
 
-    def test_programme_search_is_first_seed(self) -> None:
-        """programme-search/ must be the first (and only) seed URL."""
+    def test_snapshot_result_paths_are_configured(self) -> None:
         disc = self._load_discovery()
-        seeds = disc.seed_urls or []
-        assert len(seeds) >= 1
-        assert "programme-search" in seeds[0], (
-            f"programme-search must be the primary seed, got {seeds[0]!r}"
-        )
+        assert disc.generic_search_api is not None
+        assert disc.generic_search_api.root_path == "results"
+        assert "link.raw" in disc.generic_search_api.url_fields
+        assert "title.raw" in disc.generic_search_api.title_fields
 
-    def test_time_budget_sufficient_for_8_pages(self) -> None:
-        """Budget must cover 8 pages × settle_s + navigation headroom."""
+    def test_expected_minimum_matches_snapshot(self) -> None:
         disc = self._load_discovery()
-        cfg = disc.seed_page_click_pagination
-        assert cfg is not None
-        min_budget = (cfg.max_pages * cfg.settle_s) + 100  # 100s navigation headroom
-        actual = disc.browser_time_budget_s or 0
-        assert actual >= min_budget, (
-            f"browser_time_budget_s={actual}s is less than "
-            f"{min_budget}s needed for {cfg.max_pages} pages × {cfg.settle_s}s settle "
-            f"+ 100s headroom"
-        )
+        assert disc.expected_min_courses == 114
 
-    def test_always_browser_discover_enabled(self) -> None:
+    def test_browser_and_bfs_discovery_disabled(self) -> None:
         disc = self._load_discovery()
-        assert disc.always_browser_discover is True
+        assert disc.always_browser_discover is False
+        assert disc.bfs_page_budget == 0
 
     def test_programme_search_root_is_blocked(self) -> None:
         """The listing root must be in block_url_patterns so it is not staged as a course."""
         disc = self._load_discovery()
-        blocked = list(disc.block_url_patterns or [])
+        assert disc.generic_search_api is not None
+        blocked = list(disc.generic_search_api.block_url_patterns or [])
         assert any("programme-search" in p for p in blocked), (
             "programme-search listing hub must be in block_url_patterns"
         )
@@ -191,7 +175,11 @@ class TestLincolnYamlConfig:
         import re
 
         disc = self._load_discovery()
-        allowed = [re.compile(p, re.IGNORECASE) for p in (disc.allow_url_patterns or [])]
+        assert disc.generic_search_api is not None
+        allowed = [
+            re.compile(p, re.IGNORECASE)
+            for p in (disc.generic_search_api.allow_url_patterns or [])
+        ]
         course_url = (
             f"{ORIGIN}/study/study-programmes/programme-search/bachelor-of-agriculture/"
         )

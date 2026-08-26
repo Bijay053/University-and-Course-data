@@ -27,6 +27,7 @@ from typing import Any
 
 import httpx
 import pytest
+import pytest_asyncio
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
@@ -35,14 +36,16 @@ from app.main import app
 
 
 @pytest.fixture(autouse=True)
+def _isolate_generated_configs(monkeypatch, tmp_path):
+    """Keep auto-created university YAML stubs out of the source tree."""
+    from app.services.scraper.config import loader
+
+    monkeypatch.setattr(loader, "_UNIS_DIR", tmp_path)
+
+
+@pytest_asyncio.fixture(autouse=True, loop_scope="session")
 async def _reset_engine_pool():
-    """pytest-asyncio gives every test its own event loop, but
-    SQLAlchemy keeps the asyncpg connection pool warm between tests.
-    Once the loop the connections were opened on closes, a reuse
-    raises ``RuntimeError: Event loop is closed``. Disposing the
-    engine before each test forces a fresh pool bound to the current
-    loop. Same dispose dance the Celery tasks already do for the
-    asyncio.run() boundary."""
+    """Keep the asyncpg pool clean within pytest's session-scoped loop."""
     await engine.dispose()
     yield
     await engine.dispose()

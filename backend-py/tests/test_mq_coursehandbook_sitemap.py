@@ -110,37 +110,34 @@ class TestSitemapIndexUrl:
 
 
 class TestEarlyReturnFloor:
-    """browser_discover_mq tries the sitemap path first; when it
-    returns ≥20 URLs, the widget sweep must be skipped entirely.  We
-    can't easily inject a fake sitemap without a network mock, so this
-    test patches `_discover_from_coursehandbook_sitemap` directly."""
+    """Pin the current Funnelback-first tiering without live network calls."""
 
     @pytest.mark.asyncio
-    async def test_returns_early_when_sitemap_yields_enough(
+    async def test_returns_early_when_funnelback_yields_enough(
         self, monkeypatch,
     ):
         fake_links = [
             {"url": f"https://coursehandbook.mq.edu.au/2026/courses/C{i:06d}",
              "name": ""}
-            for i in range(1, 51)
+            for i in range(1, 301)
         ]
 
-        async def fake_sitemap(emit, *, max_courses):
+        async def fake_funnelback(emit, *, max_courses):
             return fake_links[:max_courses]
 
         monkeypatch.setattr(
-            mq, "_discover_from_coursehandbook_sitemap", fake_sitemap,
+            mq, "_discover_from_funnelback_api", fake_funnelback,
         )
 
-        # Sentinel: if the widget sweep runs, it tries to import the
-        # browser_pool — replace with a guard that fails the test.
-        def _fail_import(*a, **kw):
+        async def _fail_sitemap(*a, **kw):
             raise AssertionError(
-                "Widget sweep ran despite sitemap returning ≥20 links"
+                "Sitemap ran despite Funnelback returning a complete catalogue"
             )
 
-        # The widget sweep imports browser_pool AFTER the floor check,
-        # so we can let the import live but assert by counting emits.
+        monkeypatch.setattr(
+            mq, "_discover_from_coursehandbook_sitemap", _fail_sitemap,
+        )
+
         emits: list[str] = []
 
         async def emit(kind, msg=None, **kw):
@@ -148,13 +145,11 @@ class TestEarlyReturnFloor:
 
         result = await mq.browser_discover_mq(emit=emit, max_courses=300)
 
-        assert len(result) == 50
+        assert len(result) == 300
         assert all(
             u["url"].startswith("https://coursehandbook.mq.edu.au/")
             for u in result
         )
-        # Widget sweep emits "starting browser sweep across ... seed(s)"
-        # — its absence proves we short-circuited.
         assert not any(
             "starting browser sweep across" in m for m in emits
         ), f"Widget sweep should NOT have started; emits: {emits}"
@@ -163,6 +158,9 @@ class TestEarlyReturnFloor:
     async def test_falls_through_when_sitemap_returns_too_few(
         self, monkeypatch,
     ):
+        async def fake_funnelback(emit, *, max_courses):
+            return []
+
         # 19 URLs is under the floor of 20 → fall through to widget sweep.
         async def fake_sitemap(emit, *, max_courses):
             return [
@@ -171,8 +169,17 @@ class TestEarlyReturnFloor:
                 for i in range(19)
             ]
 
+        async def fake_search_page(emit, *, max_courses):
+            return []
+
+        monkeypatch.setattr(
+            mq, "_discover_from_funnelback_api", fake_funnelback,
+        )
         monkeypatch.setattr(
             mq, "_discover_from_coursehandbook_sitemap", fake_sitemap,
+        )
+        monkeypatch.setattr(
+            mq, "_discover_from_search_page", fake_search_page,
         )
 
         # Force the widget-sweep code path to bail immediately so we
@@ -198,8 +205,13 @@ class TestEarlyReturnFloor:
 
         result = await mq.browser_discover_mq(emit=emit, max_courses=300)
 
-        # The widget sweep entered (we see its banner) and bailed → []
-        assert result == []
+        # The widget sweep entered, then returned the structured partial
+        # catalogue rather than discarding useful URLs.
+        assert result == [
+            {"url": f"https://coursehandbook.mq.edu.au/2026/courses/C{i:06d}",
+             "name": ""}
+            for i in range(19)
+        ]
         assert any(
             "starting browser sweep across" in m for m in emits
         ), f"Widget sweep should have started; emits: {emits}"

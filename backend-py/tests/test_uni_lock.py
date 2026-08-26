@@ -31,6 +31,7 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
+import pytest_asyncio
 from sqlalchemy import text
 
 from app.database import AsyncSessionLocal, engine
@@ -41,10 +42,16 @@ from app.services.scraper import repair as repair_mod
 
 
 @pytest.fixture(autouse=True)
+def _isolate_generated_configs(monkeypatch, tmp_path):
+    """Keep auto-created university YAML stubs out of the source tree."""
+    from app.services.scraper.config import loader
+
+    monkeypatch.setattr(loader, "_UNIS_DIR", tmp_path)
+
+
+@pytest_asyncio.fixture(autouse=True, loop_scope="session")
 async def _reset_engine_pool():
-    """Dispose the SQLAlchemy pool before each test so async-pg
-    connections opened on a previous event loop are not reused
-    (mirrors the pattern in test_repair_scrape.py)."""
+    """Keep the asyncpg pool clean within pytest's session-scoped loop."""
     await engine.dispose()
     yield
     await engine.dispose()
@@ -130,7 +137,7 @@ def _make_mock_redis(
 
 
 def _noop_extract(
-    link: dict, country: Any, uni_pdf_data: Any, emit: Any = None
+    link: dict, country: Any, uni_pdf_data: Any, emit: Any = None, **kwargs: Any
 ) -> dict:
     return {
         "name": link["name"],
@@ -196,7 +203,7 @@ async def test_repair_lock_redis_down_fails_open(
     ids = await _seed()
 
     async def _fake_extract(
-        link: dict, country: Any, uni_pdf_data: Any, emit: Any = None
+        link: dict, country: Any, uni_pdf_data: Any, emit: Any = None, **kwargs: Any
     ) -> dict:
         return _noop_extract(link, country, uni_pdf_data, emit)
 
@@ -235,7 +242,7 @@ async def test_repair_lock_ttl_expiry_skips_delete(
     ids = await _seed()
 
     async def _fake_extract(
-        link: dict, country: Any, uni_pdf_data: Any, emit: Any = None
+        link: dict, country: Any, uni_pdf_data: Any, emit: Any = None, **kwargs: Any
     ) -> dict:
         return _noop_extract(link, country, uni_pdf_data, emit)
 
@@ -297,7 +304,7 @@ async def test_repair_lock_concurrent_gather(
     ids_b = {"uni_id": uni_id, "course_id": ids_a["course_id"], "job_id": job_b}
 
     async def _fake_extract(
-        link: dict, country: Any, uni_pdf_data: Any, emit: Any = None
+        link: dict, country: Any, uni_pdf_data: Any, emit: Any = None, **kwargs: Any
     ) -> dict:
         return _noop_extract(link, country, uni_pdf_data, emit)
 

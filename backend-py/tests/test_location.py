@@ -353,39 +353,36 @@ def test_recipe_rules_location_reject_takes_priority_over_allowed():
     )
 
 
-def test_uwl_yaml_location_config_round_trips():
-    """law_1902.yaml reject_values and allowed_values load correctly via YAML loader."""
+def test_law_yaml_search_api_config_round_trips():
+    """The suffixed University of Law config loads through the normal loader."""
     from app.services.scraper.config.loader import load_uni_config
     cfg = load_uni_config(
-        slug="law_1902",
+        slug="law",
         name="University of Law",
         scrape_url="https://www.law.ac.uk/study/",
+        university_id=1902,
     )
-    loc = cfg.extraction.text_cleaning.location
-    assert "Fees" in loc.reject_values, (
-        "UWL YAML must list 'Fees' in location reject_values"
-    )
-    assert "Birmingham" in loc.allowed_values, (
-        "UWL YAML must list 'Birmingham' in location allowed_values"
-    )
-    assert "London Bloomsbury" in loc.allowed_values
-    assert "Online" in loc.allowed_values
+    api = cfg.discovery.generic_search_api
+    assert api is not None
+    assert api.root_path == "Courses"
+    assert "Url" in api.url_fields
+    assert api.page_size == 20
+    assert api.max_pages == 10
 
 
-def test_uwl_yaml_central_english_pages_configured():
-    """law_1902.yaml must have both central_page_ug and central_page_pg set."""
+def test_law_yaml_english_defaults_configured():
+    """University of Law uses explicit score defaults in its active config."""
     from app.services.scraper.config.loader import load_uni_config
     cfg = load_uni_config(
-        slug="law_1902",
+        slug="law",
         name="University of Law",
         scrape_url="https://www.law.ac.uk/study/",
+        university_id=1902,
     )
-    assert cfg.extraction.english.central_page_ug == (
-        "https://www.law.ac.uk/study/undergraduate/entry-requirements/"
-    ), "UG English central page must be set in law_1902.yaml"
-    assert cfg.extraction.english.central_page_pg == (
-        "https://www.law.ac.uk/study/postgraduate/entry-requirements/"
-    ), "PG English central page must be set in law_1902.yaml"
+    english = cfg.extraction.english
+    assert english.default_ielts == 6.0
+    assert english.default_pte == 60
+    assert english.default_toefl == 80
 
 
 def test_empty_reject_and_allowed_values_are_no_ops():

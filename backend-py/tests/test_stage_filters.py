@@ -168,7 +168,7 @@ class TestShouldStageCourse:
             source_url="https://www.torrens.edu.au/courses/design/3d-design-animation",
         )
         assert accept is False
-        assert reason == "category_landing_page"
+        assert reason == "category_landing_page_missing_degree_qualifier"
 
     # ---- Fixture 2: real course, international, on-campus (accepted) ------
 
@@ -254,17 +254,12 @@ class TestBugAEdgeCases:
             "Master of Education Advanced",
             "Master of Research Studies",
             "Doctor of Philosophy by Prior Works",
-            "Professional Doctorate Research",  # no leading qualifier → should be rejected
+            "Professional Doctorate Research",
         ],
     )
     def test_professional_doctorate_edge(self, course_name: str) -> None:
-        """Professional Doctorate has no standard qualifier — will be rejected by Bug A."""
-        # "Professional Doctorate Research" has no degree qualifier at the start.
-        # This is intentional: our filter is strict about recognisable prefixes.
-        if course_name.lower().startswith("professional"):
-            assert _name_has_degree_qualifier(course_name) is False
-        else:
-            assert _name_has_degree_qualifier(course_name) is True
+        """Recognized award titles, including Professional Doctorate, pass Bug A."""
+        assert _name_has_degree_qualifier(course_name) is True
 
     def test_blended_mode_accepted(self) -> None:
         """Blended delivery is accepted."""
@@ -440,6 +435,6 @@ class TestBugAEdgeCases:
                 },
             )
             assert accept is False, f"Expected rejection for {name!r}"
-            assert reason == "category_landing_page", (
-                f"Expected category_landing_page for {name!r}, got {reason!r}"
+            assert reason == "category_landing_page_missing_degree_qualifier", (
+                f"Expected missing-degree category block for {name!r}, got {reason!r}"
             )

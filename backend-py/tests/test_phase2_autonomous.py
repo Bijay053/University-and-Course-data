@@ -282,6 +282,20 @@ class TestIdentifyFailingFields:
 class TestStage0Integration:
     """Stage 0 injects rules into extract_course() when extraction_rules provided."""
 
+    @pytest.fixture(autouse=True)
+    def _set_uni_context(self):
+        from app.services.scraper.config.context import set_uni_config
+        from app.services.scraper.config.schema import UniConfig
+
+        set_uni_config(
+            UniConfig(
+                slug="test",
+                name="Test University",
+                base_url="https://test.example.com",
+                scrape_url="https://test.example.com/courses",
+            )
+        )
+
     @pytest.mark.asyncio
     async def test_extraction_rules_none_no_stage0(self):
         """extraction_rules=None → Stage 0 skipped, function completes normally."""

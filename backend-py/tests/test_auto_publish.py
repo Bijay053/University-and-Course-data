@@ -15,6 +15,8 @@ def _make(**overrides):
     sc.completeness = 90
     sc.decision_score = 0.9
     sc.ielts_overall = 6.5
+    sc.duration = 3
+    sc.intake_months = [2]
     for k, v in overrides.items():
         setattr(sc, k, v)
     return sc

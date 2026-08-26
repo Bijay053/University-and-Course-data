@@ -22,7 +22,8 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy import select
+import pytest_asyncio
+from sqlalchemy import delete
 
 from app.database import AsyncSessionLocal, engine
 from app.models import ScrapedCourse, University
@@ -39,13 +40,33 @@ async def _dispose_engine_per_test():
     await engine.dispose()
 
 
-async def _pick_two_universities() -> tuple[int, int]:
-    """Two distinct uni ids that exist in the DB; needed for the cross-uni test."""
+@pytest_asyncio.fixture
+async def isolated_universities() -> tuple[int, int]:
+    """Create dedicated universities so cleanup cannot touch existing rows."""
+    token = uuid.uuid4().hex[:10]
     async with AsyncSessionLocal() as db:
-        rows = (await db.execute(select(University.id).order_by(University.id).limit(2))).all()
-    if len(rows) < 2:
-        pytest.skip("need at least 2 universities in the DB to run isolation test")
-    return rows[0][0], rows[1][0]
+        universities = [
+            University(name=f"Stale Cleanup A {token}", country="Test", city="Test"),
+            University(name=f"Stale Cleanup B {token}", country="Test", city="Test"),
+        ]
+        db.add_all(universities)
+        await db.flush()
+        ids = (universities[0].id, universities[1].id)
+        await db.commit()
+    try:
+        yield ids
+    finally:
+        from app.models.scrape_runtime import ScrapeRuntimeJob
+
+        async with AsyncSessionLocal() as db:
+            await db.execute(
+                delete(ScrapedCourse).where(ScrapedCourse.university_id.in_(ids))
+            )
+            await db.execute(
+                delete(ScrapeRuntimeJob).where(ScrapeRuntimeJob.university_id.in_(ids))
+            )
+            await db.execute(delete(University).where(University.id.in_(ids)))
+            await db.commit()
 
 
 async def _insert(scrape_job_id: str, uni_id: int, name: str, status: str, age_min: int) -> int:
@@ -81,8 +102,10 @@ async def _cleanup(prefix: str) -> None:
 
 
 @pytest.mark.asyncio
-async def test_clear_stale_dedup_deletes_old_pending_keeps_recent_and_rejected():
-    uni_a, uni_b = await _pick_two_universities()
+async def test_clear_stale_dedup_deletes_old_pending_keeps_recent_and_rejected(
+    isolated_universities,
+):
+    uni_a, uni_b = isolated_universities
     prefix = f"test_stale_{uuid.uuid4().hex[:8]}_"
     try:
         # Setup: one of each row category we want to assert on.
@@ -109,8 +132,10 @@ async def test_clear_stale_dedup_deletes_old_pending_keeps_recent_and_rejected()
 
 
 @pytest.mark.asyncio
-async def test_clear_stale_dedup_returns_zero_when_nothing_stale():
-    uni_a, _ = await _pick_two_universities()
+async def test_clear_stale_dedup_returns_zero_when_nothing_stale(
+    isolated_universities,
+):
+    uni_a, _ = isolated_universities
     prefix = f"test_stale_{uuid.uuid4().hex[:8]}_"
     try:
         # Only fresh rows — nothing should be cleared.
@@ -158,20 +183,21 @@ async def _delete_runtime_job(runtime_job_id: str) -> None:
 
 
 @pytest.mark.asyncio
-async def test_clear_stale_dedup_clears_completed_job_rows_for_fresh_replacement():
-    """Pending rows from COMPLETED jobs are cleared by dedup cleanup.
+async def test_clear_stale_dedup_clears_non_resumable_rows_for_fresh_replacement(
+    isolated_universities,
+):
+    """Completed/orphan rows are cleared while recent failed progress survives.
 
     Context: the original PR-1.5 fix protected completed-job rows from cleanup
     to prevent job_440a0e26c6df's counter-vs-rows mismatch. That protection
     caused a worse regression: new scrapes found all courses blocked by existing
     pending rows from the completed run and staged 0 new courses.
 
-    Current behaviour: ONLY running-job rows are protected (their rows are
-    mid-flight and must not be wiped from under the active worker). All other
-    pending rows — from failed, orphaned, or previously completed jobs — are
-    cleared so that re-scrapes always see a clean slate and can stage fresh data.
+    Current behaviour also protects recent failed jobs while resume is enabled,
+    because their rows are checkpoints for the next run. Completed and orphaned
+    pending rows are still cleared so a fresh scrape can replace them.
     """
-    uni_a, _ = await _pick_two_universities()
+    uni_a, _ = isolated_universities
     prefix = f"test_completed_{uuid.uuid4().hex[:8]}_"
     completed_job = prefix + "completed_job"
     failed_job = prefix + "failed_job"
@@ -189,12 +215,11 @@ async def test_clear_stale_dedup_clears_completed_job_rows_for_fresh_replacement
         async with AsyncSessionLocal() as db:
             cleared = await _clear_stale_dedup(db, uni_a, minutes=10)
 
-        # All three stale pending rows are cleared — only running-job rows survive.
-        assert cleared == 3, f"expected 3 deletions (completed + failed + orphan), got {cleared}"
+        assert cleared == 2, f"expected 2 deletions (completed + orphan), got {cleared}"
         assert not await _exists(from_completed), (
             "completed-job pending row should be cleared so a re-scrape can stage fresh data"
         )
-        assert not await _exists(from_failed), "failed-job pending row should be cleared"
+        assert await _exists(from_failed), "recent failed-job row is a resumable checkpoint"
         assert not await _exists(from_orphan), "orphan-job pending row should be cleared"
     finally:
         await _cleanup(prefix)
@@ -203,11 +228,13 @@ async def test_clear_stale_dedup_clears_completed_job_rows_for_fresh_replacement
 
 
 @pytest.mark.asyncio
-async def test_clear_stale_dedup_preserves_rows_from_running_jobs():
+async def test_clear_stale_dedup_preserves_rows_from_running_jobs(
+    isolated_universities,
+):
     """Pending rows whose source job is RUNNING must survive too —
     a concurrent scrape is still actively writing them. Wiping
     them mid-flight would corrupt the in-flight job's output."""
-    uni_a, _ = await _pick_two_universities()
+    uni_a, _ = isolated_universities
     prefix = f"test_running_{uuid.uuid4().hex[:8]}_"
     running_job = prefix + "running_job"
     try:

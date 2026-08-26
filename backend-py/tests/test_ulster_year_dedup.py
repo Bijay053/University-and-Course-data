@@ -18,9 +18,9 @@ URLs and stage both variants as separate courses:
            so the dedup key differed and both rows were kept.
 
 Fixes:
-  1. Add compact-year group to _YEAR_SEG_Y: 20\d{4} matches 202627 / 202728.
+1. Add compact-year group to _YEAR_SEG_Y: ``20\\d{4}`` matches 202627 / 202728.
   2. Add year_dedup_strip_trailing_id (schema + YAML) — after year stripping,
-     also strip trailing -\d{4,6} so both reduce to /courses-YYYY/law.
+also strip trailing ``-\\d{4,6}`` so both reduce to /courses-YYYY/law.
 
 Also: PGCE and degree-apprenticeship courses are domestic-only in the UK and
 are now blocked in discovery via block_url_patterns.
@@ -252,13 +252,13 @@ class TestEndToEndDedup:
 class TestUlsterYamlConfig:
     """Verify ulster_2176.yaml has the correct dedup and block settings."""
 
-    def test_year_dedup_mode_keep_latest(self):
+    def test_year_dedup_disabled_while_new_catalogue_is_incomplete(self):
         cfg = _load_ulster_yaml()
-        assert cfg["discovery"]["year_dedup_mode"] == "keep_latest"
+        assert cfg["discovery"]["year_dedup_mode"] == "none"
 
-    def test_year_dedup_strip_trailing_id_enabled(self):
+    def test_year_dedup_strip_trailing_id_is_not_configured(self):
         cfg = _load_ulster_yaml()
-        assert cfg["discovery"]["year_dedup_strip_trailing_id"] is True
+        assert "year_dedup_strip_trailing_id" not in cfg["discovery"]
 
     def test_pgce_blocked_in_discovery(self):
         cfg = _load_ulster_yaml()
@@ -291,7 +291,7 @@ class TestUlsterYamlConfig:
     def test_non_blocked_course_not_matched(self):
         cfg = _load_ulster_yaml()
         patterns = cfg["discovery"].get("block_url_patterns", [])
-        normal_url = "https://www.ulster.ac.uk/courses/202728/law-41910"
+        normal_url = "https://www.ulster.ac.uk/courses/202627/law-40288"
         matched = any(re.search(p, normal_url) for p in patterns)
         assert not matched, f"Normal Law URL should NOT be blocked by patterns {patterns}"
 

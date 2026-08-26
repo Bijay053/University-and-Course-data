@@ -92,10 +92,13 @@ class TestMissingFields:
         fee_issues = [i for i in issues if i.code == "missing_international_fee"]
         assert any(i.severity == "critical" for i in fee_issues)
 
-    def test_missing_ielts_is_warning(self):
+    def test_missing_english_is_critical_for_postgraduate_course(self):
         payload = _good_payload(ielts_overall=None)
         issues = _run_check(payload)
-        assert any(i.code == "missing_english_requirement" and i.severity == "warning" for i in issues)
+        assert any(
+            i.code == "missing_english_requirement" and i.severity == "critical"
+            for i in issues
+        )
 
     def test_has_pte_satisfies_english_requirement(self):
         payload = _good_payload(ielts_overall=None, pte_overall=58)

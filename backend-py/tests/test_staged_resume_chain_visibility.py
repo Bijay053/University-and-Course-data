@@ -1,16 +1,7 @@
-"""QMUL under-reporting fix: /api/scrape/staged/{job_id} must surface every
-pending course for the university, not just rows tagged with that exact
-job_id.
+"""/api/scrape/staged/{job_id} is an exact review view for one scrape run.
 
-Root cause: large scrapes can resume across multiple ``scrape_runtime_jobs``
-rows (task229 resume checkpoint). A worker restart/timeout leaves a partial
-job's staged courses behind with status='pending'; the next run for the same
-university picks up where it left off under a NEW job_id and never re-tags
-the earlier rows. Filtering the staged-courses list strictly by
-``scrape_job_id`` therefore hid the earlier-job rows from reviewers even
-though they were still legitimately 'pending' (e.g. QMUL: 122 of 409 shown,
-228 invisible under two stale job_ids from interrupted runs, 59 genuinely
-skipped).
+Pending rows from interrupted attempts remain available to resume/recovery
+logic, but must not be mixed with the fresh values produced by a later job.
 """
 from __future__ import annotations
 
@@ -56,7 +47,7 @@ async def _cleanup(job_ids: list[str]) -> None:
 
 
 @pytest.mark.asyncio
-async def test_staged_list_spans_resume_chain_job_ids():
+async def test_staged_list_is_scoped_to_current_job_id():
     uni_id = await _pick_university()
     old_job_id = f"test_resume_old_{uuid.uuid4().hex[:8]}"
     new_job_id = f"test_resume_new_{uuid.uuid4().hex[:8]}"
@@ -118,10 +109,8 @@ async def test_staged_list_spans_resume_chain_job_ids():
         assert resp.status_code == 200, resp.text
         body = resp.json()
         names = {c["courseName"] for c in body["courses"]}
-        # Both the current job's own row AND the earlier resumed job's row
-        # must be visible — that's the whole point of the fix.
         assert "Bachelor of New Run Course" in names
-        assert "Bachelor of Old Run Course" in names
+        assert "Bachelor of Old Run Course" not in names
         assert body["lastScrape"]["jobId"] == new_job_id
     finally:
         await _cleanup([old_job_id, new_job_id])

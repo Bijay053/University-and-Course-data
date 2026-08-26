@@ -43,9 +43,7 @@ from app.services.scraper.http_fetcher import scrape_do_render_scope
 # Fixtures
 # ---------------------------------------------------------------------------
 
-_CARDIFF_YAML_PATH = (
-    "scraper_config/unis/cardiff.yaml"
-)
+_CARDIFF_YAML_PATH = "scraper_config/unis/cardiff_2194.yaml"
 
 _CARDIFF_COURSE_URL = (
     "https://www.cardiff.ac.uk/study/postgraduate/taught/courses/"

@@ -63,30 +63,34 @@ def test_mq_yaml_file_exists():
     assert _MQ_YAML.exists(), f"Expected MQ config at {_MQ_YAML}"
 
 
-def test_mq_yaml_enables_stealth_browser():
+def test_mq_yaml_uses_rendered_funnelback_api():
     data = yaml.safe_load(_MQ_YAML.read_text())
     discovery = data.get("discovery") or {}
-    assert discovery.get("use_stealth_browser") is True, (
-        "mq.yaml must enable use_stealth_browser=true so the patchright + "
-        "Xvfb path is used for Cloudflare-protected www.mq.edu.au"
-    )
+    api = discovery.get("generic_search_api") or {}
+    assert api.get("fetch_via_scrape_do") is True
+    assert api.get("scrape_do_render") is True
 
 
-def test_mq_yaml_keeps_always_browser_discover():
-    """Stealth doesn't replace browser-discover — it augments it."""
+def test_mq_yaml_skips_browser_discovery():
+    """The rendered Funnelback API replaces the older stealth-browser path."""
     data = yaml.safe_load(_MQ_YAML.read_text())
     discovery = data.get("discovery") or {}
-    assert discovery.get("always_browser_discover") is True
+    assert discovery.get("skip_browser_discovery") is True
+    assert discovery.get("use_stealth_browser") in (None, False)
 
 
-def test_mq_loaded_uni_config_has_stealth():
-    """End-to-end: load_uni_config(slug='mq', ...) must surface the flag."""
+def test_mq_loaded_uni_config_uses_rendered_api_not_stealth():
+    """End-to-end: the loaded config must expose the current MQ transport."""
     cfg = load_uni_config(
         slug="mq",
         name="Macquarie University",
         scrape_url="https://www.mq.edu.au/study/find-a-course",
     )
-    assert cfg.discovery.use_stealth_browser is True
+    assert cfg.discovery.skip_browser_discovery is True
+    assert cfg.discovery.use_stealth_browser is False
+    assert cfg.discovery.generic_search_api is not None
+    assert cfg.discovery.generic_search_api.fetch_via_scrape_do is True
+    assert cfg.discovery.generic_search_api.scrape_do_render is True
 
 
 def test_other_uni_config_does_not_enable_stealth():
