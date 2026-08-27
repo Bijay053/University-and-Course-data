@@ -714,6 +714,7 @@ def _parse_column_keyed_english_table(
     # "postgraduate" and "undergraduate" (same value for both in most
     # institutions); the "Diploma" column maps to "diploma" only.
     _COL_LEVEL_MAP: list[tuple[list[str], list[str], int]] = [
+        (["research degree", "research"], ["doctorate"], 5),
         (["bachelor", "postgraduate"], ["postgraduate", "undergraduate"], 4),
         (["diploma", "advanced diploma", "associate diploma"], ["diploma"], 3),
         # EAP/ELICOS columns are pathway-level — excluded from by_level (level_keys=[])
@@ -779,7 +780,15 @@ def _parse_column_keyed_english_table(
 
             slot_info: tuple[str, "_re.Pattern[str]"] | None = None
             for test_token, slot_key, score_re in _TEST_ROWS:
-                if test_token in row_header:
+                # Word boundaries matter for short test acronyms: a plain
+                # substring check for "pte" also matches "accepted" in the
+                # TOEFL eligibility note and silently assigns TOEFL's score
+                # to the PTE slot.
+                if _re.search(
+                    rf"\b{_re.escape(test_token)}\b",
+                    row_header,
+                    _re.I,
+                ):
                     slot_info = (slot_key, score_re)
                     break
             if not slot_info:
@@ -791,6 +800,17 @@ def _parse_column_keyed_english_table(
                     continue
                 cell_text = cells[col_idx].get_text(" ", strip=True)
                 m = score_re.search(cell_text)
+                # Many university equivalency tables use the value-first
+                # layout "50 Overall, 53 Reading, ..." rather than
+                # "Overall 50".  Read the explicitly-labelled overall value
+                # before considering any component score in the cell.
+                value_first = _re.search(
+                    r"\b(\d{1,3}(?:\.\d+)?)\s+overall\b",
+                    cell_text,
+                    _re.I,
+                )
+                if value_first:
+                    m = value_first
                 if not m:
                     continue
                 try:

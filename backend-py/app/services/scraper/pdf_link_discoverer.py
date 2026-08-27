@@ -27,6 +27,8 @@ from urllib.parse import urljoin, urlparse
 
 import httpx
 
+from app.services.scraper.pdf_classifier import is_non_tuition_fee_pdf
+
 log = logging.getLogger(__name__)
 
 # ── Keyword sets ──────────────────────────────────────────────────────────────
@@ -231,6 +233,8 @@ def is_low_value_link(href: str, anchor: str) -> bool:
     This prevents privacy policies, annual reports, application forms, and
     similar administrative PDFs from entering the classification pipeline.
     """
+    if is_non_tuition_fee_pdf(href, anchor):
+        return True
     url_blocked = bool(_LOW_VALUE_URL_RE.search(href))
     anchor_blocked = bool(_LOW_VALUE_ANCHOR_RE.search(anchor))
     if not (url_blocked or anchor_blocked):

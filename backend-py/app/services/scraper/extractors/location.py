@@ -45,6 +45,12 @@ _JUNK = re.compile(
     r"\b(?:https?://|www\.|src=|href=|style=|googletagmanager|qtac|satac|cricos|step\s*\d+\s*of|student\s*type|fee\s*type|study\s*mode|reset\s*fee\s*calculator)\b",
     re.I,
 )
+_NON_LOCATION_VALUE_RE = re.compile(
+    r"^(?:(?:domestic|international|home|overseas|students?|"
+    r"teaching|study|academic|period|online|virtual|remote|external)\s*)+$"
+    r"|^(?:may|might|some|please|select|choose|view|see)\b",
+    re.IGNORECASE,
+)
 _TRAILING_KEYS = re.compile(
     r"\b(?:delivery\s*mode|delivery\s*method|study\s*mode|course\s*structure|intakes?|course\s*length|duration|cricos\s*code|fees?"
     r"|view\s+dates|start\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)"
@@ -283,7 +289,8 @@ def _expand_campus_codes(text: str) -> str:
     return text
 
 _PERIOD_LABEL_RE = re.compile(
-    r"^(?:Semester|Trimester|Term|Quarter|S|T)\s*\d+"
+    r"^(?:(?:Semester|Trimester|Term|Quarter|S|T)\s*\d+|"
+    r"(?:Teaching|Study|Academic)\s+Period(?:\s*\d+)?)"
     r"(?:\s*[-–—]\s*.{0,50})?$",
     re.I,
 )
@@ -302,6 +309,8 @@ _PERIOD_ANY_RE = re.compile(
     r"Term\s*\d+|"
     r"Quarter\s*\d+|"
     r"Study\s+Period\s*\d*|"
+    r"Teaching\s+Period\s*\d*|"
+    r"Academic\s+Period\s*\d*|"
     # Research Period N — used by UTAS for HDR / postgrad research courses
     # e.g. "Hobart Research Period 1, Research Period 2" → "Hobart"
     r"Research\s+Period\s*\d*|"
@@ -478,6 +487,8 @@ def _normalise(raw: str | None) -> str | None:
     # as "(s)Canterbury Scroll to top" — strip before any other cleaning.
     raw = _LEADING_SECTION_MARKER_RE.sub("", raw)
     cleaned = re.sub(r"\s+", " ", raw).replace(" , ", ", ").strip()
+    if _NON_LOCATION_VALUE_RE.match(cleaned):
+        return None
     # Normalise slash-separated city lists to comma-separated.
     # KBS (and some others) publish location as "Adelaide / Brisbane / Melbourne /".
     # _from_text_block already does this via window.replace(" / ", ", "); applying
@@ -558,6 +569,8 @@ _CAMPUS_AVAILABILITY_SUFFIX_RE = re.compile(
 def _sanitise_for_display(raw: str | None) -> str | None:
     if not raw:
         return None
+    if _NON_LOCATION_VALUE_RE.match(raw):
+        return None
     # Strip CMS section markers (e.g. "(s)") and trailing page-chrome
     # suffixes (e.g. "Scroll to top") before any other processing so that
     # Gemini-sourced location_text values like "(s)Canterbury Scroll to top"
@@ -565,6 +578,8 @@ def _sanitise_for_display(raw: str | None) -> str | None:
     raw = _LEADING_SECTION_MARKER_RE.sub("", raw).strip()
     raw = _TRAILING_KEYS.split(raw, maxsplit=1)[0].strip() or raw
     if not raw:
+        return None
+    if raw.lower().strip(" :") in _FIELD_LABEL_TOKENS:
         return None
     # Reject bare delivery-method / non-location labels (e.g. "Mode") before
     # any further processing so they never reach the staging queue regardless
@@ -665,6 +680,11 @@ _FIELD_LABEL_TOKENS: frozenset[str] = frozenset({
     "type",
     "course",
     "length",
+    "domestic",
+    "international",
+    "teaching period",
+    "study period",
+    "academic period",
 })
 
 
@@ -776,6 +796,9 @@ def _from_tables(soup: BeautifulSoup) -> str | None:
         if not LOCATION_LABEL.match(cells[0].get_text(strip=True)):
             continue
         c1_text = cells[1].get_text(strip=True)
+        is_header_row = bool(tr.find_parent("thead")) or all(
+            cell.name == "th" for cell in cells
+        )
 
         # ECU / UNE-style pivot table:
         #   ECU: "Location | Semester 1 | Semester 2"
@@ -838,6 +861,13 @@ def _from_tables(soup: BeautifulSoup) -> str | None:
                 if v:
                     return v
             continue  # don't fall through to the normal single-cell path
+
+        # Generic table headers such as
+        #   Location | Domestic | International
+        # describe columns; they are never campus values. Real key/value rows
+        # use a <th>/<td> shape and continue to the normal path below.
+        if is_header_row:
+            continue
 
         v = _normalise(c1_text)
         if v:
@@ -1005,6 +1035,44 @@ def _from_newcastle_toggles(soup: BeautifulSoup) -> str | None:
             seen.add(k)
             out.append(it)
     return _normalise(", ".join(out))
+
+
+def deakin_banner_tab_values(soup: BeautifulSoup) -> list[str]:
+    """Return Deakin's authoritative audience-specific location tab labels."""
+    tabs = soup.select(
+        "#banner .banner-course__locations "
+        ".banner-course__tabs [role='tab']"
+    )
+    values: list[str] = []
+    seen: set[str] = set()
+    for tab in tabs:
+        value = compact(tab.get_text(" ", strip=True))
+        if not value:
+            continue
+        key = value.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        values.append(value)
+    return values
+
+
+def _from_deakin_banner_tabs(soup: BeautifulSoup) -> str | None:
+    """Read Deakin's audience-specific course-location tabs.
+
+    Deakin course pages expose the authoritative delivery locations as tab
+    buttons inside the course banner. Generic heading extraction instead finds
+    the footer's university-wide "Locations" navigation and returns
+    "Campuses, Corporate centres, International offices".
+    """
+    physical = [
+        value
+        for value in deakin_banner_tab_values(soup)
+        if not _REMOVE_VIRTUAL.search(value)
+    ]
+    if physical:
+        return _normalise(", ".join(physical))
+    return None
 
 
 def _from_qut_quickbox(soup: BeautifulSoup) -> str | None:
@@ -1561,6 +1629,16 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
     if _has_utas_panel and _is_utas_host:
         cascade_list: list[tuple[str, str | None, float]] = [
             ("utas_intl_panel", _from_utas_intl_panel(soup), 0.95),
+        ]
+    elif (
+        _parsed_host == "deakin.edu.au"
+        or _parsed_host.endswith(".deakin.edu.au")
+    ):
+        # Deakin's generic "Locations" heading belongs to footer navigation.
+        # Scope extraction to the course banner tabs and fail closed if those
+        # are absent rather than staging university-wide chrome as a campus.
+        cascade_list = [
+            ("deakin_banner_tabs", _from_deakin_banner_tabs(soup), 0.98),
         ]
     elif "newcastle.edu.au" in (url or "").lower():
         # Newcastle (newcastle.edu.au): the per-degree page renders the

@@ -530,6 +530,19 @@ class TestLowValueLinkDiscoverer:
     def test_financial_statement_url_blocked(self):
         assert is_low_value_link("https://uni.edu/financial-statement-2023.pdf", "")
 
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://uni.edu/cdu-incidental-fees-2026.pdf",
+            "https://uni.edu/ancillary-charges.pdf",
+            "https://uni.edu/non-tuition-fees.pdf",
+            "https://uni.edu/student-services-and-amenities-fee.pdf",
+            "https://uni.edu/international-application-fee.pdf",
+        ],
+    )
+    def test_non_tuition_fee_documents_blocked(self, url):
+        assert is_low_value_link(url, "")
+
     # ── Blocked anchors ───────────────────────────────────────────────────────
 
     def test_annual_report_anchor_blocked(self):
@@ -605,6 +618,28 @@ class TestLowValuePdfClassifier:
 
     def test_board_minutes_blocked(self):
         assert is_low_value_pdf("https://uni.edu/board-minutes-mar24.pdf")
+
+    def test_cdu_incidental_fee_pdf_is_other(self):
+        text = (
+            "CDU Incidentals Fees 2026\n"
+            "Incidental fees are additional costs students may need to pay "
+            "beyond their tuition fees."
+        )
+        result = classify_by_keywords(
+            "https://www.cdu.edu.au/files/cdu-incidental-fees-2026.pdf",
+            text,
+        )
+        assert is_low_value_pdf(result.url, text)
+        assert result.category == "other"
+
+    def test_real_tuition_schedule_with_incidental_section_is_kept(self):
+        text = (
+            "2026 International Tuition Fee Schedule\n"
+            "International tuition fees by course. Incidental costs may also apply."
+        )
+        result = classify_by_keywords("https://uni.edu/2026-tuition-fees.pdf", text)
+        assert not is_low_value_pdf(result.url, text)
+        assert result.category == "fee_schedule"
 
     def test_fee_schedule_not_blocked(self):
         assert not is_low_value_pdf("https://uni.edu/2025-fee-schedule.pdf")

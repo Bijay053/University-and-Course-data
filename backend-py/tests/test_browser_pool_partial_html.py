@@ -33,9 +33,17 @@ from app.services.scraper import browser_pool
 class _FakePage:
     """A page whose ``goto`` raises whatever the test plants in it."""
 
-    def __init__(self, *, goto_exc: BaseException | None, content: str) -> None:
+    def __init__(
+        self,
+        *,
+        goto_exc: BaseException | None,
+        content: str,
+        evaluate_returns: bool = False,
+    ) -> None:
         self._goto_exc = goto_exc
         self._content = content
+        self._evaluate_returns = evaluate_returns
+        self.evaluate_calls: list[str] = []
         self.set_extra_http_headers_calls: list[dict[str, str]] = []
         self.goto_calls: list[tuple[str, dict[str, Any]]] = []
 
@@ -55,8 +63,9 @@ class _FakePage:
     async def wait_for_timeout(self, ms: int) -> None:  # pragma: no cover
         pass
 
-    async def evaluate(self, js: str) -> bool:  # pragma: no cover
-        return False
+    async def evaluate(self, js: str) -> bool:
+        self.evaluate_calls.append(js)
+        return self._evaluate_returns
 
     async def wait_for_load_state(self, *a: Any, **kw: Any) -> None:  # pragma: no cover
         pass
@@ -108,6 +117,60 @@ async def test_goto_timeout_with_short_html_returns_none(
 
     pool = browser_pool.BrowserPool()
     assert await pool.fetch_html("https://example.com/x") is None
+
+
+@pytest.mark.asyncio
+async def test_goto_timeout_required_action_failure_rejects_partial_html(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    good_html = "<html><body>" + ("x" * 2048) + "</body></html>"
+    page = _FakePage(
+        goto_exc=browser_pool.PlaywrightTimeoutError("timed out"),
+        content=good_html,
+        evaluate_returns=False,
+    )
+    _install_fake_page(monkeypatch, page)
+
+    pool = browser_pool.BrowserPool()
+    result = await pool.fetch_html(
+        "https://www.deakin.edu.au/course/test",
+        actions=[
+            {
+                "click_text": "Go to international course details",
+                "required": True,
+            }
+        ],
+    )
+
+    assert result is None
+    assert page.evaluate_calls
+
+
+@pytest.mark.asyncio
+async def test_goto_timeout_applies_successful_required_action(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    good_html = "<html><body>" + ("x" * 2048) + "</body></html>"
+    page = _FakePage(
+        goto_exc=browser_pool.PlaywrightTimeoutError("timed out"),
+        content=good_html,
+        evaluate_returns=True,
+    )
+    _install_fake_page(monkeypatch, page)
+
+    pool = browser_pool.BrowserPool()
+    result = await pool.fetch_html(
+        "https://www.deakin.edu.au/course/test",
+        actions=[
+            {
+                "click_text": "Go to international course details",
+                "required": True,
+            }
+        ],
+    )
+
+    assert result == good_html
+    assert page.evaluate_calls
 
 
 @pytest.mark.asyncio

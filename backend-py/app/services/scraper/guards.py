@@ -591,6 +591,13 @@ def should_stage_course(
     # This is intentionally not configurable per university: old YAML and
     # admin-config ``enabled: false`` values remain readable for compatibility,
     # but cannot silently bypass the shared safety gate.
+    if payload.get("online_only"):
+        log.info(
+            "[REJECT CHECK] course=%r decision=reject "
+            "(online_only — explicit authoritative page signal) global_policy=true",
+            payload.get("course_name") or course_name,
+        )
+        return (False, "online_only")
 
     # URL-based category-page rejection — runs FIRST so that pages whose
     # title accidentally gains a degree-level prefix (e.g. "MBA – Two

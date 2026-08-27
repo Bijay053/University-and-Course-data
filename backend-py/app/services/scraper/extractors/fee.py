@@ -530,6 +530,144 @@ def _extract_strong_label_value(
     return None, None
 
 
+def _extract_audience_scoped_fee(
+    html: str,
+    *,
+    prefer_year_one: bool,
+) -> tuple[int, str] | None:
+    """Read a fee from a machine-readable international audience container.
+
+    Some course pages publish domestic and international values in the same
+    SSR document, then use JavaScript only to toggle visibility.  Flattening
+    that document destroys the audience boundary and lets a nearby domestic
+    amount win.  Prefer explicit audience attributes before any text scan.
+
+    Supported attribute idioms are intentionally generic:
+    ``data-student-type``, ``data-audience``, and ``data-fee-audience``.
+    """
+    if not html:
+        return None
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:  # pragma: no cover - bs4 is a hard dependency
+        return None
+
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:  # pragma: no cover - defensive
+        return None
+
+    audience_attrs = ("data-student-type", "data-audience", "data-fee-audience")
+    candidates: list[tuple[int, int, str]] = []
+
+    def _has_audience_attr(tag: object) -> bool:
+        attrs = getattr(tag, "attrs", {}) or {}
+        return any(attr in attrs for attr in audience_attrs)
+
+    for block in soup.find_all(True):
+        audience = " ".join(
+            str(block.attrs.get(attr) or "") for attr in audience_attrs
+        ).strip()
+        if not audience or not _INTL_CTX.search(audience):
+            continue
+        # Mixed/shared owners do not prove which audience a descendant amount
+        # belongs to.  Fail closed and let the established contextual cascade
+        # handle them rather than promoting a possibly domestic value at high
+        # confidence.
+        mixed_audience = re.sub(
+            r"\bnon[-\s]?resident\b",
+            "",
+            audience,
+            flags=re.I,
+        )
+        if re.search(
+            r"\b(?:domestic|home|local|resident)\b",
+            mixed_audience,
+            re.I,
+        ):
+            continue
+
+        for label_tag in block.find_all(("dt", "th")):
+            # A broad international wrapper may contain a nested domestic card.
+            # Only use labels whose nearest audience owner is this exact block.
+            # This prevents ancestor inheritance from crossing audience scopes.
+            nearest_owner = label_tag.find_parent(_has_audience_attr)
+            if nearest_owner is not block:
+                continue
+
+            label = label_tag.get_text(" ", strip=True).rstrip(":").strip()
+            if not label:
+                continue
+
+            # Audience scoping alone is not enough: international sections also
+            # contain application, student-services, insurance, deposit, and
+            # scholarship charges.  Require explicit tuition/course/year
+            # semantics before assigning the value to international tuition.
+            is_year_one = bool(_FIRST_YEAR_FEE_CTX.search(label))
+            is_total = bool(_FULL_COURSE_LABEL_CTX.search(label))
+            is_annual = bool(_PER_YEAR_CTX.search(label))
+            is_explicit_tuition = bool(
+                re.search(
+                    r"\b(?:tuition|course|program(?:me)?)\s+fees?\b|"
+                    r"\bfees?\s+(?:per|for)\s+(?:year|annum)\b",
+                    label,
+                    re.I,
+                )
+            )
+            if not (is_year_one or is_total or is_annual or is_explicit_tuition):
+                continue
+            if re.search(
+                r"\b(?:application|admission|acceptance|enrol(?:ment|lment)|"
+                r"student\s+services?|amenities|insurance|visa|deposit|"
+                r"materials?|administration|registration|scholarship|"
+                r"bursary|discount|waiver)\b",
+                label,
+                re.I,
+            ):
+                continue
+
+            value_tag = label_tag.find_next_sibling(
+                "dd" if label_tag.name == "dt" else "td"
+            )
+            if value_tag is None:
+                continue
+            value_text = value_tag.get_text(" ", strip=True)
+            parsed = _classify_fee_value(value_text)
+            if parsed is None:
+                continue
+            amount, _ = parsed
+
+            score = 1
+            if prefer_year_one:
+                if is_year_one:
+                    score += 10
+                elif is_total:
+                    score -= 4
+                elif is_annual:
+                    score += 6
+            else:
+                if is_total:
+                    score += 10
+                elif is_year_one:
+                    score -= 2
+                elif is_annual:
+                    score += 5
+
+            ctx = f"{label}: {value_text} for international students"
+            candidates.append((score, amount, ctx))
+
+    if not candidates:
+        return None
+
+    # Deterministic tie-break follows the configured catalogue semantics:
+    # lower annual/year-one amount when preferred, otherwise the larger total.
+    if prefer_year_one:
+        _score_value, amount, ctx = max(candidates, key=lambda x: (x[0], -x[1]))
+    else:
+        _score_value, amount, ctx = max(candidates, key=lambda x: (x[0], x[1]))
+    return amount, ctx
+
+
 # ── Structured fee table extractor ───────────────────────────────────────────
 # UK universities (Wolverhampton, Coventry, etc.) publish fee tables with rows
 # shaped like:
@@ -1528,6 +1666,34 @@ async def extract(
             prefer_yr1 = bool(_cfg.extraction.fees.prefer_year_one_over_total)
     except Exception:  # noqa: BLE001 — defensive; keep extractor working
         prefer_yr1 = False
+
+    # ── Pre-pass: audience-scoped SSR fee blocks ─────────────────────────────
+    # Course pages can contain both domestic and international fee cards, with
+    # CSS/JavaScript hiding the inactive audience.  Read the machine-readable
+    # audience attribute before flattening the page so values cannot bleed
+    # across student types.
+    audience_fee = _extract_audience_scoped_fee(
+        html, prefer_year_one=prefer_yr1
+    )
+    if audience_fee is not None:
+        amount, ctx = audience_fee
+        return [
+            ExtractionResult(
+                field_key="international_fee",
+                value=amount,
+                normalized={
+                    "international_fee": amount,
+                    "currency": _detect_currency(ctx, country),
+                    "fee_term": _normalize_fee_term(
+                        ctx, prefer_year_one=prefer_yr1
+                    ),
+                    "fee_year": _extract_year(ctx),
+                },
+                confidence=0.96,
+                snippet=ctx[:200],
+                method="fee.audience_structural",
+            )
+        ]
 
     # ── Pre-pass Sheffield: .feebox DOM + PGT fee API ────────────────────────
     # Sheffield course pages inject fees via JavaScript (browser-rendered .feebox

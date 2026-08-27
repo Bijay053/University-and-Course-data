@@ -590,6 +590,19 @@ def _extract_strong_label_value(
         if not value_text:
             continue
         parsed = _classify_duration_value(value_text, prefer_fulltime=prefer_fulltime)
+        # Some SSR summary cards use an explicit "Full time duration" label
+        # but render only the numeric year count in the value cell
+        # (for example, <dt>Full time duration</dt><dd>4</dd>).  The label
+        # supplies the missing semantics, so do not fall through to a broad
+        # page-text scan that can capture unrelated "2 years" admission prose.
+        if (
+            parsed is None
+            and re.fullmatch(r"full[-\s]?time\s+duration", label_raw, re.I)
+            and re.fullmatch(r"\d+(?:\.\d+)?", value_text)
+        ):
+            amount = float(value_text)
+            if 0 < amount <= _DURATION_CAP["Year"]:
+                parsed = (amount, "Year")
         if parsed is not None:
             snippet = (
                 f"<{label_tag.name}>{label_raw}</{label_tag.name}> -> "

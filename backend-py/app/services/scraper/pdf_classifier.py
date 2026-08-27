@@ -155,6 +155,57 @@ _GEMINI_PROMPT = (
 )
 
 
+_NON_TUITION_FEE_URL_RE = re.compile(
+    r"(?:incidental(?:s)?|ancillary|non[-_\s]?tuition)[-_\s]*(?:fees?|costs?|charges?)"
+    r"|student[-_\s]*services[-_\s]*(?:and|&)[-_\s]*amenities[-_\s]*fees?"
+    r"|\bssaf\b"
+    r"|application[-_\s]*fees?"
+    r"|(?:enrolment|enrollment)[-_\s]*deposits?"
+    r"|(?:materials?|equipment)[-_\s]*(?:fees?|costs?)",
+    re.I,
+)
+_NON_TUITION_FEE_TITLE_RE = re.compile(
+    r"\b(?:incidental(?:s)?|ancillary|non[-\s]?tuition)\s+(?:fees?|costs?|charges?)\b"
+    r"|\bstudent\s+services\s+(?:and|&)\s+amenities\s+fees?\b"
+    r"|\bssaf\b"
+    r"|\bapplication\s+fees?\b"
+    r"|\b(?:enrolment|enrollment)\s+deposits?\b"
+    r"|\b(?:materials?|equipment)\s+(?:fees?|costs?)\b",
+    re.I,
+)
+_POSITIVE_TUITION_TITLE_RE = re.compile(
+    r"\b(?:international\s+)?tuition\s+(?:fee\s+)?schedule\b"
+    r"|\binternational\s+tuition\s+fees?\b",
+    re.I,
+)
+_BEYOND_TUITION_RE = re.compile(
+    r"\b(?:additional|extra)\s+costs?.{0,100}\bbeyond\s+(?:their\s+)?tuition\b",
+    re.I | re.S,
+)
+
+
+def is_non_tuition_fee_pdf(url: str, first_page_text: str = "") -> bool:
+    """Return True for documents explicitly dedicated to non-tuition charges.
+
+    This is intentionally narrower than the general low-value PDF filter.
+    Universities publish incidental, ancillary, SSAF, application, deposit,
+    materials, and equipment fee documents whose dollar amounts must never be
+    used as international tuition.
+    """
+    if _NON_TUITION_FEE_URL_RE.search(url or ""):
+        return True
+    sample = (first_page_text or "")[:600]
+    title = next((line.strip() for line in sample.splitlines() if line.strip()), "")
+    if not _NON_TUITION_FEE_TITLE_RE.search(title):
+        return bool(_BEYOND_TUITION_RE.search(sample))
+    # A combined international tuition schedule may mention incidental costs
+    # in its title; keep it unless the introduction explicitly says the costs
+    # are beyond tuition.
+    if _POSITIVE_TUITION_TITLE_RE.search(title) and not _BEYOND_TUITION_RE.search(sample):
+        return False
+    return True
+
+
 # ── Data class ────────────────────────────────────────────────────────────────
 
 @dataclass
@@ -204,6 +255,14 @@ def _keyword_scores(text: str) -> dict[str, float]:
 
 def classify_by_keywords(url: str, first_page_text: str = "") -> ClassifiedPdf:
     """Classify using keyword scoring only.  Fast and synchronous."""
+    if is_non_tuition_fee_pdf(url, first_page_text):
+        return ClassifiedPdf(
+            url=url,
+            category="other",
+            confidence=0.99,
+            classification_method="keyword",
+            raw_scores={},
+        )
     combined = f"{url} {first_page_text}"
     scores = _keyword_scores(combined)
     best_cat = max(scores, key=scores.__getitem__)
@@ -291,6 +350,8 @@ def is_low_value_pdf(url: str, first_page_text: str = "") -> bool:
     so that edge cases like "international-students-fee-refund-policy.pdf" are
     not wrongly suppressed.
     """
+    if is_non_tuition_fee_pdf(url, first_page_text):
+        return True
     sample = f"{url} {first_page_text[:300]}"
     if not _LOW_VALUE_PDF_RE.search(sample):
         return False

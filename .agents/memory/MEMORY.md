@@ -98,3 +98,7 @@
 - [Griffith program API authority](griffith-program-api.md) — degree pages are Vue shells; use v3 program API, with Funnelback metadata fallback for retired 404 records.
 - [Flinders AEM page compaction](flinders-aem-compaction.md) — course pages are mostly AEM chrome; retain metadata, title shell and fast facts before generic extraction.
 - [Safe cross-site HTML compaction](safe-html-compaction.md) — preserve chrome text/order, never flatten structured descendants, and require per-university full-payload parity before opt-in.
+- [Required browser state validation](required-browser-actions-timeout.md) — pooled sessions and timeout DOM require idempotent audience-state checks before extraction.
+- [Audience-scoped fee boundaries](audience-scoped-fee-boundaries.md) — audience attributes are authoritative only when exclusive, nearest-owned, and paired with explicit tuition semantics.
+- [Location table-header contamination](location-table-header-contamination.md) — “Location” table headers must not turn adjacent column labels into campuses or override authoritative Online delivery.
+- [Non-tuition PDF fee safety](non-tuition-pdf-fee-safety.md) — incidental, ancillary, SSAF, application, deposit, materials, and equipment PDFs must never populate international tuition.

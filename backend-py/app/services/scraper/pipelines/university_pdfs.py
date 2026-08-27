@@ -30,6 +30,7 @@ import httpx
 from app.services.scraper.extractors import english_test, fee
 from app.services.scraper.extractors.base import ExtractionResult
 from app.services.scraper.pdf_fetcher import download_pdf_text
+from app.services.scraper.pdf_classifier import is_non_tuition_fee_pdf
 from app.services.scraper.pdf_vision import extract_via_vision
 
 _VISION_TIMEOUT_S = 30.0
@@ -1345,6 +1346,9 @@ def match_course_in_pdf_table(
 
 
 async def _parse_fee_pdf(url: str, country: str | None, emit=None) -> dict[str, Any]:
+    if is_non_tuition_fee_pdf(url):
+        log.warning("non-tuition fee PDF rejected before download: %s", url)
+        return {}
     raw = await _download_raw_pdf(url)
     if not raw:
         return {}
@@ -1362,6 +1366,17 @@ async def _parse_fee_pdf(url: str, country: str | None, emit=None) -> dict[str, 
     except Exception as exc:  # noqa: BLE001
         log.debug("fee PDF text extraction failed for %s: %s", url, exc)
         text = ""
+    if is_non_tuition_fee_pdf(url, text):
+        log.warning("non-tuition fee PDF rejected after text inspection: %s", url)
+        if emit:
+            await emit(
+                "status",
+                f"[PDF] Rejected non-tuition fee document: {url.split('/')[-1][:60]}",
+                phase="extract",
+                kind="pdf_non_tuition_rejected",
+                url=url,
+            )
+        return {}
 
     # Per-uni parser-strategy override: when YAML supplies
     # extraction.fees.pdf_parser="columnar", re-extract text via

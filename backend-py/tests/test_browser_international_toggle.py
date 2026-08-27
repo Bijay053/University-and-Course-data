@@ -35,11 +35,12 @@ class _FakeResponse:
 class _FakePage:
     """Mimics the subset of Playwright's Page API the toggle code uses."""
 
-    def __init__(self, *, evaluate_returns: bool = True) -> None:
+    def __init__(self, *, evaluate_returns: Any = True) -> None:
         self.url: str = ""
         self.evaluate_calls: list[str] = []
         self.wait_for_load_state_calls: list[tuple[str, int | None]] = []
         self.wait_for_timeout_calls: list[int] = []
+        self.wait_for_function_calls: list[tuple[str, dict[str, Any]]] = []
         self.set_extra_http_headers_calls: list[dict[str, str]] = []
         self.goto_calls: list[tuple[str, dict[str, Any]]] = []
         self._evaluate_returns = evaluate_returns
@@ -62,6 +63,9 @@ class _FakePage:
         self, state: str, *, timeout: int | None = None
     ) -> None:
         self.wait_for_load_state_calls.append((state, timeout))
+
+    async def wait_for_function(self, js: str, **kwargs: Any) -> None:
+        self.wait_for_function_calls.append((js, kwargs))
 
     async def content(self) -> str:
         return "<html><body>fake</body></html>"
@@ -191,6 +195,197 @@ def test_toggle_evaluate_failure_is_silent(
     )
     # We still got HTML back even though the toggle errored.
     assert html == "<html><body>fake</body></html>"
+
+
+def test_required_click_failure_rejects_page(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    page = _FakePage(evaluate_returns=False)
+    _install_fake_page(monkeypatch, page)
+
+    pool = browser_pool.BrowserPool()
+    html = _run(
+        pool.fetch_html(
+            "https://www.deakin.edu.au/course/bachelor-testing",
+            actions=[
+                {
+                    "click_text": "Go to international course details",
+                    "required": True,
+                }
+            ],
+        )
+    )
+
+    assert html is None
+
+
+def test_required_click_accepts_already_reached_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _AlreadyInternationalPage(_FakePage):
+        async def evaluate(self, js: str) -> bool:
+            self.evaluate_calls.append(js)
+            return "document.body.innerText" in js
+
+    page = _AlreadyInternationalPage(evaluate_returns=False)
+    _install_fake_page(monkeypatch, page)
+
+    pool = browser_pool.BrowserPool()
+    html = _run(
+        pool.fetch_html(
+            "https://www.deakin.edu.au/course/bachelor-testing-international",
+            actions=[
+                {
+                    "click_text": "Go to international course details",
+                    "already_text": "Go to domestic course details",
+                    "required": True,
+                }
+            ],
+        )
+    )
+
+    assert html == "<html><body>fake</body></html>"
+    assert len(page.evaluate_calls) == 1
+    assert "Go to domestic course details".lower() in page.evaluate_calls[0]
+
+
+def test_text_link_action_navigates_to_resolved_href(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    international_url = (
+        "https://www.deakin.edu.au/course/bachelor-testing-international"
+    )
+    page = _FakePage(evaluate_returns={"href": international_url})
+    _install_fake_page(monkeypatch, page)
+
+    pool = browser_pool.BrowserPool()
+    html = _run(
+        pool.fetch_html(
+            "https://www.deakin.edu.au/course/bachelor-testing",
+            actions=[
+                {
+                    "click_text": "Go to international course details",
+                    "required": True,
+                }
+            ],
+        )
+    )
+
+    assert html == "<html><body>fake</body></html>"
+    assert len(page.goto_calls) == 2
+    assert page.goto_calls[1][0] == international_url
+    assert page.goto_calls[1][1]["wait_until"] == "commit"
+
+
+def test_initial_url_suffix_navigates_directly_to_international_page(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    page = _FakePage()
+    _install_fake_page(monkeypatch, page)
+
+    pool = browser_pool.BrowserPool()
+    html = _run(
+        pool.fetch_html(
+            "https://www.deakin.edu.au/course/bachelor-testing",
+            actions=[
+                {
+                    "navigate_url_suffix": "-international",
+                    "required": True,
+                }
+            ],
+        )
+    )
+
+    assert html == "<html><body>fake</body></html>"
+    assert len(page.goto_calls) == 1
+    assert page.goto_calls[0][0] == (
+        "https://www.deakin.edu.au/course/bachelor-testing-international"
+    )
+
+
+def test_initial_url_suffix_is_not_duplicated(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    page = _FakePage()
+    _install_fake_page(monkeypatch, page)
+
+    pool = browser_pool.BrowserPool()
+    _run(
+        pool.fetch_html(
+            "https://www.deakin.edu.au/course/bachelor-testing-international",
+            actions=[{"navigate_url_suffix": "-international"}],
+        )
+    )
+
+    assert page.goto_calls[0][0].endswith(
+        "/bachelor-testing-international"
+    )
+    assert not page.goto_calls[0][0].endswith(
+        "/bachelor-testing-international-international"
+    )
+
+
+def test_initial_url_suffix_404_falls_back_to_original(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _NotInternationalPage(_FakePage):
+        async def goto(self, url: str, **kwargs: Any) -> _FakeResponse:
+            self.goto_calls.append((url, kwargs))
+            return _FakeResponse(404 if len(self.goto_calls) == 1 else 200)
+
+    page = _NotInternationalPage()
+    _install_fake_page(monkeypatch, page)
+
+    pool = browser_pool.BrowserPool()
+    html = _run(
+        pool.fetch_html(
+            "https://www.deakin.edu.au/course/domestic-only",
+            actions=[
+                {
+                    "navigate_url_suffix": "-international",
+                    "fallback_to_original_on_404": True,
+                    "required": True,
+                }
+            ],
+        )
+    )
+
+    assert html == "<html><body>fake</body></html>"
+    assert [call[0] for call in page.goto_calls] == [
+        "https://www.deakin.edu.au/course/domestic-only-international",
+        "https://www.deakin.edu.au/course/domestic-only",
+    ]
+    assert page.goto_calls[1][1]["wait_until"] == "commit"
+
+
+def test_wait_for_accepts_any_authoritative_audience_marker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    page = _FakePage()
+    _install_fake_page(monkeypatch, page)
+    markers = [
+        "Go to domestic course details",
+        "This course is only available for international students.",
+        "This course is only available for domestic students.",
+        "Discontinued course",
+    ]
+
+    pool = browser_pool.BrowserPool()
+    html = _run(
+        pool.fetch_html(
+            "https://www.deakin.edu.au/course/test",
+            actions=[
+                {
+                    "wait_for": {"any_text": markers},
+                    "required": True,
+                }
+            ],
+        )
+    )
+
+    assert html == "<html><body>fake</body></html>"
+    assert page.wait_for_function_calls
+    assert page.wait_for_function_calls[0][1]["arg"] == markers
 
 
 def test_per_course_browser_passes_toggle_only_for_vit_hosts() -> None:

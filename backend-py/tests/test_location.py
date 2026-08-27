@@ -65,6 +65,51 @@ def test_th_td_location_classifies_via_existing_table_path():
     assert out[0].method == "location.table"
 
 
+def test_table_location_header_does_not_become_a_campus():
+    """Column labels are metadata, not the location value."""
+    html = """
+    <table>
+      <thead>
+        <tr><th>Location</th><th>Domestic</th><th>International</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Online</td><td>Term 1</td><td>Term 1</td></tr>
+      </tbody>
+    </table>
+    """
+    out = _run(location.extract(html, "https://e/x"))
+    assert out == []
+
+
+def test_teaching_period_header_is_not_a_course_location():
+    html = """
+    <table>
+      <thead><tr><th>Location</th><th>Teaching period</th></tr></thead>
+      <tbody><tr><td>Online</td><td>Term 1</td></tr></tbody>
+    </table>
+    """
+    out = _run(location.extract(html, "https://e/x"))
+    assert out == []
+    assert location._classify_location_value("Teaching period") is None
+
+
+def test_teaching_period_pivot_preserves_a_physical_campus():
+    """The header fix must not erase real campus rows in availability tables."""
+    html = """
+    <table>
+      <thead><tr><th>Location</th><th>Teaching period</th></tr></thead>
+      <tbody>
+        <tr><td>Gold Coast</td><td>Term 1</td></tr>
+        <tr><td>Online</td><td>Term 1</td></tr>
+      </tbody>
+    </table>
+    """
+    out = _run(location.extract(html, "https://e/x"))
+    assert out
+    assert out[0].value == "Gold Coast"
+    assert out[0].method == "location.table"
+
+
 def test_strong_location_strips_online_virtual_from_value():
     """Same `_sanitise_for_display` rule as the dl/table paths: an
     `Online` token must be stripped so the staged value is the real

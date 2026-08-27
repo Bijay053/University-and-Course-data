@@ -115,6 +115,32 @@ async def test_load_university_pdf_data_parses_fee(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_incidental_fee_pdf_cannot_populate_tuition(monkeypatch):
+    called = False
+
+    async def fake_download_raw(url):
+        nonlocal called
+        called = True
+        return b"%PDF-should-not-be-downloaded"
+
+    monkeypatch.setattr(university_pdfs, "_download_raw_pdf", fake_download_raw)
+    result = await university_pdfs.load_university_pdf_data(
+        {
+            "uniPages": {
+                "feesPdf": (
+                    "https://www.cdu.edu.au/files/2026-02/"
+                    "cdu-incidental-fees-2026.pdf"
+                )
+            }
+        },
+        country="Australia",
+    )
+    assert called is False
+    assert "fee" not in result
+    assert "fees_pdf_url" not in result
+
+
+@pytest.mark.asyncio
 async def test_load_university_pdf_data_parses_ielts(monkeypatch):
     _patch_pdf_pipeline(monkeypatch, req_text=_REQ_PDF_TEXT)
 

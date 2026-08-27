@@ -481,7 +481,7 @@ def _is_not_accepting_page(html: str) -> bool:
     return bool(_NOT_ACCEPTING_RE.search(html))
 
 
-def _is_domestic_only_page(html: str) -> bool:
+def _is_domestic_only_page(html: str, url: str | None = None) -> bool:
     """Return True when the page explicitly states it is for domestic students only.
 
     Strips HTML tags before matching so tag noise doesn't break patterns.
@@ -493,6 +493,16 @@ def _is_domestic_only_page(html: str) -> bool:
     """
     if not html:
         return False
+    # Deakin redirects an unavailable international audience URL to its
+    # generic discontinued-course page while the original course page remains
+    # domestic-only. Treat that host-scoped terminal page as ineligible rather
+    # than retrying it as a fetch failure or extracting generic page content.
+    if (
+        url
+        and urlparse(url).hostname in {"deakin.edu.au", "www.deakin.edu.au"}
+        and _re.search(r"\bdiscontinued\s+course\b", html, _re.IGNORECASE)
+    ):
+        return True
     # Hard patterns: unambiguous course-level exclusion statements.
     # Run against RAW html FIRST so attribute-in-tag markers
     # (e.g. Torrens ``<div data-studenttypes="Domestic">``) survive —
@@ -512,6 +522,59 @@ def _is_domestic_only_page(html: str) -> bool:
     if _DOMESTIC_ONLY_SOFT_RE.search(text) and not _has_international_section(html):
         return True
     return False
+
+
+def _is_deakin_online_only_page(html: str, url: str | None = None) -> bool:
+    """Return True when Deakin's international location signal is all-virtual.
+
+    Physical locations still come exclusively from banner tabs. The
+    international-audience meta value is a rejection-only fallback for Deakin
+    templates that omit the banner block entirely when the sole value is Online.
+    """
+    if not html or not url:
+        return False
+    host = urlparse(url).hostname or ""
+    if host != "deakin.edu.au" and not host.endswith(".deakin.edu.au"):
+        return False
+    try:
+        from bs4 import BeautifulSoup as _BS4_deakin
+
+        soup = _BS4_deakin(html, "html.parser")
+        values = location.deakin_banner_tab_values(soup)
+        if not values:
+            student_meta = soup.select_one("meta[name='dkncoursestudent']")
+            location_meta = soup.select_one("meta[name='dkncourselocations']")
+            student = (
+                str(student_meta.get("content") or "").strip().casefold()
+                if student_meta
+                else ""
+            )
+            raw_locations = (
+                str(location_meta.get("content") or "").strip()
+                if location_meta
+                else ""
+            )
+            if student == "international" and raw_locations:
+                values = [
+                    value.strip()
+                    for value in _re.split(r"[;,|]", raw_locations)
+                    if value.strip()
+                ]
+    except Exception:  # noqa: BLE001 — malformed DOM must not reject a course
+        return False
+    if not values:
+        return False
+    virtual = {
+        "online",
+        "virtual",
+        "remote",
+        "distance",
+        "distance learning",
+        "off campus",
+        "off-campus",
+        "external",
+    }
+    return all(value.strip().casefold() in virtual for value in values)
 
 
 _DURATION_LABEL_PAT_RE = _re.compile(
@@ -948,6 +1011,7 @@ _STRUCTURAL_COURSE_PAGE_EXACT: frozenset[str] = frozenset({
 
 _STRUCTURAL_COURSE_PAGE_PREFIXES: tuple[str, ...] = (
     "duration.",       # duration.structural — reads explicit Course Duration label
+    "fee.",            # fee.audience_structural — explicit audience + labelled amount
     "course_name.",    # course_name.h1, course_name.title, …
     "description.",    # description.meta, description.og, …
     "study_mode:",     # study_mode:rule — reads explicit Delivery/Mode label
@@ -1850,6 +1914,11 @@ async def extract_course(
                 _browser_config_for, is_challenge_shell, note_browser_rescue, should_retry_browser,
             )
             from app.services.skip_counters import note_skip as _note_skip
+            _initial_browser_actions = (
+                _uc_skip_pcb.extraction.actions or None
+                if _uc_skip_pcb is not None
+                else None
+            )
             if emit:
                 await emit(
                     "status",
@@ -1859,6 +1928,7 @@ async def extract_course(
             wait_until, settle_ms, _outer_sec, goto_ms = _browser_config_for(url)
             html = await _bp.fetch_html(
                 url, wait_until=wait_until, timeout=goto_ms, settle_ms=settle_ms,
+                actions=_initial_browser_actions,
             )
             # ── 429 rate-limit cooldown ──────────────────────────────────────
             # When Cloudflare issues a hard 429 (not a timeout / partial page),
@@ -1921,6 +1991,7 @@ async def extract_course(
                         )
                     html = await _bp.fetch_html(
                         url, wait_until=wait_until, timeout=goto_ms, settle_ms=settle_ms,
+                        actions=_initial_browser_actions,
                     )
                     if html and html is not BROWSER_RATE_LIMITED:
                         break
@@ -2115,15 +2186,32 @@ async def extract_course(
     # international students, flag it immediately.  The staging guard will
     # reject it with reason "domestic_only" without running any more extractors.
     # Phase 3: gated on extraction.filters.domestic_only.enabled (fail-open).
-    if _domestic_only_filter_enabled() and _is_domestic_only_page(html):
+    if _domestic_only_filter_enabled() and _is_domestic_only_page(html, url):
         payload["domestic_only"] = True
-        await emit(
-            "status",
-            f"[DOMESTIC ONLY] {url} — course page states domestic-students-only; skipping",
-            phase="extract",
-            kind="domestic_only_skip",
-            url=url,
-        )
+        if emit:
+            await emit(
+                "status",
+                f"[DOMESTIC ONLY] {url} — course page states domestic-students-only; skipping",
+                phase="extract",
+                kind="domestic_only_skip",
+                url=url,
+            )
+        return {"url": url, "payload": payload, "evidence": evidence}
+
+    # Deakin's international-page location state is authoritative. Fail closed
+    # before generic mode readers can mistake unrelated campus text for an
+    # in-person option.
+    if _is_deakin_online_only_page(html, url):
+        payload["online_only"] = True
+        payload["online_only_deakin"] = True
+        if emit:
+            await emit(
+                "status",
+                f"[ONLINE ONLY] {url} — Deakin banner tabs are all virtual; skipping",
+                phase="extract",
+                kind="online_only_skip",
+                url=url,
+            )
         return {"url": url, "payload": payload, "evidence": evidence}
 
     # ── Part-time-only early exit ─────────────────────────────────────────────
@@ -2895,6 +2983,25 @@ async def extract_course(
                 for k, v in r.normalized.items():
                     if v is None:
                         continue
+                    # A structural fee result carries paired semantics such as
+                    # fee_term in its normalized payload.  Record that paired
+                    # field as evidence too, so Gemini PRIMARY cannot detach an
+                    # annual amount from its label and relabel it Full Course.
+                    if (
+                        r.method.startswith("fee.audience_structural")
+                        and k == "fee_term"
+                        and k != r.field_key
+                    ):
+                        evidence.append(
+                            {
+                                "field_key": k,
+                                "value": v,
+                                "confidence": r.confidence,
+                                "method": r.method,
+                                "source_url": url,
+                                "snippet": r.snippet,
+                            }
+                        )
                     # Structural location extractors (method starts with "location.")
                     # override any Stage-0 ai_rule:css value for the same field.
                     # Stage-0 CSS rules can match testimonial or junk text on some
@@ -2903,7 +3010,9 @@ async def extract_course(
                     # structural extractor — which reads from an explicit DOM panel
                     # and has confidence ≥ 0.90 — should always win.
                     # _stage0_covered tracks exactly which fields Stage-0 wrote.
-                    if r.method.startswith("location.") and k in _stage0_covered:
+                    if r.method.startswith("fee.audience_structural"):
+                        payload[k] = v
+                    elif r.method.startswith("location.") and k in _stage0_covered:
                         payload[k] = v  # structural extractor overrides Stage-0 guess
                     else:
                         # First-write-wins so the highest-confidence result (which
@@ -4910,7 +5019,8 @@ async def extract_course(
         if _fed_signal:
             _hard_marker_hit = True
         if _hard_marker_hit or (
-            _is_domestic_only_page(rendered_html) and not _browser_confirmed_intl
+            _is_domestic_only_page(rendered_html, url)
+            and not _browser_confirmed_intl
         ):
             payload["domestic_only"] = True
             await emit(

@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from contextlib import asynccontextmanager
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlsplit, urlunsplit
 
 from app.config import settings
 from app.services.scraper.extractors.curtin_session import (
@@ -304,7 +305,14 @@ class BrowserPool:
     async def _execute_actions(self, page: Any, actions: list[dict]) -> None:
         """Execute a YAML-driven list of browser interaction actions.
 
-        Each dict in *actions* should have exactly ONE of the following keys:
+        Each dict in *actions* should have one action key and may additionally
+        set ``required: true``. Required action failures reject the page instead
+        of returning HTML from the wrong audience/tab state.
+        ``already_text`` may accompany ``click_text`` when the desired state can
+        persist in a reused browser session; if that marker is already present,
+        the click is treated as satisfied.
+        ``navigate_url_suffix`` rewrites the initial URL path before the first
+        request, then leaves subsequent required waits to verify the page state.
           click_text   str  — click a visible element whose text matches
                               (case-insensitive). The value "International"
                               uses the smart _INTERNATIONAL_TOGGLE_JS.
@@ -318,6 +326,14 @@ class BrowserPool:
             try:
                 if "click_text" in step:
                     txt = str(step["click_text"])
+                    already_text = str(step.get("already_text") or "").strip()
+                    if already_text:
+                        marker_seen = await page.evaluate(
+                            "() => (document.body.innerText || '')"
+                            f".toLowerCase().includes({json.dumps(already_text.lower())})"
+                        )
+                        if marker_seen:
+                            continue
                     if txt.lower() == "international":
                         # Use the battle-tested smart JS for the common case
                         clicked = await page.evaluate(_INTERNATIONAL_TOGGLE_JS)
@@ -340,18 +356,50 @@ class BrowserPool:
       p = p.parentElement;
     }}
     if (inNav) continue;
+    const link = el.closest('a[href]');
+    if (link && link.href) return {{ href: link.href }};
     el.click();
     return true;
   }}
   return false;
 }}"""
-                        clicked = await page.evaluate(js)
+                        action_result = await page.evaluate(js)
+                        navigate_href = (
+                            str(action_result.get("href") or "")
+                            if isinstance(action_result, dict)
+                            else ""
+                        )
+                        if navigate_href:
+                            # Calling element.click() on a normal link can
+                            # destroy the JS execution context before evaluate()
+                            # returns, making a successful navigation look like
+                            # a failed required action. Navigate to the exact
+                            # resolved href instead; a following required
+                            # wait_for step still verifies the destination DOM.
+                            try:
+                                await page.goto(
+                                    navigate_href,
+                                    wait_until="commit",
+                                    timeout=5000,
+                                )
+                            except PlaywrightTimeoutError:
+                                # The destination may still be loading after
+                                # commit; let the explicit confirmation action
+                                # decide whether the required state was reached.
+                                pass
+                            clicked = True
+                        else:
+                            clicked = bool(action_result)
                     if clicked:
                         try:
                             await page.wait_for_load_state("networkidle", timeout=5000)
                         except Exception:
                             pass
                         await page.wait_for_timeout(1200)
+                    elif step.get("required"):
+                        raise RuntimeError(
+                            f"required click target not found: {txt!r}"
+                        )
 
                 elif "click_css" in step:
                     sel = str(step["click_css"])
@@ -372,10 +420,28 @@ class BrowserPool:
                         )
                     elif "selector" in wf:
                         await page.wait_for_selector(wf["selector"], timeout=8000)
+                    elif "any_text" in wf:
+                        texts = [
+                            str(value).strip()
+                            for value in (wf.get("any_text") or [])
+                            if str(value).strip()
+                        ]
+                        if not texts:
+                            raise RuntimeError("wait_for any_text is empty")
+                        await page.wait_for_function(
+                            """(needles) => {
+                              const body = document.body.innerText || '';
+                              return needles.some((needle) => body.includes(needle));
+                            }""",
+                            arg=texts,
+                            timeout=8000,
+                        )
+                    elif step.get("required"):
+                        raise RuntimeError("required wait_for has no condition")
 
                 elif "expand_text" in step:
                     esc = str(step["expand_text"]).replace("'", "\\'")
-                    await page.evaluate(f"""
+                    clicked = await page.evaluate(f"""
 () => {{
   for (const el of document.querySelectorAll('details,summary,button,[aria-expanded]')) {{
     const t = (el.textContent || '').toLowerCase();
@@ -387,6 +453,10 @@ class BrowserPool:
   }}
   return false;
 }}""")
+                    if not clicked and step.get("required"):
+                        raise RuntimeError(
+                            f"required expand target not found: {esc!r}"
+                        )
                     await page.wait_for_timeout(600)
 
                 elif "scroll_to" in step:
@@ -398,6 +468,8 @@ class BrowserPool:
 
             except Exception as exc:
                 log.debug("action step %r failed on %s: %s", step, page.url, exc)
+                if step.get("required"):
+                    raise
 
     async def fetch_html(
         self,
@@ -500,6 +572,37 @@ class BrowserPool:
                         )
                 # Set referer to look like coming from Google
                 await page.set_extra_http_headers({"Referer": "https://www.google.com/"})
+                _all_actions: list[dict] = []
+                if click_international:
+                    _all_actions.append({"click_text": "International"})
+                if actions:
+                    _all_actions.extend(actions)
+                navigation_url = url
+                fallback_to_original_on_404 = False
+                post_navigation_actions: list[dict] = []
+                for step in _all_actions:
+                    if "navigate_url_suffix" not in step:
+                        post_navigation_actions.append(step)
+                        continue
+                    suffix = str(step.get("navigate_url_suffix") or "").strip()
+                    if not suffix:
+                        if step.get("required"):
+                            raise RuntimeError(
+                                "required navigate_url_suffix is empty"
+                            )
+                        continue
+                    parts = urlsplit(navigation_url)
+                    path = parts.path.rstrip("/")
+                    if not path.endswith(suffix):
+                        path += suffix
+                    navigation_url = urlunsplit(
+                        (parts.scheme, parts.netloc, path, parts.query, parts.fragment)
+                    )
+                    fallback_to_original_on_404 = (
+                        fallback_to_original_on_404
+                        or bool(step.get("fallback_to_original_on_404"))
+                    )
+                _all_actions = post_navigation_actions
                 # PR-5 Bug 3: catch the SPECIFIC navigation-timeout case
                 # and STILL try to grab whatever DOM is rendered.
                 # Marketing sites embed long-poll widgets that prevent
@@ -512,7 +615,11 @@ class BrowserPool:
                 # still propagate as None, and we sniff for Chromium
                 # error pages so we don't silently return junk.
                 try:
-                    resp = await page.goto(url, wait_until=wait_until, timeout=timeout)
+                    resp = await page.goto(
+                        navigation_url,
+                        wait_until=wait_until,
+                        timeout=timeout,
+                    )
                 except PlaywrightTimeoutError as goto_exc:
                     log.warning(
                         "browser fetch %s: goto timed out (%s) — trying partial HTML",
@@ -543,10 +650,35 @@ class BrowserPool:
                             url,
                         )
                         return None
+                    # A navigation timeout can still leave a fully interactive
+                    # DOM. Apply audience/tab actions before accepting it; a
+                    # required action failure must reject the partial page just
+                    # like it does on the normal navigation path.
+                    if _all_actions:
+                        await self._execute_actions(page, _all_actions)
+                        partial = await asyncio.wait_for(
+                            page.content(), timeout=3.0
+                        )
                     return partial
                 if resp is None:
                     log.warning("browser fetch %s: no response", url)
                     return None
+                if (
+                    resp.status == 404
+                    and fallback_to_original_on_404
+                    and navigation_url != url
+                ):
+                    resp = await page.goto(
+                        url,
+                        wait_until="commit",
+                        timeout=min(timeout, 10_000),
+                    )
+                    if resp is None:
+                        log.warning(
+                            "browser fetch %s: no response after 404 fallback",
+                            url,
+                        )
+                        return None
                 if resp.status == 429:
                     log.warning("browser fetch %s -> %s", url, resp.status)
                     return BROWSER_RATE_LIMITED  # type: ignore[return-value]
@@ -561,11 +693,6 @@ class BrowserPool:
                 #      International toggle as the first action.
                 #   2. YAML-driven `actions` list from extraction.actions
                 #      config — click_text, click_css, wait_for, etc.
-                _all_actions: list[dict] = []
-                if click_international:
-                    _all_actions.append({"click_text": "International"})
-                if actions:
-                    _all_actions.extend(actions)
                 if _all_actions:
                     await self._execute_actions(page, _all_actions)
                 # Generic expand pass — auto-click ALL collapsed accordions,

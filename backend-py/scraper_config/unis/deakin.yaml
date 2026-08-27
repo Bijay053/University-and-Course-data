@@ -183,7 +183,19 @@ extraction:
 
   # Deakin blocks plain HTTP (403/CF). Skip static fetch, go straight to Playwright.
   skip_initial_http_fetch: true
-  force_browser: true
+  # The default course URL is the domestic view. Follow its exact audience
+  # switch so fee, duration and campus tabs come from the international view.
+  actions:
+    - navigate_url_suffix: "-international"
+      fallback_to_original_on_404: true
+      required: true
+    - wait_for:
+        any_text:
+          - "Go to domestic course details"
+          - "This course is only available for international students."
+          - "This course is only available for domestic students."
+          - "Discontinued course"
+      required: true
 
   # Deakin's Cloudflare tier is sensitive to high concurrency.
   # 2 parallel Playwright sessions avoids triggering bot-detect.

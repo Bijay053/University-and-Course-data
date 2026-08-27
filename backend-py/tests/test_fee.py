@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import asyncio
 
+from app.services.scraper.config.context import current_uni_config
+from app.services.scraper.config.schema import UniConfig
 from app.services.scraper.extractors import fee
 
 
@@ -155,6 +157,175 @@ def test_first_year_fee_only_still_extracted():
     assert out, "fee extractor must return a result when only first-year fee is present"
     n = out[0].normalized
     assert n["international_fee"] == 38_000
+
+
+def test_audience_scoped_fee_prefers_international_year_one_when_configured():
+    """Audience-tagged SSR cards must not leak the domestic or total amount."""
+    html = """
+    <div data-student-type="domestic">
+      <dt>First year fee</dt><dd>$16,891</dd>
+    </div>
+    <div data-student-type="international" style="display:none">
+      <dt>First year fee</dt><dd>$36,730</dd>
+    </div>
+    <div data-student-type="domestic">
+      <dt>Full course fee</dt><dd>$67,564</dd>
+    </div>
+    <div data-student-type="international" style="display:none">
+      <dt>Full course fee</dt><dd>$146,920</dd>
+    </div>
+    """
+    cfg = UniConfig(
+        slug="example",
+        name="Example University",
+        base_url="https://example.edu",
+        scrape_url="https://example.edu/courses",
+        extraction={"fees": {"prefer_year_one_over_total": True}},
+    )
+    token = current_uni_config.set(cfg)
+    try:
+        out = _run(
+            fee.extract(
+                html,
+                "https://example.edu/course/b1362",
+                country="Australia",
+            )
+        )
+    finally:
+        current_uni_config.reset(token)
+
+    assert out
+    assert out[0].normalized["international_fee"] == 36_730
+    assert out[0].normalized["currency"] == "AUD"
+    assert out[0].normalized["fee_term"] == "Annual"
+    assert out[0].method == "fee.audience_structural"
+
+
+def test_audience_scoped_fee_prefers_international_total_by_default():
+    """The generic audience reader preserves the default total-fee policy."""
+    html = """
+    <div data-audience="domestic">
+      <dt>First year fee</dt><dd>$16,891</dd>
+    </div>
+    <div data-audience="international">
+      <dt>First year fee</dt><dd>$36,730</dd>
+      <dt>Full course fee</dt><dd>$146,920</dd>
+    </div>
+    """
+    cfg = UniConfig(
+        slug="example",
+        name="Example University",
+        base_url="https://example.edu",
+        scrape_url="https://example.edu/courses",
+    )
+    token = current_uni_config.set(cfg)
+    try:
+        out = _run(fee.extract(html, "https://example.edu/course/x"))
+    finally:
+        current_uni_config.reset(token)
+
+    assert out
+    assert out[0].normalized["international_fee"] == 146_920
+    assert out[0].normalized["fee_term"] == "Full Course"
+    assert out[0].method == "fee.audience_structural"
+
+
+def test_audience_scoped_fee_rejects_ancillary_international_charges():
+    """International audience containers also hold non-tuition charges."""
+    html = """
+    <div data-student-type="international">
+      <dt>Application fee</dt><dd>$5,000</dd>
+      <dt>Student services fee</dt><dd>$8,000</dd>
+      <dt>Acceptance deposit</dt><dd>$12,000</dd>
+    </div>
+    """
+
+    assert (
+        fee._extract_audience_scoped_fee(html, prefer_year_one=True) is None
+    )
+
+
+def test_audience_scoped_fee_does_not_inherit_nested_domestic_card():
+    """Nearest audience ownership prevents domestic values leaking upward."""
+    html = """
+    <section data-audience="international">
+      <div data-audience="domestic">
+        <dt>First year fee</dt><dd>$16,891</dd>
+      </div>
+      <div>
+        <dt>Application fee</dt><dd>$5,000</dd>
+      </div>
+      <div>
+        <dt>International tuition fee</dt><dd>$36,730</dd>
+      </div>
+    </section>
+    """
+
+    result = fee._extract_audience_scoped_fee(
+        html, prefer_year_one=True
+    )
+    assert result is not None
+    amount, _ctx = result
+    assert amount == 36_730
+
+
+def test_audience_scoped_fee_rejects_domestic_only_nested_wrapper():
+    html = """
+    <section data-audience="international">
+      <div data-audience="domestic">
+        <dt>First year fee</dt><dd>$16,891</dd>
+      </div>
+    </section>
+    """
+
+    assert (
+        fee._extract_audience_scoped_fee(html, prefer_year_one=True) is None
+    )
+
+
+def test_audience_scoped_fee_rejects_mixed_owner_and_uses_intl_only_source():
+    html = """
+    <section data-audience="domestic international">
+      <dt>First year fee</dt><dd>$16,891</dd>
+    </section>
+    <section data-audience="international">
+      <dt>First year fee</dt><dd>$36,730</dd>
+    </section>
+    """
+
+    result = fee._extract_audience_scoped_fee(
+        html, prefer_year_one=True
+    )
+    assert result is not None
+    amount, _ctx = result
+    assert amount == 36_730
+
+
+def test_audience_scoped_fee_rejects_mixed_owner_without_intl_only_source():
+    html = """
+    <section data-student-type="international domestic">
+      <dt>Annual tuition fee</dt><dd>$16,891</dd>
+    </section>
+    """
+
+    assert (
+        fee._extract_audience_scoped_fee(html, prefer_year_one=True) is None
+    )
+
+
+def test_audience_scoped_fee_accepts_non_resident_as_international():
+    html = """
+    <section data-student-type="non-resident">
+      <dt>Annual tuition fee</dt><dd>$42,500</dd>
+    </section>
+    """
+
+    result = fee._extract_audience_scoped_fee(
+        html, prefer_year_one=True
+    )
+    assert result is not None
+    amount, _ctx = result
+    assert amount == 42_500
 
 
 def test_uow_session_fee_wins_over_full_course_fee():

@@ -63,7 +63,7 @@ extraction:
                                        # "Full course fee"; use the annual figure.
 
   english:
-    central_page: "https://www.murdoch.edu.au/study/international-students/entry-requirements/english-language-requirements"
+    central_page: "https://www.murdoch.edu.au/study/how-to-apply/entry-requirements/english-proficiency-tests"
 
   course_name:
     strip_title_suffixes:
