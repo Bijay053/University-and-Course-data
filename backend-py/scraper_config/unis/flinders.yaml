@@ -45,14 +45,20 @@ discovery:
 extraction:
   # Flinders course pages link to /entry-requirements/ and /fees-and-scholarships/
   # sub-pages that contain IELTS and fee data not always visible on the main page.
-  follow_admission_links: true
-  max_admission_linked_pages: 3
+  # The main Flinders course document already contains the international fee,
+  # English score, duration and intake data. Following up to three linked pages
+  # per course added avoidable network waits across a ~400-course catalogue.
+  follow_admission_links: false
 
   english:
     # Disable tier-1 (non-DOM-anchored) vision OCR for English test score
     # fields.  Tier-0 images (inside Entry Requirements DOM section) still
     # trusted.  Regex+structural extraction is sufficient for Flinders.
     trust_tier1_vision_ocr_english: false
+    # Flinders' regex/structural extractors reliably find fee + IELTS in the
+    # main HTML. Once both are present, scanning 2-6 decorative AEM images adds
+    # no information and was consuming much of the per-course deadline.
+    skip_vision_when_core_found: true
 
   filters:
     domestic_only:

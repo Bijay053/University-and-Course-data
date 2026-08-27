@@ -2027,6 +2027,14 @@ async def extract_course(
     if _vu_cc_pre.is_vu_host(url):
         html = _vu_cc_pre.scrub_brand_chrome_html(html)
 
+    # Flinders AEM pages are ~750 KB, but the course-specific facts live in a
+    # ~50 KB title + fast-facts shell. Generic extractors repeatedly parse their
+    # input, so removing nav/related/footer chrome cuts per-course CPU time from
+    # several seconds without dropping authoritative course fields.
+    from app.services.scraper.extractors import flinders_html as _flinders_html
+    if _flinders_html.is_flinders_host(url):
+        html = _flinders_html.compact_course_html(html)
+
     # ── University of Newcastle: strip the "related courses" tile block ──
     # www.newcastle.edu.au course pages render a "More degrees you may like"
     # / related-courses carousel at the bottom of every page.  Each tile

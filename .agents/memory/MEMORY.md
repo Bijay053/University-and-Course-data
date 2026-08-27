@@ -96,3 +96,4 @@
 - [SSR courses with missing English](ssr-missing-english-browser-skip.md) — “English missing” can still trigger generic Playwright; proven SSR hosts need skip_per_course_browser and central English fallback.
 - [Evidence dedup schema drift](evidence-dedup-schema-drift.md) — long-lived DBs may lack the model-declared evidence unique constraint; verify pg_indexes before named ON CONFLICT.
 - [Griffith program API authority](griffith-program-api.md) — degree pages are Vue shells; use v3 program API, with Funnelback metadata fallback for retired 404 records.
+- [Flinders AEM page compaction](flinders-aem-compaction.md) — course pages are mostly AEM chrome; retain metadata, title shell and fast facts before generic extraction.
