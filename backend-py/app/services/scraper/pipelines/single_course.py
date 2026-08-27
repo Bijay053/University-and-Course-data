@@ -53,6 +53,46 @@ from app.services.scraper.course_deadline import (
 
 log = logging.getLogger(__name__)
 
+
+def _apply_configured_field_overrides(payload: dict[str, Any], url: str) -> None:
+    """Apply YAML URL-specific overrides before final warning generation.
+
+    ``stage_course`` still applies the same overrides as a last-write safety
+    net. Applying them here as well makes final-payload audits evaluate the
+    configured authoritative value instead of emitting warnings for a value
+    that staging immediately replaces.
+    """
+    try:
+        cfg = get_uni_config()
+        overrides = list(cfg.extraction.text_cleaning.field_overrides or [])
+    except Exception:  # noqa: BLE001
+        return
+    for override in overrides:
+        try:
+            if not _re.search(override.url_regex, url or "", _re.IGNORECASE):
+                continue
+            old = payload.get(override.field)
+            value = (
+                override.value
+                if override.value is not None and override.value != ""
+                else None
+            )
+            payload[override.field] = value
+            log.info(
+                "[FIELD OVERRIDE PRE-QA] %s: %s=%r → %r (regex=%s)",
+                url,
+                override.field,
+                old,
+                value,
+                override.url_regex,
+            )
+        except _re.error:
+            log.warning(
+                "field_overrides: invalid regex skipped before QA: %s",
+                override.url_regex,
+            )
+
+
 # ---------------------------------------------------------------------------
 # Domestic-only detection — regex patterns on visible page text
 # ---------------------------------------------------------------------------
@@ -7959,6 +7999,11 @@ async def extract_course(
     _course_name_for_dl = payload.get("course_name") or ""
     if _re.search(r"\b(?:graduate|postgraduate)\s+diploma\b", _course_name_for_dl, _re.I):
         payload["degree_level"] = "Graduate Diploma"
+
+    # URL-specific YAML overrides are authoritative final values. Apply them
+    # before the warning audit so corrected values do not retain avoidable
+    # missing/suspicious-field warnings.
+    _apply_configured_field_overrides(payload, url)
 
     # ── Scrape-quality warning detection ─────────────────────────────────────
     # After ALL extractors have settled, audit the final payload for cases

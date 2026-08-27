@@ -21,7 +21,7 @@ hallucinations from polluting a brand-new university's scrape).
 """
 from __future__ import annotations
 
-from typing import List, Literal, Optional, Union
+from typing import Any, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -2704,9 +2704,12 @@ class FieldOverride(BaseModel):
     field: str = Field(
         description="Payload key to overwrite (e.g. 'course_location', 'study_mode', 'duration_term').",
     )
-    value: Optional[str] = Field(
+    value: Any | None = Field(
         default=None,
-        description="Value to write. Use null/empty to clear the field instead.",
+        description=(
+            "Value to write. May be a string, number, boolean, list, or mapping "
+            "matching the target payload field. Use null/empty to clear the field."
+        ),
     )
 
 

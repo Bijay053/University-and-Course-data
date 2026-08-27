@@ -161,6 +161,32 @@ def test_dt_dd_duration_rejects_accelerated_in_value_cell():
     )
 
 
+def test_deakin_standard_duration_survives_accelerated_alternative():
+    html = """
+    <p>
+      Fees (estimated) $41,000 for 1 yr full-time AUD
+      Duration 4 years full-time or part-time equivalent
+      or 3 years full-time accelerated mode
+    </p>
+    """
+    out = _run(duration.extract(html, "https://www.deakin.edu.au/course/test"))
+    assert out
+    assert out[0].normalized == {"duration": 4.0, "duration_term": "Year"}
+
+
+def test_deakin_standard_duration_survives_unjoined_accelerated_alternative():
+    html = """
+    <p>
+      Fees (estimated) $44,400 for 1 yr full-time AUD
+      Duration 5 years full-time or part-time equivalent
+      4 years full-time accelerated program (studying in Trimester 3)
+    </p>
+    """
+    out = _run(duration.extract(html, "https://www.deakin.edu.au/course/test"))
+    assert out
+    assert out[0].normalized == {"duration": 5.0, "duration_term": "Year"}
+
+
 # ── Admission-boilerplate anti-context (Fix 1) ────────────────────────────────
 
 def test_years_of_schooling_boilerplate_is_not_duration():

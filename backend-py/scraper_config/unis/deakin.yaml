@@ -172,6 +172,17 @@ extraction:
       - " | Deakin University"
       - " | Deakin"
 
+  text_cleaning:
+    field_overrides:
+      # The international banner omits this value, while the domestic page
+      # publishes the same course's authoritative duration as 4 years.
+      - url_regex: "/course/bachelor-international-studies-bachelor-commerce/?$"
+        field: "duration"
+        value: 4.0
+      - url_regex: "/course/bachelor-international-studies-bachelor-commerce/?$"
+        field: "duration_term"
+        value: "Year"
+
   filters:
     # Do NOT filter on fee presence — Deakin's fee panel is JS-rendered.
     domestic_only:

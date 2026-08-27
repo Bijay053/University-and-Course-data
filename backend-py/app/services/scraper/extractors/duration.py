@@ -79,6 +79,19 @@ _ACCELERATED = re.compile(
     r"credit\s+for\s+previous\s+study)\b",
     re.I,
 )
+# A page can publish the standard and accelerated durations in one value:
+#   "Duration 5 years full-time ... 4 years full-time accelerated program"
+# Rejecting the whole sentence loses the authoritative standard duration.
+# Remove only the numeric alternative attached to the accelerated marker; if
+# no separate standard value remains, the existing fail-closed behaviour wins.
+_ACCELERATED_DURATION_CLAUSE_RE = re.compile(
+    rf"(?:\bor\b|[,;/])?\s*"
+    rf"\d+(?:\.\d+)?\s*(?:{_UNIT})\b"
+    rf"(?:(?!\d+(?:\.\d+)?\s*(?:{_UNIT})\b)[^.;\n]){{0,100}}?"
+    rf"\b(?:accelerat(?:ed|ion)|fast[- ]?track|condensed|"
+    rf"intensive\s+(?:mode|stream|study))\b[^.;\n]*",
+    re.I,
+)
 # Sentences that mention credit points/units in the same span as a number+year
 # match are credit-point talk (e.g. "Masters: 5 units of 8 credit points each
 # across 2 years"), not the actual program duration. Without this filter, the
@@ -460,7 +473,10 @@ def _classify_duration_value(
             value = value[m_ft.start():]
 
     if _ACCELERATED.search(value):
-        return None
+        cleaned = compact(_ACCELERATED_DURATION_CLAUSE_RE.sub(" ", value))
+        if cleaned == compact(value) or not _DURATION_VALUE_RE.search(cleaned):
+            return None
+        value = cleaned
 
     # 1. Compound match: "N year(s), M month(s)" → total months.
     cm = _COMPOUND_DURATION_RE.search(value)
@@ -910,7 +926,10 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
     parsed: list[tuple[float, float, str, str]] = list(parsed_sub_year)
     for s in sentences:
         if _ACCELERATED.search(s):
-            continue
+            cleaned = compact(_ACCELERATED_DURATION_CLAUSE_RE.sub(" ", s))
+            if cleaned == compact(s) or not _DURATION_VALUE_RE.search(cleaned):
+                continue
+            s = cleaned
         # Per-uni: strip reject_sentence_pattern fragments from the sentence
         # before it enters the tournament.  We strip rather than skip so that
         # a page where "up to N years" and "M year program" appear in the same

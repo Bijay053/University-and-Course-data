@@ -113,6 +113,17 @@ def test_english_ielts_overall_with_no_band_below():
     assert n["ielts_overall"] == 6.5 and n["ielts_listening"] == 6.0
 
 
+def test_cambridge_gce_country_table_year_is_not_an_english_score():
+    html = """
+    <p>
+      Singapore - Cambridge GCE A level
+      South Africa - National Senior Certificate (2009 onwards)
+    </p>
+    """
+    out = {r.field_key: r for r in _run(english_test.extract(html, "https://x"))}
+    assert "cambridge_overall" not in out
+
+
 # --- UOW regression: explicit course-level IELTS skill table -----------------
 def test_english_uow_skill_table_maps_bands_by_column_header():
     html = """

@@ -700,13 +700,13 @@ _CAM_ALT = r"(?:cambridge(?:\s+english)?|cae|cpe|c1\s*advanced|c2\s*proficiency)
 def _cambridge(text: str) -> float | None:
     for pat in (
         # Forward-order: keyword then 3-digit score within 40 chars.
-        _CAM_ALT + r"[^0-9]{0,40}?(\d{3})",
+        _CAM_ALT + r"[^0-9]{0,40}?(\d{3})\b",
         # Reverse-order: 3-digit score then keyword within 20 chars.
-        r"(\d{3})[^0-9]{0,20}" + _CAM_ALT,
+        r"\b(\d{3})[^0-9]{0,20}" + _CAM_ALT,
         # Table layout — wider window between label and number to clear
         # the cells in between. Capped at 80 chars so we don't cross row
         # boundaries.
-        _CAM_ALT + r"[^\n0-9]{1,80}?(\d{3})",
+        _CAM_ALT + r"[^\n0-9]{1,80}?(\d{3})\b",
     ):
         m = re.search(pat, text, re.I)
         if m:

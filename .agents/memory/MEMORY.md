@@ -102,3 +102,4 @@
 - [Audience-scoped fee boundaries](audience-scoped-fee-boundaries.md) — audience attributes are authoritative only when exclusive, nearest-owned, and paired with explicit tuition semantics.
 - [Location table-header contamination](location-table-header-contamination.md) — “Location” table headers must not turn adjacent column labels into campuses or override authoritative Online delivery.
 - [Non-tuition PDF fee safety](non-tuition-pdf-fee-safety.md) — incidental, ancillary, SSAF, application, deposit, materials, and equipment PDFs must never populate international tuition.
+- [Mixed standard and alternative values](mixed-standard-alternative-values.md) — preserve standard values beside accelerated alternatives; numeric test scores need boundaries on both sides.

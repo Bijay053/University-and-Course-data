@@ -364,3 +364,51 @@ async def test_deakin_discontinued_international_page_is_ineligible() -> None:
 
     assert result.get("error") is None
     assert result["payload"]["domestic_only"] is True
+
+
+def test_deakin_duration_override_is_applied_before_quality_warnings() -> None:
+    set_uni_config(
+        UniConfig(
+            slug="deakin",
+            name="Deakin University",
+            base_url="https://www.deakin.edu.au",
+            scrape_url="https://www.deakin.edu.au/",
+            extraction=ExtractionConfig(
+                text_cleaning={
+                    "field_overrides": [
+                        {
+                            "url_regex": (
+                                "/course/bachelor-international-studies-"
+                                "bachelor-commerce/?$"
+                            ),
+                            "field": "duration",
+                            "value": 4.0,
+                        },
+                        {
+                            "url_regex": (
+                                "/course/bachelor-international-studies-"
+                                "bachelor-commerce/?$"
+                            ),
+                            "field": "duration_term",
+                            "value": "Year",
+                        },
+                    ]
+                }
+            ),
+        )
+    )
+    from app.services.scraper.pipelines.single_course import (
+        _apply_configured_field_overrides,
+    )
+
+    payload: dict[str, Any] = {"duration": None, "duration_term": None}
+    _apply_configured_field_overrides(
+        payload,
+        (
+            "https://www.deakin.edu.au/course/"
+            "bachelor-international-studies-bachelor-commerce"
+        ),
+    )
+
+    assert payload["duration"] == 4.0
+    assert payload["duration_term"] == "Year"
