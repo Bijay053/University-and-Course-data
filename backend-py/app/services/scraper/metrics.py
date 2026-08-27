@@ -95,10 +95,12 @@ async def compute_run_metrics(
     rows = rows_result.all()
 
     metrics: list[ScrapeRunMetrics] = []
+    observed_fields: set[str] = set()
     for row in rows:
         field_key: str = row.field_key or ""
         method: str = row.method or "unknown"
         count: int = row.count
+        observed_fields.add(field_key)
 
         metrics.append(
             ScrapeRunMetrics(
@@ -109,6 +111,23 @@ async def compute_run_metrics(
                 count=count,
                 courses_total=courses_total,
                 fill_rate=round(count / courses_total, 4),
+            )
+        )
+
+    # Persist explicit zero rows so a critical field disappearing entirely is
+    # still visible to the alert engine. Without these sentinels, a field with
+    # no selected evidence simply vanished from field_totals and could not
+    # trigger a floor or trend regression.
+    for field_key in TRACKED_FIELDS - observed_fields:
+        metrics.append(
+            ScrapeRunMetrics(
+                scrape_run_id=scrape_run_id,
+                university_id=university_id,
+                field_key=field_key,
+                method="null",
+                count=0,
+                courses_total=courses_total,
+                fill_rate=0.0,
             )
         )
 

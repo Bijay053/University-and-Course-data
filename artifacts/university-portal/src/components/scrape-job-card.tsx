@@ -39,6 +39,18 @@ type ScrapeLog = {
     estimated_ai_calls_saved: number;
     estimated_cost_saved_usd: number;
   } | null;
+  html_compaction?: {
+    attempts: number;
+    accepted: number;
+    fail_open: number;
+    skipped_small: number;
+    input_bytes: number;
+    output_bytes: number;
+    elapsed_ms: number;
+    acceptance_rate: number;
+    reduction_rate: number;
+    fail_open_reasons: Record<string, number>;
+  } | null;
 };
 
 type QualityAction = {

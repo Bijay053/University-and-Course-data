@@ -704,6 +704,20 @@ export default function Scraping() {
     requeueCount: number;
     snapshotCount: number;
     latestSnapshotAt: string | null;
+    htmlCompaction: {
+      attempts: number;
+      accepted: number;
+      fail_open: number;
+      elapsed_ms: number;
+      reduction_rate: number;
+      acceptance_rate: number;
+      fail_open_reasons: Record<string, number>;
+    } | null;
+    htmlCompactionAlerts: Array<{
+      ruleId: string;
+      severity: string;
+      message: string;
+    }>;
   };
   type HistoryLogEntry = { sequence: number; event: string; createdAt: string; message?: string; phase?: string; [k: string]: unknown };
   // History staged course is now the full StagedCourse + evidence array
@@ -3737,6 +3751,12 @@ export default function Scraping() {
           <div className="space-y-2">
             {historyRuns.map((run) => {
               const isExpanded = expandedHistoryId === run.runtimeJobId;
+              const compactionLostSpeedup =
+                (run.htmlCompaction?.attempts ?? 0) >= 10
+                && (run.htmlCompaction?.reduction_rate ?? 0) < 0.10;
+              const compactionQualityAlert = run.htmlCompactionAlerts?.find(
+                (alert) => alert.ruleId === "html_compaction_critical_coverage_regression",
+              );
               return (
                 <div key={run.runtimeJobId} className={`border rounded-xl bg-white overflow-hidden transition-shadow ${historySelected.has(run.runtimeJobId) ? "ring-2 ring-indigo-400" : ""}`}>
                   <div className="p-3 sm:p-4 space-y-2">
@@ -3792,7 +3812,47 @@ export default function Scraping() {
                             No snapshots
                           </span>
                         )}
+                        {run.htmlCompaction?.attempts ? (
+                          <span
+                            title={`${run.htmlCompaction.accepted}/${run.htmlCompaction.attempts} accepted · ${run.htmlCompaction.fail_open} failed open · ${Math.round(run.htmlCompaction.elapsed_ms)}ms compaction time`}
+                            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-medium ${
+                              compactionLostSpeedup
+                                ? "bg-red-100 text-red-700"
+                                : "bg-sky-100 text-sky-700"
+                            }`}
+                          >
+                            HTML −{Math.round(run.htmlCompaction.reduction_rate * 100)}%
+                          </span>
+                        ) : null}
                       </div>
+
+                      {compactionLostSpeedup ? (
+                        <div className="w-full rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+                          <strong>HTML speed optimization is no longer useful.</strong>{" "}
+                          Only {Math.round((run.htmlCompaction?.reduction_rate ?? 0) * 100)}% was removed.
+                          Open Scraper Configs for this university and set{" "}
+                          <code className="font-mono">extraction.html_compaction_enabled: false</code>,
+                          then rerun the scrape.
+                          <Link
+                            href="/settings/scraper-configs"
+                            className="ml-2 inline-flex font-semibold underline underline-offset-2"
+                          >
+                            Open Scraper Configs
+                          </Link>
+                        </div>
+                      ) : null}
+                      {compactionQualityAlert ? (
+                        <div className="w-full rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-900">
+                          <strong>HTML compaction quality warning.</strong>{" "}
+                          {compactionQualityAlert.message}
+                          <Link
+                            href="/settings/scraper-configs"
+                            className="ml-2 inline-flex font-semibold underline underline-offset-2"
+                          >
+                            Disable in Scraper Configs
+                          </Link>
+                        </div>
+                      ) : null}
 
                       {/* Action buttons — wrap onto their own line on small screens */}
                       <div className="flex flex-wrap items-center gap-2 shrink-0">

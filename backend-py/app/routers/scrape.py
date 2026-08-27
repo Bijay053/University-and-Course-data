@@ -936,6 +936,7 @@ async def history_list(
 ) -> dict:
     """Match Node: returns {runs, total, limit, offset} with stagedCount/approvedCount/rejectedCount/snapshotCount."""
     from app.models import ScrapedCourse
+    from app.models.scrape_run_alert import ScrapeRunAlert
     from app.models.page_snapshot import PageSnapshot
     from sqlalchemy import select as _select, func as _func, case
     
@@ -975,6 +976,23 @@ async def history_list(
         .limit(limit)
     )
     rows = (await db.execute(stmt)).all()
+    run_ids = [r.runtime_job_id for r, *_ in rows]
+    compaction_alerts_by_run: dict[str, list[dict]] = {}
+    if run_ids:
+        alert_rows = (
+            await db.execute(
+                _select(ScrapeRunAlert).where(
+                    ScrapeRunAlert.scrape_run_id.in_(run_ids),
+                    ScrapeRunAlert.rule_id.like("html_compaction_%"),
+                )
+            )
+        ).scalars().all()
+        for alert in alert_rows:
+            compaction_alerts_by_run.setdefault(alert.scrape_run_id, []).append({
+                "ruleId": alert.rule_id,
+                "severity": alert.severity,
+                "message": alert.message,
+            })
     count_stmt = _select(_func.count()).select_from(ScrapeRuntimeJob)
     if base_where:
         count_stmt = count_stmt.where(*base_where)
@@ -1006,6 +1024,8 @@ async def history_list(
             "requeueCount": int(r.requeue_count or 0),
             "snapshotCount": int(snap_count or 0),
             "latestSnapshotAt": latest_snap_at.isoformat() if latest_snap_at else None,
+            "htmlCompaction": (r.gate_skip_counts or {}).get("html_compaction"),
+            "htmlCompactionAlerts": compaction_alerts_by_run.get(r.runtime_job_id, []),
         })
     return {"runs": runs, "total": int(total), "limit": limit, "offset": offset}
 

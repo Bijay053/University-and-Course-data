@@ -3,6 +3,10 @@ from app.services.scraper.html_compaction import (
     compact_course_html,
 )
 from app.services.scraper.config.schema import ExtractionConfig
+from app.services.html_compaction_counters import (
+    get_html_compaction_stats,
+    reset_html_compaction_stats,
+)
 
 
 def _chrome(label: str, count: int = 6_000) -> str:
@@ -112,6 +116,28 @@ def test_invalid_custom_selector_fails_open():
     assert compact_course_html(
         html, enabled=True, extra_remove_selectors=["["]
     ) == html
+
+
+def test_compaction_counts_accepted_and_fail_open_outcomes():
+    reset_html_compaction_stats()
+    accepted_html = (
+        "<html><body><h1>Course</h1><nav>"
+        + _chrome("menu")
+        + "</nav><main>IELTS 6.5</main></body></html>"
+    )
+    failed_html = "<html><body><h1>Course</h1><nav>" + _chrome("menu") + "</nav></body></html>"
+
+    compact_course_html(accepted_html, enabled=True)
+    compact_course_html(failed_html, enabled=True, extra_remove_selectors=["["])
+
+    stats = get_html_compaction_stats()
+    assert stats["attempts"] == 2
+    assert stats["accepted"] == 1
+    assert stats["fail_open"] == 1
+    assert stats["fail_open_reasons"] == {"invalid_selector": 1}
+    assert stats["acceptance_rate"] == 0.5
+    assert stats["reduction_rate"] > 0
+    assert stats["elapsed_ms"] >= 0
 
 
 def test_extraction_config_exposes_safe_overrides():

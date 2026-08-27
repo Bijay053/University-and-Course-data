@@ -107,6 +107,8 @@ extraction:
   # Verified against a live 278 KB course page: 31% smaller, 1.45x faster,
   # with exact critical-field parity against the unmodified document.
   html_compaction_enabled: true
+  # Emergency kill switch: set false if the run alert reports lost speedup or
+  # critical-field coverage regression after a Lancaster CMS template change.
   max_parallel_fetch: 8
   skip_browser_rescue: false
   skip_per_course_browser: false

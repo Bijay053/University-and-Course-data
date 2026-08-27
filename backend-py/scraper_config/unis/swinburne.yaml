@@ -56,6 +56,8 @@ extraction:
   # Verified against a live 391 KB course page: 29% smaller with exact
   # critical-field parity against the unmodified document.
   html_compaction_enabled: true
+  # Emergency kill switch: set false if the run alert reports lost speedup or
+  # critical-field coverage regression after a Swinburne CMS template change.
   fees:
     default_currency: AUD
   english:

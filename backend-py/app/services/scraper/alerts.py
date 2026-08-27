@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.scrape_run_metrics import ScrapeRunMetrics
 from app.models.scrape_run_alert import ScrapeRunAlert
 from app.models.university_field_baseline import UniversityFieldBaseline
+from app.models.scrape_runtime import ScrapeRuntimeJob
 
 log = logging.getLogger(__name__)
 
@@ -108,6 +109,41 @@ METHOD_QUALITY_RULES: list[dict[str, Any]] = [
 ]
 
 _TREND_DROP_THRESHOLD = 0.15  # 15 percentage-point drop vs trailing mean fires a warning
+_COMPACTION_MIN_SAMPLE = 10
+_COMPACTION_MIN_USEFUL_REDUCTION = 0.10
+_COMPACTION_MIN_QUALITY_SAMPLE = 10
+
+
+def _compaction_lost_useful_speedup(compaction: dict) -> bool:
+    """True when an enabled run no longer removes a useful share of HTML."""
+    return (
+        int(compaction.get("attempts") or 0) >= _COMPACTION_MIN_SAMPLE
+        and float(compaction.get("reduction_rate") or 0.0)
+        < _COMPACTION_MIN_USEFUL_REDUCTION
+    )
+
+
+def _compaction_quality_correlation_is_meaningful(compaction: dict) -> bool:
+    """Require a meaningful accepted sample before correlating quality drift."""
+    return int(compaction.get("accepted") or 0) >= _COMPACTION_MIN_QUALITY_SAMPLE
+
+
+async def _replace_run_alerts(
+    db: AsyncSession,
+    scrape_run_id: str,
+    alerts: list[ScrapeRunAlert],
+) -> None:
+    """Replace a run's alerts atomically, including replacement with none."""
+    from sqlalchemy import delete as sa_delete
+
+    await db.execute(
+        sa_delete(ScrapeRunAlert).where(
+            ScrapeRunAlert.scrape_run_id == scrape_run_id
+        )
+    )
+    if alerts:
+        db.add_all(alerts)
+    await db.commit()
 
 # Week 2 P3 Rule 3 — URL-pattern anomaly thresholds.
 # A URL prefix that has never appeared in the trailing N scrapes for this
@@ -214,19 +250,56 @@ async def evaluate_run_alerts(
     )
     metrics: list[ScrapeRunMetrics] = list(metrics_result.scalars().all())
 
-    if not metrics:
-        log.info("[ALERTS] run %s: no metrics rows — skipping alert evaluation", scrape_run_id)
-        return []
-
-    uni_id = university_id or metrics[0].university_id
-
-    # Delete any stale rows from a previous attempt
-    from sqlalchemy import delete as sa_delete
-    await db.execute(
-        sa_delete(ScrapeRunAlert).where(ScrapeRunAlert.scrape_run_id == scrape_run_id)
-    )
-
     alerts: list[ScrapeRunAlert] = []
+
+    # Serialize evaluation/replacement for this run. A task retry and the
+    # original completion hook can overlap; locking the parent job row keeps
+    # their delete+insert replacement transactions from interleaving and
+    # leaving duplicate or stale alerts.
+    job_result = await db.execute(
+        select(ScrapeRuntimeJob).where(
+            ScrapeRuntimeJob.runtime_job_id == scrape_run_id
+        ).with_for_update()
+    )
+    runtime_job = job_result.scalar_one_or_none()
+    uni_id = (
+        university_id
+        or (metrics[0].university_id if metrics else None)
+        or (runtime_job.university_id if runtime_job is not None else None)
+    )
+    compaction = (
+        (runtime_job.gate_skip_counts or {}).get("html_compaction", {})
+        if runtime_job is not None
+        else {}
+    )
+    attempts = int(compaction.get("attempts") or 0)
+    accepted = int(compaction.get("accepted") or 0)
+    acceptance_rate = float(compaction.get("acceptance_rate") or 0.0)
+    reduction_rate = float(compaction.get("reduction_rate") or 0.0)
+    if _compaction_lost_useful_speedup(compaction):
+        alerts.append(ScrapeRunAlert(
+            scrape_run_id=scrape_run_id,
+            rule_id="html_compaction_no_useful_speedup",
+            severity="warning",
+            message=(
+                "HTML compaction is enabled but reduced this run's attempted "
+                f"HTML by only {reduction_rate:.0%} "
+                f"({accepted}/{attempts} pages accepted); the CMS template may "
+                "have changed. Disable immediately with "
+                "extraction.html_compaction_enabled: false in this university's YAML."
+            ),
+            expected=_COMPACTION_MIN_USEFUL_REDUCTION,
+            actual=reduction_rate,
+        ))
+
+    if not metrics:
+        await _replace_run_alerts(db, scrape_run_id, alerts)
+        log.info(
+            "[ALERTS] run %s: no field metrics; compaction alerts=%d",
+            scrape_run_id,
+            len(alerts),
+        )
+        return alerts
 
     # ── Load baselines for this university ─────────────────────────────────
     baselines_result = await db.execute(
@@ -331,10 +404,32 @@ async def evaluate_run_alerts(
                     actual=current_rate,
                 ))
 
+    if _compaction_quality_correlation_is_meaningful(compaction):
+        coverage_alerts = [
+            alert for alert in alerts
+            if alert.rule_id.startswith("trend_drop:")
+            and alert.rule_id.split(":", 1)[-1] in GLOBAL_DEFAULT_FLOORS
+        ]
+        if coverage_alerts:
+            affected = ", ".join(
+                sorted({a.rule_id.split(":", 1)[-1] for a in coverage_alerts})
+            )
+            alerts.append(ScrapeRunAlert(
+                scrape_run_id=scrape_run_id,
+                rule_id="html_compaction_critical_coverage_regression",
+                severity="critical",
+                message=(
+                    "Critical-field coverage regressed while HTML compaction was "
+                    f"accepted on {accepted} pages (fields: {affected}). Disable "
+                    "immediately with extraction.html_compaction_enabled: false "
+                    "in this university's YAML, then rerun the scrape."
+                ),
+                expected=0,
+                actual=len(coverage_alerts),
+            ))
+
     # Persist all alerts
     if alerts:
-        db.add_all(alerts)
-        await db.commit()
         log.info(
             "[ALERTS] run %s: %d alerts (%d critical, %d warning)",
             scrape_run_id,
@@ -344,6 +439,7 @@ async def evaluate_run_alerts(
         )
     else:
         log.info("[ALERTS] run %s: no alerts fired", scrape_run_id)
+    await _replace_run_alerts(db, scrape_run_id, alerts)
 
     return alerts
 

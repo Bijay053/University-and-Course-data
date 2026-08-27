@@ -10,8 +10,10 @@ would be lost.
 from __future__ import annotations
 
 import re
+import time
 
 from bs4 import BeautifulSoup
+from app.services.html_compaction_counters import note_html_compaction
 
 MIN_SOURCE_BYTES = 200_000
 MIN_REDUCTION_RATIO = 0.10
@@ -97,7 +99,27 @@ def compact_course_html(
     Scripts and structured data are intentionally retained.  A university can
     add selectors for known chrome through YAML; malformed selectors fail open.
     """
-    if not enabled or not html or len(html) < MIN_SOURCE_BYTES:
+    if not enabled or not html:
+        return html
+    if len(html) < MIN_SOURCE_BYTES:
+        note_html_compaction(
+            outcome="skipped_small",
+            input_bytes=len(html),
+            output_bytes=len(html),
+            elapsed_ms=0.0,
+        )
+        return html
+
+    started = time.perf_counter()
+
+    def fail_open(reason: str) -> str:
+        note_html_compaction(
+            outcome="fail_open",
+            input_bytes=len(html),
+            output_bytes=len(html),
+            elapsed_ms=(time.perf_counter() - started) * 1000,
+            reason=reason,
+        )
         return html
 
     soup = BeautifulSoup(html, "html.parser")
@@ -116,7 +138,7 @@ def compact_course_html(
         try:
             candidates.extend(soup.select(selector))
         except Exception:
-            return html
+            return fail_open("invalid_selector")
 
     seen: set[int] = set()
     for tag in candidates:
@@ -127,7 +149,7 @@ def compact_course_html(
         if tag.name in _STRUCTURED_DESCENDANT_TAGS:
             # An extra selector directly targeting a structured element is an
             # unsafe configuration. Fail open for the entire document.
-            return html
+            return fail_open("structured_selector")
         # A semantic chrome container can still carry JSON-LD, CMS bootstrap
         # state, tables, or form-labelled values. Preserve it byte-for-byte
         # rather than trusting flattened-text parity for structural extractors.
@@ -144,14 +166,20 @@ def compact_course_html(
 
     compacted = str(soup)
     if len(compacted) > len(html) * (1.0 - MIN_REDUCTION_RATIO):
-        return html
+        return fail_open("insufficient_reduction")
     if h1_text:
         h1_after = soup.find("h1")
         if h1_after is None or h1_after.get_text(" ", strip=True) != h1_text:
-            return html
+            return fail_open("heading_changed")
     after_signals = _critical_signal_mask(compacted)
     if any(was_present and not remains for was_present, remains in zip(before_signals, after_signals)):
-        return html
+        return fail_open("critical_signal_lost")
     if _value_fingerprint(soup.get_text(" ", strip=True)) != before_values:
-        return html
+        return fail_open("value_fingerprint_changed")
+    note_html_compaction(
+        outcome="accepted",
+        input_bytes=len(html),
+        output_bytes=len(compacted),
+        elapsed_ms=(time.perf_counter() - started) * 1000,
+    )
     return compacted

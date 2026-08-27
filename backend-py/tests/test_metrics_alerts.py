@@ -13,7 +13,7 @@ PostgreSQL session only when DATABASE_URL is set; otherwise they are skipped.
 from __future__ import annotations
 
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 
 # ---------------------------------------------------------------------------
@@ -205,6 +205,60 @@ class TestGlobalDefaultFloors:
     def test_international_fee_floor_at_70(self):
         from app.services.scraper.alerts import GLOBAL_DEFAULT_FLOORS
         assert GLOBAL_DEFAULT_FLOORS["international_fee"] == pytest.approx(0.70)
+
+
+class TestHtmlCompactionAlertRules:
+    def test_lost_speedup_uses_total_reduction_not_acceptance_alone(self):
+        from app.services.scraper.alerts import _compaction_lost_useful_speedup
+
+        assert _compaction_lost_useful_speedup({
+            "attempts": 100, "accepted": 100, "reduction_rate": 0.05,
+        })
+        assert not _compaction_lost_useful_speedup({
+            "attempts": 100, "accepted": 60, "reduction_rate": 0.20,
+        })
+
+    def test_small_runs_do_not_raise_speed_warning(self):
+        from app.services.scraper.alerts import _compaction_lost_useful_speedup
+
+        assert not _compaction_lost_useful_speedup({
+            "attempts": 9, "accepted": 0, "reduction_rate": 0.0,
+        })
+
+    def test_quality_correlation_requires_ten_accepted_pages(self):
+        from app.services.scraper.alerts import (
+            _compaction_quality_correlation_is_meaningful,
+        )
+
+        assert not _compaction_quality_correlation_is_meaningful({"accepted": 9})
+        assert _compaction_quality_correlation_is_meaningful({"accepted": 10})
+
+    @pytest.mark.asyncio
+    async def test_empty_replacement_commits_stale_alert_deletion(self):
+        from app.services.scraper.alerts import _replace_run_alerts
+
+        db = MagicMock()
+        db.execute = AsyncMock()
+        db.commit = AsyncMock()
+
+        await _replace_run_alerts(db, "job_fixed", [])
+
+        db.execute.assert_awaited_once()
+        db.commit.assert_awaited_once()
+        db.add_all.assert_not_called()
+
+    def test_alert_evaluator_uses_row_lock_for_concurrent_replacements(self):
+        from sqlalchemy import select
+        from sqlalchemy.dialects import postgresql
+        from app.models.scrape_runtime import ScrapeRuntimeJob
+
+        statement = (
+            select(ScrapeRuntimeJob)
+            .where(ScrapeRuntimeJob.runtime_job_id == "job_concurrent")
+            .with_for_update()
+        )
+        sql = str(statement.compile(dialect=postgresql.dialect()))
+        assert "FOR UPDATE" in sql
 
 
 class TestAlertFormatting:

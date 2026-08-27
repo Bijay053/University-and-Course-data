@@ -1484,6 +1484,10 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         _reset_browser_only()
         from app.services.skip_counters import reset_skip_counters as _reset_skip_counters
         _reset_skip_counters()
+        from app.services.html_compaction_counters import (
+            reset_html_compaction_stats as _reset_html_compaction_stats,
+        )
+        _reset_html_compaction_stats()
         log.info(
             "UniConfig loaded: slug=%r yaml_file=%r always_browser=%r always_sitemap=%r stealth=%r",
             _uni_cfg.slug,
@@ -6039,6 +6043,26 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # ── Task #235: gate skip counters ─────────────────────────────────────
         from app.services.skip_counters import get_skip_counts as _get_skip_counts
         _gate_skips = _get_skip_counts()
+        from app.services.html_compaction_counters import (
+            get_html_compaction_stats as _get_html_compaction_stats,
+        )
+        _html_compaction_stats = _get_html_compaction_stats()
+        if _html_compaction_stats.get("attempts"):
+            await emit(
+                "status",
+                (
+                    "[HTML COMPACTION] "
+                    f"accepted={_html_compaction_stats['accepted']}/"
+                    f"{_html_compaction_stats['attempts']} "
+                    f"fail_open={_html_compaction_stats['fail_open']} "
+                    f"reduction={_html_compaction_stats['reduction_rate']:.1%} "
+                    f"elapsed={_html_compaction_stats['elapsed_ms']:.0f}ms"
+                ),
+                phase="complete",
+                kind="html_compaction_summary",
+                html_compaction=_html_compaction_stats,
+                level="info",
+            )
         _nonzero_skips = {k: v for k, v in _gate_skips.items() if v}
         if _nonzero_skips:
             _gs_parts = " ".join(f"{k}={v}" for k, v in sorted(_nonzero_skips.items()))
@@ -6184,6 +6208,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             skip_reason_samples=skip_reason_samples,
             searchstax_filter=_ss_filter_stats or None,
             performance_savings=_perf_savings,
+            html_compaction=_html_compaction_stats or None,
             phase_timings=_phase_timings,
             level="success",
         )
@@ -6337,6 +6362,9 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         job.scrape_do_render_calls = _sd_job_ctrs["render"]
         job.scrape_do_static_calls = _sd_job_ctrs["static"]
         job.gate_skip_counts = _gate_skips if _nonzero_skips else None
+        if _html_compaction_stats:
+            job.gate_skip_counts = dict(job.gate_skip_counts or {})
+            job.gate_skip_counts["html_compaction"] = _html_compaction_stats
         if _sd_job_ctrs["render"] or _sd_job_ctrs["static"]:
             log.info(
                 "[SCRAPE_DO] run=%s render_calls=%d static_calls=%d cost_est=$%.4f",
