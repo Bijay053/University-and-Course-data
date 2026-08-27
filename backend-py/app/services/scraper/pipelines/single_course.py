@@ -2035,6 +2035,29 @@ async def extract_course(
     if _flinders_html.is_flinders_host(url):
         html = _flinders_html.compact_course_html(html)
 
+    # Shared conservative compaction for large CMS pages. Unlike the Flinders
+    # specialization this keeps the complete course body and all scripts, and
+    # removes only high-confidence semantic chrome. Safety guards return the
+    # original document if title or admission signals would disappear.
+    from app.services.scraper.html_compaction import compact_course_html as _compact_html
+    _compact_cfg = getattr(get_uni_config(), "extraction", None)
+    _html_bytes_before_compaction = len(html)
+    html = _compact_html(
+        html,
+        enabled=getattr(_compact_cfg, "html_compaction_enabled", False),
+        extra_remove_selectors=getattr(
+            _compact_cfg, "html_compaction_remove_selectors", []
+        ),
+    )
+    if len(html) < _html_bytes_before_compaction:
+        log.info(
+            "[HTML COMPACT] %s reduced from %dB to %dB (%.1f%%)",
+            url,
+            _html_bytes_before_compaction,
+            len(html),
+            (1.0 - len(html) / _html_bytes_before_compaction) * 100.0,
+        )
+
     # ── University of Newcastle: strip the "related courses" tile block ──
     # www.newcastle.edu.au course pages render a "More degrees you may like"
     # / related-courses carousel at the bottom of every page.  Each tile

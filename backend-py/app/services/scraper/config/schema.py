@@ -2927,6 +2927,25 @@ class ExtractionConfig(BaseModel):
     study_mode: StudyModeConfig = Field(default_factory=StudyModeConfig)
     filters: FiltersConfig = Field(default_factory=FiltersConfig)
     text_cleaning: TextCleaningConfig = Field(default_factory=TextCleaningConfig)
+    html_compaction_enabled: bool = Field(
+        default=False,
+        description=(
+            "Conservatively remove semantic navigation/footer, cookie overlays, "
+            "and related-course containers from large course pages before the "
+            "generic extractor suite runs. Structured-data scripts are retained "
+            "and the original HTML is used whenever critical signals would be "
+            "lost. Disabled by default: enable only after full-pipeline field "
+            "parity has been verified for that university's page template."
+        ),
+    )
+    html_compaction_remove_selectors: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Additional CSS selectors for university-specific non-course chrome "
+            "to remove during conservative HTML compaction. Invalid selectors or "
+            "loss of critical course signals cause the compactor to fail open."
+        ),
+    )
     strip_non_admission_content: bool = Field(
         default=True,
         description=(

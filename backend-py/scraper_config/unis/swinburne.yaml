@@ -53,6 +53,9 @@ discovery:
   seed_urls: []
   bfs_page_budget: 1
 extraction:
+  # Verified against a live 391 KB course page: 29% smaller with exact
+  # critical-field parity against the unmodified document.
+  html_compaction_enabled: true
   fees:
     default_currency: AUD
   english:
