@@ -64,6 +64,14 @@ discovery:
     - 'term=202829'
 
 extraction:
+  # courses.leeds.ac.uk now returns a hard 403 to both direct HTTP and the
+  # datacenter Playwright pool. The page itself is fully server-rendered, so
+  # Scrape.do's static residential proxy returns complete HTML without paying
+  # for headless rendering.
+  scrape_do_static: true
+  skip_browser_rescue: true
+  skip_per_course_browser: true
+
   fees:
     default_currency: 'GBP'
     prefer_international: true

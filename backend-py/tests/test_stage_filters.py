@@ -212,6 +212,39 @@ class TestShouldStageCourse:
         assert accept is False
         assert reason == "online_only"
 
+    def test_nested_online_url_rejected_even_if_mode_was_overwritten(self) -> None:
+        """A trailing /online/ route is authoritative despite noisy campus fallback."""
+        accept, reason = should_stage_course(
+            "MSc Project Management Online",
+            {
+                "course_name": "MSc Project Management Online",
+                "international_fee": 15750,
+                "study_mode": "On Campus",
+                "course_location": "Newcastle",
+            },
+            source_url=(
+                "https://www.law.ac.uk/study/postgraduate/business/"
+                "msc-project-management/online/"
+            ),
+        )
+        assert accept is False
+        assert reason == "online_only"
+
+    def test_online_course_name_rejected_when_url_signal_is_missing(self) -> None:
+        """Provider course names ending in Online are explicit online-only evidence."""
+        accept, reason = should_stage_course(
+            "LLM Family Law Online",
+            {
+                "course_name": "LLM Family Law Online",
+                "international_fee": 15750,
+                "study_mode": "On Campus",
+                "course_location": "Newcastle",
+            },
+            source_url="https://example.edu/courses/llm-family-law",
+        )
+        assert accept is False
+        assert reason == "online_only"
+
     # ---- Fixture 5: international, on-campus Master (accepted) ------------
 
     def test_fixture5_intl_oncampus_master_accepted(self) -> None:

@@ -18,6 +18,13 @@ discovery:
 
   always_sitemap_supplement: true
 
+  # The stored auto-config was learned from an online course and only allowed
+  # URLs ending in /online/. Override it with the real campus-course shape.
+  # This deliberately excludes the separate online variant nested one segment
+  # below each campus course URL.
+  allow_url_patterns:
+    - '/study/(?:undergraduate|postgraduate)/[^/?#]+/[^/?#]+/?(?:[?#].*)?$'
+
   generic_search_api:
     enabled: true
     method: GET
@@ -75,7 +82,7 @@ extraction:
 
   filters:
     online_only:
-      enabled: false
+      enabled: true
 
   staging:
     reject_if_missing:

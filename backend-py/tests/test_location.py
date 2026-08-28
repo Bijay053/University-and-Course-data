@@ -400,6 +400,7 @@ def test_recipe_rules_location_reject_takes_priority_over_allowed():
 
 def test_law_yaml_search_api_config_round_trips():
     """The suffixed University of Law config loads through the normal loader."""
+    import re
     from app.services.scraper.config.loader import load_uni_config
     cfg = load_uni_config(
         slug="law",
@@ -414,6 +415,43 @@ def test_law_yaml_search_api_config_round_trips():
     assert api.page_size == 20
     assert api.max_pages == 10
     assert api.page_number_param == "page"
+    patterns = cfg.discovery.allow_url_patterns
+    campus_url = (
+        "https://www.law.ac.uk/study/postgraduate/business/"
+        "msc-project-management/"
+    )
+    online_url = campus_url + "online/"
+    assert any(re.search(pattern, campus_url) for pattern in patterns)
+    assert not any(re.search(pattern, online_url) for pattern in patterns)
+
+
+def test_law_yaml_overrides_stale_online_only_auto_config():
+    """A probe learned from an online page must not hide AU18 campus courses."""
+    import re
+    from app.services.scraper.config.loader import load_uni_config
+    cfg = load_uni_config(
+        slug="law",
+        name="University of Law",
+        scrape_url="https://www.law.ac.uk/study/",
+        university_id=1902,
+        db_scrape_config={
+            "auto_config": {
+                "discovery": {
+                    "allow_url_patterns": [
+                        "/study/postgraduate/.*/.*/online/"
+                    ]
+                }
+            }
+        },
+    )
+    patterns = cfg.discovery.allow_url_patterns
+    campus_url = (
+        "https://www.law.ac.uk/study/postgraduate/business/"
+        "msc-project-management/"
+    )
+    assert any(re.search(pattern, campus_url) for pattern in patterns)
+    assert not any(re.search(pattern, campus_url + "online/") for pattern in patterns)
+    assert cfg.extraction.filters.online_only.enabled is True
 
 
 def test_law_yaml_english_defaults_configured():
@@ -431,6 +469,21 @@ def test_law_yaml_english_defaults_configured():
     assert english.default_toefl == 80
     assert english.apply_defaults_before_remote_enrichment is True
     assert english.skip_vision_when_core_found is True
+    assert cfg.extraction.skip_browser_rescue is True
+    assert cfg.extraction.skip_per_course_browser is True
+
+
+def test_leeds_yaml_uses_static_residential_proxy():
+    """Leeds' SSR catalogue must bypass the direct/browser 403 paths."""
+    from app.services.scraper.config.loader import load_uni_config
+    cfg = load_uni_config(
+        slug="leeds",
+        name="University of Leeds",
+        scrape_url="https://www.leeds.ac.uk/",
+        university_id=2172,
+    )
+    assert cfg.extraction.scrape_do_static is True
+    assert cfg.extraction.scrape_do_render is False
     assert cfg.extraction.skip_browser_rescue is True
     assert cfg.extraction.skip_per_course_browser is True
 
