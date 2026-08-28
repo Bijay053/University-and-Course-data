@@ -2,11 +2,12 @@
 # Hostname: www.aut.ac.nz
 #
 # Bug history / rationale:
-#   - AUT has ~14 study-area faculties.  The BFS start URL (homepage) links to many
-#     info pages.  With the default 25-page budget, BFS exhausts its quota on
-#     homepage navigation before visiting all faculty listing pages.  AUT has NO sitemap
-#     (sitemap.xml returns 404) so always_sitemap_supplement was silently doing nothing.
-#     Fix: pre-seed all 14 faculty listing pages as seed_urls; bfs_page_budget raised.
+#   - AUT has ~14 study-area faculties and no usable sitemap.
+#     Pre-seed the faculty pages plus parent courses that expose specialisations.
+#   - Cloudflare change (2026-08-28): direct HTTP/curl now returns a challenge
+#     and Scrape.do static returns ROTATION_FAILED. Rendered Scrape.do succeeds.
+#     Route discovery straight to render, skip dead sitemap/browser fallbacks,
+#     and keep the crawl bounded to the verified seed set.
 #   - AUT is a NZ university.  Fees are in NZD, not AUD.
 #   - Graduate Diploma / Graduate Certificate duration split reported:
 #     raw strings like '1 year (full-time) / 0.5 year (full-time)' need slash splitting.
@@ -28,18 +29,25 @@
 #       3. bfs_page_budget raised to 120 (14 faculty + 22 parent + 84 headroom).
 
 discovery:
-  # BFS page budget: 14 faculty seeds + 22 parent-course seeds + headroom.
-  # AUT has no sitemap so all discovery comes from BFS + pre-seeded pages.
-  bfs_page_budget: 120
+  # 37 verified seeds plus three slots for genuinely useful cross-links.
+  # Do not restore the old 120-page budget: each page now requires rendering.
+  bfs_page_budget: 40
+  discovery_phase_timeout_s: 600
+  scrape_do_skip_fallbacks: true
+  scrape_do_render: true
+  skip_sitemap_fallback: true
+  skip_browser_discovery: true
+  use_wayback: false
 
-  # seed_urls[0]    = BFS start URL (replaces the default scrape_url homepage)
+  # seed_urls[0]    = BFS start URL (the catalogue hub, not the marketing
+  #                   homepage; this bypasses an unreliable auto-redirect)
   # seed_urls[1:13] = 14 faculty listing pages (all return HTTP 200; verified 2026-06-28)
   # seed_urls[14:]  = 22 parent course pages that have specialisation grandchildren.
   #                   Pre-seeding these guarantees BFS visits them to discover the
   #                   grandchild URLs before budget is exhausted.
   seed_urls:
     # ── BFS start + faculty listing pages ────────────────────────────────────
-    - "https://www.aut.ac.nz/"
+    - "https://www.aut.ac.nz/study/study-options"
     - "https://www.aut.ac.nz/study/study-options/health-sciences"
     - "https://www.aut.ac.nz/study/study-options/business"
     - "https://www.aut.ac.nz/study/study-options/engineering-computer-and-mathematical-sciences"
@@ -94,6 +102,12 @@ discovery:
     - "/study/study-options/[^/]+/courses/"
     - "/courses/"
 
+  listing_only_patterns:
+    # Catalogue hub and faculty pages are traversal-only. This prevents broad
+    # degree wording from promoting them to course candidates.
+    - '/study/study-options/?$'
+    - '/study/study-options/[^/]+/?$'
+
   block_url_patterns:
     # ── Info / apply / fees pages (non-course, waste BFS budget) ─────────────
     - '/study/entry-requirements'
@@ -107,7 +121,6 @@ discovery:
     - '/study/applying'
     - '/study/course-search'
     - '/study/fees-and-scholarships'
-    - '/study/study-options$'              # /study/study-options landing page itself
     - '/study/study-options/compare'       # compare-aut-degrees info page
     - '/study/study-options/workplace-experience'
     - '/study/study-options/degree-builder'
@@ -184,6 +197,12 @@ discovery:
     - 'maisci-'
 
 extraction:
+  # Direct requests now receive Cloudflare challenge HTML. Static Scrape.do
+  # also fails with ROTATION_FAILED, so per-course fetches must render first.
+  scrape_do_render: true
+  scrape_do_skip_fallbacks: true
+  skip_browser_rescue: true
+
   fees:
     default_currency: "NZD"
 

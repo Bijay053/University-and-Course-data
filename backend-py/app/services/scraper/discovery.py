@@ -739,7 +739,11 @@ async def discover_course_links(
     # return. Track the deadline so retries taper off, and the sitemap
     # fallback bails out cleanly (clear log) instead of getting silently
     # cut off mid-fetch by the outer wait_for.
-    _discovery_deadline = time.monotonic() + settings.discovery_phase_timeout_s
+    _discovery_timeout_s = float(
+        getattr(discovery_config, "discovery_phase_timeout_s", None)
+        or settings.discovery_phase_timeout_s
+    )
+    _discovery_deadline = time.monotonic() + _discovery_timeout_s
     _SITEMAP_FALLBACK_MIN_BUDGET_S = 30
 
     def _remaining_budget_s() -> float:
@@ -900,46 +904,6 @@ async def discover_course_links(
             if _seed not in visited:
                 queue.append((_seed, 0))
 
-    # AUT (Auckland University of Technology): the BFS start_url is /study
-    # which links to both faculty listing pages (architecture, art-design,
-    # business, health, etc.) AND general info pages (entry requirements,
-    # semester dates, parents info, returning students, etc.).  Because the
-    # queue is FIFO, info pages found on the start page get visited before
-    # the faculty listing pages, consuming most of the 25-page budget.  In
-    # the worst case only 2 of 12 faculties are reached (architecture and
-    # art-design — the first two alphabetically on the listing).
-    #
-    # Fix: pre-seed the study-options hub AND all known faculty listing
-    # pages so they sit at positions 2-N in the initial queue.  After the
-    # start URL is visited, these seeds are already queued and will be
-    # processed BEFORE any further info pages discovered from start_url.
-    # Non-existent slugs (404) will be skipped by the fetch-fail path
-    # without consuming significant time.
-    _aut_hosts = ("www.aut.ac.nz", "aut.ac.nz")
-    if parsed.netloc in _aut_hosts:
-        _aut_base = f"{parsed.scheme}://{parsed.netloc}/study/study-options"
-        _aut_faculties = (
-            "",                                # hub page itself (/study/study-options)
-            "architecture-and-built-environment",
-            "art-and-design",
-            "business",
-            "computer-mathematical-sciences",
-            "education",
-            "engineering",
-            "health",
-            "hospitality-tourism-and-events",
-            "language-and-culture",
-            "law",
-            "maori-and-indigenous-advancement",
-            "science",
-            "sport-and-recreation",
-            "communication-studies",
-        )
-        for _fac in _aut_faculties:
-            _aut_seed = f"{_aut_base}/{_fac}" if _fac else _aut_base
-            if _aut_seed not in visited:
-                queue.append((_aut_seed, 0))
-
     # Generic: pre-seed all discovery_config.seed_urls into the BFS queue.
     # seed_urls[0] is already the start_url (first queue entry above), so we
     # skip it here to avoid double-visiting.  seed_urls[1:] are additional
@@ -947,8 +911,8 @@ async def discover_course_links(
     # that the BFS must visit even if the crawl from seed_urls[0] wouldn't
     # naturally reach them within the page budget.
     #
-    # This is the generic companion to the per-host pre-seeding above (UOW,
-    # Flinders, UniSQ, AUT).  Any YAML with multiple seed_urls benefits
+    # This is the generic companion to the remaining per-host pre-seeding
+    # above (UOW, Flinders, UniSQ). Any YAML with multiple seed_urls benefits
     # automatically without needing a per-host hardcoded block.
     if discovery_config is not None:
         _cfg_seeds = list(getattr(discovery_config, "seed_urls", None) or [])

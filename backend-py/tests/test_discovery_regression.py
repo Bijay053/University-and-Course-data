@@ -411,6 +411,38 @@ async def test_uniformly_failing_seeds_leave_budget_for_sitemap_fallback(monkeyp
     )
 
 
+@pytest.mark.asyncio
+async def test_internal_deadline_honours_per_university_override(monkeypatch):
+    """The internal fetch budget must match the caller's per-uni override."""
+    from app.config import settings as app_settings
+    from app.services.scraper.config.schema import DiscoveryConfig
+
+    monkeypatch.setattr(app_settings, "discovery_page_fetch_timeout_s", 0.2)
+    monkeypatch.setattr(app_settings, "discovery_phase_timeout_s", 0.05)
+
+    async def slow_but_valid_listing(url, **kwargs):
+        await asyncio.sleep(0.1)
+        return (
+            '<html><body><a href="/courses/bachelor-of-science">'
+            "Bachelor of Science</a></body></html>"
+        )
+
+    monkeypatch.setattr(discovery, "fetch_html", slow_but_valid_listing)
+    cfg = DiscoveryConfig(
+        discovery_phase_timeout_s=1,
+        skip_sitemap_fallback=True,
+    )
+
+    out = await discovery.discover_course_links(
+        "https://example.edu/catalogue",
+        max_pages=1,
+        max_courses=10,
+        discovery_config=cfg,
+    )
+
+    assert any(item["url"].endswith("/courses/bachelor-of-science") for item in out)
+
+
 # ── Cardiff "doesn't scrape at all" fix: scrape.do-backed seeds must get
 #    enough per-call time to actually succeed, and must be fetched
 #    concurrently rather than one-at-a-time ─────────────────────────────

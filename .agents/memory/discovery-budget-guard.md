@@ -25,6 +25,10 @@ math for the whole phase was never tracked against a shared deadline."
 - Track a monotonic deadline once at the top of the discovery function
   (`time.monotonic() + phase_timeout_s`), with a `_remaining_budget_s()`
   helper, instead of only ever checking each stage's own local timeout.
+- Derive that internal deadline from the same per-university timeout override
+  used by the caller's outer `wait_for`. Extending only the outer timeout is
+  ineffective if the crawler's retry/fallback budget still expires at the
+  global default.
 - Gate optional retries (sleep-then-retry, bare-URL retry) behind
   `remaining_budget > per_page_timeout + reserve` — skip the retry (log a
   warning) once budget is running low, rather than always retrying.
