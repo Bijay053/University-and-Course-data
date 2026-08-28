@@ -172,6 +172,7 @@ def test_uts_international_large_total_is_accepted_as_full_course():
 
 def test_uts_total_is_annualised_by_duration_not_session_wording():
     from app.services.scraper.config.loader import get_config_for_host
+    from app.services.scraper.per_course_browser import _extended_extract
     from app.services.scraper.recipe_rules import apply_recipe_rules
 
     html = """
@@ -198,13 +199,34 @@ def test_uts_total_is_annualised_by_duration_not_session_wording():
     assert result.normalized["fee_term"] == "Full Course"
     assert result.method == "fee.uts_international_total"
 
+    browser_values, browser_evidence = _run(
+        _extended_extract(
+            html,
+            "https://www.uts.edu.au/courses/master-of-indigenous-health-research",
+            {
+                "international_fee": 43_900,
+                "fee_term": "Session",
+            },
+            override=True,
+        )
+    )
+    assert browser_values["international_fee"] == 89_556.0
+    assert browser_values["fee_term"] == "Full Course"
+    assert browser_values["currency"] == "AUD"
+    assert any(
+        row["field_key"] == "fee_term"
+        and row["method"] == "per_course_browser_extended"
+        for row in browser_evidence
+    )
+
     config = get_config_for_host(
         hostname="www.uts.edu.au",
         name="University of Technology Sydney",
         scrape_url="https://www.uts.edu.au/courses",
     )
+    assert config.extraction.force_browser is True
     payload = {
-        **result.normalized,
+        **browser_values,
         "duration": 2,
         "duration_term": "Year",
     }
@@ -543,6 +565,32 @@ def test_aut_international_panel_includes_levy_and_preserves_cents():
     )
     assert out
     assert out[0].normalized["international_fee"] == 42_859.67
+    assert out[0].normalized["currency"] == "NZD"
+    assert out[0].normalized["fee_term"] == "Annual"
+    assert out[0].method == "fee.aut_international_panel"
+
+
+def test_aut_180_point_total_includes_levy_and_is_annualised():
+    html = """
+    <div class="mb-small">
+      <div class="mb-10">
+        <div class="heading mb-5">International</div>
+        <div class="value">
+          Not offered to new students in 2027
+          $64,139.51 (for 180 points)
+          ($62,250 tuition fees + $1,889.51 student services levy)
+        </div>
+      </div>
+    </div>
+    """
+    out = _run(
+        fee.extract(
+            html,
+            "https://www.aut.ac.nz/study/study-options/example",
+        )
+    )
+    assert out
+    assert out[0].normalized["international_fee"] == 42_759.67
     assert out[0].normalized["currency"] == "NZD"
     assert out[0].normalized["fee_term"] == "Annual"
     assert out[0].method == "fee.aut_international_panel"

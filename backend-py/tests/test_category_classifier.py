@@ -59,6 +59,16 @@ def test_higher_keyword_count_wins():
     )
 
 
+def test_applied_translation_studies_maps_to_linguistics_taxonomy():
+    assert classify_category("Applied Translation Studies MA") == (
+        "Arts, Humanities & Social Sciences"
+    )
+    assert map_course_to_category("Applied Translation Studies MA") == {
+        "category": "Arts, Humanities & Social Sciences",
+        "sub_category": "Linguistics",
+    }
+
+
 def test_taxonomy_size_matches_node():
     # Issue 2: expanded from 12 → 13 to include "Trades & Construction".
     assert len(CATEGORIES) == 13

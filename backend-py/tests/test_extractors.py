@@ -113,6 +113,30 @@ def test_english_ielts_overall_with_no_band_below():
     assert n["ielts_overall"] == 6.5 and n["ielts_listening"] == 6.0
 
 
+def test_english_ielts_leeds_no_less_than_in_all_components():
+    html = (
+        "<h2>English language requirements</h2>"
+        "<p>IELTS 7.0 overall, with no less than 6.5 in all components.</p>"
+    )
+    out = {
+        r.field_key: r
+        for r in _run(
+            english_test.extract(
+                html,
+                "https://courses.leeds.ac.uk/8257/applied-translation-studies-ma",
+            )
+        )
+    }
+    n = out["ielts_overall"].normalized
+    assert n == {
+        "ielts_overall": 7.0,
+        "ielts_listening": 6.5,
+        "ielts_reading": 6.5,
+        "ielts_writing": 6.5,
+        "ielts_speaking": 6.5,
+    }
+
+
 def test_english_ielts_aut_all_bands_floor():
     html = (
         "<h2>English language requirements</h2>"

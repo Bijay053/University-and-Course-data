@@ -3,9 +3,10 @@
 #
 discovery: {}
 extraction:
-  # UTS course pages render no fee in static HTML. The browser defaults to
-  # Domestic; open the audience dropdown, select International Student, and
-  # require the international fee label before accepting the rendered DOM.
+  # Static HTML defaults to Domestic and contains plausible domestic fee
+  # values, so it cannot be trusted for international extraction. Always run
+  # the browser actions and let the rendered International values override it.
+  force_browser: true
   actions:
     - click_text: "Domestic"
       required: true

@@ -65,9 +65,11 @@ _PER_BAND_FLOOR_RE = re.compile(
 # (UniSQ and similar AU phrasings).  The number PRECEDES the "in each" clause,
 # unlike the "no band below" idiom where it follows.
 _PER_BAND_FLOOR_RE_EACH = re.compile(
-    r"(?:minimum|min\.?|at\s+least)\s+(?:score\s+of\s+|of\s+)?"
+    r"(?:minimum|min\.?|at\s+least|no\s+less\s+than)\s+"
+    r"(?:score\s+of\s+|of\s+)?"
     r"([0-9]+(?:\.[0-9]+)?)\s+"
-    r"in\s+each\s+(?:of\s+the\s+(?:four|4)\s+)?(?:components?|bands?|sections?|skills?)",
+    r"in\s+(?:each|all)\s+"
+    r"(?:of\s+the\s+(?:four|4)\s+)?(?:components?|bands?|sections?|skills?)",
     re.IGNORECASE,
 )
 

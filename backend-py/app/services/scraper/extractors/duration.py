@@ -25,6 +25,38 @@ _LABELS = (
 )
 _UNIT = r"years?|yrs?|months?|weeks?|trimesters?|semesters?"
 
+
+def _from_aut_points(html: str, url: str) -> tuple[float, str] | None:
+    """Derive AUT full-time duration from its canonical programme points.
+
+    AUT defines 120 points as one full-time year. Some pages carry stale or
+    compressed ``meta[name=duration]`` values (for example, 180 points paired
+    with "1 year"), so the points metadata is the consistent workload source.
+    """
+    if not re.search(r"https?://(?:www\.)?aut\.ac\.nz/", url, re.I):
+        return None
+    match = re.search(
+        r"<meta\b[^>]*\bname=[\"']points[\"'][^>]*\bcontent=[\"']"
+        r"(\d+(?:\.\d+)?)[\"'][^>]*>",
+        html,
+        re.I,
+    )
+    if match is None:
+        # Attribute order is not guaranteed.
+        match = re.search(
+            r"<meta\b[^>]*\bcontent=[\"'](\d+(?:\.\d+)?)[\"'][^>]*"
+            r"\bname=[\"']points[\"'][^>]*>",
+            html,
+            re.I,
+        )
+    if match is None:
+        return None
+    points = float(match.group(1))
+    years = points / 120.0
+    if not 0.1 <= years <= 10:
+        return None
+    return years, f'AUT meta[name="points"]: {points:g} points / 120 points per year'
+
 _PATTERNS = (
     re.compile(rf"\b(?:{_LABELS})\b[\s:.\-]{{0,40}}(\d+(?:\.\d+)?)\s*({_UNIT})\b", re.I),
     re.compile(rf"\bfull[- ]?time\b[\s:.\-]{{0,20}}(\d+(?:\.\d+)?)\s*({_UNIT})\b", re.I),
@@ -790,6 +822,23 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
         _prefer_fulltime = _dcfg.prefer_fulltime
     except Exception:
         pass  # contextvar not set or config missing — treat as empty list
+
+    # AUT points metadata is more reliable than its duration metadata. A
+    # 180-point programme is 1.5 full-time years even when a stale duration
+    # meta tag says one year.
+    aut_points = _from_aut_points(html, url)
+    if aut_points is not None:
+        amount, snippet = aut_points
+        return [
+            ExtractionResult(
+                field_key="duration",
+                value=amount,
+                normalized={"duration": amount, "duration_term": "Year"},
+                confidence=0.99,
+                snippet=snippet,
+                method="duration.aut_points",
+            )
+        ]
 
     # Canonical machine-readable page metadata wins before any recommendation
     # cards or flattened prose can enter the duration tournament.

@@ -81,7 +81,8 @@ _KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "arts", "humanities", "history", "philosophy", "sociology",
             "anthropology", "linguistics", "literature", "religion",
             "political science", "international relations", "criminology",
-            "social science", "language", "creative writing", "music",
+            "social science", "language", "translation", "interpreting",
+            "creative writing", "music",
             "performing arts", "theatre", "fine arts",
             # Psychology lives here per the live DB taxonomy
             # ("course_sub_categories" has Psychology under
@@ -320,7 +321,8 @@ _SUB_CATEGORY_MAP: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("Arts, Humanities & Social Sciences", "Anthropology",            ("anthropology",)),
     ("Arts, Humanities & Social Sciences", "Philosophy",              ("philosophy",)),
     ("Arts, Humanities & Social Sciences", "History",                 ("history", "historical",)),
-    ("Arts, Humanities & Social Sciences", "English & Literature",    ("english literature", "creative writing", "writing", "linguistics", "english language")),
+    ("Arts, Humanities & Social Sciences", "Linguistics",             ("translation studies", "translation", "translating", "interpreting", "linguistics")),
+    ("Arts, Humanities & Social Sciences", "English & Literature",    ("english literature", "creative writing", "writing", "english language")),
     ("Arts, Humanities & Social Sciences", "Geography",               ("geography", "urban planning", "regional planning")),
     ("Arts, Humanities & Social Sciences", "Arts",                    ("bachelor of arts", "master of arts", "liberal arts")),
     # ── Medicine & Health additional sub-categories ──────────────────────────

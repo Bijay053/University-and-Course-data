@@ -584,6 +584,12 @@ _EXTENDED_EXTRACT_HOSTS: frozenset[str] = frozenset({
     "www.unisq.edu.au",
     "vit.edu.au",
     "www.vit.edu.au",
+    # UTS: static HTML defaults to the Domestic audience and already contains
+    # plausible-looking first-year and total fees. The browser actions switch
+    # to International Student; the full extractor suite must then replace the
+    # domestic fee with the explicitly labelled international course total.
+    "uts.edu.au",
+    "www.uts.edu.au",
     # UTAS: after clicking the INTERNATIONAL tab, the rendered HTML contains
     # the international fee, IELTS requirements, campus list and study mode.
     # Run the full extractor suite so all those fields are populated from
@@ -653,6 +659,13 @@ _EXTENDED_EXTRACT_HOSTS: frozenset[str] = frozenset({
 _EXTENDED_SLOTS: tuple[str, ...] = (
     "course_name",
     "international_fee",
+    # Fee metadata must travel with the browser-rendered amount. Dropping
+    # fee_term left stale static values such as "Session" attached to a new
+    # UTS full-course total, preventing the duration-aware annual conversion.
+    "fee_term",
+    "fee_year",
+    "currency",
+    "fee_currency",
     "ielts_overall",
     "pte_overall",
     "toefl_overall",
@@ -859,9 +872,27 @@ async def maybe_browser_refetch(
     All four are empty / ``None`` / False when the slots were already
     populated (and ``force`` is False), or the browser fetch failed.
     """
-    # Even force-browser hosts must not re-render a course whose complete
-    # required field set is already available from structured/static sources.
-    if required_course_fields_complete(payload):
+    # A force-browser university with required interaction steps must run those
+    # steps even when the static page looks complete. UTS is the key example:
+    # its static response defaults to Domestic and contains plausible fees, so
+    # field completeness does not mean the audience state is authoritative.
+    try:
+        _active_cfg = get_uni_config()
+        _has_required_actions = bool(
+            _active_cfg
+            and any(
+                bool(step.get("required"))
+                for step in (_active_cfg.extraction.actions or [])
+                if isinstance(step, dict)
+            )
+        )
+    except Exception:
+        _has_required_actions = False
+    _must_run_required_actions = force and _has_required_actions
+
+    # Preserve the existing fast path for ordinary force-browser hosts that do
+    # not declare required audience/state interactions.
+    if required_course_fields_complete(payload) and not _must_run_required_actions:
         log.info(
             "per_course_browser: complete required fields — skipping %s", url
         )
@@ -873,7 +904,12 @@ async def maybe_browser_refetch(
     # AND fee are already populated (e.g. from a previous browser pass or a
     # sibling-cache hit), launching a new browser instance would yield nothing
     # new and just waste 10–60 s of wall-clock time per course.  Skip safely.
-    if force and not _all_english_empty(payload) and payload.get("international_fee"):
+    if (
+        force
+        and not _must_run_required_actions
+        and not _all_english_empty(payload)
+        and payload.get("international_fee")
+    ):
         return {}, [], None, False
 
     # Issue 1: skip browser pass when:

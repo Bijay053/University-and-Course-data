@@ -24,6 +24,26 @@ def _run(coro):
     return asyncio.run(coro)
 
 
+def test_aut_points_override_incorrect_one_year_duration_metadata():
+    html = """
+    <meta name="points" content="180">
+    <meta name="duration" content="1 year full-time; part-time available">
+    <div><span>Points:</span><span>180</span></div>
+    """
+    out = _run(
+        duration.extract(
+            html,
+            "https://www.aut.ac.nz/study/study-options/example",
+        )
+    )
+    assert out
+    assert out[0].normalized == {
+        "duration": 1.5,
+        "duration_term": "Year",
+    }
+    assert out[0].method == "duration.aut_points"
+
+
 def test_strong_duration_sibling_div_classifies_via_structural_pass():
     """ASA-style adjacent-div idiom: `<div><strong>Duration</strong>
     </div><div>3 years</div>`. Pre-fix the keyword fallback could

@@ -128,6 +128,66 @@ async def test_force_browser_skips_uow_shape_when_all_required_fields_complete(
 
 
 @pytest.mark.asyncio
+async def test_uts_required_audience_actions_override_complete_static_payload(
+    monkeypatch,
+):
+    called = []
+
+    class _Extraction:
+        actions = [
+            {"click_text": "Domestic", "required": True},
+            {"click_text": "International Student", "required": True},
+        ]
+        skip_per_course_browser = False
+
+    class _Config:
+        extraction = _Extraction()
+
+    async def _track(url: str, **kw):  # noqa: ANN001
+        called.append((url, kw.get("actions")))
+        return "<html><body>International Student</body></html>"
+
+    async def _international_values(rendered, url, payload, override=False):  # noqa: ANN001
+        assert override is True
+        return (
+            {
+                "international_fee": 44_778,
+                "fee_term": "Annual",
+            },
+            [],
+        )
+
+    monkeypatch.setattr(per_course_browser, "get_uni_config", lambda: _Config())
+    monkeypatch.setattr(per_course_browser.browser_pool, "fetch_html", _track)
+    monkeypatch.setattr(per_course_browser, "_extended_extract", _international_values)
+
+    payload = {
+        "international_fee": 43_900,
+        "ielts_overall": 7,
+        "duration": 2,
+        "intake_months": ["January", "July"],
+        "course_location": "Sydney",
+        "study_mode": "On Campus",
+    }
+    result = await per_course_browser.maybe_browser_refetch(
+        "https://www.uts.edu.au/courses/master-of-indigenous-health-research",
+        payload,
+        force=True,
+    )
+
+    assert called == [
+        (
+            "https://www.uts.edu.au/courses/master-of-indigenous-health-research",
+            _Extraction.actions,
+        )
+    ]
+    assert result[0]["international_fee"] == 44_778
+    assert result[0]["fee_term"] == "Annual"
+    assert result[3] is True
+    assert "www.uts.edu.au" in per_course_browser._EXTENDED_EXTRACT_HOSTS
+
+
+@pytest.mark.asyncio
 async def test_uow_fee_missing_still_runs_force_browser(monkeypatch):
     called = []
 

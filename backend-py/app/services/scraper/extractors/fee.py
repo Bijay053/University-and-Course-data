@@ -1763,13 +1763,13 @@ def _from_aut_international_fee_panel(
     html: str,
     url: str,
 ) -> tuple[float, str] | None:
-    """Read AUT's headline international total, including the student levy.
+    """Read and annualise AUT's headline international points-based total.
 
-    AUT fee cards publish the annual 120-point total first, followed by a
+    AUT fee cards publish the total for the stated points first, followed by a
     parenthesised tuition-only subtotal and student-services levy. Generic
     candidate scoring can choose the tuition subtotal because it is explicitly
-    labelled "tuition fees". The card's first amount is the authoritative
-    international fee shown to students and may include cents.
+    labelled "tuition fees". The card's first currency amount is authoritative,
+    includes the levy, and is converted to the standard 120-point annual load.
     """
     if not re.search(r"https?://(?:www\.)?aut\.ac\.nz/", url, re.I):
         return None
@@ -1790,17 +1790,38 @@ def _from_aut_international_fee_panel(
         value_text = compact(value_node.get_text(" ", strip=True))
         if not re.search(r"\b(?:points?|tuition\s+fees?)\b", value_text, re.I):
             continue
-        amount_match = _AMOUNT_RE.search(value_text)
+        # Match an explicitly currency-prefixed amount so a leading year in
+        # "Not offered to new students in 2027" cannot be mistaken for the fee.
+        amount_match = re.search(
+            r"(?:NZD?\s*)?\$\s*([0-9][0-9,]*(?:\.\d+)?)",
+            value_text,
+            re.I,
+        )
         if not amount_match:
             continue
-        raw_num = amount_match.group(2) or amount_match.group(3) or ""
+        raw_num = amount_match.group(1)
         cleaned = _AMOUNT_STRIP_RE.sub("", raw_num)
         try:
             amount = float(cleaned)
         except ValueError:
             continue
-        if 5_000 <= amount <= 200_000:
-            return amount, f"AUT International fee: {value_text}"
+        points_match = re.search(
+            r"\(\s*for\s+(\d+(?:\.\d+)?)\s+points?\s*\)",
+            value_text[amount_match.end():],
+            re.I,
+        )
+        if points_match is None:
+            continue
+        points = float(points_match.group(1))
+        if points <= 0:
+            continue
+        annual_amount = round(amount * 120.0 / points, 2)
+        if 5_000 <= annual_amount <= 200_000:
+            return (
+                annual_amount,
+                f"AUT International fee: {value_text} "
+                f"[annualised from {points:g} points to 120 points]",
+            )
     return None
 
 
@@ -1898,7 +1919,7 @@ async def extract(
                 normalized={
                     "international_fee": amount,
                     "currency": "NZD",
-                    "fee_term": _normalize_fee_term(ctx),
+                    "fee_term": "Annual",
                     "fee_year": _extract_year(ctx),
                 },
                 confidence=0.99,

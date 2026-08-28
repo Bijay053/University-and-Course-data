@@ -103,3 +103,5 @@
 - [Location table-header contamination](location-table-header-contamination.md) — “Location” table headers must not turn adjacent column labels into campuses or override authoritative Online delivery.
 - [Non-tuition PDF fee safety](non-tuition-pdf-fee-safety.md) — incidental, ancillary, SSAF, application, deposit, materials, and equipment PDFs must never populate international tuition.
 - [Mixed standard and alternative values](mixed-standard-alternative-values.md) — preserve standard values beside accelerated alternatives; numeric test scores need boundaries on both sides.
+- [UTS audience-state fee override](uts-audience-fee-override.md) — static UTS pages look complete but show Domestic fees; required browser actions must override amount and fee metadata together.
+- [AUT points-based fees and duration](aut-points-fee-duration.md) — 120 points is one full-time year; annualize the headline levy-inclusive fee and prefer points over conflicting duration metadata.
