@@ -3,20 +3,9 @@
 # Country: United Kingdom  |  Currency: GBP
 
 discovery:
-  # API returns exactly 20 results per page regardless of pageSize param.
-  # TotalResults=172, TotalPages=9 — all 9 pages must be seeded explicitly.
-  seed_urls:
-    - 'https://law.ac.uk/api/coursesearch/find?page=1'
-    - 'https://law.ac.uk/api/coursesearch/find?page=2'
-    - 'https://law.ac.uk/api/coursesearch/find?page=3'
-    - 'https://law.ac.uk/api/coursesearch/find?page=4'
-    - 'https://law.ac.uk/api/coursesearch/find?page=5'
-    - 'https://law.ac.uk/api/coursesearch/find?page=6'
-    - 'https://law.ac.uk/api/coursesearch/find?page=7'
-    - 'https://law.ac.uk/api/coursesearch/find?page=8'
-    - 'https://law.ac.uk/api/coursesearch/find?page=9'
-
-  always_sitemap_supplement: true
+  # The paginated API is the authoritative catalogue. Do not crawl its JSON
+  # page URLs again as HTML or run sitemap/BFS after it returns all pages.
+  always_sitemap_supplement: false
 
   # The stored auto-config was learned from an online course and only allowed
   # URLs ending in /online/. Override it with the real campus-course shape.
@@ -50,6 +39,11 @@ extraction:
   # deadline in the failed run.
   skip_browser_rescue: true
   skip_per_course_browser: true
+  # A failed static page was previously replayed sequentially for up to five
+  # minutes. AU18's API remains authoritative, so leave an individual failure
+  # visible for operator review instead of making the whole job appear stuck.
+  recovery_sweep_max_items: 0
+  recovery_sweep_time_budget_seconds: 0
 
   fees:
     default_currency: 'GBP'

@@ -471,6 +471,9 @@ def test_law_yaml_english_defaults_configured():
     assert english.skip_vision_when_core_found is True
     assert cfg.extraction.skip_browser_rescue is True
     assert cfg.extraction.skip_per_course_browser is True
+    assert cfg.extraction.recovery_sweep_max_items == 0
+    assert cfg.extraction.recovery_sweep_time_budget_seconds == 0
+    assert cfg.discovery.always_sitemap_supplement is False
 
 
 def test_leeds_yaml_uses_static_residential_proxy():

@@ -1466,6 +1466,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # infrastructure / no behaviour change).  Week-2 migrations will wire
         # it into discovery, fee extraction, english extraction, and filters.
         from urllib.parse import urlparse as _urlparse_cfg
+        from pathlib import Path as _Path_cfg
         from app.services.scraper.config import get_config_for_host, set_uni_config
         _cfg_host = (_urlparse_cfg(scrape_url).netloc or "").lower()
         _uni_cfg = get_config_for_host(
@@ -1488,10 +1489,20 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             reset_html_compaction_stats as _reset_html_compaction_stats,
         )
         _reset_html_compaction_stats()
+        _cfg_id_filename = f"{_uni_cfg.slug}_{uni_id}.yaml"
+        _cfg_id_path = (
+            _Path_cfg(__file__).resolve().parents[3]
+            / "scraper_config"
+            / "unis"
+            / _cfg_id_filename
+        )
+        _cfg_yaml_filename = (
+            _cfg_id_filename if _cfg_id_path.exists() else f"{_uni_cfg.slug}.yaml"
+        )
         log.info(
             "UniConfig loaded: slug=%r yaml_file=%r always_browser=%r always_sitemap=%r stealth=%r",
             _uni_cfg.slug,
-            f"scraper_config/unis/{_uni_cfg.slug}.yaml",
+            f"scraper_config/unis/{_cfg_yaml_filename}",
             _uni_cfg.discovery.always_browser_discover,
             _uni_cfg.discovery.always_sitemap_supplement,
             getattr(_uni_cfg.discovery, "use_stealth_browser", False),
