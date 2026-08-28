@@ -1,9 +1,19 @@
 # University of Technology Sydney — stub created for Week 4 scale-up.
 # Hostname: www.uts.edu.au  (course catalogue under /study)
 #
-# Bug history: none yet — fill in after first scrape.
 discovery: {}
 extraction:
+  # UTS course pages render no fee in static HTML. The browser defaults to
+  # Domestic; open the audience dropdown, select International Student, and
+  # require the international fee label before accepting the rendered DOM.
+  actions:
+    - click_text: "Domestic"
+      required: true
+    - click_text: "International Student"
+      required: true
+    - wait_for:
+        text: "Indicative total tuition fee for international students"
+      required: true
   filters:
     domestic_only:
       enabled: false

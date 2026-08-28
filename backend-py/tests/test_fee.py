@@ -127,6 +127,82 @@ def test_fee_structural_does_not_misfire_on_random_strong_tags():
     assert not out[0].method.startswith("fee.structural")
 
 
+def test_uts_domestic_total_is_never_international_fee():
+    """UTS defaults to a Domestic audience card in the browser."""
+    html = """
+    <section>
+      <div>COURSE FEES</div>
+      <div>Indicative total tuition fee for domestic students</div>
+      <div>$74,949.60</div>
+      <a>More on fees</a>
+    </section>
+    """
+    out = _run(
+        fee.extract(
+            html,
+            "https://www.uts.edu.au/courses/master-of-philosophy-in-science",
+            country="Australia",
+        )
+    )
+    assert out == []
+
+
+def test_uts_international_large_total_is_accepted_as_full_course():
+    """Explicit full-course tuition may legitimately exceed the generic cap."""
+    html = """
+    <section>
+      <div>COURSE FEES</div>
+      <div>Indicative total tuition fee for international students</div>
+      <div>$251,437.94</div>
+      <a>More on fees</a>
+    </section>
+    """
+    out = _run(
+        fee.extract(
+            html,
+            "https://www.uts.edu.au/courses/bachelor-of-engineering-honours-biomedical",
+            country="Australia",
+        )
+    )
+    assert out
+    assert out[0].normalized["international_fee"] == 251_437
+    assert out[0].normalized["fee_term"] == "Full Course"
+
+
+def test_nearest_audience_label_wins_when_both_fee_rows_are_visible():
+    html = """
+    <div>Indicative total tuition fee for domestic students $74,949.60</div>
+    <div>Indicative total tuition fee for international students $251,437.94</div>
+    """
+    out = _run(fee.extract(html, "https://example.edu/course/x", country="Australia"))
+    assert out
+    assert out[0].normalized["international_fee"] == 251_437
+    assert out[0].normalized["fee_term"] == "Full Course"
+
+
+def test_unlabelled_repeat_of_domestic_amount_stays_rejected():
+    """A later generic tuition section must retain the amount's known owner."""
+    html = """
+    <section>
+      Indicative total tuition fee for domestic students $74,949.60
+    </section>
+    <section>
+      Commonwealth Supported Places may be available.
+      2027 Tuition Fee
+      Indicative first-year tuition fee: $36,740.00
+      Indicative total tuition fee: $74,949.60
+    </section>
+    """
+    out = _run(
+        fee.extract(
+            html,
+            "https://www.uts.edu.au/courses/master-of-philosophy-in-science",
+            country="Australia",
+        )
+    )
+    assert all(r.normalized["international_fee"] != 74_949 for r in out)
+
+
 def test_full_course_fee_preferred_over_first_year_fee():
     """Murdoch-style pages show both 'First year fee: $41,990' and
     'Full course fee: $125,970'. The extractor must prefer the full-course

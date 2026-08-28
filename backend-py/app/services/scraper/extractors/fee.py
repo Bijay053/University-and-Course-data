@@ -95,7 +95,8 @@ _FULL_COURSE_LABEL_CTX = re.compile(
     # so labels like Curtin's "Total indicative course fee" still match
     # (previously only literal "total course fee" matched, so $141,348 was
     # silently classified as Annual instead of Full Course).
-    r"\b(?:full|total|complete)\s+(?:\w+\s+)?(?:course|program(?:me)?)\s+fee",
+    r"\b(?:full|total|complete)\s+(?:\w+\s+)?(?:course|program(?:me)?)\s+fee"
+    r"|\b(?:indicative\s+)?total\s+tuition\s+fee",
     re.IGNORECASE,
 )
 # First-year fee context — penalise by default (picking the first-year sticker
@@ -124,11 +125,6 @@ _CSP_DOMESTIC_CTX = re.compile(
     r"\b(?:commonwealth\s+supported(?:\s+place)?|"
     r"HECS(?:-HELP)?|"
     r"student\s+contribution(?:\s+amount)?|"
-    r"domestic\s+(?:student\s+)?(?:tuition\s+)?fees?|"
-    # UK home-student labels — both singular "Home fee" and plural "Home fees"
-    r"home\s+(?:student\s+)?(?:tuition\s+)?fees?|"
-    r"uk\s+(?:student\s+)?(?:tuition\s+)?fees?|"
-    r"(?:for\s+)?(?:uk|home)\s+students?|"
     # Per-module / per-credit / CPD prices (never annual international tuition)
     r"per\s+(?:module|credit|unit\s+of\s+credit)|"
     r"module\s+fee|credit\s+fee|"
@@ -136,6 +132,75 @@ _CSP_DOMESTIC_CTX = re.compile(
     r"part[\s\-]time\s+(?:fee|rate|tuition))\b",
     re.IGNORECASE,
 )
+
+# Audience-owned fee labels in either word order. The original domestic guard
+# covered "domestic student tuition fee" but missed UTS's equally explicit
+# "tuition fee for domestic students". Keep these separate from CSP/module
+# markers so pages that print domestic and international rows side-by-side can
+# assign each amount to the nearest audience label rather than rejecting both.
+_DOMESTIC_FEE_LABEL_CTX = re.compile(
+    r"\b(?:domestic|home|local|uk)\s+(?:students?\s+)?"
+    r"(?:indicative\s+|total\s+|annual\s+)*(?:tuition\s+)?fees?\b"
+    r"|\b(?:indicative\s+|total\s+|annual\s+)*(?:tuition\s+|course\s+|program(?:me)?\s+)"
+    r"fees?\s+for\s+(?:domestic|home|local|uk)\s+students?\b",
+    re.IGNORECASE,
+)
+_INTERNATIONAL_FEE_LABEL_CTX = re.compile(
+    r"\b(?:international|overseas|non[-\s]?resident)\s+(?:students?\s+)?"
+    r"(?:indicative\s+|total\s+|annual\s+)*(?:tuition\s+)?fees?\b"
+    r"|\b(?:indicative\s+|total\s+|annual\s+)*(?:tuition\s+|course\s+|program(?:me)?\s+)"
+    r"fees?\s+for\s+(?:international|overseas|non[-\s]?resident)\s+students?\b",
+    re.IGNORECASE,
+)
+
+
+def _nearest_label_distance(pattern: re.Pattern, ctx: str, anchor: int) -> float:
+    return min(
+        (abs(((match.start() + match.end()) / 2) - anchor) for match in pattern.finditer(ctx)),
+        default=float("inf"),
+    )
+
+
+def _is_domestic_owned_fee(ctx: str, anchor: int) -> bool:
+    """Return True when the amount is owned by the nearest domestic fee label."""
+    domestic_distance = _nearest_label_distance(_DOMESTIC_FEE_LABEL_CTX, ctx, anchor)
+    if domestic_distance == float("inf"):
+        return False
+    international_distance = _nearest_label_distance(
+        _INTERNATIONAL_FEE_LABEL_CTX, ctx, anchor
+    )
+    return domestic_distance < international_distance
+
+
+def _audience_owned_amounts(text: str) -> tuple[set[int], set[int]]:
+    """Collect amounts explicitly owned by domestic/international labels.
+
+    A page can repeat a domestic amount later in an unlabeled tuition section.
+    The explicit occurrence remains authoritative for that duplicated value.
+    """
+    domestic: set[int] = set()
+    international: set[int] = set()
+    for match in _AMOUNT_RE.finditer(text):
+        raw = match.group(2) or match.group(3) or ""
+        amount = _parse_amount(raw)
+        if amount is None:
+            continue
+        start = max(0, match.start() - 160)
+        end = min(len(text), match.end() + 160)
+        ctx = text[start:end]
+        anchor = match.start() - start
+        domestic_distance = _nearest_label_distance(
+            _DOMESTIC_FEE_LABEL_CTX, ctx, anchor
+        )
+        international_distance = _nearest_label_distance(
+            _INTERNATIONAL_FEE_LABEL_CTX, ctx, anchor
+        )
+        if domestic_distance < international_distance:
+            domestic.add(amount)
+        elif international_distance < domestic_distance:
+            international.add(amount)
+    return domestic, international
+
 
 # Minimum plausible international annual fee in GBP for a UK university.
 # Genuine international UG/PG fees at UK universities are ≥ £10,000/yr.
@@ -913,6 +978,7 @@ def _extract_fee_table_row(
 
 def _candidates(text: str) -> Iterable[tuple[int, str, str]]:
     """Yield (amount, currency_token_in_match, surrounding_context)."""
+    domestic_owned_amounts, international_owned_amounts = _audience_owned_amounts(text)
     for m in _AMOUNT_RE.finditer(text):
         cur = m.group(1) or m.group(4) or ""
         raw = m.group(2) or m.group(3) or ""
@@ -937,7 +1003,12 @@ def _candidates(text: str) -> Iterable[tuple[int, str, str]]:
         # The per-unit floor (1_500) is kept as the *upper* limit for
         # per-unit context — it gates whether the rollup branch should
         # multiply the value, not whether to reject it outright.
-        if amount < 1_000 or amount > 200_000:
+        # Full-course totals for long combined degrees can exceed A$200k
+        # (UTS Biomedical Engineering is A$251,437.94). Permit up to A$500k
+        # only when the local label explicitly identifies a total tuition /
+        # course/program fee; retain the conservative ceiling otherwise.
+        max_amount = 500_000 if _FULL_COURSE_LABEL_CTX.search(ctx) else 200_000
+        if amount < 1_000 or amount > max_amount:
             continue
         per_unit = bool(_PER_UNIT_HINT_RE.search(ctx))
         if (per_unit and amount < 1_500) or (not per_unit and amount < 5_000):
@@ -960,12 +1031,19 @@ def _candidates(text: str) -> Iterable[tuple[int, str, str]]:
         )
         if sal_dist < tui_dist:
             continue
+        if (
+            amount in domestic_owned_amounts
+            and amount not in international_owned_amounts
+        ):
+            continue
         # CSP / domestic fee guard: reject amounts whose immediate context
         # mentions "Commonwealth Supported Place", "HECS", "student
         # contribution", "domestic fee", "home student fee", "UK student fee",
         # "per module", "per credit", "CPD fee", or "part-time fee".
         # These are domestic/module prices and must never be stored as the
         # international annual tuition fee.
+        if _is_domestic_owned_fee(ctx, anchor):
+            continue
         if _CSP_DOMESTIC_CTX.search(ctx):
             continue
         # GBP floor guard for UK universities.
