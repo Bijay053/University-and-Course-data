@@ -80,6 +80,37 @@ def test_th_td_duration_classifies_via_structural_pass():
     assert out[0].method == "duration.structural"
 
 
+def test_scu_snapshot_heading_duration_classifies_via_structural_pass():
+    """SCU uses an h4 label followed by the value in a sibling div."""
+    html = """
+    <li class="course-snapshot__item">
+      <div class="course-snapshot__label">
+        <h4 class="course-snapshot__label-text">Duration</h4>
+        <button><span class="sr-only">What's this</span></button>
+      </div>
+      <div class="course-snapshot__text">
+        <p>2 years full-time; 4 years part-time</p>
+      </div>
+    </li>
+    <li class="course-snapshot__item">
+      <div class="course-snapshot__label">
+        <h4 class="course-snapshot__label-text">Location</h4>
+      </div>
+      <div class="course-snapshot__text"><p>Brisbane</p></div>
+    </li>
+    """
+    out = _run(
+        duration.extract(
+            html,
+            "https://www.scu.edu.au/study/courses/example/2026/",
+        )
+    )
+    assert out
+    n = out[0].normalized
+    assert n["duration"] == 2.0 and n["duration_term"] == "Year"
+    assert out[0].method == "duration.structural"
+
+
 def test_duration_label_does_not_misfire_on_unrelated_strong_tags():
     """Random `<strong>` tags whose text isn't a duration label must
     not trigger the structural pre-pass — the keyword fallback should

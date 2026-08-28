@@ -550,6 +550,8 @@ def _extract_strong_label_value(
       Walks forward in document order until the next labelled boundary.
     * ``<dt>Duration</dt><dd>3 years</dd>`` — definition lists.
     * ``<th>Course length</th><td>2 years</td>`` — table key/value rows.
+    * ``<h4>Duration</h4> … <p>2 years full-time</p>`` — snapshot cards
+      used by Southern Cross University and similar CMS templates.
     """
     if not html:
         return None, None
@@ -564,7 +566,9 @@ def _extract_strong_label_value(
     except Exception:  # pragma: no cover - defensive
         return None, None
 
-    for label_tag in soup.find_all(("strong", "b", "dt", "th")):
+    for label_tag in soup.find_all(
+        ("strong", "b", "dt", "th", "h1", "h2", "h3", "h4", "h5", "h6")
+    ):
         label_raw = label_tag.get_text(" ", strip=True).rstrip(":").strip()
         if not label_raw or not _DURATION_LABEL_RE.fullmatch(label_raw):
             continue
