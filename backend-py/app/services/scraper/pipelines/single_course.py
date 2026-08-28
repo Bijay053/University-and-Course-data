@@ -1436,6 +1436,45 @@ def _apply_ai_duration_mapping(payload: dict[str, Any], ai_filled: dict[str, Any
             payload["duration_term"] = ai_filled["duration_term"]
 
 
+def _resolve_configured_english_defaults(
+    payload: dict[str, Any],
+    english_config: Any,
+) -> dict[str, float | int]:
+    """Resolve flat or degree-level institutional English defaults."""
+    degree = str(payload.get("degree_level") or "").lower().strip()
+    tier: str | None = None
+    if any(k in degree for k in ("bachelor", "honours", "honor")):
+        tier = "undergraduate"
+    elif "master" in degree:
+        tier = "postgraduate"
+    elif any(k in degree for k in ("doctor", "phd", "dphil")):
+        tier = "doctorate"
+    elif degree.startswith("graduate") or "postgraduate" in degree:
+        tier = "postgraduate"
+    elif any(k in degree for k in ("diploma", "certificate")):
+        tier = "undergraduate"
+
+    tier_map = getattr(english_config, "degree_level_defaults", {}) or {}
+    tier_config = tier_map.get(tier) if tier else None
+    if tier == "doctorate" and tier_config is None:
+        tier_config = tier_map.get("postgraduate")
+
+    def pick(tier_attr: str, flat_attr: str) -> float | int | None:
+        if tier_config is not None:
+            value = getattr(tier_config, tier_attr, None)
+            if value not in (None, 0):
+                return value
+        value = getattr(english_config, flat_attr, None)
+        return value if value not in (None, 0) else None
+
+    defaults = {
+        "ielts_overall": pick("ielts", "default_ielts"),
+        "pte_overall": pick("pte", "default_pte"),
+        "toefl_overall": pick("toefl", "default_toefl"),
+    }
+    return {key: value for key, value in defaults.items() if value is not None}
+
+
 # Each entry: (module, kwargs the extractor accepts beyond html/url).
 # degree_level + study_mode were missing before Bug C — without them the
 # Review table's Level / Mode columns showed "--" for every staged course
@@ -3463,6 +3502,66 @@ async def extract_course(
                     kind="per_course_modal_error",
                     url=url,
                 )
+
+    # Opt-in institutional defaults can satisfy the English requirement before
+    # expensive remote enrichment. Local course-page extraction and hidden
+    # modal extraction have already run, so real per-course values always win.
+    try:
+        _eng_cfg_early = getattr(
+            getattr(get_uni_config(), "extraction", None),
+            "english",
+            None,
+        )
+        if (
+            _eng_cfg_early is not None
+            and bool(
+                getattr(
+                    _eng_cfg_early,
+                    "apply_defaults_before_remote_enrichment",
+                    False,
+                )
+            )
+            and not bool(payload.get("is_pathway"))
+        ):
+            _early_defaults = _resolve_configured_english_defaults(
+                payload,
+                _eng_cfg_early,
+            )
+            _early_filled: list[str] = []
+            for _slot, _value in _early_defaults.items():
+                if payload.get(_slot) not in (None, "", 0):
+                    continue
+                payload[_slot] = _value
+                evidence.append(
+                    {
+                        "field_key": _slot,
+                        "value": _value,
+                        "confidence": 0.40,
+                        "method": "uni_config:english_default",
+                        "source_url": url,
+                        "snippet": (
+                            "authoritative institutional default applied before "
+                            f"remote enrichment: {_slot}={_value}"
+                        ),
+                    }
+                )
+                _early_filled.append(_slot)
+            if emit and _early_filled:
+                _scores = " ".join(
+                    f"{key.replace('_overall', '')}={payload.get(key)}"
+                    for key in _early_filled
+                )
+                await emit(
+                    "status",
+                    f"[ENG-DEFAULT EARLY] "
+                    f"{payload.get('course_name', url)[:40]} — {_scores}",
+                    phase="extract",
+                    kind="english_default_applied_early",
+                    url=url,
+                    filled=_early_filled,
+                )
+    except Exception as exc:  # noqa: BLE001 — defaults must never abort a course
+        log.warning("early English defaults failed on %s: %s", url, exc)
 
     # ── PHASE A — exhaust the course page (no university-wide sources) ──────────
     # All extractors in this phase read exclusively from the course's own page:

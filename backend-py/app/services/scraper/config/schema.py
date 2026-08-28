@@ -2201,6 +2201,17 @@ class EnglishConfig(BaseModel):
             "detector misses (e.g. ASAHE), and only after manual spot-check."
         ),
     )
+    apply_defaults_before_remote_enrichment: bool = Field(
+        default=False,
+        description=(
+            "When True, apply configured institutional English defaults after "
+            "local course-page extraction but before Gemini, browser, and vision "
+            "enrichment. Enable only when the defaults are authoritative for the "
+            "whole institution and missing English would otherwise trigger "
+            "remote work that cannot improve the result. Existing course-page "
+            "values are never overwritten."
+        ),
+    )
     default_ielts: Optional[float] = Field(
         default=None,
         description=(

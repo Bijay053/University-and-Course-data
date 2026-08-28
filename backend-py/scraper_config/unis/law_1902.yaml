@@ -34,10 +34,16 @@ discovery:
     # FIX 3: tell the paginator which field holds total page count
     total_pages_field: 'TotalPages'
     total_results_field: 'TotalResults'
-    page_param: 'page'
+    page_number_param: 'page'
     first_page: 1
 
 extraction:
+  # Static course HTML already contains the fee, duration, intake and mode.
+  # Browser rendering adds no fields and consumed most of the 90-second course
+  # deadline in the failed run.
+  skip_browser_rescue: true
+  skip_per_course_browser: true
+
   fees:
     default_currency: 'GBP'
     prefer_international: true
@@ -51,6 +57,10 @@ extraction:
 
   english:
     trust_vision_ocr: false
+    skip_vision_when_core_found: true
+    # These institution-wide scores are authoritative. Apply them after local
+    # extraction so missing English does not trigger Gemini/browser/fallback.
+    apply_defaults_before_remote_enrichment: true
     default_ielts: 6.0
     default_pte: 60
     default_toefl: 80

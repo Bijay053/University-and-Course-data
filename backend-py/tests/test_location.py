@@ -413,6 +413,7 @@ def test_law_yaml_search_api_config_round_trips():
     assert "Url" in api.url_fields
     assert api.page_size == 20
     assert api.max_pages == 10
+    assert api.page_number_param == "page"
 
 
 def test_law_yaml_english_defaults_configured():
@@ -428,6 +429,10 @@ def test_law_yaml_english_defaults_configured():
     assert english.default_ielts == 6.0
     assert english.default_pte == 60
     assert english.default_toefl == 80
+    assert english.apply_defaults_before_remote_enrichment is True
+    assert english.skip_vision_when_core_found is True
+    assert cfg.extraction.skip_browser_rescue is True
+    assert cfg.extraction.skip_per_course_browser is True
 
 
 def test_empty_reject_and_allowed_values_are_no_ops():
