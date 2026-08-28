@@ -165,8 +165,52 @@ def test_uts_international_large_total_is_accepted_as_full_course():
         )
     )
     assert out
-    assert out[0].normalized["international_fee"] == 251_437
+    assert out[0].normalized["international_fee"] == 251_437.94
     assert out[0].normalized["fee_term"] == "Full Course"
+    assert out[0].method == "fee.uts_international_total"
+
+
+def test_uts_total_is_annualised_by_duration_not_session_wording():
+    from app.services.scraper.config.loader import get_config_for_host
+    from app.services.scraper.recipe_rules import apply_recipe_rules
+
+    html = """
+    <section>
+      <h3>COURSE FEES</h3>
+      <p>Indicative total tuition fee for international students<br>
+         $89,556.00</p>
+      <div>
+        <strong>Indicative first-year tuition fee:</strong> $43,900.00
+        You can choose to pay your fees upfront per session.
+      </div>
+    </section>
+    """
+    out = _run(
+        fee.extract(
+            html,
+            "https://www.uts.edu.au/courses/master-of-indigenous-health-research",
+            country="Australia",
+        )
+    )
+    assert out
+    result = out[0]
+    assert result.normalized["international_fee"] == 89_556.0
+    assert result.normalized["fee_term"] == "Full Course"
+    assert result.method == "fee.uts_international_total"
+
+    config = get_config_for_host(
+        hostname="www.uts.edu.au",
+        name="University of Technology Sydney",
+        scrape_url="https://www.uts.edu.au/courses",
+    )
+    payload = {
+        **result.normalized,
+        "duration": 2,
+        "duration_term": "Year",
+    }
+    final = apply_recipe_rules(payload, config.extraction.fees.model_dump())
+    assert final["international_fee"] == 44_778
+    assert final["fee_term"] == "Annual"
 
 
 def test_nearest_audience_label_wins_when_both_fee_rows_are_visible():
@@ -443,6 +487,65 @@ def test_uow_session_fee_wins_over_full_course_fee():
     assert n["fee_term"] == "Session"
     assert n["fee_year"] == 2026
     assert out[0].method == "fee.uow_session_table"
+
+
+def test_scu_international_snapshot_fee_beats_per_unit_rollup():
+    """SCU's snapshot amount is annual, not a per-unit full-course total."""
+    html = """
+    <div data-course="international">
+      <h3>International snapshot</h3>
+      <p id="int_snapshot_fee">$26,000 (first year only)</p>
+    </div>
+    <table>
+      <tr><td>$26,000 ($3,250 per unit)</td></tr>
+    </table>
+    <p>Equivalent units 32</p>
+    <p>384 credit points</p>
+    """
+    out = _run(
+        fee.extract(
+            html,
+            "https://www.scu.edu.au/study/courses/example/2026/",
+        )
+    )
+    assert out
+    assert out[0].normalized["international_fee"] == 26_000
+    assert out[0].normalized["fee_term"] == "Annual"
+    assert out[0].method == "fee.scu_int_snapshot"
+
+
+def test_aut_international_panel_includes_levy_and_preserves_cents():
+    html = """
+    <div class="mb-small">
+      <div class="mb-10">
+        <div class="heading mb-5">Domestic</div>
+        <div class="value">
+          $11,851.60 (for 120 points)
+          ($10,630 tuition fees + $1,221.60 student services levy)
+        </div>
+      </div>
+    </div>
+    <div class="mb-small">
+      <div class="mb-10">
+        <div class="heading mb-5">International</div>
+        <div class="value">
+          $42,859.67 (for 120 points)
+          ($41,600 tuition fees + $1,259.67 student services levy)
+        </div>
+      </div>
+    </div>
+    """
+    out = _run(
+        fee.extract(
+            html,
+            "https://www.aut.ac.nz/study/study-options/example",
+        )
+    )
+    assert out
+    assert out[0].normalized["international_fee"] == 42_859.67
+    assert out[0].normalized["currency"] == "NZD"
+    assert out[0].normalized["fee_term"] == "Annual"
+    assert out[0].method == "fee.aut_international_panel"
 
 
 # ── Structured fee table tests ─────────────────────────────────────────────

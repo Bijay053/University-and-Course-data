@@ -254,6 +254,29 @@ def _ielts(text: str) -> dict[str, float] | None:
             result[exc] = lower
             return result
 
+    # Pattern 2a: AUT wording — "IELTS (Academic) 6.5 overall with all
+    # bands 6.0 or higher". The collective band label precedes the floor,
+    # unlike Pattern 2 below where the score precedes "in each band".
+    m = re.search(
+        r"ielts(?:\s*\(\s*academic\s*\)|\s+academic)?"
+        r"[^a-z0-9]{0,20}([0-9]+(?:\.[0-9]+)?)\s*overall"
+        r"[^a-z0-9]{0,30}(?:with\s*)?(?:all|each)\s+"
+        r"(?:bands?|components?|sections?|skills?)\s+"
+        r"([0-9]+(?:\.[0-9]+)?)(?:\s+or\s+(?:higher|above|more))?",
+        text,
+        re.I,
+    )
+    if m:
+        ov, ea = float(m.group(1)), float(m.group(2))
+        if 4 <= ov <= 9 and 4 <= ea <= ov:
+            return {
+                "overall": ov,
+                "listening": ea,
+                "reading": ea,
+                "writing": ea,
+                "speaking": ea,
+            }
+
     # Pattern 2: "IELTS 6.5 overall with 6.0 in each band"
     m = re.search(
         r"ielts(?:\s+academic)?[^a-z0-9]{0,20}([0-9]+(?:\.[0-9]+)?)\s*overall"

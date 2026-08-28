@@ -1724,6 +1724,130 @@ def _from_bcu_int_fee_panel(
     return None
 
 
+def _from_scu_international_snapshot(
+    html: str,
+    url: str,
+) -> tuple[int, str] | None:
+    """Read SCU's authoritative annual fee from the international snapshot.
+
+    SCU also publishes the same amount as ``$3,250 per unit`` beside total
+    credit/equivalent-unit counts. The generic per-unit rollup can multiply
+    that amount by the largest page-wide unit count and manufacture a
+    full-course total. The audience-specific ``#int_snapshot_fee`` value is
+    already the annual/first-year fee and must win unchanged.
+    """
+    if not re.search(r"https?://(?:www\.)?scu\.edu\.au/", url, re.I):
+        return None
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:  # pragma: no cover - malformed HTML / missing parser
+        return None
+
+    fee_node = soup.select_one("#int_snapshot_fee")
+    if fee_node is None:
+        return None
+    value_text = compact(fee_node.get_text(" ", strip=True))
+    amount_match = _AMOUNT_RE.search(value_text)
+    if not amount_match:
+        return None
+    raw_num = amount_match.group(2) or amount_match.group(3) or ""
+    amount = _parse_amount(raw_num)
+    if amount is None:
+        return None
+    return amount, f"SCU International snapshot Indicative fee: {value_text}"
+
+
+def _from_aut_international_fee_panel(
+    html: str,
+    url: str,
+) -> tuple[float, str] | None:
+    """Read AUT's headline international total, including the student levy.
+
+    AUT fee cards publish the annual 120-point total first, followed by a
+    parenthesised tuition-only subtotal and student-services levy. Generic
+    candidate scoring can choose the tuition subtotal because it is explicitly
+    labelled "tuition fees". The card's first amount is the authoritative
+    international fee shown to students and may include cents.
+    """
+    if not re.search(r"https?://(?:www\.)?aut\.ac\.nz/", url, re.I):
+        return None
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:  # pragma: no cover - malformed HTML / missing parser
+        return None
+
+    for heading in soup.select(".heading"):
+        if compact(heading.get_text(" ", strip=True)).casefold() != "international":
+            continue
+        owner = heading.parent
+        value_node = owner.select_one(".value") if owner is not None else None
+        if value_node is None:
+            continue
+        value_text = compact(value_node.get_text(" ", strip=True))
+        if not re.search(r"\b(?:points?|tuition\s+fees?)\b", value_text, re.I):
+            continue
+        amount_match = _AMOUNT_RE.search(value_text)
+        if not amount_match:
+            continue
+        raw_num = amount_match.group(2) or amount_match.group(3) or ""
+        cleaned = _AMOUNT_STRIP_RE.sub("", raw_num)
+        try:
+            amount = float(cleaned)
+        except ValueError:
+            continue
+        if 5_000 <= amount <= 200_000:
+            return amount, f"AUT International fee: {value_text}"
+    return None
+
+
+def _from_uts_international_total(
+    html: str,
+    url: str,
+) -> tuple[float, str] | None:
+    """Read UTS's explicitly labelled international full-course total.
+
+    UTS pages also contain a first-year amount and prose about paying fees
+    "per session". A wide generic context can therefore select the first-year
+    amount and mislabel it Session. The key-facts value is explicitly the
+    indicative total for the entire course and should be annualised later by
+    the UTS recipe using the course duration.
+    """
+    if not re.search(r"https?://(?:www\.)?uts\.edu\.au/", url, re.I):
+        return None
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:  # pragma: no cover - malformed HTML / missing parser
+        return None
+
+    text = compact(soup.get_text(" ", strip=True))
+    label = re.search(
+        r"\bindicative\s+total\s+tuition\s+fee\s+for\s+international\s+students\b",
+        text,
+        re.I,
+    )
+    if label is None:
+        return None
+    amount_match = _AMOUNT_RE.search(text, label.end())
+    if amount_match is None or amount_match.start() - label.end() > 160:
+        return None
+    raw_num = amount_match.group(2) or amount_match.group(3) or ""
+    cleaned = _AMOUNT_STRIP_RE.sub("", raw_num)
+    try:
+        amount = float(cleaned)
+    except ValueError:
+        return None
+    if not 5_000 <= amount <= 500_000:
+        return None
+    ctx = text[label.start():min(len(text), amount_match.end() + 80)]
+    return amount, ctx
+
+
 async def extract(
     html: str, url: str, *, country: str | None = None
 ) -> list[ExtractionResult]:
@@ -1744,6 +1868,63 @@ async def extract(
             prefer_yr1 = bool(_cfg.extraction.fees.prefer_year_one_over_total)
     except Exception:  # noqa: BLE001 — defensive; keep extractor working
         prefer_yr1 = False
+
+    uts_total_fee = _from_uts_international_total(html, url)
+    if uts_total_fee is not None:
+        amount, ctx = uts_total_fee
+        return [
+            ExtractionResult(
+                field_key="international_fee",
+                value=amount,
+                normalized={
+                    "international_fee": amount,
+                    "currency": "AUD",
+                    "fee_term": "Full Course",
+                    "fee_year": _extract_year(ctx),
+                },
+                confidence=0.99,
+                snippet=ctx[:200],
+                method="fee.uts_international_total",
+            )
+        ]
+
+    aut_panel_fee = _from_aut_international_fee_panel(html, url)
+    if aut_panel_fee is not None:
+        amount, ctx = aut_panel_fee
+        return [
+            ExtractionResult(
+                field_key="international_fee",
+                value=amount,
+                normalized={
+                    "international_fee": amount,
+                    "currency": "NZD",
+                    "fee_term": _normalize_fee_term(ctx),
+                    "fee_year": _extract_year(ctx),
+                },
+                confidence=0.99,
+                snippet=ctx[:200],
+                method="fee.aut_international_panel",
+            )
+        ]
+
+    scu_snapshot_fee = _from_scu_international_snapshot(html, url)
+    if scu_snapshot_fee is not None:
+        amount, ctx = scu_snapshot_fee
+        return [
+            ExtractionResult(
+                field_key="international_fee",
+                value=amount,
+                normalized={
+                    "international_fee": amount,
+                    "currency": "AUD",
+                    "fee_term": "Annual",
+                    "fee_year": _extract_year(ctx),
+                },
+                confidence=0.98,
+                snippet=ctx,
+                method="fee.scu_int_snapshot",
+            )
+        ]
 
     # ── Pre-pass: audience-scoped SSR fee blocks ─────────────────────────────
     # Course pages can contain both domestic and international fee cards, with

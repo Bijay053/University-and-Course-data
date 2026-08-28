@@ -113,6 +113,31 @@ def test_english_ielts_overall_with_no_band_below():
     assert n["ielts_overall"] == 6.5 and n["ielts_listening"] == 6.0
 
 
+def test_english_ielts_aut_all_bands_floor():
+    html = (
+        "<h2>English language requirements</h2>"
+        "<p>IELTS (Academic) 6.5 overall with all bands 6.0 or higher; "
+        "or equivalent</p>"
+    )
+    out = {
+        r.field_key: r
+        for r in _run(
+            english_test.extract(
+                html,
+                "https://www.aut.ac.nz/study/study-options/example",
+            )
+        )
+    }
+    n = out["ielts_overall"].normalized
+    assert n == {
+        "ielts_overall": 6.5,
+        "ielts_listening": 6.0,
+        "ielts_reading": 6.0,
+        "ielts_writing": 6.0,
+        "ielts_speaking": 6.0,
+    }
+
+
 def test_cambridge_gce_country_table_year_is_not_an_english_score():
     html = """
     <p>

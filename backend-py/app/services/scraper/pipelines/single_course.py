@@ -533,6 +533,31 @@ def _is_domestic_only_page(html: str, url: str | None = None) -> bool:
     """
     if not html:
         return False
+    # SCU always emits an empty International snapshot shell, even for courses
+    # unavailable to international applicants. Its audience selector is the
+    # authoritative signal: the surrounding div is hidden when Domestic is
+    # the only selectable audience.
+    if url and (urlparse(url).hostname or "").lower() in {
+        "scu.edu.au",
+        "www.scu.edu.au",
+    }:
+        try:
+            from bs4 import BeautifulSoup as _BS4_scu
+
+            _scu_soup = _BS4_scu(html, "html.parser")
+            _audience_select = _scu_soup.select_one("#course-location")
+            _audience_wrapper = (
+                _audience_select.find_parent("div")
+                if _audience_select is not None
+                else None
+            )
+            _wrapper_style = str(
+                _audience_wrapper.get("style") or ""
+            ).replace(" ", "").lower() if _audience_wrapper is not None else ""
+            if "display:none" in _wrapper_style:
+                return True
+        except Exception:
+            pass  # malformed DOM must not create a false domestic-only verdict
     # Deakin redirects an unavailable international audience URL to its
     # generic discontinued-course page while the original course page remains
     # domestic-only. Treat that host-scoped terminal page as ineligible rather

@@ -14,6 +14,12 @@ extraction:
     - wait_for:
         text: "Indicative total tuition fee for international students"
       required: true
+  fees:
+    # UTS labels this value as the indicative TOTAL tuition fee for the entire
+    # course. Keep it as Full Course until the duration-aware recipe divides it
+    # into the annual amount shown in the review table.
+    fee_prevent_full_course_rollup: false
+    fee_calculation_mode: full_course_to_annual
   filters:
     domestic_only:
       enabled: false

@@ -8,6 +8,7 @@ from app.services.scraper.pipelines.single_course import (
     _domestic_only_filter_enabled,
     _duration_labeled_values,
     _infer_study_load_from_text,
+    _is_domestic_only_page,
     _is_parttime_only_page,
     _parttime_only_filter_enabled,
 )
@@ -59,6 +60,46 @@ def test_disabled_legacy_overrides_cannot_bypass_global_delivery_filters() -> No
         assert domestic_reason == "domestic_only"
     finally:
         current_uni_config.reset(token)
+
+
+def test_scu_hidden_audience_selector_marks_domestic_only_course() -> None:
+    html = """
+    <form class="course-filter">
+      <div style="display:none">
+        <label for="course-location">Show me course information for</label>
+        <select id="course-location">
+          <option value="default">Domestic</option>
+          <option value="international">International</option>
+        </select>
+      </div>
+    </form>
+    <div data-course="international">
+      <h3>International snapshot</h3>
+      <p>5 years full-time</p>
+    </div>
+    """
+    assert _is_domestic_only_page(
+        html,
+        "https://www.scu.edu.au/study/courses/domestic-only/2027/",
+    )
+
+
+def test_scu_visible_audience_selector_keeps_international_course() -> None:
+    html = """
+    <form class="course-filter">
+      <div>
+        <label for="course-location">Show me course information for</label>
+        <select id="course-location">
+          <option value="default">Domestic</option>
+          <option value="international">International</option>
+        </select>
+      </div>
+    </form>
+    """
+    assert not _is_domestic_only_page(
+        html,
+        "https://www.scu.edu.au/study/courses/international/2027/",
+    )
 
 
 def test_full_time_wins_when_duration_also_mentions_part_time_equivalent() -> None:
