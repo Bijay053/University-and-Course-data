@@ -1869,6 +1869,59 @@ def _from_uts_international_total(
     return amount, ctx
 
 
+def _from_swinburne_international_panel(
+    html: str,
+    url: str,
+) -> tuple[float, str] | None:
+    """Read Swinburne's SSR international yearly-fee panel.
+
+    Swinburne emits domestic and international fee containers in the same
+    document and toggles them with CSS.  Both use the ambiguous label
+    ``Yearly fee* ($AUD)``, so flattening the page makes the first domestic
+    yearly/total amount win.  Preserve the explicit ``.international`` DOM
+    boundary and ignore the neighbouring SSAF block.
+    """
+    try:
+        from urllib.parse import urlparse
+
+        host = (urlparse(url or "").hostname or "").lower()
+        if host != "swinburne.edu.au" and not host.endswith(".swinburne.edu.au"):
+            return None
+
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:  # pragma: no cover - malformed HTML / missing parser
+        return None
+
+    for container in soup.select(".course-fees__container.international"):
+        for block in container.select(".course-fees__block"):
+            label_el = block.select_one(".course-fees__sub-title")
+            label = compact(label_el.get_text(" ", strip=True)) if label_el else ""
+            if not re.search(r"\byearly\s+fee\b", label, re.I):
+                continue
+            value_el = block.select_one(".course-fees__total")
+            value_text = compact(value_el.get_text(" ", strip=True)) if value_el else ""
+            parsed = _classify_fee_value(value_text)
+            ctx = compact(container.get_text(" ", strip=True))
+            if parsed is None:
+                # Swinburne uses an explicit $0.00 placeholder when no
+                # international fee is published. Preserve that state as a
+                # sentinel so the generic flattened-text fallback cannot claim
+                # the neighbouring domestic yearly/total amount.
+                amount_match = _AMOUNT_RE.search(value_text)
+                if amount_match is None:
+                    continue
+                raw = amount_match.group(2) or amount_match.group(3) or ""
+                amount = _parse_amount(raw)
+                if amount is None or amount != 0:
+                    continue
+                return 0.0, ctx
+            amount, _ = parsed
+            return amount, ctx
+    return None
+
+
 async def extract(
     html: str, url: str, *, country: str | None = None
 ) -> list[ExtractionResult]:
@@ -1889,6 +1942,27 @@ async def extract(
             prefer_yr1 = bool(_cfg.extraction.fees.prefer_year_one_over_total)
     except Exception:  # noqa: BLE001 — defensive; keep extractor working
         prefer_yr1 = False
+
+    swinburne_fee = _from_swinburne_international_panel(html, url)
+    if swinburne_fee is not None:
+        amount, ctx = swinburne_fee
+        if amount == 0:
+            return []
+        return [
+            ExtractionResult(
+                field_key="international_fee",
+                value=amount,
+                normalized={
+                    "international_fee": amount,
+                    "currency": "AUD",
+                    "fee_term": "Annual",
+                    "fee_year": _extract_year(ctx),
+                },
+                confidence=0.99,
+                snippet=ctx[:200],
+                method="fee.swinburne_international_panel",
+            )
+        ]
 
     uts_total_fee = _from_uts_international_total(html, url)
     if uts_total_fee is not None:

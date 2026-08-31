@@ -296,6 +296,28 @@ def test_strip_patterns_not_applied_without_config():
         set_uni_config(_BARE_CFG)
 
 
+def test_swinburne_hero_campus_beats_key_dates_column_heading():
+    html = """
+    <div class="course-details__summary-item course-details__campus">
+      <div class="domestic">Hawthorn</div>
+      <div class="international">Hawthorn</div>
+    </div>
+    <div class="keydates-table-header">
+      <div>Intake date</div>
+      <div>Last date to apply</div>
+    </div>
+    """
+    out = _run(
+        location.extract(
+            html,
+            "https://www.swinburne.edu.au/course/postgraduate/master-of-business-information-systems/finance/",
+        )
+    )
+    assert out
+    assert out[0].normalized == {"course_location": "Hawthorn"}
+    assert out[0].method == "location.swinburne_international_hero"
+
+
 # ── LocationCleaningConfig.reject_values + allowed_values (UWL / law.ac.uk) ──
 #
 # These tests cover the new YAML-configurable location filtering fields:

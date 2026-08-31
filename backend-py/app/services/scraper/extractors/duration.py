@@ -801,6 +801,44 @@ def _from_qut_quickbox(html: str, url: str) -> tuple[tuple[float, str], str] | N
     return parsed, f"qut.quickbox[{selected_key}]: {selected[:80]}"
 
 
+def _from_swinburne_international_hero(
+    html: str,
+    url: str,
+) -> tuple[tuple[float, str], str] | None:
+    """Read the international duration from Swinburne's hero facts.
+
+    The page includes unrelated pathway and credit durations later in the
+    body. Its authoritative duration is the audience-scoped value inside the
+    ``course-details__duration`` summary item.
+    """
+    try:
+        from urllib.parse import urlparse
+
+        host = (urlparse(url or "").hostname or "").lower()
+        if host != "swinburne.edu.au" and not host.endswith(".swinburne.edu.au"):
+            return None
+
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:  # pragma: no cover - malformed HTML / missing parser
+        return None
+
+    panel = soup.select_one(
+        ".course-details__summary-item.course-details__duration"
+    )
+    if panel is None:
+        return None
+    audience_value = panel.select_one(".international")
+    candidates = [audience_value, panel] if audience_value is not None else [panel]
+    for candidate in candidates:
+        value_text = compact(candidate.get_text(" ", strip=True))
+        parsed = _classify_duration_value(value_text)
+        if parsed is not None:
+            return parsed, f"swinburne international hero: {value_text[:120]}"
+    return None
+
+
 async def extract(html: str, url: str) -> list[ExtractionResult]:
     # Per-uni: load reject_sentence_patterns from the contextvar set by
     # set_uni_config() before extraction runs.  These are compiled once
@@ -837,6 +875,21 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
                 confidence=0.99,
                 snippet=snippet,
                 method="duration.aut_points",
+            )
+        ]
+
+    swinburne_hero = _from_swinburne_international_hero(html, url)
+    if swinburne_hero is not None:
+        (amount, unit), snippet = swinburne_hero
+        amount, unit = _convert_weeks(amount, unit)
+        return [
+            ExtractionResult(
+                field_key="duration",
+                value=amount,
+                normalized={"duration": amount, "duration_term": unit},
+                confidence=0.98,
+                snippet=snippet,
+                method="duration.swinburne_international_hero",
             )
         ]
 

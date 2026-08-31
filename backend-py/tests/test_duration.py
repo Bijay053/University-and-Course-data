@@ -177,6 +177,63 @@ def test_duration_meta_beats_uow_courses_you_might_like_cards():
     assert out[0].method == "duration.meta"
 
 
+def test_swinburne_international_hero_beats_unrelated_pathway_duration():
+    html = """
+    <div class="course-details__summary-item course-details__duration">
+      <div>
+        <span class="domestic">3 years full-time or equivalent part-time</span>
+        <span class="international">3 years full-time</span>
+      </div>
+    </div>
+    <section class="pathways">
+      Advanced Diploma of Screen and Media - Animation
+      1 year full-time, 12 units max credit.
+      A separate accelerated option takes 8 months.
+    </section>
+    """
+    out = _run(
+        duration.extract(
+            html,
+            "https://www.swinburne.edu.au/course/undergraduate/bachelor-of-screen-production/",
+        )
+    )
+    assert out
+    assert out[0].normalized == {"duration": 3.0, "duration_term": "Year"}
+    assert out[0].method == "duration.swinburne_international_hero"
+
+
+def test_swinburne_postgraduate_international_hero_duration():
+    html = """
+    <div class="course-details__summary-item course-details__duration">
+      <span class="domestic">2 years full time or equivalent part-time</span>
+      <span class="international">2 years full-time</span>
+    </div>
+    """
+    out = _run(
+        duration.extract(
+            html,
+            "https://www.swinburne.edu.au/course/postgraduate/master-of-business-information-systems/finance/",
+        )
+    )
+    assert out[0].normalized == {"duration": 2.0, "duration_term": "Year"}
+
+
+def test_swinburne_full_time_only_international_label_uses_shared_duration():
+    html = """
+    <div class="course-details__summary-item course-details__duration">
+      <span class="domestic">3 years full-time or equivalent part-time</span>
+      <span class="international">Full-time only</span>
+    </div>
+    """
+    out = _run(
+        duration.extract(
+            html,
+            "https://www.swinburne.edu.au/course/undergraduate/bachelor-of-psychological-sciences/",
+        )
+    )
+    assert out[0].normalized == {"duration": 3.0, "duration_term": "Year"}
+
+
 def test_related_course_section_cannot_win_duration_tournament():
     """Generic pages without meta tags must ignore sibling-course fact boxes."""
     html = """

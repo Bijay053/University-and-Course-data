@@ -127,6 +127,74 @@ def test_fee_structural_does_not_misfire_on_random_strong_tags():
     assert not out[0].method.startswith("fee.structural")
 
 
+def test_swinburne_international_panel_beats_domestic_yearly_and_total_fees():
+    html = """
+    <div class="course-fees__container course-fees domestic">
+      <h2>2026 tuition fees</h2>
+      <div class="course-fees__block domestic">
+        <h4 class="course-fees__sub-title">Yearly fee* ($AUD)</h4>
+        <p class="course-fees__total">$17,399.00</p>
+      </div>
+      <div class="course-fees__block domestic">
+        <h4 class="course-fees__sub-title">Total fee* ($AUD)</h4>
+        <p class="course-fees__total">$52,197.00</p>
+      </div>
+    </div>
+    <div class="course-fees__container course-fees international">
+      <h2>2026 tuition fees</h2>
+      <div class="course-fees__block international">
+        <h4 class="course-fees__sub-title">Yearly fee* ($AUD)</h4>
+        <p class="course-fees__total">$44,840.00</p>
+      </div>
+      <div class="course-fees__block international">
+        <h4 class="course-fees__sub-title">SSAF fee* ($AUD)</h4>
+        <p class="course-fees__total">$373.00</p>
+      </div>
+    </div>
+    """
+    out = _run(
+        fee.extract(
+            html,
+            "https://www.swinburne.edu.au/course/undergraduate/bachelor-of-screen-production/",
+            country="Australia",
+        )
+    )
+    assert out
+    assert out[0].normalized == {
+        "international_fee": 44840,
+        "currency": "AUD",
+        "fee_term": "Annual",
+        "fee_year": 2026,
+    }
+    assert out[0].method == "fee.swinburne_international_panel"
+
+
+def test_swinburne_zero_international_placeholder_suppresses_domestic_fee():
+    html = """
+    <div class="course-fees__container course-fees domestic">
+      <div class="course-fees__block domestic">
+        <h4 class="course-fees__sub-title">Total fee* ($AUD)</h4>
+        <p class="course-fees__total">$73,080.00</p>
+      </div>
+    </div>
+    <div class="course-fees__container course-fees international">
+      <h2>2026 fees</h2>
+      <div class="course-fees__block international">
+        <h4 class="course-fees__sub-title">Yearly fee* ($AUD)</h4>
+        <p class="course-fees__total">$0.00</p>
+      </div>
+    </div>
+    """
+    out = _run(
+        fee.extract(
+            html,
+            "https://www.swinburne.edu.au/course/postgraduate/master-of-project-management/",
+            country="Australia",
+        )
+    )
+    assert out == []
+
+
 def test_uts_domestic_total_is_never_international_fee():
     """UTS defaults to a Domestic audience card in the browser."""
     html = """

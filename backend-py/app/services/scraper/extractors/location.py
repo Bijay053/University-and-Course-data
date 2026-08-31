@@ -1540,6 +1540,24 @@ def _from_bcu_keyfacts(soup: BeautifulSoup) -> str | None:
     return None
 
 
+def _from_swinburne_international_hero(soup: BeautifulSoup) -> str | None:
+    """Read Swinburne's audience-scoped campus hero fact.
+
+    The generic div-label walker can pair a key-dates header with the adjacent
+    ``Last date to apply`` column.  Swinburne's authoritative campus is already
+    present in the course hero, with an international child when audiences
+    differ and a shared value otherwise.
+    """
+    panel = soup.select_one(
+        ".course-details__summary-item.course-details__campus"
+    )
+    if panel is None:
+        return None
+    audience_value = panel.select_one(".international")
+    raw = (audience_value or panel).get_text(" ", strip=True)
+    return _classify_location_value(raw)
+
+
 async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG001
     if not html:
         return []
@@ -1615,6 +1633,10 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
     # Correct behaviour: if the international panel has no physical location,
     # course_location should be blank → UTAS guard rejects the course.
     _is_qut_host: bool = "qut.edu.au" in (url or "").lower()
+    _is_swinburne_host: bool = (
+        _parsed_host == "swinburne.edu.au"
+        or _parsed_host.endswith(".swinburne.edu.au")
+    )
 
     # IMPORTANT — the UTAS-panel branch MUST be gated on the UTAS host.
     # Without the host guard, the `tab.?international` regex (where `.` is
@@ -1626,7 +1648,11 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
     # pages, and `course_location` stages blank fleet-wide.  Verified
     # 2026-05-17 on Master of Nursing, Master of Leadership and Management
     # in Education, and Master of Health Management and Policy (Global).
-    if _has_utas_panel and _is_utas_host:
+    if _is_swinburne_host:
+        cascade_list = [
+            ("swinburne_international_hero", _from_swinburne_international_hero(soup), 0.98),
+        ]
+    elif _has_utas_panel and _is_utas_host:
         cascade_list: list[tuple[str, str | None, float]] = [
             ("utas_intl_panel", _from_utas_intl_panel(soup), 0.95),
         ]
