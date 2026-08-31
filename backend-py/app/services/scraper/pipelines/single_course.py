@@ -22,7 +22,11 @@ if TYPE_CHECKING:
 
 from app.services.scraper.category import classify_category, map_course_to_category
 from app.services.scraper.config.context import get_uni_config
-from app.services.scraper.guards import should_trust_generic_university_fee_fallback
+from app.services.scraper.guards import (
+    OBVIOUS_NON_DEGREE,
+    classify_static_course_page,
+    should_trust_generic_university_fee_fallback,
+)
 from app.services.scraper.extractors import (
     ai_fallback,
     course_name,
@@ -1532,6 +1536,7 @@ async def extract_course(
     central_data: dict[str, Any] | None = None,
     extraction_rules: dict[str, Any] | None = None,
     seen_pdf_urls: set[str] | None = None,
+    discovery_title: str = "",
 ) -> dict[str, Any]:
     """Fetch (if needed) and run all extractors. Returns merged payload + raw evidence.
 
@@ -2178,6 +2183,53 @@ async def extract_course(
             "payload": {},
             "evidence": [],
         }
+
+    # ── Shared non-degree static-page gate ───────────────────────────────────
+    # Discovery catches high-confidence URL/title signals before fetch.  This
+    # second pass handles ambiguous URLs using the static page's reliable H1 and
+    # explicit course-owned evidence. It intentionally runs before every
+    # extractor, browser rescue, and Gemini path.
+    _ng_cfg = getattr(getattr(_uc, "discovery", None), "non_degree_classifier", None)
+    if _ng_cfg is not None:
+        _ng_outcome, _ng_reason, _ng_title = classify_static_course_page(
+            url,
+            html,
+            discovery_title=discovery_title,
+            enabled=bool(getattr(_ng_cfg, "enabled", True)),
+            allow_url_patterns=list(getattr(_ng_cfg, "allow_url_patterns", []) or []),
+            allow_title_patterns=list(getattr(_ng_cfg, "allow_title_patterns", []) or []),
+            force_url_patterns=list(getattr(_ng_cfg, "force_url_patterns", []) or []),
+            force_title_patterns=list(getattr(_ng_cfg, "force_title_patterns", []) or []),
+        )
+        if _ng_outcome == OBVIOUS_NON_DEGREE:
+            log.info(
+                "[NON-DEGREE] static-page skip reason=%s title=%r url=%s",
+                _ng_reason,
+                _ng_title,
+                url,
+            )
+            if emit:
+                await emit(
+                    "status",
+                    f"[NON-DEGREE] skipped before browser/AI: {_ng_title or url[:70]}",
+                    phase="extract",
+                    kind="non_degree_static_skip",
+                    reason=_ng_reason,
+                    url=url,
+                )
+            return {
+                "url": url,
+                "error": "skipped:non_degree_static_page",
+                "skip_reason": _ng_reason,
+                "payload": {},
+                "evidence": [],
+                "_perf": {
+                    **_perf_flags,
+                    "non_degree_static_skipped": True,
+                    "non_degree_browser_avoided": True,
+                    "non_degree_ai_avoided": True,
+                },
+            }
 
     # ── Federation stub-page guard (2026-05-10) ──────────────────────────
     # Federation pages such as Cert II in Furniture Making are content

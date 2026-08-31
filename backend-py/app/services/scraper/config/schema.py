@@ -1162,9 +1162,66 @@ class SrucApiConfig(BaseModel):
     )
 
 
+class NonDegreeClassifierConfig(BaseModel):
+    """Conservative shared gate for obvious non-degree course candidates.
+
+    The classifier is enabled fleet-wide.  Universities with legitimate CPD,
+    executive-education, microcredential, or other nonstandard award catalogues
+    can bypass matching candidates with allow patterns, disable the gate
+    entirely, or force additional site-specific patterns to be treated as
+    non-degree.
+    """
+
+    enabled: bool = Field(
+        default=True,
+        description=(
+            "Enable the shared non-degree candidate gate. Defaults to true for "
+            "all universities. Set false only when this university intentionally "
+            "scrapes a non-degree catalogue."
+        ),
+    )
+    allow_url_patterns: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Regex patterns whose matching URLs bypass all non-degree checks. "
+            "Use to preserve legitimate CPD, executive-education, microcredential, "
+            "or other nonstandard award catalogues."
+        ),
+    )
+    allow_title_patterns: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Regex patterns whose matching discovery title or page H1 bypasses "
+            "all non-degree checks."
+        ),
+    )
+    force_url_patterns: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Regex patterns that force a matching URL to be classified as an "
+            "obvious non-degree candidate before extraction."
+        ),
+    )
+    force_title_patterns: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Regex patterns that force a matching discovery title or page H1 "
+            "to be classified as an obvious non-degree candidate."
+        ),
+    )
+
+
 class DiscoveryConfig(BaseModel):
     """Safe to replay against unknown universities (Tier-3 playbook matching)."""
 
+    non_degree_classifier: NonDegreeClassifierConfig = Field(
+        default_factory=NonDegreeClassifierConfig,
+        description=(
+            "Fleet-wide conservative classifier that removes obvious CPD, short "
+            "course, module, workshop, and microcredential pages before they "
+            "consume browser or AI work. Unknown candidates fail open."
+        ),
+    )
     manchester_xml: Optional[ManchesterXmlConfig] = Field(
         default=None,
         description=(

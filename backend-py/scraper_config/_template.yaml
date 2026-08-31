@@ -22,6 +22,18 @@
 
 discovery:
 
+  # ── Shared non-degree candidate gate ─────────────────────────────────────
+  # Enabled fleet-wide. Obvious CPD/short-course/module/microcredential pages
+  # are dropped before browser/Gemini work. Unknown candidates fail open.
+  # Recognized degree/diploma/certificate titles are preserved automatically.
+  #
+  # non_degree_classifier:
+  #   enabled: true
+  #   allow_url_patterns: []    # protect legitimate nonstandard catalogues
+  #   allow_title_patterns: []
+  #   force_url_patterns: []    # add site-specific obvious non-degree shapes
+  #   force_title_patterns: []
+
   # ── API-first discovery: generic JSON/REST endpoint ───────────────────────
   # When set, this runs BEFORE BFS/browser/Wayback. If ≥1 link is returned,
   # BFS and browser tiers are skipped entirely. Falls through on 0 links.

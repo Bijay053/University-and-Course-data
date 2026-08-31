@@ -20,6 +20,16 @@
 # matching because they do not assume anything about a specific site's layout.
 
 discovery:
+  # Fleet-wide conservative gate for obvious CPD, short-course, standalone
+  # module, workshop, and microcredential pages. Unknown candidates fail open,
+  # and recognized degree/diploma/certificate titles are preserved.
+  non_degree_classifier:
+    enabled: true
+    allow_url_patterns: []
+    allow_title_patterns: []
+    force_url_patterns: []
+    force_title_patterns: []
+
   # Additional subdomains to probe when the primary URL yields < 5 candidates.
   # Entries may contain {domain} which is replaced with the primary hostname
   # (e.g. 'handbook.{domain}' → 'handbook.acu.edu.au').

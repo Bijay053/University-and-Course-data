@@ -28,6 +28,7 @@ from app.services.scraper.per_course_vision import (
     new_vision_image_cache,
 )
 from app.services.scraper.http_fetcher import ScrapedoAccountError
+from app.services.scraper.guards import filter_non_degree_candidates
 from app.services.scraper.pipelines.single_course import extract_course
 from app.services.scraper.pipelines.university_pdfs import load_university_pdf_data
 from app.services.scraper.stage_course import stage_course
@@ -720,6 +721,7 @@ async def _extract_only(
             central_data=central_data,
             extraction_rules=extraction_rules,
             seen_pdf_urls=seen_pdf_urls,
+            discovery_title=name,
         )
     except ScrapedoAccountError:
         raise  # propagate — caller sets scrape_do_dead_flag to abort remaining courses
@@ -4193,6 +4195,63 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 )
             links = _kept_y
 
+        # Phase A.5e — shared non-degree candidate gate ─────────────────────────
+        # Apply once after every discovery provider and URL/year filter has
+        # settled, but before final count/capping/extraction. Unknown candidates
+        # fail open; recognized award titles override default CPD-path signals.
+        _non_degree_prefetch_count = 0
+        _non_degree_prefetch_sample: list[dict[str, str]] = []
+        _ng_cfg = getattr(
+            getattr(_uni_cfg, "discovery", None),
+            "non_degree_classifier",
+            None,
+        )
+        if links and _ng_cfg is not None and getattr(_ng_cfg, "enabled", True):
+            links, _ng_dropped = filter_non_degree_candidates(
+                links,
+                enabled=True,
+                allow_url_patterns=list(getattr(_ng_cfg, "allow_url_patterns", []) or []),
+                allow_title_patterns=list(getattr(_ng_cfg, "allow_title_patterns", []) or []),
+                force_url_patterns=list(getattr(_ng_cfg, "force_url_patterns", []) or []),
+                force_title_patterns=list(getattr(_ng_cfg, "force_title_patterns", []) or []),
+            )
+            _non_degree_prefetch_count = len(_ng_dropped)
+            if _non_degree_prefetch_count:
+                summary["non_degree_prefetch_skipped"] = (
+                    summary.get("non_degree_prefetch_skipped", 0)
+                    + _non_degree_prefetch_count
+                )
+                _non_degree_prefetch_sample = [
+                    {
+                        "url": str(_lk.get("url") or ""),
+                        "name": str(_lk.get("name") or ""),
+                        "reason": str(_lk.get("non_degree_reason") or ""),
+                    }
+                    for _lk in _ng_dropped[:10]
+                ]
+                _filter_dropped_sample.extend(
+                    str(_lk.get("url") or "") for _lk in _ng_dropped[:10]
+                )
+                log.info(
+                    "[NON-DEGREE] prefetch gate dropped %d obvious candidate(s); kept %d",
+                    _non_degree_prefetch_count,
+                    len(links),
+                )
+                await emit(
+                    "status",
+                    (
+                        f"[NON-DEGREE] skipped {_non_degree_prefetch_count} obvious "
+                        f"non-degree candidate(s) before fetch; {len(links)} remain"
+                    ),
+                    phase="extract",
+                    kind="non_degree_prefetch_summary",
+                    dropped=_non_degree_prefetch_count,
+                    kept=len(links),
+                    browser_launches_avoided=_non_degree_prefetch_count,
+                    ai_calls_avoided=_non_degree_prefetch_count,
+                    sample=_non_degree_prefetch_sample,
+                )
+
         # ── Post-filter discovered count ──────────────────────────────────────────
         # Now that must_contain (and any other post-discovery filters) have run,
         # lock in the true extractable count.  This is what the UI and DB show
@@ -4230,6 +4289,10 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             "filter_drop_count": _raw - len(links),
             "filter_drop_pct": round((_raw - len(links)) / _raw * 100) if _raw else 0,
             "dropped_sample": _filter_dropped_sample[:10],
+            "non_degree_prefetch_skipped": _non_degree_prefetch_count,
+            "non_degree_prefetch_sample": _non_degree_prefetch_sample,
+            "non_degree_browser_launches_avoided": _non_degree_prefetch_count,
+            "non_degree_ai_calls_avoided": _non_degree_prefetch_count,
         }
         job.discovered_config = _dc
         job.heartbeat_at = datetime.now(timezone.utc)
@@ -4584,6 +4647,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         _skipped_empty_count: int = 0
         _fallback_skipped_count: int = 0
         _cpd_skipped_count: int = 0
+        _non_degree_static_count: int = 0
 
         # Collect non-error result dicts across all batches for the data-quality
         # check that runs after staging (it reads payloads, not the DB).
@@ -4800,6 +4864,11 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             _fallback_skipped_count += sum(
                 1 for _r in results
                 if isinstance(_r, dict) and (_r.get("_perf") or {}).get("fallback_skipped_empty_text")
+            )
+            _non_degree_static_count += sum(
+                1 for _r in results
+                if isinstance(_r, dict)
+                and (_r.get("_perf") or {}).get("non_degree_static_skipped")
             )
             # ── Bug 3: within-batch name dedup ───────────────────────────────────
             # Multiple distinct URLs can yield the same course_name (e.g. Flinders
@@ -5067,6 +5136,10 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         summary["skipped"] += 1
                         if r["error"] == "skipped:cpd_short_course":
                             _cpd_skipped_count += 1
+                        elif r["error"] == "skipped:non_degree_static_page":
+                            skip_reasons["non_degree_static_page"] = (
+                                skip_reasons.get("non_degree_static_page", 0) + 1
+                            )
                     else:
                         summary["errors"] += 1
                         _counter = "errors"
@@ -5796,16 +5869,22 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             + _vision_skipped_count * 4
             + _empty_text_count * 2
             + _skipped_empty_count * 15
+            + (_non_degree_prefetch_count + _non_degree_static_count) * 32
         )
         # $0.00015 per Gemini vision call; $0.00020 per avoided primary Gemini call
         _est_cost_saved_usd = round(
-            _vision_skipped_count * 0.00015 + _empty_text_count * 0.00020, 5
+            _vision_skipped_count * 0.00015
+            + _empty_text_count * 0.00020
+            + (_non_degree_prefetch_count + _non_degree_static_count) * 0.00020,
+            5,
         )
         _any_savings = (
             _http_skipped_count or _vision_skipped_count or _empty_text_count
             or _browser_retry_empty_count or _skipped_empty_count
-            or _cpd_skipped_count
+            or _cpd_skipped_count or _non_degree_prefetch_count
+            or _non_degree_static_count
         )
+        _non_degree_total = _non_degree_prefetch_count + _non_degree_static_count
         _perf_savings = {
             "http_fetches_skipped": _http_skipped_count,
             "vision_ocr_skipped": _vision_skipped_count,
@@ -5814,8 +5893,14 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             "skipped_empty_text": _skipped_empty_count,
             "fallback_skipped_empty_text": _fallback_skipped_count,
             "cpd_skipped": _cpd_skipped_count,
+            "non_degree_prefetch_skipped": _non_degree_prefetch_count,
+            "non_degree_static_skipped": _non_degree_static_count,
+            "non_degree_browser_launches_avoided": _non_degree_total,
+            "non_degree_ai_calls_avoided": _non_degree_total,
             "estimated_seconds_saved": _est_seconds_saved,
-            "estimated_ai_calls_saved": _vision_skipped_count + _empty_text_count,
+            "estimated_ai_calls_saved": (
+                _vision_skipped_count + _empty_text_count + _non_degree_total
+            ),
             "estimated_cost_saved_usd": _est_cost_saved_usd,
         } if _any_savings else None
 

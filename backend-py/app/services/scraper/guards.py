@@ -44,6 +44,8 @@ import re
 from typing import Any
 from urllib.parse import urlparse
 
+from bs4 import BeautifulSoup
+
 log = logging.getLogger(__name__)
 
 # Pre-compiled regexes — these run on every staged row in the orchestrator
@@ -102,6 +104,250 @@ _RE_TOKEN_STOPWORDS = re.compile(
     r"^(bachelor|master|doctor|graduate|diploma|certificate|advanced|"
     r"course|degree|program|online|studies|partnership|with)$"
 )
+
+# Candidate classification outcomes.  Strings are intentionally stable because
+# the orchestrator persists them in diagnostic stats and tests assert the exact
+# skip reason.
+LIKELY_DEGREE = "likely_degree"
+OBVIOUS_NON_DEGREE = "obvious_non_degree"
+UNKNOWN_CANDIDATE = "unknown"
+
+# High-confidence URL signals only.  Generic segments such as /courses/ or
+# /modules/ are deliberately absent because universities often use them for
+# award-bearing degree pages or degree curricula.
+_NON_DEGREE_URL_RE = re.compile(
+    r"(?:"
+    r"/(?:"
+    r"cpd(?:[-_](?:courses?|modules?))?"
+    r"|short[-_]?courses?"
+    r"|continuing[-_]?professional[-_]?development"
+    r"|professional[-_]?development"
+    r"|micro[-_]?credentials?"
+    r"|masterclasses?"
+    r"|workshops?"
+    r"|standalone[-_]?modules?"
+    r"|individual[-_]?modules?"
+    r")(?:/|$)"
+    r"|/courses?/modules?(?:/|$)"
+    r")",
+    re.IGNORECASE,
+)
+
+_NON_DEGREE_TITLE_RE = re.compile(
+    r"(?:"
+    r"\bshort[- ]course\b"
+    r"|\bcpd(?:[- ]course|[- ]module)?\b"
+    r"|\bcontinuing professional development\b"
+    r"|\bprofessional development (?:course|programme|program|workshop)\b"
+    r"|\bmicro[- ]?credential\b"
+    r"|\bnon[- ]award\b"
+    r"|\b(?:standalone|stand-alone|individual|single) module\b"
+    r"|\bmasterclass\b"
+    r")",
+    re.IGNORECASE,
+)
+
+# Static-page evidence must be explicitly course-owned.  This avoids repeating
+# the Adelaide dormant-modal failure mode where a broad body-text phrase from
+# shared page chrome was mistaken for course eligibility.
+_NON_DEGREE_PAGE_EVIDENCE_RE = re.compile(
+    r"(?:"
+    r"\b(?:course type|programme type|program type|award|qualification)"
+    r"\s*[:\-]?\s*(?:short[- ]course|cpd|non[- ]award|micro[- ]?credential|"
+    r"(?:standalone|stand-alone|individual|single) module)\b"
+    r"|\bthis is (?:a |an )?(?:short[- ]course|cpd course|non[- ]award course|"
+    r"micro[- ]?credential|(?:standalone|stand-alone|individual|single) module)\b"
+    r"|\bstudy (?:a |an )?(?:standalone|stand-alone|individual|single) module\b"
+    r")",
+    re.IGNORECASE,
+)
+
+
+def _matches_config_pattern(value: str, patterns: list[str] | tuple[str, ...]) -> bool:
+    """Return True for the first valid matching regex; invalid regexes fail open."""
+    if not value:
+        return False
+    for pattern in patterns or ():
+        try:
+            if re.search(pattern, value, re.IGNORECASE):
+                return True
+        except re.error:
+            log.warning("non-degree classifier ignored invalid regex: %r", pattern)
+    return False
+
+
+def _url_slug_title(url: str) -> str:
+    """Turn the final URL segment into a weak title hint."""
+    try:
+        slug = urlparse(url or "").path.rstrip("/").rsplit("/", 1)[-1]
+    except Exception:  # noqa: BLE001
+        return ""
+    return re.sub(r"[-_]+", " ", slug).strip()
+
+
+def classify_course_candidate(
+    url: str,
+    title: str = "",
+    page_text: str = "",
+    *,
+    enabled: bool = True,
+    allow_url_patterns: list[str] | tuple[str, ...] = (),
+    allow_title_patterns: list[str] | tuple[str, ...] = (),
+    force_url_patterns: list[str] | tuple[str, ...] = (),
+    force_title_patterns: list[str] | tuple[str, ...] = (),
+) -> tuple[str, str]:
+    """Classify one course candidate without network or AI work.
+
+    Unknown candidates always fail open.  Degree-prefix absence alone is never
+    a rejection signal.  Explicit allow patterns protect legitimate nonstandard
+    catalogues; explicit force patterns let a university add high-confidence
+    site-specific exclusions.
+    """
+    if not enabled:
+        return UNKNOWN_CANDIDATE, "classifier_disabled"
+
+    clean_title = (title or "").strip()
+    if _matches_config_pattern(url, allow_url_patterns):
+        return LIKELY_DEGREE, "allowed_url_override"
+    if _matches_config_pattern(clean_title, allow_title_patterns):
+        return LIKELY_DEGREE, "allowed_title_override"
+    if _matches_config_pattern(url, force_url_patterns):
+        return OBVIOUS_NON_DEGREE, "forced_url_pattern"
+    if _matches_config_pattern(clean_title, force_title_patterns):
+        return OBVIOUS_NON_DEGREE, "forced_title_pattern"
+
+    # A recognized award in the discovery title or final URL slug protects a
+    # real degree route nested under a CPD section (e.g. an accelerated MSc).
+    if clean_title and _name_has_degree_qualifier(clean_title):
+        return LIKELY_DEGREE, "degree_title"
+    slug_title = _url_slug_title(url)
+    if slug_title and _name_has_degree_qualifier(slug_title):
+        return LIKELY_DEGREE, "degree_url_slug"
+
+    if clean_title and _NON_DEGREE_TITLE_RE.search(clean_title):
+        return OBVIOUS_NON_DEGREE, "non_degree_title"
+    if _NON_DEGREE_URL_RE.search(url or ""):
+        return OBVIOUS_NON_DEGREE, "non_degree_url"
+    if page_text and _NON_DEGREE_PAGE_EVIDENCE_RE.search(page_text):
+        return OBVIOUS_NON_DEGREE, "non_degree_page_evidence"
+    return UNKNOWN_CANDIDATE, "insufficient_evidence"
+
+
+def filter_non_degree_candidates(
+    links: list[dict[str, Any]],
+    *,
+    enabled: bool = True,
+    allow_url_patterns: list[str] | tuple[str, ...] = (),
+    allow_title_patterns: list[str] | tuple[str, ...] = (),
+    force_url_patterns: list[str] | tuple[str, ...] = (),
+    force_title_patterns: list[str] | tuple[str, ...] = (),
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Split discovery links into retained and obvious non-degree candidates."""
+    kept: list[dict[str, Any]] = []
+    dropped: list[dict[str, Any]] = []
+    for link in links:
+        outcome, reason = classify_course_candidate(
+            str(link.get("url") or ""),
+            str(link.get("name") or ""),
+            enabled=enabled,
+            allow_url_patterns=allow_url_patterns,
+            allow_title_patterns=allow_title_patterns,
+            force_url_patterns=force_url_patterns,
+            force_title_patterns=force_title_patterns,
+        )
+        if outcome == OBVIOUS_NON_DEGREE:
+            dropped.append({**link, "non_degree_reason": reason})
+        else:
+            kept.append(link)
+    return kept, dropped
+
+
+def _visible_course_detail_evidence(raw_html: str) -> tuple[str, str]:
+    """Return visible ``(H1, structured evidence)`` from main/article.
+
+    This parses a private copy of the static document.  Inert and explicitly
+    hidden elements are removed before selecting either signal, so embedded
+    component templates and shared hidden dialogs cannot decide a rejection.
+    """
+    soup = BeautifulSoup(raw_html or "", "html.parser")
+    for node in soup.find_all(["script", "style", "noscript", "template"]):
+        node.decompose()
+    for node in list(soup.find_all(True)):
+        if node.attrs is None:
+            continue
+        attrs = node.attrs
+        style = str(attrs.get("style") or "").lower().replace(" ", "")
+        if (
+            node.has_attr("hidden")
+            or str(attrs.get("aria-hidden") or "").strip().lower() == "true"
+            or "display:none" in style
+            or "visibility:hidden" in style
+        ):
+            node.decompose()
+
+    region = soup.find("main") or soup.find("article")
+    if region is None:
+        return "", ""
+
+    h1 = region.find("h1")
+    h1_text = (
+        _NORMALIZE_WS.sub(" ", h1.get_text(" ", strip=True)).strip()
+        if h1 is not None
+        else ""
+    )
+    blocks: list[str] = []
+    for block in region.find_all(["dl", "table"]):
+        text = _NORMALIZE_WS.sub(" ", block.get_text(" ", strip=True)).strip()
+        if text:
+            blocks.append(text)
+    return h1_text, " ".join(blocks)[:20000]
+
+
+def classify_static_course_page(
+    url: str,
+    raw_html: str,
+    *,
+    discovery_title: str = "",
+    enabled: bool = True,
+    allow_url_patterns: list[str] | tuple[str, ...] = (),
+    allow_title_patterns: list[str] | tuple[str, ...] = (),
+    force_url_patterns: list[str] | tuple[str, ...] = (),
+    force_title_patterns: list[str] | tuple[str, ...] = (),
+) -> tuple[str, str, str]:
+    """Classify reliable titles plus scoped, structured static-page evidence.
+
+    Returns ``(outcome, reason, title)``.  Script/style content is removed and
+    only visible ``<dl>``/``<table>`` label-value blocks inside ``<main>`` or
+    ``<article>`` are scanned, so footer/nav/hidden chrome cannot decide a skip.
+    """
+    h1_text, page_text = _visible_course_detail_evidence(raw_html)
+
+    # Preserve a degree/allow decision made from the discovery provider's title
+    # even when the fetched page renders a shorter H1.
+    if discovery_title:
+        discovery_outcome, discovery_reason = classify_course_candidate(
+            url,
+            discovery_title,
+            enabled=enabled,
+            allow_url_patterns=allow_url_patterns,
+            allow_title_patterns=allow_title_patterns,
+            force_url_patterns=force_url_patterns,
+            force_title_patterns=force_title_patterns,
+        )
+        if discovery_outcome == LIKELY_DEGREE:
+            return discovery_outcome, discovery_reason, h1_text or discovery_title
+
+    outcome, reason = classify_course_candidate(
+        url,
+        h1_text,
+        page_text,
+        enabled=enabled,
+        allow_url_patterns=allow_url_patterns,
+        allow_title_patterns=allow_title_patterns,
+        force_url_patterns=force_url_patterns,
+        force_title_patterns=force_title_patterns,
+    )
+    return outcome, reason, h1_text
 
 
 _GENERIC_CATEGORY_NAMES = frozenset(

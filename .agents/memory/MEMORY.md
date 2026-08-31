@@ -105,3 +105,4 @@
 - [Mixed standard and alternative values](mixed-standard-alternative-values.md) — preserve standard values beside accelerated alternatives; numeric test scores need boundaries on both sides.
 - [UTS audience-state fee override](uts-audience-fee-override.md) — static UTS pages look complete but show Domestic fees; required browser actions must override amount and fee metadata together.
 - [AUT points-based fees and duration](aut-points-fee-duration.md) — 120 points is one full-time year; annualize the headline levy-inclusive fee and prefer points over conflicting duration metadata.
+- [Fleet-wide non-degree gating](non-degree-gating.md) — Degree evidence wins over CPD paths; static rejection requires visible structured main/article evidence; discovery drops are not staging skips.
