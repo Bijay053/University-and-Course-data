@@ -1,12 +1,29 @@
 # University of Technology Sydney — stub created for Week 4 scale-up.
 # Hostname: www.uts.edu.au  (course catalogue under /study)
 #
-discovery: {}
+discovery:
+  # The broad /courses/ discovery cache also contains study plans, subject
+  # lists, transfer guidance and other support pages. Only degree/award-shaped
+  # slugs should enter the expensive International-state browser pipeline.
+  allow_url_patterns:
+    - '^https://www\.uts\.edu\.au/courses/(?:bachelor|master|graduate|doctor|juris-doctor|diploma|undergraduate|postgraduate|executive|honours|certificate|phd)(?:-|/|$)'
 extraction:
   # Static HTML defaults to Domestic and contains plausible domestic fee
   # values, so it cannot be trusted for international extraction. Always run
   # the browser actions and let the rendered International values override it.
   force_browser: true
+  # Required audience interactions are much more reliable below the browser
+  # pool capacity. Twelve concurrent interactive sessions were timing out at
+  # the shared 90-second course deadline.
+  max_parallel_fetch: 4
+  # English scores are present in page text. Decorative image OCR added remote
+  # calls and latency without recovering authoritative UTS fee state.
+  english:
+    trust_vision_ocr: false
+    skip_vision_when_core_found: true
+  # Do not replay browser timeouts sequentially after the main 500-course pass.
+  recovery_sweep_max_items: 0
+  recovery_sweep_time_budget_seconds: 0
   actions:
     - click_text: "Domestic"
       required: true

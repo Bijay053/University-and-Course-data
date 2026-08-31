@@ -3312,6 +3312,15 @@ class ExtractionConfig(BaseModel):
             "Example: extraction.skip_ai_when_text_empty: true"
         ),
     )
+    skip_remote_ai_enrichment: bool = Field(
+        default=False,
+        description=(
+            "When True, skip Gemini primary and the later AI fallback for every "
+            "course at this university. Use only when deterministic extraction "
+            "and configured central/default sources already provide the required "
+            "fields and remote AI adds latency without field coverage."
+        ),
+    )
     retry_on_cloudflare: bool = Field(
         default=False,
         description=(

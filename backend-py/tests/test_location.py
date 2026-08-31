@@ -491,6 +491,26 @@ def test_leeds_yaml_uses_static_residential_proxy():
     assert cfg.extraction.skip_per_course_browser is True
 
 
+def test_swinburne_yaml_disables_dead_browser_vision_and_sweep_paths():
+    """Swinburne's fully SSR pages must not spend 90s on remote rescue work."""
+    from app.services.scraper.config.loader import load_uni_config
+
+    cfg = load_uni_config(
+        slug="swinburne",
+        name="Swinburne University of Technology",
+        scrape_url="https://www.swinburne.edu.au/",
+        university_id=1747,
+    )
+
+    assert cfg.extraction.skip_browser_rescue is True
+    assert cfg.extraction.skip_per_course_browser is True
+    assert cfg.extraction.skip_remote_ai_enrichment is True
+    assert cfg.extraction.english.trust_vision_ocr is False
+    assert cfg.extraction.english.skip_vision_when_core_found is True
+    assert cfg.extraction.recovery_sweep_max_items == 0
+    assert cfg.extraction.recovery_sweep_time_budget_seconds == 0
+
+
 def test_empty_reject_and_allowed_values_are_no_ops():
     """Empty reject_values and allowed_values in recipe must leave location unchanged."""
     from app.services.scraper.recipe_rules import apply_recipe_rules

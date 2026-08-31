@@ -3774,6 +3774,23 @@ async def extract_course(
             else:
                 _gate_skip, _gate_reason = _gate_check(payload, evidence)
 
+            # Per-university remote-enrichment kill switch. Fully SSR sites can
+            # already expose their authoritative fee/English/intake data to the
+            # deterministic extractors; repeatedly timing out Gemini then adds
+            # latency without improving publishability.
+            _uc_remote_ai = get_uni_config()
+            if (
+                _uc_remote_ai is not None
+                and getattr(
+                    _uc_remote_ai.extraction,
+                    "skip_remote_ai_enrichment",
+                    False,
+                )
+            ):
+                _gate_skip = True
+                _gate_reason = "per_uni_remote_ai_disabled"
+                use_ai_fallback = False
+
             # Once every required staging field is present, no remote
             # enrichment can improve publishability. Local taxonomy fallback
             # later in this function can still classify without an API call.
