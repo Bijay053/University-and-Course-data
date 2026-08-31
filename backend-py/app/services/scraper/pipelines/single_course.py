@@ -563,6 +563,43 @@ def _is_domestic_only_page(html: str, url: str | None = None) -> bool:
     """
     if not html:
         return False
+    # Adelaide University publishes the eligible audiences as authoritative
+    # page metadata. The reusable domestic-exclusivity dialog is embedded on
+    # every degree page, so its text alone is deliberately ignored below.
+    # `studentType=Domestic` means the International audience URL redirects
+    # back to the domestic page; eligible degrees publish
+    # `studentType=Domestic|International`.
+    if url and (urlparse(url).hostname or "").lower() in {
+        "adelaide.edu.au",
+        "www.adelaide.edu.au",
+    }:
+        try:
+            from bs4 import BeautifulSoup as _BS4_adelaide
+
+            _adelaide_soup = _BS4_adelaide(html, "html.parser")
+            _student_type_meta = _adelaide_soup.find(
+                "meta",
+                attrs={
+                    "property": lambda value: bool(value)
+                    and str(value).lower() == "studenttype"
+                },
+            )
+            _student_types = {
+                item.strip().lower()
+                for item in _re.split(
+                    r"[|,;/]+",
+                    str(
+                        _student_type_meta.get("content") or ""
+                        if _student_type_meta is not None
+                        else ""
+                    ),
+                )
+                if item.strip()
+            }
+            if "domestic" in _student_types and "international" not in _student_types:
+                return True
+        except Exception:
+            pass  # malformed metadata must not create a false rejection
     # SCU always emits an empty International snapshot shell, even for courses
     # unavailable to international applicants. Its audience selector is the
     # authoritative signal: the surrounding div is hidden when Domestic is

@@ -1922,6 +1922,54 @@ def _from_swinburne_international_panel(
     return None
 
 
+def _from_leeds_beckett_international_panel(
+    html: str,
+    url: str,
+) -> "tuple[float, str] | None":
+    """Read Leeds Beckett's International tab without crossing into UK fees.
+
+    Leeds Beckett renders the active UK panel first and a hidden International
+    sibling in the same SSR document.  The international fee card has the
+    stable ``color-bg-green-int`` class.  A zero sentinel means the page has an
+    International tab but no published amount, preventing the generic flat-text
+    cascade from claiming the preceding UK fee.
+    """
+    from urllib.parse import urlparse as _urlparse
+
+    host = (_urlparse(url or "").hostname or "").lower()
+    if host != "leedsbeckett.ac.uk" and not host.endswith(".leedsbeckett.ac.uk"):
+        return None
+
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html or "", "html.parser")
+    except Exception:  # pragma: no cover - defensive
+        return None
+
+    root = soup.select_one("#fees-and-funding-component")
+    if root is None:
+        return None
+
+    international_tab_exists = any(
+        re.fullmatch(r"\s*international\s*", button.get_text(" ", strip=True), re.I)
+        for button in root.select("button[role='tab']")
+    )
+    international_card = root.select_one(".color-bg-green-int")
+    if international_card is not None:
+        value_el = international_card.select_one(".key-info__item-value")
+        value_text = value_el.get_text(" ", strip=True) if value_el else ""
+        parsed = _classify_fee_value(value_text)
+        if parsed is not None:
+            amount, _ = parsed
+            ctx = compact(international_card.get_text(" ", strip=True))
+            return float(amount), f"Leeds Beckett international tab: {ctx}"
+
+    if international_tab_exists:
+        return 0.0, "Leeds Beckett International tab has no published fee"
+    return None
+
+
 async def extract(
     html: str, url: str, *, country: str | None = None
 ) -> list[ExtractionResult]:
@@ -1961,6 +2009,29 @@ async def extract(
                 confidence=0.99,
                 snippet=ctx[:200],
                 method="fee.swinburne_international_panel",
+            )
+        ]
+
+    leeds_beckett_fee = _from_leeds_beckett_international_panel(html, url)
+    if leeds_beckett_fee is not None:
+        amount, ctx = leeds_beckett_fee
+        if amount == 0:
+            return []
+        return [
+            ExtractionResult(
+                field_key="international_fee",
+                value=amount,
+                normalized={
+                    "international_fee": amount,
+                    "currency": "GBP",
+                    "fee_term": _normalize_fee_term(
+                        ctx, prefer_year_one=prefer_yr1
+                    ),
+                    "fee_year": _extract_year(ctx),
+                },
+                confidence=0.99,
+                snippet=ctx[:200],
+                method="fee.leeds_beckett_international_panel",
             )
         ]
 

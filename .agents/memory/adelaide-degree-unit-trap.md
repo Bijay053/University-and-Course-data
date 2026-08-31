@@ -38,4 +38,4 @@ Every Adelaide degree page embeds a reusable `dom-modal-exclusive` dialog whose 
 
 **Why:** Treating that hidden dialog as a hard course-level signal rejected 534 of 560 discovered pages in one run, including Bachelor of Arts, Bachelor of Nursing, and international IT degrees.
 
-**How to apply:** Remove only Adelaide's `dialog[data-modal-opener="dom-modal-exclusive"]` subtree before both static and rendered hard-marker checks. Continue honoring explicit domestic-only statements elsewhere on the page.
+**How to apply:** Remove only Adelaide's `dialog[data-modal-opener="dom-modal-exclusive"]` subtree before both static and rendered hard-marker checks. Continue honoring explicit domestic-only statements elsewhere on the page. Use the page-level `studentType` metadata as the authoritative availability signal: `Domestic` alone is ineligible, while `Domestic|International` is eligible. This also prevents a domestic page fee from being promoted to `international_fee` when the International URL redirects back to `/dom/`.

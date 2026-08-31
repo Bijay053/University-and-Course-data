@@ -27,6 +27,91 @@ def _run(coro):
     return asyncio.run(coro)
 
 
+def test_leeds_beckett_reads_international_tab_not_active_uk_fee():
+    html = """
+    <section id="fees-and-funding-component">
+      <button role="tab" class="is-active">UK</button>
+      <button role="tab">International</button>
+      <div class="tabs__panel is-active">
+        <div class="key-info__item">
+          <div class="key-info__item-value">£9,790</div>
+          <p class="key-info__item-title">UK</p>
+        </div>
+      </div>
+      <div class="tabs__panel">
+        <div class="key-info__item color-bg-green-int">
+          <div class="key-info__item-value">£16,840</div>
+          <p class="key-info__item-title">International 2026</p>
+        </div>
+      </div>
+    </section>
+    """
+    out = _run(
+        fee.extract(
+            html,
+            "https://www.leedsbeckett.ac.uk/courses/geography-bsc/",
+            country="United Kingdom",
+        )
+    )
+    assert len(out) == 1
+    assert out[0].normalized == {
+        "international_fee": 16840.0,
+        "currency": "GBP",
+        "fee_term": "Annual",
+        "fee_year": 2026,
+    }
+    assert out[0].method == "fee.leeds_beckett_international_panel"
+
+
+def test_leeds_beckett_blank_international_tab_never_falls_back_to_uk_fee():
+    html = """
+    <section id="fees-and-funding-component">
+      <button role="tab" class="is-active">UK</button>
+      <button role="tab">International</button>
+      <div class="tabs__panel is-active">
+        <div class="key-info__item">
+          <div class="key-info__item-value">£9,790</div>
+          <p class="key-info__item-title">UK</p>
+        </div>
+      </div>
+      <div class="tabs__panel"></div>
+    </section>
+    """
+    out = _run(
+        fee.extract(
+            html,
+            "https://www.leedsbeckett.ac.uk/courses/unpublished-course/",
+            country="United Kingdom",
+        )
+    )
+    assert out == []
+
+
+def test_leeds_beckett_preserves_full_course_international_fee_term():
+    html = """
+    <section id="fees-and-funding-component">
+      <button role="tab" class="is-active">UK</button>
+      <button role="tab">International</button>
+      <div class="key-info__item color-bg-green-int">
+        <div class="key-info__item-value">£3,350</div>
+        <p class="key-info__item-title">
+          International 2026. Full Course Tuition Fees.
+        </p>
+      </div>
+    </section>
+    """
+    out = _run(
+        fee.extract(
+            html,
+            "https://www.leedsbeckett.ac.uk/courses/example-pg-cert/",
+            country="United Kingdom",
+        )
+    )
+    assert len(out) == 1
+    assert out[0].normalized["international_fee"] == 3350.0
+    assert out[0].normalized["fee_term"] == "Full Course"
+
+
 def test_strong_intl_fee_sibling_div_classifies_via_structural_pass():
     """ASA-style adjacent-div idiom: `<div><strong>International tuition
     fees</strong></div><div>A$42,000 per year</div>`. The keyword

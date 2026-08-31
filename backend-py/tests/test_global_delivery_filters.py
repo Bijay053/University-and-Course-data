@@ -104,6 +104,7 @@ def test_scu_visible_audience_selector_keeps_international_course() -> None:
 
 def test_adelaide_dormant_domestic_modal_does_not_reject_international_degree() -> None:
     html = """
+    <meta property="studentType" content="Domestic|International"/>
     <dialog data-modal-opener="dom-modal-exclusive" role="dialog">
       <h2>This degree is only available to Australian students</h2>
     </dialog>
@@ -116,6 +117,31 @@ def test_adelaide_dormant_domestic_modal_does_not_reject_international_degree() 
     assert not _is_domestic_only_page(
         html,
         "https://adelaide.edu.au/study/degrees/bachelor-of-arts/",
+    )
+
+
+def test_adelaide_domestic_student_type_metadata_rejects_course() -> None:
+    html = """
+    <meta property="studentType" content="Domestic"/>
+    <dialog data-modal-opener="dom-modal-exclusive" role="dialog">
+      <h2>This degree is only available to Australian students</h2>
+    </dialog>
+    <main>
+      <p>Indicative annual fee: $25,000</p>
+    </main>
+    """
+    assert _is_domestic_only_page(
+        html,
+        "https://adelaide.edu.au/study/degrees/"
+        "graduate-certificate-in-oral-health-science/",
+    )
+
+
+def test_adelaide_student_type_metadata_is_attribute_order_independent() -> None:
+    html = '<meta content="Domestic" data-source="degree" property="studentType"/>'
+    assert _is_domestic_only_page(
+        html,
+        "https://www.adelaide.edu.au/study/degrees/domestic-program/",
     )
 
 
