@@ -610,28 +610,33 @@ export default function Scraping() {
 
   // ── Multi-slot state ──────────────────────────────────────────────────────
   const [slotIds, setSlotIds] = useState<number[]>(() => {
-    // Restore slots for all positions that have an active job saved.
-    // We always show at least slot 0. Any higher-index slots that have a
-    // saved jobId are also restored so running scrapes survive navigation.
-    let highest = 0;
+    // Slot IDs are stable persistence identities, not grid positions. Restore
+    // slot 0 plus only IDs that actually have a saved job so gaps left by
+    // removed cards cannot clone a neighboring card's session state.
+    const restored = new Set<number>([0]);
     for (let i = 0; i < 8; i++) {
-      if (sessionStorage.getItem(`scrape_slot_${i}_jobId`)) highest = i;
+      if (sessionStorage.getItem(`scrape_slot_${i}_jobId`)) restored.add(i);
     }
-    return Array.from({ length: highest + 1 }, (_, i) => i);
+    return [...restored].sort((a, b) => a - b);
   });
-  const nextSlotId = useRef(8); // safe ceiling — slot IDs 0-7 are pre-allocated
 
   const addSlot = useCallback(() => {
-    if (slotIds.length >= 8) return;
-    setSlotIds((prev) => [...prev, nextSlotId.current++]);
-  }, [slotIds.length]);
+    setSlotIds((prev) => {
+      if (prev.length >= 8) return prev;
+      const nextId = Array.from({ length: 8 }, (_, i) => i).find(
+        (candidate) => !prev.includes(candidate),
+      );
+      return nextId === undefined ? prev : [...prev, nextId];
+    });
+  }, []);
 
   const removeSlot = useCallback((id: number) => {
-    // Clear the sessionStorage key for this slot's position before removing
-    const idx = slotIds.indexOf(id);
-    if (idx !== -1) sessionStorage.removeItem(`scrape_slot_${idx}_jobId`);
+    // Clear persistence by stable ID. Using the visual array index here caused
+    // newly-added cards to inherit and display another slot's active job.
+    sessionStorage.removeItem(`scrape_slot_${id}_jobId`);
+    sessionStorage.removeItem(`scrape_slot_${id}_startTime`);
     setSlotIds((prev) => prev.filter((s) => s !== id));
-  }, [slotIds]);
+  }, []);
 
   const [stagedCourses, setStagedCourses] = useState<StagedCourse[]>([]);
   const [courseQualityMap, setCourseQualityMap] = useState<Record<number, CourseQualityData>>({});
@@ -2444,6 +2449,7 @@ export default function Scraping() {
           {slotIds.map((id, index) => (
             <ScrapeJobCard
               key={id}
+              slotId={id}
               slotIndex={index}
               universities={uniData?.data || []}
               onReviewReady={handleReviewReady}

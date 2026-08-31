@@ -106,3 +106,4 @@
 - [UTS audience-state fee override](uts-audience-fee-override.md) — static UTS pages look complete but show Domestic fees; required browser actions must override amount and fee metadata together.
 - [AUT points-based fees and duration](aut-points-fee-duration.md) — 120 points is one full-time year; annualize the headline levy-inclusive fee and prefer points over conflicting duration metadata.
 - [Fleet-wide non-degree gating](non-degree-gating.md) — Degree evidence wins over CPD paths; static rejection requires visible structured main/article evidence; discovery drops are not staging skips.
+- [Scrape slot persistence identity](scrape-slot-identity.md) — Persist multi-slot jobs by stable slot ID, never current grid position; reindexing positional keys can clone another active job.

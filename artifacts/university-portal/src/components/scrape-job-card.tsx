@@ -213,6 +213,9 @@ type DiagnoseResult = {
 };
 
 export type ScrapeJobCardProps = {
+  /** Stable persistence identity. Never changes when neighboring cards are removed. */
+  slotId: number;
+  /** Current visual position, used only for the user-facing slot number. */
   slotIndex: number;
   universities: UniOption[];
   onReviewReady: (jobId: string, uniName: string, force?: boolean) => void;
@@ -321,10 +324,10 @@ function UniPicker({ value, onChange, universities, disabled }: {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export function ScrapeJobCard({ slotIndex, universities, onReviewReady, onRemove, canRemove, forceResetKey }: ScrapeJobCardProps) {
+export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, onRemove, canRemove, forceResetKey }: ScrapeJobCardProps) {
   const { toast } = useToast();
-  const slotKey = `scrape_slot_${slotIndex}_jobId`;
-  const startTimeKey = `scrape_slot_${slotIndex}_startTime`;
+  const slotKey = `scrape_slot_${slotId}_jobId`;
+  const startTimeKey = `scrape_slot_${slotId}_startTime`;
   const [selectedUni, setSelectedUni] = useState("");
   const [scrapeUrl, setScrapeUrl] = useState("");
   const [newUniName, setNewUniName] = useState("");
