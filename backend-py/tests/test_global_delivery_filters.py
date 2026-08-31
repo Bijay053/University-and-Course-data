@@ -102,6 +102,38 @@ def test_scu_visible_audience_selector_keeps_international_course() -> None:
     )
 
 
+def test_adelaide_dormant_domestic_modal_does_not_reject_international_degree() -> None:
+    html = """
+    <dialog data-modal-opener="dom-modal-exclusive" role="dialog">
+      <h2>This degree is only available to Australian students</h2>
+    </dialog>
+    <section class="degree-details">
+      <p>Published fees are for international students starting in 2026.</p>
+      <p>International tuition fee: $43,400</p>
+      <p>CRICOS 097508M</p>
+    </section>
+    """
+    assert not _is_domestic_only_page(
+        html,
+        "https://adelaide.edu.au/study/degrees/bachelor-of-arts/",
+    )
+
+
+def test_adelaide_real_course_level_domestic_statement_still_rejects() -> None:
+    html = """
+    <dialog data-modal-opener="dom-modal-exclusive" role="dialog">
+      <h2>This degree is only available to Australian students</h2>
+    </dialog>
+    <main>
+      <p>This degree is only available to domestic applicants.</p>
+    </main>
+    """
+    assert _is_domestic_only_page(
+        html,
+        "https://adelaide.edu.au/study/degrees/domestic-program/",
+    )
+
+
 def test_full_time_wins_when_duration_also_mentions_part_time_equivalent() -> None:
     assert (
         _infer_study_load_from_text("2 years full-time or part-time equivalent")

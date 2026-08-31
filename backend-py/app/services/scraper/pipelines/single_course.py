@@ -327,6 +327,32 @@ _DOMESTIC_ONLY_SOFT_RE: _re.Pattern[str] = _re.compile(
 )
 
 
+_ADELAIDE_DORMANT_DOMESTIC_MODAL_RE: _re.Pattern[str] = _re.compile(
+    r"<dialog\b(?=[^>]*\bdata-modal-opener\s*=\s*[\"']dom-modal-exclusive[\"'])"
+    r"[^>]*>[\s\S]*?</dialog\s*>",
+    _re.IGNORECASE,
+)
+
+
+def _domestic_only_relevant_html(html: str, url: str | None = None) -> str:
+    """Remove host-scoped dormant UI before course eligibility matching.
+
+    Adelaide University renders its domestic-exclusivity dialog on every
+    degree page, including international courses. The dialog is reusable page
+    chrome and is not evidence unless the page activates it elsewhere.
+    """
+    if not html or not url:
+        return html
+    host = (urlparse(url).hostname or "").lower()
+    if host in {"adelaide.edu.au", "www.adelaide.edu.au"}:
+        return _ADELAIDE_DORMANT_DOMESTIC_MODAL_RE.sub(" ", html)
+    return html
+
+
+def _has_hard_domestic_only_marker(html: str, url: str | None = None) -> bool:
+    return bool(_DOMESTIC_ONLY_RE.search(_domestic_only_relevant_html(html, url)))
+
+
 def _has_international_section(html: str) -> bool:
     """True when the raw HTML has structural evidence of an international section.
 
@@ -576,9 +602,10 @@ def _is_domestic_only_page(html: str, url: str | None = None) -> bool:
     # ``"hasInternational": false`` JSON sits inside a <script> tag's
     # text content (not an attribute), so it survives the strip and
     # would still match either way.
-    if _DOMESTIC_ONLY_RE.search(html):
+    relevant_html = _domestic_only_relevant_html(html, url)
+    if _DOMESTIC_ONLY_RE.search(relevant_html):
         return True
-    text = _re.sub(r"<[^>]+>", " ", html)
+    text = _re.sub(r"<[^>]+>", " ", relevant_html)
     text = _re.sub(r"\s+", " ", text)
     if _DOMESTIC_ONLY_RE.search(text):
         return True
@@ -5165,7 +5192,7 @@ async def extract_course(
         and _domestic_only_filter_enabled()
         and not _url_signals_international
     ):
-        _hard_marker_hit = bool(_DOMESTIC_ONLY_RE.search(rendered_html))
+        _hard_marker_hit = _has_hard_domestic_only_marker(rendered_html, url)
         # Federation-scoped supplement: the React app disables the
         # International tab (and shows a CSP-only fee) via component state
         # rather than emitting the `"hasInternational": false` JSON string

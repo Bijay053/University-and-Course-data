@@ -31,3 +31,11 @@ The default BFS finds only 5 courses because `/study/degrees/` listing page load
 - Study mode: `On campus` / `online`
 
 No Cloudflare detected; pages are 400–500 KB static HTML.
+
+## Dormant domestic-only modal
+
+Every Adelaide degree page embeds a reusable `dom-modal-exclusive` dialog whose title says the degree is only available to Australian students. The dialog also exists on international-eligible degrees with international fees and CRICOS data, so its dormant subtree is page chrome and must be excluded from domestic-only matching.
+
+**Why:** Treating that hidden dialog as a hard course-level signal rejected 534 of 560 discovered pages in one run, including Bachelor of Arts, Bachelor of Nursing, and international IT degrees.
+
+**How to apply:** Remove only Adelaide's `dialog[data-modal-opener="dom-modal-exclusive"]` subtree before both static and rendered hard-marker checks. Continue honoring explicit domestic-only statements elsewhere on the page.
