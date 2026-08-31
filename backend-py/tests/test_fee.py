@@ -225,6 +225,7 @@ def test_uts_total_is_annualised_by_duration_not_session_wording():
         scrape_url="https://www.uts.edu.au/courses",
     )
     assert config.extraction.force_browser is True
+    assert config.extraction.skip_remote_ai_enrichment is True
     assert config.extraction.max_parallel_fetch == 4
     assert config.extraction.english.trust_vision_ocr is False
     assert config.extraction.english.skip_vision_when_core_found is True

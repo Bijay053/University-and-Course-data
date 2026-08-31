@@ -505,6 +505,12 @@ def test_swinburne_yaml_disables_dead_browser_vision_and_sweep_paths():
     assert cfg.extraction.skip_browser_rescue is True
     assert cfg.extraction.skip_per_course_browser is True
     assert cfg.extraction.skip_remote_ai_enrichment is True
+    assert cfg.extraction.max_parallel_fetch == 8
+    assert cfg.extraction.html_compaction_remove_selectors == [
+        ".brand-header__nav > ul",
+        ".course-majors",
+        ".brand-footer .pagelist",
+    ]
     assert cfg.extraction.english.trust_vision_ocr is False
     assert cfg.extraction.english.skip_vision_when_core_found is True
     assert cfg.extraction.recovery_sweep_max_items == 0

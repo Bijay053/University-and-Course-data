@@ -56,12 +56,23 @@ extraction:
   # Verified against a live 391 KB course page: 29% smaller with exact
   # critical-field parity against the unmodified document.
   html_compaction_enabled: true
+  # Collapse Swinburne's large mega-menu, majors navigation and footer link
+  # trees to inert text. The compactor preserves text order and refuses the
+  # change if any critical value fingerprint differs.
+  html_compaction_remove_selectors:
+    - '.brand-header__nav > ul'
+    - '.course-majors'
+    - '.brand-footer .pagelist'
   # Course pages are fully SSR. The old pipeline still launched Playwright
   # and OCR over decorative accreditation/campus images, causing batches to
   # hit the shared 90-second deadline with no additional field coverage.
   skip_browser_rescue: true
   skip_per_course_browser: true
   skip_remote_ai_enrichment: true
+  # Twelve simultaneous 300–400 KB AEM pages contend on repeated DOM parsing;
+  # tail tasks then cross the 90s wall-clock deadline. Eight keeps the CPU queue
+  # bounded while maintaining the same useful throughput without timeout waste.
+  max_parallel_fetch: 8
   recovery_sweep_max_items: 0
   recovery_sweep_time_budget_seconds: 0
   # Emergency kill switch: set false if the run alert reports lost speedup or

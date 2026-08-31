@@ -12,6 +12,11 @@ extraction:
   # values, so it cannot be trusted for international extraction. Always run
   # the browser actions and let the rendered International values override it.
   force_browser: true
+  # The mandatory International-state browser pass is authoritative for fees
+  # and also returns the remaining course fields. Gemini on the Domestic static
+  # page runs first otherwise, adding several seconds per course only to be
+  # overwritten by the browser result.
+  skip_remote_ai_enrichment: true
   # Required audience interactions are much more reliable below the browser
   # pool capacity. Twelve concurrent interactive sessions were timing out at
   # the shared 90-second course deadline.
