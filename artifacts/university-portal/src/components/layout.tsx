@@ -1,8 +1,16 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Building2, HardDrive, UploadCloud, Menu, X, Shield, Settings, Search as SearchIcon, LogOut, Users as UsersIcon, BarChart2, Radio, Send, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, Building2, HardDrive, UploadCloud, Menu, X, Shield, Settings, Search as SearchIcon, LogOut, Users as UsersIcon, BarChart2, Radio, Send, ShieldCheck, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/auth";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const navigation: { name: string; href: string; icon: typeof LayoutDashboard; permission?: string }[] = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard, permission: "dashboard.view" },
@@ -78,24 +86,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="flex-1 py-4 overflow-y-auto">
           <NavLinks />
         </div>
-        {user && (
-          <div className="border-t border-sidebar-border px-3 py-3 flex items-center gap-2 group">
-            <div className="w-7 h-7 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-semibold text-xs flex-shrink-0">
-              {initials}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-sidebar-foreground truncate">{user.name}</p>
-              <p className="text-xs text-sidebar-foreground/50 truncate">{user.email}</p>
-            </div>
-            <button
-              onClick={logout}
-              title="Sign out"
-              className="p-1 rounded text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all duration-150 opacity-0 group-hover:opacity-100"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Mobile Drawer Overlay */}
@@ -133,23 +123,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="flex-1 py-4 overflow-y-auto">
           <NavLinks onNav={() => setMobileOpen(false)} />
         </div>
-        {user && (
-          <div className="border-t border-sidebar-border px-3 py-3 flex items-center gap-2 group">
-            <div className="w-7 h-7 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-semibold text-xs flex-shrink-0">
-              {initials}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-sidebar-foreground truncate">{user.name}</p>
-            </div>
-            <button
-              onClick={logout}
-              title="Sign out"
-              className="p-1 rounded text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all duration-150 opacity-0 group-hover:opacity-100"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Main content */}
@@ -173,14 +146,34 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <div className="font-semibold text-sm text-muted-foreground">Study Info Centre</div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            {user && (
-              <span className="text-sm text-muted-foreground hidden sm:inline">{user.name}</span>
-            )}
-            <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-semibold text-sm">
-              {initials}
-            </div>
-          </div>
+          {user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={`Open account menu for ${user.name}`}
+                >
+                  <span className="text-muted-foreground hidden sm:inline">{user.name}</span>
+                  <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-semibold text-sm">
+                    {initials}
+                  </div>
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel className="font-normal">
+                  <p className="font-medium text-foreground">{user.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => void logout()} className="cursor-pointer">
+                  <LogOut className="h-4 w-4" />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
