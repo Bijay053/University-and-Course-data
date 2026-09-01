@@ -11,7 +11,12 @@ Covers:
 """
 
 import pytest
-from app.services.scraper.course_name_cleaner import clean_course_name
+from app.services.scraper.config.context import current_uni_config
+from app.services.scraper.config.loader import get_config_for_host
+from app.services.scraper.course_name_cleaner import (
+    clean_course_name,
+    clean_course_name_with_config,
+)
 
 
 UNI = "University of East London"
@@ -233,3 +238,23 @@ def test_duplicate_tokens_not_double_stripped() -> None:
     )
     assert cleaned == "MSc AI"
     assert suffix is not None
+
+
+def test_federation_config_strips_production_course_title_suffix() -> None:
+    config = get_config_for_host(
+        hostname="www.federation.edu.au",
+        name="Federation University Australia",
+        scrape_url="https://www.federation.edu.au/",
+        university_id=18,
+        db_scrape_config={"admin_config": {}},
+    )
+    token = current_uni_config.set(config)
+    try:
+        cleaned, suffix = clean_course_name_with_config(
+            "Bachelor of Psychological Science (Honours) | Federation University"
+        )
+    finally:
+        current_uni_config.reset(token)
+
+    assert cleaned == "Bachelor of Psychological Science (Honours)"
+    assert suffix == " | Federation University"

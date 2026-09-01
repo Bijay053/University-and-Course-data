@@ -80,6 +80,11 @@ extraction:
       - \s*\(\s*(?:online|virtual|distance|external|flexible|blended|on[\s-]?campus|in[\s-]?person)\s*\)
       deduplicate: true
   course_name:
+    # Used by the final provider-name cleaner after Federation's late JSON
+    # canonical-name override. Keep both current and legacy brand forms.
+    university_aliases:
+    - Federation University Australia
+    - Federation University
     strip_title_suffixes:
     - ' | Federation University Australia'
     - ' - Federation University Australia'

@@ -459,6 +459,18 @@ def apply_overrides(
     # (e.g. "Bachelor of Information Technology").
     canonical_name, source_heading = extract_canonical_course_name(html, url)
     if canonical_name:
+        # The URL-matching heading can be the document title rather than a bare
+        # H1, e.g. "Bachelor of Psychological Science (Honours) | Federation
+        # University". This override runs after the normal course-name
+        # extractor, so clean the late value before replacing the payload.
+        try:
+            from app.services.scraper.course_name_cleaner import (
+                clean_course_name_with_config,
+            )
+
+            canonical_name, _ = clean_course_name_with_config(canonical_name)
+        except Exception:  # noqa: BLE001 — extraction must remain fail-soft
+            pass
         prev_name = payload.get("course_name")
         # Only replace when DIFFERENT — avoid logging a no-op override
         # for the common case where the page H1 already matches.
