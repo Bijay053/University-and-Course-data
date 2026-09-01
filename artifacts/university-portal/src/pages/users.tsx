@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, FormEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Trash2, KeyRound, ShieldCheck, ShieldOff,
-  Eye, EyeOff, Tag, Pencil, Users, Lock,
+  Eye, EyeOff, Tag, Pencil, Users, Lock, UserCheck, UserX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,6 +74,7 @@ export default function UsersPage() {
   const [createUserOpen, setCreateUserOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
   const [permsFor, setPermsFor] = useState<UserRow | null>(null);
+  const [confirmStatusUser, setConfirmStatusUser] = useState<UserRow | null>(null);
   const [confirmDeleteUser, setConfirmDeleteUser] = useState<UserRow | null>(null);
 
   const [createRoleOpen, setCreateRoleOpen] = useState(false);
@@ -139,7 +140,7 @@ export default function UsersPage() {
                           <td className="px-4 py-3">
                             {u.is_active
                               ? <Badge className="bg-emerald-600">Active</Badge>
-                              : <Badge variant="secondary">Disabled</Badge>}
+                               : <Badge variant="secondary">Inactive</Badge>}
                           </td>
                           <td className="px-4 py-3">
                             {u.is_super_admin ? (
@@ -168,6 +169,29 @@ export default function UsersPage() {
                               <Button size="sm" variant="outline" onClick={() => setEditingUser(u)}>
                                 <Pencil className="h-3.5 w-3.5" />
                               </Button>
+                              <Button
+                                 size="sm"
+                                 variant="outline"
+                                 className={u.is_active
+                                   ? "text-amber-600 hover:bg-amber-50 hover:text-amber-700"
+                                   : "text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"}
+                                 onClick={() => setConfirmStatusUser(u)}
+                                 disabled={u.id === me?.id || !!u.is_protected}
+                                 title={
+                                   u.id === me?.id
+                                     ? "You cannot change your own account status"
+                                     : u.is_protected
+                                     ? "The protected admin account cannot be deactivated"
+                                     : u.is_active
+                                     ? "Set user inactive"
+                                     : "Set user active"
+                                 }
+                                 aria-label={u.is_active ? `Set ${u.email} inactive` : `Set ${u.email} active`}
+                               >
+                                 {u.is_active
+                                   ? <UserX className="h-3.5 w-3.5" />
+                                   : <UserCheck className="h-3.5 w-3.5" />}
+                               </Button>
                               <Button
                                 size="sm" variant="outline"
                                 className="text-destructive hover:bg-destructive/10"
@@ -278,6 +302,49 @@ export default function UsersPage() {
         onClose={() => setPermsFor(null)}
         onSaved={() => toast({ title: "Permissions updated" })}
       />
+
+      {/* Activate / deactivate user confirm */}
+      <AlertDialog open={!!confirmStatusUser} onOpenChange={(o) => !o && setConfirmStatusUser(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmStatusUser?.is_active ? "Set user inactive?" : "Set user active?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmStatusUser?.is_active
+                ? <><strong>{confirmStatusUser?.email}</strong> will no longer be able to sign in.</>
+                : <><strong>{confirmStatusUser?.email}</strong> will be able to sign in again.</>}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={async () => {
+              if (!confirmStatusUser) return;
+              const userToUpdate = confirmStatusUser;
+              const nextActive = !userToUpdate.is_active;
+              try {
+                await api(`/api/users/${userToUpdate.id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ is_active: nextActive }),
+                });
+                refreshUsers();
+                toast({ title: nextActive ? "User activated" : "User set inactive" });
+              } catch (err) {
+                toast({
+                  title: "Status update failed",
+                  description: (err as Error).message,
+                  variant: "destructive",
+                });
+              } finally {
+                setConfirmStatusUser(null);
+              }
+            }}>
+              {confirmStatusUser?.is_active ? "Set inactive" : "Set active"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <CreateRoleDialog
         open={createRoleOpen}
