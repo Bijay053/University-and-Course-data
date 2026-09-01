@@ -45,6 +45,16 @@ extraction:
       enabled: true
 
   fees:
+    # Production fallback pinned from Torrens' official Tuition Fees page:
+    # https://www.torrens.edu.au/how-to-apply/fees-scholarships/tuition-fees
+    #
+    # Why: PDF auto-discovery currently follows the legacy
+    # /how-to-apply/international-student page, which contains no parseable
+    # per-course fees. Without an explicit feesPdf source, the scraper falls
+    # back to mostly blank course-page fee components and stages ~92% of
+    # Torrens courses with no international fee.
+    fees_pdf_url: "https://cdn.intelligencebank.com/au/share/RyzZ/D1G8V/jlMdo/original/2026-International-Fee-Schedule"
+
     # Per-uni PDF parser override.
     #
     # Why: the Torrens fee schedule uses a 3+ column table where many
