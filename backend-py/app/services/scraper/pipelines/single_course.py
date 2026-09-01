@@ -2324,6 +2324,15 @@ async def extract_course(
             "evidence": [],
         }
 
+    # Preserve Federation's original response before generic HTML compaction
+    # and audience-oriented transformations run.  Its authoritative Duration,
+    # Locations, Start dates, and canonical-name blocks live in embedded JSON;
+    # later processing may remove those script blocks even though the visible
+    # page text remains usable.
+    _federation_authority_html = (
+        html if _fed_json.is_federation_host(url) else None
+    )
+
     # ── VU brand-chrome scrub (2026-05-14) ────────────────────────────────
     # VU pages ship two footer chunks on EVERY page that list "Sydney",
     # "Melbourne", and "Brisbane" as VU brand-chrome (Indigenous
@@ -6462,7 +6471,10 @@ async def extract_course(
         if _fed_json.is_federation_host(url):
             try:
                 _fed_json.apply_overrides(
-                    payload, html, url=url, rendered_html=rendered_html
+                    payload,
+                    _federation_authority_html or html,
+                    url=url,
+                    rendered_html=rendered_html,
                 )
             except Exception as _fed_exc:  # noqa: BLE001 — never break a scrape
                 log.warning("federation_json override failed on %s: %s", url, _fed_exc)

@@ -184,6 +184,7 @@ def extract_locations(html: str) -> tuple[list[str], bool, str | None]:
 
     Returns ``([], False, None)`` when no Locations block is present.
     """
+    selected: tuple[list[str], bool, str] | None = None
     for heading, summary in _iter_blocks(html):
         h_lower = heading.strip().lower()
         if h_lower not in ("location", "locations"):
@@ -212,8 +213,12 @@ def extract_locations(html: str) -> tuple[list[str], bool, str | None]:
             if cleaned not in campuses:
                 campuses.append(cleaned)
         online_only = had_any and had_online and not campuses
-        return campuses, online_only, summary
-    return [], False, None
+        if campuses or online_only:
+            # Federation pages can contain an aggregate/search-card Locations
+            # block before the visible course-detail block. Keep the last
+            # usable block, matching the Start dates policy below.
+            selected = (campuses, online_only, summary)
+    return selected if selected is not None else ([], False, None)
 
 
 def extract_intake_months(html: str) -> tuple[list[str], str | None]:
@@ -474,11 +479,19 @@ def apply_overrides(
         # University". This override runs after the normal course-name
         # extractor, so clean the late value before replacing the payload.
         try:
-            from app.services.scraper.course_name_cleaner import (
-                clean_course_name_with_config,
-            )
+            from app.services.scraper.course_name_cleaner import clean_course_name
 
-            canonical_name, _ = clean_course_name_with_config(canonical_name)
+            # Keep this Federation-specific authority independent of the
+            # ContextVar. Some Celery extraction paths do not retain that
+            # context at this late stage; the provider aliases are intrinsic
+            # to this hostname and therefore safe to pass explicitly.
+            canonical_name, _ = clean_course_name(
+                canonical_name,
+                aliases=(
+                    "Federation University Australia",
+                    "Federation University",
+                ),
+            )
         except Exception:  # noqa: BLE001 — extraction must remain fail-soft
             pass
         prev_name = payload.get("course_name")
