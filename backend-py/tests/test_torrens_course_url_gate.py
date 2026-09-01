@@ -10,14 +10,18 @@ from app.services.scraper.config.loader import load_uni_config
 
 
 @pytest.fixture(scope="module")
-def torrens_detail_patterns() -> list[re.Pattern[str]]:
-    cfg = load_uni_config(
+def torrens_config():
+    return load_uni_config(
         slug="torrens",
         name="Torrens University Australia",
         scrape_url="https://www.torrens.edu.au",
         university_id=22,
     )
-    raw_patterns = cfg.discovery.course_detail_url_patterns
+
+
+@pytest.fixture(scope="module")
+def torrens_detail_patterns(torrens_config) -> list[re.Pattern[str]]:
+    raw_patterns = torrens_config.discovery.course_detail_url_patterns
     assert raw_patterns, "Torrens needs a strict final extraction URL gate"
     return [re.compile(pattern, re.IGNORECASE) for pattern in raw_patterns]
 
@@ -77,3 +81,14 @@ def test_future_topic_slug_is_rejected_without_a_slug_blocklist(
         "https://www.torrens.edu.au/courses/technology/bachelor-of-quantum-computing",
         torrens_detail_patterns,
     )
+
+
+def test_torrens_pins_official_2026_international_fee_schedule(
+    torrens_config,
+) -> None:
+    assert torrens_config.extraction.fees.fees_pdf_url == (
+        "https://cdn.intelligencebank.com/au/share/RyzZ/D1G8V/jlMdo/"
+        "original/2026-International-Fee-Schedule"
+    )
+    assert torrens_config.extraction.fees.pdf_parser == "columnar"
+    assert torrens_config.extraction.fees.prefer_annual_over_total is True
