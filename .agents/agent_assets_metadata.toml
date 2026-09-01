@@ -6,3 +6,18 @@ id = "YFtWn_S26umLD2SG4_Vys"
 uri = "file://system_architecture.pdf"
 type = "pdf"
 title = "University Portal — System Architecture (7 pages)"
+logical_id = "fd8bbd0d-7406-430f-8148-ffe1eaeb0170"
+
+[[outputs]]
+id = "z3cp3VXqoTYsAQM86XHS4"
+uri = "file://attached_assets/image_1776917782083.png"
+type = "image"
+title = "Study Info Centre logo"
+description = "Logo required by the University Portal frontend build."
+logical_id = "de2d5afc-11ff-462d-b030-41995378abe2"
+content_hash = "sha256:37821677e79aaf3a0562ef3d860bb40ba8f7ab09011a0b5a754aea2afdf5e258"
+size = 10009
+mtime_ms = 1776917796404
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/de2d5afc-11ff-462d-b030-41995378abe2/cf256251-fd38-401b-a5b4-531036367de9"
+storage_version_token = "1788234075846570"
+content_type = "image/png"
