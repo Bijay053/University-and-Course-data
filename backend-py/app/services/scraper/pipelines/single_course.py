@@ -650,6 +650,33 @@ def _is_domestic_only_page(html: str, url: str | None = None) -> bool:
     text = _re.sub(r"\s+", " ", text)
     if _DOMESTIC_ONLY_RE.search(text):
         return True
+    # Torrens' current course template no longer consistently emits the
+    # `studenttypes="Domestic"` component attribute handled by the hard
+    # pattern above.  The server-rendered quick-facts block still carries an
+    # authoritative bounded audience field:
+    #
+    #   Student Domestic Course duration ...
+    #   Student Domestic International Course duration ...
+    #
+    # Match only inside that label/value boundary and only on Torrens hosts.
+    # A bare "Domestic" match is intentionally unsafe because valid
+    # international courses contain domestic application/FEE-HELP copy.
+    if url and (urlparse(url).hostname or "").lower() in {
+        "torrens.edu.au",
+        "www.torrens.edu.au",
+    }:
+        audience_match = _re.search(
+            r"\bStudent\s+(?P<audience>.{1,80}?)\s+Course\s+duration\b",
+            text,
+            _re.IGNORECASE,
+        )
+        if audience_match:
+            audience = audience_match.group("audience").casefold()
+            if (
+                _re.search(r"\bdomestic\b", audience)
+                and not _re.search(r"\binternational\b", audience)
+            ):
+                return True
     # Soft pattern: "may not be available" — only block when there is no
     # structural international section elsewhere on the same page.
     if _DOMESTIC_ONLY_SOFT_RE.search(text) and not _has_international_section(html):

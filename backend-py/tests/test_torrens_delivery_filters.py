@@ -4,6 +4,7 @@ from __future__ import annotations
 from app.services.scraper.config.context import current_uni_config
 from app.services.scraper.config.loader import get_config_for_host
 from app.services.scraper.guards import should_stage_course
+from app.services.scraper.pipelines.single_course import _is_domestic_only_page
 
 
 def test_torrens_config_blocks_domestic_and_online_only_courses() -> None:
@@ -53,3 +54,47 @@ def test_torrens_config_blocks_domestic_and_online_only_courses() -> None:
         assert domestic_reason == "domestic_only"
     finally:
         current_uni_config.reset(token)
+
+
+def test_torrens_current_quickfacts_rejects_domestic_only_audience() -> None:
+    html = """
+    <section class="course-quick-facts">
+      <div>Study mode</div><div>Blended</div>
+      <div>Campus locations</div><div>Online</div>
+      <div>Student</div><div>Domestic</div>
+      <div>Course duration</div><div>2 years full time</div>
+    </section>
+    """
+
+    assert _is_domestic_only_page(
+        html,
+        "https://www.torrens.edu.au/courses/health/master-of-counselling-advanced",
+    ) is True
+
+
+def test_torrens_current_quickfacts_keeps_international_audience() -> None:
+    html = """
+    <section class="course-quick-facts">
+      <div>Study mode</div><div>Blended</div>
+      <div>Campus locations</div><div>Sydney, Melbourne</div>
+      <div>Student</div><div>Domestic International</div>
+      <div>Course duration</div><div>3 years full time</div>
+    </section>
+    """
+
+    assert _is_domestic_only_page(
+        html,
+        "https://www.torrens.edu.au/courses/business/bachelor-of-business",
+    ) is False
+
+
+def test_torrens_quickfacts_shape_is_host_scoped() -> None:
+    html = """
+    <div>Student</div><div>Domestic</div>
+    <div>Course duration</div><div>2 years</div>
+    """
+
+    assert _is_domestic_only_page(
+        html,
+        "https://example.edu/courses/master-of-counselling",
+    ) is False
