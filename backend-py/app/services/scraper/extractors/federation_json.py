@@ -233,6 +233,14 @@ def extract_intake_months(html: str) -> tuple[list[str], str | None]:
 
     Returns ``([], None)`` when no Start dates block is present.
     """
+    # Federation can embed two Start dates blocks on the same page. The first
+    # is an aggregate/search-card summary, while the last is the
+    # course-detail block rendered in the visible Course essentials section.
+    # For example, DHY5 contains a five-month aggregate followed by the
+    # course-specific dates 20 July 2026, 01 March 2027, and 26 July 2027.
+    # Walk in document order and keep the last usable block.
+    selected_summary: str | None = None
+    selected_months: list[str] = []
     for heading, summary in _iter_blocks(html):
         if heading.strip().lower() != "start dates":
             continue
@@ -242,8 +250,10 @@ def extract_intake_months(html: str) -> tuple[list[str], str | None]:
             if abbr:
                 seen.add(abbr)
         ordered = [m for m in _MONTH_ORDER if m in seen]
-        return ordered, summary
-    return [], None
+        if ordered:
+            selected_summary = summary
+            selected_months = ordered
+    return selected_months, selected_summary
 
 
 def extract_canonical_course_name(
