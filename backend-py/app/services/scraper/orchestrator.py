@@ -281,6 +281,7 @@ def _strip_provider_name_from_title(
     course_name: str,
     uni_name: str,
     scrape_url: str = "",
+    aliases: tuple[str, ...] = (),
 ) -> str:
     """Remove university-name suffixes from a course title.
 
@@ -305,6 +306,7 @@ def _strip_provider_name_from_title(
         course_name,
         university_name=uni_name,
         scrape_url=scrape_url,
+        aliases=aliases,
     )
     if suffix:
         log.info(
@@ -5182,8 +5184,23 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 # so course_name is always provider-free before staging.
                 _raw_cn = (payload.get("course_name") or "").strip()
                 if _raw_cn:
+                    _course_name_aliases = tuple(
+                        getattr(
+                            getattr(
+                                getattr(_uni_cfg, "extraction", None),
+                                "course_name",
+                                None,
+                            ),
+                            "university_aliases",
+                            (),
+                        )
+                        or ()
+                    )
                     _clean_cn = _strip_provider_name_from_title(
-                        _raw_cn, uni_name, uni_scrape_url
+                        _raw_cn,
+                        uni_name,
+                        uni_scrape_url,
+                        aliases=_course_name_aliases,
                     )
                     if _clean_cn != _raw_cn:
                         payload["course_name"] = _clean_cn

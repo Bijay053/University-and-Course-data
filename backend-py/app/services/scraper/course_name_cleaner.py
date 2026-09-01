@@ -92,6 +92,7 @@ def clean_course_name_with_config(
     *,
     university_name: str = "",
     scrape_url: str = "",
+    aliases: Sequence[str] = (),
 ) -> tuple[str, str | None]:
     """Convenience wrapper that augments :func:`clean_course_name` with
     per-uni YAML aliases and a domain-derived short token.
@@ -103,13 +104,16 @@ def clean_course_name_with_config(
     """
     from urllib.parse import urlparse as _up
 
-    aliases: list[str] = []
+    configured_aliases: list[str] = []
     extra_tokens: list[str] = []
 
     try:
         from app.services.scraper.config.context import get_uni_config
         cfg = get_uni_config()
-        aliases = list(cfg.extraction.course_name.university_aliases)
+        if cfg is not None:
+            configured_aliases = list(
+                cfg.extraction.course_name.university_aliases
+            )
         if not university_name and getattr(cfg, "name", None):
             university_name = cfg.name
         if not scrape_url and getattr(cfg, "scrape_url", None):
@@ -129,6 +133,6 @@ def clean_course_name_with_config(
     return clean_course_name(
         name,
         university_name=university_name,
-        aliases=aliases,
+        aliases=[*aliases, *configured_aliases],
         extra_tokens=extra_tokens,
     )

@@ -14,6 +14,7 @@ from app.services.scraper.guards import (
     should_trust_generic_university_fee_fallback,
 )
 from app.services.scraper.orchestrator import _strip_provider_name_from_title
+from app.services.scraper.config.context import current_uni_config
 from app.services.scraper.extractors.course_name import _clean as _course_name_clean
 
 
@@ -622,6 +623,21 @@ class TestProviderNameStrip:
             "Bachelor of Science - Chemistry", "AIBI", "https://aibi.edu.au/courses"
         )
         assert result == "Bachelor of Science - Chemistry"
+
+    def test_orchestrator_explicit_alias_survives_missing_context(self) -> None:
+        """Final staging cleanup must not depend on ContextVar inheritance."""
+        token = current_uni_config.set(None)
+        try:
+            result = _strip_provider_name_from_title(
+                "Bachelor of Psychological Science (Honours) | Federation University",
+                "Federation University Australia",
+                "https://www.federation.edu.au/",
+                aliases=("Federation University",),
+            )
+        finally:
+            current_uni_config.reset(token)
+
+        assert result == "Bachelor of Psychological Science (Honours)"
 
     def test_course_name_extractor_strips_aibi_all_caps(self) -> None:
         """_TITLE_SUFFIX in course_name.py catches '- AIBI' at extraction time."""
