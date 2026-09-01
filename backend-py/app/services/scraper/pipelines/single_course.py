@@ -6455,29 +6455,6 @@ async def extract_course(
                     url,
                 )
 
-        # ── Federation JSON-block authoritative override (2026-05-10) ──
-        # Federation embeds the canonical course summary as a JSON tree
-        # inside <script>; the standard text-strip wipes it, so the
-        # downstream regex extractors never see "4 years full-time" /
-        # "Berwick (on campus)<br>Gippsland (on campus)<br>Mt Helen ...".
-        # Net effect upstream: NULL durations on B Occupational Therapy
-        # (Honours) / M Data Science / M Social Work, plus Gemini-
-        # hallucinated locations ("Sydney" appearing on Berwick-only
-        # programmes). Run AFTER ai_fallback / _apply_ai_duration_mapping
-        # so the JSON value REPLACES whatever Gemini guessed (gates the
-        # PDF-merge condition at L2742 are then irrelevant for these
-        # rows; the JSON is strictly more reliable than either source).
-        # Hostname-gated → no-op for every other uni.
-        if _fed_json.is_federation_host(url):
-            try:
-                _fed_json.apply_overrides(
-                    payload,
-                    _federation_authority_html or html,
-                    url=url,
-                    rendered_html=rendered_html,
-                )
-            except Exception as _fed_exc:  # noqa: BLE001 — never break a scrape
-                log.warning("federation_json override failed on %s: %s", url, _fed_exc)
         # ── CQU JSON-block authoritative override (2026-05-11) ──
         # CQU is a NextJS / Sitecore site that ships every course's
         # canonical AIMSData inside __NEXT_DATA__. The text-strip wipes
@@ -6782,6 +6759,22 @@ async def extract_course(
     # delivered. Pages that never mention a delivery mode should stage with an
     # empty study_mode rather than a fabricated "On Campus" value.
     # The Review UI will surface these as a completeness gap for human review.
+
+    # ── Federation JSON-block authoritative override (2026-05-10) ────────
+    # This authority must run independently of ``use_ai_fallback``. Federation
+    # pages can have every required slot populated with plausible aggregate
+    # values, which intentionally disables AI fallback but still requires the
+    # course-detail JSON to replace those aggregate values.
+    if _fed_json.is_federation_host(url):
+        try:
+            _fed_json.apply_overrides(
+                payload,
+                _federation_authority_html or html,
+                url=url,
+                rendered_html=rendered_html,
+            )
+        except Exception as _fed_exc:  # noqa: BLE001 — never break a scrape
+            log.warning("federation_json override failed on %s: %s", url, _fed_exc)
 
     # ── Study-mode field trace ────────────────────────────────────────────────
     # Emits a single diagnostic event so operators can follow the mode value

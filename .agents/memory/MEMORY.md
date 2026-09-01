@@ -107,4 +107,4 @@
 - [AUT points-based fees and duration](aut-points-fee-duration.md) — 120 points is one full-time year; annualize the headline levy-inclusive fee and prefer points over conflicting duration metadata.
 - [Fleet-wide non-degree gating](non-degree-gating.md) — Degree evidence wins over CPD paths; static rejection requires visible structured main/article evidence; discovery drops are not staging skips.
 - [Scrape slot persistence identity](scrape-slot-identity.md) — Persist multi-slot jobs by stable slot ID, never current grid position; reindexing positional keys can clone another active job.
-- [Authoritative embedded JSON preservation](authoritative-embedded-json-preservation.md) — preserve raw HTML before compaction when late site-specific overrides depend on embedded JSON blocks.
+- [Authoritative provider overrides](authoritative-embedded-json-preservation.md) — preserve raw source and run deterministic provider authority outside optional AI/fallback gates.
