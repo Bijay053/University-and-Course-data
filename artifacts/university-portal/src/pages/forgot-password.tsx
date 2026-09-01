@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import brandLogo from "@assets/image_1776917782083.png";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -43,7 +42,12 @@ export default function ForgotPassword() {
       <Card className="w-full max-w-sm shadow-lg">
         <CardHeader className="text-center space-y-3">
           <div className="flex justify-center">
-            <img src={brandLogo} alt="Study Info Centre" className="h-12 w-auto" />
+            <div
+              aria-label="Study Info Centre"
+              className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-lg font-bold text-primary-foreground"
+            >
+              SI
+            </div>
           </div>
           <div>
             <CardTitle className="text-xl">Forgot password</CardTitle>

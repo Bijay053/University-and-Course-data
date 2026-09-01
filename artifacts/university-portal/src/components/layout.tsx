@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { LayoutDashboard, Building2, HardDrive, UploadCloud, Menu, X, Shield, Settings, Search as SearchIcon, LogOut, Users as UsersIcon, BarChart2, Radio, Send, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
-import brandLogo from "@assets/image_1776917782083.png";
 import { useAuth } from "@/context/auth";
 
 const navigation: { name: string; href: string; icon: typeof LayoutDashboard; permission?: string }[] = [
@@ -68,7 +67,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {/* Desktop Sidebar */}
       <div className="w-64 border-r bg-sidebar text-sidebar-foreground hidden md:flex flex-col flex-shrink-0">
         <div className="h-14 flex items-center gap-2 px-4 font-bold tracking-tight border-b border-sidebar-border">
-          <img src={brandLogo} alt="Study Info Centre" className="h-8 w-auto" />
+          <div
+            aria-label="Study Info Centre"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground"
+          >
+            SI
+          </div>
           <span className="text-sm leading-tight">Study Info Centre</span>
         </div>
         <div className="flex-1 py-4 overflow-y-auto">
@@ -111,7 +115,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
       >
         <div className="h-14 flex items-center justify-between px-4 font-bold tracking-tight border-b border-sidebar-border">
           <div className="flex items-center gap-2">
-            <img src={brandLogo} alt="Study Info Centre" className="h-8 w-auto" />
+            <div
+              aria-label="Study Info Centre"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground"
+            >
+              SI
+            </div>
             <span className="text-sm leading-tight">Study Info Centre</span>
           </div>
           <button
@@ -155,7 +164,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <Menu className="h-5 w-5" />
             </button>
             <div className="flex items-center gap-2 md:hidden">
-              <img src={brandLogo} alt="Study Info Centre" className="h-7 w-auto" />
+              <div
+                aria-label="Study Info Centre"
+                className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-[10px] font-bold text-primary-foreground"
+              >
+                SI
+              </div>
               <div className="font-semibold text-sm text-muted-foreground">Study Info Centre</div>
             </div>
           </div>
