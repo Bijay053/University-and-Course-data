@@ -1,8 +1,11 @@
-"""Public course search endpoints. Reads from the existing materialized view
-``course_search_view`` so the user-facing search behaviour stays identical
-to Node. The view is created/refreshed by the existing Drizzle migrations.
+"""Public course search endpoints.
 
-View columns we rely on (verified live):
+The retired Node API used to create a ``course_search_view`` materialized
+view at startup. FastAPI now owns the full API surface, so search builds the
+same denormalized row shape from live base tables through a CTE instead of
+depending on that removed bootstrap side effect.
+
+Search-row columns:
     id, course_name, university_id, university_name, university_country,
     university_city, degree_level, course_location, duration, duration_term,
     international_fee, ielts_overall, intakes, search_tsv
@@ -31,6 +34,103 @@ log = logging.getLogger(__name__)
 router = APIRouter()
 
 
+# Keep the historical ``course_search_view`` row contract without relying on
+# the materialized view that the removed Node API used to create. Naming the
+# CTE ``course_search_view`` lets the existing list, count, and compare queries
+# remain identical while always reflecting newly approved course data.
+_COURSE_SEARCH_CTE = """
+course_search_view AS MATERIALIZED (
+    SELECT
+        c.id,
+        c.name AS course_name,
+        c.category,
+        c.sub_category,
+        c.degree_level,
+        c.duration,
+        c.duration_term,
+        c.study_mode,
+        c.course_website,
+        c.course_location,
+        c.university_id,
+        setweight(to_tsvector('simple', coalesce(c.name, '')), 'A') ||
+            setweight(to_tsvector('simple', coalesce(u.name, '')), 'B')
+            AS name_tsv,
+        setweight(to_tsvector('english', coalesce(c.name, '')), 'A') ||
+            setweight(to_tsvector('english', coalesce(u.name, '')), 'B') ||
+            setweight(to_tsvector('english', coalesce(c.category, '')), 'C') ||
+            setweight(
+                to_tsvector('english', coalesce(c.course_location, '')), 'C'
+            ) ||
+            setweight(to_tsvector('english', coalesce(u.city, '')), 'C') ||
+            setweight(to_tsvector('english', coalesce(u.country, '')), 'C') ||
+            setweight(to_tsvector('english', coalesce(c.sub_category, '')), 'D')
+            AS search_tsv,
+        u.name AS university_name,
+        u.logo_url,
+        u.city AS university_city,
+        u.country AS university_country,
+        u.website AS university_website,
+        coalesce(u.featured, FALSE) AS featured,
+        coalesce(u.featured_priority, 0) AS featured_priority,
+        latest_fee.international_fee,
+        latest_fee.currency,
+        latest_fee.fee_term,
+        NULL::real AS application_fee,
+        course_intakes.intakes,
+        english_scores.ielts_overall,
+        english_scores.pte_overall,
+        english_scores.toefl_overall,
+        english_scores.cae_overall,
+        english_scores.duolingo_overall,
+        CASE
+            WHEN c.duration IS NULL THEN NULL
+            WHEN c.duration_term ILIKE 'month%' THEN c.duration / 12.0
+            WHEN c.duration_term ILIKE 'week%' THEN c.duration / 52.0
+            ELSE c.duration
+        END AS duration_years
+    FROM courses c
+    JOIN universities u ON u.id = c.university_id
+    LEFT JOIN LATERAL (
+        SELECT f.international_fee, f.currency, f.fee_term
+        FROM fees f
+        WHERE f.course_id = c.id
+        ORDER BY f.id DESC
+        LIMIT 1
+    ) latest_fee ON TRUE
+    LEFT JOIN LATERAL (
+        SELECT array_agg(
+            DISTINCT i.intake_month ORDER BY i.intake_month
+        ) AS intakes
+        FROM intakes i
+        WHERE i.course_id = c.id
+          AND i.intake_month IS NOT NULL
+    ) course_intakes ON TRUE
+    LEFT JOIN LATERAL (
+        SELECT
+            max(er.overall) FILTER (
+                WHERE upper(er.test_type) = 'IELTS'
+            ) AS ielts_overall,
+            max(er.overall) FILTER (
+                WHERE upper(er.test_type) = 'PTE'
+            ) AS pte_overall,
+            max(er.overall) FILTER (
+                WHERE upper(er.test_type) = 'TOEFL'
+            ) AS toefl_overall,
+            max(er.overall) FILTER (
+                WHERE upper(er.test_type) IN ('CAE', 'CAMBRIDGE')
+            ) AS cae_overall,
+            max(er.overall) FILTER (
+                WHERE upper(er.test_type) IN ('DUOLINGO', 'DET')
+            ) AS duolingo_overall
+        FROM english_requirements er
+        WHERE er.course_id = c.id
+    ) english_scores ON TRUE
+    WHERE coalesce(c.status, 'active') = 'active'
+      AND coalesce(c.approval_status, 'approved') = 'approved'
+)
+"""
+
+
 @router.get("/courses")
 async def search_courses(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -43,8 +143,8 @@ async def search_courses(
     max_fee: float | None = None,
     max_ielts: float | None = None,
     # B5: the /search UI sends ~14 filter params that the previous
-    # implementation silently ignored. The MV `course_search_view`
-    # actually has the columns we need for most of them (location,
+    # implementation silently ignored. The search CTE has the columns
+    # we need for most of them (location,
     # intakes, fee, duration_years, per-exam overall scores,
     # category/sub_category) — they were just never wired. The ones
     # that DO require a join (per-band English bands beyond overall,
@@ -145,7 +245,7 @@ async def search_courses(
         where.append("(c.international_fee IS NULL OR c.international_fee <= :fee_max)")
         params["fee_max"] = fee_max
 
-    # B5: duration_years already pre-computed on the MV (real column
+    # B5: duration_years is pre-computed by the search CTE (real column
     # `duration_years`). NULL is treated as "matches" so courses with
     # missing duration data aren't silently dropped.
     if duration_years_min is not None and duration_years_min > 0:
@@ -156,7 +256,7 @@ async def search_courses(
         params["dy_max"] = duration_years_max
 
     # B5: english_exam picks which of the per-exam overall columns to
-    # filter on. The MV has overall scores for all five tests
+    # filter on. The search CTE has overall scores for all five tests
     # (ielts/pte/toefl/cae/duolingo). english_overall is the user's
     # achievable score → keep courses requiring AT MOST that.
     if english_exam and english_overall is not None:
@@ -209,15 +309,23 @@ async def search_courses(
     )
 
     base_sql = f"""
+        WITH {_COURSE_SEARCH_CTE}
         SELECT c.id           AS course_id,
                c.course_name,
                c.university_id,
                c.university_name,
+               c.university_city AS uni_city,
+               c.university_country AS uni_country,
+               c.featured AS uni_featured,
+               c.logo_url AS uni_logo_url,
                c.degree_level,
                c.course_location,
+               c.course_website,
                c.duration,
                c.duration_term,
                c.international_fee,
+               c.currency,
+               c.fee_term,
                c.ielts_overall,
                c.pte_overall,
                c.toefl_overall,
@@ -234,7 +342,10 @@ async def search_courses(
         ORDER BY {sort_clause}
         LIMIT :limit OFFSET :offset
     """
-    count_sql = f"SELECT COUNT(*) FROM course_search_view c WHERE {where_sql}"
+    count_sql = (
+        f"WITH {_COURSE_SEARCH_CTE} "
+        f"SELECT COUNT(*) FROM course_search_view c WHERE {where_sql}"
+    )
 
     params["limit"] = limit
     params["offset"] = (page - 1) * limit
@@ -285,7 +396,7 @@ async def search_courses(
 
         # Required by UI: english_requirements nested object.
         # pte_overall / toefl_overall / cae_overall / duolingo_overall all
-        # live in course_search_view alongside ielts_overall — previously
+        # live in the search CTE alongside ielts_overall — previously
         # they were hardcoded to None here, which prevented the search card
         # from showing PTE/TOEFL badges even when data existed.
         d["english_requirements"] = {
@@ -351,8 +462,8 @@ async def search_compare(
 
     Ports Node ``GET /api/search/compare`` (``artifacts/api-server/src/
     routes/search.ts:644``). The UI calls this with up to 5 course ids and
-    expects ``{courses: [...]}`` where each course bundles the materialised
-    view row plus its full english + academic requirement lists.
+    expects ``{courses: [...]}`` where each course bundles the denormalized
+    search row plus its full english + academic requirement lists.
 
     Without this endpoint the React Compare page (``pages/compare.tsx:77``)
     receives 404 and shows ``error: "Not Found"`` — the only P0 missing
@@ -387,7 +498,10 @@ async def search_compare(
     try:
         mv_rows = (
             await db.execute(
-                text("SELECT * FROM course_search_view WHERE id = ANY(:ids)"),
+                text(
+                    f"WITH {_COURSE_SEARCH_CTE} "
+                    "SELECT * FROM course_search_view WHERE id = ANY(:ids)"
+                ),
                 {"ids": int_ids},
             )
         ).mappings().all()

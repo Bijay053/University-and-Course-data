@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 
 from app.dependencies import get_db
 from app.main import app
+from app.routers.search import _COURSE_SEARCH_CTE
 
 
 class _StubResult:
@@ -71,6 +72,16 @@ def test_compare_rejects_missing_ids():
     r = client.get("/api/search/compare?ids=")
     assert r.status_code == 400
     assert r.json()["error"] == "ids_required"
+
+
+def test_search_row_source_is_live_base_tables_not_retired_node_view():
+    """FastAPI search must work when no physical course_search_view exists."""
+    normalized = " ".join(_COURSE_SEARCH_CTE.split())
+    assert normalized.startswith("course_search_view AS MATERIALIZED (")
+    assert "FROM courses c JOIN universities u" in normalized
+    assert "FROM fees f" in normalized
+    assert "FROM intakes i" in normalized
+    assert "FROM english_requirements er" in normalized
 
 
 def test_compare_rejects_non_numeric_ids():
