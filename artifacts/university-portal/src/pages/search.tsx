@@ -49,10 +49,10 @@ type SearchResponse = {
   did_you_mean_location?: string | null;
   no_match_suggestion?: { q_matches: number; location_matches: number; message: string } | null;
   results: CourseResult[];
-  facets: {
-    universities: FacetItem[]; categories: FacetItem[];
-    degree_levels: FacetItem[]; intakes: FacetItem[];
-  };
+  facets?: {
+    universities?: FacetItem[]; categories?: FacetItem[];
+    degree_levels?: FacetItem[]; intakes?: FacetItem[];
+  } | null;
 };
 
 type OptionsResponse = {
@@ -249,7 +249,7 @@ export default function SearchPage() {
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.limit)) : 1;
 
   const intakeOptions = useMemo(() => {
-    return (data?.facets.intakes ?? []).map((f) => ({ value: f.name, label: f.name, count: f.count }));
+    return (data?.facets?.intakes ?? []).map((f) => ({ value: f.name, label: f.name, count: f.count }));
   }, [data]);
 
   const currentSchemeOuts = useMemo(() => {
