@@ -7,12 +7,16 @@ import pytest
 from app.services.scraper.config.loader import load_uni_config
 
 
-@pytest.mark.parametrize("university_id", [None, 9])
+@pytest.mark.parametrize(
+    ("slug", "university_id"),
+    [("asa", 2), ("asahe", None), ("asahe", 9)],
+)
 def test_asa_pins_official_international_fee_schedule(
+    slug: str,
     university_id: int | None,
 ) -> None:
     cfg = load_uni_config(
-        slug="asahe",
+        slug=slug,
         name="ASA Institute of Higher Education",
         scrape_url="https://asahe.edu.au",
         university_id=university_id,
