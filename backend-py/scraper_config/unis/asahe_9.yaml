@@ -13,3 +13,9 @@ discovery: {}
 extraction:
   fees:
     default_currency: AUD
+    # ID-specific production config. This file takes precedence over
+    # asahe.yaml, so the authoritative fee schedule must be declared here.
+    fees_pdf_url: "https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf"
+    pdf_parser: columnar
+    prefer_annual_over_total: true
+    pdf_overrides_page_regex: true

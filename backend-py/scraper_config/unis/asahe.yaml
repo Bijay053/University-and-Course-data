@@ -13,3 +13,10 @@ discovery: {}
 extraction:
   fees:
     default_currency: AUD
+    # Official 2026 International Student Tuition Fee Schedule. ASA's
+    # course pages do not reliably expose international tuition, so use
+    # the annual per-course values from the institution's schedule.
+    fees_pdf_url: "https://cdn.prod.website-files.com/68660d9286e56f070b7bebe7/696f704ddf123bd8c8d982b0_2026%20Fees%20Schedule%20-%20International%20Student.pdf"
+    pdf_parser: columnar
+    prefer_annual_over_total: true
+    pdf_overrides_page_regex: true

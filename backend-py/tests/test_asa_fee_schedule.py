@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
+import pytest
+
 from app.services.scraper.config.loader import load_uni_config
 
 
-def test_asa_pins_official_international_fee_schedule() -> None:
+@pytest.mark.parametrize("university_id", [None, 9])
+def test_asa_pins_official_international_fee_schedule(
+    university_id: int | None,
+) -> None:
     cfg = load_uni_config(
-        slug="asa",
+        slug="asahe",
         name="ASA Institute of Higher Education",
         scrape_url="https://asahe.edu.au",
-        university_id=2,
+        university_id=university_id,
     )
 
     assert cfg.extraction.fees.fees_pdf_url == (
