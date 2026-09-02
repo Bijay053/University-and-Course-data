@@ -14,6 +14,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
+from app.release_info import get_release_revision
 from app.routers import import_routes as _import_routes
 from app.routers import backup as _backup
 from app.routers import (
@@ -53,7 +54,11 @@ log = logging.getLogger("uniportal")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # noqa: ARG001
-    log.info("Python backend starting up (debug=%s)", settings.debug)
+    log.info(
+        "Python backend starting up (debug=%s, release_revision=%s)",
+        settings.debug,
+        get_release_revision(),
+    )
     try:
         from app.routers.auth import ensure_admin_user
 

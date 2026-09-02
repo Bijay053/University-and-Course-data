@@ -36,6 +36,7 @@ from celery.schedules import crontab
 from celery.signals import worker_ready
 
 from app.config import settings
+from app.release_info import get_release_revision
 
 log = logging.getLogger(__name__)
 
@@ -266,6 +267,10 @@ def on_worker_ready(**kwargs) -> None:  # noqa: ANN003
     The Redis NX lock in _immediate_requeue_hook makes this race-safe across all
     4 worker processes that each fire this signal on startup.
     """
+    log.info(
+        "Celery worker starting (release_revision=%s)",
+        get_release_revision(),
+    )
     # ── Shadow-mode startup log ───────────────────────────────────────────────
     # Emitted at boot so operators can confirm SHADOW_MODE_UNI_IDS /
     # SHADOW_CUTOVER_UNI_IDS are being read by the worker process.

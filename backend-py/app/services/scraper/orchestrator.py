@@ -1166,7 +1166,18 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         if event in ("complete", "error", "stopped") or len(_emit_buf) >= _EMIT_FLUSH_BATCH:
             await _flush_emit_buf()
 
-    await emit("status", f"Worker claimed queued scrape job (job_id={runtime_job_id})", phase="queue")
+    from app.release_info import get_release_revision
+
+    _release_revision = get_release_revision()
+    await emit(
+        "status",
+        (
+            "Worker claimed queued scrape job "
+            f"(job_id={runtime_job_id}, release_revision={_release_revision})"
+        ),
+        phase="queue",
+        release_revision=_release_revision,
+    )
 
     _targeted_retry = _is_targeted_retry_payload(job.request_payload)
 
