@@ -7,6 +7,7 @@ Type=simple
 User=root
 WorkingDirectory=/root/University-and-Course-data/backend-py
 EnvironmentFile=/root/University-and-Course-data/backend-py/.env
+EnvironmentFile=/root/University-and-Course-data/backend-py/.release.env
 ExecStart=/root/University-and-Course-data/backend-py/venv/bin/gunicorn \
     app.main:app -w 4 -k uvicorn.workers.UvicornWorker -b 127.0.0.1:8000 --timeout 120 \
     --access-logfile - --error-logfile -
