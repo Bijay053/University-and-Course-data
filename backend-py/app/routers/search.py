@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
@@ -354,9 +354,11 @@ async def search_courses(
         rows = (await db.execute(text(base_sql), params)).mappings().all()
         total = (await db.execute(text(count_sql), params)).scalar_one()
     except Exception as exc:
-        # Surface DB errors in logs (don't silently mask) but never 500 the search page.
-        log.error("search_courses SQL failed: %s", exc)
-        return SearchCourseResponse(results=[], total=0, page=page, limit=limit)
+        log.exception("search_courses SQL failed")
+        raise HTTPException(
+            status_code=500,
+            detail="Course search is temporarily unavailable",
+        ) from exc
 
     aliases = {
         "course_id": "courseId",

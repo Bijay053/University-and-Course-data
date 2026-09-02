@@ -15,7 +15,9 @@ from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 
+from app.database import AsyncSessionLocal
 from app.dependencies import get_db
 from app.main import app
 from app.routers.search import _COURSE_SEARCH_CTE
@@ -53,6 +55,13 @@ class _StubSession:
         return _StubResult([])
 
 
+class _FailingSearchSession:
+    async def execute(self, stmt, params=None):  # noqa: ARG002
+        raise RuntimeError(
+            'relation "course_search_view" does not exist'
+        )
+
+
 def _client_with(mv_rows, eng_rows=None, acad_rows=None):
     sess = _StubSession(mv_rows, eng_rows or [], acad_rows or [])
 
@@ -82,6 +91,103 @@ def test_search_row_source_is_live_base_tables_not_retired_node_view():
     assert "FROM fees f" in normalized
     assert "FROM intakes i" in normalized
     assert "FROM english_requirements er" in normalized
+    assert "max(er.overall)" in normalized
+    assert "upper(er.test_type) = 'IELTS'" in normalized
+
+
+@pytest.mark.asyncio
+async def test_search_cte_executes_against_production_base_table_shape():
+    """Exercise the replacement view contract in PostgreSQL without a view."""
+    async with AsyncSessionLocal() as db:
+        try:
+            for ddl in (
+                """CREATE TEMP TABLE universities (
+                    id integer, name text, logo_url text, city text, country text,
+                    website text, featured boolean, featured_priority integer
+                ) ON COMMIT DROP""",
+                """CREATE TEMP TABLE courses (
+                    id integer, name text, category text, sub_category text,
+                    degree_level text, duration numeric, duration_term text,
+                    study_mode text, course_website text, course_location text,
+                    university_id integer, status text, approval_status text
+                ) ON COMMIT DROP""",
+                """CREATE TEMP TABLE fees (
+                    id integer, course_id integer, international_fee real,
+                    currency text, fee_term text
+                ) ON COMMIT DROP""",
+                """CREATE TEMP TABLE intakes (
+                    course_id integer, intake_month text
+                ) ON COMMIT DROP""",
+                """CREATE TEMP TABLE english_requirements (
+                    course_id integer, test_type text, overall real
+                ) ON COMMIT DROP""",
+            ):
+                await db.execute(text(ddl))
+
+            await db.execute(text(
+                """INSERT INTO universities
+                   VALUES (1, 'Shape University', NULL, 'Sydney', 'Australia',
+                           'https://uni.test', TRUE, 7)"""
+            ))
+            await db.execute(text(
+                """INSERT INTO courses
+                   VALUES (10, 'Master of Testing', 'Computing', 'Software',
+                           'Master', 2, 'Years', 'On Campus',
+                           'https://uni.test/testing', 'Sydney Campus', 1,
+                           'active', 'approved')"""
+            ))
+            await db.execute(text(
+                "INSERT INTO fees VALUES (1, 10, 42000, 'AUD', 'Year')"
+            ))
+            await db.execute(text(
+                "INSERT INTO intakes VALUES (10, 'February')"
+            ))
+            await db.execute(text(
+                """INSERT INTO english_requirements VALUES
+                   (10, 'ielts', 6.5),
+                   (10, 'IELTS', 7.0)"""
+            ))
+
+            row = (
+                await db.execute(
+                    text(
+                        f"""WITH {_COURSE_SEARCH_CTE}
+                            SELECT id, course_name, university_country,
+                                   international_fee, ielts_overall, intakes
+                            FROM course_search_view
+                            WHERE university_country = :country
+                              AND :intake = ANY(intakes)"""
+                    ),
+                    {"country": "Australia", "intake": "February"},
+                )
+            ).mappings().one()
+
+            assert dict(row) == {
+                "id": 10,
+                "course_name": "Master of Testing",
+                "university_country": "Australia",
+                "international_fee": 42000.0,
+                "ielts_overall": 7.0,
+                "intakes": ["February"],
+            }
+        finally:
+            await db.rollback()
+
+
+def test_search_sql_failure_is_not_disguised_as_empty_results():
+    """A schema/query mismatch must be observable instead of looking like no data."""
+    async def _db_override():
+        yield _FailingSearchSession()
+
+    app.dependency_overrides[get_db] = _db_override
+    client = TestClient(app, raise_server_exceptions=False)
+
+    response = client.get("/api/search/courses")
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "detail": "Course search is temporarily unavailable"
+    }
 
 
 def test_compare_rejects_non_numeric_ids():
