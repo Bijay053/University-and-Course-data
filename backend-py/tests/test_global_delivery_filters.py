@@ -192,7 +192,8 @@ def test_utas_shared_distance_disclaimer_does_not_reject_on_campus_course() -> N
     html = """
     <main>
       <p>This course may not be available to international students.</p>
-      <p>Please see the list of distance courses for available options.</p>
+      <p>Please <a href="/distance">see the list of distance courses</a>
+      for available options.</p>
       <p>Study on campus in Hobart or Launceston.</p>
     </main>
     """
@@ -200,6 +201,40 @@ def test_utas_shared_distance_disclaimer_does_not_reject_on_campus_course() -> N
         html,
         "https://www.utas.edu.au/courses/example/courses/distance-program",
     )
+
+
+def test_utas_explicit_full_time_option_beats_shared_part_time_prose() -> None:
+    html = """
+    <section>
+      <div>Duration</div>
+      <div>
+        Minimum 3 years, up to a maximum of 7 years.
+        This course is available to study as both part-time or full-time.
+      </div>
+      <div>Duration</div>
+      <div>
+        Duration refers to the minimum and maximum amounts of time in which
+        this course can be completed. Some programs are only available part time.
+      </div>
+    </section>
+    """
+    assert _is_parttime_only_page(html) is False
+
+
+def test_utas_shared_part_time_prose_alone_is_not_course_level_evidence() -> None:
+    html = """
+    <section>
+      <div>Duration</div>
+      <div>
+        Minimum 3 years, up to a maximum of 7 years.
+        Duration refers to the minimum and maximum amounts of time in which
+        this course can be completed. It will be affected by whether you choose
+        to study full or part time, noting that some programs are only available
+        part time.
+      </div>
+    </section>
+    """
+    assert _is_parttime_only_page(html) is False
 
 
 def test_full_time_wins_when_duration_also_mentions_part_time_equivalent() -> None:

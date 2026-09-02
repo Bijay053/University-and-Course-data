@@ -659,6 +659,12 @@ def _is_domestic_only_page(html: str, url: str | None = None) -> bool:
         return True
     text = _re.sub(r"<[^>]+>", " ", relevant_html)
     text = _re.sub(r"\s+", " ", text)
+    host = (urlparse(url).hostname or "").lower() if url else ""
+    if host in {"utas.edu.au", "www.utas.edu.au"}:
+        # The shared UTAS distance-course advisory can be split across inline
+        # tags, so it may not exist as contiguous text until after tag removal.
+        # Strip it again from normalized visible text before hard matching.
+        text = _UTAS_DISTANCE_DISCLAIMER_RE.sub(" ", text)
     if _DOMESTIC_ONLY_RE.search(text):
         return True
     # Torrens' current course template no longer consistently emits the
@@ -692,9 +698,8 @@ def _is_domestic_only_page(html: str, url: str | None = None) -> bool:
     # international courses. Renderers/HTML compactors can omit the hidden
     # #tabInternational structure while retaining the caveat, so absence of
     # that structural marker is not negative eligibility evidence on UTAS.
-    # Genuine UTAS exclusions remain covered by the hard, course-level
-    # statements above, including the distance-courses disclaimer.
-    host = (urlparse(url).hostname or "").lower() if url else ""
+    # Genuine UTAS exclusions remain covered by explicit hard, course-level
+    # statements and by the later authoritative online-only delivery guard.
     soft_marker_is_authoritative = host not in {
         "utas.edu.au",
         "www.utas.edu.au",
@@ -770,6 +775,12 @@ _DURATION_LABEL_PAT_RE = _re.compile(
 )
 _PARTTIME_ONLY_PT_RE = _re.compile(r"\bpart[- ]?time\b", _re.IGNORECASE)
 _PARTTIME_ONLY_FT_RE = _re.compile(r"\bfull[- ]?time\b", _re.IGNORECASE)
+_GENERIC_PARTTIME_DISCLAIMER_RE = _re.compile(
+    r"(?:\bit\s+will\s+be\s+affected\s+by\s+whether\s+you\s+choose\s+to\s+"
+    r"study\s+full\s+or\s+part[- ]?time\s*,?\s*)?"
+    r"\bnoting\s+that\s+some\s+programs\s+are\s+only\s+available\s+part[- ]?time\b",
+    _re.IGNORECASE,
+)
 
 # Task #233: minimum browser-returned body length to count as a genuine
 # "browser rescue" (used by the confirmed-browser-only host gate).  A fully
@@ -847,6 +858,21 @@ def _infer_study_load_from_text(text: str) -> str | None:
     """Prefer Full Time whenever the course explicitly offers that option."""
     if not text:
         return None
+    # This explanatory UTAS boilerplate describes the catalogue generally,
+    # not the current course. It commonly follows every Duration value and
+    # cannot establish that the current course is part-time-only.
+    text = _GENERIC_PARTTIME_DISCLAIMER_RE.sub(" ", text)
+    # UTAS places a generic explanatory sentence ("some programs are only
+    # available part time") in every Duration panel. Course-level availability
+    # in the same panel is authoritative and must win over that shared prose.
+    if _re.search(
+        r"\bthis\s+(?:course|program|degree)\s+is\s+available\s+to\s+study\s+as\s+"
+        r"both\s+(?:part[- ]?time\s+(?:or|and)\s+full[- ]?time|"
+        r"full[- ]?time\s+(?:or|and)\s+part[- ]?time)\b",
+        text,
+        _re.IGNORECASE,
+    ):
+        return "Full Time"
     # An equivalent full-time duration is sometimes quoted only as a workload
     # measure even though the course itself is explicitly part-time-only.
     if _re.search(
