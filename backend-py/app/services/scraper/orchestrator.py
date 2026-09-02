@@ -318,6 +318,14 @@ def _strip_provider_name_from_title(
     return cleaned
 
 
+def _resolve_stage_course_name(result: dict, payload: dict) -> str:
+    """Use the final extracted name instead of a stale discovery/SEO title."""
+    return (
+        (payload.get("course_name") or "").strip()
+        or (result.get("name") or "").strip()
+    )
+
+
 async def _apply_render_listing_pages(
     *,
     links: list[dict],
@@ -5393,7 +5401,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                             stage_db,
                             scrape_job_id=runtime_job_id,
                             university_id=uni_id,
-                            course_name=r["name"],
+                            course_name=_resolve_stage_course_name(r, payload),
                             payload=payload,
                             # Bug D: pass per-field evidence so it lands in
                             # scraped_field_evidence and the review modal can

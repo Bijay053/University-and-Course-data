@@ -8,6 +8,7 @@ from app.services.scraper.extractors.federation_json import (
     extract_intake_months,
     extract_locations,
 )
+from app.services.scraper.orchestrator import _resolve_stage_course_name
 from app.services.scraper.pipelines.single_course import extract_course
 
 
@@ -112,3 +113,21 @@ def test_federation_authority_is_not_nested_under_ai_fallback() -> None:
     # authority back inside ``if use_ai_fallback:``, reproducing the DHY5 bug.
     assert authority_gate.startswith("    if ")
     assert not authority_gate.startswith("        if ")
+
+
+def test_staging_prefers_final_clean_course_name_over_stale_seo_title() -> None:
+    result = {
+        "name": (
+            "Bachelor of Information Technology (Professional Practice) "
+            "| Federation University"
+        )
+    }
+    payload = {
+        "course_name": (
+            "Bachelor of Information Technology (Professional Practice)"
+        )
+    }
+
+    assert _resolve_stage_course_name(result, payload) == (
+        "Bachelor of Information Technology (Professional Practice)"
+    )
