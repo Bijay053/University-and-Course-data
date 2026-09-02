@@ -18,12 +18,23 @@ COURSE_TAXONOMY = MappingProxyType(
     }
 )
 CATEGORIES = tuple(COURSE_TAXONOMY)
+DEFAULT_SUBCATEGORY_BY_CATEGORY = MappingProxyType(
+    dict(_DATA["defaultSubcategories"])
+)
 LEGACY_PARENT_ALIASES = MappingProxyType(_DATA["legacyParentAliases"])
 TAXONOMY_PAIRS = tuple(
     (parent, sub_category)
     for parent, sub_categories in COURSE_TAXONOMY.items()
     for sub_category in sub_categories
 )
+
+if set(DEFAULT_SUBCATEGORY_BY_CATEGORY) != set(CATEGORIES):
+    raise ValueError("Every category must define exactly one default subcategory")
+for _parent, _default_subcategory in DEFAULT_SUBCATEGORY_BY_CATEGORY.items():
+    if _default_subcategory not in COURSE_TAXONOMY[_parent]:
+        raise ValueError(
+            f"Default subcategory {_default_subcategory!r} is not valid for {_parent!r}"
+        )
 
 
 def _parent_key(value: str) -> str:

@@ -20,8 +20,8 @@ from scripts.apply_migration_040 import _SEED
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_current_thirteen_parents_drive_backend_and_database_seed():
-    assert len(CATEGORIES) == 13
+def test_current_parents_drive_backend_and_database_seed():
+    assert len(CATEGORIES) == 14
     assert tuple(COURSE_TAXONOMY) == CATEGORIES
     assert tuple(_SEED) == TAXONOMY_PAIRS
     assert {parent for parent, _ in _SEED} == set(CATEGORIES)

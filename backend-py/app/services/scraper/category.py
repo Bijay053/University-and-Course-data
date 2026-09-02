@@ -18,6 +18,7 @@ import re
 
 from app.services.scraper.taxonomy import (
     CATEGORIES,
+    DEFAULT_SUBCATEGORY_BY_CATEGORY,
     LEGACY_PARENT_ALIASES,
     canonical_parent,
 )
@@ -486,13 +487,18 @@ def infer_course_taxonomy(
     clean_category = canonical_parent(category)
     clean_sub = sub_category.strip() if sub_category and sub_category.strip() else None
 
-    # A bare research-degree title contains no discipline signal.  Keep any
-    # real caller-supplied taxonomy, but never let the broad classifier turn
-    # "Doctor of Philosophy" / "MPhil" into a guessed parent category.
+    # A bare research-degree title contains no discipline signal. Preserve a
+    # real caller-supplied parent, but use its honest General child rather than
+    # guessing that "Philosophy" is the research discipline. With no supplied
+    # parent, keep the row complete and visibly unresolved as Other.
     if course_name and _GENERIC_DOCTORATE_RE.match(course_name.strip()):
+        resolved_category = clean_category or "Other"
         return {
-            "category": clean_category,
-            "sub_category": clean_sub,
+            "category": resolved_category,
+            "sub_category": clean_sub
+            or DEFAULT_SUBCATEGORY_BY_CATEGORY.get(
+                resolved_category, "General / Unclassified"
+            ),
         }
 
     deterministic = map_course_to_category(course_name)
@@ -502,7 +508,7 @@ def infer_course_taxonomy(
             deterministic.get("category")
             if deterministic
             else classify_category(course_name)
-        )
+        ) or "Other"
 
     resolved_sub = clean_sub
     if (
@@ -511,6 +517,10 @@ def infer_course_taxonomy(
         and _category_key(resolved_category) == _category_key(deterministic.get("category"))
     ):
         resolved_sub = deterministic.get("sub_category")
+    if not resolved_sub:
+        resolved_sub = DEFAULT_SUBCATEGORY_BY_CATEGORY.get(
+            resolved_category, "General / Unclassified"
+        )
 
     return {
         "category": resolved_category,

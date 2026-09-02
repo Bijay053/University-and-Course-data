@@ -79,7 +79,7 @@ def test_backfill_can_fill_parent_before_subcategory():
     assert change.new_sub_category == "Computer Science"
 
 
-def test_backfill_leaves_genuinely_unclassifiable_title_unchanged():
+def test_backfill_assigns_honest_fallback_to_unclassifiable_title():
     row = CandidateRow(
         "scraped_courses",
         5,
@@ -88,10 +88,32 @@ def test_backfill_leaves_genuinely_unclassifiable_title_unchanged():
         None,
         None,
     )
-    assert plan_change(row) is None
+    change = plan_change(row)
+    assert change is not None
+    assert change.new_category == "Other"
+    assert change.new_sub_category == "General / Unclassified"
 
 
-def test_backfill_does_not_create_subcategory_under_legacy_parent_alias():
+def test_backfill_repairs_pictured_generic_doctorate():
+    change = plan_change(
+        CandidateRow(
+            "scraped_courses",
+            7,
+            14,
+            "Doctor of Philosophy",
+            "Arts, Humanities & Social Sciences",
+            None,
+        )
+    )
+    assert change is not None
+    assert change.new_category == "Arts, Humanities & Social Sciences"
+    assert (
+        change.new_sub_category
+        == "General Arts, Humanities & Social Sciences"
+    )
+
+
+def test_backfill_canonicalizes_known_legacy_parent_alias():
     row = CandidateRow(
         "courses",
         6,
@@ -100,7 +122,26 @@ def test_backfill_does_not_create_subcategory_under_legacy_parent_alias():
         "Engineering",
         None,
     )
-    assert plan_change(row) is None
+    change = plan_change(row)
+    assert change is not None
+    assert change.old_category == "Engineering"
+    assert change.new_category == "Engineering & Technology"
+    assert change.new_sub_category == "Mechanical Engineering"
+
+
+def test_backfill_reclassifies_noncanonical_parent_when_child_is_blank():
+    row = CandidateRow(
+        "courses",
+        8,
+        13,
+        "Bachelor of Mechanical Engineering",
+        "Operator Custom Category",
+        None,
+    )
+    change = plan_change(row)
+    assert change is not None
+    assert change.new_category == "Engineering & Technology"
+    assert change.new_sub_category == "Mechanical Engineering"
 
 
 @pytest.mark.asyncio
@@ -128,3 +169,31 @@ async def test_apply_uses_original_parent_as_compare_and_set_precondition():
     compiled = statement.compile()
     assert "courses.category =" in str(compiled)
     assert "Media & Communications" in compiled.params.values()
+
+
+@pytest.mark.asyncio
+async def test_apply_updates_known_legacy_parent_and_blank_child_together():
+    class _Result:
+        def scalars(self):
+            return []
+
+    db = AsyncMock()
+    db.execute.return_value = _Result()
+    change = PlannedChange(
+        scope="courses",
+        row_id=101,
+        university_id=1,
+        course_name="Bachelor of Mechanical Engineering",
+        old_category="Engineering",
+        old_sub_category=None,
+        new_category="Engineering & Technology",
+        new_sub_category="Mechanical Engineering",
+    )
+
+    await _apply_grouped_updates(db, [change])
+
+    statement = db.execute.await_args.args[0]
+    compiled = statement.compile()
+    assert compiled.params["category"] == "Engineering & Technology"
+    assert compiled.params["sub_category"] == "Mechanical Engineering"
+    assert "Engineering" in compiled.params.values()

@@ -1,6 +1,7 @@
 {
   "categories": {
     "Business & Management": [
+      "General Business & Management",
       "Accounting",
       "Business",
       "Actuarial Science",
@@ -28,6 +29,7 @@
       "Business Analytics"
     ],
     "Computer Science & IT": [
+      "General Computer Science & IT",
       "Artificial Intelligence",
       "Information Technology (IT)",
       "Business Information Systems",
@@ -44,6 +46,7 @@
       "Information Technology"
     ],
     "Engineering & Technology": [
+      "General Engineering & Technology",
       "Aerospace Engineering",
       "Automotive Engineering",
       "Bio & Biomedical Engineering",
@@ -53,7 +56,6 @@
       "Electronics Engineering",
       "Energy & Power Engineering",
       "Environmental Engineering",
-      "General Engineering & Technology",
       "Industrial & Systems Engineering",
       "Marine Engineering",
       "Engineering Management",
@@ -72,6 +74,7 @@
       "Telecommunications"
     ],
     "Medicine & Health": [
+      "General Medicine & Health",
       "Biomedicine",
       "Biomedical Sciences",
       "Clinical Psychology",
@@ -107,6 +110,7 @@
       "Podiatry"
     ],
     "Arts, Humanities & Social Sciences": [
+      "General Arts, Humanities & Social Sciences",
       "Arts",
       "Humanities",
       "Social Sciences",
@@ -138,6 +142,7 @@
       "Geography"
     ],
     "Education & Social Work": [
+      "General Education & Social Work",
       "Education",
       "Coaching",
       "Counselling",
@@ -152,6 +157,7 @@
       "Special Education"
     ],
     "Architecture, Building & Design": [
+      "General Architecture, Building & Design",
       "Architecture",
       "Design",
       "Building",
@@ -163,6 +169,7 @@
       "Construction"
     ],
     "Media & Communications": [
+      "General Media & Communications",
       "Journalism",
       "Communications",
       "Media Management",
@@ -175,6 +182,7 @@
       "Digital Media"
     ],
     "Law & Legal Studies": [
+      "General Law & Legal Studies",
       "Business Law",
       "Criminology",
       "Law",
@@ -191,6 +199,7 @@
       "Legal Practice"
     ],
     "Hospitality, Tourism & Events": [
+      "General Hospitality, Tourism & Events",
       "Culinary Arts",
       "Event Management",
       "Hospitality Management",
@@ -199,6 +208,7 @@
       "Cookery"
     ],
     "Science & Mathematics": [
+      "General Science & Mathematics",
       "Applied Mathematics",
       "Science",
       "Astronomy & Space Sciences",
@@ -216,6 +226,7 @@
       "Psychology"
     ],
     "Agriculture & Environmental Science": [
+      "General Agriculture & Environmental Science",
       "Agriculture",
       "Animal Sciences",
       "Aquaculture & Fisheries",
@@ -240,13 +251,33 @@
       "Marine Science"
     ],
     "Trades & Construction": [
+      "General Trades & Construction",
       "Carpentry",
       "Plumbing",
       "Electrical Trades",
       "Welding & Fabrication",
       "Cabinet Making",
       "Refrigeration & HVAC"
+    ],
+    "Other": [
+      "General / Unclassified"
     ]
+  },
+  "defaultSubcategories": {
+    "Business & Management": "General Business & Management",
+    "Computer Science & IT": "General Computer Science & IT",
+    "Engineering & Technology": "General Engineering & Technology",
+    "Medicine & Health": "General Medicine & Health",
+    "Arts, Humanities & Social Sciences": "General Arts, Humanities & Social Sciences",
+    "Education & Social Work": "General Education & Social Work",
+    "Architecture, Building & Design": "General Architecture, Building & Design",
+    "Media & Communications": "General Media & Communications",
+    "Law & Legal Studies": "General Law & Legal Studies",
+    "Hospitality, Tourism & Events": "General Hospitality, Tourism & Events",
+    "Science & Mathematics": "General Science & Mathematics",
+    "Agriculture & Environmental Science": "General Agriculture & Environmental Science",
+    "Trades & Construction": "General Trades & Construction",
+    "Other": "General / Unclassified"
   },
   "legacyParentAliases": {
     "Agriculture & Environmental Studies": "Agriculture & Environmental Science",

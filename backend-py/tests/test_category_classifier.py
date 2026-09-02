@@ -69,9 +69,9 @@ def test_applied_translation_studies_maps_to_linguistics_taxonomy():
     }
 
 
-def test_taxonomy_size_matches_node():
-    # Issue 2: expanded from 12 → 13 to include "Trades & Construction".
-    assert len(CATEGORIES) == 13
+def test_taxonomy_includes_honest_unclassified_parent():
+    assert len(CATEGORIES) == 14
+    assert "Other" in CATEGORIES
 
 
 @pytest.mark.parametrize(
@@ -184,8 +184,25 @@ def test_inference_canonicalizes_legacy_parent_alias():
     "title",
     ["Doctor of Philosophy", "PhD", "Master of Philosophy", "MPhil"],
 )
-def test_shared_inference_does_not_guess_generic_doctorate_taxonomy(title: str):
+def test_shared_inference_keeps_generic_doctorate_taxonomy_complete(title: str):
     assert infer_course_taxonomy(title) == {
-        "category": None,
-        "sub_category": None,
+        "category": "Other",
+        "sub_category": "General / Unclassified",
+    }
+
+
+def test_generic_doctorate_uses_general_child_of_known_parent():
+    assert infer_course_taxonomy(
+        "Doctor of Philosophy",
+        category="Arts, Humanities & Social Sciences",
+    ) == {
+        "category": "Arts, Humanities & Social Sciences",
+        "sub_category": "General Arts, Humanities & Social Sciences",
+    }
+
+
+def test_unmatched_course_uses_honest_complete_fallback():
+    assert infer_course_taxonomy("Foundation Pathway Program") == {
+        "category": "Other",
+        "sub_category": "General / Unclassified",
     }

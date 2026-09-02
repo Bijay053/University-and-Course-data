@@ -70,10 +70,25 @@ def plan_change(row: CandidateRow) -> PlannedChange | None:
     )
     new_category = inferred.get("category")
     new_sub = inferred.get("sub_category")
-    # Historical/manual nonblank parents are outside this blank-subcategory
-    # repair's scope. Even a known legacy alias must not be rewritten here.
+    # Historical imports sometimes stored a subject ("Economics") or provider
+    # faculty label ("Business, Marketing and Management") in the parent
+    # column. For blank-child rows only, reclassify those noncanonical parents
+    # from the title so the result belongs to the controlled taxonomy.
+    if new_category not in CATEGORIES:
+        inferred = infer_course_taxonomy(
+            row.course_name,
+            category=None,
+            sub_category=None,
+        )
+        new_category = inferred.get("category")
+        new_sub = inferred.get("sub_category")
+
+    # Never rewrite one valid canonical parent to another during this repair.
+    # Noncanonical and legacy parent values cannot own a canonical child and
+    # are safe to normalize.
     if row.category and row.category.strip() and new_category != row.category.strip():
-        return None
+        if row.category.strip() in CATEGORIES:
+            return None
     if not new_category or new_category not in CATEGORIES or not new_sub:
         return None
     return PlannedChange(
@@ -237,6 +252,8 @@ async def _apply_grouped_updates(
             # this script is planning.  If it changed, skip rather than attach a
             # child inferred for a stale parent.
             predicates.append(model.category == expected_category)
+            if category != expected_category:
+                values["category"] = category
         result = await db.execute(
             update(model)
             .where(*predicates)

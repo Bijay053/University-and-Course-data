@@ -26,21 +26,6 @@ from app.services.sub_category_matcher import resolve_sub_category
 
 import re
 
-# A "generic doctorate" is a course whose title is JUST the degree
-# (e.g. "Doctor of Philosophy", "PhD", "Master of Philosophy") with no
-# research-field qualifier such as "(Psychology)" or "in Computer Science".
-# For these, the discipline is not knowable from the course name alone —
-# we MUST leave category + sub_category NULL so the reviewer fills them in
-# rather than letting the AI default to a wrong-but-plausible bucket like
-# "Maths & Sciences" / "Doctor of Philosophy". A field qualifier in
-# parentheses (any text inside `()`) or after " in " / " of " (where "of"
-# is followed by a discipline, not "Philosophy") disables this guard.
-_GENERIC_DOCTORATE_RE = re.compile(
-    r"^\s*(doctor of philosophy|doctor of professional studies|master of philosophy|"
-    r"ph\.?d\.?|d\.?phil\.?|m\.?phil\.?)\s*$",
-    re.IGNORECASE,
-)
-
 # A sub_category that is just the degree-level echo ("Doctor of Philosophy",
 # "Master of Education", "Bachelor of Arts" …). These are degrees, not fields.
 _DEGREE_NAME_RE = re.compile(
@@ -48,31 +33,6 @@ _DEGREE_NAME_RE = re.compile(
     r"diploma|certificate( i+v?)?|phd|mphil|dphil)\b.*$",
     re.IGNORECASE,
 )
-
-
-def _is_generic_doctorate_title(name: str | None) -> bool:
-    """Return True when the course title is a bare PhD/MPhil with no field info.
-
-    "Doctor of Philosophy"            → True   (bare)
-    "PhD"                             → True   (bare)
-    "Doctor of Philosophy (Psychology)" → False (parenthetical field)
-    "PhD in Computer Science"         → False (explicit field)
-    "Doctor of Education"             → False (specific doctorate)
-    """
-    if not name:
-        return False
-    s = name.strip()
-    # Strip trailing parentheticals before testing — anything in `()` is a
-    # field qualifier so its presence alone disqualifies the "generic" label.
-    if "(" in s and ")" in s:
-        return False
-    if re.search(r"\b(in|of)\s+[A-Za-z]", s, re.IGNORECASE):
-        # "Doctor of Philosophy in X" / "PhD of X" — but "Doctor of Philosophy"
-        # by itself trips the bare match below; the " of " inside it is part
-        # of the degree name, not a field separator.
-        if not _GENERIC_DOCTORATE_RE.match(s):
-            return False
-    return bool(_GENERIC_DOCTORATE_RE.match(s))
 
 
 _ENGLISH_TESTS = (
@@ -157,54 +117,33 @@ async def approve_scraped_course(
     else:
         course.degree_level = None
 
-    # Generic-doctorate guard: bare "Doctor of Philosophy" / "PhD" / "MPhil"
-    # titles do NOT contain enough info to infer a research discipline from
-    # the title alone. We still TRUST a real discipline if the page body
-    # surfaced one (Gemini's `sub_category` is a real field, not a degree
-    # echo) — that's a true signal worth keeping. We only null both fields
-    # when there is no real discipline signal anywhere, otherwise the AI
-    # default of "Science" → mapped to "Maths & Sciences" sticks.
-    _is_generic_phd = _is_generic_doctorate_title(getattr(sc, "course_name", None))
-
-    # Pre-compute the cleaned sub_category so the generic-PhD branch can use
-    # it as a signal-quality check.
+    # Drop degree-name echoes before taxonomy inference. The shared helper
+    # supplies a neutral General child when no genuine discipline is present.
     _raw_sub = getattr(sc, "sub_category", None)
     if _raw_sub and _DEGREE_NAME_RE.match(_raw_sub.strip()):
         # The AI sometimes echoes the degree name into sub_category — drop it
         # since "Doctor of Philosophy" is a degree, not a research field.
         _raw_sub = None
-    _has_real_discipline = bool(_raw_sub and _raw_sub.strip())
-
     _cat = getattr(sc, "category", None)
-    if _is_generic_phd and not _has_real_discipline:
-        # Generic PhD with no real discipline → null both for reviewer.
-        course.category = None
-    elif _cat:
-        course.category = canonical_parent(_cat)
-    else:
-        course.category = None
+    course.category = canonical_parent(_cat) if _cat else None
 
     # Approval is the final consistency boundary before the public catalogue.
     # Direct/imported staged rows can predate the staging safety net, so infer
-    # a missing taxonomy field here as well.  The helper preserves every
-    # nonblank value and keeps the generic-doctorate guard authoritative.
-    if not (_is_generic_phd and not _has_real_discipline):
-        _inferred = infer_course_taxonomy(
-            sc.course_name,
-            category=course.category,
-            sub_category=_raw_sub,
-        )
-        course.category = _inferred["category"]
-        _raw_sub = _inferred["sub_category"]
+    # missing taxonomy fields here as well.
+    _inferred = infer_course_taxonomy(
+        sc.course_name,
+        category=course.category,
+        sub_category=_raw_sub,
+    )
+    course.category = _inferred["category"]
+    _raw_sub = _inferred["sub_category"]
 
     # Resolve sub_category via fuzzy matcher — tries to match an existing
     # option for this category; inserts a new row if no match is found so the
     # value is available for future search / course-matching queries.
     _resolved_cat = getattr(course, "category", None)
 
-    if _is_generic_phd and not _has_real_discipline:
-        course.sub_category = None
-    elif _raw_sub and _resolved_cat:
+    if _raw_sub and _resolved_cat:
         course.sub_category = await resolve_sub_category(db, _resolved_cat, _raw_sub)
     else:
         course.sub_category = _raw_sub  # None or blank — keep as-is
