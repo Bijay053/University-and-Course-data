@@ -9,6 +9,7 @@ from app.services.scraper.extractors.federation_json import (
     extract_intake_months,
     extract_locations,
 )
+from app.services.scraper.guards import enforce_source_evidence
 from app.services.scraper.orchestrator import _resolve_stage_course_name
 from app.services.scraper.pipelines.single_course import extract_course
 
@@ -98,6 +99,7 @@ def test_federation_override_applies_ielts_from_hidden_json() -> None:
         "course_name": "Bachelor of Digital Transformation (IT)",
         "ielts_overall": None,
     }
+    evidence: list[dict] = []
 
     applied = apply_overrides(
         payload,
@@ -106,6 +108,7 @@ def test_federation_override_applies_ielts_from_hidden_json() -> None:
             "https://www.federation.edu.au/courses/"
             "dix5-bachelor-of-digital-transformation-it/"
         ),
+        evidence=evidence,
     )
 
     assert payload["ielts_overall"] == 6.5
@@ -114,6 +117,17 @@ def test_federation_override_applies_ielts_from_hidden_json() -> None:
     assert payload["ielts_writing"] == 6.0
     assert payload["ielts_speaking"] == 6.0
     assert "ielts" in applied
+    overall_evidence = next(
+        item for item in evidence if item["field_key"] == "ielts_overall"
+    )
+    assert overall_evidence["value"] == 6.5
+    assert overall_evidence["source_url"].endswith(
+        "/dix5-bachelor-of-digital-transformation-it/"
+    )
+    assert "Overall Academic IELTS" in overall_evidence["snippet"]
+    staged_payload, dropped = enforce_source_evidence(payload, evidence)
+    assert staged_payload["ielts_overall"] == 6.5
+    assert "ielts_overall" not in dropped
 
 
 def test_federation_late_override_cleans_name_without_config_context() -> None:

@@ -402,6 +402,7 @@ def apply_overrides(
     *,
     url: str = "",
     rendered_html: str | None = None,
+    evidence: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Apply Federation JSON overrides to *payload* in place.
 
@@ -521,6 +522,18 @@ def apply_overrides(
     if ielts_scores:
         previous = {key: payload.get(key) for key in ielts_scores}
         payload.update(ielts_scores)
+        if evidence is not None:
+            for field_key, value in ielts_scores.items():
+                evidence.append(
+                    {
+                        "field_key": field_key,
+                        "value": value,
+                        "confidence": 0.95,
+                        "method": "federation_json:course_essentials",
+                        "source_url": url,
+                        "snippet": ielts_raw or f"Federation IELTS: {value}",
+                    }
+                )
         applied["ielts"] = {
             "old": previous,
             "new": ielts_scores,

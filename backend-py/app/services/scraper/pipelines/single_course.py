@@ -6772,6 +6772,7 @@ async def extract_course(
                 _federation_authority_html or html,
                 url=url,
                 rendered_html=rendered_html,
+                evidence=evidence,
             )
         except Exception as _fed_exc:  # noqa: BLE001 — never break a scrape
             log.warning("federation_json override failed on %s: %s", url, _fed_exc)
