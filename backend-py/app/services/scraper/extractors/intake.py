@@ -500,6 +500,24 @@ _UOW_HOSTS: frozenset[str] = frozenset({"www.uow.edu.au", "uow.edu.au"})
 # circuiting the noisy Pass-1/2 raw-month scan.
 _ECU_HOSTS: frozenset[str] = frozenset({"www.ecu.edu.au", "ecu.edu.au"})
 
+# Waikato qualification pages publish the authoritative intake summary as:
+#
+#   Trimester A (February) and Trimester B (July)
+#
+# The surrounding page also contains application, scholarship, event, and
+# footer dates.  A generic month scan can therefore select an unrelated month
+# (December in the production incident) when the visual "Start dates" label is
+# not preserved by html_to_text().  This host-scoped pattern reads only the
+# explicit trimester-to-month pairs and remains data-driven: no course title or
+# month is hard-coded.
+_WAIKATO_HOSTS: frozenset[str] = frozenset(
+    {"www.waikato.ac.nz", "waikato.ac.nz"}
+)
+_WAIKATO_TRIMESTER_MONTH_RE = re.compile(
+    rf"\bTrimester\s+(?:[A-C]|[1-3])\s*\(\s*(?P<month>{_MONTH_ANY})\s*\)",
+    re.IGNORECASE,
+)
+
 # Anchors that confirm we are looking at ECU's canonical course-page
 # semester pivot, not an incidental "Semester 1" mention elsewhere on the
 # site.  Either anchor is sufficient — both appear on every ECU coursework
@@ -570,6 +588,7 @@ async def _extract_raw(html: str, url: str) -> list[ExtractionResult]:
     _host = (_up(url).netloc or "").lower()
     _is_uow = _host in _UOW_HOSTS
     _is_ecu = _host in _ECU_HOSTS
+    _is_waikato = _host in _WAIKATO_HOSTS
 
     # ── Candidate accumulator (regression fix 2026-05-28) ────────────────
     # Previously each content-gated pass below (campus-pivot, structural,
@@ -634,6 +653,37 @@ async def _extract_raw(html: str, url: str) -> list[ExtractionResult]:
     # widget; leaving it in causes months from unrelated courses to be
     # captured as this course's own intake dates.
     text = _strip_recently_viewed(text)
+
+    # Waikato's qualification summary is authoritative even when the visual
+    # "Start dates" label disappears during text flattening.  Read only explicit
+    # "Trimester X (Month)" pairs so unrelated deadlines and calendar dates can
+    # never become course intakes.
+    if _is_waikato:
+        _waikato_months: list[str] = []
+        for _wm in _WAIKATO_TRIMESTER_MONTH_RE.finditer(text):
+            _month = _normalise_month(_wm.group("month"))
+            if _month and _month not in _waikato_months:
+                _waikato_months.append(_month)
+        if _waikato_months:
+            _ordered_waikato = [
+                month for month in _MONTHS if month in set(_waikato_months)
+            ]
+            return [
+                ExtractionResult(
+                    field_key="intake_months",
+                    value=_ordered_waikato,
+                    normalized={
+                        "intake_months": _ordered_waikato,
+                        "intake_days": None,
+                    },
+                    confidence=0.95,
+                    snippet=(
+                        "Waikato trimester starts: "
+                        + ", ".join(_ordered_waikato)
+                    ),
+                    method="intake.waikato_trimesters",
+                )
+            ]
 
     # ── Pass 0a: Start-dates-section anchor (YAML start_dates_only) ───────
     # When extraction.intake.start_dates_only=True in the per-uni YAML, only

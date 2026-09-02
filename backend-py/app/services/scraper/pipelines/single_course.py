@@ -1226,6 +1226,26 @@ def _is_structural_course_page_method(method: str) -> bool:
     return any(method.startswith(p) for p in _STRUCTURAL_COURSE_PAGE_PREFIXES)
 
 
+def _gemini_may_override_course_page_value(
+    field_key: str,
+    current_method: str | None,
+) -> bool:
+    """Return whether Gemini PRIMARY may replace a course-page result.
+
+    Plain ``regex`` is generally treated as a structural course-page method,
+    but intake's plain-regex fallback is deliberately different: it is an
+    unscoped, low-confidence month scan and can capture unrelated application
+    or calendar dates.  A page-grounded Gemini intake may replace that weak
+    result.  Explicit intake structures (``intake.*``) remain protected.
+    """
+    if field_key == "intake_months" and current_method == "regex":
+        return True
+    return not (
+        current_method
+        and _is_structural_course_page_method(current_method)
+    )
+
+
 def _method_authority(method: str) -> float:
     """Return the authority level for a given extraction method string.
 
@@ -4433,7 +4453,10 @@ async def extract_course(
                 # conversion to win (it reads the authoritative Start-dates section).
                 if _gp_k == "intake_months":
                     _int_method = _best_ev_method("intake_months")
-                    if _int_method and _int_method != "regex":
+                    if not _gemini_may_override_course_page_value(
+                        _gp_k,
+                        _int_method,
+                    ):
                         continue
 
                 # Issue 5: Don't let Gemini PRIMARY set fee_term when it
@@ -4543,7 +4566,10 @@ async def extract_course(
                 # readability / documentation of the original intent.
                 if _gp_k not in _ENGLISH_SLOTS:
                     _cur_method = _best_ev_method(_gp_k)
-                    if _cur_method and _is_structural_course_page_method(_cur_method):
+                    if not _gemini_may_override_course_page_value(
+                        _gp_k,
+                        _cur_method,
+                    ):
                         continue  # course page structural extractor owns this field
 
                 # Guard: never overwrite an existing non-null value with None.

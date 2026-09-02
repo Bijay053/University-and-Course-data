@@ -118,6 +118,70 @@ def test_intake_label_does_not_misfire_on_unrelated_strong_tags():
     assert out[0].method != "intake.structural"
 
 
+def test_waikato_health_science_uses_only_published_trimester_months():
+    """Incidental December dates must not override Waikato's summary."""
+    html = """
+        <main>
+          <h1>Postgraduate Certificate of Health Science</h1>
+          <div>60 points, 6 months</div>
+          <div>Trimester A (February) and Trimester B (July)</div>
+          <section>Scholarship applications close 4 December 2026.</section>
+        </main>
+    """
+    out = _run(
+        intake.extract(
+            html,
+            "https://www.waikato.ac.nz/study/qualifications/"
+            "postgraduate-certificate-of-health-science/",
+        )
+    )
+    assert out
+    assert out[0].normalized["intake_months"] == ["February", "July"]
+    assert out[0].method == "intake.waikato_trimesters"
+
+
+def test_waikato_indigenous_data_uses_published_trimester_months():
+    """The same deterministic reader must support different published months."""
+    html = """
+        <main>
+          <h1>Postgraduate Certificate in Indigenous Data Sovereignty
+              and Analytics</h1>
+          <div>Trimester A (March) and Trimester B (July)</div>
+          <footer>University closes in December.</footer>
+        </main>
+    """
+    out = _run(
+        intake.extract(
+            html,
+            "https://www.waikato.ac.nz/study/qualifications/"
+            "postgraduate-certificate-in-indigenous-data-sovereignty-"
+            "and-analytics/",
+        )
+    )
+    assert out
+    assert out[0].normalized["intake_months"] == ["March", "July"]
+    assert out[0].method == "intake.waikato_trimesters"
+
+
+def test_waikato_explicit_december_trimester_remains_valid():
+    """December is rejected only when incidental, not when explicitly offered."""
+    html = """
+        <main>
+          <h1>Example Waikato qualification</h1>
+          <div>Trimester C (December)</div>
+        </main>
+    """
+    out = _run(
+        intake.extract(
+            html,
+            "https://www.waikato.ac.nz/study/qualifications/example/",
+        )
+    )
+    assert out
+    assert out[0].normalized["intake_months"] == ["December"]
+    assert out[0].method == "intake.waikato_trimesters"
+
+
 # ── Issue 3 regression: PGCE/PGCert tier detection ───────────────────────────
 # Teaching qualifications (PGCE, PGDE, PGCert, PGDip) do not contain
 # "master" or "postgraduate" verbatim in their degree_level string, so the
