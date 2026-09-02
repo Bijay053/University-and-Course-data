@@ -6772,10 +6772,32 @@ async def extract_course(
                 _federation_authority_html or html,
                 url=url,
                 rendered_html=rendered_html,
-                evidence=evidence,
             )
         except Exception as _fed_exc:  # noqa: BLE001 — never break a scrape
             log.warning("federation_json override failed on %s: %s", url, _fed_exc)
+
+    # ── Fleet-wide embedded JSON English rescue ─────────────────────────────
+    # Some course-detail pages keep explicit IELTS requirements inside
+    # application/JSON script payloads that html_to_text intentionally strips.
+    # Fill only one unambiguous profile and attach real source evidence so the
+    # staging proof gate preserves the value.
+    try:
+        from app.services.scraper.extractors.embedded_english import (
+            apply_embedded_english,
+        )
+
+        apply_embedded_english(
+            payload,
+            "\n".join(part for part in (html, rendered_html) if part),
+            url=url,
+            evidence=evidence,
+        )
+    except Exception as _embedded_eng_exc:  # noqa: BLE001
+        log.warning(
+            "embedded English rescue failed on %s: %s",
+            url,
+            _embedded_eng_exc,
+        )
 
     # ── Study-mode field trace ────────────────────────────────────────────────
     # Emits a single diagnostic event so operators can follow the mode value

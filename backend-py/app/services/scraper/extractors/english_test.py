@@ -99,6 +99,28 @@ def _try_floor(text: str, match_end: int, lo: float, hi: float) -> float | None:
 
 # --- IELTS (overall + subscores 4.0-9.0) -------------------------------------
 def _ielts(text: str) -> dict[str, float] | None:
+    # "Overall Academic IELTS band score of 6.0, with no band less than 6.0"
+    # — common in embedded course JSON where "overall" precedes the test name.
+    m = re.search(
+        r"\boverall\s+(?:academic\s+)?ielts\s+(?:band\s+)?score\s+of\s+"
+        r"([0-9]+(?:\.[0-9]+)?)"
+        r"[^0-9\n]{0,80}?(?:no\s+(?:individual\s+)?band\s+(?:score\s+)?"
+        r"(?:below|less\s+than|lower\s+than|under))\s*"
+        r"([0-9]+(?:\.[0-9]+)?)",
+        text,
+        re.I,
+    )
+    if m:
+        ov, mn = float(m.group(1)), float(m.group(2))
+        if 4 <= mn <= ov <= 9:
+            return {
+                "overall": ov,
+                "listening": mn,
+                "reading": mn,
+                "writing": mn,
+                "speaking": mn,
+            }
+
     # Pattern 1: "IELTS overall 6.0 with no band below 5.5"
     # — also matches "Academic IELTS Overall 6.0, with no band below 5.5"
     #   (PDF policy phrasing; allow leading "Academic " prefix and a
