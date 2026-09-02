@@ -146,18 +146,35 @@ export default function SearchPage() {
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [metadataError, setMetadataError] = useState<string | null>(null);
   const [tray, setTray] = useState<number[]>(loadCompareTray());
 
   // Fetch dropdown options + stats once.
   useEffect(() => {
-    fetch(`${BASE}/api/search/options`)
-      .then((r) => r.ok ? r.json() : null)
-      .then((j) => j && setOptions(j))
-      .catch(() => {});
-    fetch(`${BASE}/api/search/stats`)
-      .then((r) => r.ok ? r.json() : null)
-      .then((j) => j && setStats(j))
-      .catch(() => {});
+    const loadMetadata = async () => {
+      const [optionsResult, statsResult] = await Promise.allSettled([
+        fetch(`${BASE}/api/search/options`).then(async (response) => {
+          if (!response.ok) throw new Error("Search filters are temporarily unavailable.");
+          return response.json() as Promise<OptionsResponse>;
+        }),
+        fetch(`${BASE}/api/search/stats`).then(async (response) => {
+          if (!response.ok) throw new Error("Search statistics are temporarily unavailable.");
+          return response.json() as Promise<{
+            universities_with_courses: number;
+            total_universities: number;
+            total_courses: number;
+          }>;
+        }),
+      ]);
+
+      const failures: string[] = [];
+      if (optionsResult.status === "fulfilled") setOptions(optionsResult.value);
+      else failures.push(optionsResult.reason instanceof Error ? optionsResult.reason.message : "Search filters are temporarily unavailable.");
+      if (statsResult.status === "fulfilled") setStats(statsResult.value);
+      else failures.push(statsResult.reason instanceof Error ? statsResult.reason.message : "Search statistics are temporarily unavailable.");
+      setMetadataError(failures.length ? failures.join(" ") : null);
+    };
+    void loadMetadata();
   }, []);
 
   useEffect(() => {
@@ -294,6 +311,11 @@ export default function SearchPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4">
+        {metadataError && (
+          <div role="alert" className="lg:col-span-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {metadataError} Please try again later.
+          </div>
+        )}
         {/* ── Filters ──────────────────────────────────────── */}
         <aside className="bg-white rounded-xl border p-4 space-y-4 self-start lg:sticky lg:top-4">
           <div className="flex items-center justify-between">

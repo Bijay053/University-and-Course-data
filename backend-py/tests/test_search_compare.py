@@ -33,6 +33,12 @@ class _StubResult:
     def all(self):
         return self._rows
 
+    def scalars(self):
+        return self
+
+    def scalar_one(self):
+        return self._rows[0]
+
 
 class _StubSession:
     """Returns canned result-sets keyed by the SQL fragment matched."""
@@ -60,6 +66,14 @@ class _FailingSearchSession:
         raise RuntimeError(
             'relation "course_search_view" does not exist'
         )
+
+
+class _SequentialSession:
+    def __init__(self, results):
+        self.results = iter(results)
+
+    async def execute(self, stmt, params=None):  # noqa: ARG002
+        return _StubResult(next(self.results))
 
 
 def _client_with(mv_rows, eng_rows=None, acad_rows=None):
@@ -187,6 +201,94 @@ def test_search_sql_failure_is_not_disguised_as_empty_results():
     assert response.status_code == 500
     assert response.json() == {
         "detail": "Course search is temporarily unavailable"
+    }
+
+
+@pytest.mark.parametrize(
+    ("path", "detail", "log_message"),
+    [
+        (
+            "/api/search/options",
+            "Search options are temporarily unavailable",
+            "search_options SQL failed",
+        ),
+        (
+            "/api/search/stats",
+            "Search statistics are temporarily unavailable",
+            "search_stats SQL failed",
+        ),
+    ],
+)
+def test_search_metadata_sql_failures_are_not_disguised(
+    path, detail, log_message, caplog
+):
+    async def _db_override():
+        yield _FailingSearchSession()
+
+    app.dependency_overrides[get_db] = _db_override
+    client = TestClient(app, raise_server_exceptions=False)
+
+    with caplog.at_level("ERROR", logger="app.routers.search"):
+        response = client.get(path)
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": detail}
+    record = next(r for r in caplog.records if r.message == log_message)
+    assert record.exc_info is not None
+
+
+def test_search_options_success_response_is_unchanged():
+    session = _SequentialSession([
+        ["Australia", "United Kingdom"],
+        ["London", "Sydney"],
+        [{"id": 2, "name": "Alpha University"}],
+        ["Bachelor", "Master"],
+    ])
+
+    async def _db_override():
+        yield session
+
+    app.dependency_overrides[get_db] = _db_override
+    response = TestClient(app).get("/api/search/options")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "countries": ["Australia", "United Kingdom"],
+        "cities": ["London", "Sydney"],
+        "universities": [{"id": 2, "name": "Alpha University"}],
+        "degree_levels": ["Bachelor", "Master"],
+        "degreeLevels": ["Bachelor", "Master"],
+        "intake_months": [
+            "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December",
+        ],
+        "intakeMonths": [
+            "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December",
+        ],
+    }
+
+
+def test_search_stats_success_response_is_unchanged():
+    session = _SequentialSession([[12], [345], [4], [42000], [9]])
+
+    async def _db_override():
+        yield session
+
+    app.dependency_overrides[get_db] = _db_override
+    response = TestClient(app).get("/api/search/stats")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "total_universities": 12,
+        "totalUniversities": 12,
+        "total_courses": 345,
+        "totalCourses": 345,
+        "universities_with_courses": 9,
+        "universitiesWithCourses": 9,
+        "countries": 4,
+        "average_fee": 42000.0,
+        "averageFee": 42000.0,
     }
 
 

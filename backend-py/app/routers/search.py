@@ -656,8 +656,11 @@ async def search_options(db: Annotated[AsyncSession, Depends(get_db)]) -> Search
             "December",
         ]
     except Exception as exc:
-        log.error("search_options SQL failed: %s", exc)
-        return JSONResponse(content={"countries": [], "cities": [], "universities": [], "degree_levels": [], "degreeLevels": [], "intake_months": [], "intakeMonths": []})
+        log.exception("search_options SQL failed")
+        raise HTTPException(
+            status_code=500,
+            detail="Search options are temporarily unavailable",
+        ) from exc
 
     return JSONResponse(content=jsonable_encoder({
         "countries": list(countries),
@@ -687,18 +690,26 @@ async def search_stats(db: Annotated[AsyncSession, Depends(get_db)]) -> SearchSt
                 )
             )
         ).scalar_one()
+        # Count unis that actually have courses (not just total registered).
+        uwc = (
+            await db.execute(
+                text(
+                    "SELECT COUNT(DISTINCT university_id) FROM courses "
+                    "WHERE status = 'active'"
+                )
+            )
+        ).scalar_one()
     except Exception as exc:
-        log.error("search_stats SQL failed: %s", exc)
-        return JSONResponse(content={"total_universities": 0, "totalUniversities": 0, "total_courses": 0, "totalCourses": 0, "universities_with_courses": 0, "universitiesWithCourses": 0, "countries": 0, "average_fee": 0, "averageFee": 0})
+        log.exception("search_stats SQL failed")
+        raise HTTPException(
+            status_code=500,
+            detail="Search statistics are temporarily unavailable",
+        ) from exc
 
     tu = int(total_unis or 0)
     tc = int(total_courses or 0)
     co = int(countries or 0)
     af = float(avg_fee) if avg_fee is not None else 0
-    # Count unis that actually have courses (not just total registered)
-    uwc = (await db.execute(text(
-        "SELECT COUNT(DISTINCT university_id) FROM courses WHERE status = 'active'"
-    ))).scalar_one()
     uwc = int(uwc or 0)
     return JSONResponse(content={
         "total_universities": tu, "totalUniversities": tu,
