@@ -64,6 +64,25 @@ def test_backfill_never_overwrites_existing_subcategory():
     assert plan_change(row) is None
 
 
+def test_backfill_fills_missing_parent_and_preserves_existing_child():
+    change = plan_change(
+        CandidateRow(
+            "courses",
+            31,
+            11,
+            "BA (Hons) Liberal Arts",
+            None,
+            "School of History, Politics and Philosophy",
+        )
+    )
+    assert change is not None
+    assert change.new_category == "Arts, Humanities & Social Sciences"
+    assert (
+        change.new_sub_category
+        == "School of History, Politics and Philosophy"
+    )
+
+
 def test_backfill_can_fill_parent_before_subcategory():
     row = CandidateRow(
         "scraped_courses",

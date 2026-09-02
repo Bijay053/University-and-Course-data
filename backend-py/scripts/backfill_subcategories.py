@@ -61,11 +61,13 @@ class PlannedChange:
 
 def plan_change(row: CandidateRow) -> PlannedChange | None:
     """Return a no-overwrite taxonomy change when title evidence is enough."""
-    if row.sub_category and row.sub_category.strip():
+    has_category = bool(row.category and row.category.strip())
+    has_sub_category = bool(row.sub_category and row.sub_category.strip())
+    if has_category and has_sub_category:
         return None
     inferred = infer_course_taxonomy(
         row.course_name,
-        category=row.category,
+        category=row.category if has_category else None,
         sub_category=row.sub_category,
     )
     new_category = inferred.get("category")
@@ -127,6 +129,8 @@ async def _load_candidates(db: Any, limit: int | None) -> list[CandidateRow]:
         .where(
             ScrapedCourse.status.in_(["pending", "approved"]),
             or_(
+                ScrapedCourse.category.is_(None),
+                func.btrim(ScrapedCourse.category) == "",
                 ScrapedCourse.sub_category.is_(None),
                 func.btrim(ScrapedCourse.sub_category) == "",
             ),
@@ -143,7 +147,12 @@ async def _load_candidates(db: Any, limit: int | None) -> list[CandidateRow]:
         )
         .where(
             Course.status == "active",
-            or_(Course.sub_category.is_(None), func.btrim(Course.sub_category) == ""),
+            or_(
+                Course.category.is_(None),
+                func.btrim(Course.category) == "",
+                Course.sub_category.is_(None),
+                func.btrim(Course.sub_category) == "",
+            ),
         )
         .order_by(Course.id)
     )
@@ -182,27 +191,17 @@ async def _canonicalize_changes(
     for change in changes:
         key = (change.new_category, change.new_sub_category)
         if key not in cache:
-            cache[key] = (
+            resolved = (
                 await resolve_sub_category(
                     db,
                     change.new_category,
                     change.new_sub_category,
-                    auto_add=False,
+                    auto_add=True,
                 )
                 or change.new_sub_category
             )
-        if (change.new_category, cache[key]) not in canonical_pairs:
-            rejected.append(
-                CandidateRow(
-                    change.scope,
-                    change.row_id,
-                    change.university_id,
-                    change.course_name,
-                    change.old_category,
-                    change.old_sub_category,
-                )
-            )
-            continue
+            cache[key] = resolved
+            canonical_pairs.add((change.new_category, resolved))
         canonicalized.append(
             PlannedChange(
                 **{
@@ -218,11 +217,18 @@ async def _apply_grouped_updates(
     db: Any,
     changes: list[PlannedChange],
 ) -> set[tuple[str, int]]:
-    groups: dict[tuple[str, str, str, str | None], list[int]] = defaultdict(list)
+    groups: dict[
+        tuple[str, str, str, str | None, str | None], list[int]
+    ] = defaultdict(list)
     for change in changes:
         expected_category = (
             change.old_category
             if change.old_category and change.old_category.strip()
+            else None
+        )
+        expected_sub_category = (
+            change.old_sub_category
+            if change.old_sub_category and change.old_sub_category.strip()
             else None
         )
         groups[
@@ -231,17 +237,21 @@ async def _apply_grouped_updates(
                 change.new_category,
                 change.new_sub_category,
                 expected_category,
+                expected_sub_category,
             )
         ].append(change.row_id)
 
     updated: set[tuple[str, int]] = set()
-    for (scope, category, sub_category, expected_category), ids in groups.items():
+    for (
+        scope,
+        category,
+        sub_category,
+        expected_category,
+        expected_sub_category,
+    ), ids in groups.items():
         model = ScrapedCourse if scope == "scraped_courses" else Course
-        values: dict[str, Any] = {"sub_category": sub_category}
-        predicates = [
-            model.id.in_(ids),
-            or_(model.sub_category.is_(None), func.btrim(model.sub_category) == ""),
-        ]
+        values: dict[str, Any] = {}
+        predicates = [model.id.in_(ids)]
         if expected_category is None:
             values["category"] = category
             predicates.append(
@@ -254,6 +264,13 @@ async def _apply_grouped_updates(
             predicates.append(model.category == expected_category)
             if category != expected_category:
                 values["category"] = category
+        if expected_sub_category is None:
+            values["sub_category"] = sub_category
+            predicates.append(
+                or_(model.sub_category.is_(None), func.btrim(model.sub_category) == "")
+            )
+        else:
+            predicates.append(model.sub_category == expected_sub_category)
         result = await db.execute(
             update(model)
             .where(*predicates)
