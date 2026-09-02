@@ -120,6 +120,20 @@ _DATE_RE = re.compile(
     r"\b\d{1,2}\s+(?P<mon>[A-Za-z]{3,9})\s+\d{4}\b"
 )
 
+# Federation's Course essentials JSON uses the order
+# "Overall Academic IELTS band score of 6.0, with no band less than 6.0".
+# The generic visible-text extractor never sees this script content, and its
+# general IELTS patterns expect "Academic IELTS ... overall" in the opposite
+# word order.
+_IELTS_RE = re.compile(
+    r"\boverall\s+(?:academic\s+)?ielts\s+(?:band\s+)?score\s+of\s+"
+    r"(?P<overall>\d(?:\.\d)?)"
+    r".{0,80}?\bno\s+(?:individual\s+)?band\s+(?:score\s+)?"
+    r"(?:below|less\s+than|lower\s+than|under)\s+"
+    r"(?P<minimum>\d(?:\.\d)?)",
+    re.IGNORECASE | re.DOTALL,
+)
+
 # Federation URL prefix (before the canonical slug):
 #   dsz8-bachelor-of-science-honours
 #   dgc4-graduate-certificate-in-social-and-community-services
@@ -259,6 +273,37 @@ def extract_intake_months(html: str) -> tuple[list[str], str | None]:
             selected_summary = summary
             selected_months = ordered
     return selected_months, selected_summary
+
+
+def extract_ielts_scores(
+    html: str,
+) -> tuple[dict[str, float], str | None]:
+    """Read IELTS overall and component floor from Course essentials JSON."""
+    selected: tuple[dict[str, float], str] | None = None
+    for heading, summary in _iter_blocks(html):
+        if heading.strip().lower() not in (
+            "ielts",
+            "english language requirements",
+        ):
+            continue
+        match = _IELTS_RE.search(summary)
+        if not match:
+            continue
+        overall = float(match.group("overall"))
+        minimum = float(match.group("minimum"))
+        if not (4 <= minimum <= overall <= 9):
+            continue
+        selected = (
+            {
+                "ielts_overall": overall,
+                "ielts_listening": minimum,
+                "ielts_reading": minimum,
+                "ielts_writing": minimum,
+                "ielts_speaking": minimum,
+            },
+            summary,
+        )
+    return selected if selected is not None else ({}, None)
 
 
 def extract_canonical_course_name(
@@ -466,6 +511,20 @@ def apply_overrides(
             "old": prev_intake,
             "new": months,
             "summary": intake_raw,
+        }
+
+    # IELTS from the authoritative Course essentials JSON. This content lives
+    # inside a script block, so the generic visible-text extractor sees none of
+    # it on pages such as DIX5. Replace all five IELTS slots together so the
+    # overall score cannot become detached from its component-floor semantics.
+    ielts_scores, ielts_raw = extract_ielts_scores(html)
+    if ielts_scores:
+        previous = {key: payload.get(key) for key in ielts_scores}
+        payload.update(ielts_scores)
+        applied["ielts"] = {
+            "old": previous,
+            "new": ielts_scores,
+            "summary": ielts_raw,
         }
 
     # Canonical course name from URL-slug-matching heading block —

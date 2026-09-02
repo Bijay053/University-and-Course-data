@@ -5,6 +5,7 @@ import inspect
 
 from app.services.scraper.extractors.federation_json import (
     apply_overrides,
+    extract_ielts_scores,
     extract_intake_months,
     extract_locations,
 )
@@ -63,6 +64,56 @@ def test_federation_uses_course_detail_locations_block() -> None:
     assert campuses == ["Berwick", "Mt Helen"]
     assert online_only is False
     assert summary == "Berwick (on campus)<br>Mt Helen (on campus)"
+
+
+def test_federation_extracts_ielts_from_course_essentials_json() -> None:
+    html = r'''
+    {
+      "heading": "IELTS",
+      "summary": "<p>Overall Academic IELTS band score of 6.0, with no band less than 6.0, or equivalent.</p>"
+    }
+    '''
+
+    scores, summary = extract_ielts_scores(html)
+
+    assert scores == {
+        "ielts_overall": 6.0,
+        "ielts_listening": 6.0,
+        "ielts_reading": 6.0,
+        "ielts_writing": 6.0,
+        "ielts_speaking": 6.0,
+    }
+    assert summary is not None
+    assert "Overall Academic IELTS" in summary
+
+
+def test_federation_override_applies_ielts_from_hidden_json() -> None:
+    html = r'''
+    {
+      "heading": "IELTS",
+      "summary": "<p>Overall Academic IELTS band score of 6.5, with no band less than 6.0, or equivalent.</p>"
+    }
+    '''
+    payload = {
+        "course_name": "Bachelor of Digital Transformation (IT)",
+        "ielts_overall": None,
+    }
+
+    applied = apply_overrides(
+        payload,
+        html,
+        url=(
+            "https://www.federation.edu.au/courses/"
+            "dix5-bachelor-of-digital-transformation-it/"
+        ),
+    )
+
+    assert payload["ielts_overall"] == 6.5
+    assert payload["ielts_listening"] == 6.0
+    assert payload["ielts_reading"] == 6.0
+    assert payload["ielts_writing"] == 6.0
+    assert payload["ielts_speaking"] == 6.0
+    assert "ielts" in applied
 
 
 def test_federation_late_override_cleans_name_without_config_context() -> None:
