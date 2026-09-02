@@ -53,6 +53,28 @@ class StageResult:
         return self.saved
 
 
+def _clean_model_value(field_name: str, value: Any) -> Any:
+    """Normalize extractor values to the types required by ScrapedCourse."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+
+    if field_name == "fee_year":
+        if value is None or isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            return value if 1900 <= value <= 2200 else None
+        if isinstance(value, float):
+            return int(value) if value.is_integer() and 1900 <= value <= 2200 else None
+        if isinstance(value, str):
+            stripped = value.strip()
+            if re.fullmatch(r"\d{4}", stripped):
+                year = int(stripped)
+                return year if 1900 <= year <= 2200 else None
+            return None
+
+    return value
+
+
 # ---------------------------------------------------------------------------
 # Specialisation name augmentation
 # ---------------------------------------------------------------------------
@@ -838,16 +860,15 @@ async def stage_course(
                     except re.error:
                         log.warning("field_overrides: invalid regex skipped: %s", _fo.url_regex)
 
-    # Sanitize NaN/Inf floats before writing — PostgreSQL accepts NaN as a
-    # FLOAT value but Python's JSON encoder will later raise ValueError on it.
-    def _clean(v: Any) -> Any:
-        return None if isinstance(v, float) and not math.isfinite(v) else v
-
     sc = ScrapedCourse(
         scrape_job_id=scrape_job_id,
         university_id=university_id,
         course_name=name,
-        **{k: _clean(v) for k, v in payload.items() if hasattr(ScrapedCourse, k) and k != "course_name"},
+        **{
+            k: _clean_model_value(k, v)
+            for k, v in payload.items()
+            if hasattr(ScrapedCourse, k) and k != "course_name"
+        },
     )
     db.add(sc)
     try:
