@@ -188,14 +188,15 @@ def test_utas_hard_domestic_only_statement_still_rejects() -> None:
     )
 
 
-def test_utas_distance_course_disclaimer_still_rejects() -> None:
+def test_utas_shared_distance_disclaimer_does_not_reject_on_campus_course() -> None:
     html = """
     <main>
       <p>This course may not be available to international students.</p>
       <p>Please see the list of distance courses for available options.</p>
+      <p>Study on campus in Hobart or Launceston.</p>
     </main>
     """
-    assert _is_domestic_only_page(
+    assert not _is_domestic_only_page(
         html,
         "https://www.utas.edu.au/courses/example/courses/distance-program",
     )

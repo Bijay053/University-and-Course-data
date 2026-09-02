@@ -330,6 +330,11 @@ _DOMESTIC_ONLY_SOFT_RE: _re.Pattern[str] = _re.compile(
     _re.IGNORECASE,
 )
 
+_UTAS_DISTANCE_DISCLAIMER_RE: _re.Pattern[str] = _re.compile(
+    r"please\s+see\s+the\s+list\s+of\s+distance\s+courses",
+    _re.IGNORECASE,
+)
+
 
 _ADELAIDE_DORMANT_DOMESTIC_MODAL_RE: _re.Pattern[str] = _re.compile(
     r"<dialog\b(?=[^>]*\bdata-modal-opener\s*=\s*[\"']dom-modal-exclusive[\"'])"
@@ -350,6 +355,12 @@ def _domestic_only_relevant_html(html: str, url: str | None = None) -> str:
     host = (urlparse(url).hostname or "").lower()
     if host in {"adelaide.edu.au", "www.adelaide.edu.au"}:
         return _ADELAIDE_DORMANT_DOMESTIC_MODAL_RE.sub(" ", html)
+    if host in {"utas.edu.au", "www.utas.edu.au"}:
+        # UTAS includes this distance-course advisory in shared eligibility UI
+        # on ordinary on-campus courses too. It is not course-level exclusion
+        # evidence. Actual all-virtual courses are rejected later by the
+        # authoritative online-only delivery guard after mode/location parsing.
+        return _UTAS_DISTANCE_DISCLAIMER_RE.sub(" ", html)
     return html
 
 
