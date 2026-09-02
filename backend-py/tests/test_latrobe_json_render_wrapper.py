@@ -41,6 +41,24 @@ def test_decode_json_response_rejects_non_json_html():
         _decode_json_response("<html><body>challenge page</body></html>")
 
 
+def test_parse_eng_req_supports_academic_score_of_wording():
+    eng_req = """
+    <p>IELTS is the only English Proficiency test accepted for entry.</p>
+    <p>
+      IELTS (Academic) score of 7.0 with no individual band score less
+      than 6.5.
+    </p>
+    """
+
+    assert latrobe_json.parse_eng_req(eng_req) == {
+        "ielts_overall": 7.0,
+        "ielts_listening": 6.5,
+        "ielts_reading": 6.5,
+        "ielts_writing": 6.5,
+        "ielts_speaking": 6.5,
+    }
+
+
 def test_fetch_course_bundle_uses_top_level_navigation(monkeypatch):
     detail_doc = {
         "availability": True,
@@ -99,7 +117,11 @@ def test_apply_overrides_uses_prefetched_document_without_fetch(monkeypatch):
         "availability": True,
         "data": {
             "duration": "3 years full-time",
-            "entryReq": {"engReq": "IELTS 6.5 with no band below 6.0"},
+            "entryReq": {
+                "engReq": (
+                    "6.5 IELTS (Academic) with no individual band less than 6.0"
+                )
+            },
         },
     }
 
@@ -129,6 +151,11 @@ def test_apply_overrides_uses_prefetched_document_without_fetch(monkeypatch):
     assert payload["duration"] == 3
     assert applied["study_load"]["new"] == "Full Time"
     assert payload["study_load"] == "Full Time"
+    assert payload["ielts_overall"] == 6.5
+    assert payload["ielts_listening"] == 6.0
+    assert payload["ielts_reading"] == 6.0
+    assert payload["ielts_writing"] == 6.0
+    assert payload["ielts_speaking"] == 6.0
 
 
 def test_parse_international_fee_supports_current_raw_fees_schema():

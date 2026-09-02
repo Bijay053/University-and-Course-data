@@ -481,18 +481,16 @@ def international_authority_missing(
 # Trobe (capturing scores from unrelated marketing imagery), so the
 # JSON value REPLACES whatever those produced.
 _IELTS_OVERALL_RE = re.compile(
-    # Three accepted phrasings (all observed live on La Trobe engReq snippets
-    # as of 2026-05-17):
+    # Accepted phrasings observed live on La Trobe engReq snippets:
     #   1. "6.0 IELTS (Academic)"           — leading score + "Academic" tag
     #   2. "6.5 IELTS (Academic) with …"    — same as (1), longer sentence
     #   3. "IELTS of 7.0 with no individual band score less than 7.0"
-    #      — Bachelor of Nursing 2027/international/bu engReq.  Has NO
-    #      "Academic" qualifier and the score follows the word "IELTS".
-    #      Pattern (3) must come AFTER (1)/(2) in the alternation so the
-    #      leading-numeric phrasing wins when both are present in the
-    #      same snippet.
+    #   4. "IELTS (Academic) score of 7.0 with no individual band score
+    #      less than 6.5" — Prosthetics and Orthotics 2027/international/bu.
+    # The trailing-score branch accepts the optional Academic qualifier and
+    # optional word "score" while remaining anchored to IELTS.
     r"(?:(\d(?:\.\d)?)\s*IELTS\s*\(?Academic\)?"
-    r"|IELTS\s+of\s+(\d(?:\.\d)?))",
+    r"|IELTS\s*(?:\(\s*Academic\s*\)\s*)?(?:score\s+)?of\s+(\d(?:\.\d)?))",
     re.IGNORECASE,
 )
 _IELTS_NO_BAND_LESS_RE = re.compile(
