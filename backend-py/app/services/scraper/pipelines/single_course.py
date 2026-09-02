@@ -677,9 +677,24 @@ def _is_domestic_only_page(html: str, url: str | None = None) -> bool:
                 and not _re.search(r"\binternational\b", audience)
             ):
                 return True
-    # Soft pattern: "may not be available" — only block when there is no
-    # structural international section elsewhere on the same page.
-    if _DOMESTIC_ONLY_SOFT_RE.search(text) and not _has_international_section(html):
+    # UTAS publishes this soft caveat in shared course-page UI, including on
+    # international courses. Renderers/HTML compactors can omit the hidden
+    # #tabInternational structure while retaining the caveat, so absence of
+    # that structural marker is not negative eligibility evidence on UTAS.
+    # Genuine UTAS exclusions remain covered by the hard, course-level
+    # statements above, including the distance-courses disclaimer.
+    host = (urlparse(url).hostname or "").lower() if url else ""
+    soft_marker_is_authoritative = host not in {
+        "utas.edu.au",
+        "www.utas.edu.au",
+    }
+    # Soft pattern: "may not be available" — only block when the host treats
+    # it as authoritative and no international section exists on the page.
+    if (
+        soft_marker_is_authoritative
+        and _DOMESTIC_ONLY_SOFT_RE.search(text)
+        and not _has_international_section(html)
+    ):
         return True
     return False
 

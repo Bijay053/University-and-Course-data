@@ -160,6 +160,47 @@ def test_adelaide_real_course_level_domestic_statement_still_rejects() -> None:
     )
 
 
+def test_utas_soft_international_caveat_is_not_course_level_rejection() -> None:
+    """Rendered/compacted UTAS HTML may retain the caveat but omit hidden tabs."""
+    html = """
+    <main>
+      <h1>Bachelor of Information and Communication Technology</h1>
+      <p>This course may not be available to international students.</p>
+      <p>Study on campus in Hobart or Launceston.</p>
+    </main>
+    """
+    assert not _is_domestic_only_page(
+        html,
+        "https://www.utas.edu.au/courses/tsbe/courses/p3t-bachelor-of-ict",
+    )
+
+
+def test_utas_hard_domestic_only_statement_still_rejects() -> None:
+    html = """
+    <main>
+      <h1>Domestic Program</h1>
+      <p>This course is only available to domestic students.</p>
+    </main>
+    """
+    assert _is_domestic_only_page(
+        html,
+        "https://www.utas.edu.au/courses/example/courses/domestic-program",
+    )
+
+
+def test_utas_distance_course_disclaimer_still_rejects() -> None:
+    html = """
+    <main>
+      <p>This course may not be available to international students.</p>
+      <p>Please see the list of distance courses for available options.</p>
+    </main>
+    """
+    assert _is_domestic_only_page(
+        html,
+        "https://www.utas.edu.au/courses/example/courses/distance-program",
+    )
+
+
 def test_full_time_wins_when_duration_also_mentions_part_time_equivalent() -> None:
     assert (
         _infer_study_load_from_text("2 years full-time or part-time equivalent")
