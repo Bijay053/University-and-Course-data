@@ -18,7 +18,7 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 import json
 
-from sqlalchemy import desc, func, or_, select, text
+from sqlalchemy import and_, desc, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_user, get_db
@@ -328,7 +328,11 @@ async def list_universities(
     limit: int = Query(default=50, ge=1, le=500),
 ) -> UniversityListResponse:
     stmt = select(University, func.count(Course.id).label("course_count")).outerjoin(
-        Course, Course.university_id == University.id
+        Course,
+        and_(
+            Course.university_id == University.id,
+            Course.status == "active",
+        ),
     )
     if search:
         like = f"%{search.lower()}%"
@@ -499,7 +503,10 @@ async def get_university(uni_id: int, db: Annotated[AsyncSession, Depends(get_db
     u = await db.get(University, uni_id)
     if not u:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="University not found")
-    cc_stmt = select(func.count(Course.id)).where(Course.university_id == uni_id)
+    cc_stmt = select(func.count(Course.id)).where(
+        Course.university_id == uni_id,
+        Course.status == "active",
+    )
     cc = (await db.execute(cc_stmt)).scalar_one()
     return _to_read(u, int(cc)).model_dump()
 

@@ -48,6 +48,102 @@ async def test_approve_raises_valueerror_on_whitespace_course_name():
     db.execute.assert_not_called()
 
 
+@pytest.mark.asyncio
+async def test_approve_reactivates_a_matching_inactive_course():
+    existing = SimpleNamespace(
+        id=7,
+        name="Master of Example Studies",
+        status="inactive",
+    )
+    lock_result = MagicMock()
+    existing_result = MagicMock()
+    existing_result.scalar_one_or_none.return_value = existing
+    db = MagicMock()
+    execute_calls = 0
+
+    async def execute_with_existing(*_args, **_kwargs):
+        nonlocal execute_calls
+        execute_calls += 1
+        return existing_result if execute_calls == 2 else lock_result
+
+    db.execute = AsyncMock(side_effect=execute_with_existing)
+    db.commit = AsyncMock()
+    db.refresh = AsyncMock()
+    db.flush = AsyncMock()
+
+    sc = SimpleNamespace(
+        id=101,
+        university_id=1,
+        course_name="Master of Example Studies",
+        category=None,
+        sub_category=None,
+        degree_level="Master",
+        course_website="https://example.edu/course",
+        duration=2,
+        duration_term="Year",
+        study_mode="On Campus",
+        study_load="Full Time",
+        language="English",
+        description="Example",
+        other_requirement=None,
+        course_location="Main Campus",
+        student_market="International",
+        delivery_mode="On Campus",
+        international_eligible=True,
+        on_campus_available=True,
+        eligibility_status="ready",
+        eligibility_reason=None,
+        eligibility_confidence=100,
+        completeness=100,
+        decision_score=100,
+        avg_verification_confidence=100,
+        intake_months=["February"],
+        intake_days=None,
+        international_fee=None,
+        fee_term=None,
+        fee_year=None,
+        currency=None,
+        academic_level=None,
+        academic_score=None,
+        score_type=None,
+        academic_country=None,
+        ielts_overall=6.5,
+        ielts_listening=None,
+        ielts_speaking=None,
+        ielts_writing=None,
+        ielts_reading=None,
+        pte_overall=None,
+        pte_listening=None,
+        pte_speaking=None,
+        pte_writing=None,
+        pte_reading=None,
+        toefl_overall=None,
+        toefl_listening=None,
+        toefl_speaking=None,
+        toefl_writing=None,
+        toefl_reading=None,
+        cambridge_overall=None,
+        duolingo_overall=None,
+    )
+
+    result = await approve_scraped_course(db, sc)
+
+    assert result["course_id"] == 7
+    assert existing.status == "active"
+    assert sc.course_id == 7
+
+
+def test_university_course_counts_exclude_inactive_courses():
+    import inspect
+
+    from app.routers import universities
+
+    list_source = inspect.getsource(universities.list_universities)
+    detail_source = inspect.getsource(universities.get_university)
+    assert 'Course.status == "active"' in list_source
+    assert 'Course.status == "active"' in detail_source
+
+
 def test_bulk_approve_calls_rollback_on_per_row_exception():
     """Bug 2: bulk_approve.py must call ``db.rollback()`` in its except block.
 

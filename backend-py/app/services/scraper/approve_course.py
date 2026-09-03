@@ -99,6 +99,10 @@ async def approve_scraped_course(
         db.add(course)
         await db.flush()
 
+    # A course excluded by one scrape may legitimately return in a later run.
+    # Promotion is authoritative for the current catalogue, so reactivate it.
+    course.status = "active"
+
     # Normalise degree_level and category to the canonical frontend values so
     # the edit-form dropdowns always show a selected option.
     _dl = getattr(sc, "degree_level", None)
