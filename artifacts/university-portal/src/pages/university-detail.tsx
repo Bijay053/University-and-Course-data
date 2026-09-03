@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -5314,6 +5314,9 @@ export default function UniversityDetail() {
           <DialogContent className="max-w-sm">
             <DialogHeader>
               <DialogTitle>Delete approved course?</DialogTitle>
+              <DialogDescription>
+                Confirm permanent removal of this approved course and all of its associated records.
+              </DialogDescription>
             </DialogHeader>
             <p className="text-sm text-muted-foreground py-2">
               This will permanently delete the course and all its associated fees, intakes, English requirements, academic requirements, and scholarships. <strong>This cannot be undone.</strong>
@@ -6331,6 +6334,9 @@ export default function UniversityDetail() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Edit University</DialogTitle>
+            <DialogDescription>
+              Update the institution name, location, and website.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1">
@@ -6367,6 +6373,9 @@ export default function UniversityDetail() {
               <Wrench className="h-5 w-5 text-amber-600" />
               Repair Scrape — {uni.name}
             </DialogTitle>
+            <DialogDescription>
+              Review courses with missing critical fields before starting a targeted repair scrape.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3">

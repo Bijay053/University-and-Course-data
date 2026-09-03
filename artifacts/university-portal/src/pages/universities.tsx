@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -275,6 +275,9 @@ export default function Universities() {
                   <DialogTitle className="flex items-center gap-2">
                     <Globe className="h-4 w-4 text-blue-600" /> Add University by URL
                   </DialogTitle>
+                  <DialogDescription>
+                    Create and auto-configure a university from its website address.
+                  </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 pt-1">
                   <p className="text-sm text-muted-foreground">
@@ -323,6 +326,9 @@ export default function Universities() {
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Add New University</DialogTitle>
+                  <DialogDescription>
+                    Enter the institution details and choose whether to configure scraping immediately.
+                  </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-1">
@@ -523,7 +529,7 @@ export default function Universities() {
                             </Link>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <button className="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 border border-transparent hover:border-gray-200 transition-all opacity-0 group-hover:opacity-100 cursor-pointer">
+                                <button aria-label={`Actions for ${uni.name}`} className="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 border border-transparent hover:border-gray-200 transition-all opacity-0 group-hover:opacity-100 cursor-pointer">
                                   <MoreHorizontal className="w-4 h-4" />
                                 </button>
                               </DropdownMenuTrigger>
@@ -663,6 +669,9 @@ export default function Universities() {
               <Star className={`w-4 h-4 ${featuredConfirm?.current ? "text-gray-400" : "fill-amber-500 text-amber-500"}`} />
               {featuredConfirm?.current ? "Remove from Featured" : "Mark as Featured"}
             </DialogTitle>
+            <DialogDescription>
+              Confirm whether this university should appear in featured search results.
+            </DialogDescription>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
             {featuredConfirm?.current
@@ -695,6 +704,9 @@ export default function Universities() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Edit University</DialogTitle>
+            <DialogDescription>
+              Update the institution name, location, and website.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-1">
             <div className="space-y-1">
@@ -730,6 +742,9 @@ export default function Universities() {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Delete University</DialogTitle>
+            <DialogDescription>
+              Confirm permanent removal of this university and its associated records.
+            </DialogDescription>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
             Are you sure you want to delete <span className="font-semibold text-foreground">{deleteName}</span>?
