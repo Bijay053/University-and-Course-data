@@ -8,9 +8,10 @@ import io
 import re
 from pathlib import Path
 from typing import Annotated, Any
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import yaml as _yaml_mod
+from bs4 import BeautifulSoup
 
 from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import JSONResponse
@@ -21,7 +22,7 @@ from sqlalchemy import desc, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_user, get_db
-from app.models import Course, University
+from app.models import Course, University, UniversityLocation
 from app.permissions import require_permission
 from app.schemas.course import CourseListResponse, CourseRead
 from app.schemas.university import (
@@ -57,6 +58,223 @@ def _contains_encoded_html_entity(value: str | None) -> bool:
         value
         and re.search(r"&(?:[A-Za-z][A-Za-z0-9]+|#\d+|#x[0-9A-Fa-f]+);", value)
     )
+
+
+def _extract_structured_locations(page_html: str) -> list[dict[str, str | None]]:
+    """Extract every distinct JSON-LD postal address exposed by a homepage."""
+    locations: list[dict[str, str | None]] = []
+    seen: set[tuple[str, str, str, str, str]] = set()
+
+    def add_address(address: dict[str, Any], owner_name: str | None) -> None:
+        city = _decode_metadata_text(str(address.get("addressLocality") or ""))
+        region = _decode_metadata_text(str(address.get("addressRegion") or ""))
+        country_value = address.get("addressCountry") or ""
+        if isinstance(country_value, dict):
+            country_value = country_value.get("name") or country_value.get("@id") or ""
+        country = _decode_metadata_text(str(country_value))
+        street = _decode_metadata_text(str(address.get("streetAddress") or ""))
+        postal = _decode_metadata_text(str(address.get("postalCode") or ""))
+        if not any((city, region, country, street)):
+            return
+
+        owner = _decode_metadata_text(owner_name or "")
+        display_name = owner if owner and owner.lower() not in {
+            "organization", "university", "college"
+        } else city
+        if not display_name:
+            display_name = street or region or country
+        full_address = ", ".join(
+            part for part in (street, city, region, postal, country) if part
+        )
+        key = tuple(
+            part.casefold()
+            for part in (display_name, full_address, city, region, country)
+        )
+        if key in seen:
+            return
+        seen.add(key)
+        locations.append({
+            "display_name": display_name,
+            "full_address": full_address or None,
+            "city": city or None,
+            "state_region": region or None,
+            "country": country or None,
+        })
+
+    def visit(value: Any, owner_name: str | None = None) -> None:
+        if isinstance(value, list):
+            for item in value:
+                visit(item, owner_name)
+            return
+        if not isinstance(value, dict):
+            return
+
+        current_name = value.get("name")
+        if not isinstance(current_name, str):
+            current_name = owner_name
+        address = value.get("address")
+        if isinstance(address, dict):
+            add_address(address, current_name)
+        elif isinstance(address, list):
+            for item in address:
+                if isinstance(item, dict):
+                    add_address(item, current_name)
+
+        for key in ("location", "campus", "department", "subOrganization"):
+            if key in value:
+                visit(value[key], current_name)
+        graph = value.get("@graph")
+        if graph is not None:
+            visit(graph, None)
+
+    for match in re.finditer(
+        r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+        page_html,
+        re.S | re.I,
+    ):
+        try:
+            visit(json.loads(match.group(1)))
+        except (TypeError, ValueError):
+            continue
+    return locations
+
+
+def _campus_page_links(page_html: str, root_url: str) -> list[str]:
+    """Return unique campus-detail links advertised by the homepage."""
+    links_by_slug: dict[str, str] = {}
+    soup = BeautifulSoup(page_html, "html.parser")
+    for anchor in soup.find_all("a", href=True):
+        absolute = urljoin(root_url + "/", str(anchor["href"]))
+        parsed = urlparse(absolute)
+        path = parsed.path.rstrip("/")
+        match = re.search(r"/(?:our-)?campuses/([^/]+)$", path, re.I)
+        if not match:
+            continue
+        slug = match.group(1).casefold()
+        if any(token in slug for token in ("counselling", "counseling", "centre", "center")):
+            continue
+        candidate = f"{parsed.scheme}://{parsed.netloc}{path}/"
+        previous = links_by_slug.get(slug)
+        if previous is None or "/campuses/" in candidate:
+            links_by_slug[slug] = candidate
+    return list(links_by_slug.values())[:12]
+
+
+def _campus_page_location(
+    page_html: str,
+    page_url: str,
+) -> dict[str, str | float | None] | None:
+    """Extract one campus name, address, and map coordinates from a detail page."""
+    soup = BeautifulSoup(page_html, "html.parser")
+    title = soup.title.get_text(" ", strip=True) if soup.title else ""
+    segments = _metadata_title_segments(title)
+    display_name = segments[0] if segments else ""
+
+    address_node = soup.select_one(
+        "address, .campus-location, [itemprop='address']"
+    )
+    full_address = (
+        _decode_metadata_text(address_node.get_text(" ", strip=True))
+        if address_node
+        else ""
+    )
+    if not display_name:
+        display_name = urlparse(page_url).path.rstrip("/").rsplit("/", 1)[-1]
+        display_name = display_name.replace("-", " ").title()
+    if not full_address:
+        return None
+
+    parts = [part.strip() for part in full_address.split(",") if part.strip()]
+    known_countries = {
+        "australia", "canada", "china", "france", "germany", "india",
+        "ireland", "malaysia", "netherlands", "new zealand", "singapore",
+        "united kingdom", "united states", "usa",
+    }
+    country: str | None = None
+    address_parts = list(parts)
+    if address_parts and address_parts[-1].strip(" .").casefold() in known_countries:
+        country = address_parts.pop().strip(" .")
+    city: str | None = None
+    region: str | None = None
+    postal_index: int | None = None
+    for index in range(len(address_parts) - 1, -1, -1):
+        postal_match = re.search(
+            r"\b\d{4,6}\s+([A-Za-z][A-Za-z .'-]+)\)?$",
+            address_parts[index],
+        )
+        if postal_match:
+            city = postal_match.group(1).strip(" .)") or None
+            postal_index = index
+            break
+    if postal_index is not None and postal_index + 1 < len(address_parts):
+        region = address_parts[-1].strip(" .") or None
+    elif address_parts:
+        city = address_parts[-1].strip(" .") or None
+
+    latitude: float | None = None
+    longitude: float | None = None
+    for iframe in soup.find_all("iframe", src=True):
+        coord_match = re.search(
+            r"!2d(-?\d+(?:\.\d+)?)!3d(-?\d+(?:\.\d+)?)",
+            str(iframe["src"]),
+        )
+        if coord_match:
+            longitude = float(coord_match.group(1))
+            latitude = float(coord_match.group(2))
+            break
+
+    return {
+        "display_name": display_name,
+        "full_address": full_address,
+        "city": city,
+        "state_region": region,
+        "country": country,
+        "latitude": latitude,
+        "longitude": longitude,
+    }
+
+
+async def _upsert_discovered_locations(
+    db: AsyncSession,
+    university_id: int,
+    locations: list[dict[str, str | float | None]],
+    fallback_country: str,
+) -> int:
+    """Add homepage-discovered locations without replacing operator edits."""
+    if not locations:
+        return 0
+    existing_names = {
+        name.casefold()
+        for name in (
+            await db.execute(
+                select(UniversityLocation.display_name).where(
+                    UniversityLocation.university_id == university_id
+                )
+            )
+        ).scalars()
+    }
+    added = 0
+    for values in locations:
+        display_name = str(values["display_name"])
+        if display_name.casefold() in existing_names:
+            continue
+        db.add(UniversityLocation(
+            university_id=university_id,
+            display_name=display_name,
+            full_address=values["full_address"],
+            city=values["city"],
+            state_region=values["state_region"],
+            country=values["country"] or (
+                fallback_country if fallback_country != "Unknown" else None
+            ),
+            latitude=values.get("latitude"),
+            longitude=values.get("longitude"),
+            course_count=0,
+            is_verified=False,
+        ))
+        existing_names.add(display_name.casefold())
+        added += 1
+    return added
 
 
 def _to_read(u: University, course_count: int = 0) -> UniversityRead:
@@ -631,6 +849,7 @@ async def add_university_by_url(
     name: str = ""
     country: str = "Unknown"
     city: str = "Unknown"
+    discovered_locations: list[dict[str, str | float | None]] = []
 
     # Country from TLD
     tld_country: dict[str, str] = {
@@ -815,6 +1034,7 @@ async def add_university_by_url(
             resp = await client.get(root_url)
             if resp.status_code < 400:
                 html = resp.text
+                discovered_locations = _extract_structured_locations(html)
 
                 # ── Name from og:site_name (most reliable branded name) ──────
                 # Many universities set this to their official full name even
@@ -901,8 +1121,49 @@ async def add_university_by_url(
                     if og_m:
                         city = og_m.group(1).strip()
 
+                # Some sites expose each campus on a separate linked page
+                # instead of publishing homepage JSON-LD. Fetch only the small,
+                # explicit campus-detail set and parse their address blocks.
+                campus_links = _campus_page_links(html, root_url)
+                if campus_links:
+                    import asyncio as _asyncio
+
+                    async def _fetch_campus(campus_url: str):
+                        try:
+                            campus_resp = await client.get(campus_url)
+                            if campus_resp.status_code < 400:
+                                return _campus_page_location(
+                                    campus_resp.text, campus_url
+                                )
+                        except Exception:
+                            return None
+                        return None
+
+                    campus_results = await _asyncio.gather(
+                        *(_fetch_campus(link) for link in campus_links)
+                    )
+                    known_names = {
+                        str(location["display_name"]).casefold()
+                        for location in discovered_locations
+                    }
+                    for location in campus_results:
+                        if (
+                            location
+                            and str(location["display_name"]).casefold()
+                            not in known_names
+                        ):
+                            discovered_locations.append(location)
+                            known_names.add(
+                                str(location["display_name"]).casefold()
+                            )
+
     except Exception:
         pass  # Best-effort; we'll fall back to hostname-derived name
+
+    if city == "Unknown" and discovered_locations:
+        first_city = discovered_locations[0].get("city")
+        if first_city:
+            city = first_city
 
     # ── City fallback: hostname lookup ────────────────────────────────────────
     if city == "Unknown":
@@ -985,6 +1246,10 @@ async def add_university_by_url(
         if _contains_encoded_html_entity(existing.name) and name:
             existing.name = name
             _needs_update = True
+        if await _upsert_discovered_locations(
+            db, existing.id, discovered_locations, country
+        ):
+            _needs_update = True
         _eff_city    = existing.city
         _eff_country = existing.country
         if (not existing.city or existing.city == "Unknown") and city != "Unknown":
@@ -1025,6 +1290,10 @@ async def add_university_by_url(
     db.add(uni)
     await db.commit()
     await db.refresh(uni)
+    if await _upsert_discovered_locations(
+        db, uni.id, discovered_locations, country
+    ):
+        await db.commit()
 
     # ── Step 4: Dispatch probe_and_configure ──────────────────────────────
     task_id: str | None = None
