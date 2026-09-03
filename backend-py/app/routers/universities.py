@@ -140,24 +140,54 @@ def _extract_structured_locations(page_html: str) -> list[dict[str, str | None]]
 
 
 def _campus_page_links(page_html: str, root_url: str) -> list[str]:
-    """Return unique campus-detail links advertised by the homepage."""
-    links_by_slug: dict[str, str] = {}
+    """Return same-site campus/location detail links advertised by a page."""
+    links_by_path: dict[str, str] = {}
+    root_host = urlparse(root_url).netloc.casefold()
     soup = BeautifulSoup(page_html, "html.parser")
     for anchor in soup.find_all("a", href=True):
         absolute = urljoin(root_url + "/", str(anchor["href"]))
         parsed = urlparse(absolute)
+        if parsed.netloc.casefold() != root_host:
+            continue
         path = parsed.path.rstrip("/")
-        match = re.search(r"/(?:our-)?campuses/([^/]+)$", path, re.I)
+        match = re.search(
+            r"/(?:[^/]+/)*(?:campus(?:es)?|locations?)/([^/]+)$",
+            path,
+            re.I,
+        )
         if not match:
             continue
         slug = match.group(1).casefold()
-        if any(token in slug for token in ("counselling", "counseling", "centre", "center")):
+        if any(token in slug for token in ("counselling", "counseling")):
             continue
         candidate = f"{parsed.scheme}://{parsed.netloc}{path}/"
-        previous = links_by_slug.get(slug)
-        if previous is None or "/campuses/" in candidate:
-            links_by_slug[slug] = candidate
-    return list(links_by_slug.values())[:12]
+        canonical_path = re.sub(r"/our-(campuses|locations)/", r"/\1/", path)
+        previous = links_by_path.get(canonical_path.casefold())
+        if previous is None or "/our-" not in candidate:
+            links_by_path[canonical_path.casefold()] = candidate
+    return list(links_by_path.values())[:12]
+
+
+def _campus_index_links(page_html: str, root_url: str) -> list[str]:
+    """Return same-site campus/location landing pages for one bounded follow-up."""
+    root_host = urlparse(root_url).netloc.casefold()
+    links: list[str] = []
+    seen: set[str] = set()
+    soup = BeautifulSoup(page_html, "html.parser")
+    for anchor in soup.find_all("a", href=True):
+        absolute = urljoin(root_url + "/", str(anchor["href"]))
+        parsed = urlparse(absolute)
+        if parsed.netloc.casefold() != root_host:
+            continue
+        path = parsed.path.rstrip("/")
+        if not re.search(r"/(?:campus(?:es)?|locations?)$", path, re.I):
+            continue
+        candidate = f"{parsed.scheme}://{parsed.netloc}{path}/"
+        key = candidate.casefold()
+        if key not in seen:
+            links.append(candidate)
+            seen.add(key)
+    return links[:4]
 
 
 def _campus_page_location(
@@ -171,7 +201,9 @@ def _campus_page_location(
     display_name = segments[0] if segments else ""
 
     address_node = soup.select_one(
-        "address, .campus-location, [itemprop='address']"
+        "address, .campus-location, .location-address, .campus-address, "
+        ".contact-address, [itemprop='address'], [class*='campus'][class*='address'], "
+        "[class*='location'][class*='address']"
     )
     full_address = (
         _decode_metadata_text(address_node.get_text(" ", strip=True))
@@ -1124,10 +1156,39 @@ async def add_university_by_url(
                 # Some sites expose each campus on a separate linked page
                 # instead of publishing homepage JSON-LD. Fetch only the small,
                 # explicit campus-detail set and parse their address blocks.
-                campus_links = _campus_page_links(html, root_url)
-                if campus_links:
-                    import asyncio as _asyncio
+                import asyncio as _asyncio
 
+                campus_links = _campus_page_links(html, root_url)
+                # Many homepages link only to a "Campuses" or "Locations"
+                # landing page. Follow at most four such indexes, then collect
+                # their explicit detail links; never crawl beyond this level.
+                index_links = _campus_index_links(html, root_url)
+                if index_links and len(campus_links) < 12:
+                    async def _fetch_index(index_url: str):
+                        try:
+                            index_resp = await client.get(index_url)
+                            if index_resp.status_code < 400:
+                                return _campus_page_links(
+                                    index_resp.text, root_url
+                                )
+                        except Exception:
+                            return []
+                        return []
+
+                    index_results = await _asyncio.gather(
+                        *(_fetch_index(link) for link in index_links)
+                    )
+                    seen_campus_links = {link.casefold() for link in campus_links}
+                    for result_links in index_results:
+                        for link in result_links:
+                            if link.casefold() not in seen_campus_links:
+                                campus_links.append(link)
+                                seen_campus_links.add(link.casefold())
+                                if len(campus_links) >= 12:
+                                    break
+                        if len(campus_links) >= 12:
+                            break
+                if campus_links:
                     async def _fetch_campus(campus_url: str):
                         try:
                             campus_resp = await client.get(campus_url)

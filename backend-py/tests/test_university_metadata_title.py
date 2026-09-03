@@ -1,4 +1,5 @@
 from app.routers.universities import (
+    _campus_index_links,
     _campus_page_links,
     _campus_page_location,
     _contains_encoded_html_entity,
@@ -109,6 +110,30 @@ def test_discovers_unique_campus_detail_pages() -> None:
     assert _campus_page_links(page_html, "https://example.edu") == [
         "https://example.edu/campuses/city-campus/",
         "https://example.edu/campuses/north-campus/",
+    ]
+
+
+def test_discovers_nested_generic_location_paths_and_rejects_external_links() -> None:
+    page_html = """
+    <a href="/about/locations/london-campus/">London</a>
+    <a href="/study/campus/city-centre/">City Centre</a>
+    <a href="https://other.edu/locations/other-campus/">Other</a>
+    """
+    assert _campus_page_links(page_html, "https://example.edu") == [
+        "https://example.edu/about/locations/london-campus/",
+        "https://example.edu/study/campus/city-centre/",
+    ]
+
+
+def test_discovers_campus_and_location_index_pages() -> None:
+    page_html = """
+    <a href="/about/campuses/">Campuses</a>
+    <a href="/locations/">Locations</a>
+    <a href="https://other.edu/campuses/">External</a>
+    """
+    assert _campus_index_links(page_html, "https://example.edu") == [
+        "https://example.edu/about/campuses/",
+        "https://example.edu/locations/",
     ]
 
 
