@@ -1501,7 +1501,7 @@ class DiscoveryConfig(BaseModel):
         ),
     )
     year_dedup_mode: str = Field(
-        default="none",
+        default="keep_latest",
         description=(
             "Post-discovery year-based URL deduplication mode.  When not 'none', the "
             "orchestrator groups discovered URLs by their course slug stripped of any "
@@ -1511,11 +1511,12 @@ class DiscoveryConfig(BaseModel):
             "  'keep_latest'          — keep the highest year (most recent intake)\n"
             "  'keep_preferred_year'  — keep year_dedup_preferred_year; fall back to latest\n"
             "  'keep_current'         — keep the year closest to the calendar year\n"
-            "  'none' / 'keep_all'    — disabled (default)\n"
+            "  'none' / 'keep_all'    — explicitly disable the global default\n"
             "URLs with no year in their path are always kept regardless of mode.\n"
             "Courses whose slug exists in only ONE year are always kept.\n"
-            "This is the YAML alternative to the UI-recipe course_year block — use "
-            "it when you want year dedup without creating a UI recipe."
+            "This is the YAML alternative to the UI-recipe course_year block. "
+            "The default is 'keep_latest' so scrapes do not stage older fee-year "
+            "variants when newer versions of the same course are available."
         ),
     )
     year_dedup_preferred_year: Optional[int] = Field(

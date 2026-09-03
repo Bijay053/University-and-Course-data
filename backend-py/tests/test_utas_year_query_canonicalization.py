@@ -3,6 +3,7 @@ from pathlib import Path
 import yaml
 
 from app.services.scraper.url_identity import (
+    deduplicate_latest_course_year_queries,
     strip_and_deduplicate_course_query_parameters,
     strip_course_url_query_parameters,
 )
@@ -55,3 +56,53 @@ def test_utas_year_variants_collapse_to_one_canonical_fetch() -> None:
     assert rewritten == [{"url": UTAS_S4E, "name": "S4E 2025"}]
     assert rewrite_count == 2
     assert duplicate_count == 2
+
+
+def test_global_year_query_dedup_prefers_yearless_canonical() -> None:
+    links = [
+        {"url": f"{UTAS_S4E}?year=2025"},
+        {"url": UTAS_S4E},
+        {"url": f"{UTAS_S4E}?year=2027"},
+    ]
+    kept, dropped = deduplicate_latest_course_year_queries(links)
+    assert kept == [{"url": UTAS_S4E}]
+    assert dropped == 2
+
+
+def test_global_year_query_dedup_keeps_latest_when_no_canonical_found() -> None:
+    links = [
+        {"url": f"{UTAS_S4E}?year=2025"},
+        {"url": f"{UTAS_S4E}?year=2027"},
+        {"url": f"{UTAS_S4E}?year=2026"},
+    ]
+    kept, dropped = deduplicate_latest_course_year_queries(links)
+    assert kept == [{"url": f"{UTAS_S4E}?year=2027"}]
+    assert dropped == 2
+
+
+def test_global_year_query_dedup_preserves_semantic_query_groups() -> None:
+    links = [
+        {"url": f"{UTAS_S4E}?students=international&year=2025"},
+        {"url": f"{UTAS_S4E}?students=international&year=2027"},
+        {"url": f"{UTAS_S4E}?students=domestic&year=2026"},
+    ]
+    kept, dropped = deduplicate_latest_course_year_queries(links)
+    assert kept == [
+        {"url": f"{UTAS_S4E}?students=international&year=2027"},
+        {"url": f"{UTAS_S4E}?students=domestic&year=2026"},
+    ]
+    assert dropped == 1
+
+
+def test_global_year_query_dedup_never_merges_studenttype_audiences() -> None:
+    links = [
+        {"url": f"{UTAS_S4E}?studenttype=international&year=2025"},
+        {"url": f"{UTAS_S4E}?studenttype=international&year=2027"},
+        {"url": f"{UTAS_S4E}?studenttype=domestic&year=2026"},
+    ]
+    kept, dropped = deduplicate_latest_course_year_queries(links)
+    assert kept == [
+        {"url": f"{UTAS_S4E}?studenttype=international&year=2027"},
+        {"url": f"{UTAS_S4E}?studenttype=domestic&year=2026"},
+    ]
+    assert dropped == 1

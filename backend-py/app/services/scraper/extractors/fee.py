@@ -426,6 +426,58 @@ def _extract_year(ctx: str) -> int | None:
     return None
 
 
+def _extract_year_for_amount(ctx: str, amount: int) -> int | None:
+    """Return the valid publication year nearest a specific fee amount."""
+    from datetime import datetime as _dt
+
+    cur = _dt.now(tz=None).year
+    year_matches = [
+        match
+        for match in _YEAR_RE.finditer(ctx)
+        if cur - 1 <= int(match.group(0)) <= cur + 3
+    ]
+    if not year_matches:
+        return None
+
+    amount_matches = []
+    for match in _AMOUNT_RE.finditer(ctx):
+        raw = match.group(2) or match.group(3) or ""
+        if _parse_amount(raw) == amount:
+            amount_matches.append(match)
+    if not amount_matches:
+        return None
+
+    amount_match = min(amount_matches, key=lambda match: abs(match.start() - len(ctx) // 2))
+    sentence_start = max(
+        ctx.rfind(mark, 0, amount_match.start())
+        for mark in (".", "!", "?", ";", "\n")
+    ) + 1
+    following_boundaries = [
+        pos
+        for mark in (".", "!", "?", ";", "\n")
+        if (pos := ctx.find(mark, amount_match.end())) >= 0
+    ]
+    sentence_end = min(following_boundaries) if following_boundaries else len(ctx)
+    sentence_years = [
+        year
+        for year in year_matches
+        if sentence_start <= year.start() and year.end() <= sentence_end
+    ]
+    if not sentence_years:
+        return None
+    preceding_years = [
+        year for year in sentence_years if year.end() <= amount_match.start()
+    ]
+    if preceding_years:
+        year_match = max(preceding_years, key=lambda year: year.end())
+    else:
+        year_match = min(
+            sentence_years,
+            key=lambda year: abs(year.start() - amount_match.end()),
+        )
+    return int(year_match.group(0))
+
+
 _PER_UNIT_HINT_RE = re.compile(
     r"per\s*(?:credit\s*)?(?:unit|point|credit|subject|module)", re.IGNORECASE
 )
@@ -1129,6 +1181,139 @@ def _score(amount: int, ctx: str, *, prefer_year_one: bool = False) -> int:
     if _SCHOLARSHIP_CTX.search(ctx):
         s -= 8
     return s
+
+
+def _select_latest_explicit_dated_fee(
+    html: str,
+    *,
+    prefer_year_one: bool,
+) -> tuple[int, int, str, int, str] | None:
+    """Select the newest of multiple explicitly dated international fees.
+
+    The override is deliberately narrow: at least two different valid years
+    must be attached to amount clauses that themselves contain both
+    international and tuition/fee semantics.
+    """
+    text = compact(html_to_text(html))
+    if not text:
+        return None
+
+    non_tuition_charge = re.compile(
+        r"\b(?:deposit|application|acceptance|enrolment|registration|"
+        r"student\s+services?|amenities|SSAF|materials?|equipment|insurance|"
+        r"visa|accommodation)\s+(?:charge|cost|fee|fees|payment)\b",
+        re.IGNORECASE,
+    )
+
+    def eligible_clause(clause: str, amount: int) -> bool:
+        return bool(
+            1_000 <= amount <= 500_000
+            and _INTL_CTX.search(clause)
+            and re.search(r"\btuition\b|\bcost\s+of\s+study\b", clause, re.IGNORECASE)
+            and not _SCHOLARSHIP_CTX.search(clause)
+            and not non_tuition_charge.search(clause)
+        )
+
+    candidates: list[tuple[int, int, int, str]] = []
+    seen: set[tuple[int, int]] = set()
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "html.parser")
+        for label_tag in soup.find_all(("dt", "th")):
+            value_tag = label_tag.find_next_sibling(
+                "dd" if label_tag.name == "dt" else "td"
+            )
+            if value_tag is None:
+                continue
+            label = compact(label_tag.get_text(" ", strip=True))
+            value_text = compact(value_tag.get_text(" ", strip=True))
+            ctx = compact(f"{label}: {value_text}")
+            year = _extract_year(ctx)
+            if year is None:
+                continue
+            for match in _AMOUNT_RE.finditer(value_text):
+                raw = match.group(2) or match.group(3) or ""
+                amount = _parse_amount(raw)
+                if amount is None or not eligible_clause(ctx, amount):
+                    continue
+                identity = (year, amount)
+                if identity in seen:
+                    continue
+                seen.add(identity)
+                candidates.append(
+                    (
+                        year,
+                        _score(amount, ctx, prefer_year_one=prefer_year_one),
+                        amount,
+                        ctx,
+                    )
+                )
+    except Exception:
+        pass
+
+    if len({year for year, _score_value, _amount, _ctx in candidates}) < 2:
+        candidates.clear()
+        seen.clear()
+        for amount, _currency_token, ctx in _candidates(text):
+            year = _extract_year_for_amount(ctx, amount)
+            if year is None:
+                continue
+
+            matching_amounts = []
+            for match in _AMOUNT_RE.finditer(ctx):
+                raw = match.group(2) or match.group(3) or ""
+                if _parse_amount(raw) == amount:
+                    matching_amounts.append(match)
+            if not matching_amounts:
+                continue
+            amount_match = min(
+                matching_amounts,
+                key=lambda match: abs(match.start() - len(ctx) // 2),
+            )
+            clause_start = max(
+                ctx.rfind(mark, 0, amount_match.start())
+                for mark in (".", "!", "?", ";", "\n")
+            ) + 1
+            following_boundaries = [
+                pos
+                for mark in (".", "!", "?", ";", "\n")
+                if (pos := ctx.find(mark, amount_match.end())) >= 0
+            ]
+            clause_end = min(following_boundaries) if following_boundaries else len(ctx)
+            clause = ctx[clause_start:clause_end]
+            if not eligible_clause(clause, amount):
+                continue
+
+            identity = (year, amount)
+            if identity in seen:
+                continue
+            seen.add(identity)
+            candidates.append(
+                (
+                    year,
+                    _score(amount, ctx, prefer_year_one=prefer_year_one),
+                    amount,
+                    ctx,
+                )
+            )
+
+    if len({year for year, _score_value, _amount, _ctx in candidates}) < 2:
+        return None
+
+    latest_year = max(year for year, _score_value, _amount, _ctx in candidates)
+    latest = [candidate for candidate in candidates if candidate[0] == latest_year]
+    if prefer_year_one:
+        year, score, amount, ctx = max(
+            latest,
+            key=lambda candidate: (candidate[1], -candidate[2]),
+        )
+    else:
+        year, score, amount, ctx = max(
+            latest,
+            key=lambda candidate: (candidate[1], candidate[2]),
+        )
+    return amount, year, ctx, score, text
 
 
 _UWL_DOMESTIC_ONLY = object()  # sentinel: select exists, no International option
@@ -1991,6 +2176,39 @@ async def extract(
     except Exception:  # noqa: BLE001 — defensive; keep extractor working
         prefer_yr1 = False
 
+    latest_dated_fee = _select_latest_explicit_dated_fee(
+        html,
+        prefer_year_one=prefer_yr1,
+    )
+    if latest_dated_fee is not None:
+        amount, fee_year, ctx, score, text = latest_dated_fee
+        currency = _detect_currency(ctx, country)
+        if currency in ("AUD", "CAD"):
+            url_currency = _infer_currency_from_url(url)
+            if url_currency:
+                currency = url_currency
+        fee_term = _normalize_fee_term(ctx, prefer_year_one=prefer_yr1)
+        method = "fee.latest_explicit_year"
+        rollup = _maybe_compute_full_course(amount, fee_term, text)
+        if rollup is not None:
+            amount, fee_term = rollup
+            method += "+per_unit_rollup"
+        return [
+            ExtractionResult(
+                field_key="international_fee",
+                value=amount,
+                normalized={
+                    "international_fee": amount,
+                    "currency": currency,
+                    "fee_term": fee_term,
+                    "fee_year": fee_year,
+                },
+                confidence=min(1.0, 0.4 + score * 0.1),
+                snippet=ctx[:240],
+                method=method,
+            )
+        ]
+
     swinburne_fee = _from_swinburne_international_panel(html, url)
     if swinburne_fee is not None:
         amount, ctx = swinburne_fee
@@ -2426,23 +2644,28 @@ async def extract(
     text = compact(html_to_text(html))
     if not text:
         return []
-    best: tuple[int, int, str] | None = None  # (score, amount, ctx)
+    best: tuple[int, int, int, str] | None = None  # (score, year, amount, ctx)
     for amount, _cur, ctx in _candidates(text):
         sc = _score(amount, ctx, prefer_year_one=prefer_yr1)
+        candidate_year = _extract_year_for_amount(ctx, amount) or -1
         if best is None or sc > best[0]:
-            best = (sc, amount, ctx)
+            best = (sc, candidate_year, amount, ctx)
         elif sc == best[0]:
-            # Default tiebreak: prefer larger amount (full-course wins).
-            # When the per-uni knob flips the preference, prefer smaller
-            # so the year-1 figure beats any larger numeric on the page
-            # that happens to score equally (e.g. mid-year intake total).
-            if (not prefer_yr1 and amount > best[1]) or (
-                prefer_yr1 and amount < best[1]
-            ):
-                best = (sc, amount, ctx)
+            # Equally authoritative international tuition candidates are
+            # ordered by their explicitly associated year before amount. This
+            # prevents a larger old fee from beating a newer published fee.
+            if candidate_year > best[1]:
+                best = (sc, candidate_year, amount, ctx)
+            elif candidate_year == best[1]:
+                # Final deterministic tiebreak follows catalogue semantics:
+                # normally larger/full-course, optionally smaller/year-one.
+                if (not prefer_yr1 and amount > best[2]) or (
+                    prefer_yr1 and amount < best[2]
+                ):
+                    best = (sc, candidate_year, amount, ctx)
     if best is None:
         return []
-    score, amount, ctx = best
+    score, _candidate_year, amount, ctx = best
     # Hard gate: never emit a fee unless the amount has at least one tuition
     # OR international cue in its window. This prevents random currency
     # numbers (deposits, scholarships, room costs) from being labelled as
@@ -2478,7 +2701,7 @@ async def extract(
                 "international_fee": amount,
                 "currency": currency,
                 "fee_term": fee_term,
-                "fee_year": _extract_year(ctx),
+                "fee_year": _extract_year_for_amount(ctx, amount),
             },
             confidence=min(1.0, 0.4 + score * 0.1),
             snippet=ctx[:240],

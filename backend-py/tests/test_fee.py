@@ -848,6 +848,74 @@ def test_fee_table_prefers_latest_year():
     assert out[0].normalized["international_fee"] == 18_700
 
 
+def test_generic_fee_candidates_prefer_latest_explicit_year_over_larger_old_fee():
+    html = """
+    <main>
+      <p>2025 international tuition fee: AUD $48,000 per year.</p>
+      <p>2027 international tuition fee: AUD $44,950 per year.</p>
+    </main>
+    """
+    out = _run(fee.extract(html, "https://example.edu.au/course/science"))
+    assert out
+    assert out[0].normalized["international_fee"] == 44_950
+    assert out[0].normalized["fee_year"] == 2027
+
+
+def test_generic_fee_candidates_bind_year_printed_after_amount():
+    html = """
+    <main>
+      <p>International tuition fee: AUD $48,000 per year for 2025.</p>
+      <p>International tuition fee: AUD $44,950 per year for 2027.</p>
+    </main>
+    """
+    out = _run(fee.extract(html, "https://example.edu.au/course/science"))
+    assert out
+    assert out[0].normalized["international_fee"] == 44_950
+    assert out[0].normalized["fee_year"] == 2027
+
+
+def test_structural_fee_pairs_still_choose_latest_explicit_year():
+    html = """
+    <dl>
+      <dt>2025 international tuition fee</dt><dd>AUD $48,000 per year</dd>
+      <dt>2027 international tuition fee</dt><dd>AUD $44,950 per year</dd>
+    </dl>
+    """
+    out = _run(fee.extract(html, "https://example.edu.au/course/science"))
+    assert out
+    assert out[0].normalized["international_fee"] == 44_950
+    assert out[0].normalized["fee_year"] == 2027
+    assert out[0].method == "fee.latest_explicit_year"
+
+
+def test_newer_dated_scholarship_never_overrides_international_tuition():
+    html = """
+    <main>
+      <p>2027 international tuition fee: AUD $44,950 per year.</p>
+      <p>2028 international tuition fee scholarship: AUD $2,000 per year.</p>
+    </main>
+    """
+    out = _run(fee.extract(html, "https://example.edu.au/course/science"))
+    assert out
+    assert out[0].normalized["international_fee"] == 44_950
+    assert out[0].normalized["fee_year"] == 2027
+
+
+def test_unpublished_new_year_does_not_attach_to_an_undated_fee():
+    html = """
+    <main>
+      <p>2025 international tuition fee: AUD $40,000 per year.</p>
+      <p>For 2027, international tuition fees will be announced shortly.</p>
+      <p>International tuition fee: AUD $45,000 per year.</p>
+    </main>
+    """
+    out = _run(fee.extract(html, "https://example.edu.au/course/science"))
+    assert out
+    assert out[0].normalized["international_fee"] == 40_000
+    assert out[0].normalized["fee_year"] == 2025
+    assert out[0].method != "fee.latest_explicit_year"
+
+
 def test_fee_table_not_triggered_for_non_fee_tables():
     """An HTML page with a plain table (no Home/International rows) must
     NOT trigger the fee-table pre-pass — falls through to keyword extractor."""

@@ -34,6 +34,7 @@ from app.services.scraper.pipelines.university_pdfs import load_university_pdf_d
 from app.services.scraper.stage_course import stage_course
 from app.services.scraper.url_identity import (
     canonical_course_url_key,
+    deduplicate_latest_course_year_queries,
     strip_and_deduplicate_course_query_parameters,
 )
 from app.services.scraper.course_deadline import (
@@ -3999,6 +4000,29 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     rewritten=_query_rewritten,
                     dropped_duplicates=_query_duplicates,
                     parameters=_strip_query_params,
+                )
+
+        # Phase A.5c.1 — Global latest-year query deduplication ─────────────────
+        # Prefer a yearless canonical candidate when discovery found one;
+        # otherwise retain the highest ?year=20xx variant. Other semantic query
+        # parameters remain in the group key and are never collapsed.
+        if links:
+            links, _query_year_duplicates = deduplicate_latest_course_year_queries(links)
+            if _query_year_duplicates:
+                log.info(
+                    "[EXTRACT] latest-year query dedup: dropped %d older variants",
+                    _query_year_duplicates,
+                )
+                await emit(
+                    "status",
+                    (
+                        "[EXTRACT] Latest-year query dedup: dropped "
+                        f"{_query_year_duplicates} older course URL variants"
+                    ),
+                    phase="extract",
+                    kind="latest_year_query_dedup",
+                    dropped=_query_year_duplicates,
+                    kept=len(links),
                 )
 
         # Phase A.5d — Recipe year filter + year-based URL deduplication ──────────
