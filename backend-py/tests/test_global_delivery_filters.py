@@ -203,6 +203,49 @@ def test_utas_shared_distance_disclaimer_does_not_reject_on_campus_course() -> N
     )
 
 
+def test_utas_advisory_only_international_panel_rejects_domestic_course() -> None:
+    html = """
+    <main>
+      <h1>Bachelor of Outdoor and Environmental Education</h1>
+      <div id="tabDomestic">
+        <p>Commonwealth Supported places available</p>
+      </div>
+      <div id="tabInternational" hidden>
+        This course may not be available to international students.
+        Please see the <a href="/study/online">list of distance courses</a>
+        (i.e. online and taken outside Australia) that are offered to
+        international students
+      </div>
+    </main>
+    """
+    assert _is_domestic_only_page(
+        html,
+        "https://www.utas.edu.au/courses/arts-soc/courses/"
+        "a3f-bachelor-of-outdoor-and-environmental-education?year=2026",
+    )
+
+
+def test_utas_substantive_international_panel_keeps_eligible_course() -> None:
+    html = """
+    <main>
+      <p>This course may not be available to international students.</p>
+      <p>Please see the list of distance courses that are offered to
+      international students.</p>
+      <div id="tabInternational" hidden>
+        <h2>Key Information</h2>
+        <p>CRICOS: 002346B</p>
+        <p>Duration: Minimum 3 years</p>
+        <p>Location: Hobart — Semester 1, Semester 2</p>
+      </div>
+    </main>
+    """
+    assert not _is_domestic_only_page(
+        html,
+        "https://www.utas.edu.au/courses/tsbe/courses/"
+        "b3a-bachelor-of-business?year=2026",
+    )
+
+
 def test_utas_explicit_full_time_option_beats_shared_part_time_prose() -> None:
     html = """
     <section>

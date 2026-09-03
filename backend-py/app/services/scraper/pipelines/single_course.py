@@ -335,6 +335,16 @@ _UTAS_DISTANCE_DISCLAIMER_RE: _re.Pattern[str] = _re.compile(
     _re.IGNORECASE,
 )
 
+_UTAS_ADVISORY_ONLY_INTERNATIONAL_PANEL_RE: _re.Pattern[str] = _re.compile(
+    r"^\s*"
+    r"(?:this\s+course\s+)?may\s+not\s+be\s+available\s+to\s+international\s+students?\.?\s*"
+    r"please\s+see\s+the\s+list\s+of\s+distance\s+courses"
+    r"(?:\s*\(\s*i\.?e\.?\s*online\s+and\s+taken\s+outside\s+australia\s*\))?"
+    r"\s+that\s+are\s+offered\s+to\s+international\s+students?\.?"
+    r"\s*$",
+    _re.IGNORECASE,
+)
+
 
 _ADELAIDE_DORMANT_DOMESTIC_MODAL_RE: _re.Pattern[str] = _re.compile(
     r"<dialog\b(?=[^>]*\bdata-modal-opener\s*=\s*[\"']dom-modal-exclusive[\"'])"
@@ -366,6 +376,36 @@ def _domestic_only_relevant_html(html: str, url: str | None = None) -> str:
 
 def _has_hard_domestic_only_marker(html: str, url: str | None = None) -> bool:
     return bool(_DOMESTIC_ONLY_RE.search(_domestic_only_relevant_html(html, url)))
+
+
+def _utas_has_advisory_only_international_panel(
+    html: str,
+    url: str | None = None,
+) -> bool:
+    """Detect UTAS pages whose International tab is an exclusion advisory only.
+
+    UTAS embeds ``#tabInternational`` on domestic-only and international courses,
+    so tab presence is not eligibility evidence. Domestic-only pages render only
+    the standard availability advisory in that panel, while eligible pages render
+    substantive course data such as CRICOS, duration, location, and intake.
+    """
+    if not html or not url:
+        return False
+    if (urlparse(url).hostname or "").lower() not in {
+        "utas.edu.au",
+        "www.utas.edu.au",
+    }:
+        return False
+    try:
+        from bs4 import BeautifulSoup as _BS4_utas
+
+        panel = _BS4_utas(html, "html.parser").select_one("#tabInternational")
+        if panel is None:
+            return False
+        panel_text = " ".join(panel.get_text(" ", strip=True).split())
+        return bool(_UTAS_ADVISORY_ONLY_INTERNATIONAL_PANEL_RE.fullmatch(panel_text))
+    except Exception:
+        return False
 
 
 def _has_international_section(html: str) -> bool:
@@ -574,6 +614,8 @@ def _is_domestic_only_page(html: str, url: str | None = None) -> bool:
     """
     if not html:
         return False
+    if _utas_has_advisory_only_international_panel(html, url):
+        return True
     # Adelaide University publishes the eligible audiences as authoritative
     # page metadata. The reusable domestic-exclusivity dialog is embedded on
     # every degree page, so its text alone is deliberately ignored below.
