@@ -94,11 +94,14 @@ def _extraction_failure_details(
     if normalized == "per_course_timeout":
         return {
             "reason": "per_course_timeout",
-            "detail": (
-                f"Extraction exceeded the "
-                f"{_PER_COURSE_EXTRACTION_TIMEOUT_SECONDS:.0f}-second "
-                "per-course safety cap; "
-                "the provider/browser fallback chain did not settle in time."
+            "detail": str(
+                result.get("error_reason")
+                or (
+                    f"Extraction exceeded the "
+                    f"{_PER_COURSE_EXTRACTION_TIMEOUT_SECONDS:.0f}-second "
+                    "per-course safety cap; "
+                    "the provider/browser fallback chain did not settle in time."
+                )
             ),
             "retryable": True,
         }
@@ -4385,6 +4388,21 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 "[CONCURRENCY] per-uni max_parallel_fetch=%d (global default=%d)",
                 _effective_parallel, _MAX_PARALLEL_FETCH,
             )
+        _effective_course_timeout = _PER_COURSE_EXTRACTION_TIMEOUT_SECONDS
+        try:
+            _configured_course_timeout = getattr(
+                _cfg_for_parallel.extraction if _cfg_for_parallel is not None else None,
+                "per_course_timeout_seconds",
+                None,
+            )
+            if _configured_course_timeout is not None:
+                _effective_course_timeout = float(_configured_course_timeout)
+        except (TypeError, ValueError):
+            pass
+        log.info(
+            "[TIMEOUT] per-course extraction deadline configured at %.1fs",
+            _effective_course_timeout,
+        )
         sem = asyncio.Semaphore(_effective_parallel)
         total = len(links)
         progress = [0]
@@ -4506,6 +4524,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                             central_data=central_data,
                             extraction_rules=_ac_ext_rules,
                             seen_pdf_urls=seen_pdf_urls,
+                            timeout_seconds=_effective_course_timeout,
                         )
                     except ScrapedoAccountError as _sd_auth_exc:
                         _sd_url = (link.get("url") or "?")[:80]
@@ -4531,8 +4550,9 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     if result.get("_timed_out"):
                         _timed_url = (link.get("url") or "?")[:80]
                         log.warning(
-                            "[BOUNDED] per-course extraction exceeded 300s"
+                            "[BOUNDED] per-course extraction exceeded %.1fs"
                             " for %s — marking fetch_failed and moving on",
+                            _effective_course_timeout,
                             _timed_url,
                         )
                 # ── semaphore released here ──────────────────────────────────
@@ -5688,7 +5708,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         extraction_rules=_ac_ext_rules,
                         seen_pdf_urls=seen_pdf_urls,
                         timeout_seconds=min(
-                            _PER_COURSE_EXTRACTION_TIMEOUT_SECONDS,
+                            _effective_course_timeout,
                             _remaining_budget,
                         ),
                     )

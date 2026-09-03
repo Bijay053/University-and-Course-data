@@ -36,6 +36,7 @@ from contextvars import ContextVar
 import httpx
 
 from app.config import settings
+from app.services.scraper.course_deadline import clamp_timeout, has_budget, remaining_seconds
 from app.services.scraper.extractors.curtin_session import cookies_for_url
 from app.services.scraper.url_identity import canonical_course_url_key
 
@@ -614,6 +615,9 @@ async def fetch_html_scrape_do(
     if not token:
         log.debug("fetch_html_scrape_do: SCRAPE_DO_TOKEN not set — skipping")
         return None
+    if not has_budget():
+        log.info("[COURSE DEADLINE] skipping Scrape.do fetch for %s", url)
+        return None
     # Task #229: cross-process throttle so the 8-worker fleet doesn't exhaust the
     # shared Scrape.do account in bursts.  No-op unless scrape_do_rate_limit_per_sec
     # is configured > 0; fail-open on any Redis issue.
@@ -632,7 +636,16 @@ async def fetch_html_scrape_do(
     if rate_limit:
         try:
             from app.services.scraper.rate_limiter import acquire_scrape_do
-            await acquire_scrape_do()
+            _limiter_timeout = clamp_timeout(None)
+            if _limiter_timeout is None:
+                await acquire_scrape_do()
+            elif _limiter_timeout > 0:
+                await asyncio.wait_for(acquire_scrape_do(), timeout=_limiter_timeout)
+            else:
+                return None
+        except asyncio.TimeoutError:
+            log.info("[COURSE DEADLINE] Scrape.do limiter wait expired for %s", url)
+            return None
         except Exception as _rl_exc:  # noqa: BLE001 — never block a fetch on the limiter
             log.debug("scrape_do rate-limit acquire skipped: %s", _rl_exc)
     params: dict[str, str] = {"token": token, "url": url}
@@ -676,6 +689,14 @@ async def fetch_html_scrape_do(
                 "[FETCH RETRY] scrape.do %s render=%s → attempt %d/%d after %.0fs backoff",
                 url, render, _sd_attempt + 1, len(_SD_BACKOFFS) + 1, _wait,
             )
+            _remaining = remaining_seconds()
+            if _remaining is not None and _remaining <= _wait:
+                log.info(
+                    "[COURSE DEADLINE] skipping %.0fs Scrape.do retry backoff for %s "
+                    "(remaining=%.3fs)",
+                    _wait, url, _remaining,
+                )
+                return None
             await asyncio.sleep(_wait)
         try:
             # Bound real concurrent connections to the shared Scrape.do account —
@@ -690,10 +711,26 @@ async def fetch_html_scrape_do(
             # rest of the fleet.  account_slot() is a no-op unless
             # scrape_do_account_concurrency > 0 and fails open on any Redis error.
             from app.services.scraper.scrape_do_semaphore import account_slot
-            async with _get_scrape_do_sem(local_concurrency_limit):
-                async with account_slot():
-                    async with httpx.AsyncClient(timeout=90, follow_redirects=True) as c:
-                        _last_sd_r = await c.get("https://api.scrape.do", params=params)
+            _request_timeout = clamp_timeout(90.0)
+            if _request_timeout is not None and _request_timeout <= 0:
+                return None
+
+            async def _request() -> httpx.Response:
+                async with _get_scrape_do_sem(local_concurrency_limit):
+                    async with account_slot():
+                        async with httpx.AsyncClient(
+                            timeout=_request_timeout or 90.0,
+                            follow_redirects=True,
+                        ) as c:
+                            return await c.get("https://api.scrape.do", params=params)
+
+            if _request_timeout is None:
+                _last_sd_r = await _request()
+            else:
+                _last_sd_r = await asyncio.wait_for(
+                    _request(),
+                    timeout=_request_timeout,
+                )
             _status = _last_sd_r.status_code
             if _status == 200 and len(_last_sd_r.text) > 500:
                 log.info(
@@ -808,6 +845,19 @@ async def fetch_html_scrape_do(
             return None
         except ScrapedoAccountError:
             raise  # always propagate — orchestrator must abort the job
+        except asyncio.TimeoutError:
+            log.warning(
+                "[COURSE DEADLINE] Scrape.do request exceeded remaining %.3fs for %s",
+                _request_timeout or 0.0,
+                url,
+            )
+            _record_fetch_failure(
+                kind="scrape_do_timeout",
+                reason="Scrape.do did not finish within the shared course deadline.",
+                retryable=True,
+                transport="scrape_do_render" if render else "scrape_do_static",
+            )
+            return None
         except Exception as _sd_exc:
             _redacted_exception = _redact_scrape_do_log_text(_sd_exc, token=token)
             if _sd_attempt < len(_SD_BACKOFFS):

@@ -45,6 +45,8 @@ if "google.genai" not in sys.modules:
 
 from app.services.ai import gemini_client
 from app.services.ai.gemini_client import GeminiQuotaTracker, GeminiResponse
+from app.services.scraper import http_fetcher
+from app.services.scraper.course_deadline import reset_course_deadline, set_course_deadline
 
 
 def _mk(**kw) -> GeminiQuotaTracker:
@@ -178,3 +180,45 @@ def test_generate_no_timeout_when_timeout_s_none(monkeypatch) -> None:
     # An SDK RuntimeError (not a timeout) is handled by the generic except —
     # the call still returns a GeminiResponse rather than raising.
     assert isinstance(resp, GeminiResponse)
+
+
+def test_scrape_do_request_obeys_shared_course_deadline(monkeypatch) -> None:
+    class _SlowResponse:
+        status_code = 200
+        text = "<html>" + ("x" * 600) + "</html>"
+        headers = {}
+
+    class _SlowClient:
+        def __init__(self, **_kwargs) -> None:
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args) -> None:
+            return None
+
+        async def get(self, *_args, **_kwargs):
+            await asyncio.sleep(5)
+            return _SlowResponse()
+
+    monkeypatch.setenv("SCRAPE_DO_TOKEN", "test-token")
+    monkeypatch.setattr(http_fetcher.httpx, "AsyncClient", _SlowClient)
+
+    async def _run() -> None:
+        token = set_course_deadline(0.05)
+        try:
+            result = await http_fetcher.fetch_html_scrape_do(
+                "https://example.edu/course",
+                rate_limit=False,
+                max_retries=0,
+            )
+        finally:
+            reset_course_deadline(token)
+        assert result is None
+
+    loop = asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(asyncio.wait_for(_run(), timeout=0.5))
+    finally:
+        loop.close()

@@ -26,6 +26,18 @@ def test_timeout_is_retryable_with_an_actionable_reason() -> None:
     )
 
 
+def test_timeout_detail_reports_per_university_configured_cap() -> None:
+    from app.services.scraper.orchestrator import _extraction_failure_details
+
+    details = _extraction_failure_details(
+        "per_course_timeout",
+        result={"error_reason": "Extraction exceeded the 20-second per-course safety cap"},
+    )
+
+    assert details["retryable"] is True
+    assert "20-second" in str(details["detail"])
+
+
 def test_fetch_failures_retry_but_extract_errors_stay_for_review() -> None:
     from app.services.scraper.orchestrator import _extraction_failure_details
 

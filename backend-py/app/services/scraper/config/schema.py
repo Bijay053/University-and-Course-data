@@ -3165,6 +3165,15 @@ class ExtractionConfig(BaseModel):
             "cooldown penalties, typically making the overall run faster."
         ),
     )
+    per_course_timeout_seconds: Optional[float] = Field(
+        default=None,
+        gt=0,
+        description=(
+            "Optional wall-clock cap for one course extraction at this university. "
+            "Every provider, browser, and AI stage shares this budget. Leave unset "
+            "to use the global per_course_extraction_timeout_s setting."
+        ),
+    )
     recovery_sweep_max_items: int = Field(
         default=100,
         description=(

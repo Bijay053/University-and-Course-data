@@ -14,8 +14,12 @@ both ``orchestrator.run_scrape`` and ``repair.run_repair``.
 from __future__ import annotations
 
 import contextvars
+from pathlib import Path
+
+import yaml
 
 from app.services.scraper import per_course_browser as pcb
+from app.services.scraper.config.schema import ExtractionConfig
 
 
 def test_threshold_requires_three_rescues() -> None:
@@ -66,3 +70,19 @@ def test_no_run_context_is_safe_noop() -> None:
         return pcb.is_confirmed_browser_only("x.edu")
 
     assert ctx.run(_inside) is False
+
+
+def test_utas_uses_rendered_provider_without_local_browser_rescue() -> None:
+    config_path = (
+        Path(__file__).parents[1] / "scraper_config" / "unis" / "utas.yaml"
+    )
+    cfg = ExtractionConfig.model_validate(
+        yaml.safe_load(config_path.read_text())["extraction"]
+    )
+
+    assert cfg.scrape_do_render is True
+    assert cfg.skip_browser_rescue is True
+    assert cfg.skip_per_course_browser is True
+    assert cfg.per_course_timeout_seconds == 20
+    assert cfg.recovery_sweep_max_items > 0
+    assert cfg.recovery_sweep_time_budget_seconds > 0

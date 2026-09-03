@@ -172,6 +172,13 @@ extraction:
   # datacenter IP that Cloudflare rate-limits to 1 concurrent session).
   scrape_do_render: true
   scrape_do_skip_fallbacks: true
+  # A failed provider call must release one of the eight extraction slots quickly
+  # enough for the 463-course catalogue to remain below the 30-minute job target.
+  per_course_timeout_seconds: 20
+  # Local Playwright uses the same blocked datacenter route and cannot safely
+  # improve rendered Scrape.do HTML, so do not spend another 10-60s rescuing it.
+  skip_browser_rescue: true
+  skip_per_course_browser: true
   # 5s gives enough time for Funnelback panels / lazy CSS to fully load.
   # Tab panels with domestic/international sections are SSR'd in the initial HTML
   # but some CSS class toggling happens post-load; wait_for_ms ensures the final
@@ -181,6 +188,11 @@ extraction:
   # multiple concurrent extractions don't share a rate-limit window. 8 concurrent
   # gives ~3-4 min total for 358 courses (vs ~140 min sequential Playwright).
   max_parallel_fetch: 8
+  # Preserve transient provider failures for a small sequential second chance
+  # without allowing the end-of-job sweep to erase the primary-pass time saving.
+  recovery_sweep_max_items: 24
+  recovery_sweep_time_budget_seconds: 120
+  recovery_sweep_delay_seconds: 1
   default_course_location: "Hobart"
   fees:
     # UTAS publishes international fees on a central schedule, not on each course
