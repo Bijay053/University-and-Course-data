@@ -110,3 +110,4 @@
 - [Authoritative provider overrides](authoritative-embedded-json-preservation.md) — preserve raw source and run deterministic provider authority outside optional AI/fallback gates.
 - [Search English-score casing](search-english-score-casing.md) — stored test types are mostly lowercase; normalize case and aggregate deterministically in live search.
 - [Vitest accessibility hook ordering](vitest-accessibility-hook-ordering.md) — global DOM assertions must run before test-local cleanup; explicitly use list hook sequencing.
+- [Generated YAML shadowing](generated-yaml-shadowing.md) — production-only ID stubs can silently shadow later shared hostname recipes; verify effective config after deployment.
