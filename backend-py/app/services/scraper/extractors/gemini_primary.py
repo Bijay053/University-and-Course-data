@@ -741,8 +741,9 @@ async def extract_primary(
     url: str,
     *,
     timeout: float | None = None,
+    fields: list[str] | tuple[str, ...] | None = None,
 ) -> tuple[dict[str, Any], float, int, int, dict]:
-    """Run one Gemini Flash call to extract all hard fields.
+    """Run one Gemini Flash call to extract the requested missing hard fields.
 
     Parameters
     ----------
@@ -758,6 +759,11 @@ async def extract_primary(
         SDK call so it (a) excludes rate-limiter wait and (b) actually trips the
         circuit breaker on repeated timeouts — the old outer ``wait_for`` here
         cancelled the inner coroutine, so timeouts never reached the breaker.
+    fields:
+        Optional subset of hard fields that are still missing after deterministic
+        extraction. Unknown names are ignored. ``None`` preserves the standalone
+        API's historical all-fields behaviour; the course pipeline always passes
+        an explicit missing-field list.
 
     Returns
     -------
@@ -772,7 +778,23 @@ async def extract_primary(
         from app.config import settings as _settings
         timeout = float(getattr(_settings, "gemini_primary_timeout_s", 20.0))
 
-    fields_block = "\n".join(f"- {k}: {hint}" for k, hint in _HARD_FIELDS.items())
+    requested_fields = (
+        list(_HARD_FIELDS)
+        if fields is None
+        else [field for field in fields if field in _HARD_FIELDS]
+    )
+    if not requested_fields:
+        return {}, 0.0, 0, 0, {
+            "skipped": True,
+            "skip_reason": "no_missing_fields",
+            "text_len": 0,
+            "text_snippet": "",
+            "raw_response": "",
+        }
+
+    fields_block = "\n".join(
+        f"- {field}: {_HARD_FIELDS[field]}" for field in requested_fields
+    )
     text = _trim_text(html, url=url)
 
     # Fast-exit: if the page has no visible text content, calling the API
@@ -823,7 +845,7 @@ async def extract_primary(
 
     raw_data = _parse_json(resp.text)
     filled: dict[str, Any] = {}
-    for fk in _HARD_FIELDS:
+    for fk in requested_fields:
         coerced = _coerce(fk, raw_data.get(fk))
         validated = _validate(fk, coerced)
         if validated is not None:

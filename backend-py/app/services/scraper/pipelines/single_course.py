@@ -1325,6 +1325,30 @@ def _gemini_may_override_course_page_value(
     )
 
 
+_GEMINI_PRIMARY_CANONICAL_FIELDS = {
+    "duration_value": "duration",
+    "duration_unit": "duration_term",
+    "duration_text": "duration",
+    "intake_text": "intake_months",
+    "location_text": "course_location",
+    "mode": "study_mode",
+}
+
+
+def _gemini_primary_missing_fields(
+    payload: dict,
+    candidate_fields: list[str] | tuple[str, ...],
+) -> list[str]:
+    """Return only fields that deterministic extraction has not populated."""
+    missing: list[str] = []
+    for field in candidate_fields:
+        canonical = _GEMINI_PRIMARY_CANONICAL_FIELDS.get(field, field)
+        value = payload.get(canonical)
+        if value is None or value == "" or value == 0 or value == [] or value == {}:
+            missing.append(field)
+    return missing
+
+
 def _method_authority(method: str) -> float:
     """Return the authority level for a given extraction method string.
 
@@ -3837,7 +3861,7 @@ async def extract_course(
     #
     # Phase A order (each step in its own try/except):
     #   1. Regex / rule extractors   ← complete above; zero network I/O
-    #   2. Gemini PRIMARY            ← AI extraction on static HTML (below)
+    #   2. Gemini PRIMARY            ← fills only static deterministic gaps
     #   3. Browser fallback          ← JS-render + fee-toggle clicks (below)
     #   4. Domestic-only re-check    ← uses browser-rendered DOM (below)
     #   5. Vision OCR                ← screenshot / image OCR (below)
@@ -3852,9 +3876,8 @@ async def extract_course(
 
     # ── Gemini Flash PRIMARY (Phase A, step 2) ───────────────────────────────
     # Runs on static HTML; rendered_html is not yet available (browser is
-    # step 3).  PRIMARY semantics: Gemini's value always wins over an earlier
-    # regex hit for the 16 hard fields.  Evidence entries for those fields are
-    # replaced so extraction_method correctly credits gemini_primary.
+    # step 3). PRIMARY receives only fields that deterministic extraction left
+    # genuinely empty and may not replace existing values.
     # Emit [GEMINI] unconditionally — even when 0 fields filled — so every
     # course has a visible log entry for diagnostics.
     #
@@ -4126,11 +4149,18 @@ async def extract_course(
 
             elif _gate_reason == "classification_only":
                 # Only category/sub_category missing — use cheap 100-token prompt.
+                _class_fields = tuple(
+                    _gemini_primary_missing_fields(
+                        payload,
+                        ("category", "sub_category"),
+                    )
+                )
                 _class_text = _h2t_gate(rendered_html or html)
                 _class_prompt = _build_class_prompt(
                     payload.get("course_name") or "",
                     _class_text,
                     payload.get("category"),
+                    fields=_class_fields,
                 )
                 _class_timeout = clamp_timeout(
                     float(getattr(settings, "gemini_primary_timeout_s", 20.0))
@@ -4159,7 +4189,18 @@ async def extract_course(
                 _gp_out_tok = _class_resp.output_tokens
                 if _class_resp.text and not _class_resp.skipped:
                     try:
-                        _gp_filled = _gp_json.loads(_class_resp.text)
+                        _class_raw = _gp_json.loads(_class_resp.text)
+                        if isinstance(_class_raw, dict):
+                            for _class_field in _class_fields:
+                                _class_value = _gp._validate(
+                                    _class_field,
+                                    _gp._coerce(
+                                        _class_field,
+                                        _class_raw.get(_class_field),
+                                    ),
+                                )
+                                if _class_value is not None:
+                                    _gp_filled[_class_field] = _class_value
                     except Exception:
                         pass
                 if emit:
@@ -4293,6 +4334,10 @@ async def extract_course(
                         "skip_reason": "course_deadline_exhausted",
                     }
                 else:
+                    _gp_requested_fields = _gemini_primary_missing_fields(
+                        payload,
+                        tuple(_gp._HARD_FIELDS),
+                    )
                     (
                         _gp_filled,
                         _gp_cost,
@@ -4304,6 +4349,7 @@ async def extract_course(
                             _gp_html,
                             url,
                             timeout=_gp_inner_timeout,
+                            fields=_gp_requested_fields,
                         ),
                         timeout=_gp_stage_timeout_s,
                     )
@@ -4488,6 +4534,19 @@ async def extract_course(
                 # returned "On Campus" or "Online".
                 if _gp_k == "mode":
                     _gp_k = "study_mode"
+
+                # Global fill-only policy: Gemini is a fallback for gaps left by
+                # deterministic extraction, never an alternative authority that
+                # replaces a usable value.
+                _existing_gp_value = payload.get(_gp_k)
+                if (
+                    _existing_gp_value is not None
+                    and _existing_gp_value != ""
+                    and _existing_gp_value != 0
+                    and _existing_gp_value != []
+                    and _existing_gp_value != {}
+                ):
+                    continue
 
                 # Taxonomy fields are fill-only. Deterministic extractors,
                 # imported operator values, and the shared title mapper outrank

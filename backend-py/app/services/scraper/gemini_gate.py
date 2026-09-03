@@ -150,6 +150,7 @@ def build_classification_only_prompt(
     course_name: str,
     page_text: str,
     known_category: str | None = None,
+    fields: tuple[str, ...] = ("category", "sub_category"),
 ) -> str:
     """Build a cheap classification-only prompt for Gemini.
 
@@ -169,6 +170,9 @@ def build_classification_only_prompt(
     snippet = (page_text or "")[:1500]
     category_options = ", ".join(CATEGORIES)
     subcategory_options = subcategory_options_for_category(known_category)
+    requested_fields = tuple(
+        field for field in fields if field in {"category", "sub_category"}
+    )
     taxonomy_constraint = (
         f"\nThe category is already known and MUST be exactly: {known_category}\n"
         f"Choose sub_category ONLY from: {', '.join(subcategory_options)}\n"
@@ -179,12 +183,14 @@ def build_classification_only_prompt(
             "do not repeat the degree name.\n"
         )
     )
+    schema = ", ".join(f'"{field}": "..."' for field in requested_fields)
+    labels = " and ".join(field.replace("_", " ") for field in requested_fields)
     return (
         f"Given this Australian university course, classify it into a "
-        f"taxonomy category and sub-category.\n\n"
+        f"taxonomy {labels}.\n\n"
         f"Course name: {course_name}\n"
         f"Page excerpt:\n{snippet}\n\n"
         f"{taxonomy_constraint}"
         f"Respond with ONLY valid JSON, no markdown fences:\n"
-        f'{{"category": "...", "sub_category": "..."}}\n'
+        f"{{{schema}}}\n"
     )
