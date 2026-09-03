@@ -1,0 +1,58 @@
+# INTI International University
+# Host-scoped so the same validated recipe loads across database environments.
+hostname_guard: "newinti.edu.my"
+
+discovery:
+  bfs_page_budget: 150
+
+  allow_url_patterns:
+    - "/programme/"
+
+  block_url_patterns:
+    # Category listing pages — crawl for links but never extract as courses.
+    - "/academic-programmes/$"
+    - "/academic-programmes/postgraduate-studies"
+    - "/academic-programmes/undergraduate"
+    - "/academic-programmes/postgraduate"
+    - "/academic-programmes/.*/(masters|doctorate|foundation|certificate|diploma|degrees|postgraduate-studies|postgraduate|bachelor)/?$"
+    - "/undergraduate/bachelor-degrees"
+    - "/undergraduate/diploma"
+    - "/undergraduate/foundation"
+    - "/undergraduate/certificate"
+    - "/micro-credential"
+    - "/professional-development"
+    - "/english-language"
+    - "/inti-english"
+    - "/american-university"
+    - "/student-life"
+    - "/about"
+    - "/news"
+    - "/events"
+    - "/contact"
+    - "/admission"
+    - "/scholarship"
+    - "/campus"
+
+  use_wayback: false
+
+extraction:
+  study_mode:
+    # The site's shared fee tables and navigation contain "Campus" and
+    # "Online Learning"; neither is authoritative for an individual course.
+    suppress_nav_rule: true
+
+  fees:
+    default_currency: MYR
+    # INTI publishes total-programme fees; annualize them after duration is known.
+    fee_calculation_mode: full_course_to_annual
+    fee_prevent_full_course_rollup: false
+
+  campus_allowlist:
+    - Nilai
+    - Subang
+    - Penang
+    - Sabah
+    - INTI International University
+    - INTI International College
+    - Online
+    - Distance Learning

@@ -28,6 +28,18 @@ from urllib.parse import urlparse
 log = logging.getLogger(__name__)
 
 
+def _has_usable_refinement(value: dict[str, Any]) -> bool:
+    """Return whether an AI response contains any actionable config decision."""
+    return bool(
+        value.get("allow_url_patterns")
+        or value.get("block_url_patterns")
+        or value.get("fee_page_hint")
+        or value.get("english_page_hint")
+        or isinstance(value.get("fees_on_course_page"), bool)
+        or isinstance(value.get("ielts_on_course_page"), bool)
+    )
+
+
 # ── Platform type derivation ──────────────────────────────────────────────────
 
 def _derive_platform_type(profile: "SiteProfile") -> str:  # type: ignore[name-defined]
@@ -292,7 +304,7 @@ async def _gemini_refine(
     sample_html: str | None,
     sample_urls: list[str],
 ) -> dict[str, Any]:
-    """Call Gemini to refine the heuristic config with site-specific details."""
+    """Refine heuristic config with Gemini, falling back to OpenAI on failure."""
     from app.services.ai import gemini_client
 
     # Build a compact profile summary for the prompt
@@ -350,56 +362,92 @@ RULES:
 - URL patterns should use Python re syntax (no anchors needed, substring match)
 - Respond ONLY with valid JSON"""
 
-    resp = await gemini_client.generate(
-        prompt=prompt,
-        call_type="auto_config",
-    )
-
-    if resp.skipped or not resp.text:
-        log.info("[AUTO_CONFIG] Gemini skipped (budget/quota) — using heuristic config only")
-        return config
-
-    # Parse Gemini response
+    ai_cfg: dict[str, Any] | None = None
+    provider = "Gemini"
     try:
-        raw = resp.text.strip()
-        # Strip markdown code fences if present
-        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.M).strip()
-        gemini_cfg = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        log.warning("[AUTO_CONFIG] Gemini returned non-JSON: %s — %s", exc, resp.text[:200])
+        resp = await gemini_client.generate(
+            prompt=prompt,
+            call_type="auto_config",
+        )
+        if not resp.skipped and resp.text:
+            raw = resp.text.strip()
+            raw = re.sub(
+                r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.M
+            ).strip()
+            try:
+                parsed = json.loads(raw)
+                if isinstance(parsed, dict) and _has_usable_refinement(parsed):
+                    ai_cfg = parsed
+                elif isinstance(parsed, dict):
+                    log.warning(
+                        "[AUTO_CONFIG] Gemini returned valid but incomplete "
+                        "configuration; trying OpenAI"
+                    )
+            except json.JSONDecodeError as exc:
+                log.warning(
+                    "[AUTO_CONFIG] Gemini returned non-JSON: %s — %s",
+                    exc,
+                    resp.text[:200],
+                )
+        else:
+            log.warning(
+                "[AUTO_CONFIG] Gemini skipped or returned no text; trying OpenAI"
+            )
+    except Exception as exc:
+        log.warning("[AUTO_CONFIG] Gemini refinement call failed: %s", exc)
+
+    if ai_cfg is None:
+        provider = "OpenAI"
+        from app.services.ai.openai_client import chat_json
+
+        ai_cfg = await chat_json(
+            system=(
+                "You configure university course-catalogue scrapers. Return "
+                "only a valid JSON object matching the requested contract."
+            ),
+            user=prompt,
+            max_tokens=1200,
+        )
+
+    if not isinstance(ai_cfg, dict) or not _has_usable_refinement(ai_cfg):
+        log.warning(
+            "[AUTO_CONFIG] Gemini and OpenAI refinement unavailable; "
+            "using heuristic config only"
+        )
         return config
 
-    # Merge Gemini refinements into config
+    # Merge AI refinements into config
     disc = config.setdefault("discovery", {})
     extr = config.setdefault("extraction", {})
 
-    if gemini_cfg.get("allow_url_patterns"):
-        disc["allow_url_patterns"] = gemini_cfg["allow_url_patterns"]
+    if ai_cfg.get("allow_url_patterns"):
+        disc["allow_url_patterns"] = ai_cfg["allow_url_patterns"]
 
-    if gemini_cfg.get("block_url_patterns"):
-        disc["block_url_patterns"] = gemini_cfg["block_url_patterns"]
+    if ai_cfg.get("block_url_patterns"):
+        disc["block_url_patterns"] = ai_cfg["block_url_patterns"]
 
-    fees_on_page = gemini_cfg.get("fees_on_course_page")
+    fees_on_page = ai_cfg.get("fees_on_course_page")
     if fees_on_page is False:
         extr.setdefault("fees", {})["force_central_fee_stage"] = True
-        fee_page = gemini_cfg.get("fee_page_hint")
+        fee_page = ai_cfg.get("fee_page_hint")
         if fee_page:
             extr.setdefault("fees", {})["central_page"] = fee_page
 
-    ielts_on_page = gemini_cfg.get("ielts_on_course_page")
-    english_page = gemini_cfg.get("english_page_hint")
+    ielts_on_page = ai_cfg.get("ielts_on_course_page")
+    english_page = ai_cfg.get("english_page_hint")
     if ielts_on_page is False and english_page:
         extr.setdefault("english", {})["central_page"] = english_page
 
-    if gemini_cfg.get("notes"):
+    if ai_cfg.get("notes"):
         config.setdefault("_notes", [])
         if isinstance(config["_notes"], list):
-            config["_notes"].append(gemini_cfg["notes"])
+            config["_notes"].append(ai_cfg["notes"])
         else:
-            config["_notes"] = [gemini_cfg["notes"]]
+            config["_notes"] = [ai_cfg["notes"]]
 
     log.info(
-        "[AUTO_CONFIG] Gemini refined: allow=%s fees_on_page=%s",
+        "[AUTO_CONFIG] %s refined: allow=%s fees_on_page=%s",
+        provider,
         disc.get("allow_url_patterns"),
         fees_on_page,
     )
