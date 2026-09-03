@@ -1,8 +1,22 @@
 import React from "react";
 
-type LocationsPanelProps = Record<string, any> & {
-  locations: any[];
+type LocationRow = {
+  id: number; displayName: string; city: string | null; stateRegion: string | null; country: string | null;
+  fullAddress: string | null; latitude: number | null; longitude: number | null; courseCount: number; isVerified: boolean;
 };
+type LocationEditForm = Omit<LocationRow, "id" | "courseCount" | "latitude" | "longitude"> & {
+  latitude?: number; longitude?: number;
+};
+
+interface LocationsPanelProps {
+  Button: React.ElementType; Check: React.ElementType; Globe: React.ElementType; Loader2: React.ElementType;
+  MapPin: React.ElementType; Pencil: React.ElementType; RefreshCw: React.ElementType; Trash2: React.ElementType;
+  deleteLocation: (id: number) => Promise<void>; geocodeLocation: (id: number) => Promise<void>; locations: LocationRow[];
+  locsGeocodingId: number | null; locsLoading: boolean; locsSyncing: boolean;
+  setLocsEditForm: React.Dispatch<React.SetStateAction<LocationEditForm>>;
+  setLocsEditId: React.Dispatch<React.SetStateAction<number | null>>;
+  syncLocations: () => Promise<void>;
+}
 
 export function LocationsPanel(props: LocationsPanelProps) {
   const { Button, Check, Globe, Loader2, MapPin, Pencil, RefreshCw, Trash2, deleteLocation, geocodeLocation, locations, locsGeocodingId, locsLoading, locsSyncing, setLocsEditForm, setLocsEditId, syncLocations } = props;

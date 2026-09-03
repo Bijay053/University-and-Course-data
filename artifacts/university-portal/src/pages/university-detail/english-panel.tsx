@@ -1,8 +1,25 @@
 import React from "react";
 
-type EnglishPanelProps = Record<string, any> & {
-  englishCourses: any[];
+type EnglishCourse = {
+  id: number; name: string; degreeLevel?: string | null;
+  ieltsListening?: number | null; ieltsSpeaking?: number | null; ieltsWriting?: number | null; ieltsReading?: number | null; ieltsOverall?: number | null;
+  pteListening?: number | null; pteSpeaking?: number | null; pteWriting?: number | null; pteReading?: number | null; pteOverall?: number | null;
+  toeflListening?: number | null; toeflSpeaking?: number | null; toeflWriting?: number | null; toeflReading?: number | null; toeflOverall?: number | null;
+  otherEnglishTestName?: string | null; otherEnglishReading?: number | null; otherEnglishListening?: number | null;
+  otherEnglishSpeaking?: number | null; otherEnglishWriting?: number | null; otherEnglishOverall?: number | null;
 };
+
+interface EnglishPanelProps {
+  Button: React.ElementType; Pencil: React.ElementType; Trash2: React.ElementType;
+  DEGREE_COLORS: Record<string, string>;
+  englishCourses: EnglishCourse[];
+  num: (value: number | null | undefined) => number | "—";
+  txt: (value: string | null | undefined) => string;
+  openBulk: (mode: "english") => void;
+  openEngEdit: (course: EnglishCourse) => void;
+  setDeleteEngCourse: React.Dispatch<React.SetStateAction<{ id: number; name: string } | null>>;
+  tableScrollRef: React.RefObject<HTMLDivElement | null>;
+}
 
 export function EnglishPanel(props: EnglishPanelProps) {
   const { Button, DEGREE_COLORS, Pencil, Trash2, englishCourses, num, openBulk, openEngEdit, setDeleteEngCourse, tableScrollRef, txt } = props;

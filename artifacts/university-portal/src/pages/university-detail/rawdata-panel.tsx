@@ -1,8 +1,32 @@
 import React from "react";
+import type { StagedCourse } from "../university-detail";
 
-type RawDataPanelProps = Record<string, any> & {
-  filteredRaw: any[];
-};
+type Setter<T> = React.Dispatch<React.SetStateAction<T>>;
+interface RawDataPanelProps {
+  AlertTriangle: React.ElementType; Button: React.ElementType; CheckCircle2: React.ElementType; Database: React.ElementType;
+  Dialog: React.ElementType; DialogContent: React.ElementType; DialogDescription: React.ElementType; DialogFooter: React.ElementType;
+  DialogHeader: React.ElementType; DialogTitle: React.ElementType; ExternalLink: React.ElementType; GitMerge: React.ElementType;
+  Input: React.ElementType; Loader2: React.ElementType; Pencil: React.ElementType; RefreshCw: React.ElementType; Search: React.ElementType;
+  Select: React.ElementType; SelectContent: React.ElementType; SelectItem: React.ElementType; SelectTrigger: React.ElementType;
+  SelectValue: React.ElementType; StatusBadge: React.ElementType; Textarea: React.ElementType; Trash2: React.ElementType;
+  Upload: React.ElementType; XCircle: React.ElementType; DEGREE_COLORS: Record<string, string>;
+  approvedCount: number; approvingId: number | null; bulkApproveProgress: { done: number; total: number };
+  bulkApproveRunning: boolean; bulkDeleteRawRunning: boolean; bulkMapRunning: boolean; bulkRejectFieldKey: string;
+  bulkRejectReason: string; bulkRejectRunning: boolean; deletingId: number | null; filteredRaw: StagedCourse[];
+  forceApproveRowId: number | null; importingAll: boolean; mappedIds: Set<number>; pendingCount: number;
+  rawData: StagedCourse[]; rawLoading: boolean; rawSearch: string; rawSelectedIds: Set<number>;
+  rawStatus: "all" | "pending" | "approved"; showBulkRejectConfirm: boolean; showForceApproveConfirm: boolean;
+  fetchRawData: () => Promise<void>; handleApprove: (id: number, force?: boolean) => Promise<void>;
+  handleBulkApprove: (force?: boolean) => Promise<void>; handleBulkMap: (forceOverwrite: boolean) => Promise<void>;
+  handleBulkRejectSelected: () => Promise<void>; handleDelete: (id: number) => void; handleImportAll: () => void;
+  num: (value: number | null | undefined) => number | "—"; openBackupMap: (course: StagedCourse) => Promise<void>;
+  openEdit: (course: StagedCourse) => void; tableScrollRef: React.RefObject<HTMLDivElement | null>;
+  toggleRawSelect: (id: number) => void; toggleSelectAllRaw: () => void; txt: (value: string | null | undefined) => string;
+  setBulkRejectFieldKey: Setter<string>; setBulkRejectReason: Setter<string>; setForceApproveRowId: Setter<number | null>;
+  setRawSearch: Setter<string>; setRawSelectedIds: Setter<Set<number>>; setRawStatus: Setter<"all" | "pending" | "approved">;
+  setShowBulkDeleteRawConfirm: Setter<boolean>; setShowBulkRejectConfirm: Setter<boolean>; setShowDeleteAllRawConfirm: Setter<boolean>;
+  setShowForceApproveConfirm: Setter<boolean>;
+}
 
 export function RawDataPanel(props: RawDataPanelProps) {
   const { AlertTriangle, Button, CheckCircle2, DEGREE_COLORS, Database, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, ExternalLink, GitMerge, Input, Loader2, Pencil, RefreshCw, Search, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, StatusBadge, Textarea, Trash2, Upload, XCircle, approvedCount, approvingId, bulkApproveProgress, bulkApproveRunning, bulkDeleteRawRunning, bulkMapRunning, bulkRejectFieldKey, bulkRejectReason, bulkRejectRunning, deletingId, fetchRawData, filteredRaw, forceApproveRowId, handleApprove, handleBulkApprove, handleBulkMap, handleBulkRejectSelected, handleDelete, handleImportAll, importingAll, mappedIds, num, openBackupMap, openEdit, pendingCount, rawData, rawLoading, rawSearch, rawSelectedIds, rawStatus, setBulkRejectFieldKey, setBulkRejectReason, setForceApproveRowId, setRawSearch, setRawSelectedIds, setRawStatus, setShowBulkDeleteRawConfirm, setShowBulkRejectConfirm, setShowDeleteAllRawConfirm, setShowForceApproveConfirm, showBulkRejectConfirm, showForceApproveConfirm, tableScrollRef, toggleRawSelect, toggleSelectAllRaw, txt } = props;

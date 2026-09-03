@@ -1,9 +1,22 @@
 import React from "react";
+import type { AssessNote } from "../university-detail";
 
-type AssessmentPanelProps = Record<string, any> & {
-  COUNTRIES: string[];
-  assessNotes: any[];
-};
+type Setter<T> = React.Dispatch<React.SetStateAction<T>>;
+type Toast = (options: { title: string; description?: string; variant?: "destructive" }) => unknown;
+
+interface AssessmentPanelProps {
+  BASE: string; id: number; COUNTRIES: string[];
+  Button: React.ElementType; ClipboardList: React.ElementType; Dialog: React.ElementType; DialogContent: React.ElementType;
+  DialogDescription: React.ElementType; DialogFooter: React.ElementType; DialogHeader: React.ElementType;
+  DialogTitle: React.ElementType; Label: React.ElementType; Pencil: React.ElementType; Plus: React.ElementType; Trash2: React.ElementType;
+  assessAddCountry: string; assessAddText: string; assessAdding: boolean; assessCountry: string;
+  assessDeleteNote: AssessNote | null; assessDeleting: boolean; assessEditCountry: string; assessEditNote: AssessNote | null;
+  assessEditText: string; assessEditing: boolean; assessLoading: boolean; assessNotes: AssessNote[]; assessShowAdd: boolean;
+  loadAssessNotes: () => Promise<void>; toast: Toast;
+  setAssessAddCountry: Setter<string>; setAssessAddText: Setter<string>; setAssessAdding: Setter<boolean>; setAssessCountry: Setter<string>;
+  setAssessDeleteNote: Setter<AssessNote | null>; setAssessDeleting: Setter<boolean>; setAssessEditCountry: Setter<string>;
+  setAssessEditNote: Setter<AssessNote | null>; setAssessEditText: Setter<string>; setAssessEditing: Setter<boolean>; setAssessShowAdd: Setter<boolean>;
+}
 
 export function AssessmentPanel(props: AssessmentPanelProps) {
   const { BASE, Button, COUNTRIES, ClipboardList, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Label, Pencil, Plus, Trash2, assessAddCountry, assessAddText, assessAdding, assessCountry, assessDeleteNote, assessDeleting, assessEditCountry, assessEditNote, assessEditText, assessEditing, assessLoading, assessNotes, assessShowAdd, id, loadAssessNotes, setAssessAddCountry, setAssessAddText, setAssessAdding, setAssessCountry, setAssessDeleteNote, setAssessDeleting, setAssessEditCountry, setAssessEditNote, setAssessEditText, setAssessEditing, setAssessShowAdd, toast } = props;
@@ -97,9 +110,9 @@ export function AssessmentPanel(props: AssessmentPanelProps) {
 
                   return (
                     <div className="p-5" style={{ columns:"2 280px", gap:"16px" }}>
-                      {note.parsed_data!.map((card: any, ci: number) => {
+                      {note.parsed_data!.map((card, ci) => {
                         const t = T(card.emoji ?? "ℹ️");
-                        const totalFields = (card.fields?.length ?? 0) + (card.sections?.reduce((a: number, s: any) => a + (s.fields?.length ?? 0), 0) ?? 0);
+                        const totalFields = (card.fields?.length ?? 0) + (card.sections?.reduce((a, s) => a + (s.fields?.length ?? 0), 0) ?? 0);
                         return (
                           <div key={ci} className="rounded-2xl overflow-hidden"
                             style={{ breakInside:"avoid", marginBottom:"16px", boxShadow:`0 4px 24px -4px ${t.glow},0 1px 3px rgba(0,0,0,0.08)`, border:"1px solid rgba(0,0,0,0.07)" }}>
@@ -120,21 +133,21 @@ export function AssessmentPanel(props: AssessmentPanelProps) {
                             </div>
                             {/* ── Body ── */}
                             <div className="bg-white">
-                              {card.fields?.map((f: any, fi: number) => (
+                              {card.fields?.map((f, fi) => (
                                 <div key={fi} className="flex justify-between items-center gap-4 px-4 py-2.5"
                                   style={{ borderBottom:"1px solid #f1f5f9" }}>
                                   <span className="text-[13px] text-slate-400 shrink-0 max-w-[44%] leading-snug">{f.label}</span>
                                   <Badge badge={f.badge} value={f.value} />
                                 </div>
                               ))}
-                              {card.sections?.map((sec: any, si: number) => (
+                              {card.sections?.map((sec, si) => (
                                 <div key={si}>
                                   <div className="px-4 py-2 flex items-center gap-2" style={{ background: t.tint }}>
                                     <div className="h-px flex-1 rounded-full" style={{ background: t.accent + "40" }} />
                                     <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: t.accent }}>{sec.label}</span>
                                     <div className="h-px flex-1 rounded-full" style={{ background: t.accent + "40" }} />
                                   </div>
-                                  {sec.fields?.map((f: any, fi: number) => (
+                                  {sec.fields?.map((f, fi) => (
                                     <div key={fi} className="flex justify-between items-center gap-4 px-4 py-2.5"
                                       style={{ borderBottom:"1px solid #f1f5f9" }}>
                                       <span className="text-[13px] text-slate-400 shrink-0 max-w-[44%] leading-snug">{f.label}</span>

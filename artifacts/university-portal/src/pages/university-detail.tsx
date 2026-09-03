@@ -94,7 +94,7 @@ function txt(v: string | null | undefined) { return v || "—"; }
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-type StagedCourse = {
+export type StagedCourse = {
   id: number;
   university_id: number;
   course_name: string;
@@ -142,6 +142,19 @@ type StagedCourse = {
   course_id?: number | null;
   created_at?: string | null;
 };
+
+export type AcadReqRow = {
+  id: number; courseId: number; courseName: string; degreeLevel: string | null;
+  academicLevel: string | null; academicScore: number | null;
+  scoreType: string | null; academicCountry: string | null;
+};
+
+export type ScholEntry = { id: number; name: string; details: string | null; eligibilityCriteria: string | null; amount: number | null; percentage: number | null; currency: string | null };
+export type ScholCourse = { id: number; name: string; degreeLevel: string | null; category: string | null; scholarships: ScholEntry[] };
+export type CardField = { label: string; value: string; badge: "yes" | "no" | "case" | null };
+export type CardSection = { label: string; fields: CardField[] };
+export type AssessCard = { title: string; emoji?: string; bg?: string; color?: string; fields: CardField[]; sections: CardSection[] };
+export type AssessNote = { id: number; country: string; raw_text: string; parsed_data: AssessCard[] | null; created_at: string };
 
 type EditForm = {
   courseName: string;
@@ -781,11 +794,6 @@ export default function UniversityDetail() {
   const [bSchReplace, setBSchReplace] = useState(false);
 
   // ── All academic requirements (one row per course × country) ──────────────
-  type AcadReqRow = {
-    id: number; courseId: number; courseName: string; degreeLevel: string | null;
-    academicLevel: string | null; academicScore: number | null;
-    scoreType: string | null; academicCountry: string | null;
-  };
   const [allAcademicReqs, setAllAcademicReqs] = useState<AcadReqRow[]>([]);
   const [acadReqsLoading, setAcadReqsLoading] = useState(false);
 
@@ -815,8 +823,6 @@ export default function UniversityDetail() {
   const [editAcadCountry, setEditAcadCountry] = useState("");
 
   // ── Scholarship tab data ───────────────────────────────────────────────────
-  type ScholEntry = { id: number; name: string; details: string | null; eligibilityCriteria: string | null; amount: number | null; percentage: number | null; currency: string | null };
-  type ScholCourse = { id: number; name: string; degreeLevel: string | null; category: string | null; scholarships: ScholEntry[] };
   const [scholCourses, setScholCourses] = useState<ScholCourse[]>([]);
   const [scholLoading, setScholLoading] = useState(false);
   const loadScholarshipCourses = useCallback(async () => {
@@ -851,11 +857,6 @@ export default function UniversityDetail() {
   const [editScholValueType, setEditScholValueType] = useState<"none" | "fixed" | "percent">("none");
 
   // ── Assessment Notes state ─────────────────────────────────────────────────
-  type CardField = { label: string; value: string; badge: "yes" | "no" | "case" | null };
-  type CardSection = { label: string; fields: CardField[] };
-  type AssessCard = { title: string; emoji?: string; bg?: string; color?: string; fields: CardField[]; sections: CardSection[] };
-  type AssessNote = { id: number; country: string; raw_text: string; parsed_data: AssessCard[] | null; created_at: string };
-
   const [assessNotes, setAssessNotes] = useState<AssessNote[]>([]);
   const [assessLoading, setAssessLoading] = useState(false);
   const [assessCountry, setAssessCountry] = useState<string>("__all__");

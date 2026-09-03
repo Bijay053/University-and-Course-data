@@ -1,8 +1,15 @@
 import React from "react";
+import type { ScholCourse } from "../university-detail";
 
-type ScholarshipsPanelProps = Record<string, any> & {
-  scholCourses: Array<any & { scholarships: any[] }>;
-};
+interface ScholarshipsPanelProps {
+  Award: React.ElementType; Badge: React.ElementType; Button: React.ElementType; Pencil: React.ElementType; Trash2: React.ElementType;
+  DEGREE_COLORS: Record<string, string>;
+  openBulk: (mode: "scholarships") => void;
+  openScholDelete: (courseId: number, courseName: string, scholarshipId?: number) => Promise<void>;
+  openScholEdit: (courseId: number, courseName: string) => Promise<void>;
+  scholCourses: ScholCourse[];
+  scholLoading: boolean;
+}
 
 export function ScholarshipsPanel(props: ScholarshipsPanelProps) {
   const { Award, Badge, Button, DEGREE_COLORS, Pencil, Trash2, openBulk, openScholDelete, openScholEdit, scholCourses, scholLoading } = props;
@@ -42,7 +49,7 @@ export function ScholarshipsPanel(props: ScholarshipsPanelProps) {
                     </button>
                   </div>
                   <div className="mt-3 space-y-2">
-                    {c.scholarships.map((s: any) => (
+                    {c.scholarships.map((s) => (
                       <div key={s.id} className="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">

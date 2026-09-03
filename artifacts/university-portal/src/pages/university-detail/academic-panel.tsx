@@ -1,8 +1,17 @@
 import React from "react";
+import type { AcadReqRow } from "../university-detail";
 
-type AcademicPanelProps = Record<string, any> & {
-  allAcademicReqs: any[];
-};
+interface AcademicPanelProps {
+  Button: React.ElementType; Pencil: React.ElementType; Trash2: React.ElementType;
+  DEGREE_COLORS: Record<string, string>;
+  acadReqsLoading: boolean;
+  allAcademicReqs: AcadReqRow[];
+  openAcadEdit: (row: AcadReqRow) => void;
+  openBulk: (mode: "academic") => void;
+  setDeleteAcadRow: React.Dispatch<React.SetStateAction<AcadReqRow | null>>;
+  tableScrollRef: React.RefObject<HTMLDivElement | null>;
+  txt: (value: string | null | undefined) => string;
+}
 
 export function AcademicPanel(props: AcademicPanelProps) {
   const { Button, DEGREE_COLORS, Pencil, Trash2, acadReqsLoading, allAcademicReqs, openAcadEdit, openBulk, setDeleteAcadRow, tableScrollRef, txt } = props;
