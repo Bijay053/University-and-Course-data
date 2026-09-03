@@ -285,6 +285,8 @@ interface FixResults {
   updated: number;
   skipped: number;
   errors: number;
+  valueUpdatedFields: string[];
+  provenanceOnlyFields: string[];
   beforeIssues: FixIssue[];
   afterIssues: FixIssue[];
 }
@@ -2060,6 +2062,8 @@ export default function Scraping() {
       for (let i = 0; i < ids.length; i += _FIX_BATCH) chunks.push(ids.slice(i, i + _FIX_BATCH));
 
       let totalUpdated = 0, totalSkipped = 0, totalErrors = 0, totalTotal = 0;
+      const valueUpdatedFields = new Set<string>();
+      const provenanceOnlyFields = new Set<string>();
       for (const chunk of chunks) {
         const res = await fetch("/api/scrape/staged/re-extract", {
           method: "POST",
@@ -2076,8 +2080,22 @@ export default function Scraping() {
         totalSkipped += part.skipped ?? 0;
         totalErrors += part.errors ?? 0;
         totalTotal += part.total ?? 0;
+        for (const result of part.results ?? []) {
+          const updatedFields = new Set<string>(result.updated_fields ?? []);
+          for (const field of updatedFields) valueUpdatedFields.add(field);
+          for (const field of result.refreshed_evidence_fields ?? []) {
+            if (!updatedFields.has(field)) provenanceOnlyFields.add(field);
+          }
+        }
       }
-      const data = { updated: totalUpdated, skipped: totalSkipped, errors: totalErrors, total: totalTotal };
+      const data = {
+        updated: totalUpdated,
+        skipped: totalSkipped,
+        errors: totalErrors,
+        total: totalTotal,
+        valueUpdatedFields: Array.from(valueUpdatedFields).sort(),
+        provenanceOnlyFields: Array.from(provenanceOnlyFields).sort(),
+      };
 
       // Reload staged courses then re-analyze to get accurate after counts.
       if (reviewJobId) await loadStagedCourses(reviewJobId);
@@ -3281,7 +3299,7 @@ export default function Scraping() {
             <div className="space-y-4">
               <div className="bg-muted/50 rounded-lg p-3 flex items-center justify-between text-sm">
                 <div className="flex items-center gap-3">
-                  <span className="font-medium">Updated {fixResults.updated} of {fixResults.total}</span>
+                  <span className="font-medium">Re-extracted {fixResults.updated} of {fixResults.total}</span>
                   {fixResults.skipped > 0 && <span className="text-muted-foreground">· {fixResults.skipped} skipped</span>}
                   {fixResults.errors > 0 && <span className="text-red-600">· {fixResults.errors} failed</span>}
                 </div>
@@ -3294,6 +3312,27 @@ export default function Scraping() {
                    fixResults.updated > 0 ? "Partially successful" : "Failed"}
                 </span>
               </div>
+
+              {(fixResults.valueUpdatedFields.length > 0 || fixResults.provenanceOnlyFields.length > 0) && (
+                <div className="space-y-3">
+                  {fixResults.valueUpdatedFields.length > 0 && (
+                    <div className="rounded-lg border border-green-200 bg-green-50 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-green-800">Values updated</p>
+                      <p className="mt-1 text-sm text-green-700">
+                        {fixResults.valueUpdatedFields.map(field => FIX_FIELD_LABELS[field] ?? field).join(", ")}
+                      </p>
+                    </div>
+                  )}
+                  {fixResults.provenanceOnlyFields.length > 0 && (
+                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-blue-800">Sources refreshed — values unchanged</p>
+                      <p className="mt-1 text-sm text-blue-700">
+                        {fixResults.provenanceOnlyFields.map(field => FIX_FIELD_LABELS[field] ?? field).join(", ")}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {fixResults.beforeIssues.length > 0 && (
                 <div>
