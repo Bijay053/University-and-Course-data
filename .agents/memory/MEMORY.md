@@ -111,4 +111,5 @@
 - [Search English-score casing](search-english-score-casing.md) — stored test types are mostly lowercase; normalize case and aggregate deterministically in live search.
 - [Vitest accessibility hook ordering](vitest-accessibility-hook-ordering.md) — global DOM assertions must run before test-local cleanup; explicitly use list hook sequencing.
 - [INTI fee currency and period authority](inti-fee-authority.md) — INTI’s RM figures are full-programme totals; force MYR and Full Course after extraction, without annualization.
+- [INTI duration badge authority](inti-duration-authority.md) — use the current programme’s top facts badge; related product cards repeat other courses’ durations and corrupt generic extraction.
 - [AI extraction is fill-only](ai-extraction-fill-only.md) — across all universities, deterministic static extraction owns populated values; AI is requested only for remaining gaps.
