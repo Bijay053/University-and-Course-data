@@ -28,6 +28,7 @@ defaults only (plus the DB scrape_config backwards-compat translation).
 from __future__ import annotations
 
 import logging
+import re
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -242,6 +243,106 @@ def _load_yaml_file(path: Path) -> dict[str, Any]:
         return {}
 
 
+def _hosts_match(scrape_host: str, declared_host: str) -> bool:
+    scrape_clean = scrape_host.lower().strip().lstrip("*.")
+    declared_clean = declared_host.lower().strip().lstrip("*.")
+    return bool(
+        scrape_clean
+        and declared_clean
+        and (
+            scrape_clean == declared_clean
+            or scrape_clean.endswith("." + declared_clean)
+        )
+    )
+
+
+def _declared_yaml_hostname(path: Path) -> str:
+    """Read hostname_guard or the header ``# Hostname:`` value."""
+    data = _load_yaml_file(path)
+    guard = data.get("hostname_guard")
+    if isinstance(guard, str) and guard.strip():
+        return guard.strip()
+    try:
+        header = path.read_text(encoding="utf-8")[:4096]
+    except OSError:
+        return ""
+    match = re.search(r"(?im)^#\s*Hostname:\s*(\S+)\s*$", header)
+    return match.group(1).strip() if match else ""
+
+
+def _is_generated_stub(path: Path) -> bool:
+    """Identify minimal files created by ``_create_stub_yaml``."""
+    try:
+        header = path.read_text(encoding="utf-8")[:4096]
+    except OSError:
+        return False
+    return (
+        "# Auto-generated:" in header
+        and "This stub was created automatically" in header
+    )
+
+
+def _select_uni_yaml(
+    *,
+    slug: str,
+    university_id: int | None,
+    scrape_url: str,
+) -> tuple[Path, bool]:
+    """Select a recipe without relying on database IDs being portable."""
+    shared = _UNIS_DIR / f"{slug}.yaml"
+    exact = (
+        _UNIS_DIR / f"{slug}_{university_id}.yaml"
+        if university_id is not None
+        else None
+    )
+    scrape_host = urlparse(scrape_url).hostname or ""
+
+    if exact is not None and exact.exists():
+        if (
+            _is_generated_stub(exact)
+            and shared.exists()
+            and _hosts_match(scrape_host, _declared_yaml_hostname(shared))
+        ):
+            log.warning(
+                "Ignoring generated YAML stub %s because matching shared "
+                "recipe %s exists",
+                exact.name,
+                shared.name,
+            )
+            return shared, False
+        return exact, True
+
+    if shared.exists() and _hosts_match(
+        scrape_host, _declared_yaml_hostname(shared)
+    ):
+        return shared, False
+
+    matches = [
+        path
+        for path in _UNIS_DIR.glob(f"{slug}_*.yaml")
+        if not _is_generated_stub(path)
+        and _hosts_match(scrape_host, _declared_yaml_hostname(path))
+    ]
+    if len(matches) == 1:
+        log.warning(
+            "Using hostname-matched YAML %s for slug=%r uni_id=%r",
+            matches[0].name,
+            slug,
+            university_id,
+        )
+        return matches[0], True
+    if len(matches) > 1:
+        log.error(
+            "Multiple hostname-matched YAML recipes for slug=%r host=%r: %s; "
+            "refusing to choose",
+            slug,
+            scrape_host,
+            [path.name for path in matches],
+        )
+
+    return shared, False
+
+
 def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
     """Recursively merge *override* into *base*.  Override wins on conflicts.
 
@@ -412,13 +513,11 @@ def load_uni_config(
     #      needed; it shadows the shared slug file entirely.
     #   2. unis/{slug}.yaml — legacy / single-tenant case; used when the
     #      university_id-specific file does not exist.
-    _id_yaml: Path | None = None
-    if university_id is not None:
-        candidate = _UNIS_DIR / f"{slug}_{university_id}.yaml"
-        if candidate.exists():
-            _id_yaml = candidate
-
-    uni_yaml_path: Path = _id_yaml if _id_yaml is not None else _UNIS_DIR / f"{slug}.yaml"
+    uni_yaml_path, _is_id_yaml = _select_uni_yaml(
+        slug=slug,
+        university_id=university_id,
+        scrape_url=scrape_url,
+    )
     per_uni = _load_yaml_file(uni_yaml_path)
     if per_uni:
         # Hostname guard — prevents a shared-slug YAML from being applied to the
@@ -435,14 +534,7 @@ def load_uni_config(
         _guard_host = per_uni.pop("hostname_guard", None)
         if _guard_host is not None:
             _scrape_host = urlparse(scrape_url).hostname or ""
-            _guard_clean = _guard_host.lstrip("*.").lower()
-            _scrape_clean = _scrape_host.lower()
-            # Allow exact match OR subdomain-of-guard (e.g. guard="canterbury.ac.nz"
-            # accepts "www.canterbury.ac.nz").
-            _host_ok = (
-                _scrape_clean == _guard_clean
-                or _scrape_clean.endswith("." + _guard_clean)
-            )
+            _host_ok = _hosts_match(_scrape_host, _guard_host)
             if not _host_ok:
                 log.warning(
                     "YAML hostname_guard mismatch for slug=%r: guard=%r scrape_host=%r "
@@ -458,7 +550,7 @@ def load_uni_config(
                 per_uni = {}
 
         if per_uni:
-            if _id_yaml is not None:
+            if _is_id_yaml:
                 log.debug(
                     "Per-uni YAML loaded for slug=%r uni_id=%r (id-specific file)",
                     slug,
