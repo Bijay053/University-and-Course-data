@@ -12,6 +12,7 @@ fast-track variants — they should not overwrite the standard duration
 from __future__ import annotations
 
 import re
+from urllib.parse import urlparse
 
 from app.services.scraper.extractors._text import compact, html_to_text
 from app.services.scraper.extractors.base import ExtractionResult
@@ -91,7 +92,15 @@ _RELATED_COURSE_CONTAINER_RE = re.compile(
     r"similar[-_ ]?courses?|"
     r"courses?[-_ ]?you[-_ ]?might[-_ ]?like|"
     r"course[-_ ]?recommendations?|"
-    r"course__like"
+    r"course__like|"
+    # INTI wraps recommendation products in ``ul.custom-related`` and places
+    # each sibling duration in ``custom-product-label-loop``.
+    r"custom[-_ ]?related|"
+    r"custom[-_ ]?product[-_ ]?label[-_ ]?loop|"
+    # INTI recommendation/compare cards repeat sibling programme durations
+    # inside ``product-compare-loop`` containers. The current programme's
+    # authoritative ``custom-product-label`` duration sits outside these cards.
+    r"product[-_ ]?compare[-_ ]?loop"
     r")",
     re.IGNORECASE,
 )
@@ -693,6 +702,96 @@ def _from_duration_meta(html: str) -> tuple[tuple[float, str], str] | None:
     return None
 
 
+def _from_inti_duration_badge(
+    html: str,
+    url: str,
+) -> tuple[tuple[float, str], str] | None:
+    """Read INTI's current-programme duration from its top facts bar.
+
+    INTI uses the same page for the current programme and many recommendation
+    cards. Generic flattened-text extraction can therefore select a sibling
+    course's duration. Only the non-``-loop`` top badge belongs to the current
+    programme.
+    """
+    host = (urlparse(url or "").hostname or "").lower()
+    if host != "newinti.edu.my":
+        return None
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:  # pragma: no cover - defensive
+        return None
+
+    for tag in soup.select(".custom-product-label"):
+        # Some recommendation templates reuse the non-loop badge class. Reject
+        # any candidate nested inside a known sibling-course container.
+        ancestor = tag.parent
+        inside_related = False
+        while ancestor is not None:
+            marker = " ".join(
+                [
+                    str(ancestor.get("id") or ""),
+                    *[str(value) for value in (ancestor.get("class") or [])],
+                ]
+            )
+            if marker and _RELATED_COURSE_CONTAINER_RE.search(marker):
+                inside_related = True
+                break
+            ancestor = ancestor.parent
+        if inside_related:
+            continue
+
+        classes = {
+            str(value).strip().lower()
+            for value in (tag.get("class") or [])
+        }
+        if any(value.endswith("-loop") for value in classes):
+            continue
+        text = compact(tag.get_text(" ", strip=True))
+        # Parse ranges before the generic classifier, whose loose scan would
+        # otherwise select the range's final number (e.g. 3-4 Years → 4).
+        range_match = re.search(
+            r"(?<![\d.])(\d+(?:\.\d+)?)\s*(?:-|–|—|\bto\b)\s*"
+            r"(\d+(?:\.\d+)?)\s*(years?|months?|weeks?)\b",
+            text,
+            re.IGNORECASE,
+        )
+        if range_match:
+            parsed = (
+                float(range_match.group(1)),
+                _normalise_unit(range_match.group(3)),
+            )
+        else:
+            # Compound durations are converted to months. Keep the separator
+            # tight so an inclusive internship note does not get added twice
+            # to a duration such as "3.5 Years (inclusive of 6 months)".
+            compound_match = re.search(
+                r"(?<![\d.])(\d+(?:\.\d+)?)\s*years?\s*"
+                r"(?:,|and)?\s*(\d+(?:\.\d+)?)\s*months?\b",
+                text,
+                re.IGNORECASE,
+            )
+            if compound_match:
+                parsed = (
+                    float(compound_match.group(1)) * 12
+                    + float(compound_match.group(2)),
+                    "Month",
+                )
+            else:
+                parsed = _classify_duration_value(text)
+        if parsed is not None:
+            amount, unit = parsed
+            if (
+                unit not in _DURATION_CAP
+                or amount <= 0
+                or amount > _DURATION_CAP[unit]
+            ):
+                continue
+            return (amount, unit), f"INTI programme duration badge: {text[:120]}"
+    return None
+
+
 def _strip_related_course_sections(html: str) -> str:
     """Remove high-confidence sibling-course recommendation containers."""
     try:
@@ -907,6 +1006,24 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
                 confidence=0.95,
                 snippet=snippet,
                 method="duration.meta",
+            )
+        ]
+
+    # INTI's top facts bar is authoritative for the current programme. Read it
+    # before generic text processing so sibling recommendation cards and body
+    # copy cannot win the duration tournament.
+    inti_badge = _from_inti_duration_badge(html, url)
+    if inti_badge is not None:
+        (amount, unit), snippet = inti_badge
+        amount, unit = _convert_weeks(amount, unit)
+        return [
+            ExtractionResult(
+                field_key="duration",
+                value=amount,
+                normalized={"duration": amount, "duration_term": unit},
+                confidence=0.98,
+                snippet=snippet,
+                method="duration.inti_badge",
             )
         ]
 

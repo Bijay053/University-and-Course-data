@@ -66,6 +66,166 @@ def test_strong_duration_sibling_div_classifies_via_structural_pass():
     assert out[0].method == "duration.structural"
 
 
+def test_inti_ignores_sibling_compare_card_durations():
+    """INTI's recommendation cards must not beat the current programme badge."""
+    html = """
+    <main>
+      <h1>Master of Engineering in Mechanical Engineering 4+0</h1>
+      <span class="custom-product-label">
+        <i class="icon-clock"></i> 4 Years
+      </span>
+      <p>Programme can be completed in 4 Years.</p>
+    </main>
+    <ul class="custom-related">
+      <li class="product">
+        <h3>Master of Engineering Management</h3>
+        <div class="product-labels-loop">
+          <span class="custom-product-label-loop">
+            <i class="icon-clock"></i> Full time: 1 year | Part time: 2 years
+          </span>
+        </div>
+      </li>
+      <li class="product">
+        <h3>Master of Business Administration</h3>
+        <span class="custom-product-label-loop">
+          <i class="icon-clock"></i> Full time: 1 year
+        </span>
+      </li>
+    </ul>
+    """
+
+    out = _run(
+        duration.extract(
+            html,
+            "https://newinti.edu.my/programme/"
+            "master-of-engineering-in-mechanical-engineering-40/",
+        )
+    )
+
+    assert out
+    assert out[0].normalized == {
+        "duration": 4.0,
+        "duration_term": "Year",
+    }
+    assert out[0].method == "duration.inti_badge"
+
+
+def test_inti_badge_handles_combined_year_and_month_duration():
+    html = """
+    <div class="top-facts">
+      <span class="custom-product-label">Hospitality</span>
+      <span class="custom-product-label">Certificate</span>
+      <span class="custom-product-label">
+        <i class="icon-clock"></i> 1 Year 4 Months
+      </span>
+      <span class="custom-product-label">From RM 18,000</span>
+    </div>
+    <ul class="custom-related">
+      <li><span class="custom-product-label-loop">2 Years</span></li>
+    </ul>
+    """
+
+    out = _run(
+        duration.extract(
+            html,
+            "https://newinti.edu.my/programme/certificate-in-hotel-operations/",
+        )
+    )
+
+    assert out
+    assert out[0].normalized == {
+        "duration": 16.0,
+        "duration_term": "Month",
+    }
+    assert out[0].method == "duration.inti_badge"
+
+
+def test_inti_badge_skips_related_ancestor_even_with_reused_plain_class():
+    html = """
+    <ul class="custom-related">
+      <li>
+        <span class="custom-product-label">4 Years</span>
+      </li>
+    </ul>
+    <div id="programme-intro">
+      <span class="custom-product-label">18 Months</span>
+    </div>
+    <div class="product-compare-loop">
+      <span class="custom-product-label">3 Years</span>
+    </div>
+    """
+
+    out = _run(
+        duration.extract(
+            html,
+            "https://newinti.edu.my/programme/example/",
+        )
+    )
+
+    assert out
+    assert out[0].normalized == {
+        "duration": 18.0,
+        "duration_term": "Month",
+    }
+    assert out[0].method == "duration.inti_badge"
+
+
+def test_inti_badge_handles_decimal_compound_duration():
+    html = '<span class="custom-product-label">1.5 Years and 4 Months</span>'
+    out = _run(
+        duration.extract(
+            html,
+            "https://newinti.edu.my/programme/example/",
+        )
+    )
+    assert out[0].normalized == {
+        "duration": 22.0,
+        "duration_term": "Month",
+    }
+
+
+def test_inti_badge_uses_minimum_of_duration_range():
+    for separator in ("-", "–", "—", " to "):
+        html = (
+            '<span class="custom-product-label">'
+            f"3{separator}4 Years"
+            "</span>"
+        )
+        out = _run(
+            duration.extract(
+                html,
+                "https://newinti.edu.my/programme/example/",
+            )
+        )
+        assert out[0].normalized == {
+            "duration": 3.0,
+            "duration_term": "Year",
+        }
+
+
+def test_inti_badge_rejects_invalid_or_out_of_cap_ranges():
+    for value in ("0-1 Years", "11-12 Years", "0-4 Months", "500-600 Weeks"):
+        html = f'<span class="custom-product-label">{value}</span>'
+        out = _run(
+            duration.extract(
+                html,
+                "https://newinti.edu.my/programme/example/",
+            )
+        )
+        assert not out or out[0].method != "duration.inti_badge"
+
+
+def test_inti_badge_requires_exact_hostname():
+    html = '<span class="custom-product-label">4 Years</span>'
+    out = _run(
+        duration.extract(
+            html,
+            "https://newinti.edu.my.evil.example/programme/example/",
+        )
+    )
+    assert not out or out[0].method != "duration.inti_badge"
+
+
 def test_dt_dd_duration_classifies_via_structural_pass():
     """`<dt>Course duration</dt><dd>2 years</dd>` — definition list,
     with optional trailing marketing copy that mentions an unrelated
