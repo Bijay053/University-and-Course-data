@@ -12,5 +12,9 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.{ts,tsx}"],
+    setupFiles: ["./src/test/setup.ts"],
+    sequence: {
+      hooks: "list",
+    },
   },
 });
