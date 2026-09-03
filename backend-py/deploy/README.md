@@ -1,12 +1,49 @@
 # Deploy artifacts
 
-Three files, plus the cutover runbook in `../README.md`.
+Three files, the secure OpenAI environment installer, plus the cutover runbook
+in `../README.md`.
 
 | File | Where it goes on production |
 |---|---|
 | `uni-api-py.service` | `/etc/systemd/system/uni-api-py.service` |
 | `uni-celery.service` | `/etc/systemd/system/uni-celery.service` |
 | `nginx.conf` | `/etc/nginx/sites-available/default` (after backup of current) |
+| `install_openai_fallback_via_ssm.py` | Run from a trusted deployment workspace; do not copy to production |
+
+## Install the OpenAI fallback environment securely
+
+Both services load `/etc/university-portal/openai.env` after the general
+application environment. The file is optional so deployments without the
+fallback still start, and is created mode `0600` when fallback credentials are
+installed.
+
+When the deployment principal cannot write encrypted Parameter Store values,
+use the one-time envelope-encrypted installer:
+
+```bash
+python backend-py/deploy/install_openai_fallback_via_ssm.py \
+  --instance-id "$UNIVERSITY_PORTAL_INSTANCE_ID" \
+  --region ap-south-1
+```
+
+For an external production host, set `OPENAI_API_KEY` to a direct OpenAI API
+key. The installer maps it to the service's existing
+`AI_INTEGRATIONS_OPENAI_API_KEY` setting and uses
+`https://api.openai.com/v1` unless `OPENAI_BASE_URL` is set. Replit-provisioned
+`AI_INTEGRATIONS_OPENAI_*` values must not be copied to external hosts because
+their proxy endpoint is loopback-only outside a Replit runtime.
+
+The production host generates a temporary private key and returns only its
+public certificate. SSM command history receives CMS ciphertext, never either
+plaintext value. The host decrypts directly into the root-only environment
+file, deletes the temporary key material, installs late-loading systemd
+drop-ins, and restarts both services.
+
+The caller needs `ssm:SendCommand` and `ssm:GetCommandInvocation` for the target
+instance and `AWS-RunShellScript`. OpenSSL must be installed on both machines.
+If `AWS_SSM_ACCESS_KEY_ID` and `AWS_SSM_SECRET_ACCESS_KEY` are set, the installer
+uses that dedicated deployment principal; otherwise it uses the default AWS
+credential chain.
 
 ## Record the deployed release
 
