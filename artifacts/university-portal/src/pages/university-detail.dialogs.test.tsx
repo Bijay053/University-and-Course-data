@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
 import React from "react";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -10,6 +12,32 @@ import UniversityDetail from "./university-detail";
 import { assertOpenDialogsHaveAccessibleContext } from "@/test/dialog-accessibility";
 
 const toastMock = vi.fn();
+
+const panelPropContracts = [
+  ["academic-panel.tsx", "AcademicPanelProps"],
+  ["assessment-panel.tsx", "AssessmentPanelProps"],
+  ["english-panel.tsx", "EnglishPanelProps"],
+  ["locations-panel.tsx", "LocationsPanelProps"],
+  ["rawdata-panel.tsx", "RawDataPanelProps"],
+  ["scholarships-panel.tsx", "ScholarshipsPanelProps"],
+] as const;
+
+function readInterfaceDeclaration(source: string, interfaceName: string) {
+  const declarationStart = source.indexOf(`interface ${interfaceName}`);
+  expect(declarationStart, `${interfaceName} must remain an interface`).toBeGreaterThanOrEqual(0);
+
+  const bodyStart = source.indexOf("{", declarationStart);
+  expect(bodyStart, `${interfaceName} must have a body`).toBeGreaterThanOrEqual(0);
+
+  let depth = 0;
+  for (let index = bodyStart; index < source.length; index += 1) {
+    if (source[index] === "{") depth += 1;
+    if (source[index] === "}") depth -= 1;
+    if (depth === 0) return source.slice(declarationStart, index + 1);
+  }
+
+  throw new Error(`${interfaceName} has an unclosed body`);
+}
 
 const course = {
   id: 42,
@@ -99,6 +127,21 @@ async function expectDialogAndClose(
 }
 
 describe("University Detail dialogs", () => {
+  it("keeps all extracted panel prop contracts closed and type-safe", () => {
+    for (const [fileName, interfaceName] of panelPropContracts) {
+      const source = readFileSync(resolve("src/pages/university-detail", fileName), "utf8");
+      const contract = readInterfaceDeclaration(source, interfaceName);
+
+      expect(contract, `${fileName} must not use any in its prop contract`).not.toMatch(/\bany\b/);
+      expect(contract, `${fileName} must not use a broad Record prop bag`).not.toMatch(
+        /\bRecord\s*<\s*(?:string|number|symbol|PropertyKey)\s*,\s*(?:unknown|object)\s*>/,
+      );
+      expect(contract, `${fileName} must not use a broad index-signature prop bag`).not.toMatch(
+        /\[\s*[\w$]+\s*:\s*(?:string|number|symbol)\s*\]\s*:\s*(?:any|unknown|object)\b/,
+      );
+    }
+  });
+
   it("opens the university edit and repair confirmation dialogs", async () => {
     const user = userEvent.setup();
     renderPage();
