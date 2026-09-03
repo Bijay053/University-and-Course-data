@@ -145,12 +145,12 @@ isValidation = true
 name = "full-scraper-regression"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd backend-py && PYTHONPATH=. python -m pytest -q"
-
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend-py && scripts/run_full_scraper_regression.sh"
 
 [agent]
 stack = "PNPM_WORKSPACE"

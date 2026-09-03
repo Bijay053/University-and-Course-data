@@ -328,7 +328,9 @@ def test_requeue_skips_job_when_nx_lock_is_held():
 
 
 @pytest.mark.asyncio
-async def test_requeue_concurrent_two_ticks_dispatch_exactly_once():
+async def test_requeue_concurrent_two_ticks_dispatch_exactly_once(
+    require_real_redis,
+):
     """Two simultaneous invocations of ``requeue_stale_queued`` against a *real*
     Redis instance must result in exactly one ``.delay()`` call.
 

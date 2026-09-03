@@ -271,6 +271,7 @@ async def test_repair_lock_ttl_expiry_skips_delete(
 @pytest.mark.asyncio
 async def test_repair_lock_concurrent_gather(
     monkeypatch: pytest.MonkeyPatch,
+    require_real_redis,
 ) -> None:
     """Two repairs for the same university run concurrently via
     asyncio.gather against a *real* Redis instance.  Exactly one must
