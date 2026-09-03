@@ -133,6 +133,8 @@ def test_interrupted_pytest_cleans_up_temporary_redis(tmp_path: Path) -> None:
     bin_dir.mkdir()
     log = tmp_path / "calls.log"
     pytest_running = tmp_path / "pytest-running"
+    pytest_stopped = tmp_path / "pytest-stopped"
+    pytest_pid_file = tmp_path / "pytest.pid"
 
     _write_executable(
         bin_dir,
@@ -158,7 +160,9 @@ touch "$TEST_STATE"
         "python",
         """
 echo "python $*" >> "$CALLS_LOG"
+echo "$$" > "$PYTEST_PID_FILE"
 touch "$PYTEST_RUNNING"
+trap 'touch "$PYTEST_STOPPED"; exit 0' TERM
 while :; do sleep 1; done
 """,
     )
@@ -169,6 +173,8 @@ while :; do sleep 1; done
         "CALLS_LOG": str(log),
         "TEST_STATE": str(tmp_path / "redis-ready"),
         "PYTEST_RUNNING": str(pytest_running),
+        "PYTEST_STOPPED": str(pytest_stopped),
+        "PYTEST_PID_FILE": str(pytest_pid_file),
         "TEST_REDIS_HOST": "test.invalid",
         "TEST_REDIS_PORT": "16379",
     }
@@ -182,6 +188,7 @@ while :; do sleep 1; done
         start_new_session=True,
     )
 
+    pytest_pid: int | None = None
     try:
         deadline = time.monotonic() + 5
         while not pytest_running.exists() and process.poll() is None:
@@ -190,14 +197,23 @@ while :; do sleep 1; done
             time.sleep(0.01)
 
         assert process.poll() is None
-        os.killpg(process.pid, signal.SIGTERM)
+        pytest_pid = int(pytest_pid_file.read_text())
+        os.kill(process.pid, signal.SIGTERM)
         stdout, stderr = process.communicate(timeout=5)
     finally:
         if process.poll() is None:
-            os.killpg(process.pid, signal.SIGKILL)
+            process.kill()
             process.wait(timeout=5)
+        if pytest_pid is not None:
+            try:
+                os.kill(pytest_pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
 
-    assert process.returncode != 0, (stdout, stderr)
+    assert process.returncode == 143, (stdout, stderr)
+    assert pytest_stopped.exists()
+    with pytest.raises(ProcessLookupError):
+        os.kill(pytest_pid, 0)
     calls = log.read_text()
     assert "redis-server --bind test.invalid --port 16379" in calls
     assert "python -m pytest -q tests/example.py" in calls
