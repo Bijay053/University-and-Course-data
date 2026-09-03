@@ -202,6 +202,7 @@ async def _persist_evidence(
                     if isinstance(ev.get("confidence"), (int, float))
                     else None
                 ),
+                "validation_status": (ev.get("validation_status") or "pending")[:50],
                 "decision_status": _ds,
                 "selected": _ds == "selected",
             }
@@ -218,6 +219,59 @@ async def _persist_evidence(
     return len(values)
 
 
+def _evidence_provenance(ev: Any) -> tuple[Any, ...]:
+    """Fields whose changes make otherwise-equal evidence materially fresher."""
+    if isinstance(ev, dict):
+        return (
+            ev.get("source_url"),
+            ev.get("page_type"),
+            ev.get("method") or "unknown",
+            ev.get("snippet"),
+        )
+    return (
+        ev.source_url,
+        ev.page_type,
+        ev.extraction_method or "unknown",
+        ev.snippet,
+    )
+
+
+async def evidence_fields_with_changed_provenance(
+    db: AsyncSession,
+    *,
+    scraped_course_id: int,
+    evidence: list[dict[str, Any]],
+    field_keys: set[str],
+) -> set[str]:
+    """Return unchanged-value fields whose selected provenance has changed."""
+    fresh_selected = {
+        str(ev.get("field_key")): ev
+        for ev in evidence
+        if isinstance(ev, dict)
+        and ev.get("field_key") in field_keys
+        and ev.get("decision_status") == "selected"
+    }
+    if not fresh_selected:
+        return set()
+
+    existing = (
+        await db.execute(
+            select(ScrapedFieldEvidence).where(
+                ScrapedFieldEvidence.scraped_course_id == scraped_course_id,
+                ScrapedFieldEvidence.field_key.in_(fresh_selected),
+                ScrapedFieldEvidence.selected.is_(True),
+            )
+        )
+    ).scalars().all()
+    existing_by_field = {ev.field_key: ev for ev in existing}
+    return {
+        field_key
+        for field_key, fresh in fresh_selected.items()
+        if (old := existing_by_field.get(field_key)) is not None
+        and _evidence_provenance(old) != _evidence_provenance(fresh)
+    }
+
+
 async def refresh_evidence_for_fields(
     db: AsyncSession,
     *,
@@ -230,6 +284,20 @@ async def refresh_evidence_for_fields(
     if not field_keys:
         return 0
 
+    existing = (
+        await db.execute(
+            select(ScrapedFieldEvidence).where(
+                ScrapedFieldEvidence.scraped_course_id == scraped_course_id,
+                ScrapedFieldEvidence.field_key.in_(field_keys),
+            )
+        )
+    ).scalars().all()
+    reviewed_by_value = {
+        (ev.field_key, ev.normalized_value): ev.validation_status
+        for ev in existing
+        if ev.validation_status != "pending"
+    }
+
     await db.execute(
         delete(ScrapedFieldEvidence).where(
             ScrapedFieldEvidence.scraped_course_id == scraped_course_id,
@@ -237,7 +305,19 @@ async def refresh_evidence_for_fields(
         )
     )
     refreshed = [
-        ev
+        {
+            **ev,
+            # A reviewer validation remains applicable when re-extraction found
+            # the same normalized value from fresher provenance. Changed values
+            # intentionally fall back to "pending".
+            "validation_status": reviewed_by_value.get(
+                (
+                    str(ev.get("field_key")),
+                    _to_text(ev.get("normalized") if ev.get("normalized") is not None else ev.get("value")),
+                ),
+                ev.get("validation_status") or "pending",
+            ),
+        }
         for ev in evidence
         if isinstance(ev, dict) and ev.get("field_key") in field_keys
     ]

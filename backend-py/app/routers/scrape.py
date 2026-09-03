@@ -1846,7 +1846,10 @@ async def re_extract_staged(
     from app.services.scraper.config.context import set_uni_config
     from app.services.scraper.config.loader import get_config_for_host
     from app.services.scraper.orchestrator import _extract_only
-    from app.services.scraper.stage_course import refresh_evidence_for_fields
+    from app.services.scraper.stage_course import (
+        evidence_fields_with_changed_provenance,
+        refresh_evidence_for_fields,
+    )
 
     uni = await db.get(University, body.university_id)
     if uni is None:
@@ -1949,15 +1952,31 @@ async def re_extract_staged(
                 setattr(row, field_key, cleaned)
                 changed_fields.append(field_key)
 
+        incoming_evidence = out.get("evidence") or []
+        unchanged_payload_fields = {
+            field_key
+            for field_key in payload
+            if field_key not in changed_fields and hasattr(ScrapedCourse, field_key)
+        }
+        provenance_changed_fields = await evidence_fields_with_changed_provenance(
+            db,
+            scraped_course_id=row.id,
+            evidence=incoming_evidence,
+            field_keys=unchanged_payload_fields,
+        )
+
         # Evidence and staged values must move together. Remove stale candidates
         # even when the extractor found no replacement evidence for a changed
         # field; showing no evidence is safer than showing evidence for old data.
+        # Equal normalized values also refresh when their selected source details
+        # changed, so canonical newer-year pages replace stale provenance.
+        evidence_refreshed_fields = set(changed_fields) | provenance_changed_fields
         await refresh_evidence_for_fields(
             db,
             scraped_course_id=row.id,
-            evidence=out.get("evidence") or [],
+            evidence=incoming_evidence,
             source_url=out.get("url") or payload.get("course_website") or url,
-            field_keys=set(changed_fields),
+            field_keys=evidence_refreshed_fields,
         )
 
         # Always refresh completeness and publish decision.
@@ -1977,6 +1996,7 @@ async def re_extract_staged(
             "id": sc_id,
             "ok": True,
             "updated_fields": changed_fields,
+            "refreshed_evidence_fields": sorted(evidence_refreshed_fields),
             "new_completeness": row.completeness,
         })
         updated += 1

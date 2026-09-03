@@ -433,3 +433,99 @@ async def test_re_extract_staged_refreshes_changed_fee_evidence(monkeypatch):
         assert by_field["fee_year"].snippet == "Fees shown are for 2026"
     finally:
         await _cleanup(job_id)
+
+
+@pytest.mark.asyncio
+async def test_re_extract_refreshes_unchanged_fee_from_newer_canonical_page(monkeypatch):
+    uni_id = await _pick_university()
+    job_id = f"test_reextract_same_ev_{uuid.uuid4().hex[:10]}"
+    old_url = "https://example.edu/courses/2025/computer-science"
+    new_url = "https://example.edu/courses/2026/computer-science"
+    try:
+        async with AsyncSessionLocal() as db:
+            staged = await stage_course(
+                db,
+                scrape_job_id=job_id,
+                university_id=uni_id,
+                course_name="Bachelor of Computer Science",
+                payload={
+                    "course_name": "Bachelor of Computer Science",
+                    "international_fee": 41000,
+                    "fee_year": 2026,
+                    "course_website": old_url,
+                },
+                evidence=[{
+                    "field_key": "international_fee",
+                    "value": 41000,
+                    "normalized": 41000,
+                    "method": "fee:table",
+                    "source_url": old_url,
+                    "snippet": "2025 international fee: A$41,000",
+                    "decision_status": "selected",
+                }],
+                source_url=old_url,
+            )
+            assert staged.saved
+            sc_id = staged.scraped_course_id
+            old_evidence = (
+                await db.execute(
+                    select(ScrapedFieldEvidence).where(
+                        ScrapedFieldEvidence.scraped_course_id == sc_id,
+                        ScrapedFieldEvidence.field_key == "international_fee",
+                    )
+                )
+            ).scalar_one()
+            old_evidence.validation_status = "ok"
+            await db.commit()
+
+        async def _fake_extract_only(*_args, **_kwargs):
+            return {
+                "url": new_url,
+                "payload": {"international_fee": 41000},
+                "evidence": [{
+                    "field_key": "international_fee",
+                    "value": 41000,
+                    "normalized": 41000,
+                    "method": "fee:canonical-table",
+                    "source_url": new_url,
+                    "snippet": "2026 international fee remains A$41,000",
+                    "decision_status": "selected",
+                }],
+            }
+
+        monkeypatch.setattr(
+            "app.services.scraper.orchestrator._extract_only",
+            _fake_extract_only,
+        )
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post(
+                "/api/scrape/staged/re-extract",
+                json={"ids": [sc_id], "universityId": uni_id},
+            )
+
+        assert response.status_code == 200, response.text
+        result = response.json()["results"][0]
+        assert result["updated_fields"] == []
+        assert result["refreshed_evidence_fields"] == ["international_fee"]
+
+        async with AsyncSessionLocal() as db:
+            course = await db.get(ScrapedCourse, sc_id)
+            assert course.international_fee == 41000
+            fee_evidence = (
+                await db.execute(
+                    select(ScrapedFieldEvidence).where(
+                        ScrapedFieldEvidence.scraped_course_id == sc_id,
+                        ScrapedFieldEvidence.field_key == "international_fee",
+                    )
+                )
+            ).scalar_one()
+
+        assert fee_evidence.source_url == new_url
+        assert fee_evidence.extraction_method == "fee:canonical-table"
+        assert fee_evidence.snippet == "2026 international fee remains A$41,000"
+        assert fee_evidence.validation_status == "ok"
+        assert fee_evidence.selected is True
+    finally:
+        await _cleanup(job_id)
