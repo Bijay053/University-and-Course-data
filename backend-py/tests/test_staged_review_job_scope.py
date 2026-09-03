@@ -130,3 +130,72 @@ def test_job_review_includes_explicit_unresolved_continuation_chain(monkeypatch)
         {"id": 201, "courseName": "Original course"},
         {"id": 202, "courseName": "Recovered course"},
     ]
+
+
+def test_job_review_includes_only_recorded_automatic_resume_rows(monkeypatch):
+    """Implicit resume provenance is row-exact and university-bounded."""
+
+    class _ResumeRows:
+        def scalars(self):
+            return self
+
+        def all(self):
+            return [
+                SimpleNamespace(id=301, course_name="Current course"),
+                SimpleNamespace(id=302, course_name="Resumed course"),
+            ]
+
+    class _ResumeDb:
+        def __init__(self):
+            self.statement = None
+
+        async def get(self, _model, job_id):
+            if job_id != "job_current":
+                return None
+            return SimpleNamespace(
+                runtime_job_id="job_current",
+                university_id=42,
+                request_payload={
+                    "resumeCourseIds": [302, 303, -1, "304", True],
+                    "resumeSourceJobIds": ["job_failed"],
+                },
+                started_at=None,
+                completed_at=None,
+                total_found=2,
+                imported=2,
+                skipped=0,
+                errors=0,
+            )
+
+        async def execute(self, statement):
+            self.statement = statement
+            return _ResumeRows()
+
+    async def _no_op(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(
+        scrape,
+        "_staged_row_to_dict",
+        lambda row: {"id": row.id, "courseName": row.course_name},
+    )
+    monkeypatch.setattr(scrape, "_attach_evidence_bulk", _no_op)
+    monkeypatch.setattr(scrape, "_attach_recovery_counts_bulk", _no_op)
+
+    db = _ResumeDb()
+    response = asyncio.run(scrape.staged_one("job_current", db))
+
+    compiled = db.statement.compile()
+    bound_lists = [
+        value
+        for value in compiled.params.values()
+        if isinstance(value, (list, tuple, set))
+    ]
+    assert {"job_current"} in [set(value) for value in bound_lists]
+    assert {302, 303} in [set(value) for value in bound_lists]
+    query = str(db.statement)
+    assert "scraped_courses.university_id" in query
+    assert response["courses"] == [
+        {"id": 301, "courseName": "Current course"},
+        {"id": 302, "courseName": "Resumed course"},
+    ]

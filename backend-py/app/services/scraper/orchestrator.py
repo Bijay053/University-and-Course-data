@@ -944,10 +944,10 @@ def _normalize_course_url(url: str | None) -> str:
     return canonical_course_url_key(url)
 
 
-async def _already_staged_urls(
+async def _already_staged_checkpoint_rows(
     db: AsyncSession, university_id: int, *, current_job_id: str | None = None
-) -> set[str]:
-    """Return course URLs the resume checkpoint should skip on the next run.
+) -> dict[str, tuple[int, str]]:
+    """Return normalized URL -> (staged row ID, source job ID) checkpoints.
 
     Task #229 resume checkpoint: a large scrape that died on the time ceiling
     leaves its partial progress in ``scraped_courses``.  On the next run we skip
@@ -983,7 +983,7 @@ async def _already_staged_urls(
     rows = (await db.execute(
         _text(
             f"""
-            SELECT sc.course_website
+            SELECT sc.id, sc.course_website, sc.scrape_job_id
             FROM scraped_courses sc
             JOIN scrape_runtime_jobs j ON j.runtime_job_id = sc.scrape_job_id
             WHERE sc.university_id = :uid
@@ -993,11 +993,46 @@ async def _already_staged_urls(
               AND sc.course_website IS NOT NULL
               AND sc.course_website <> ''
               {not_current}
+            ORDER BY sc.created_at DESC
             """
         ),
         params,
-    )).scalars().all()
-    return {_normalize_course_url(u) for u in rows if u}
+    )).all()
+
+    checkpoints: dict[str, tuple[int, str]] = {}
+    for course_id, course_url, source_job_id in rows:
+        key = _normalize_course_url(course_url)
+        if key and key not in checkpoints:
+            # If interrupted attempts contain the same URL, use only the newest
+            # pending row. This prevents duplicate review rows after a resume.
+            checkpoints[key] = (int(course_id), str(source_job_id))
+    return checkpoints
+
+
+async def _already_staged_urls(
+    db: AsyncSession, university_id: int, *, current_job_id: str | None = None
+) -> set[str]:
+    """Compatibility wrapper returning only normalized resume-checkpoint URLs."""
+    return set(
+        await _already_staged_checkpoint_rows(
+            db, university_id, current_job_id=current_job_id
+        )
+    )
+
+
+def _matched_resume_provenance(
+    links: list[dict],
+    checkpoints: dict[str, tuple[int, str]],
+) -> tuple[set[str], list[int], list[str]]:
+    """Return exact checkpoint rows and source jobs used by this work list."""
+    matched_keys = {
+        key
+        for link in links
+        if (key := _normalize_course_url(link.get("url"))) in checkpoints
+    }
+    course_ids = sorted({checkpoints[key][0] for key in matched_keys})
+    source_job_ids = sorted({checkpoints[key][1] for key in matched_keys})
+    return matched_keys, course_ids, source_job_ids
 
 
 def _target_course_urls_from_payload(payload: dict | None) -> list[str]:
@@ -4717,11 +4752,17 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         _resume_already_staged = 0
         if settings.scrape_resume_enabled and job.university_id and links:
             try:
-                _done_urls = await _already_staged_urls(
+                _done_rows = await _already_staged_checkpoint_rows(
                     db, job.university_id, current_job_id=runtime_job_id
                 )
+                _done_urls = set(_done_rows)
                 if _done_urls:
                     _before = len(links)
+                    (
+                        _matched_resume_keys,
+                        _resume_course_ids,
+                        _resume_source_job_ids,
+                    ) = _matched_resume_provenance(links, _done_rows)
                     links = [
                         lk for lk in links
                         if _normalize_course_url(lk.get("url")) not in _done_urls
@@ -4729,6 +4770,14 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     _skipped_resume = _before - len(links)
                     if _skipped_resume > 0:
                         _resume_already_staged = _skipped_resume
+                        # Persist exact row provenance so the review API can
+                        # reunite this run with only the checkpoints it used.
+                        # Counts alone are not a safe scope because unrelated
+                        # pending rows can exist for the same university.
+                        _payload = dict(job.request_payload or {})
+                        _payload["resumeCourseIds"] = _resume_course_ids
+                        _payload["resumeSourceJobIds"] = _resume_source_job_ids
+                        job.request_payload = _payload
                         await db.commit()
                         log.info(
                             "[RESUME] %s: skipping %d already-staged course(s); "

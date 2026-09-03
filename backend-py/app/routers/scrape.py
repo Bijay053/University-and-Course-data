@@ -2212,9 +2212,15 @@ async def staged_one(
         # standalone runs.
         review_job_ids = [sc_id_or_job]
         seen_job_ids = {sc_id_or_job}
+        resume_course_ids: set[int] = set()
         chain_job = job
         for _ in range(20):
             payload = getattr(chain_job, "request_payload", None) or {}
+            raw_resume_ids = payload.get("resumeCourseIds")
+            if isinstance(raw_resume_ids, list):
+                for raw_id in raw_resume_ids[:5000]:
+                    if isinstance(raw_id, int) and not isinstance(raw_id, bool) and raw_id > 0:
+                        resume_course_ids.add(raw_id)
             parent_job_id = payload.get("retrySourceJobId")
             if not isinstance(parent_job_id, str):
                 break
@@ -2237,6 +2243,14 @@ async def staged_one(
             chain_job = parent_job
 
         where_clause = ScrapedCourse.scrape_job_id.in_(review_job_ids)
+        if resume_course_ids and job is not None and job.university_id is not None:
+            where_clause = or_(
+                where_clause,
+                and_(
+                    ScrapedCourse.id.in_(resume_course_ids),
+                    ScrapedCourse.university_id == job.university_id,
+                ),
+            )
         rows = (await db.execute(
             select(ScrapedCourse).where(where_clause, ScrapedCourse.status == "pending")
             .order_by(ScrapedCourse.created_at.desc())

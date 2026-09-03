@@ -17,7 +17,10 @@ import pytest
 
 from app.config import settings
 from app.services.scraper import rate_limiter
-from app.services.scraper.orchestrator import _normalize_course_url
+from app.services.scraper.orchestrator import (
+    _matched_resume_provenance,
+    _normalize_course_url,
+)
 
 
 def _run(coro):
@@ -84,6 +87,33 @@ def test_resume_filter_noop_when_nothing_staged():
         if _normalize_course_url(lk.get("url")) not in done
     ]
     assert remaining == links
+
+
+def test_resume_provenance_records_only_checkpoint_rows_used_by_current_links():
+    links = [
+        {"url": "https://uni.edu/course/a/"},
+        {"url": "https://uni.edu/course/b"},
+        {"url": "https://uni.edu/course/new"},
+    ]
+    checkpoints = {
+        _normalize_course_url("http://www.uni.edu/course/a"): (101, "job_failed_a"),
+        _normalize_course_url("https://uni.edu/course/b/"): (102, "job_failed_b"),
+        _normalize_course_url("https://uni.edu/course/unrelated"): (
+            999,
+            "job_unrelated",
+        ),
+    }
+
+    keys, course_ids, source_job_ids = _matched_resume_provenance(
+        links, checkpoints
+    )
+
+    assert keys == {
+        _normalize_course_url("https://uni.edu/course/a"),
+        _normalize_course_url("https://uni.edu/course/b"),
+    }
+    assert course_ids == [101, 102]
+    assert source_job_ids == ["job_failed_a", "job_failed_b"]
 
 
 # ── _clear_stale_dedup SQL shaping (reviewer-rejection + resume preservation) ─
