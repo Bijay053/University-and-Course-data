@@ -185,6 +185,12 @@ type StagedCourse = {
   createdAt: string;
 };
 
+export type ScrapingInitialReviewState = {
+  courses: StagedCourse[];
+  universityId: number;
+  jobId: string;
+};
+
 type ReviewEvidence = {
   id: number;
   fieldKey: string;
@@ -574,7 +580,7 @@ function EvidenceDialogContent({ reviewDetail }: { reviewDetail: CourseReviewPay
   );
 }
 
-export default function Scraping() {
+function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingInitialReviewState }) {
   const { toast } = useToast();
   const [jobs, setJobs] = useState<ImportJob[]>([]);
   const [importPage, setImportPage] = useState(1);
@@ -585,7 +591,9 @@ export default function Scraping() {
   const [loadingJobs, setLoadingJobs] = useState(true);
 
   const [scrapeUrls, setScrapeUrls] = useState<string[]>([""]);
-  const [selectedUni, setSelectedUni] = useState("");
+  const [selectedUni, setSelectedUni] = useState(
+    initialReviewState ? String(initialReviewState.universityId) : "",
+  );
   const [newUniName, setNewUniName] = useState("");
   const [newUniCountry, setNewUniCountry] = useState("");
   const [newUniCity, setNewUniCity] = useState("");
@@ -641,13 +649,17 @@ export default function Scraping() {
     setSlotIds((prev) => prev.filter((s) => s !== id));
   }, []);
 
-  const [stagedCourses, setStagedCourses] = useState<StagedCourse[]>([]);
+  const [stagedCourses, setStagedCourses] = useState<StagedCourse[]>(
+    initialReviewState?.courses ?? [],
+  );
   const [courseQualityMap, setCourseQualityMap] = useState<Record<number, CourseQualityData>>({});
   const [qualityExpanded, setQualityExpanded] = useState<Set<number>>(new Set());
   const [qualitySortDesc, setQualitySortDesc] = useState(false);
   const [lastScrapeInfo, setLastScrapeInfo] = useState<{ jobId: string; startedAt: string | null; completedAt: string | null; durationMs: number | null; totalFound: number; staged: number; skipped: number; errors: number } | null>(null);
-  const [showReview, setShowReview] = useState(false);
-  const [reviewJobId, setReviewJobId] = useState<string | null>(null);
+  const [showReview, setShowReview] = useState(Boolean(initialReviewState));
+  const [reviewJobId, setReviewJobId] = useState<string | null>(
+    initialReviewState?.jobId ?? null,
+  );
   const [latestAvailableJobId, setLatestAvailableJobId] = useState<string | null>(null);
   const latestAvailableJobIdRef = useRef<string | null>(null);
   // Refs so callbacks can read current review state without stale closure issues
@@ -661,7 +673,9 @@ export default function Scraping() {
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
   const [approving, setApproving] = useState(false);
   const [approvingId, setApprovingId] = useState<number | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(
+    () => new Set(initialReviewState?.courses.map((course) => course.id) ?? []),
+  );
   const [scrapeUniName, setScrapeUniName] = useState("");
   const [scrapeTargetUrl, setScrapeTargetUrl] = useState("");
   const [stopping, setStopping] = useState(false);
@@ -5038,4 +5052,12 @@ export default function Scraping() {
       </Dialog>
     </div>
   );
+}
+
+export function ScrapingForTest({ initialReviewState }: { initialReviewState: ScrapingInitialReviewState }) {
+  return <ScrapingPage initialReviewState={initialReviewState} />;
+}
+
+export default function Scraping() {
+  return <ScrapingPage />;
 }
