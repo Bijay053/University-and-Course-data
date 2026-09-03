@@ -24,6 +24,7 @@ def _run_preflight(
     *,
     cli_body: str | None,
     server_body: str | None = None,
+    python_body: str = 'echo "python $*" >> "$CALLS_LOG"',
 ) -> tuple[subprocess.CompletedProcess[str], Path]:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -33,7 +34,7 @@ def _run_preflight(
         _write_executable(bin_dir, "redis-cli", cli_body)
     if server_body is not None:
         _write_executable(bin_dir, "redis-server", server_body)
-    _write_executable(bin_dir, "python", 'echo "python $*" >> "$CALLS_LOG"')
+    _write_executable(bin_dir, "python", python_body)
     _write_executable(bin_dir, "sleep", ":")
 
     env = {
@@ -91,6 +92,33 @@ touch "$TEST_STATE"
     )
 
     assert result.returncode == 0, result.stderr
+    calls = log.read_text()
+    assert "redis-server --bind test.invalid --port 16379" in calls
+    assert "python -m pytest -q tests/example.py" in calls
+    assert "redis-cli -h test.invalid -p 16379 shutdown nosave" in calls
+    assert not (tmp_path / "redis-ready").exists()
+
+
+def test_failed_pytest_preserves_exit_code_and_cleans_up_temporary_redis(
+    tmp_path: Path,
+) -> None:
+    result, log = _run_preflight(
+        tmp_path,
+        cli_body="""
+echo "redis-cli $*" >> "$CALLS_LOG"
+case " $* " in
+  *" shutdown nosave "*) rm -f "$TEST_STATE"; exit 0 ;;
+esac
+test -f "$TEST_STATE" && printf 'PONG\\n'
+""",
+        server_body="""
+echo "redis-server $*" >> "$CALLS_LOG"
+touch "$TEST_STATE"
+""",
+        python_body='echo "python $*" >> "$CALLS_LOG"; exit 7',
+    )
+
+    assert result.returncode == 7
     calls = log.read_text()
     assert "redis-server --bind test.invalid --port 16379" in calls
     assert "python -m pytest -q tests/example.py" in calls
