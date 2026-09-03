@@ -158,6 +158,12 @@ discovery:
     - "-domestic(?:/|$)"
     - "/study/undergraduate"
 
+  # Funnelback still returns stale ?year=2025/2026 variants for some courses.
+  # UTAS's yearless canonical URL resolves to the latest published entry year
+  # (currently 2027), so strip the selector before deduplication and extraction.
+  strip_query_parameters:
+    - "year"
+
   extra_course_urls:
     # Master of Teaching — under arts-soc which returns 403 for plain HTTP.
     # Belt-and-suspenders: injected unconditionally after all discovery tiers.

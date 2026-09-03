@@ -1491,6 +1491,15 @@ class DiscoveryConfig(BaseModel):
             "before extraction.  E.g. '/handbook/handbook-20' blocks old ACU handbooks."
         ),
     )
+    strip_query_parameters: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Query parameter names to remove from discovered course URLs before "
+            "deduplication and extraction. Use only when the yearless/canonical URL "
+            "is authoritative; for example, UTAS publishes stale ?year= variants "
+            "while the canonical URL serves the current entry year."
+        ),
+    )
     year_dedup_mode: str = Field(
         default="none",
         description=(

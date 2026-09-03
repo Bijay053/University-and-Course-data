@@ -58,6 +58,36 @@ def normalize_course_fetch_url(url: str) -> str:
         return raw
 
 
+def strip_course_url_query_parameters(
+    url: str,
+    parameter_names: list[str] | tuple[str, ...] | set[str] | frozenset[str],
+) -> str:
+    """Remove selected query parameters from the URL actually fetched.
+
+    This is intentionally opt-in rather than part of the global identity
+    normalizer: unknown query parameters can select a real international view.
+    Per-university discovery config may use this for stale catalogue selectors
+    such as UTAS ``?year=2025``, where the yearless canonical URL is the live,
+    authoritative entry-year page.
+    """
+    raw = (url or "").strip()
+    drop = {str(name).strip().lower() for name in parameter_names if str(name).strip()}
+    if not raw or not drop:
+        return raw
+    try:
+        parts = urlsplit(raw)
+        kept = [
+            (key, value)
+            for key, value in parse_qsl(parts.query, keep_blank_values=True)
+            if key.lower() not in drop
+        ]
+        return urlunsplit(
+            (parts.scheme, parts.netloc, parts.path, urlencode(kept, doseq=True), parts.fragment)
+        )
+    except (TypeError, ValueError):
+        return raw
+
+
 def canonical_course_url_key(url: str | None) -> str:
     """Return a stable identity key while preserving semantic query params.
 
@@ -97,3 +127,29 @@ def canonical_course_url_key(url: str | None) -> str:
         return result
     except (TypeError, ValueError):
         return raw.lower().rstrip("/")
+
+
+def strip_and_deduplicate_course_query_parameters(
+    items: list[dict],
+    parameter_names: list[str] | tuple[str, ...] | set[str] | frozenset[str],
+) -> tuple[list[dict], int, int]:
+    """Rewrite configured query parameters and collapse resulting duplicates."""
+    rewritten_items: list[dict] = []
+    seen: set[str] = set()
+    rewritten = 0
+    duplicates = 0
+    for item in items:
+        old_url = item.get("url") or ""
+        new_url = strip_course_url_query_parameters(old_url, parameter_names)
+        output_item = item
+        if new_url != old_url:
+            rewritten += 1
+            output_item = dict(item)
+            output_item["url"] = new_url
+        key = canonical_course_url_key(new_url)
+        if key in seen:
+            duplicates += 1
+            continue
+        seen.add(key)
+        rewritten_items.append(output_item)
+    return rewritten_items, rewritten, duplicates

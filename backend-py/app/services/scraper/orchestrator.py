@@ -32,7 +32,10 @@ from app.services.scraper.guards import filter_non_degree_candidates
 from app.services.scraper.pipelines.single_course import extract_course
 from app.services.scraper.pipelines.university_pdfs import load_university_pdf_data
 from app.services.scraper.stage_course import stage_course
-from app.services.scraper.url_identity import canonical_course_url_key
+from app.services.scraper.url_identity import (
+    canonical_course_url_key,
+    strip_and_deduplicate_course_query_parameters,
+)
 from app.services.scraper.course_deadline import (
     reset_course_deadline,
     set_course_deadline,
@@ -3958,7 +3961,47 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         dropped_sample=[d.get("url", "") for d in _cdp_dropped[:5]],
                     )
 
-        # Phase A.5c — Recipe year filter + year-based URL deduplication ──────────
+        # Phase A.5c — Configured query cleanup before year dedup/extraction ──────
+        # Some catalogues publish stale query-selected variants while the
+        # yearless canonical page tracks the currently published entry year.
+        # This must rewrite the URL actually fetched (not merely its identity key)
+        # and collapse duplicates before extraction. It is opt-in per university
+        # because unknown query parameters can select a real audience/view.
+        _strip_query_params = (
+            list(_uni_cfg.discovery.strip_query_parameters)
+            if _uni_cfg is not None
+            else []
+        )
+        if _strip_query_params and links:
+            links, _query_rewritten, _query_duplicates = (
+                strip_and_deduplicate_course_query_parameters(
+                    links,
+                    _strip_query_params,
+                )
+            )
+            if _query_rewritten or _query_duplicates:
+                log.info(
+                    "[YAML] stripped query parameters %s from %d URLs; "
+                    "dropped %d rewritten duplicates",
+                    _strip_query_params,
+                    _query_rewritten,
+                    _query_duplicates,
+                )
+                await emit(
+                    "status",
+                    (
+                        f"[YAML] Canonicalized {_query_rewritten} course URLs "
+                        f"(removed query parameters: {', '.join(_strip_query_params)}; "
+                        f"dropped {_query_duplicates} duplicates)"
+                    ),
+                    phase="extract",
+                    kind="yaml_query_parameter_strip",
+                    rewritten=_query_rewritten,
+                    dropped_duplicates=_query_duplicates,
+                    parameters=_strip_query_params,
+                )
+
+        # Phase A.5d — Recipe year filter + year-based URL deduplication ──────────
         # Reads course_year config from the recipe (stored in uni_scrape_config["recipe"]).
         # Three operations applied in order:
         #   1. Drop URLs matching ignore_urls_matching substrings (exact substring match)
@@ -4127,7 +4170,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 )
             links = _kept_r
 
-        # Phase A.5d — YAML-driven year dedup ────────────────────────────────────
+        # Phase A.5e — YAML-driven year dedup ────────────────────────────────────
         # Alternative to the UI-recipe Phase A.5c above.  When the per-uni YAML
         # sets ``discovery.year_dedup_mode`` to anything other than "none", groups
         # discovered URLs by slug-without-year and keeps ONE URL per group.
@@ -4253,7 +4296,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 )
             links = _kept_y
 
-        # Phase A.5e — shared non-degree candidate gate ─────────────────────────
+        # Phase A.5f — shared non-degree candidate gate ─────────────────────────
         # Apply once after every discovery provider and URL/year filter has
         # settled, but before final count/capping/extraction. Unknown candidates
         # fail open; recognized award titles override default CPD-path signals.
