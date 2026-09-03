@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronsUpDown, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import {
   FileSpreadsheet, CheckCircle2, Clock, AlertCircle, RefreshCw,
@@ -3232,6 +3232,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
               <Sparkles className="w-5 h-5 text-blue-600" />
               Review Before Fixing
             </DialogTitle>
+            <DialogDescription>
+              Review the pending re-extraction action before applying it to the selected courses.
+            </DialogDescription>
           </DialogHeader>
           {fixAnalysis && (
             <div className="space-y-4">
@@ -3306,6 +3309,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
               <Sparkles className="w-5 h-5 text-blue-600" />
               Fix Results
             </DialogTitle>
+            <DialogDescription>
+              Review the completed re-extraction summary for the selected courses.
+            </DialogDescription>
           </DialogHeader>
           {fixResults && (
             <div className="space-y-4">

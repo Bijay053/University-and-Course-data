@@ -112,9 +112,16 @@ describe("Scraping repair reviewer", () => {
     await user.click(selectAll);
     await user.click(selectAll);
     await user.click(screen.getByRole("button", { name: "Fix (51)" }));
-    await user.click(await screen.findByRole("button", { name: "Confirm Fix (51)" }));
+    const previewDialog = await screen.findByRole("dialog", {
+      name: "Review Before Fixing",
+      description: "Review the pending re-extraction action before applying it to the selected courses.",
+    });
+    await user.click(within(previewDialog).getByRole("button", { name: "Confirm Fix (51)" }));
 
-    const dialog = await screen.findByRole("dialog", { name: "Fix Results" });
+    const dialog = await screen.findByRole("dialog", {
+      name: "Fix Results",
+      description: "Review the completed re-extraction summary for the selected courses.",
+    });
     expect(within(dialog).getByText("Re-extracted 51 of 51")).toBeTruthy();
     const valueSummary = within(dialog).getByText("Values updated").parentElement;
     const sourceSummary = within(dialog).getByText("Sources refreshed — values unchanged").parentElement;
