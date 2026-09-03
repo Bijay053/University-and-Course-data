@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from "react";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, within } from "@testing-library/react";
@@ -13,14 +13,21 @@ import { assertOpenDialogsHaveAccessibleContext } from "@/test/dialog-accessibil
 
 const toastMock = vi.fn();
 
-const panelPropContracts = [
-  ["academic-panel.tsx", "AcademicPanelProps"],
-  ["assessment-panel.tsx", "AssessmentPanelProps"],
-  ["english-panel.tsx", "EnglishPanelProps"],
-  ["locations-panel.tsx", "LocationsPanelProps"],
-  ["rawdata-panel.tsx", "RawDataPanelProps"],
-  ["scholarships-panel.tsx", "ScholarshipsPanelProps"],
-] as const;
+const panelDirectory = resolve("src/pages/university-detail");
+const panelFilePattern = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*-panel\.tsx$/;
+
+function discoverPanelFiles(fileNames: string[]) {
+  return fileNames.filter((fileName) => panelFilePattern.test(fileName));
+}
+
+function discoverPanelPropsInterface(source: string, fileName: string) {
+  const interfaceNames = [
+    ...source.matchAll(/\binterface\s+([A-Za-z_$][\w$]*PanelProps)\b/g),
+  ].map((match) => match[1]);
+
+  expect(interfaceNames, `${fileName} must declare exactly one *PanelProps interface`).toHaveLength(1);
+  return interfaceNames[0];
+}
 
 function readInterfaceDeclaration(source: string, interfaceName: string) {
   const declarationStart = source.indexOf(`interface ${interfaceName}`);
@@ -127,9 +134,25 @@ async function expectDialogAndClose(
 }
 
 describe("University Detail dialogs", () => {
+  it("discovers panel contracts by filename without including helper files", () => {
+    expect(
+      discoverPanelFiles([
+        "academic-panel.tsx",
+        "course-requirements-panel.tsx",
+        "course-formatters.tsx",
+        "panel-helper.ts",
+      ]),
+    ).toEqual(["academic-panel.tsx", "course-requirements-panel.tsx"]);
+  });
+
   it("keeps all extracted panel prop contracts closed and type-safe", () => {
-    for (const [fileName, interfaceName] of panelPropContracts) {
-      const source = readFileSync(resolve("src/pages/university-detail", fileName), "utf8");
+    const panelFiles = discoverPanelFiles(readdirSync(panelDirectory));
+
+    expect(panelFiles.length, "at least one *-panel.tsx file must be discovered").toBeGreaterThan(0);
+
+    for (const fileName of panelFiles) {
+      const source = readFileSync(resolve(panelDirectory, fileName), "utf8");
+      const interfaceName = discoverPanelPropsInterface(source, fileName);
       const contract = readInterfaceDeclaration(source, interfaceName);
 
       expect(contract, `${fileName} must not use any in its prop contract`).not.toMatch(/\bany\b/);
