@@ -69,37 +69,44 @@ def client_and_session(monkeypatch):
         app.dependency_overrides.clear()
 
 
-def _has_status_predicate(sqls: list[str]) -> bool:
-    return any("scraped_courses.status =" in s for s in sqls)
+def _has_literal_all_predicate(sqls: list[str]) -> bool:
+    return any(
+        "scraped_courses.status = 'all'" in s
+        or 'scraped_courses.status = "all"' in s
+        for s in sqls
+    )
 
 
 def test_status_all_does_not_apply_status_predicate(client_and_session):
     client, fake = client_and_session
     r = client.get("/api/scrape/staged?universityId=1011&status=all")
     assert r.status_code == 200, r.text
-    assert not _has_status_predicate(fake.sqls), (
-        "status=all must not generate a SQL status predicate; "
+    assert not _has_literal_all_predicate(fake.sqls), (
+        "status=all must not be treated as a stored status value; "
         f"saw: {fake.sqls}"
     )
+    assert any("max(scraped_courses.id)" in s for s in fake.sqls)
+    assert any("courses.status = 'active'" in s for s in fake.sqls)
 
 
 def test_status_all_uppercase_also_skips_filter(client_and_session):
     client, fake = client_and_session
     r = client.get("/api/scrape/staged?universityId=1011&status=ALL")
     assert r.status_code == 200
-    assert not _has_status_predicate(fake.sqls)
+    assert not _has_literal_all_predicate(fake.sqls)
 
 
 def test_specific_status_does_apply_predicate(client_and_session):
     client, fake = client_and_session
     r = client.get("/api/scrape/staged?universityId=1011&status=approved")
     assert r.status_code == 200
-    assert _has_status_predicate(fake.sqls)
     assert any("'approved'" in s for s in fake.sqls)
+    assert any("max(scraped_courses.id)" in s for s in fake.sqls)
+    assert any("courses.status = 'active'" in s for s in fake.sqls)
 
 
 def test_no_status_param_does_not_apply_predicate(client_and_session):
     client, fake = client_and_session
     r = client.get("/api/scrape/staged?universityId=1011")
     assert r.status_code == 200
-    assert not _has_status_predicate(fake.sqls)
+    assert not _has_literal_all_predicate(fake.sqls)

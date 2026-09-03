@@ -2136,32 +2136,40 @@ async def staged_list(
     limit: int = Query(default=500, ge=1, le=2000),
     page: int = Query(default=1, ge=1),
 ):
-    from app.models import ScrapedCourse
+    from app.models import Course, ScrapedCourse
 
-    # For "approved" + university view: deduplicate by course_id so the
-    # Approved count matches the live Courses count.  Every re-scrape adds a
-    # new approved row pointing to the same course_id; without dedup the
-    # Approved count grows unboundedly while live courses stay constant.
-    # Keep only the most-recent approved row per live course (max id per
-    # course_id).  Rows with course_id IS NULL (failed promotions) are kept
-    # individually as they have no live-course match yet.
-    if status_f and status_f.lower() == "approved" and university_id and not job_id:
+    # University-level Raw Data is a current operational view, not an
+    # append-only scrape history. Every re-scrape creates another approved row
+    # for the same live course, so both "All" and "Approved" must keep only the
+    # newest approved row per active live course. Pending/rejected rows remain
+    # visible individually in "All"; job-scoped history remains unchanged.
+    status_norm = (status_f or "").lower()
+    if university_id and not job_id and status_norm in {"all", "approved"}:
         latest_subq = (
             select(func.max(ScrapedCourse.id).label("latest_id"))
+            .join(Course, Course.id == ScrapedCourse.course_id)
             .where(
                 ScrapedCourse.university_id == university_id,
                 ScrapedCourse.status == "approved",
                 ScrapedCourse.course_id.isnot(None),
+                Course.status == "active",
             )
             .group_by(ScrapedCourse.course_id)
         ).subquery()
 
-        stmt = select(ScrapedCourse).where(
-            ScrapedCourse.university_id == university_id,
+        current_approved = and_(
             ScrapedCourse.status == "approved",
             or_(
                 ScrapedCourse.course_id.is_(None),
                 ScrapedCourse.id.in_(select(latest_subq.c.latest_id)),
+            ),
+        )
+        stmt = select(ScrapedCourse).where(
+            ScrapedCourse.university_id == university_id,
+            (
+                current_approved
+                if status_norm == "approved"
+                else or_(ScrapedCourse.status != "approved", current_approved)
             ),
         )
         total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
