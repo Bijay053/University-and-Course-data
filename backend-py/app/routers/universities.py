@@ -36,7 +36,9 @@ router = APIRouter()
 
 def _decode_metadata_text(value: str) -> str:
     """Decode HTML entities before storing text sourced from page metadata."""
-    return re.sub(r"\s+", " ", html_lib.unescape(value)).strip()
+    decoded = html_lib.unescape(value)
+    decoded = re.sub(r"\s*&\s*", " & ", decoded)
+    return re.sub(r"\s+", " ", decoded).strip()
 
 
 def _metadata_title_segments(value: str) -> list[str]:

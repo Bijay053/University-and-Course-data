@@ -7,7 +7,7 @@ from app.routers.universities import (
 
 def test_decodes_html_entities_in_metadata_text() -> None:
     assert _decode_metadata_text(
-        "INTI International University &amp; Colleges"
+        "INTI International University&amp; Colleges"
     ) == "INTI International University & Colleges"
 
 
