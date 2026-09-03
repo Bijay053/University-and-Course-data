@@ -2,7 +2,7 @@
 
 import React from "react";
 import { readdirSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -13,19 +13,24 @@ import { assertOpenDialogsHaveAccessibleContext } from "@/test/dialog-accessibil
 
 const toastMock = vi.fn();
 
-const panelDirectory = resolve("src/pages/university-detail");
+const pagesDirectory = resolve("src/pages");
 const panelFilePattern = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*-panel\.tsx$/;
-const extractedPanelImportPattern =
-  /import\s*\{([^}]+)\}\s*from\s*["']\.\/university-detail\/([^"']+)["'];?/g;
 
 function discoverPanelFiles(fileNames: string[]) {
   return fileNames.filter((fileName) => panelFilePattern.test(fileName));
 }
 
-function discoverExtractedPanelImports(source: string) {
-  return [...source.matchAll(extractedPanelImportPattern)].flatMap((match) => {
-    const importPath = match[2];
-    return match[1]
+function discoverExtractedPanelImports(source: string, pageName: string) {
+  const namedPanelImportPattern =
+    /import\s*\{([^}]+)\}\s*from\s*["']\.\/([^/"']+)\/([^"']+)["'];?/g;
+  const defaultPanelImportPattern =
+    /import\s+([A-Za-z_$][\w$]*)\s+from\s*["']\.\/([^/"']+)\/([^"']+)["'];?/g;
+
+  const namedPanels = [...source.matchAll(namedPanelImportPattern)].flatMap((match) => {
+    const [, bindingsSource, importDirectory, importPath] = match;
+    if (importDirectory !== pageName) return [];
+
+    return bindingsSource
       .split(",")
       .map((binding) => binding.trim().split(/\s+as\s+/))
       .filter(([importedBinding]) => importedBinding.endsWith("Panel"))
@@ -33,6 +38,26 @@ function discoverExtractedPanelImports(source: string) {
         binding: bindings.at(-1) as string,
         fileName: `${importPath}.tsx`,
       }));
+  });
+
+  const defaultPanels = [...source.matchAll(defaultPanelImportPattern)].flatMap((match) => {
+    const [, binding, importDirectory, importPath] = match;
+    if (importDirectory !== pageName || !binding.endsWith("Panel")) return [];
+    return [{ binding, fileName: `${importPath}.tsx` }];
+  });
+
+  return [...namedPanels, ...defaultPanels];
+}
+
+function discoverAllExtractedPagePanels() {
+  const pageFiles = readdirSync(pagesDirectory).filter((fileName) => fileName.endsWith(".tsx"));
+  return pageFiles.flatMap((pageFile) => {
+    const pageName = basename(pageFile, ".tsx");
+    const pageSource = readFileSync(resolve(pagesDirectory, pageFile), "utf8");
+    return discoverExtractedPanelImports(pageSource, pageName).map((panel) => ({
+      ...panel,
+      pageName,
+    }));
   });
 }
 
@@ -60,6 +85,19 @@ function readInterfaceDeclaration(source: string, interfaceName: string) {
   }
 
   throw new Error(`${interfaceName} has an unclosed body`);
+}
+
+function expectPanelContractSafe(source: string, fileName: string) {
+  const interfaceName = discoverPanelPropsInterface(source, fileName);
+  const contract = readInterfaceDeclaration(source, interfaceName);
+
+  expect(contract, `${fileName} must not use any in its prop contract`).not.toMatch(/\bany\b/);
+  expect(contract, `${fileName} must not use a broad Record prop bag`).not.toMatch(
+    /\bRecord\s*<\s*(?:string|number|symbol|PropertyKey)\s*,\s*(?:unknown|object)\s*>/,
+  );
+  expect(contract, `${fileName} must not use a broad index-signature prop bag`).not.toMatch(
+    /\[\s*[\w$]+\s*:\s*(?:string|number|symbol)\s*\]\s*:\s*(?:any|unknown|object)\b/,
+  );
 }
 
 const course = {
@@ -165,46 +203,50 @@ describe("University Detail dialogs", () => {
     const sampleImports = `
       import { AcademicPanel } from "./university-detail/academic-panel";
       import { EnglishPanel as EnglishRequirements } from "./university-detail/english-section";
+      import FeesPanel from "./university-detail/fees-section";
+      import PageHeader from "./university-detail/page-header";
       import { formatCourse } from "./university-detail/course-formatters";
       import { EmptyState } from "./university-detail/empty-state";
     `;
 
-    expect(discoverExtractedPanelImports(sampleImports)).toEqual([
+    expect(discoverExtractedPanelImports(sampleImports, "university-detail")).toEqual([
       { binding: "AcademicPanel", fileName: "academic-panel.tsx" },
       { binding: "EnglishRequirements", fileName: "english-section.tsx" },
+      { binding: "FeesPanel", fileName: "fees-section.tsx" },
     ]);
 
-    const pageSource = readFileSync(resolve("src/pages/university-detail.tsx"), "utf8");
-    const extractedPanels = discoverExtractedPanelImports(pageSource);
+    const extractedPanels = discoverAllExtractedPagePanels();
 
-    expect(extractedPanels.length, "at least one extracted University Detail panel import must be discovered")
+    expect(extractedPanels.length, "at least one extracted page panel import must be discovered")
       .toBeGreaterThan(0);
-    for (const { binding, fileName } of extractedPanels) {
+    for (const { binding, fileName, pageName } of extractedPanels) {
       expect(
         panelFilePattern.test(fileName),
-        `${binding} is an extracted University Detail panel, so ${fileName} must use the *-panel.tsx naming convention`,
+        `${binding} is an extracted ${pageName} panel, so ${fileName} must use the *-panel.tsx naming convention`,
       ).toBe(true);
     }
   });
 
   it("keeps all extracted panel prop contracts closed and type-safe", () => {
-    const panelFiles = discoverPanelFiles(readdirSync(panelDirectory));
+    const extractedPanels = discoverAllExtractedPagePanels();
 
-    expect(panelFiles.length, "at least one *-panel.tsx file must be discovered").toBeGreaterThan(0);
+    expect(extractedPanels.length, "at least one extracted page panel must be discovered").toBeGreaterThan(0);
 
-    for (const fileName of panelFiles) {
-      const source = readFileSync(resolve(panelDirectory, fileName), "utf8");
-      const interfaceName = discoverPanelPropsInterface(source, fileName);
-      const contract = readInterfaceDeclaration(source, interfaceName);
-
-      expect(contract, `${fileName} must not use any in its prop contract`).not.toMatch(/\bany\b/);
-      expect(contract, `${fileName} must not use a broad Record prop bag`).not.toMatch(
-        /\bRecord\s*<\s*(?:string|number|symbol|PropertyKey)\s*,\s*(?:unknown|object)\s*>/,
-      );
-      expect(contract, `${fileName} must not use a broad index-signature prop bag`).not.toMatch(
-        /\[\s*[\w$]+\s*:\s*(?:string|number|symbol)\s*\]\s*:\s*(?:any|unknown|object)\b/,
-      );
+    for (const { fileName, pageName } of extractedPanels) {
+      const source = readFileSync(resolve(pagesDirectory, pageName, fileName), "utf8");
+      expectPanelContractSafe(source, `${pageName}/${fileName}`);
     }
+  });
+
+  it("rejects an unsafe extracted panel contract outside University Detail", () => {
+    const unsafeCoursesPanel = `
+      interface ResultsPanelProps {
+        filters: Record<string, unknown>;
+      }
+    `;
+
+    expect(() => expectPanelContractSafe(unsafeCoursesPanel, "courses/results-panel.tsx"))
+      .toThrow(/must not use a broad Record prop bag/);
   });
 
   it("opens the university edit and repair confirmation dialogs", async () => {
