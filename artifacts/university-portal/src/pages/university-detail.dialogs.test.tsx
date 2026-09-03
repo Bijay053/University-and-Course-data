@@ -15,9 +15,25 @@ const toastMock = vi.fn();
 
 const panelDirectory = resolve("src/pages/university-detail");
 const panelFilePattern = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*-panel\.tsx$/;
+const extractedPanelImportPattern =
+  /import\s*\{([^}]+)\}\s*from\s*["']\.\/university-detail\/([^"']+)["'];?/g;
 
 function discoverPanelFiles(fileNames: string[]) {
   return fileNames.filter((fileName) => panelFilePattern.test(fileName));
+}
+
+function discoverExtractedPanelImports(source: string) {
+  return [...source.matchAll(extractedPanelImportPattern)].flatMap((match) => {
+    const importPath = match[2];
+    return match[1]
+      .split(",")
+      .map((binding) => binding.trim().split(/\s+as\s+/))
+      .filter(([importedBinding]) => importedBinding.endsWith("Panel"))
+      .map((bindings) => ({
+        binding: bindings.at(-1) as string,
+        fileName: `${importPath}.tsx`,
+      }));
+  });
 }
 
 function discoverPanelPropsInterface(source: string, fileName: string) {
@@ -143,6 +159,32 @@ describe("University Detail dialogs", () => {
         "panel-helper.ts",
       ]),
     ).toEqual(["academic-panel.tsx", "course-requirements-panel.tsx"]);
+  });
+
+  it("requires extracted University Detail panels to use the *-panel.tsx convention", () => {
+    const sampleImports = `
+      import { AcademicPanel } from "./university-detail/academic-panel";
+      import { EnglishPanel as EnglishRequirements } from "./university-detail/english-section";
+      import { formatCourse } from "./university-detail/course-formatters";
+      import { EmptyState } from "./university-detail/empty-state";
+    `;
+
+    expect(discoverExtractedPanelImports(sampleImports)).toEqual([
+      { binding: "AcademicPanel", fileName: "academic-panel.tsx" },
+      { binding: "EnglishRequirements", fileName: "english-section.tsx" },
+    ]);
+
+    const pageSource = readFileSync(resolve("src/pages/university-detail.tsx"), "utf8");
+    const extractedPanels = discoverExtractedPanelImports(pageSource);
+
+    expect(extractedPanels.length, "at least one extracted University Detail panel import must be discovered")
+      .toBeGreaterThan(0);
+    for (const { binding, fileName } of extractedPanels) {
+      expect(
+        panelFilePattern.test(fileName),
+        `${binding} is an extracted University Detail panel, so ${fileName} must use the *-panel.tsx naming convention`,
+      ).toBe(true);
+    }
   });
 
   it("keeps all extracted panel prop contracts closed and type-safe", () => {
