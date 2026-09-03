@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { shouldLoadForBackgroundJob } from "@/utils/scraping-poll-guard";
+import { mergeReextractFieldResults } from "@/utils/reextract-field-aggregation";
 import { useListUniversities } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -2080,13 +2081,10 @@ export default function Scraping() {
         totalSkipped += part.skipped ?? 0;
         totalErrors += part.errors ?? 0;
         totalTotal += part.total ?? 0;
-        for (const result of part.results ?? []) {
-          const updatedFields = new Set<string>(result.updated_fields ?? []);
-          for (const field of updatedFields) valueUpdatedFields.add(field);
-          for (const field of result.refreshed_evidence_fields ?? []) {
-            if (!updatedFields.has(field)) provenanceOnlyFields.add(field);
-          }
-        }
+        mergeReextractFieldResults(
+          { valueUpdatedFields, provenanceOnlyFields },
+          part.results ?? [],
+        );
       }
       const data = {
         updated: totalUpdated,
