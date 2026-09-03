@@ -118,3 +118,72 @@ async def test_outer_deadline_is_shared_by_sequential_child_stages(
     assert len(observed) == 2
     assert observed[1] < observed[0]
     assert course_deadline.remaining_seconds() is None
+
+
+@pytest.mark.asyncio
+async def test_scrape_do_shared_deadline_queues_one_bounded_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A transient provider timeout reaches the sweep; account failures do not."""
+    from app.services.scraper import orchestrator
+
+    url = "https://example.edu/course/provider-timeout"
+
+    async def _scrape_do_request_exhausts_deadline(
+        *args: object,
+        **kwargs: object,
+    ) -> dict:
+        await asyncio.sleep(60)
+        return {}
+
+    monkeypatch.setattr(
+        orchestrator,
+        "_extract_only",
+        _scrape_do_request_exhausts_deadline,
+    )
+    timed_out = await orchestrator._extract_with_hard_timeout(
+        {"name": "Provider timeout", "url": url},
+        "Australia",
+        timeout_seconds=0.01,
+    )
+
+    sweep_links: list[dict] = []
+    sweep_url_keys: set[str] = set()
+    assert timed_out["error"] == "per_course_timeout"
+    assert timed_out["retryable"] is True
+    assert orchestrator._queue_recovery_sweep_candidate(
+        timed_out,
+        counter="fetch_failed",
+        links=sweep_links,
+        url_keys=sweep_url_keys,
+    )
+    assert not orchestrator._queue_recovery_sweep_candidate(
+        timed_out,
+        counter="fetch_failed",
+        links=sweep_links,
+        url_keys=sweep_url_keys,
+    )
+
+    account_failure = {
+        "name": "Permanent provider failure",
+        "url": "https://example.edu/course/account-failure",
+        "error": "extract: Scrape.do account unavailable",
+        "error_type": "ScrapedoAccountError",
+        "_scrape_do_auth_error": True,
+        "retryable": False,
+    }
+    assert not orchestrator._queue_recovery_sweep_candidate(
+        account_failure,
+        counter="errors",
+        links=sweep_links,
+        url_keys=sweep_url_keys,
+    )
+    assert sweep_links == [
+        {
+            "url": url,
+            "name": "Provider timeout",
+            "counter": "fetch_failed",
+            "source_error": "per_course_timeout",
+            "reason": "per_course_timeout",
+        }
+    ]

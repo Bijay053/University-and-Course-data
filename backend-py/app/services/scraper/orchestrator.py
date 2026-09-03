@@ -140,6 +140,40 @@ def _select_recovery_work(
     return links[:limit], links[limit:]
 
 
+def _queue_recovery_sweep_candidate(
+    result: dict,
+    *,
+    counter: str,
+    links: list[dict],
+    url_keys: set[str],
+    details: dict[str, object] | None = None,
+) -> bool:
+    """Queue one retryable extraction failure, deduplicated by normalized URL."""
+    failure_details = details or _extraction_failure_details(
+        result.get("error"),
+        result=result,
+    )
+    if not failure_details["retryable"]:
+        return False
+    sweep_url = (result.get("url") or "").strip()
+    if not sweep_url:
+        return False
+    key = _normalize_course_url(sweep_url)
+    if key in url_keys:
+        return False
+    url_keys.add(key)
+    links.append(
+        {
+            "url": sweep_url,
+            "name": result.get("name", "?"),
+            "counter": counter,
+            "source_error": result.get("error"),
+            "reason": failure_details["reason"],
+        }
+    )
+    return True
+
+
 def _recovery_time_remaining(
     started_at: float,
     budget_seconds: float,
@@ -4707,23 +4741,13 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             counter: str,
             details: dict[str, object],
         ) -> bool:
-            sweep_url = (result.get("url") or "").strip()
-            if not sweep_url:
-                return False
-            key = _normalize_course_url(sweep_url)
-            if key in _sweep_url_keys:
-                return False
-            _sweep_url_keys.add(key)
-            _sweep_links.append(
-                {
-                    "url": sweep_url,
-                    "name": result.get("name", "?"),
-                    "counter": counter,
-                    "source_error": result.get("error"),
-                    "reason": details["reason"],
-                }
+            return _queue_recovery_sweep_candidate(
+                result,
+                counter=counter,
+                links=_sweep_links,
+                url_keys=_sweep_url_keys,
+                details=details,
             )
-            return True
 
         # ── Batch extraction + staging ────────────────────────────────────────
         # Allow per-uni YAML to tune the batch size via `extraction.batch_size`.
