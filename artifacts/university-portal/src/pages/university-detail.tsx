@@ -4338,6 +4338,7 @@ export default function UniversityDetail() {
             <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2"><ClipboardList className="w-5 h-5 text-red-600" /> Add Key Insight</DialogTitle>
+                <DialogDescription>Add a country-specific assessment insight for this university.</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <div>
@@ -4395,6 +4396,7 @@ export default function UniversityDetail() {
             <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2"><Pencil className="w-4 h-4 text-red-600" /> Edit Key Insight</DialogTitle>
+                <DialogDescription>Update the country and assessment insight text.</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <div>
@@ -4452,6 +4454,7 @@ export default function UniversityDetail() {
             <DialogContent className="max-w-sm">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 text-red-600"><Trash2 className="w-4 h-4" /> Delete Note</DialogTitle>
+                <DialogDescription>Confirm permanent removal of this assessment insight.</DialogDescription>
               </DialogHeader>
               <p className="text-sm text-gray-600 py-2">
                 Are you sure you want to delete the insight for <strong>{assessDeleteNote?.country}</strong>? This cannot be undone.
@@ -4647,6 +4650,7 @@ export default function UniversityDetail() {
                   <AlertTriangle className="w-5 h-5 shrink-0" />
                   Force Approve {rawSelectedIds.size} Course{rawSelectedIds.size !== 1 ? "s" : ""}
                 </DialogTitle>
+                <DialogDescription>Confirm publishing the selected staged courses while bypassing the confidence gate.</DialogDescription>
               </DialogHeader>
               <div className="space-y-3 text-sm text-gray-600">
                 <p>
@@ -4682,6 +4686,7 @@ export default function UniversityDetail() {
                   <AlertTriangle className="w-5 h-5 shrink-0" />
                   Force Approve Course
                 </DialogTitle>
+                <DialogDescription>Confirm publishing this staged course while bypassing the confidence gate.</DialogDescription>
               </DialogHeader>
               <div className="space-y-3 text-sm text-gray-600">
                 <p>
@@ -4724,6 +4729,7 @@ export default function UniversityDetail() {
                   <XCircle className="w-5 h-5 shrink-0" />
                   Reject {rawSelectedIds.size} Course{rawSelectedIds.size !== 1 ? "s" : ""} With Reason
                 </DialogTitle>
+                <DialogDescription>Choose a reason before rejecting the selected staged courses.</DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div className="text-sm text-muted-foreground">
@@ -5174,6 +5180,7 @@ export default function UniversityDetail() {
             <DialogTitle className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-blue-500" /> Edit Location
             </DialogTitle>
+            <DialogDescription>Update this campus location and its verification details.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
@@ -5228,6 +5235,7 @@ export default function UniversityDetail() {
               <DialogTitle className="flex items-center gap-2 text-amber-700">
                 <AlertTriangle className="w-5 h-5" /> Duplicate Requirements Detected
               </DialogTitle>
+              <DialogDescription>Review academic requirements that already exist for the selected countries.</DialogDescription>
             </DialogHeader>
             <p className="text-sm text-muted-foreground">
               The following course + country combinations already have a requirement.
@@ -5296,6 +5304,7 @@ export default function UniversityDetail() {
           <DialogContent className="max-w-sm">
             <DialogHeader>
               <DialogTitle>Delete staged course?</DialogTitle>
+              <DialogDescription>Confirm permanent removal of this staged course from the review queue.</DialogDescription>
             </DialogHeader>
             <p className="text-sm text-muted-foreground py-2">
               This will permanently remove the staged course from the review queue. This cannot be undone.
@@ -5337,6 +5346,7 @@ export default function UniversityDetail() {
               <Trash2 className="w-4 h-4" />
               Delete {selectedLiveCourseIds.size} course{selectedLiveCourseIds.size !== 1 ? "s" : ""}?
             </DialogTitle>
+            <DialogDescription>Confirm permanent removal of the selected approved courses and associated records.</DialogDescription>
           </DialogHeader>
           <p className="text-sm text-muted-foreground py-2">
             Permanently deletes the selected <strong>{selectedLiveCourseIds.size}</strong> course{selectedLiveCourseIds.size !== 1 ? "s" : ""} and all their associated fees, intakes, and requirements. <strong>This cannot be undone.</strong>
@@ -5359,6 +5369,7 @@ export default function UniversityDetail() {
               <Trash2 className="w-4 h-4" />
               Remove all {total} courses?
             </DialogTitle>
+            <DialogDescription>Confirm permanent removal of every approved course for this university.</DialogDescription>
           </DialogHeader>
           <p className="text-sm text-muted-foreground py-2">
             This will permanently delete <strong>all {total} approved courses</strong> for this university, including all fees, intakes, English requirements, academic requirements, and scholarships. <strong>This cannot be undone.</strong>
@@ -5381,6 +5392,7 @@ export default function UniversityDetail() {
               <Trash2 className="w-4 h-4" />
               Delete {rawSelectedIds.size} staged row{rawSelectedIds.size !== 1 ? "s" : ""}?
             </DialogTitle>
+            <DialogDescription>Confirm permanent removal of the selected staged course rows.</DialogDescription>
           </DialogHeader>
           <p className="text-sm text-muted-foreground py-2">
             Permanently removes <strong>{rawSelectedIds.size}</strong> staged row{rawSelectedIds.size !== 1 ? "s" : ""}. If any are approved (linked to live courses), those live courses will also be deleted. <strong>This cannot be undone.</strong>
@@ -5403,6 +5415,7 @@ export default function UniversityDetail() {
               <Trash2 className="w-4 h-4" />
               Remove all staged data?
             </DialogTitle>
+            <DialogDescription>Confirm permanent removal of all staged course data for this university.</DialogDescription>
           </DialogHeader>
           <p className="text-sm text-muted-foreground py-2">
             Permanently deletes <strong>all {rawData.length} staged row{rawData.length !== 1 ? "s" : ""}</strong> for this university. Approved rows will also remove the linked live courses. <strong>This cannot be undone.</strong>
@@ -5422,6 +5435,7 @@ export default function UniversityDetail() {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Import all pending courses?</DialogTitle>
+            <DialogDescription>Confirm publishing every pending staged course to the approved course list.</DialogDescription>
           </DialogHeader>
           <p className="text-sm text-muted-foreground py-2">
             This will import all <strong>{pendingCount}</strong> pending course{pendingCount !== 1 ? "s" : ""} to production. Each course's current staged data will be published.
@@ -5441,6 +5455,7 @@ export default function UniversityDetail() {
               <GitMerge className="w-5 h-5 text-red-500" />
               Map from Backup
             </DialogTitle>
+            <DialogDescription>Review and apply values recovered from the most recent approved course backup.</DialogDescription>
             {backupMapData && (
               <p className="text-sm text-muted-foreground pt-1 font-medium">{backupMapData.stagedCourseName}</p>
             )}
@@ -5597,6 +5612,7 @@ export default function UniversityDetail() {
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit Course — {editingCourse.course_name}</DialogTitle>
+              <DialogDescription>Update the staged course data before approval.</DialogDescription>
             </DialogHeader>
 
             <div className="space-y-5 py-2">
@@ -5822,7 +5838,7 @@ export default function UniversityDetail() {
           <DialogContent className="max-w-5xl h-[90vh] flex flex-col p-0 gap-0">
             <DialogHeader className="px-6 pt-5 pb-3 border-b shrink-0">
               <DialogTitle style={{ color: accentColor }}>{title}</DialogTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">{selectedIds.size} course{selectedIds.size !== 1 ? "s" : ""} selected · fill in the form and click Apply</p>
+              <DialogDescription>{selectedIds.size} course{selectedIds.size !== 1 ? "s" : ""} selected · fill in the form and click Apply</DialogDescription>
             </DialogHeader>
             <div className="flex flex-1 overflow-hidden">
               {/* Left: course selector */}
@@ -6133,7 +6149,10 @@ export default function UniversityDetail() {
         return (
           <Dialog open onOpenChange={() => setEditEngCourse(null)}>
             <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader><DialogTitle>Edit English Proficiency — {editEngCourse.name}</DialogTitle></DialogHeader>
+              <DialogHeader>
+                <DialogTitle>Edit English Proficiency — {editEngCourse.name}</DialogTitle>
+                <DialogDescription>Update English test scores for this course.</DialogDescription>
+              </DialogHeader>
               <div className="space-y-4 py-2">
                 <ScoreRow label="IELTS" color="text-purple-700" vals={engEditIelts} set={setEngEditIelts} />
                 <ScoreRow label="PTE" color="text-orange-600" vals={engEditPte} set={setEngEditPte} />
@@ -6166,7 +6185,10 @@ export default function UniversityDetail() {
       {deleteEngCourse && (
         <Dialog open onOpenChange={() => setDeleteEngCourse(null)}>
           <DialogContent className="max-w-sm">
-            <DialogHeader><DialogTitle>Delete English Requirements</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>Delete English Requirements</DialogTitle>
+              <DialogDescription>Confirm permanent removal of all English requirements for this course.</DialogDescription>
+            </DialogHeader>
             <p className="text-sm text-gray-600 py-2">Delete all English proficiency requirements for <strong>{deleteEngCourse.name}</strong>? This cannot be undone.</p>
             <DialogFooter>
               <Button variant="outline" onClick={() => setDeleteEngCourse(null)}>Cancel</Button>
@@ -6180,7 +6202,10 @@ export default function UniversityDetail() {
       {editAcadRow && (
         <Dialog open onOpenChange={() => setEditAcadRow(null)}>
           <DialogContent className="max-w-md">
-            <DialogHeader><DialogTitle>Edit Academic Requirement</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>Edit Academic Requirement</DialogTitle>
+              <DialogDescription>Update the academic entry requirement for this course and country.</DialogDescription>
+            </DialogHeader>
             <div className="space-y-3 py-2 text-sm">
               <p className="text-gray-500">{editAcadRow.courseName}</p>
               <div>
@@ -6264,7 +6289,10 @@ export default function UniversityDetail() {
       {deleteAcadRow && (
         <Dialog open onOpenChange={() => setDeleteAcadRow(null)}>
           <DialogContent className="max-w-sm">
-            <DialogHeader><DialogTitle>Delete Academic Requirement</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>Delete Academic Requirement</DialogTitle>
+              <DialogDescription>Confirm permanent removal of this academic entry requirement.</DialogDescription>
+            </DialogHeader>
             <p className="text-sm text-gray-600 py-2">Delete the <strong>{deleteAcadRow.academicCountry ?? "Any"}</strong> requirement for <strong>{deleteAcadRow.courseName}</strong>? This cannot be undone.</p>
             <DialogFooter>
               <Button variant="outline" onClick={() => setDeleteAcadRow(null)}>Cancel</Button>
@@ -6278,7 +6306,10 @@ export default function UniversityDetail() {
       {editScholCourse && (
         <Dialog open onOpenChange={() => setEditScholCourse(null)}>
           <DialogContent className="max-w-md">
-            <DialogHeader><DialogTitle>Edit Scholarship — {editScholCourse.courseName}</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>Edit Scholarship — {editScholCourse.courseName}</DialogTitle>
+              <DialogDescription>Add or update scholarship details for this course.</DialogDescription>
+            </DialogHeader>
             <div className="space-y-3 py-2 text-sm">
               <div><Label>Scholarship Name</Label><Input className="mt-1" value={editScholName} onChange={(e) => setEditScholName(e.target.value)} placeholder="e.g. International Student Merit Award" /></div>
               <div><Label>Details</Label><textarea className="mt-1 w-full border rounded-md px-3 py-2 text-sm resize-none" rows={3} value={editScholDetails} onChange={(e) => setEditScholDetails(e.target.value)} placeholder="Scholarship details…" /></div>
@@ -6319,7 +6350,10 @@ export default function UniversityDetail() {
       {deleteScholInfo && (
         <Dialog open onOpenChange={() => setDeleteScholInfo(null)}>
           <DialogContent className="max-w-sm">
-            <DialogHeader><DialogTitle>Delete Scholarship</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>Delete Scholarship</DialogTitle>
+              <DialogDescription>Confirm permanent removal of this course scholarship.</DialogDescription>
+            </DialogHeader>
             <p className="text-sm text-gray-600 py-2">Delete the scholarship for <strong>{deleteScholInfo.courseName}</strong>? This cannot be undone.</p>
             <DialogFooter>
               <Button variant="outline" onClick={() => setDeleteScholInfo(null)}>Cancel</Button>
