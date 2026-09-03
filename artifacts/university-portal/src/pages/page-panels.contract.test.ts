@@ -9,15 +9,30 @@ function discoverPanelFiles(fileNames: string[]) {
   return fileNames.filter((fileName) => panelFilePattern.test(fileName));
 }
 
+function pageLocalImportPath(importSource: string, pageName: string) {
+  const relativePrefix = `./${pageName}`;
+  const aliasPrefix = `@/pages/${pageName}`;
+
+  for (const prefix of [relativePrefix, aliasPrefix]) {
+    if (importSource === prefix) return "";
+    if (importSource.startsWith(`${prefix}/`)) {
+      return importSource.slice(prefix.length + 1);
+    }
+  }
+
+  return undefined;
+}
+
 function rejectPageLocalPanelBarrels(source: string, pageName: string) {
   const namedBarrelImportPattern =
-    /import\s*\{([^}]+)\}\s*from\s*["']\.\/([^/"']+)(?:\/index)?["'];?/g;
+    /import\s*\{([^}]+)\}\s*from\s*["']([^"']+)["'];?/g;
   const defaultBarrelImportPattern =
-    /import\s+([A-Za-z_$][\w$]*)\s+from\s*["']\.\/([^/"']+)(?:\/index)?["'];?/g;
+    /import\s+([A-Za-z_$][\w$]*)\s+from\s*["']([^"']+)["'];?/g;
 
   for (const match of source.matchAll(namedBarrelImportPattern)) {
-    const [, bindingsSource, importDirectory] = match;
-    if (importDirectory !== pageName) continue;
+    const [, bindingsSource, importSource] = match;
+    const importPath = pageLocalImportPath(importSource, pageName);
+    if (importPath !== "" && importPath !== "index") continue;
 
     const panelBinding = bindingsSource
       .split(",")
@@ -32,8 +47,9 @@ function rejectPageLocalPanelBarrels(source: string, pageName: string) {
   }
 
   for (const match of source.matchAll(defaultBarrelImportPattern)) {
-    const [, binding, importDirectory] = match;
-    if (importDirectory === pageName && binding.endsWith("Panel")) {
+    const [, binding, importSource] = match;
+    const importPath = pageLocalImportPath(importSource, pageName);
+    if ((importPath === "" || importPath === "index") && binding.endsWith("Panel")) {
       throw new Error(
         `${binding} is imported through the ${pageName} barrel; import panels from their source files`,
       );
@@ -45,13 +61,14 @@ function discoverExtractedPanelImports(source: string, pageName: string) {
   rejectPageLocalPanelBarrels(source, pageName);
 
   const namedPanelImportPattern =
-    /import\s*\{([^}]+)\}\s*from\s*["']\.\/([^/"']+)\/([^"']+)["'];?/g;
+    /import\s*\{([^}]+)\}\s*from\s*["']([^"']+)["'];?/g;
   const defaultPanelImportPattern =
-    /import\s+([A-Za-z_$][\w$]*)\s+from\s*["']\.\/([^/"']+)\/([^"']+)["'];?/g;
+    /import\s+([A-Za-z_$][\w$]*)\s+from\s*["']([^"']+)["'];?/g;
 
   const namedPanels = [...source.matchAll(namedPanelImportPattern)].flatMap((match) => {
-    const [, bindingsSource, importDirectory, importPath] = match;
-    if (importDirectory !== pageName) return [];
+    const [, bindingsSource, importSource] = match;
+    const importPath = pageLocalImportPath(importSource, pageName);
+    if (!importPath || importPath === "index") return [];
 
     return bindingsSource
       .split(",")
@@ -64,8 +81,9 @@ function discoverExtractedPanelImports(source: string, pageName: string) {
   });
 
   const defaultPanels = [...source.matchAll(defaultPanelImportPattern)].flatMap((match) => {
-    const [, binding, importDirectory, importPath] = match;
-    if (importDirectory !== pageName || !binding.endsWith("Panel")) return [];
+    const [, binding, importSource] = match;
+    const importPath = pageLocalImportPath(importSource, pageName);
+    if (!importPath || importPath === "index" || !binding.endsWith("Panel")) return [];
     return [{ binding, fileName: `${importPath}.tsx` }];
   });
 
@@ -140,6 +158,8 @@ describe("page panel contracts", () => {
       import { AcademicPanel } from "./university-detail/academic-panel";
       import { EnglishPanel as EnglishRequirements } from "./university-detail/english-section";
       import FeesPanel from "./university-detail/fees-section";
+      import { OutcomesPanel } from "@/pages/university-detail/outcomes-panel";
+      import ScholarshipsPanel from "@/pages/university-detail/scholarships-section";
       import PageHeader from "./university-detail/page-header";
       import { formatCourse } from "./university-detail/course-formatters";
       import { EmptyState } from "./university-detail/empty-state";
@@ -148,7 +168,9 @@ describe("page panel contracts", () => {
     expect(discoverExtractedPanelImports(sampleImports, "university-detail")).toEqual([
       { binding: "AcademicPanel", fileName: "academic-panel.tsx" },
       { binding: "EnglishRequirements", fileName: "english-section.tsx" },
+      { binding: "OutcomesPanel", fileName: "outcomes-panel.tsx" },
       { binding: "FeesPanel", fileName: "fees-section.tsx" },
+      { binding: "ScholarshipsPanel", fileName: "scholarships-section.tsx" },
     ]);
 
     const extractedPanels = discoverAllExtractedPagePanels();
@@ -188,11 +210,27 @@ describe("page panel contracts", () => {
       ),
     ).toThrow(/FeesPanel is imported through the university-detail barrel/);
 
+    expect(() =>
+      discoverExtractedPanelImports(
+        `import { OutcomesPanel as GraduateOutcomesPanel } from "@/pages/university-detail";`,
+        "university-detail",
+      ),
+    ).toThrow(/GraduateOutcomesPanel is imported through the university-detail barrel/);
+
+    expect(() =>
+      discoverExtractedPanelImports(
+        `import ScholarshipsPanel from "@/pages/university-detail/index";`,
+        "university-detail",
+      ),
+    ).toThrow(/ScholarshipsPanel is imported through the university-detail barrel/);
+
     expect(
       discoverExtractedPanelImports(
         `
           import { formatCourse, EmptyState } from "./university-detail";
           import PageHeader from "./university-detail/index";
+          import { formatOutcome } from "@/pages/university-detail";
+          import AliasPageHeader from "@/pages/university-detail/index";
         `,
         "university-detail",
       ),
