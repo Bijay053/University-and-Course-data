@@ -1846,6 +1846,7 @@ async def re_extract_staged(
     from app.services.scraper.config.context import set_uni_config
     from app.services.scraper.config.loader import get_config_for_host
     from app.services.scraper.orchestrator import _extract_only
+    from app.services.scraper.stage_course import refresh_evidence_for_fields
 
     uni = await db.get(University, body.university_id)
     if uni is None:
@@ -1947,6 +1948,17 @@ async def re_extract_staged(
             if getattr(row, field_key) != cleaned:
                 setattr(row, field_key, cleaned)
                 changed_fields.append(field_key)
+
+        # Evidence and staged values must move together. Remove stale candidates
+        # even when the extractor found no replacement evidence for a changed
+        # field; showing no evidence is safer than showing evidence for old data.
+        await refresh_evidence_for_fields(
+            db,
+            scraped_course_id=row.id,
+            evidence=out.get("evidence") or [],
+            source_url=out.get("url") or payload.get("course_website") or url,
+            field_keys=set(changed_fields),
+        )
 
         # Always refresh completeness and publish decision.
         try:

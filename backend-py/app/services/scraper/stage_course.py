@@ -218,6 +218,37 @@ async def _persist_evidence(
     return len(values)
 
 
+async def refresh_evidence_for_fields(
+    db: AsyncSession,
+    *,
+    scraped_course_id: int,
+    evidence: list[dict[str, Any]],
+    source_url: str | None,
+    field_keys: set[str],
+) -> int:
+    """Replace stale evidence for fields changed by an in-place re-extraction."""
+    if not field_keys:
+        return 0
+
+    await db.execute(
+        delete(ScrapedFieldEvidence).where(
+            ScrapedFieldEvidence.scraped_course_id == scraped_course_id,
+            ScrapedFieldEvidence.field_key.in_(field_keys),
+        )
+    )
+    refreshed = [
+        ev
+        for ev in evidence
+        if isinstance(ev, dict) and ev.get("field_key") in field_keys
+    ]
+    return await _persist_evidence(
+        db,
+        scraped_course_id=scraped_course_id,
+        evidence=refreshed,
+        source_url=source_url,
+    )
+
+
 async def stage_course(
     db: AsyncSession,
     *,

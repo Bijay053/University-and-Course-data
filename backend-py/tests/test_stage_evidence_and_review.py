@@ -302,3 +302,134 @@ async def test_stage_course_review_status_when_blockers_present():
             assert "englishTest" in sc.eligibility_reason
     finally:
         await _cleanup(job_id)
+
+
+@pytest.mark.asyncio
+async def test_re_extract_staged_refreshes_changed_fee_evidence(monkeypatch):
+    uni_id = await _pick_university()
+    job_id = f"test_reextract_ev_{uuid.uuid4().hex[:10]}"
+    old_url = "https://example.edu/courses/2025/computer-science"
+    new_url = "https://example.edu/courses/computer-science?year=2026"
+    try:
+        async with AsyncSessionLocal() as db:
+            db.add(
+                ScrapeRuntimeJob(
+                    runtime_job_id=job_id,
+                    university_id=uni_id,
+                    university_name="Re-extract Evidence Test",
+                    url=old_url,
+                    job_type="scrape",
+                    status="running",
+                    request_payload={},
+                )
+            )
+            await db.commit()
+            staged = await stage_course(
+                db,
+                scrape_job_id=job_id,
+                university_id=uni_id,
+                course_name="Bachelor of Computer Science",
+                payload={
+                    "course_name": "Bachelor of Computer Science",
+                    "international_fee": 41000,
+                    "fee_year": 2025,
+                    "course_website": old_url,
+                },
+                evidence=[
+                    {
+                        "field_key": "international_fee",
+                        "value": 41000,
+                        "method": "fee:table",
+                        "source_url": old_url,
+                        "snippet": "2025 international fee: A$41,000",
+                        "decision_status": "selected",
+                    },
+                    {
+                        "field_key": "fee_year",
+                        "value": 2025,
+                        "method": "fee:table",
+                        "source_url": old_url,
+                        "snippet": "Fees for 2025",
+                        "decision_status": "selected",
+                    },
+                ],
+                source_url=old_url,
+            )
+        assert staged.saved
+        sc_id = staged.scraped_course_id
+        assert sc_id is not None
+
+        async def _fake_extract_only(*_args, **_kwargs):
+            return {
+                "url": new_url,
+                "payload": {
+                    "international_fee": 45000,
+                    "fee_year": 2026,
+                    "course_website": new_url,
+                },
+                "evidence": [
+                    {
+                        "field_key": "international_fee",
+                        "value": 45000,
+                        "normalized": 45000,
+                        "method": "fee:canonical-table",
+                        "source_url": new_url,
+                        "snippet": "2026 international tuition fee: A$45,000",
+                        "decision_status": "selected",
+                    },
+                    {
+                        "field_key": "fee_year",
+                        "value": 2026,
+                        "normalized": 2026,
+                        "method": "fee:canonical-table",
+                        "source_url": new_url,
+                        "snippet": "Fees shown are for 2026",
+                        "decision_status": "selected",
+                    },
+                ],
+            }
+
+        monkeypatch.setattr(
+            "app.services.scraper.orchestrator._extract_only",
+            _fake_extract_only,
+        )
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post(
+                "/api/scrape/staged/re-extract",
+                json={"ids": [sc_id], "universityId": uni_id},
+            )
+        assert response.status_code == 200, response.text
+        assert response.json()["updated"] == 1
+
+        async with AsyncSessionLocal() as db:
+            course = await db.get(ScrapedCourse, sc_id)
+            assert course is not None
+            assert course.international_fee == 45000
+            assert course.fee_year == 2026
+            assert course.course_website == new_url
+            fee_evidence = (
+                await db.execute(
+                    select(ScrapedFieldEvidence).where(
+                        ScrapedFieldEvidence.scraped_course_id == sc_id,
+                        ScrapedFieldEvidence.field_key.in_(
+                            {"international_fee", "fee_year"}
+                        ),
+                    )
+                )
+            ).scalars().all()
+
+        assert len(fee_evidence) == 2
+        assert all(ev.selected for ev in fee_evidence)
+        assert all(ev.decision_status == "selected" for ev in fee_evidence)
+        assert all(ev.source_url == new_url for ev in fee_evidence)
+        by_field = {ev.field_key: ev for ev in fee_evidence}
+        assert by_field["international_fee"].candidate_value == "45000"
+        assert by_field["international_fee"].snippet == (
+            "2026 international tuition fee: A$45,000"
+        )
+        assert by_field["fee_year"].candidate_value == "2026"
+        assert by_field["fee_year"].snippet == "Fees shown are for 2026"
+    finally:
+        await _cleanup(job_id)
