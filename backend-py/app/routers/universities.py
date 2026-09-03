@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 import csv
+import html as html_lib
 import io
 import re
 from pathlib import Path
@@ -31,6 +32,29 @@ from app.schemas.university import (
 )
 
 router = APIRouter()
+
+
+def _decode_metadata_text(value: str) -> str:
+    """Decode HTML entities before storing text sourced from page metadata."""
+    return re.sub(r"\s+", " ", html_lib.unescape(value)).strip()
+
+
+def _metadata_title_segments(value: str) -> list[str]:
+    """Split a decoded SEO title into its branded/marketing segments."""
+    decoded = _decode_metadata_text(value)
+    return [
+        segment.strip()
+        for segment in re.split(r"\s*[|–—:]\s*", decoded)
+        if segment.strip()
+    ]
+
+
+def _contains_encoded_html_entity(value: str | None) -> bool:
+    """Return True when a stored display name still contains HTML entities."""
+    return bool(
+        value
+        and re.search(r"&(?:[A-Za-z][A-Za-z0-9]+|#\d+|#x[0-9A-Fa-f]+);", value)
+    )
 
 
 def _to_read(u: University, course_count: int = 0) -> UniversityRead:
@@ -801,7 +825,7 @@ async def add_university_by_url(
                 ):
                     _og_m = _re.search(_og_pat, html, _re.I)
                     if _og_m:
-                        _candidate = _og_m.group(1).strip()
+                        _candidate = _decode_metadata_text(_og_m.group(1))
                         # Only accept if it looks like an institution name or is
                         # at least reasonably long (avoids grabbing short codes).
                         if (
@@ -815,8 +839,7 @@ async def add_university_by_url(
                 if not name:
                     title_m = _re.search(r"<title[^>]*>([^<]+)</title>", html, _re.I)
                     if title_m:
-                        raw_title = title_m.group(1).strip()
-                        segments = [s.strip() for s in _re.split(r"\s*[|–—:]\s*", raw_title) if s.strip()]
+                        segments = _metadata_title_segments(title_m.group(1))
                         if segments:
                             # Prefer the segment that looks like an institution name
                             preferred = next(
@@ -954,9 +977,12 @@ async def add_university_by_url(
     )).scalar_one_or_none()
 
     if existing:
-        # Patch city / country in-place if the stored value is still "Unknown"
-        # (happens when the university was added before city extraction worked).
+        # Repair metadata-created names from older versions that persisted raw
+        # entities such as "&amp;" and "&#8211;" plus the SEO tagline.
         _needs_update = False
+        if _contains_encoded_html_entity(existing.name) and name:
+            existing.name = name
+            _needs_update = True
         _eff_city    = existing.city
         _eff_country = existing.country
         if (not existing.city or existing.city == "Unknown") and city != "Unknown":
