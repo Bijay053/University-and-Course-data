@@ -20,7 +20,41 @@ function discoverPanelFiles(fileNames: string[]) {
   return fileNames.filter((fileName) => panelFilePattern.test(fileName));
 }
 
+function rejectPageLocalPanelBarrels(source: string, pageName: string) {
+  const namedBarrelImportPattern =
+    /import\s*\{([^}]+)\}\s*from\s*["']\.\/([^/"']+)(?:\/index)?["'];?/g;
+  const defaultBarrelImportPattern =
+    /import\s+([A-Za-z_$][\w$]*)\s+from\s*["']\.\/([^/"']+)(?:\/index)?["'];?/g;
+
+  for (const match of source.matchAll(namedBarrelImportPattern)) {
+    const [, bindingsSource, importDirectory] = match;
+    if (importDirectory !== pageName) continue;
+
+    const panelBinding = bindingsSource
+      .split(",")
+      .map((binding) => binding.trim().split(/\s+as\s+/))
+      .find((bindings) => bindings.some((binding) => binding.endsWith("Panel")));
+
+    if (panelBinding) {
+      throw new Error(
+        `${panelBinding.at(-1)} is imported through the ${pageName} barrel; import panels from their source files`,
+      );
+    }
+  }
+
+  for (const match of source.matchAll(defaultBarrelImportPattern)) {
+    const [, binding, importDirectory] = match;
+    if (importDirectory === pageName && binding.endsWith("Panel")) {
+      throw new Error(
+        `${binding} is imported through the ${pageName} barrel; import panels from their source files`,
+      );
+    }
+  }
+}
+
 function discoverExtractedPanelImports(source: string, pageName: string) {
+  rejectPageLocalPanelBarrels(source, pageName);
+
   const namedPanelImportPattern =
     /import\s*\{([^}]+)\}\s*from\s*["']\.\/([^/"']+)\/([^"']+)["'];?/g;
   const defaultPanelImportPattern =
@@ -225,6 +259,42 @@ describe("University Detail dialogs", () => {
         `${binding} is an extracted ${pageName} panel, so ${fileName} must use the *-panel.tsx naming convention`,
       ).toBe(true);
     }
+  });
+
+  it("rejects page-local panel barrels without rejecting ordinary exports", () => {
+    expect(() =>
+      discoverExtractedPanelImports(
+        `
+          import { AcademicPanel } from "./university-detail";
+          import { formatCourse } from "./university-detail/index";
+        `,
+        "university-detail",
+      ),
+    ).toThrow(/AcademicPanel is imported through the university-detail barrel/);
+
+    expect(() =>
+      discoverExtractedPanelImports(
+        `import { EnglishPanel as EnglishRequirements } from "./university-detail/index";`,
+        "university-detail",
+      ),
+    ).toThrow(/EnglishRequirements is imported through the university-detail barrel/);
+
+    expect(() =>
+      discoverExtractedPanelImports(
+        `import FeesPanel from "./university-detail/index";`,
+        "university-detail",
+      ),
+    ).toThrow(/FeesPanel is imported through the university-detail barrel/);
+
+    expect(
+      discoverExtractedPanelImports(
+        `
+          import { formatCourse, EmptyState } from "./university-detail";
+          import PageHeader from "./university-detail/index";
+        `,
+        "university-detail",
+      ),
+    ).toEqual([]);
   });
 
   it("keeps all extracted panel prop contracts closed and type-safe", () => {
