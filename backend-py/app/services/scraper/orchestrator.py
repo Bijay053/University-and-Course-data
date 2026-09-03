@@ -5516,6 +5516,8 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     # without needing a DB-stored recipe entry.  YAML wins when
                     # both YAML and DB recipe set the same key.
                     _yaml_fees_bridge_keys = (
+                        "currency_override",
+                        "fee_term",
                         "fee_calculation_mode",
                         "fee_prevent_full_course_rollup",
                         "max_annual_fee",

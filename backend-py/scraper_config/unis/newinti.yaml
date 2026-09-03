@@ -55,8 +55,11 @@ extraction:
 
   fees:
     default_currency: MYR
-    # INTI publishes total-programme fees; annualize them after duration is known.
-    fee_calculation_mode: full_course_to_annual
+    currency_override: MYR
+    # INTI publishes total-programme fees. Preserve the source amount and label
+    # it as a full-course total; never divide it by duration.
+    fee_term: Full Course
+    fee_calculation_mode: use_source_value_only
     fee_prevent_full_course_rollup: false
 
   campus_allowlist:

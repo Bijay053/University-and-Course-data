@@ -1868,6 +1868,14 @@ class FeesConfig(BaseModel):
         default="AUD",
         description="ISO currency code used when no currency marker is found on the page.",
     )
+    currency_override: Optional[str] = Field(
+        default=None,
+        description=(
+            "Authoritative ISO currency code for every extracted fee at this "
+            "university. Unlike default_currency, this replaces an incorrectly "
+            "extracted currency marker. Empty by default."
+        ),
+    )
     credit_points_per_unit: Optional[int] = Field(
         default=None,
         description=(
@@ -2066,6 +2074,13 @@ class FeesConfig(BaseModel):
     # per-university fee calculation behaviour can be configured in the uni YAML
     # without needing a DB-stored recipe. The orchestrator merges them into the
     # recipe dict at scrape time (YAML wins over DB recipe when both are set).
+    fee_term: Optional[str] = Field(
+        default=None,
+        description=(
+            "Authoritative fee period for this university. Supported values "
+            "include 'Annual', 'Per Unit', and 'Full Course'."
+        ),
+    )
     fee_calculation_mode: Optional[str] = Field(
         default=None,
         description=(

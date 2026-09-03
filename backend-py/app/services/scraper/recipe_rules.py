@@ -31,6 +31,7 @@ def apply_recipe_rules(payload: dict[str, Any], recipe: dict) -> dict[str, Any]:
         return payload
 
     _apply_course_name_cleanup(payload, recipe)
+    _apply_currency_override(payload, recipe)
     _apply_fee_term_override(payload, recipe)
     _apply_ielts_component_mapping(payload, recipe)
     _apply_location_rules(payload, recipe)
@@ -78,6 +79,18 @@ def _apply_course_name_cleanup(payload: dict, recipe: dict) -> None:
 
 
 # ── Fee term override ─────────────────────────────────────────────────────────
+
+def _apply_currency_override(payload: dict, recipe: dict) -> None:
+    """Apply an explicitly configured fee currency at the final boundary."""
+    currency = str(recipe.get("currency_override") or "").strip().upper()
+    if not currency or not payload.get("international_fee"):
+        return
+    previous = payload.get("currency") or payload.get("fee_currency")
+    payload["currency"] = currency
+    payload["fee_currency"] = currency
+    if previous != currency:
+        log.info("[RECIPE] currency forced %r → %r", previous, currency)
+
 
 def _apply_fee_term_override(payload: dict, recipe: dict) -> None:
     """Apply fee_term and fee_calculation_mode rules.

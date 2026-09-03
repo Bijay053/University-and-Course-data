@@ -3,6 +3,7 @@ import pytest
 from app.services.scraper import discovery as discovery_mod
 from app.services.scraper import sitemap as sitemap_mod
 from app.services.scraper.config.loader import load_uni_config
+from app.services.scraper.recipe_rules import apply_recipe_rules
 
 
 def test_inti_hostname_recipe_loads_for_production_database_id() -> None:
@@ -22,6 +23,35 @@ def test_inti_hostname_recipe_loads_for_production_database_id() -> None:
     assert config.discovery.course_detail_url_patterns
     assert config.extraction.study_mode.suppress_nav_rule is True
     assert config.extraction.fees.default_currency == "MYR"
+    assert config.extraction.fees.currency_override == "MYR"
+    assert config.extraction.fees.fee_term == "Full Course"
+    assert config.extraction.fees.fee_calculation_mode == "use_source_value_only"
+    assert config.extraction.fees.fee_prevent_full_course_rollup is False
+
+
+def test_inti_fee_recipe_preserves_full_programme_total_in_myr() -> None:
+    config = load_uni_config(
+        slug="newinti",
+        scrape_url="https://newinti.edu.my/",
+        university_id=11,
+        name="INTI International University & Colleges",
+    )
+    payload = {
+        "international_fee": 70_002,
+        "currency": "AUD",
+        "fee_currency": "AUD",
+        "fee_term": "Annual",
+        "duration": 2,
+        "duration_term": "Year",
+    }
+
+    recipe = config.extraction.fees.model_dump()
+    result = apply_recipe_rules(payload, recipe)
+
+    assert result["international_fee"] == 70_002
+    assert result["currency"] == "MYR"
+    assert result["fee_currency"] == "MYR"
+    assert result["fee_term"] == "Full Course"
 
 
 @pytest.mark.asyncio
