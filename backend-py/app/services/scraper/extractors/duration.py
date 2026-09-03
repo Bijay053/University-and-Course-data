@@ -749,47 +749,55 @@ def _from_inti_duration_badge(
         if any(value.endswith("-loop") for value in classes):
             continue
         text = compact(tag.get_text(" ", strip=True))
-        # INTI sometimes publishes both study loads in one badge. Select the
-        # explicitly labelled full-time value regardless of whether the mode
-        # label appears before or after the amount.
-        fulltime_match = re.search(
-            r"(?<![\d.])(\d+(?:\.\d+)?)\s*(years?|months?|weeks?)"
-            r"\s*\(?\s*full[- ]?time\b",
-            text,
-            re.IGNORECASE,
-        ) or re.search(
-            r"\bfull[- ]?time\b\s*[:\-–—()]?\s*"
-            r"(\d+(?:\.\d+)?)\s*(years?|months?|weeks?)\b",
+        # INTI sometimes publishes both study loads in one badge. Isolate the
+        # complete explicitly-labelled full-time expression before parsing it,
+        # regardless of whether the mode label appears before or after it.
+        # Keeping the whole expression preserves ranges and year+month values.
+        duration_expr = (
+            r"(?P<duration>"
+            r"\d+(?:\.\d+)?\s*(?:"
+            r"(?:-|–|—|\bto\b)\s*\d+(?:\.\d+)?\s*(?:years?|months?|weeks?)"
+            r"|years?(?:\s*(?:,|and)?\s*\d+(?:\.\d+)?\s*months?)?"
+            r"|months?|weeks?"
+            r"))"
+        )
+        label_before = re.search(
+            rf"\bfull[- ]?time\b\s*[:\-–—()]?\s*{duration_expr}",
             text,
             re.IGNORECASE,
         )
-        if fulltime_match:
-            parsed = (
-                float(fulltime_match.group(1)),
-                _normalise_unit(fulltime_match.group(2)),
-            )
-        else:
-            # Parse ranges before the generic classifier, whose loose scan
-            # would otherwise select the range's final number (3-4 Years → 4).
-            range_match = re.search(
-                r"(?<![\d.])(\d+(?:\.\d+)?)\s*(?:-|–|—|\bto\b)\s*"
-                r"(\d+(?:\.\d+)?)\s*(years?|months?|weeks?)\b",
-                text,
-                re.IGNORECASE,
-            )
-        if not fulltime_match and range_match:
+        value_before = re.search(
+            rf"{duration_expr}\s*\(?\s*full[- ]?time\b",
+            text,
+            re.IGNORECASE,
+        )
+        parse_text = (
+            (label_before or value_before).group("duration")
+            if label_before or value_before
+            else text
+        )
+
+        # Parse ranges before the generic classifier, whose loose scan would
+        # otherwise select the range's final number (e.g. 3-4 Years → 4).
+        range_match = re.search(
+            r"(?<![\d.])(\d+(?:\.\d+)?)\s*(?:-|–|—|\bto\b)\s*"
+            r"(\d+(?:\.\d+)?)\s*(years?|months?|weeks?)\b",
+            parse_text,
+            re.IGNORECASE,
+        )
+        if range_match:
             parsed = (
                 float(range_match.group(1)),
                 _normalise_unit(range_match.group(3)),
             )
-        elif not fulltime_match:
+        else:
             # Compound durations are converted to months. Keep the separator
             # tight so an inclusive internship note does not get added twice
             # to a duration such as "3.5 Years (inclusive of 6 months)".
             compound_match = re.search(
                 r"(?<![\d.])(\d+(?:\.\d+)?)\s*years?\s*"
                 r"(?:,|and)?\s*(\d+(?:\.\d+)?)\s*months?\b",
-                text,
+                parse_text,
                 re.IGNORECASE,
             )
             if compound_match:
@@ -799,7 +807,7 @@ def _from_inti_duration_badge(
                     "Month",
                 )
             else:
-                parsed = _classify_duration_value(text)
+                parsed = _classify_duration_value(parse_text)
         if parsed is not None:
             amount, unit = parsed
             if (
