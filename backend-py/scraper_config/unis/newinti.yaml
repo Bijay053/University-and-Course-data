@@ -3,10 +3,23 @@
 hostname_guard: "newinti.edu.my"
 
 discovery:
-  bfs_page_budget: 150
+  # The static finder contains every programme link on one page. Do not spend
+  # the BFS budget crawling individual programme pages and their shared nav.
+  seed_urls:
+    - "https://newinti.edu.my/find-a-programme/"
+  bfs_page_budget: 1
 
   allow_url_patterns:
     - "/programme/"
+
+  force_candidate_url_patterns:
+    - "^/programme/(?!micro-credential/?$)[^/?#]+/?$"
+
+  course_detail_url_patterns:
+    - "^https?://newinti\\.edu\\.my/programme/(?!micro-credential/?$)[^/?#]+/?$"
+
+  listing_only_patterns:
+    - "^https?://newinti\\.edu\\.my/find-a-programme/?$"
 
   block_url_patterns:
     # Category listing pages — crawl for links but never extract as courses.
@@ -19,8 +32,7 @@ discovery:
     - "/undergraduate/diploma"
     - "/undergraduate/foundation"
     - "/undergraduate/certificate"
-    - "/micro-credential"
-    - "/professional-development"
+    - "/programme/micro-credential/?$"
     - "/english-language"
     - "/inti-english"
     - "/american-university"
