@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+import { sourceAliases } from "./source-aliases";
 
 const workspaceRoot = path.resolve(import.meta.dirname, "..", "..");
 
@@ -40,7 +41,7 @@ export default defineConfig(async ({ mode }) => {
     ],
     resolve: {
       alias: {
-        "@": path.resolve(import.meta.dirname, "src"),
+        ...sourceAliases,
         "@assets": path.resolve(import.meta.dirname, "..", "..", "attached_assets"),
       },
       dedupe: ["react", "react-dom"],

@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { sourceAliases } from "../../source-aliases";
 
 const pagesDirectory = resolve("src/pages");
 const panelFilePattern = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*-panel\.tsx$/;
@@ -11,9 +12,11 @@ function discoverPanelFiles(fileNames: string[]) {
 
 function pageLocalImportPath(importSource: string, pageName: string) {
   const relativePrefix = `./${pageName}`;
-  const aliasPrefix = `@/pages/${pageName}`;
+  const aliasPrefixes = Object.keys(sourceAliases).map(
+    (alias) => `${alias}/pages/${pageName}`,
+  );
 
-  for (const prefix of [relativePrefix, aliasPrefix]) {
+  for (const prefix of [relativePrefix, ...aliasPrefixes]) {
     if (importSource === prefix) return "";
     if (importSource.startsWith(`${prefix}/`)) {
       return importSource.slice(prefix.length + 1);
@@ -154,24 +157,37 @@ describe("page panel contracts", () => {
   });
 
   it("requires extracted page panels to use the *-panel.tsx convention", () => {
+    const aliasedImports = Object.keys(sourceAliases)
+      .map(
+        (alias) => `
+          import { OutcomesPanel } from "${alias}/pages/university-detail/outcomes-panel";
+          import ScholarshipsPanel from "${alias}/pages/university-detail/scholarships-section";
+        `,
+      )
+      .join("\n");
     const sampleImports = `
       import { AcademicPanel } from "./university-detail/academic-panel";
       import { EnglishPanel as EnglishRequirements } from "./university-detail/english-section";
       import FeesPanel from "./university-detail/fees-section";
-      import { OutcomesPanel } from "@/pages/university-detail/outcomes-panel";
-      import ScholarshipsPanel from "@/pages/university-detail/scholarships-section";
+      ${aliasedImports}
       import PageHeader from "./university-detail/page-header";
       import { formatCourse } from "./university-detail/course-formatters";
       import { EmptyState } from "./university-detail/empty-state";
     `;
 
     expect(discoverExtractedPanelImports(sampleImports, "university-detail")).toEqual([
-      { binding: "AcademicPanel", fileName: "academic-panel.tsx" },
-      { binding: "EnglishRequirements", fileName: "english-section.tsx" },
-      { binding: "OutcomesPanel", fileName: "outcomes-panel.tsx" },
-      { binding: "FeesPanel", fileName: "fees-section.tsx" },
-      { binding: "ScholarshipsPanel", fileName: "scholarships-section.tsx" },
-    ]);
+        { binding: "AcademicPanel", fileName: "academic-panel.tsx" },
+        { binding: "EnglishRequirements", fileName: "english-section.tsx" },
+        ...Object.keys(sourceAliases).map(() => ({
+          binding: "OutcomesPanel",
+          fileName: "outcomes-panel.tsx",
+        })),
+        { binding: "FeesPanel", fileName: "fees-section.tsx" },
+        ...Object.keys(sourceAliases).map(() => ({
+          binding: "ScholarshipsPanel",
+          fileName: "scholarships-section.tsx",
+        })),
+      ]);
 
     const extractedPanels = discoverAllExtractedPagePanels();
 
@@ -210,19 +226,21 @@ describe("page panel contracts", () => {
       ),
     ).toThrow(/FeesPanel is imported through the university-detail barrel/);
 
-    expect(() =>
-      discoverExtractedPanelImports(
-        `import { OutcomesPanel as GraduateOutcomesPanel } from "@/pages/university-detail";`,
-        "university-detail",
-      ),
-    ).toThrow(/GraduateOutcomesPanel is imported through the university-detail barrel/);
+    for (const alias of Object.keys(sourceAliases)) {
+      expect(() =>
+        discoverExtractedPanelImports(
+          `import { OutcomesPanel as GraduateOutcomesPanel } from "${alias}/pages/university-detail";`,
+          "university-detail",
+        ),
+      ).toThrow(/GraduateOutcomesPanel is imported through the university-detail barrel/);
 
-    expect(() =>
-      discoverExtractedPanelImports(
-        `import ScholarshipsPanel from "@/pages/university-detail/index";`,
-        "university-detail",
-      ),
-    ).toThrow(/ScholarshipsPanel is imported through the university-detail barrel/);
+      expect(() =>
+        discoverExtractedPanelImports(
+          `import ScholarshipsPanel from "${alias}/pages/university-detail/index";`,
+          "university-detail",
+        ),
+      ).toThrow(/ScholarshipsPanel is imported through the university-detail barrel/);
+    }
 
     expect(
       discoverExtractedPanelImports(
