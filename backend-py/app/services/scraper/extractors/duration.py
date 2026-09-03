@@ -749,20 +749,40 @@ def _from_inti_duration_badge(
         if any(value.endswith("-loop") for value in classes):
             continue
         text = compact(tag.get_text(" ", strip=True))
-        # Parse ranges before the generic classifier, whose loose scan would
-        # otherwise select the range's final number (e.g. 3-4 Years → 4).
-        range_match = re.search(
-            r"(?<![\d.])(\d+(?:\.\d+)?)\s*(?:-|–|—|\bto\b)\s*"
+        # INTI sometimes publishes both study loads in one badge. Select the
+        # explicitly labelled full-time value regardless of whether the mode
+        # label appears before or after the amount.
+        fulltime_match = re.search(
+            r"(?<![\d.])(\d+(?:\.\d+)?)\s*(years?|months?|weeks?)"
+            r"\s*\(?\s*full[- ]?time\b",
+            text,
+            re.IGNORECASE,
+        ) or re.search(
+            r"\bfull[- ]?time\b\s*[:\-–—()]?\s*"
             r"(\d+(?:\.\d+)?)\s*(years?|months?|weeks?)\b",
             text,
             re.IGNORECASE,
         )
-        if range_match:
+        if fulltime_match:
+            parsed = (
+                float(fulltime_match.group(1)),
+                _normalise_unit(fulltime_match.group(2)),
+            )
+        else:
+            # Parse ranges before the generic classifier, whose loose scan
+            # would otherwise select the range's final number (3-4 Years → 4).
+            range_match = re.search(
+                r"(?<![\d.])(\d+(?:\.\d+)?)\s*(?:-|–|—|\bto\b)\s*"
+                r"(\d+(?:\.\d+)?)\s*(years?|months?|weeks?)\b",
+                text,
+                re.IGNORECASE,
+            )
+        if not fulltime_match and range_match:
             parsed = (
                 float(range_match.group(1)),
                 _normalise_unit(range_match.group(3)),
             )
-        else:
+        elif not fulltime_match:
             # Compound durations are converted to months. Keep the separator
             # tight so an inclusive internship note does not get added twice
             # to a duration such as "3.5 Years (inclusive of 6 months)".

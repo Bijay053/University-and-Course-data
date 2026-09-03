@@ -228,6 +228,27 @@ def test_inti_badge_covers_representative_programme_levels():
         assert out[0].method == "duration.inti_badge"
 
 
+def test_inti_badge_selects_full_time_when_part_time_is_listed_first():
+    cases = (
+        "3 Years (Part-Time), 2 Years (Full-Time)",
+        "Part-Time: 3 Years, Full-Time: 2 Years",
+    )
+
+    for badge in cases:
+        html = f'<span class="custom-product-label">{badge}</span>'
+        out = _run(
+            duration.extract(
+                html,
+                "https://newinti.edu.my/programme/example/",
+            )
+        )
+        assert out[0].normalized == {
+            "duration": 2.0,
+            "duration_term": "Year",
+        }
+        assert out[0].method == "duration.inti_badge"
+
+
 def test_inti_badge_uses_minimum_of_duration_range():
     for separator in ("-", "–", "—", " to "):
         html = (
