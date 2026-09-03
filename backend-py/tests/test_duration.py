@@ -184,6 +184,50 @@ def test_inti_badge_handles_decimal_compound_duration():
     }
 
 
+def test_inti_badge_covers_representative_programme_levels():
+    cases = (
+        (
+            "Bachelor of Accounting & Finance (Honours)",
+            "3 Years",
+            {"duration": 3.0, "duration_term": "Year"},
+        ),
+        (
+            "Diploma in Business",
+            "2 Years",
+            {"duration": 2.0, "duration_term": "Year"},
+        ),
+        (
+            "Foundation in Business",
+            "1 Year",
+            {"duration": 1.0, "duration_term": "Year"},
+        ),
+        (
+            "Master of Traditional Chinese Medicine",
+            "2 Years (Full-Time), 3 Years (Part-Time)",
+            {"duration": 2.0, "duration_term": "Year"},
+        ),
+    )
+
+    for title, badge, expected in cases:
+        html = f"""
+        <div id="programme-intro">
+          <h1>{title}</h1>
+          <span class="custom-product-label">{badge}</span>
+        </div>
+        <ul class="custom-related">
+          <li><span class="custom-product-label">4 Years</span></li>
+        </ul>
+        """
+        out = _run(
+            duration.extract(
+                html,
+                "https://newinti.edu.my/programme/example/",
+            )
+        )
+        assert out[0].normalized == expected
+        assert out[0].method == "duration.inti_badge"
+
+
 def test_inti_badge_uses_minimum_of_duration_range():
     for separator in ("-", "–", "—", " to "):
         html = (
