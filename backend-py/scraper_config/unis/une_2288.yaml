@@ -35,6 +35,8 @@
 # Per-course pages (www.une.edu.au/study/courses/...) are CF Enterprise
 # blocked; Scrape.do render=True is required.
 
+hostname_guard: www.une.edu.au
+
 discovery:
   seed_urls:
     - https://www.une.edu.au/study/study-options/courses
@@ -54,6 +56,8 @@ discovery:
   # Without this, httpx/cffi/Wayback are tried first (all 403/empty), then
   # Scrape.do static (502), and render=True is never attempted → 0 bytes.
   scrape_do_skip_fallbacks: true
+  scrape_do_render: true
+  skip_home_page_redirect: true
 
   block_url_patterns:
     - /news
@@ -82,6 +86,9 @@ extraction:
 
   # Lower parallelism — render calls are ~4-6s each via Scrape.do.
   max_parallel_fetch: 3
+  per_course_timeout_seconds: 90
+  recovery_sweep_max_items: 3
+  recovery_sweep_time_budget_seconds: 120
 
   fees:
     default_currency: AUD

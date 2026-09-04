@@ -1,15 +1,55 @@
-# University of New England
-# Hostname: www.une.edu.au
-# Country: Australia  |  Currency: AUD
-# Slug: une
-# Auto-generated: 2026-07-22
+# University of New England (UNE) — production university ID 15.
 #
-# This stub was created automatically on the first scrape of this university.
-# Review and expand it to improve discovery and extraction quality.
-# See scraper_config/defaults.yaml for all available options.
+# IMPORTANT: Keep this slug recipe aligned with une_2288.yaml. Production loads
+# this file before the ID-suffixed duplicate; leaving it as an empty generated
+# stub silently restores obsolete generic/Wayback discovery.
 
-discovery: {}
+hostname_guard: www.une.edu.au
+
+discovery:
+  seed_urls:
+    - https://www.une.edu.au/study/study-options/courses
+
+  # Current course-specific sitemap. It contains canonical non-year URLs;
+  # individual unit URLs are excluded by the exact course-path allowlist.
+  sitemap_url: https://www.une.edu.au/cauc-static/study/sitemap.xml
+  allow_url_patterns:
+    - '/study/courses/[a-zA-Z0-9_-]+$'
+
+  # UNE is Cloudflare Enterprise protected. Static and datacenter transports
+  # fail; go directly to Scrape.do render for the one sitemap request.
+  scrape_do_skip_fallbacks: true
+  scrape_do_render: true
+  skip_home_page_redirect: true
+
+  block_url_patterns:
+    - /news
+    - /events
+    - /staff/
+    - /about
+    - /contact
+
+  bfs_page_budget: 0
+  always_sitemap_supplement: false
+  use_wayback: false
 
 extraction:
+  scrape_do_render: true
+  scrape_do_skip_fallbacks: true
+  skip_browser_rescue: true
+
+  # Rendered course fetches routinely exceed the historical 3-second production
+  # default. Pin a safe deadline here so environment overrides cannot regress it.
+  max_parallel_fetch: 3
+  per_course_timeout_seconds: 90
+
+  # A fleet-wide provider outage should not trigger a five-minute 100-item sweep.
+  recovery_sweep_max_items: 3
+  recovery_sweep_time_budget_seconds: 120
+
   fees:
     default_currency: AUD
+
+  filters:
+    domestic_only:
+      enabled: false
