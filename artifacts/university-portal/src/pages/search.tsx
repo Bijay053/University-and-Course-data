@@ -202,7 +202,7 @@ export default function SearchPage() {
     if (eWriting) params.set("english_writing", eWriting);
     if (eListening) params.set("english_listening", eListening);
     if (eSpeaking) params.set("english_speaking", eSpeaking);
-    if (country) params.set("country_residence", country);
+    if (country) params.set("country", country);
     if (qualification) params.set("highest_qualification", qualification);
     if (scheme) params.set("grading_scheme", scheme);
     if (outOf) params.set("grading_out_of", outOf);
@@ -330,10 +330,10 @@ export default function SearchPage() {
             defaultValue={["country", "qualification", "grading", "english", "other", "intakes", "duration", "fee"]}
             className="w-full"
           >
-            {/* 1. Country of Residence */}
+            {/* 1. Study Destination Country */}
             <AccordionItem value="country">
               <AccordionTrigger className="text-sm">
-                Country of Residence <span className="text-red-500 ml-0.5">*</span>
+                Study Destination Country <span className="text-red-500 ml-0.5">*</span>
               </AccordionTrigger>
               <AccordionContent className="pt-2">
                 <Select value={country || "any"} onValueChange={(v) => { setCountry(v === "any" ? "" : v); resetPage(); }}>

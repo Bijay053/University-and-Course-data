@@ -71,8 +71,10 @@ class _FailingSearchSession:
 class _SequentialSession:
     def __init__(self, results):
         self.results = iter(results)
+        self.calls: list[tuple[str, dict]] = []
 
-    async def execute(self, stmt, params=None):  # noqa: ARG002
+    async def execute(self, stmt, params=None):
+        self.calls.append((str(stmt), dict(params or {})))
         return _StubResult(next(self.results))
 
 
@@ -202,6 +204,23 @@ def test_search_sql_failure_is_not_disguised_as_empty_results():
     assert response.json() == {
         "detail": "Course search is temporarily unavailable"
     }
+
+
+def test_search_destination_country_filters_university_country():
+    session = _SequentialSession([[], [0]])
+
+    async def _db_override():
+        yield session
+
+    app.dependency_overrides[get_db] = _db_override
+    response = TestClient(app).get("/api/search/courses?country=Malaysia")
+
+    assert response.status_code == 200
+    assert response.json()["total"] == 0
+    assert len(session.calls) == 2
+    for sql, params in session.calls:
+        assert "lower(c.university_country) = lower(:country)" in sql
+        assert params["country"] == "Malaysia"
 
 
 @pytest.mark.parametrize(
