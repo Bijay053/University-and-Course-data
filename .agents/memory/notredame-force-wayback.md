@@ -5,22 +5,21 @@ description: Durable rules for mixing complete CDX coverage, exact archive repla
 
 ## Rule
 
-Use CDX-cached Wayback snapshots as the cheap first transport, but treat the
-archive as one source rather than the whole catalogue. When the current sitemap
-contains URLs absent from a complete CDX result, route those current-only pages
-directly to the one live transport that has passed a representative probe. Never
-put known permanent archive misses into the sequential recovery queue.
+Use the fastest representative-probe winner as the primary transport. As of
+September 2026, Scrape.do rendered live pages complete materially faster than
+Archive.org, so rendered live is primary and CDX-cached Wayback is the last
+resort. Treat the archive as one source rather than the whole catalogue, and
+never put known permanent archive misses into the sequential recovery queue.
 
-**Why:** The static proxy tier can spend about a minute returning
-ROTATION_FAILED before rendered fetching succeeds. Wayback is much faster for
-captured pages, but the current catalogue has many valid pages with no capture.
-Archive-only mode therefore finishes quickly with incomplete data, while the
-old static-then-render chain is complete but takes hours.
+**Why:** Transport performance changed over time. Archive snapshots varied from
+roughly 9 to 35 seconds per page while rendered live probes returned equivalent
+HTML in roughly 5 to 19 seconds. Direct/static requests remain blocked. The old
+Wayback-first decision was correct when cached snapshots took about 1.4 seconds,
+but became the dominant latency once Archive.org slowed.
 
-**How to apply:** Enable Wayback-first only after CDX discovery preloads
-timestamps. Configure a direct rendered miss fallback only after a live probe
-succeeds. Keep primary concurrency conservative and cap recovery by both item
-count and wall-clock time.
+**How to apply:** Re-probe several representative pages before changing order.
+Skip direct/static tiers, keep primary concurrency conservative, retain cached
+Wayback as last resort, and cap recovery by both item count and wall-clock time.
 
 ## Archive identity and completeness
 

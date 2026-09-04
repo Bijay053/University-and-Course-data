@@ -1,7 +1,7 @@
 - [UC Canberra SPA + hidden-input fees](uc-canberra-fix.md) — Listing=SPA shell (0 links); sitemap at /services/wcm/site-map/course.xml has 184 courses; fees in id="N-eftsl-international" hidden inputs matched via id="current-year".
 - [MQ coursehandbook resolver](mq-coursehandbook-resolver.md) — Sitemap needs patchright (CF-guarded); resolver needs httpx (127→223/383); BFS seeds return 0 in dev (expected).
 - [MQ Funnelback discovery + CF bypass](mq-search-page-tier.md) — entire mq.edu.au domain is CF Enterprise; scrape.do render=true on mqu-search.funnelback.squiz.cloud works (368 courses, 2 paginated API calls); static proxy and direct requests all fail.
-- [Notre Dame hybrid blocked-site transport](notredame-force-wayback.md) — CDX-cached Wayback first; current-only URLs go straight to rendered live fallback; recovery is bounded.
+- [Notre Dame hybrid blocked-site transport](notredame-force-wayback.md) — rendered live first while it outperforms Archive.org; CDX-cached Wayback remains the bounded fallback.
 - [La Trobe CF Enterprise fixes](latrobe-cf-enterprise.md) — one browser session navigates shell→canonical JSON; selector parity + an 8-slot host override keeps 232 courses under 30m.
 - [Phase 9B conflict resolution](phase9b-conflict-resolution.md) — T001-T004: repair order, confidence formula, field normalizer canon forms, schema (migration 028), KPI API shape, pre-existing test failures.
 - [QMUL fetch_failed visibility gap](qmul-fetch-failed-visibility.md) — DONE-line + DB persistence for scraper fetch losses already exist (run_summary.py, http_fetcher.py retry ladder); grep before re-adding.
