@@ -1,6 +1,10 @@
 import pytest
 
 from app.services.scraper.config.loader import load_uni_config
+from app.services.scraper.nz_programme_points import (
+    find_programme_points_for_fee,
+    full_time_years_from_nz_points,
+)
 
 
 def _config(university_id: int):
@@ -50,3 +54,26 @@ def test_any_database_id_routes_blocked_course_pages_through_static_proxy(
     assert config.extraction.skip_per_course_browser is True
     assert config.extraction.max_parallel_fetch == 8
     assert config.extraction.fees.default_currency == "NZD"
+    assert config.extraction.fees.fee_prevent_full_course_rollup is False
+
+
+def test_special_programme_fee_uses_points_as_full_course_duration():
+    text = """
+    INTERNATIONAL
+    2026 Special Programme Fee: $65,100 (180 points)
+    2027 Special Programme Fee: $68,850 (180 points)
+    2028 Special Programme Fee: $73,050 (180 points)
+    STUDENT SERVICES LEVY (SSL)
+    2026 SSL: $10.30 per point ($1,236.00 per 120 points)
+    """
+
+    points = find_programme_points_for_fee(text, 68_850)
+
+    assert points == 180
+    assert full_time_years_from_nz_points(points) == 1.5
+
+
+def test_levy_per_point_text_does_not_relabel_programme_fee():
+    text = "2027 Special Programme Fee: $68,850 (180 points); SSL $10.30 per point"
+
+    assert find_programme_points_for_fee(text, 10.30) is None

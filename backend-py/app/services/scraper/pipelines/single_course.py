@@ -54,6 +54,10 @@ from app.services.scraper.course_deadline import (
     remaining_seconds,
     required_course_fields_complete,
 )
+from app.services.scraper.nz_programme_points import (
+    find_programme_points_for_fee,
+    full_time_years_from_nz_points,
+)
 
 log = logging.getLogger(__name__)
 
@@ -8421,6 +8425,45 @@ async def extract_course(
     _sc_host = (urlparse(url).hostname or "").lower()
     if _sc_host in _FULL_COURSE_FEE_HOSTS and payload.get("fee_term") == "Annual":
         payload["fee_term"] = "Full Course"
+
+    # University of Canterbury special-programme fees are whole-programme
+    # totals paired with the qualification's point load, e.g.
+    # "NZ$68,850 (180 points)". They are not per-unit charges. In New Zealand,
+    # 120 points is one full-time equivalent year, so the same source qualifier
+    # is authoritative for duration when generic page metadata says "1 Year".
+    if _sc_host in {"canterbury.ac.nz", "www.canterbury.ac.nz"}:
+        from app.services.scraper.extractors._text import html_to_text as _h2t_nz
+
+        _nz_fee = payload.get("international_fee")
+        _nz_text = _h2t_nz(rendered_html or html or "")
+        _nz_points = find_programme_points_for_fee(_nz_text, _nz_fee)
+        _nz_years = full_time_years_from_nz_points(_nz_points)
+        if _nz_points and _nz_years:
+            payload["fee_term"] = "Full Course"
+            payload["duration"] = _nz_years
+            payload["duration_term"] = "Years"
+            evidence.extend([
+                {
+                    "field_key": "fee_term",
+                    "value": "Full Course",
+                    "confidence": 0.98,
+                    "method": "canterbury:programme_points",
+                    "snippet": f"Selected fee is quoted for the full {_nz_points}-point programme",
+                },
+                {
+                    "field_key": "duration",
+                    "value": _nz_years,
+                    "confidence": 0.98,
+                    "method": "canterbury:programme_points",
+                    "snippet": f"{_nz_points} points ÷ 120 points per full-time year",
+                },
+            ])
+            log.info(
+                "[CANTERBURY POINTS] fee %.0f is Full Course for %d points; duration=%g years",
+                float(_nz_fee),
+                _nz_points,
+                _nz_years,
+            )
 
     # ── MYR total-fee normalizer ──────────────────────────────────────────────
     # INTI and similar Malaysian universities quote TOTAL programme fees with

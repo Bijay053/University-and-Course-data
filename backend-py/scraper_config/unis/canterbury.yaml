@@ -93,6 +93,8 @@ extraction:
     prefer_international: true
     max_annual_fee: 90000
     allow_bucket_match: true
+    # Course-page special programme fees are totals for the stated point load.
+    fee_prevent_full_course_rollup: false
 
     reject_keywords:
       - Domestic students
