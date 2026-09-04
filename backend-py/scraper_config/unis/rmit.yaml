@@ -7,6 +7,7 @@ discovery:
   sitemap_url: "https://www.rmit.edu.au/study-with-us/sitemap.xml"
   always_sitemap_supplement: true
   skip_sitemap_fallback: false
+  use_wayback: false
   bfs_page_budget: 0
   skip_browser_discovery: true
   allow_url_patterns:

@@ -38,6 +38,7 @@ def test_rmit_verified_discovery_cannot_be_replaced_by_stale_ai_admin_rules():
         "https://www.rmit.edu.au/study-with-us/sitemap.xml"
     )
     assert config.discovery.skip_sitemap_fallback is False
+    assert config.discovery.use_wayback is False
     assert config.discovery.skip_browser_discovery is True
     assert config.discovery.bfs_page_budget == 0
     assert config.discovery.static_course_urls_file is None
