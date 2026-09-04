@@ -303,6 +303,7 @@ async def test_notredame_recipe_prefers_rendered_live_with_wayback_fallback():
         university_id=1165,
     )
     set_uni_config(cfg)
+    assert "/resources/snippets/" in cfg.discovery.block_url_patterns
     url = "https://www.notredame.edu.au/programs/school-of-law/test-course"
     rendered = "<html><body>" + ("live course " * 200) + "</body></html>"
     wayback = AsyncMock(return_value=None)

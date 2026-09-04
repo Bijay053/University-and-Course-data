@@ -68,6 +68,7 @@ discovery:
   block_url_patterns:
     - '/programs/[^/]+/courses/'
     - '/programs/re-usable-snippets/'
+    - '/resources/snippets/'
     - '-webinar-'
 
   # CDX provides the campus-prefixed URLs not in the sitemap.
