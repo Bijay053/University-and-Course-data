@@ -293,7 +293,7 @@ async def test_wayback_network_failure_remains_retryable():
 
 
 @pytest.mark.asyncio
-async def test_force_wayback_first_can_use_configured_rendered_live_fallback():
+async def test_notredame_recipe_prefers_rendered_live_with_wayback_fallback():
     from app.services.scraper.config import get_config_for_host, set_uni_config
 
     cfg = get_config_for_host(
@@ -321,9 +321,9 @@ async def test_force_wayback_first_can_use_configured_rendered_live_fallback():
     ):
         assert await fetch_html(url) == rendered
 
+    wayback.assert_not_awaited()
     live.assert_awaited_once()
     assert live.await_args.kwargs["render"] is True
-    assert live.await_args.kwargs["max_retries"] == 1
 
 
 @pytest.mark.asyncio

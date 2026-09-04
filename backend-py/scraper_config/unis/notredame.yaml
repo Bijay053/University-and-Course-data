@@ -139,18 +139,18 @@ extraction:
   # above, so the browser pass contributes nothing.
   skip_per_course_browser: true
 
-  # Use CDX-cached Wayback snapshots first. The current sitemap also contains
-  # hundreds of active non-campus URLs with no archive snapshot, so those pages
-  # fall back directly to the one live transport proven to work: Scrape.do
-  # render=True. This skips the doomed ~57 s static attempt and does not use
-  # Playwright/httpx/cffi.
-  force_wayback_first: true
-  wayback_miss_fallback: scrape_do_render
+  # Scrape.do render=True is currently faster and returns HTML equivalent to
+  # Wayback for live Notre Dame pages.  Go directly to that proven transport,
+  # skipping the doomed static/httpx/cffi tiers.  Because discovery.use_wayback
+  # remains true, fetch_html() automatically uses the cached archive snapshot
+  # as a last resort when a rendered live request fails.
+  scrape_do_render: true
+  scrape_do_skip_fallbacks: true
+  force_wayback_first: false
 
-  # Archive.org becomes unreliable when a large primary batch opens too many
-  # snapshot requests at once. Keep this host below the shared default so the
-  # CDX-cached fast path succeeds during the primary pass instead of creating a
-  # large transient recovery queue.
+  # Keep provider concurrency conservative. Four rendered requests in parallel
+  # materially reduce wall time without creating a large transient recovery
+  # queue; archive fallback shares this same bounded course semaphore.
   max_parallel_fetch: 4
 
   # Only transient archive/network failures enter recovery. URLs with no
