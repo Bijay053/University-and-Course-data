@@ -621,6 +621,21 @@ interface RegressionAlert {
   resolved_at: string | null;
 }
 
+interface DiscoveryDeliveryAlert {
+  id: number;
+  universityId: number;
+  universityName: string;
+  candidatesFound: number;
+  deliveryStatus: "failed" | "pending" | "disabled" | "not_configured";
+  deliveryAttempts: number;
+  deliveryDetail: {
+    transports?: Record<string, { success: boolean; detail: string }>;
+    error?: string;
+  } | null;
+  deliveryAttemptedAt: string | null;
+  createdAt: string | null;
+}
+
 const ALERT_TYPE_LABELS: Record<string, string> = {
   course_count_drop:     "Course Count Drop",
   overall_health_drop:   "Overall Health Drop",
@@ -3139,6 +3154,8 @@ export default function SettingsScraperConfigs() {
   const [loading, setLoading] = useState(true);
   const [healthData, setHealthData] = useState<Record<string, UniversityHealth>>({});
   const [regressionAlerts, setRegressionAlerts]   = useState<Record<string, RegressionAlert[]>>({});
+  const [failedDeliveryAlerts, setFailedDeliveryAlerts] = useState<DiscoveryDeliveryAlert[]>([]);
+  const [retryingDeliveryAlert, setRetryingDeliveryAlert] = useState<number | null>(null);
   const [repairSuggestions, setRepairSuggestions] = useState<Record<string, AutoRepairSuggestion[]>>({});
   const [repairEvidenceOpen, setRepairEvidenceOpen] = useState<Record<number, boolean>>({});
   const [repairApplying, setRepairApplying] = useState<Record<number, boolean>>({});
@@ -3244,6 +3261,10 @@ export default function SettingsScraperConfigs() {
       const data = await res.json();
       const cfgs: ConfigEntry[] = data.configs ?? [];
       setConfigs(cfgs);
+      fetchWithAuth(`${BASE}/api/settings/discovery-failure-alerts?delivery_status=failed,pending,disabled,not_configured`)
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d?.alerts) setFailedDeliveryAlerts(d.alerts as DiscoveryDeliveryAlert[]); })
+        .catch(() => { /* delivery alerts are non-critical */ });
       // Fire-and-forget health + alerts fetch for all linked universities
       const ids = cfgs.map(c => c.university_id).filter((id): id is number => id != null);
       if (ids.length > 0) {
@@ -3265,6 +3286,39 @@ export default function SettingsScraperConfigs() {
       toast({ title: "Failed to load configs", description: (err as Error).message, variant: "destructive" });
     } finally {
       setLoading(false);
+    }
+  }, [toast]);
+
+  const retryAlertDelivery = useCallback(async (alertId: number) => {
+    setRetryingDeliveryAlert(alertId);
+    try {
+      const res = await fetchWithAuth(
+        `${BASE}/api/settings/discovery-failure-alerts/${alertId}/retry`,
+        { method: "POST" },
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail ?? "Retry failed");
+      if (data.deliveryStatus !== "delivered") {
+        setFailedDeliveryAlerts(current =>
+          current.map(alert => alert.id === alertId ? data : alert),
+        );
+        toast({
+          title: "Alert was not delivered",
+          description: data.deliveryStatus === "disabled"
+            ? "Notifications are currently disabled."
+            : data.deliveryStatus === "not_configured"
+              ? "No Slack or email transport is configured."
+              : "No configured notification transport accepted the alert.",
+          variant: "destructive",
+        });
+      } else {
+        setFailedDeliveryAlerts(current => current.filter(alert => alert.id !== alertId));
+        toast({ title: "Alert delivered", description: `Notification sent for ${data.universityName}.` });
+      }
+    } catch (err) {
+      toast({ title: "Could not retry alert", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setRetryingDeliveryAlert(null);
     }
   }, [toast]);
 
@@ -4001,6 +4055,53 @@ export default function SettingsScraperConfigs() {
       </div>
 
       <SettingsTabs />
+
+      {failedDeliveryAlerts.length > 0 && (
+        <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-950">
+          <div className="flex items-start gap-3">
+            <ShieldAlert className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-700" />
+            <div className="min-w-0 flex-1">
+              <h2 className="font-semibold">
+                {failedDeliveryAlerts.length} discovery alert notification{failedDeliveryAlerts.length === 1 ? " was" : "s were"} not delivered
+              </h2>
+              <p className="mt-0.5 text-sm text-red-800">
+                The alerts are saved, but operators were not notified through Slack or email.
+              </p>
+              <div className="mt-3 space-y-2">
+                {failedDeliveryAlerts.map(alert => {
+                  const pendingRecently = alert.deliveryStatus === "pending"
+                    && alert.deliveryAttemptedAt != null
+                    && Date.now() - new Date(alert.deliveryAttemptedAt).getTime() < 30_000;
+                  const transportDetails = Object.entries(alert.deliveryDetail?.transports ?? {})
+                    .map(([name, result]) => `${name}: ${result.detail}`)
+                    .join(" · ");
+                  return (
+                    <div key={alert.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-red-200 bg-white/70 px-3 py-2">
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium">{alert.universityName}</div>
+                        <div className="truncate text-xs text-red-700">
+                          {alert.deliveryStatus === "pending" ? "Delivery pending" : `Attempt ${alert.deliveryAttempts}`}
+                          {transportDetails ? ` · ${transportDetails}` : ""}
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-red-300 bg-white hover:bg-red-100"
+                        disabled={retryingDeliveryAlert === alert.id || pendingRecently}
+                        onClick={() => void retryAlertDelivery(alert.id)}
+                      >
+                        <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", retryingDeliveryAlert === alert.id && "animate-spin")} />
+                        {pendingRecently ? "Sending…" : "Retry delivery"}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-4 h-[calc(100vh-280px)] min-h-[500px]">
         {/* Left sidebar — config list */}

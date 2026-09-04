@@ -31,6 +31,10 @@ def test_discovery_failure_alert_model_importable() -> None:
     assert "created_at" in columns
     assert "resolved_at" in columns
     assert "resolved_by" in columns
+    assert "delivery_status" in columns
+    assert "delivery_attempts" in columns
+    assert "delivery_detail" in columns
+    assert "delivery_attempted_at" in columns
 
 
 def test_discovery_failure_alert_in_models_init() -> None:
@@ -70,6 +74,7 @@ def test_deliver_discovery_failure_alert_calls_slack(monkeypatch) -> None:
 
     def _fake_slack(url, subject, body):
         calls.append((url, subject, body))
+        return {"success": True, "detail": "ok"}
 
     monkeypatch.setattr(ad, "_send_slack_raw", _fake_slack)
 
@@ -87,6 +92,48 @@ def test_deliver_discovery_failure_alert_calls_slack(monkeypatch) -> None:
     assert "Bond University" in subject
     assert "1 candidate" in subject
     assert "bond.edu.au" in body
+
+
+def test_discovery_delivery_records_all_configured_transport_failures(monkeypatch) -> None:
+    import app.services.scraper.alert_delivery as ad
+
+    monkeypatch.setattr(ad, "SLACK_WEBHOOK_URL", "https://hooks.slack.invalid/fake")
+    monkeypatch.setattr(ad, "ALERT_EMAIL_TO", "ops@example.test")
+    monkeypatch.setattr(ad, "SMTP_HOST", "smtp.invalid")
+    monkeypatch.setattr(
+        ad, "_send_slack_raw",
+        lambda *args: {"success": False, "detail": "Slack unavailable"},
+    )
+    monkeypatch.setattr(
+        ad, "_send_email",
+        lambda **kwargs: {"success": False, "detail": "SMTP unavailable"},
+    )
+
+    result = ad.deliver_discovery_failure_alert(
+        uni_name="Test University", uni_id=99,
+        scrape_url="https://test.example/courses", candidates_found=0,
+        diagnostic={"job_id": "job-test"},
+    )
+
+    assert result["status"] == "failed"
+    assert result["transports"]["slack"]["success"] is False
+    assert result["transports"]["email"]["success"] is False
+
+
+def test_discovery_delivery_reports_no_configured_transport(monkeypatch) -> None:
+    import app.services.scraper.alert_delivery as ad
+
+    monkeypatch.setattr(ad, "SLACK_WEBHOOK_URL", None)
+    monkeypatch.setattr(ad, "ALERT_EMAIL_TO", None)
+    monkeypatch.setattr(ad, "SMTP_HOST", "")
+
+    result = ad.deliver_discovery_failure_alert(
+        uni_name="Test University", uni_id=99,
+        scrape_url="https://test.example/courses", candidates_found=0,
+        diagnostic={},
+    )
+
+    assert result == {"status": "not_configured", "transports": {}}
 
 
 @pytest.mark.asyncio
@@ -109,7 +156,10 @@ async def test_discovery_failure_alert_uses_runtime_job_id_and_delivers(
     monkeypatch.setattr(
         alert_delivery,
         "deliver_discovery_failure_alert",
-        lambda **kwargs: delivered.append(kwargs),
+        lambda **kwargs: (
+            delivered.append(kwargs)
+            or {"status": "delivered", "transports": {"test": {"success": True}}}
+        ),
     )
 
     async def _run_inline(function, *args, **kwargs):
@@ -144,6 +194,8 @@ async def test_discovery_failure_alert_uses_runtime_job_id_and_delivers(
     persisted = db.add.call_args.args[0]
     assert persisted.diagnostic["job_id"] == "stable-runtime-job"
     assert persisted.candidates_found == candidates_found
+    assert persisted.delivery_attempts == 1
+    assert persisted.delivery_attempted_at is not None
     assert delivered[0]["diagnostic"]["job_id"] == "stable-runtime-job"
     assert delivered[0]["candidates_found"] == candidates_found
 

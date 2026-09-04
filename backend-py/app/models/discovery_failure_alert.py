@@ -29,6 +29,16 @@ class DiscoveryFailureAlert(Base):
     )
     candidates_found: Mapped[int] = mapped_column(Integer, nullable=False)
     diagnostic: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    delivery_status: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="pending"
+    )
+    delivery_attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0"
+    )
+    delivery_detail: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    delivery_attempted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

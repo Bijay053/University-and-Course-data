@@ -21,7 +21,7 @@ import ssl
 import urllib.request
 import urllib.error
 from email.message import EmailMessage
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from app.models.scrape_run_alert import ScrapeRunAlert
@@ -113,7 +113,7 @@ def deliver_discovery_failure_alert(
     scrape_url: str,
     candidates_found: int,
     diagnostic: dict,
-) -> None:
+) -> dict[str, Any]:
     """Fire-and-forget Slack/email when discovery yields < 3 candidates.
 
     Wraps the raw transport helpers so the orchestrator can call this with
@@ -145,13 +145,22 @@ def deliver_discovery_failure_alert(
 
     if not _notifications_enabled():
         log.info("[ALERT DELIVERY] ALERTS_NOTIFICATION_ENABLED=false — muting discovery-failure alert")
-        return
+        return {"status": "disabled", "transports": {}}
 
+    transports: dict[str, dict[str, str | bool]] = {}
     if SLACK_WEBHOOK_URL:
-        _send_slack_raw(SLACK_WEBHOOK_URL, subject, body)
+        transports["slack"] = _send_slack_raw(SLACK_WEBHOOK_URL, subject, body)
 
     if ALERT_EMAIL_TO and SMTP_HOST:
-        _send_email(to=ALERT_EMAIL_TO, subject=subject, body=body)
+        transports["email"] = _send_email(to=ALERT_EMAIL_TO, subject=subject, body=body)
+
+    if not transports:
+        return {"status": "not_configured", "transports": {}}
+    succeeded = any(result["success"] for result in transports.values())
+    return {
+        "status": "delivered" if succeeded else "failed",
+        "transports": transports,
+    }
 
 
 def deliver_drift_alert(
@@ -219,7 +228,9 @@ def deliver_drift_alert(
         _send_email(to=ALERT_EMAIL_TO, subject=subject, body=body)
 
 
-def _send_slack_raw(webhook_url: str, subject: str, body: str) -> None:
+def _send_slack_raw(
+    webhook_url: str, subject: str, body: str
+) -> dict[str, str | bool]:
     """Post an arbitrary text message to Slack."""
     payload = json.dumps({"text": f"*{subject}*\n```{body}```"}).encode()
     req = urllib.request.Request(
@@ -231,15 +242,21 @@ def _send_slack_raw(webhook_url: str, subject: str, body: str) -> None:
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
             status = resp.status
+        if not 200 <= status < 300:
+            detail = f"HTTP {status}"
+            log.warning("[ALERT DELIVERY] Slack failed: %s", detail)
+            return {"success": False, "detail": detail}
         log.info("[ALERT DELIVERY] Slack OK (HTTP %s)", status)
-    except urllib.error.URLError as exc:
+        return {"success": True, "detail": f"HTTP {status}"}
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
         log.warning("[ALERT DELIVERY] Slack failed: %s", exc)
+        return {"success": False, "detail": str(exc)[:500]}
 
 
-def _send_email(to: str, subject: str, body: str) -> None:
+def _send_email(to: str, subject: str, body: str) -> dict[str, str | bool]:
     if not SMTP_HOST:
         log.debug("[ALERT DELIVERY] SMTP_HOST not set — skipping email")
-        return
+        return {"success": False, "detail": "SMTP_HOST not configured"}
     msg = EmailMessage()
     msg["From"] = SMTP_FROM
     msg["To"] = to
@@ -254,5 +271,7 @@ def _send_email(to: str, subject: str, body: str) -> None:
                 smtp.login(SMTP_USER, SMTP_PASSWORD)
             smtp.send_message(msg)
         log.info("[ALERT DELIVERY] email sent to %s", to)
+        return {"success": True, "detail": f"sent to {to}"}
     except Exception as exc:  # noqa: BLE001
         log.warning("[ALERT DELIVERY] email failed: %s", exc)
+        return {"success": False, "detail": str(exc)[:500]}

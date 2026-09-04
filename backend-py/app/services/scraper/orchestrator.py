@@ -16,7 +16,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -64,20 +64,56 @@ async def _persist_and_deliver_discovery_failure_alert(
     from app.services.scraper.alert_delivery import deliver_discovery_failure_alert
 
     diagnostic["job_id"] = str(job.runtime_job_id)
-    db.add(DiscoveryFailureAlert(
+    alert = DiscoveryFailureAlert(
         university_id=uni_id,
         candidates_found=candidates_found,
         diagnostic=diagnostic,
-    ))
+        delivery_attempts=1,
+        delivery_attempted_at=datetime.now(timezone.utc),
+    )
+    db.add(alert)
     await db.commit()
-    asyncio.create_task(asyncio.to_thread(
-        deliver_discovery_failure_alert,
-        uni_name=uni_name,
-        uni_id=uni_id,
-        scrape_url=scrape_url,
-        candidates_found=candidates_found,
-        diagnostic=diagnostic,
-    ))
+
+    async def _deliver_and_record() -> None:
+        from app.database import AsyncSessionLocal
+
+        try:
+            result = await asyncio.to_thread(
+                deliver_discovery_failure_alert,
+                uni_name=uni_name,
+                uni_id=uni_id,
+                scrape_url=scrape_url,
+                candidates_found=candidates_found,
+                diagnostic=diagnostic,
+            )
+            if not isinstance(result, dict) or "status" not in result:
+                result = {
+                    "status": "failed",
+                    "transports": {},
+                    "error": "delivery helper returned no outcome",
+                }
+        except Exception as exc:  # delivery state must survive unexpected helpers
+            log.exception("Discovery failure alert delivery crashed")
+            result = {
+                "status": "failed",
+                "transports": {},
+                "error": str(exc)[:500],
+            }
+        async with AsyncSessionLocal() as delivery_db:
+            await delivery_db.execute(
+                update(DiscoveryFailureAlert)
+                .where(
+                    DiscoveryFailureAlert.id == alert.id,
+                    DiscoveryFailureAlert.delivery_attempts == 1,
+                )
+                .values(
+                    delivery_status=str(result["status"]),
+                    delivery_detail=result,
+                )
+            )
+            await delivery_db.commit()
+
+    asyncio.create_task(_deliver_and_record())
 
 
 def _extraction_failure_details(
