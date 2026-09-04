@@ -69,6 +69,42 @@ def test_domestic_or_ambiguous_fee_meta_does_not_trigger_international_prepass()
     )
 
 
+def test_domestic_only_meta_blocks_early_dated_csp_fee_under_strict_context():
+    cfg = UniConfig(
+        slug="rmit",
+        name="RMIT University",
+        base_url="https://www.rmit.edu.au",
+        scrape_url="https://www.rmit.edu.au",
+        extraction={
+            "fees": {
+                "require_explicit_international_context": True,
+            }
+        },
+    )
+    html = """
+    <head>
+      <meta name="fees_domestic" content="Commonwealth Supported Places">
+    </head>
+    <body>
+      <p>2027 Education and Nursing student contribution amount:
+      $4,908 per standard year.</p>
+    </body>
+    """
+    token = current_uni_config.set(cfg)
+    try:
+        out = _run(
+            fee.extract(
+                html,
+                "https://www.rmit.edu.au/study-with-us/example",
+                country="Australia",
+            )
+        )
+    finally:
+        current_uni_config.reset(token)
+
+    assert out == []
+
+
 def test_leeds_beckett_reads_international_tab_not_active_uk_fee():
     html = """
     <section id="fees-and-funding-component">

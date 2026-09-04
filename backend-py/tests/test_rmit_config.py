@@ -20,7 +20,12 @@ def test_rmit_verified_discovery_cannot_be_replaced_by_stale_ai_admin_rules():
             "discovery": {
                 "skip_sitemap_fallback": True,
                 "static_course_urls_file": "wrong-library-pages.txt",
-            }
+            },
+            "extraction": {
+                "fees": {
+                    "require_explicit_international_context": False,
+                }
+            },
         },
         "admin_config": {
             "discovery": {
@@ -30,7 +35,12 @@ def test_rmit_verified_discovery_cannot_be_replaced_by_stale_ai_admin_rules():
                 ],
                 "skip_sitemap_fallback": True,
                 "bfs_page_budget": 99,
-            }
+            },
+            "extraction": {
+                "fees": {
+                    "require_explicit_international_context": False,
+                }
+            },
         },
     })
 
@@ -42,6 +52,7 @@ def test_rmit_verified_discovery_cannot_be_replaced_by_stale_ai_admin_rules():
     assert config.discovery.skip_browser_discovery is True
     assert config.discovery.bfs_page_budget == 0
     assert config.discovery.static_course_urls_file is None
+    assert config.extraction.fees.require_explicit_international_context is True
 
 
 def test_rmit_detail_pattern_accepts_main_awards_and_rejects_online_children():

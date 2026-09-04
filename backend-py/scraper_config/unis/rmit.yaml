@@ -3,6 +3,7 @@
 # use the sitemap and require the institution's trailing award code.
 locked_config_paths:
   - discovery
+  - extraction.fees.require_explicit_international_context
 discovery:
   sitemap_url: "https://www.rmit.edu.au/study-with-us/sitemap.xml"
   always_sitemap_supplement: true
@@ -17,6 +18,8 @@ discovery:
   block_url_patterns:
     - '/levels-of-study/online/'
 extraction:
+  fees:
+    require_explicit_international_context: true
   filters:
     domestic_only:
       enabled: false

@@ -105,6 +105,39 @@ def _extract_explicit_international_fee_meta(
     return None
 
 
+def _has_domestic_only_fee_meta(html: str) -> bool:
+    """Return True when structured metadata declares only a domestic fee."""
+    if not html or "fees_domestic" not in html.lower():
+        return False
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "html.parser")
+        names = {
+            re.sub(r"[-\s]+", "_", str(meta.get("name") or "").strip().lower())
+            for meta in soup.find_all("meta")
+        }
+        domestic = bool(
+            names
+            & {
+                "fees_domestic",
+                "domestic_fee",
+                "domestic_fees",
+            }
+        )
+        international = bool(
+            names
+            & {
+                "fees_international",
+                "international_fee",
+                "international_fees",
+            }
+        )
+        return domestic and not international
+    except Exception:  # noqa: BLE001 — malformed metadata must not break extraction
+        return False
+
+
 _SALARY_CTX = re.compile(
     r"\b(salary|salaries|earn|earning|earnings|wage|wages|income|"
     r"starting\s+pay|graduate\s+(?:salary|outcomes?|income))\b",
@@ -2294,6 +2327,12 @@ async def extract(
                 method="fee.explicit_international_meta",
             )
         ]
+    if require_explicit_intl_context and _has_domestic_only_fee_meta(html):
+        # The page's structured audience contract publishes only a domestic
+        # fee. Do not let generic body scanning select embedded CSP schedules,
+        # related-course cards, scholarships, or pathway fees as this course's
+        # international tuition.
+        return []
 
     latest_dated_fee = _select_latest_explicit_dated_fee(
         html,
