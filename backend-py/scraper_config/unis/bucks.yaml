@@ -59,6 +59,12 @@ extraction:
   fees:
     default_currency: GBP
     prefer_international: true
+    # BNU's official 2026/27 international guidance publishes £15,910/year
+    # as the typical undergraduate tuition. Course pages for pilot programmes
+    # may expose only separate £50k–£60k licensing/training costs; those are
+    # rejected by the shared fee extractor and this fill-only fallback applies.
+    degree_level_defaults:
+      undergraduate: 15910
   english:
     central_page: "https://www.bucks.ac.uk/study/general-entry-requirements"
     default_ielts: 6.0

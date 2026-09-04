@@ -88,6 +88,14 @@ _SCHOLARSHIP_CTX = re.compile(
     r"\b(scholarships?|bursar(?:y|ies)|discounts?|waivers?|prizes?|awards?|grants?|reductions?)\b",
     re.IGNORECASE,
 )
+_ADDITIONAL_TRAINING_COST_CTX = re.compile(
+    r"\b(?:additional|extra|further|another)\b.{0,100}\b"
+    r"(?:licen[cs]es?|ratings?|flight\s+training|flying\s+costs?|"
+    r"pilot\s+training|overall\s+training\s+cost)\b|"
+    r"\b(?:flight|flying|pilot)\s+training\s+(?:costs?|fees?)\b|"
+    r"\b(?:CPL|MER|UPRT|APS\s+MCC)\b",
+    re.IGNORECASE,
+)
 
 
 def _selected_amount_is_scholarship(amount: int, ctx: str) -> bool:
@@ -112,6 +120,25 @@ def _selected_amount_is_scholarship(amount: int, ctx: str) -> bool:
         right = min(right_candidates, default=len(ctx))
         clause = ctx[left + 1 : right]
         if _SCHOLARSHIP_CTX.search(clause):
+            return True
+    return False
+
+
+def _selected_amount_is_additional_training_cost(amount: int, ctx: str) -> bool:
+    """Reject extra professional training/licensing costs near the amount."""
+    separators = ".!?;\n"
+    for match in _AMOUNT_RE.finditer(ctx):
+        raw_amount = match.group(2) or match.group(3)
+        if _parse_amount(raw_amount) != amount:
+            continue
+        left = max(ctx.rfind(char, 0, match.start()) for char in separators)
+        right_candidates = [
+            pos
+            for char in separators
+            if (pos := ctx.find(char, match.end())) != -1
+        ]
+        right = min(right_candidates, default=len(ctx))
+        if _ADDITIONAL_TRAINING_COST_CTX.search(ctx[left + 1 : right]):
             return True
     return False
 # Full-course-total context — strongly prefer over annual / per-year amounts
@@ -1238,6 +1265,7 @@ def _select_latest_explicit_dated_fee(
             and _INTL_CTX.search(clause)
             and re.search(r"\btuition\b|\bcost\s+of\s+study\b", clause, re.IGNORECASE)
             and not _SCHOLARSHIP_CTX.search(clause)
+            and not _ADDITIONAL_TRAINING_COST_CTX.search(clause)
             and not _CSP_DOMESTIC_CTX.search(clause)
             and not _DOMESTIC_FEE_LABEL_CTX.search(clause)
             and not non_tuition_charge.search(clause)
@@ -2634,6 +2662,7 @@ async def extract(
         if (
             _CSP_DOMESTIC_CTX.search(structural_ctx)
             or _SCHOLARSHIP_CTX.search(structural_ctx)
+            or _ADDITIONAL_TRAINING_COST_CTX.search(structural_ctx)
             or _DOMESTIC_FEE_LABEL_CTX.search(structural_ctx)
             or (
                 require_explicit_intl_context
@@ -2728,6 +2757,8 @@ async def extract(
     # labelled tuition structures are handled by the higher-authority passes
     # above, so failing closed here protects generic text fallback pages.
     if _selected_amount_is_scholarship(amount, ctx):
+        return []
+    if _selected_amount_is_additional_training_cost(amount, ctx):
         return []
     if require_explicit_intl_context and not (
         _INTL_CTX.search(ctx) and _TUITION_CTX.search(ctx)

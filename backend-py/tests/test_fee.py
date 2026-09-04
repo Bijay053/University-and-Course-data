@@ -924,6 +924,60 @@ def test_une_travelling_scholarship_is_never_tuition():
     assert out == []
 
 
+def test_additional_pilot_licensing_cost_never_overrides_tuition():
+    html = """
+    <main>
+      <p>International tuition fee £15,910 per year.</p>
+      <p>To become airline-ready, students must also complete further licences
+      or ratings such as CPL, MER, IR, UPRT, and APS MCC, which typically add
+      another £50,000-£60,000 to the overall training cost.</p>
+    </main>
+    """
+
+    out = _run(
+        fee.extract(
+            html,
+            "https://www.bucks.ac.uk/courses/undergraduate/"
+            "bsc-hons-aviation-management-commercial-pilot-training-helicopters",
+            country="United Kingdom",
+        )
+    )
+
+    assert out
+    assert out[0].normalized["international_fee"] == 15_910
+
+
+def test_additional_pilot_licensing_cost_alone_is_not_tuition():
+    html = """
+    <p>Students must complete further licences and ratings such as CPL, MER,
+    IR, UPRT, and APS MCC, which add another £50,000-£60,000 to the overall
+    training cost.</p>
+    """
+
+    out = _run(
+        fee.extract(
+            html,
+            "https://www.bucks.ac.uk/courses/undergraduate/pilot-training",
+            country="United Kingdom",
+        )
+    )
+
+    assert out == []
+
+
+def test_bucks_config_falls_back_to_published_undergraduate_tuition():
+    from app.services.scraper.config.loader import load_uni_config
+
+    cfg = load_uni_config(
+        slug="bucks",
+        scrape_url="https://www.bucks.ac.uk",
+        university_id=None,
+        name="Buckinghamshire New University",
+    )
+
+    assert cfg.extraction.fees.degree_level_defaults["undergraduate"] == 15_910
+
+
 def test_csp_acronym_fee_is_never_international_tuition():
     html = """
     <main>
