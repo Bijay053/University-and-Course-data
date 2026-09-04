@@ -6595,49 +6595,6 @@ async def extract_course(
                         _uel_raw_loc, _uel_norm_loc, url,
                     )
 
-        # ── Title-based "Online Learning" belt-and-suspenders (Bug 2 fix) ──────
-        # When a course title explicitly contains "Online Learning" or "Fully
-        # Online", the course is unambiguously online regardless of what the
-        # study_mode rule, location_derived heuristic, or ai_fallback said.
-        # This fires AFTER all other study_mode logic so it overrides even
-        # rule:study_mode structural protection (the course's own name is the
-        # most authoritative signal available).
-        #
-        # Affected cases: Malaysian university fee tables whose "Campus" column
-        # header triggers study_mode:rule → "On Campus", then structural
-        # protection blocks Gemini from overriding with the correct "Online"
-        # value it reads from the course title ("MBA (Online Learning)").
-        _cn_for_online = (payload.get("course_name") or "").lower()
-        _ONLINE_TITLE_SIGNALS = (
-            "online learning",
-            "fully online",
-            "100% online",
-            "online only",
-            "distance learning",
-            "distance education",
-        )
-        if any(sig in _cn_for_online for sig in _ONLINE_TITLE_SIGNALS):
-            _prev_mode = payload.get("study_mode")
-            if _prev_mode != "Online":
-                payload["study_mode"] = "Online"
-                evidence.append({
-                    "field_key": "study_mode",
-                    "value": "Online",
-                    "confidence": 0.90,
-                    "method": "study_mode:title_keyword",
-                    "snippet": (
-                        f"Course title contains online keyword — overriding "
-                        f"{_prev_mode!r}: {(payload.get('course_name') or '')[:80]}"
-                    ),
-                })
-                log.info(
-                    "[STUDY_MODE TITLE] course=%r — title keyword → 'Online' "
-                    "(was %r) for %s",
-                    payload.get("course_name") or url,
-                    _prev_mode,
-                    url,
-                )
-
         # ── CQU JSON-block authoritative override (2026-05-11) ──
         # CQU is a NextJS / Sitecore site that ships every course's
         # canonical AIMSData inside __NEXT_DATA__. The text-strip wipes
@@ -6981,6 +6938,42 @@ async def extract_course(
             url,
             _embedded_eng_exc,
         )
+
+    # ── Explicit online title authority ──────────────────────────────────────
+    # Run outside the optional AI branch and after all extraction/fallback
+    # logic. A course's own title is more authoritative than campus-derived
+    # heuristics when it explicitly says Online Mode/Learning.
+    _cn_for_online = (payload.get("course_name") or "").lower()
+    _ONLINE_TITLE_SIGNALS = (
+        "online learning",
+        "online mode",
+        "fully online",
+        "100% online",
+        "online only",
+        "distance learning",
+        "distance education",
+    )
+    if any(sig in _cn_for_online for sig in _ONLINE_TITLE_SIGNALS):
+        _prev_mode = payload.get("study_mode")
+        if _prev_mode != "Online":
+            payload["study_mode"] = "Online"
+            evidence.append({
+                "field_key": "study_mode",
+                "value": "Online",
+                "confidence": 0.90,
+                "method": "study_mode:title_keyword",
+                "snippet": (
+                    f"Course title contains online keyword — overriding "
+                    f"{_prev_mode!r}: {(payload.get('course_name') or '')[:80]}"
+                ),
+            })
+            log.info(
+                "[STUDY_MODE TITLE] course=%r — title keyword → 'Online' "
+                "(was %r) for %s",
+                payload.get("course_name") or url,
+                _prev_mode,
+                url,
+            )
 
     # ── Study-mode field trace ────────────────────────────────────────────────
     # Emits a single diagnostic event so operators can follow the mode value
