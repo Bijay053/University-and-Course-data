@@ -69,6 +69,42 @@ def _parse_amount(raw: str) -> int | None:
         return None
 
 
+def _extract_explicit_international_fee_meta(
+    html: str,
+) -> tuple[int, str] | None:
+    """Read an explicitly international fee from structured page metadata.
+
+    Some course templates publish authoritative audience-specific values in
+    ``<meta name="fees_international" content="...">`` while the visible body
+    also embeds domestic CSP tables and incidental charges. The metadata name
+    is an unambiguous audience contract, so it must outrank body-text scoring.
+    """
+    if not html or "fee" not in html.lower() or "international" not in html.lower():
+        return None
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "html.parser")
+        for meta in soup.find_all("meta"):
+            name = re.sub(r"[-\s]+", "_", str(meta.get("name") or "").strip().lower())
+            if name not in {
+                "fees_international",
+                "international_fee",
+                "international_fees",
+            }:
+                continue
+            content = str(meta.get("content") or "").strip()
+            match = _AMOUNT_RE.search(content)
+            if not match:
+                continue
+            amount = _parse_amount(match.group(2) or match.group(3) or "")
+            if amount is not None and amount > 0:
+                return amount, content
+    except Exception:  # noqa: BLE001 — malformed metadata must not break extraction
+        return None
+    return None
+
+
 _SALARY_CTX = re.compile(
     r"\b(salary|salaries|earn|earning|earnings|wage|wages|income|"
     r"starting\s+pay|graduate\s+(?:salary|outcomes?|income))\b",
@@ -2237,6 +2273,27 @@ async def extract(
     except Exception:  # noqa: BLE001 — defensive; keep extractor working
         prefer_yr1 = False
         require_explicit_intl_context = False
+
+    metadata_fee = _extract_explicit_international_fee_meta(html)
+    if metadata_fee is not None:
+        amount, ctx = metadata_fee
+        return [
+            ExtractionResult(
+                field_key="international_fee",
+                value=amount,
+                normalized={
+                    "international_fee": amount,
+                    "currency": _detect_currency(ctx, country),
+                    "fee_term": _normalize_fee_term(
+                        ctx, prefer_year_one=prefer_yr1
+                    ),
+                    "fee_year": _extract_year(ctx),
+                },
+                confidence=0.99,
+                snippet=ctx[:240],
+                method="fee.explicit_international_meta",
+            )
+        ]
 
     latest_dated_fee = _select_latest_explicit_dated_fee(
         html,

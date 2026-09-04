@@ -27,6 +27,48 @@ def _run(coro):
     return asyncio.run(coro)
 
 
+def test_explicit_international_fee_meta_beats_domestic_csp_body_amounts():
+    html = """
+    <head>
+      <meta content="AU$47,040 (2027 annual)" name="fees_international">
+      <meta content="AU$38,400 (2027 annual)" name="fees_domestic">
+    </head>
+    <body>
+      <p>2027 Commonwealth supported places range from AU$4,908 to AU$18,025.</p>
+    </body>
+    """
+    out = _run(
+        fee.extract(
+            html,
+            "https://www.rmit.edu.au/study-with-us/example-mc292",
+            country="Australia",
+        )
+    )
+    assert len(out) == 1
+    assert out[0].normalized == {
+        "international_fee": 47040,
+        "currency": "AUD",
+        "fee_term": "Annual",
+        "fee_year": 2027,
+    }
+    assert out[0].method == "fee.explicit_international_meta"
+    assert out[0].confidence == 0.99
+
+
+def test_domestic_or_ambiguous_fee_meta_does_not_trigger_international_prepass():
+    html = """
+    <head>
+      <meta name="fees_domestic" content="AU$8,000 (2027 annual)">
+      <meta name="course_fee" content="AU$9,000 (2027 annual)">
+    </head>
+    <body><p>Domestic tuition fees are AU$8,000 annually.</p></body>
+    """
+    out = _run(fee.extract(html, "https://example.edu/course"))
+    assert not any(
+        result.method == "fee.explicit_international_meta" for result in out
+    )
+
+
 def test_leeds_beckett_reads_international_tab_not_active_uk_fee():
     html = """
     <section id="fees-and-funding-component">
