@@ -70,7 +70,7 @@ def test_rmit_detail_pattern_accepts_main_awards_and_rejects_online_children():
 
     def matches(url: str) -> bool:
         path = urlparse(url).path
-        return any(pattern.search(path) for pattern in patterns)
+        return any(pattern.search(url) and pattern.search(path) for pattern in patterns)
 
     assert matches(urls["undergraduate"])
     assert matches(urls["postgraduate"])
