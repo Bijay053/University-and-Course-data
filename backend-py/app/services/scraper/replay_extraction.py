@@ -95,22 +95,45 @@ def _diff_course(old: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
     return changes
 
 
-async def _continuation_chain(
+async def continuation_review_scope(
     db: AsyncSession,
     job_id: str,
     *,
     max_depth: int = 20,
-) -> tuple[list[str], int | None]:
-    """Return current→ancestor job IDs from explicit retrySourceJobId links."""
+) -> tuple[list[str], int | None, set[int], bool]:
+    """Return review rows plus whether every job performed full discovery."""
     job = await db.get(ScrapeRuntimeJob, job_id)
     if job is None:
-        return [], None
+        return [], None, set(), False
     university_id = job.university_id
     chain = [job_id]
     seen = {job_id}
+    resume_course_ids: set[int] = set()
+    full_catalogue_scope = True
     current = job
     for _ in range(max_depth):
         payload = current.request_payload or {}
+        raw_resume_ids = payload.get("resumeCourseIds")
+        if isinstance(raw_resume_ids, list):
+            resume_course_ids.update(
+                raw_id for raw_id in raw_resume_ids[:5000]
+                if isinstance(raw_id, int)
+                and not isinstance(raw_id, bool)
+                and raw_id > 0
+            )
+        targeted_values = (
+            payload.get("courseUrls"),
+            payload.get("course_urls"),
+            payload.get("repair_targets"),
+            payload.get("repairTargets"),
+            payload.get("resumeCourseIds"),
+        )
+        if (
+            getattr(current, "job_type", None)
+            not in {"single", "bulk", "full", "scrape", "university_full"}
+            or any(bool(value) for value in targeted_values)
+        ):
+            full_catalogue_scope = False
         parent_id = payload.get("retrySourceJobId")
         if not isinstance(parent_id, str):
             break
@@ -123,6 +146,19 @@ async def _continuation_chain(
         chain.append(parent_id)
         seen.add(parent_id)
         current = parent
+    return chain, university_id, resume_course_ids, full_catalogue_scope
+
+
+async def continuation_review_chain(
+    db: AsyncSession,
+    job_id: str,
+    *,
+    max_depth: int = 20,
+) -> tuple[list[str], int | None]:
+    """Return current→ancestor job IDs from explicit retrySourceJobId links."""
+    chain, university_id, _, _ = await continuation_review_scope(
+        db, job_id, max_depth=max_depth
+    )
     return chain, university_id
 
 
@@ -142,7 +178,7 @@ async def restore_review_rows(
     if own_db:
         db = AsyncSessionLocal()
     try:
-        chain, university_id = await _continuation_chain(db, job_id)
+        chain, university_id = await continuation_review_chain(db, job_id)
         if not chain:
             return {
                 "job_id": job_id, "chain_job_ids": [], "candidates": 0,

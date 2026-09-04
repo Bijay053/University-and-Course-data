@@ -78,6 +78,29 @@ type ScrapeStatusResponse = {
   awaitingApproval?: ApprovalSummary;
 };
 
+type RemovalCandidate = {
+  courseId: number;
+  courseName: string;
+  courseWebsite: string | null;
+  status: string;
+  decision: "remove" | "keep" | null;
+  decidedBy: string | null;
+  decidedAt: string | null;
+};
+
+type RemovalReconciliation = {
+  jobId: string;
+  ready: boolean;
+  fullCatalogueScope: boolean;
+  blockedReason: string | null;
+  warning: string | null;
+  stagedCount: number;
+  approvedLinkedCount: number;
+  rejectedOrUnlinkedCount: number;
+  duplicateLinkedCourseIds: number[];
+  courses: RemovalCandidate[];
+};
+
 type ScrapeLog = {
   event: string;
   message?: string;
@@ -676,6 +699,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   const [selectedIds, setSelectedIds] = useState<Set<number>>(
     () => new Set(initialReviewState?.courses.map((course) => course.id) ?? []),
   );
+  const [removalReconciliation, setRemovalReconciliation] = useState<RemovalReconciliation | null>(null);
+  const [removalDecisionId, setRemovalDecisionId] = useState<number | null>(null);
   const [scrapeUniName, setScrapeUniName] = useState("");
   const [scrapeTargetUrl, setScrapeTargetUrl] = useState("");
   const [stopping, setStopping] = useState(false);
@@ -1223,6 +1248,10 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         setShowReview(true);
         if (pending.length > 0) setLatestAvailableJobId(null);
         setSelectedIds(new Set(pending.map((c: StagedCourse) => c.id)));
+        fetch(`/api/scrape/jobs/${jobId}/removal-reconciliation`, { credentials: "include", cache: "no-store" })
+          .then((r) => r.ok ? r.json() : null)
+          .then((reconciliation: RemovalReconciliation | null) => setRemovalReconciliation(reconciliation))
+          .catch(() => setRemovalReconciliation(null));
         // Fire quality fetch in background — uses universityId from first course
         const uniId = pending[0]?.universityId;
         if (uniId) {
@@ -1240,6 +1269,43 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       }
     } catch {}
   }, []);
+
+  const refreshRemovalReconciliation = useCallback(async () => {
+    if (!reviewJobId) return;
+    const res = await fetch(`/api/scrape/jobs/${reviewJobId}/removal-reconciliation`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (res.ok) setRemovalReconciliation(await res.json());
+  }, [reviewJobId]);
+
+  useEffect(() => {
+    if (reviewJobId && stagedCourses.length === 0) void refreshRemovalReconciliation();
+  }, [reviewJobId, stagedCourses.length, refreshRemovalReconciliation]);
+
+  const handleRemovalDecision = async (courseId: number, decision: "remove" | "keep") => {
+    if (!reviewJobId) return;
+    setRemovalDecisionId(courseId);
+    try {
+      const res = await fetch(`/api/scrape/jobs/${reviewJobId}/removal-reconciliation/${courseId}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision }),
+      });
+      if (!res.ok) {
+        toast({ title: "Could not save removal decision", description: await getFetchErrorMessage(res), variant: "destructive" });
+      } else {
+        await refreshRemovalReconciliation();
+        toast({
+          title: decision === "remove" ? "Course marked inactive" : "Course kept active",
+          description: "The decision and scrape source were recorded.",
+        });
+      }
+    } finally {
+      setRemovalDecisionId(null);
+    }
+  };
 
   // Keep refs in sync so auto-complete handler can read current review state.
   useEffect(() => { showReviewRef.current = showReview; }, [showReview]);
@@ -2491,7 +2557,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         </div>
       </div>
 
-      {showReview && stagedCourses.length === 0 && selectedUni && selectedUni !== ALL && (
+      {showReview && stagedCourses.length === 0 && lastScrapeInfo?.staged === 0 && selectedUni && selectedUni !== ALL && (
         <Card className="border border-amber-200 bg-amber-50">
           <CardContent className="py-4 flex items-center justify-between gap-4">
             <div className="flex items-start gap-2">
@@ -2513,6 +2579,106 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
               {clearingRejected ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <XCircle className="w-3 h-3 mr-1" />}
               Clear rejected
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {showReview && removalReconciliation?.ready && (
+        <Card className="border-2 border-amber-200">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex flex-wrap items-center gap-2 text-lg">
+              <ShieldCheck className="w-5 h-5 text-amber-600" />
+              Reconcile courses missing from this scrape
+              <Badge className="bg-amber-100 text-amber-800">
+                {removalReconciliation.courses.filter((course) => course.decision === null).length} to review
+              </Badge>
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              These active live courses were not linked to an approved row from this scrape. Check each course before marking it inactive.
+              Nothing is deleted, and a later approval can reactivate it.
+            </p>
+            {removalReconciliation.warning && (
+              <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-2">
+                {removalReconciliation.warning}
+              </div>
+            )}
+            {(removalReconciliation.rejectedOrUnlinkedCount > 0 || removalReconciliation.duplicateLinkedCourseIds.length > 0) && (
+              <div className="text-xs text-gray-600">
+                Safety checks: {removalReconciliation.rejectedOrUnlinkedCount} rejected or unlinked staged row(s) were not treated as proof of presence
+                {removalReconciliation.duplicateLinkedCourseIds.length > 0
+                  ? `; ${removalReconciliation.duplicateLinkedCourseIds.length} duplicate linked course ID(s) were collapsed.`
+                  : "."}
+              </div>
+            )}
+          </CardHeader>
+          <CardContent>
+            {removalReconciliation.courses.length === 0 ? (
+              <p className="text-sm text-green-700">No active live courses are missing from this reviewed scrape.</p>
+            ) : (
+              <div className="border rounded-lg divide-y">
+                {removalReconciliation.courses.map((course) => (
+                  <div key={course.courseId} className="p-3 flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm">{course.courseName}</span>
+                        {course.courseWebsite && (
+                          <a href={course.courseWebsite} target="_blank" rel="noopener noreferrer" className="text-blue-500" title="Open live course page">
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+                      </div>
+                      {course.decision && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          {course.decision === "remove" ? "Marked inactive" : "Kept active"}
+                          {course.decidedBy ? ` by ${course.decidedBy}` : ""}
+                          {course.decidedAt ? ` on ${new Date(course.decidedAt).toLocaleString()}` : ""}
+                        </p>
+                      )}
+                    </div>
+                    {course.decision === null ? (
+                      <Can permission="staged.approve">
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={removalDecisionId === course.courseId}
+                            onClick={() => void handleRemovalDecision(course.courseId, "keep")}
+                          >
+                            Keep active
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600 border-red-200 hover:bg-red-50"
+                            disabled={removalDecisionId === course.courseId}
+                            onClick={() => void handleRemovalDecision(course.courseId, "remove")}
+                          >
+                            {removalDecisionId === course.courseId && <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />}
+                            Mark inactive
+                          </Button>
+                        </div>
+                      </Can>
+                    ) : (
+                      <Badge variant="outline" className={course.decision === "remove" ? "text-red-700" : "text-green-700"}>
+                        {course.decision === "remove" ? "Inactive" : "Active"}
+                      </Badge>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {showReview && removalReconciliation && !removalReconciliation.ready && stagedCourses.length === 0 && (
+        <Card className="border border-gray-200 bg-gray-50">
+          <CardContent className="py-4 flex items-start gap-2">
+            <Info className="w-5 h-5 text-gray-500 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-gray-800">Removal reconciliation is not available for this run</p>
+              <p className="text-xs text-gray-600 mt-1">{removalReconciliation.blockedReason}</p>
+            </div>
           </CardContent>
         </Card>
       )}

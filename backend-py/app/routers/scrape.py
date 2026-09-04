@@ -2266,45 +2266,18 @@ async def staged_one(
         # through retrySourceJobId, bounded and cycle-safe.  Unrelated older
         # scrapes remain excluded, preserving the exact-job scope for normal
         # standalone runs.
-        review_job_ids = [sc_id_or_job]
-        seen_job_ids = {sc_id_or_job}
-        resume_course_ids: set[int] = set()
-        chain_job = job
-        for _ in range(20):
-            payload = getattr(chain_job, "request_payload", None) or {}
-            raw_resume_ids = payload.get("resumeCourseIds")
-            if isinstance(raw_resume_ids, list):
-                for raw_id in raw_resume_ids[:5000]:
-                    if isinstance(raw_id, int) and not isinstance(raw_id, bool) and raw_id > 0:
-                        resume_course_ids.add(raw_id)
-            parent_job_id = payload.get("retrySourceJobId")
-            if not isinstance(parent_job_id, str):
-                break
-            parent_job_id = parent_job_id.strip()
-            if not parent_job_id or parent_job_id in seen_job_ids:
-                break
-            parent_job = await db.get(ScrapeRuntimeJob, parent_job_id)
-            if parent_job is None:
-                break
-            # Never aggregate across universities even if malformed request
-            # metadata points at an unrelated job.
-            if (
-                job is not None
-                and job.university_id is not None
-                and parent_job.university_id != job.university_id
-            ):
-                break
-            review_job_ids.append(parent_job_id)
-            seen_job_ids.add(parent_job_id)
-            chain_job = parent_job
+        from app.services.scraper.replay_extraction import continuation_review_scope
+        review_job_ids, scope_university_id, resume_course_ids, _ = (
+            await continuation_review_scope(db, sc_id_or_job)
+        )
 
         where_clause = ScrapedCourse.scrape_job_id.in_(review_job_ids)
-        if resume_course_ids and job is not None and job.university_id is not None:
+        if resume_course_ids and scope_university_id is not None:
             where_clause = or_(
                 where_clause,
                 and_(
                     ScrapedCourse.id.in_(resume_course_ids),
-                    ScrapedCourse.university_id == job.university_id,
+                    ScrapedCourse.university_id == scope_university_id,
                 ),
             )
         rows = (await db.execute(
@@ -3047,6 +3020,7 @@ async def staged_dedup(
 async def staged_approve(
     sc_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict, Depends(require_permission("staged.approve"))],
     body: dict | None = Body(default=None),
 ) -> dict:
     """Approve a staged course → import into the live ``courses`` table.
@@ -3107,7 +3081,7 @@ async def staged_approve(
     # Promote to the live courses table (creates/updates Course record, sets course_id)
     from app.services.scraper.approve_course import approve_scraped_course as _promote
     try:
-        result = await _promote(db, sc, actor="admin")
+        result = await _promote(db, sc, actor=user.get("email", "admin"))
         return {
             "ok": True,
             "id": sc_id,
@@ -3127,6 +3101,51 @@ async def staged_approve(
             "confidence": _cg["score"],
             "promote_error": str(exc),
         }
+
+
+@router.get("/jobs/{job_id}/removal-reconciliation")
+async def removal_reconciliation(
+    job_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(require_permission("staged.view"))],
+) -> dict:
+    from app.services.scraper.removal_reconciliation import get_removal_reconciliation
+    try:
+        return await get_removal_reconciliation(db, job_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+class _RemovalDecisionBody(BaseModel):
+    decision: str
+
+    @field_validator("decision")
+    @classmethod
+    def validate_decision(cls, value: str) -> str:
+        if value not in {"remove", "keep"}:
+            raise ValueError("decision must be 'remove' or 'keep'")
+        return value
+
+
+@router.post("/jobs/{job_id}/removal-reconciliation/{course_id}")
+async def decide_removal_reconciliation(
+    job_id: str,
+    course_id: int,
+    body: _RemovalDecisionBody,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict, Depends(require_permission("staged.approve"))],
+) -> dict:
+    from app.services.scraper.removal_reconciliation import decide_course_removal
+    try:
+        return await decide_course_removal(
+            db,
+            job_id,
+            course_id,
+            remove=body.decision == "remove",
+            actor=user.get("email", "admin"),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 class _RejectBody(BaseModel):
