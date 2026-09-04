@@ -339,7 +339,8 @@ _CAMPUS_TABLE_LABEL_RE = re.compile(
     re.I,
 )
 _CAMPUS_PERIOD_COL_RE = re.compile(
-    r"(?:Semester|Trimester|Term|Quarter)\s+\d+"
+    r"(?P<period_type>Semester|Trimester|Term|Quarter|Research\s+Period)\s+"
+    r"(?P<period_number>\d+)"
     r"(?:\s*[-–—]\s*(?P<month>"
     + "|".join(_MONTHS) +
     r"))?",
@@ -375,10 +376,13 @@ def _extract_campus_table_intake(html: str) -> list[str] | None:
             continue
         # Build a mapping: col_index → month extracted from header text
         col_month: dict[int, str] = {}
+        col_period: dict[int, str] = {}
         for i, hcell in enumerate(header_cells[1:], start=1):
             htext = hcell.get_text(strip=True)
             m = _CAMPUS_PERIOD_COL_RE.search(htext)
             if m:
+                if m.group("period_type").lower().startswith("research"):
+                    col_period[i] = f"Research Period {m.group('period_number')}"
                 mo_str = m.group("month")
                 if mo_str:
                     mo = _normalise_month(mo_str)
@@ -391,10 +395,11 @@ def _extract_campus_table_intake(html: str) -> list[str] | None:
                         if mo:
                             col_month[i] = mo
                             break
-        if not col_month:
+        if not col_month and not col_period:
             return None
         # Walk data rows and collect months with at least one physical campus ✓
         confirmed: set[str] = set()
+        confirmed_periods: set[str] = set()
         for row in parent_table.find_all("tr"):
             cells = row.find_all(["th", "td"])
             if not cells or len(cells) < 2:
@@ -410,9 +415,20 @@ def _extract_campus_table_intake(html: str) -> list[str] | None:
                 avail = _cell_availability(cells[col_idx])
                 if avail == "yes":
                     confirmed.add(month)
+            for col_idx, period in col_period.items():
+                if col_idx >= len(cells):
+                    continue
+                if _cell_availability(cells[col_idx]) == "yes":
+                    confirmed_periods.add(period)
         if confirmed:
             # Preserve calendar order
             return [m for m in _MONTHS if m in confirmed]
+        if confirmed_periods:
+            return [
+                period
+                for period in ("Research Period 1", "Research Period 2")
+                if period in confirmed_periods
+            ]
         # Availability opaque (all icons undetectable) — fall through
         return None
 

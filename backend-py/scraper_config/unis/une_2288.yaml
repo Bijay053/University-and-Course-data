@@ -96,6 +96,18 @@ extraction:
     force_central_fee_stage: true
     require_explicit_international_context: true
 
+  english:
+    default_ielts: 6.0
+    default_pte: 57
+    default_toefl: 79
+    degree_level_defaults:
+      research:
+        ielts: 6.5
+        pte: 64
+        toefl: 91
+    course_english_priority: true
+    apply_defaults_before_remote_enrichment: true
+
   filters:
     domestic_only:
       enabled: false

@@ -2243,6 +2243,7 @@ class DegreeEnglishDefaults(BaseModel):
       - ``undergraduate``  — Bachelors, Honours, Diploma, Certificate (non-graduate)
       - ``postgraduate``   — Masters, Graduate Diploma, Graduate Certificate
       - ``doctorate``      — Doctorate / PhD
+      - ``research``       — Higher Degrees by Research, including research Masters
 
     Any tier NOT listed falls back to the flat ``default_ielts`` / ``default_pte``
     / ``default_toefl`` fields on :class:`EnglishConfig`.
@@ -2372,7 +2373,7 @@ class EnglishConfig(BaseModel):
         default_factory=dict,
         description=(
             "Per-degree-level English score defaults. Keys are normalised tiers: "
-            "``undergraduate``, ``postgraduate``, ``doctorate``. "
+            "``undergraduate``, ``postgraduate``, ``doctorate``, ``research``. "
             "When set, the tier matching the course's degree_level overrides the "
             "flat default_ielts / default_pte / default_toefl values. "
             "Courses whose degree_level cannot be mapped to a tier fall back to "

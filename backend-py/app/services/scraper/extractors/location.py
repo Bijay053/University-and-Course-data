@@ -290,10 +290,30 @@ def _expand_campus_codes(text: str) -> str:
 
 _PERIOD_LABEL_RE = re.compile(
     r"^(?:(?:Semester|Trimester|Term|Quarter|S|T)\s*\d+|"
-    r"(?:Teaching|Study|Academic)\s+Period(?:\s*\d+)?)"
+    r"(?:Teaching|Study|Academic|Research)\s+Period(?:\s*\d+)?)"
     r"(?:\s*[-–—]\s*.{0,50})?$",
     re.I,
 )
+_CAMPUS_PIVOT_LABEL_RE = re.compile(
+    r"^start\s+dates?\s+(?:and\s+)?campus(?:es)?\b",
+    re.I,
+)
+
+
+def _is_period_label(text: str) -> bool:
+    """Recognize period headers, including duplicated responsive-label text."""
+    compact_text = re.sub(r"\s+", " ", text or "").strip()
+    if _PERIOD_LABEL_RE.match(compact_text):
+        return True
+    words = compact_text.split()
+    midpoint = len(words) // 2
+    if len(words) >= 4 and len(words) % 2 == 0:
+        left = " ".join(words[:midpoint])
+        right = " ".join(words[midpoint:])
+        if left.casefold() == right.casefold():
+            return bool(_PERIOD_LABEL_RE.match(left))
+    return False
+
 
 # UTAS (and similar) panel divs concatenate availability schedules onto campus
 # names in a single text node:
@@ -353,18 +373,25 @@ def _strip_period_labels(text: str) -> str:
 _CHECKMARK_CHARS = frozenset("✓✔✅√☑")
 _CROSS_CHARS = frozenset("✗✘✕✖❌")
 _AVAIL_KEYWORDS = frozenset(("available", "yes", "tick", "check", "offered", "offered here"))
-_UNAVAIL_KEYWORDS = frozenset(("not available", "no", "cross", "unavailable"))
+_UNAVAIL_KEYWORDS = frozenset(
+    ("not available", "not offered", "no", "cross", "unavailable")
+)
 _AVAIL_CLASS_FRAGMENTS = ("check", "tick", "yes", "available", "success", "positive", "offered")
 _UNAVAIL_CLASS_FRAGMENTS = ("cross", "no-", "unavailable", "not-available", "negative")
 
 
 def _cell_availability(td) -> str:
     """Return 'yes', 'no', or 'unknown' based on icon/aria-label/text in a table cell."""
-    text = td.get_text(strip=True)
+    text = td.get_text(" ", strip=True)
     if any(c in text for c in _CHECKMARK_CHARS):
         return "yes"
     if any(c in text for c in _CROSS_CHARS):
         return "no"
+    normalized_text = re.sub(r"\s+", " ", text).strip().lower()
+    if normalized_text in _UNAVAIL_KEYWORDS:
+        return "no"
+    if normalized_text in _AVAIL_KEYWORDS:
+        return "yes"
     for el in td.find_all(True):
         label = (el.get("aria-label") or el.get("title") or "").lower().strip()
         # Check unavailable FIRST — "not available" contains "available" as
@@ -538,7 +565,7 @@ def _normalise(raw: str | None) -> str | None:
     # Reject bare period/semester labels (e.g. "Semester 1", "Trimester 2") —
     # these appear as ECU-style pivot-table column headers and must never be
     # returned as a campus location.
-    if _PERIOD_LABEL_RE.match(head):
+    if _is_period_label(head):
         return None
     # Phase A.5 — never accept a value that is only delivery-method
     # words.  Stops "Online" / "External" / "Online, Distance" / etc.
@@ -793,9 +820,11 @@ def _from_tables(soup: BeautifulSoup) -> str | None:
         cells = tr.find_all(["th", "td"])
         if len(cells) < 2:
             continue
-        if not LOCATION_LABEL.match(cells[0].get_text(strip=True)):
+        first_cell_text = cells[0].get_text(" ", strip=True)
+        is_campus_pivot = bool(_CAMPUS_PIVOT_LABEL_RE.match(first_cell_text))
+        if not LOCATION_LABEL.match(first_cell_text) and not is_campus_pivot:
             continue
-        c1_text = cells[1].get_text(strip=True)
+        c1_text = cells[1].get_text(" ", strip=True)
         is_header_row = bool(tr.find_parent("thead")) or all(
             cell.name == "th" for cell in cells
         )
@@ -810,7 +839,7 @@ def _from_tables(soup: BeautifulSoup) -> str | None:
         # trimester/semester are included.  When no availability signal is
         # detected (icons totally opaque) we include ALL non-Online rows to
         # avoid returning null and falling through to the city-text extractor.
-        if _PERIOD_LABEL_RE.match(c1_text):
+        if _is_period_label(c1_text):
             parent_table = tr.find_parent("table")
             if not parent_table:
                 continue
@@ -822,7 +851,11 @@ def _from_tables(soup: BeautifulSoup) -> str | None:
                 # Skip the header row itself
                 if not dcells:
                     continue
-                if LOCATION_LABEL.match(dcells[0].get_text(strip=True)):
+                data_label = dcells[0].get_text(" ", strip=True)
+                if (
+                    LOCATION_LABEL.match(data_label)
+                    or _CAMPUS_PIVOT_LABEL_RE.match(data_label)
+                ):
                     continue
                 # Skip group-header rows spanning multiple columns
                 try:

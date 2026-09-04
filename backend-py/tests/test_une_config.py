@@ -43,6 +43,15 @@ def test_une_duplicate_recipes_resolve_to_same_hardened_strategy(
     assert (
         config.extraction.fees.require_explicit_international_context is True
     )
+    assert config.extraction.english.default_ielts == 6.0
+    assert config.extraction.english.default_pte == 57
+    assert config.extraction.english.default_toefl == 79
+    assert config.extraction.english.course_english_priority is True
+    assert config.extraction.english.apply_defaults_before_remote_enrichment is True
+    research = config.extraction.english.degree_level_defaults["research"]
+    assert research.ielts == 6.5
+    assert research.pte == 64
+    assert research.toefl == 91
 
 
 def test_une_slug_and_id_recipe_files_exist() -> None:

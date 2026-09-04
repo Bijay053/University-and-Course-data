@@ -89,6 +89,32 @@ def test_th_td_intake_classifies_via_structural_pass():
     assert out[0].method == "intake.structural"
 
 
+def test_une_research_period_pivot_preserves_period_labels():
+    html = """
+    <table>
+      <thead>
+        <tr>
+          <th>Start Dates and Campus</th>
+          <th>Research Period 1</th>
+          <th>Research Period 2</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><th>Online</th><td><span>Offered</span></td><td><span>Offered</span></td></tr>
+        <tr><th>Armidale Campus</th><td><span>Offered</span></td><td><span>Offered</span></td></tr>
+        <tr><th>Sydney Campus</th><td><span>Not Offered</span></td><td><span>Not Offered</span></td></tr>
+      </tbody>
+    </table>
+    """
+    out = _run(intake.extract(html, "https://www.une.edu.au/study/courses/example"))
+    assert out
+    assert out[0].normalized["intake_months"] == [
+        "Research Period 1",
+        "Research Period 2",
+    ]
+    assert out[0].method == "intake.campus_pivot"
+
+
 def test_dt_dd_intake_with_full_dates_captures_day():
     """The pre-pass reuses the same two-pass parser as the keyword
     fallback: full `day Month` dates first, bare month names as a

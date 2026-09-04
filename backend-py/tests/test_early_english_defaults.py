@@ -37,3 +37,25 @@ def test_degree_level_defaults_take_precedence_over_flat_values():
         "pte_overall": 58,
         "toefl_overall": 90,
     }
+
+
+def test_research_master_uses_research_defaults_not_coursework_defaults():
+    research = SimpleNamespace(ielts=6.5, pte=64, toefl=91)
+    postgraduate = SimpleNamespace(ielts=6.0, pte=57, toefl=79)
+    config = _config(
+        degree_level_defaults={
+            "postgraduate": postgraduate,
+            "research": research,
+        }
+    )
+    assert _resolve_configured_english_defaults(
+        {
+            "course_name": "Master of Education (Research)",
+            "degree_level": "Master",
+        },
+        config,
+    ) == {
+        "ielts_overall": 6.5,
+        "pte_overall": 64,
+        "toefl_overall": 91,
+    }

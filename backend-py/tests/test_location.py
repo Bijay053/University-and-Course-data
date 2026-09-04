@@ -110,6 +110,28 @@ def test_teaching_period_pivot_preserves_a_physical_campus():
     assert out[0].method == "location.table"
 
 
+def test_une_research_period_pivot_excludes_not_offered_sydney():
+    html = """
+    <table>
+      <thead>
+        <tr>
+          <th>Start Dates and Campus <span>?</span><span>Open/close tooltip</span></th>
+          <th><span>Research Period 1</span><span>Research Period 1</span></th>
+          <th><span>Research Period 2</span><span>Research Period 2</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><th>Online</th><td><span>Offered</span></td><td><span>Offered</span></td></tr>
+        <tr><th>Armidale Campus</th><td><span>Offered</span></td><td><span>Offered</span></td></tr>
+        <tr><th>Sydney Campus</th><td><span>Not Offered</span></td><td><span>Not Offered</span></td></tr>
+      </tbody>
+    </table>
+    """
+    out = _run(location.extract(html, "https://www.une.edu.au/study/courses/example"))
+    assert out and out[0].value == "Armidale Campus"
+    assert out[0].method == "location.table"
+
+
 def test_strong_location_strips_online_virtual_from_value():
     """Same `_sanitise_for_display` rule as the dl/table paths: an
     `Online` token must be stripped so the staged value is the real

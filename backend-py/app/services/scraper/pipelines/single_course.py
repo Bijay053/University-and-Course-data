@@ -1679,8 +1679,20 @@ def _resolve_configured_english_defaults(
 ) -> dict[str, float | int]:
     """Resolve flat or degree-level institutional English defaults."""
     degree = str(payload.get("degree_level") or "").lower().strip()
+    tier_map = getattr(english_config, "degree_level_defaults", {}) or {}
+    research_context = " ".join(
+        str(payload.get(key) or "")
+        for key in ("course_name", "academic_level", "degree_level")
+    ).lower()
     tier: str | None = None
-    if any(k in degree for k in ("bachelor", "honours", "honor")):
+    if "research" in tier_map and (
+        "(research)" in research_context
+        or "higher degree by research" in research_context
+        or "research degree" in research_context
+        or any(k in degree for k in ("phd", "dphil", "doctor"))
+    ):
+        tier = "research"
+    elif any(k in degree for k in ("bachelor", "honours", "honor")):
         tier = "undergraduate"
     elif "master" in degree:
         tier = "postgraduate"
@@ -1691,7 +1703,6 @@ def _resolve_configured_english_defaults(
     elif any(k in degree for k in ("diploma", "certificate")):
         tier = "undergraduate"
 
-    tier_map = getattr(english_config, "degree_level_defaults", {}) or {}
     tier_config = tier_map.get(tier) if tier else None
     if tier == "doctorate" and tier_config is None:
         tier_config = tier_map.get("postgraduate")
@@ -8098,8 +8109,20 @@ async def extract_course(
         if _eng_cfg is not None and not bool(payload.get("is_pathway")):
             # Resolve degree-level tier for per-level defaults (e.g. UG 6.0 / PG 6.5).
             _dl_raw = (payload.get("degree_level") or "").lower().strip()
+            _dl_defaults_map: dict = getattr(_eng_cfg, "degree_level_defaults", {}) or {}
+            _research_context = " ".join(
+                str(payload.get(key) or "")
+                for key in ("course_name", "academic_level", "degree_level")
+            ).lower()
             _dl_tier: str | None = None
-            if _dl_raw:
+            if "research" in _dl_defaults_map and (
+                "(research)" in _research_context
+                or "higher degree by research" in _research_context
+                or "research degree" in _research_context
+                or any(k in _dl_raw for k in ("phd", "dphil", "doctor"))
+            ):
+                _dl_tier = "research"
+            elif _dl_raw:
                 if any(k in _dl_raw for k in ("bachelor", "honours", "honor")):
                     _dl_tier = "undergraduate"
                 elif any(k in _dl_raw for k in ("master",)):
@@ -8113,7 +8136,6 @@ async def extract_course(
                     # Plain diploma/cert without graduate/postgraduate prefix → UG tier
                     _dl_tier = "undergraduate"
             # Look up per-tier config; fall back to flat defaults if tier not found.
-            _dl_defaults_map: dict = getattr(_eng_cfg, "degree_level_defaults", {}) or {}
             _tier_cfg = None
             if _dl_tier and _dl_defaults_map:
                 _tier_cfg = _dl_defaults_map.get(_dl_tier)
