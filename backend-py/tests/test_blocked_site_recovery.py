@@ -193,6 +193,12 @@ async def test_cached_wayback_snapshot_retries_transient_without_per_url_cdx():
     async def fake_get(self, endpoint_url, **kwargs):
         calls.append(endpoint_url)
         assert "cdx/search" not in endpoint_url
+        if len(calls) == 1:
+            request = httpx.Request("GET", endpoint_url)
+            raise httpx.ConnectError(
+                "archive connection temporarily refused",
+                request=request,
+            )
         return responses.pop(0)
 
     with (
@@ -201,8 +207,8 @@ async def test_cached_wayback_snapshot_retries_transient_without_per_url_cdx():
     ):
         assert await fetch_html_wayback(url)
 
-    assert len(calls) == 2
-    assert calls[0] == calls[1]
+    assert len(calls) == 3
+    assert calls[0] == calls[1] == calls[2]
 
 
 @pytest.mark.asyncio
@@ -221,7 +227,10 @@ async def test_wayback_no_snapshot_is_a_permanent_typed_failure():
         assert "cdx/search" in endpoint_url
         return FakeResponse()
 
-    with patch("httpx.AsyncClient.get", new=fake_get):
+    with (
+        patch("httpx.AsyncClient.get", new=fake_get),
+        patch("app.services.scraper.http_fetcher.asyncio.sleep", new=AsyncMock()),
+    ):
         assert await fetch_html_wayback(url) is None
 
     failure = get_last_fetch_failure()
