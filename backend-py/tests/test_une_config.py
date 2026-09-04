@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -22,8 +23,20 @@ def test_une_duplicate_recipes_resolve_to_same_hardened_strategy(
         "https://www.une.edu.au/cauc-static/study/sitemap.xml"
     )
     assert config.discovery.allow_url_patterns == [
-        "/study/courses/[a-zA-Z0-9_-]+$"
+        r"/study/courses/[a-zA-Z0-9_-]+(?:\?international=true)?$"
     ]
+    allow = re.compile(config.discovery.allow_url_patterns[0])
+    assert allow.search(
+        "https://www.une.edu.au/study/courses/master-of-education-research"
+    )
+    assert allow.search(
+        "https://www.une.edu.au/study/courses/"
+        "master-of-education-research?international=true"
+    )
+    assert not allow.search(
+        "https://www.une.edu.au/study/courses/"
+        "master-of-education-research?domestic=true"
+    )
     assert config.discovery.bfs_page_budget == 0
     assert config.discovery.always_sitemap_supplement is False
     assert config.discovery.use_wayback is False

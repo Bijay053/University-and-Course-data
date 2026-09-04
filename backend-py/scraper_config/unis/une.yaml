@@ -14,7 +14,7 @@ discovery:
   # individual unit URLs are excluded by the exact course-path allowlist.
   sitemap_url: https://www.une.edu.au/cauc-static/study/sitemap.xml
   allow_url_patterns:
-    - '/study/courses/[a-zA-Z0-9_-]+$'
+    - '/study/courses/[a-zA-Z0-9_-]+(?:\?international=true)?$'
 
   # UNE is Cloudflare Enterprise protected. Static and datacenter transports
   # fail; go directly to Scrape.do render for the one sitemap request.

@@ -49,7 +49,7 @@ discovery:
   # UNE's current URL structure uses /study/courses/{slug} (no year segment).
   # 203 of 1920 sitemap entries match this pattern (rest are /study/units/).
   allow_url_patterns:
-    - '/study/courses/[a-zA-Z0-9_-]+$'
+    - '/study/courses/[a-zA-Z0-9_-]+(?:\?international=true)?$'
 
   # REQUIRED — skip_fallbacks=true makes the fetch chain go:
   #   Scrape.do static (502 ROTATION_FAILED) → render=True → 200 OK, 2MB XML ✓
