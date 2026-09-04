@@ -1442,28 +1442,17 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
                     )
                 _mark_last_fetch_failure_terminal()
                 return None
-            # If scrape_do_skip_fallbacks is ALSO set this is a CF-Enterprise
-            # host where scrape.do render/static will fail with ROTATION_FAILED
-            # just as reliably as httpx.  Falling through would waste ~90 s per
-            # course (502 attempt + 2 s backoff + second 502/404) for zero gain.
-            # Return None immediately so the course is marked fetch_failed.
-            try:
-                if getattr(
-                    getattr(_cfg_fwb2, "discovery", None),
-                    "scrape_do_skip_fallbacks",
-                    False,
-                ):
-                    log.warning(
-                        "fetch %s: force_wayback_first miss + scrape_do_skip_fallbacks"
-                        " active — returning None immediately (CF-blocked host;"
-                        " live scrape.do will also fail)",
-                        url,
-                    )
-                    _mark_last_fetch_failure_terminal()
-                    return None
-            except Exception:  # noqa: BLE001
-                pass
-            # Fall through: no Wayback copy → try live fetch as best-effort.
+            # "none" is deliberately terminal. Archive-only universities use
+            # this policy because every live transport is known to fail; falling
+            # through here would reintroduce the same 60-90s-per-page timeout
+            # that force_wayback_first exists to avoid.
+            log.warning(
+                "fetch %s: force_wayback_first miss + wayback_miss_fallback=none"
+                " — returning None without any live transport",
+                url,
+            )
+            _mark_last_fetch_failure_terminal()
+            return None
 
     # Discovery-phase fast-path: when discovery.scrape_do_skip_fallbacks=True,
     # skip httpx + curl_cffi for listing/sitemap pages and go straight to

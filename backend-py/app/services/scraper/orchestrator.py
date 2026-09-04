@@ -1113,6 +1113,55 @@ def _inject_extra_course_urls(
     return injected, moved
 
 
+_ARCHIVE_ONLY_PROVIDER_DEFAULTS: dict[str, object] = {
+    "manchester_xml": None,
+    "searchstax": None,
+    "swiftype": None,
+    "tafensw_api": None,
+    "melbournepolytechnic_api": None,
+    "ssr_prop_discovery": None,
+    "lancaster_listing": False,
+    "scrapy": None,
+    "generic_search_api": None,
+    "algolia": None,
+    "vuw_api": None,
+    "sruc_api": None,
+    "seed_page_click_pagination": None,
+    "elastic_api_bootstrap": None,
+    "auto_api_discovery": False,
+    "static_course_urls_file": None,
+}
+
+
+def _without_live_discovery_providers(uni_config):
+    """Return an archive-only config immune to merged DB provider settings."""
+    return uni_config.model_copy(
+        update={
+            "discovery": uni_config.discovery.model_copy(
+                update=_ARCHIVE_ONLY_PROVIDER_DEFAULTS
+            )
+        }
+    )
+
+
+async def _discover_archive_only(
+    *,
+    scrape_url: str,
+    discovery_config,
+    max_courses: int,
+    emit,
+) -> list[dict]:
+    """Run the sole external discovery provider allowed by archive-only mode."""
+    from app.services.scraper.wayback_discover import wayback_discover
+
+    return await wayback_discover(
+        scrape_url,
+        max_courses=max_courses,
+        emit=emit,
+        cdx_url_prefix=getattr(discovery_config, "wayback_cdx_prefix", None),
+    )
+
+
 async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
     """Execute one scrape job.
 
@@ -1717,6 +1766,18 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             {"url": url, "name": "Targeted retry"}
             for url in _target_course_urls
         ]
+        _archive_only = bool(
+            not _targeted_retry
+            and getattr(_uni_cfg.discovery, "archive_only", False)
+        )
+        _archive_wayback_done = False
+        if _archive_only:
+            # Archive-only is an ordering guarantee, not just a transport hint.
+            # Clear every schema-backed discovery provider that a stale DB
+            # auto-config may have merged before the id-specific YAML. Raw
+            # recipe/_api_provider paths are gated explicitly below.
+            _uni_cfg = _without_live_discovery_providers(_uni_cfg)
+            set_uni_config(_uni_cfg)
 
         # Read browser-first flag early so we can skip BFS when configured.
         # When always_browser_discover=True, the browser discovery step below
@@ -1781,6 +1842,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         )
         if (
             not _targeted_retry
+            and not _archive_only
             and not _c1_force
             and not _c1_has_api_provider
             and _c1_scope_key
@@ -1902,6 +1964,23 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         elif _c1_force:
             log.info("[DISCOVER] forceDiscovery=true — bypassing discovery URL cache")
 
+        if _archive_only:
+            await emit(
+                "status",
+                "[DISCOVER] archive_only=True — bypassing recipes, APIs, BFS, "
+                "sitemap, and browser; querying Wayback CDX directly...",
+                phase="discover",
+                kind="archive_only",
+            )
+            links = await _discover_archive_only(
+                scrape_url=scrape_url,
+                discovery_config=_uni_cfg.discovery,
+                max_courses=max_courses,
+                emit=emit,
+            )
+            _archive_wayback_done = True
+            _always_browser = False
+
         # ── Advanced Recipe: JSON API discovery ───────────────────────────────
         # When the operator stored a recipe with discovery_strategy=json_api
         # (via the Advanced Recipe Editor in the portal) the orchestrator fetches
@@ -1929,7 +2008,12 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 len(_recipe_seeds), len(_merged_seeds),
             )
 
-        if not _targeted_retry and _recipe.get("discovery_strategy") == "json_api" and _recipe.get("api"):
+        if (
+            not _targeted_retry
+            and not _archive_only
+            and _recipe.get("discovery_strategy") == "json_api"
+            and _recipe.get("api")
+        ):
             _api_endpoint = (_recipe.get("api") or {}).get("endpoint", "")
             log.info(
                 "[RECIPE] discovery_strategy=json_api endpoint=%s — "
@@ -2460,7 +2544,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # handled it (the YAML searchstax block above sets links if non-empty).
         # This is what makes "enter URL → autonomous scrape" work for any
         # university whose site embeds a known search API — no YAML required.
-        if not links and uni_scrape_config:
+        if not links and not _archive_only and uni_scrape_config:
             _auto_cfg = uni_scrape_config.get("auto_config") or {}
             _auto_provider = _auto_cfg.get("_api_provider", "")
             _auto_endpoint = _auto_cfg.get("_api_endpoint_hint", "")
@@ -2677,7 +2761,12 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 _filter_funnel_stats["after_block"] = int(kwargs.get("kept", 0))
             await _emit_for_discover(type_, message, **kwargs)
 
-        if not _targeted_retry and (not links or _yaml_api_partial) and not _always_browser:
+        if (
+            not _targeted_retry
+            and not _archive_only
+            and (not links or _yaml_api_partial)
+            and not _always_browser
+        ):
             _pre_bfs_links = list(links)
             # Per-uni YAML can override the global discovery_phase_timeout_s
             # (default 300 s) via discovery.discovery_phase_timeout_s.
@@ -2773,6 +2862,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         _skip_browser_discovery = getattr(_uni_cfg.discovery, "skip_browser_discovery", False)
         if (
             not _targeted_retry
+            and not _archive_only
             and (not links or _always_browser)
             and not (_is_mq_host and links)
             and not _skip_browser_discovery
@@ -2855,6 +2945,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # walled host and the tier would just add latency / noise.
         if (
             not _targeted_retry
+            and not _archive_wayback_done
             and _use_wayback is not False
             and (not links or _use_wayback)
             and not (_is_mq_host and links)
@@ -2878,7 +2969,12 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         phase="discover",
                     )
                 _wb_links = await wayback_discover(
-                    scrape_url, max_courses=max_courses, emit=emit
+                    scrape_url,
+                    max_courses=max_courses,
+                    emit=emit,
+                    cdx_url_prefix=getattr(
+                        _uni_cfg.discovery, "wayback_cdx_prefix", None
+                    ),
                 )
                 if _wb_links:
                     log.info(

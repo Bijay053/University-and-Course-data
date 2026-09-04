@@ -1441,6 +1441,14 @@ class DiscoveryConfig(BaseModel):
             "call (triggered by use_wayback=True) does the CDX bulk lookup instead."
         ),
     )
+    skip_home_page_redirect: bool = Field(
+        default=False,
+        description=(
+            "Skip the generic homepage fetch and catalogue-path HEAD probes that "
+            "normally run before BFS. Use with bfs_page_budget=0 for archive/API-only "
+            "universities where every live-host request is known to fail."
+        ),
+    )
     scrape_do_skip_fallbacks: bool = Field(
         default=False,
         description=(
@@ -1638,6 +1646,25 @@ class DiscoveryConfig(BaseModel):
             "null/unset (default) = run Wayback only when all other discovery returns 0 links (fallback-only mode). "
             "true = always run Wayback after BFS+browser and merge results (supplemental mode, e.g. QUT). "
             "false = never run Wayback, even as a fallback (use for Cloudflare-blocked sites where archive.org has no useful coverage, e.g. JCU)."
+        ),
+    )
+    archive_only: bool = Field(
+        default=False,
+        description=(
+            "Make Wayback CDX the first and only discovery network provider. "
+            "When enabled, discovery cache, recipes, APIs, BFS, sitemap, and "
+            "browser discovery are bypassed even if stale DB auto-config contains "
+            "provider settings. Requires use_wayback=true and is intended for "
+            "hosts where every live transport is known to fail."
+        ),
+    )
+    wayback_cdx_prefix: Optional[str] = Field(
+        default=None,
+        description=(
+            "Optional host/path prefix passed to the Wayback CDX API, for example "
+            "'www.example.edu/course/*'. Use when a domain-wide CDX query reaches "
+            "the 10,000-result cap before the course subtree. The value must remain "
+            "scoped to the configured university hostname."
         ),
     )
     skip_browser_discovery: bool = Field(

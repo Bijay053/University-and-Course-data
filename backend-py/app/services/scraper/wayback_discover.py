@@ -296,6 +296,7 @@ async def wayback_discover(
     *,
     max_courses: int = 300,
     emit=None,
+    cdx_url_prefix: str | None = None,
 ) -> list[dict]:
     """Query the Wayback Machine CDX API for course URLs on the given domain.
 
@@ -316,7 +317,16 @@ async def wayback_discover(
         log.warning("wayback_discover: cannot parse hostname from %s", scrape_url)
         return []
 
-    cdx_prefix = _HOST_CDX_URL_PREFIX.get(host, f"{host}/*")
+    cdx_prefix = cdx_url_prefix or _HOST_CDX_URL_PREFIX.get(host, f"{host}/*")
+    prefix_host = urlparse(f"https://{cdx_prefix.removesuffix('*')}").hostname
+    if prefix_host not in {host, host.removeprefix("www."), f"www.{host.removeprefix('www.')}"}:
+        log.error(
+            "wayback_discover: refusing cross-host CDX prefix %r for %s",
+            cdx_prefix,
+            host,
+        )
+        await _emit("[DISCOVER] Wayback: configured CDX prefix is outside this university host")
+        return []
     await _emit(f"[DISCOVER] Wayback: querying CDX index for {cdx_prefix} (this may take ~10s)")
     log.info("wayback_discover: querying CDX for %s (prefix=%s)", host, cdx_prefix)
 

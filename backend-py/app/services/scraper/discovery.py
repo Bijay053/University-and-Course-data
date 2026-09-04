@@ -815,7 +815,10 @@ async def discover_course_links(
     # the Python crawler used to fall back to the sitemap (yielding ~24
     # candidates) instead of using the per-listing pagination Node uses
     # (yielding ~30).
-    if _is_home_page(start_url):
+    _skip_home_redirect = bool(
+        getattr(discovery_config, "skip_home_page_redirect", False)
+    )
+    if _is_home_page(start_url) and not _skip_home_redirect:
         home_html = await fetch_html(start_url) or ""
         redirect = None
         try:
@@ -826,6 +829,12 @@ async def discover_course_links(
             start_url = redirect
             parsed = urlparse(start_url)
             origin = f"{parsed.scheme}://{parsed.netloc}"
+    elif _is_home_page(start_url) and _skip_home_redirect:
+        log.info(
+            "[DISCOVER] skip_home_page_redirect=True — skipping live homepage "
+            "fetch and catalogue-path probes for %s",
+            start_url,
+        )
 
     # ── Cross-origin Funnelback candidate origins ───────────────────────────
     # When the BFS is seeded from a cross-domain search provider (e.g.

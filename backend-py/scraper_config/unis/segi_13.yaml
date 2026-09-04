@@ -1,0 +1,37 @@
+# SEGi University & Colleges (production university id 13)
+#
+# The live host is Cloudflare-blocked from datacenter IPs. Direct HTTP returns
+# 403 and both Scrape.do static/render return ROTATION_FAILED after ~58 seconds.
+# Discovery and extraction therefore use the latest Wayback snapshots.
+hostname_guard: "www.segi.edu.my"
+
+discovery:
+  # Do not spend the 300-second phase budget on known-dead live transports.
+  bfs_page_budget: 0
+  skip_home_page_redirect: true
+  skip_sitemap_fallback: true
+  skip_browser_discovery: true
+  use_wayback: true
+  archive_only: true
+
+  # The domain-wide CDX index reaches its 10,000-row cap on old multilingual
+  # pages. The current WordPress catalogue lives under /course/<slug>/.
+  wayback_cdx_prefix: "www.segi.edu.my/course/*"
+  max_candidates: 500
+  allow_url_patterns:
+    - "^/course/(?!search(?:/|$))[^/?#]+/?$"
+  course_detail_url_patterns:
+    - "^https?://(?:www\\.)?segi\\.edu\\.my/course/(?!search(?:/|$))[^/?#]+/?$"
+  block_url_patterns:
+    - "^/course-search(?:/|$)"
+
+extraction:
+  # CDX discovery preloads exact snapshot timestamps. Never wait on the live
+  # site when a snapshot is missing; report the archive miss explicitly.
+  force_wayback_first: true
+  wayback_miss_fallback: none
+  skip_browser_rescue: true
+
+  fees:
+    default_currency: MYR
+    currency_override: MYR

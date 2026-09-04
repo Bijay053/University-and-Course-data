@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 from functools import lru_cache
 
@@ -13,6 +14,7 @@ _REVISION_ENV_VARS = (
     "SOURCE_VERSION",
     "BUILD_REVISION",
 )
+_GIT_SHA_RE = re.compile(r"^[0-9a-fA-F]{7,40}$")
 
 
 def _safe_value(value: str) -> str:
@@ -25,18 +27,28 @@ def _safe_value(value: str) -> str:
 def get_release_revision() -> str:
     """Return deployed revision metadata without ever blocking process startup."""
     try:
+        env_revision = ""
         for name in _REVISION_ENV_VARS:
             value = _safe_value(os.environ.get(name, ""))
             if value:
-                return value
+                env_revision = value
+                break
 
         result = subprocess.run(
-            ["git", "rev-parse", "--short=12", "HEAD"],
+            ["git", "rev-parse", "HEAD"],
             check=True,
             capture_output=True,
             text=True,
             timeout=0.5,
         )
-        return _safe_value(result.stdout) or UNKNOWN_RELEASE
+        git_revision = _safe_value(result.stdout)
+        if (
+            env_revision
+            and _GIT_SHA_RE.fullmatch(env_revision)
+            and _GIT_SHA_RE.fullmatch(git_revision)
+            and not git_revision.lower().startswith(env_revision.lower())
+        ):
+            return git_revision[:12]
+        return env_revision or git_revision[:12] or UNKNOWN_RELEASE
     except Exception:  # noqa: BLE001 -- release logging must always fail open
-        return UNKNOWN_RELEASE
+        return env_revision or UNKNOWN_RELEASE
