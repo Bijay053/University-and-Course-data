@@ -1,6 +1,6 @@
 # Deploy artifacts
 
-Three files, the secure OpenAI environment installer, plus the cutover runbook
+Three files, two secure OpenAI rotation tools, plus the cutover runbook
 in `../README.md`.
 
 | File | Where it goes on production |
@@ -9,16 +9,54 @@ in `../README.md`.
 | `uni-celery.service` | `/etc/systemd/system/uni-celery.service` |
 | `nginx.conf` | `/etc/nginx/sites-available/default` (after backup of current) |
 | `install_openai_fallback_via_ssm.py` | Run from a trusted deployment workspace; do not copy to production |
+| `rotate_openai_fallback_via_parameter_store.py` | Routine credential rotation from a trusted deployment workspace |
+| `openai-parameter-store-iam.yaml` | One-time least-privilege IAM and KMS setup |
 
-## Install the OpenAI fallback environment securely
+## Rotate the OpenAI fallback routinely
 
 Both services load `/etc/university-portal/openai.env` after the general
 application environment. The file is optional so deployments without the
 fallback still start, and is created mode `0600` when fallback credentials are
 installed.
 
-When the deployment principal cannot write encrypted Parameter Store values,
-use the one-time envelope-encrypted installer:
+An AWS administrator must deploy `openai-parameter-store-iam.yaml` once. It
+creates a rotating customer-managed KMS key, a fixed-purpose SSM rotation
+document, and grants the deployment user write access to exactly one
+SecureString:
+
+- `/university-portal/openai/configuration`
+
+The SecureString is one JSON configuration bundle, so the key and URL cannot
+be observed as a partially updated pair. It is rotation input, not a claim
+about which value is currently active. The production instance role can read
+only that bundle and can decrypt it only through Parameter Store. The
+deployment user can encrypt but cannot read either value. Supply the production
+instance ID when creating the stack; the default principal names match the
+current production setup.
+
+For each routine rotation, inject `OPENAI_API_KEY` (and optional
+`OPENAI_BASE_URL`) into the deployment process environment through the CI
+secret store, then run:
+
+```bash
+python backend-py/deploy/rotate_openai_fallback_via_parameter_store.py \
+  --instance-id "$UNIVERSITY_PORTAL_INSTANCE_ID" \
+  --region ap-south-1
+```
+
+The script writes the encrypted bundle and invokes only the fixed-purpose SSM
+document (never arbitrary shell). The document owns the complete host
+transaction: it backs up the prior environment, installs the new one, checks
+the API health endpoint, and verifies that both running process environments
+contain the new values. Its exit trap restores and restarts the prior
+environment on any failure before successful verification. Never place a
+credential in a command-line option, shell assignment, redirected file, or
+debug trace. The script prints status only.
+
+## Emergency envelope-encrypted installation
+
+If Parameter Store or its scoped IAM setup is unavailable, retain this
+envelope-encrypted installer as the emergency fallback:
 
 ```bash
 python backend-py/deploy/install_openai_fallback_via_ssm.py \

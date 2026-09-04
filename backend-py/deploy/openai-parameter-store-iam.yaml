@@ -1,0 +1,214 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Least-privilege OpenAI Parameter Store rotation for university-portal
+
+Parameters:
+  DeploymentUserName:
+    Type: String
+    Default: replit-production-ssm
+  ProductionInstanceRoleName:
+    Type: String
+    Default: EC2-SystemsManager-Role
+  ProductionInstanceId:
+    Type: AWS::EC2::Instance::Id
+
+Resources:
+  OpenAIParameterKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: Encrypt university-portal OpenAI fallback parameters
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowAccountAdministration
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:root
+            Action: kms:*
+            Resource: "*"
+          - Sid: AllowDeploymentEncryption
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:user/${DeploymentUserName}
+            Action:
+              - kms:Encrypt
+              - kms:GenerateDataKey
+            Resource: "*"
+            Condition:
+              StringEquals:
+                kms:ViaService: !Sub ssm.${AWS::Region}.amazonaws.com
+              StringLike:
+                kms:EncryptionContext:PARAMETER_ARN: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/university-portal/openai/configuration
+          - Sid: AllowProductionDecryption
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${ProductionInstanceRoleName}
+            Action: kms:Decrypt
+            Resource: "*"
+            Condition:
+              StringEquals:
+                kms:ViaService: !Sub ssm.${AWS::Region}.amazonaws.com
+                kms:EncryptionContext:PARAMETER_ARN: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/university-portal/openai/configuration
+
+  OpenAIParameterKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: alias/university-portal-openai
+      TargetKeyId: !Ref OpenAIParameterKey
+
+  OpenAIRotationDocument:
+    Type: AWS::SSM::Document
+    Properties:
+      Name: university-portal-openai-rotation
+      DocumentType: Command
+      UpdateMethod: NewVersion
+      Content:
+        schemaVersion: "2.2"
+        description: Transactionally rotate university-portal OpenAI fallback
+        mainSteps:
+          - action: aws:runShellScript
+            name: rotateOpenAI
+            inputs:
+              timeoutSeconds: "150"
+              runCommand:
+                - |
+                  set -eu
+                  set +x
+                  umask 077
+                  env_path=/etc/university-portal/openai.env
+                  backup_path=/etc/university-portal/openai.env.pre-rotation
+                  absent_marker=/etc/university-portal/openai.env.pre-rotation-absent
+                  tmp=
+                  python=/root/University-and-Course-data/backend-py/venv/bin/python
+                  region="{{ global:REGION }}"
+
+                  restart_and_verify() {
+                    systemctl restart uni-api-py uni-celery
+                    sleep 8
+                    systemctl is-active --quiet uni-api-py uni-celery
+                    curl --fail --silent --show-error http://127.0.0.1:8000/api/health >/dev/null
+                    "$python" - "$env_path" <<'PY'
+                  import os, subprocess, sys
+                  expected = {}
+                  with open(sys.argv[1], encoding="utf-8") as stream:
+                      for line in stream:
+                          key, quoted = line.rstrip("\n").split("=", 1)
+                          expected[key] = bytes(quoted[1:-1], "utf-8").decode("unicode_escape")
+                  for unit in ("uni-api-py", "uni-celery"):
+                      pid = subprocess.check_output(
+                          ["systemctl", "show", "--property=MainPID", "--value", unit],
+                          text=True,
+                      ).strip()
+                      assert pid and pid != "0"
+                      process_env = dict(
+                          item.split(b"=", 1)
+                          for item in open(f"/proc/{pid}/environ", "rb").read().split(b"\0")
+                          if b"=" in item
+                      )
+                      for key, value in expected.items():
+                          assert process_env.get(key.encode()) == value.encode()
+                  PY
+                  }
+
+                  restore_previous() {
+                    if test -f "$backup_path"; then
+                      mv -f "$backup_path" "$env_path"
+                      restart_and_verify
+                    elif test -f "$absent_marker"; then
+                      rm -f "$env_path" "$absent_marker"
+                      systemctl restart uni-api-py uni-celery
+                      sleep 8
+                      systemctl is-active --quiet uni-api-py uni-celery
+                      curl --fail --silent --show-error http://127.0.0.1:8000/api/health >/dev/null
+                    else
+                      return 1
+                    fi
+                  }
+
+                  rollback_on_error() {
+                    rc=$?
+                    trap - EXIT
+                    test -z "$tmp" || rm -f "$tmp"
+                    if ! restore_previous; then
+                      echo "rotation and rollback failed; manual recovery required" >&2
+                    fi
+                    exit "$rc"
+                  }
+
+                  install -d -m 700 /etc/university-portal
+                  rm -f "$backup_path" "$absent_marker"
+                  if test -f "$env_path"; then
+                    cp -p "$env_path" "$backup_path"
+                  else
+                    touch "$absent_marker"
+                  fi
+                  trap rollback_on_error EXIT
+                  tmp=$(mktemp /etc/university-portal/openai.env.XXXXXX)
+                  "$python" - "$tmp" "$region" <<'PY'
+                  import json, os, sys
+                  import boto3
+                  raw = boto3.client("ssm", region_name=sys.argv[2]).get_parameter(
+                      Name="/university-portal/openai/configuration",
+                      WithDecryption=True,
+                  )["Parameter"]["Value"]
+                  config = json.loads(raw)
+                  assert set(config) == {"api_key", "base_url"}
+                  assert all(isinstance(value, str) and value for value in config.values())
+                  assert all("\n" not in value and "\r" not in value for value in config.values())
+                  with open(sys.argv[1], "w", encoding="utf-8") as stream:
+                      for key, name in (
+                          ("AI_INTEGRATIONS_OPENAI_API_KEY", "api_key"),
+                          ("AI_INTEGRATIONS_OPENAI_BASE_URL", "base_url"),
+                      ):
+                          escaped = config[name].replace("\\", "\\\\").replace('"', '\\"')
+                          stream.write(f'{key}="{escaped}"\n')
+                  os.chmod(sys.argv[1], 0o600)
+                  PY
+                  mv -f "$tmp" "$env_path"
+                  tmp=
+                  restart_and_verify
+                  rm -f "$backup_path" "$absent_marker"
+                  trap - EXIT
+                  echo rotated
+
+  DeploymentRotationPolicy:
+    Type: AWS::IAM::UserPolicy
+    Properties:
+      UserName: !Ref DeploymentUserName
+      PolicyName: university-portal-openai-rotation
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: WriteOnlyOpenAIParameters
+            Effect: Allow
+            Action: ssm:PutParameter
+            Resource:
+              - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/university-portal/openai/configuration
+          - Sid: RestartProductionServices
+            Effect: Allow
+            Action: ssm:SendCommand
+            Resource:
+              - !Sub arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${ProductionInstanceId}
+              - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:document/${OpenAIRotationDocument}
+          - Sid: ObserveOwnRotationCommand
+            Effect: Allow
+            Action: ssm:GetCommandInvocation
+            Resource: "*"
+
+  ProductionParameterReadPolicy:
+    Type: AWS::IAM::RolePolicy
+    Properties:
+      RoleName: !Ref ProductionInstanceRoleName
+      PolicyName: university-portal-openai-parameter-read
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: ReadOnlyOpenAIParameters
+            Effect: Allow
+            Action: ssm:GetParameter
+            Resource:
+              - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/university-portal/openai/configuration
+
+Outputs:
+  KmsKeyAlias:
+    Value: !Ref OpenAIParameterKeyAlias
