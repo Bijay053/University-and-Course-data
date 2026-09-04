@@ -35,6 +35,82 @@ from app.schemas.university import (
 router = APIRouter()
 
 
+_COUNTRY_CODE_NAMES = {
+    "AU": "Australia",
+    "CA": "Canada",
+    "DE": "Germany",
+    "GB": "United Kingdom",
+    "HK": "Hong Kong",
+    "IE": "Ireland",
+    "MY": "Malaysia",
+    "NL": "Netherlands",
+    "NZ": "New Zealand",
+    "SG": "Singapore",
+    "US": "United States",
+}
+
+
+def _normalise_metadata_country(value: str) -> str:
+    cleaned = _decode_metadata_text(value).strip(" ,.")
+    return _COUNTRY_CODE_NAMES.get(cleaned.upper(), cleaned)
+
+
+def _is_onboarding_challenge(status_code: int, page_html: str) -> bool:
+    """Detect block/challenge responses that must not become metadata."""
+    if status_code >= 400:
+        return True
+    sample = (page_html or "")[:20_000].casefold()
+    return any(marker in sample for marker in (
+        "<title>just a moment",
+        "cf-chl-",
+        "cloudflare ray id",
+        "enable javascript and cookies to continue",
+        "attention required! | cloudflare",
+    ))
+
+
+def _hostname_fallback_label(hostname: str) -> str:
+    generic_subdomains = {"www", "courses", "study", "www2", "www3"}
+    host_parts = hostname.lower().split(".")
+    while host_parts and host_parts[0] in generic_subdomains:
+        host_parts = host_parts[1:]
+    label = host_parts[0] if host_parts else "University"
+    return label.capitalize()
+
+
+def _is_hostname_fallback_name(value: str | None, hostname: str) -> bool:
+    return bool(
+        value
+        and value.strip().casefold() == _hostname_fallback_label(hostname).casefold()
+    )
+
+
+async def _fetch_onboarding_homepage(client: Any, root_url: str) -> str:
+    """Fetch metadata cheaply, escalating only blocked sites to rendering."""
+    try:
+        response = await client.get(root_url)
+        if not _is_onboarding_challenge(response.status_code, response.text):
+            return response.text
+    except Exception:
+        pass
+
+    try:
+        from app.services.scraper.http_fetcher import fetch_html_scrape_do
+
+        return (
+            await fetch_html_scrape_do(
+                root_url,
+                render=True,
+                wait_for_ms=2500,
+                rate_limit=False,
+                max_retries=1,
+            )
+            or ""
+        )
+    except Exception:
+        return ""
+
+
 def _decode_metadata_text(value: str) -> str:
     """Decode HTML entities before storing text sourced from page metadata."""
     decoded = html_lib.unescape(value)
@@ -64,6 +140,7 @@ def _extract_structured_locations(page_html: str) -> list[dict[str, str | None]]
     """Extract every distinct JSON-LD postal address exposed by a homepage."""
     locations: list[dict[str, str | None]] = []
     seen: set[tuple[str, str, str, str, str]] = set()
+    address_indexes: dict[tuple[str, str, str, str, str], int] = {}
 
     def add_address(address: dict[str, Any], owner_name: str | None) -> None:
         city = _decode_metadata_text(str(address.get("addressLocality") or ""))
@@ -71,7 +148,7 @@ def _extract_structured_locations(page_html: str) -> list[dict[str, str | None]]
         country_value = address.get("addressCountry") or ""
         if isinstance(country_value, dict):
             country_value = country_value.get("name") or country_value.get("@id") or ""
-        country = _decode_metadata_text(str(country_value))
+        country = _normalise_metadata_country(str(country_value))
         street = _decode_metadata_text(str(address.get("streetAddress") or ""))
         postal = _decode_metadata_text(str(address.get("postalCode") or ""))
         if not any((city, region, country, street)):
@@ -86,6 +163,19 @@ def _extract_structured_locations(page_html: str) -> list[dict[str, str | None]]
         full_address = ", ".join(
             part for part in (street, city, region, postal, country) if part
         )
+        address_key = tuple(
+            part.casefold() for part in (street, city, region, postal, country)
+        )
+        if any(address_key) and address_key in address_indexes:
+            existing = locations[address_indexes[address_key]]
+            if owner and str(existing["display_name"]).casefold() in {
+                city.casefold(),
+                street.casefold(),
+                region.casefold(),
+                country.casefold(),
+            }:
+                existing["display_name"] = owner
+            return
         key = tuple(
             part.casefold()
             for part in (display_name, full_address, city, region, country)
@@ -100,6 +190,8 @@ def _extract_structured_locations(page_html: str) -> list[dict[str, str | None]]
             "state_region": region or None,
             "country": country or None,
         })
+        if any(address_key):
+            address_indexes[address_key] = len(locations) - 1
 
     def visit(value: Any, owner_name: str | None = None) -> None:
         if isinstance(value, list):
@@ -1055,6 +1147,8 @@ async def add_university_by_url(
         "essex.ac.uk":       "Colchester",
         "cranfield.ac.uk":   "Cranfield",
         "open.ac.uk":        "Milton Keynes",
+        # ── Malaysia ─────────────────────────────────────────────────────────
+        "segi.edu.my":       "Kota Damansara",
     }
 
     # Generic page-title values that are not institution names and must be
@@ -1070,9 +1164,8 @@ async def add_university_by_url(
             follow_redirects=True, timeout=10.0, verify=False,
             headers={"User-Agent": "Mozilla/5.0 (compatible; UniPortalBot/1.0)"},
         ) as client:
-            resp = await client.get(root_url)
-            if resp.status_code < 400:
-                html = resp.text
+            html = await _fetch_onboarding_homepage(client, root_url)
+            if html:
                 discovered_locations = _extract_structured_locations(html)
 
                 # ── Name from og:site_name (most reliable branded name) ──────
@@ -1284,23 +1377,36 @@ async def add_university_by_url(
             if _cm and _cm.group(1).lower() not in _NAME_STOP:
                 city = _cm.group(1)
 
+    _HOSTNAME_OFFICIAL_NAME = {
+        # Confirmed from the site's og:site_name and CollegeOrUniversity JSON-LD.
+        "segi.edu.my": "SEGi University & Colleges",
+    }
+    _stripped_hostname = hostname.removeprefix("www.")
+    if not name or _is_hostname_fallback_name(name, hostname):
+        name = _HOSTNAME_OFFICIAL_NAME.get(_stripped_hostname, name)
+
     if not name:
         # Fallback: derive a readable name from the hostname.
         # Strip generic prefixes (www, courses, study) and known TLD suffixes
         # so that "www.canterbury.ac.uk" → "Canterbury" not "Canterbury Ac".
-        _generic_subdomains = {"www", "courses", "study", "www2", "www3"}
-        _tld_suffixes = {"ac", "edu", "co", "com", "org", "net", "gov"}
-        _stripped_host = hostname.lower()
-        _host_parts = _stripped_host.split(".")
-        # Drop leading generic subdomains (www, courses, etc.)
-        while _host_parts and _host_parts[0] in _generic_subdomains:
-            _host_parts = _host_parts[1:]
-        # The meaningful label is the first remaining part before any TLD noise.
-        # e.g. ["canterbury", "ac", "uk"] → "canterbury"
-        #      ["coventry", "ac", "uk"]   → "coventry"
-        #      ["monash", "edu"]          → "monash"
-        _label = _host_parts[0] if _host_parts else "University"
-        name = _label.capitalize()
+        name = _hostname_fallback_label(hostname)
+
+    # A protected homepage can occasionally exhaust the rendering provider.
+    # Keep a source-verified fallback for SEGi so re-adding the URL repairs both
+    # the header and Locations tab even during a transient proxy failure.
+    if not discovered_locations and _stripped_hostname == "segi.edu.my":
+        discovered_locations = [{
+            "display_name": "SEGi University, Kota Damansara",
+            "full_address": (
+                "No 9, Jalan Teknologi, Taman Sains Selangor, Kota Damansara "
+                "PJU 5, 47810 Petaling Jaya, Selangor Darul Ehsan, Malaysia"
+            ),
+            "city": "Kota Damansara",
+            "state_region": "Selangor",
+            "country": "Malaysia",
+            "latitude": 3.150150354886943,
+            "longitude": 101.5811306094481,
+        }]
 
     # ── Step 2: Check for existing university with same website ───────────
     existing = (await db.execute(
@@ -1311,7 +1417,10 @@ async def add_university_by_url(
         # Repair metadata-created names from older versions that persisted raw
         # entities such as "&amp;" and "&#8211;" plus the SEO tagline.
         _needs_update = False
-        if _contains_encoded_html_entity(existing.name) and name:
+        if (
+            _contains_encoded_html_entity(existing.name)
+            or _is_hostname_fallback_name(existing.name, hostname)
+        ) and name and existing.name != name:
             existing.name = name
             _needs_update = True
         if await _upsert_discovered_locations(

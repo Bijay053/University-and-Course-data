@@ -1,3 +1,6 @@
+import pytest
+
+from app.services.scraper import http_fetcher
 from app.routers.universities import (
     _campus_index_links,
     _campus_page_links,
@@ -6,7 +9,44 @@ from app.routers.universities import (
     _decode_metadata_text,
     _extract_structured_locations,
     _metadata_title_segments,
+    _hostname_fallback_label,
+    _fetch_onboarding_homepage,
+    _is_hostname_fallback_name,
+    _is_onboarding_challenge,
 )
+
+
+@pytest.mark.asyncio
+async def test_blocked_homepage_escalates_to_rendered_metadata(monkeypatch) -> None:
+    class Response:
+        status_code = 403
+        text = "<title>Just a moment...</title>"
+
+    class Client:
+        async def get(self, _url: str) -> Response:
+            return Response()
+
+    calls: list[dict] = []
+
+    async def fake_rendered_fetch(url: str, **kwargs) -> str:
+        calls.append({"url": url, **kwargs})
+        return "<title>SEGi University &amp; Colleges</title>"
+
+    monkeypatch.setattr(http_fetcher, "fetch_html_scrape_do", fake_rendered_fetch)
+
+    html = await _fetch_onboarding_homepage(
+        Client(),
+        "https://www.segi.edu.my",
+    )
+
+    assert "SEGi University" in html
+    assert calls == [{
+        "url": "https://www.segi.edu.my",
+        "render": True,
+        "wait_for_ms": 2500,
+        "rate_limit": False,
+        "max_retries": 1,
+    }]
 
 
 def test_decodes_html_entities_in_metadata_text() -> None:
@@ -26,6 +66,27 @@ def test_decodes_numeric_dash_before_splitting_seo_title() -> None:
 
 def test_normalizes_metadata_whitespace() -> None:
     assert _decode_metadata_text("Example&nbsp;&nbsp; University\n") == "Example University"
+
+
+def test_detects_cloudflare_onboarding_challenge() -> None:
+    assert _is_onboarding_challenge(403, "<title>Just a moment...</title>")
+    assert _is_onboarding_challenge(
+        200,
+        "<title>Just a moment...</title><div class='cf-chl-widget'></div>",
+    )
+    assert not _is_onboarding_challenge(
+        200,
+        "<title>SEGi University &amp; Colleges</title>",
+    )
+
+
+def test_identifies_hostname_derived_names_for_later_repair() -> None:
+    assert _hostname_fallback_label("www.segi.edu.my") == "Segi"
+    assert _is_hostname_fallback_name("Segi", "www.segi.edu.my")
+    assert not _is_hostname_fallback_name(
+        "SEGi University & Colleges",
+        "www.segi.edu.my",
+    )
 
 
 def test_detects_encoded_entities_in_existing_university_name() -> None:
@@ -97,6 +158,46 @@ def test_deduplicates_repeated_jsonld_locations() -> None:
     </script>
     """
     assert len(_extract_structured_locations(page_html)) == 1
+
+
+def test_prefers_branded_jsonld_owner_and_expands_country_code() -> None:
+    page_html = """
+    <script type="application/ld+json">
+    {"@graph": [
+      {
+        "@type": "Place",
+        "address": {
+          "streetAddress": "No 9, Jalan Teknologi",
+          "addressLocality": "Kota Damansara",
+          "addressRegion": "Selangor",
+          "postalCode": "47810",
+          "addressCountry": "MY"
+        }
+      },
+      {
+        "@type": "CollegeOrUniversity",
+        "name": "SEGi University & Colleges",
+        "address": {
+          "streetAddress": "No 9, Jalan Teknologi",
+          "addressLocality": "Kota Damansara",
+          "addressRegion": "Selangor",
+          "postalCode": "47810",
+          "addressCountry": "MY"
+        }
+      }
+    ]}
+    </script>
+    """
+
+    assert _extract_structured_locations(page_html) == [{
+        "display_name": "SEGi University & Colleges",
+        "full_address": (
+            "No 9, Jalan Teknologi, Kota Damansara, Selangor, 47810, Malaysia"
+        ),
+        "city": "Kota Damansara",
+        "state_region": "Selangor",
+        "country": "Malaysia",
+    }]
 
 
 def test_discovers_unique_campus_detail_pages() -> None:
