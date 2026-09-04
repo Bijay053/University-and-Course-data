@@ -14,6 +14,7 @@ from app.schemas.scrape import ScrapeStartResponse, StartScrapeBody
 from app.services.scraper.orchestrator import (
     _inject_extra_course_urls,
     _is_targeted_retry_payload,
+    _should_auto_discover_fee_page,
     _target_course_urls_from_payload,
 )
 
@@ -65,6 +66,19 @@ def test_targeted_retry_does_not_expand_with_yaml_extra_urls() -> None:
 
     assert (injected, moved) == (0, 0)
     assert links == [{"url": "https://example.edu/course/a", "name": "Targeted retry"}]
+
+
+def test_targeted_retry_does_not_probe_course_samples_for_fee_discovery() -> None:
+    assert not _should_auto_discover_fee_page(
+        has_fee_page=False,
+        has_links=True,
+        targeted_retry=True,
+    )
+    assert _should_auto_discover_fee_page(
+        has_fee_page=False,
+        has_links=True,
+        targeted_retry=False,
+    )
 
 
 def test_unresolved_history_entries_keep_latest_reason_per_url() -> None:

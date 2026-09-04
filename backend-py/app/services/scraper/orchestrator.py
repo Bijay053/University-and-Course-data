@@ -1071,6 +1071,16 @@ def _is_targeted_retry_payload(payload: dict | None) -> bool:
     return bool(_target_course_urls_from_payload(payload))
 
 
+def _should_auto_discover_fee_page(
+    *,
+    has_fee_page: bool,
+    has_links: bool,
+    targeted_retry: bool,
+) -> bool:
+    """Targeted retries must not re-run course-sample discovery probes."""
+    return not has_fee_page and has_links and not targeted_retry
+
+
 def _inject_extra_course_urls(
     links: list[dict],
     extra_urls: list[str],
@@ -3466,7 +3476,11 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 # blank-fee courses.
                 or _eff_uni_pages.get("feesPdf")
             )
-            if not has_fee_page and links:
+            if _should_auto_discover_fee_page(
+                has_fee_page=has_fee_page,
+                has_links=bool(links),
+                targeted_retry=_targeted_retry,
+            ):
                 # Bug 7: discovery may have encountered a real fee-page URL and
                 # blocked it (correct — it's not a course page) but saved it in
                 # _discover_blocked_fee_urls.  Use that URL as the fee candidate
