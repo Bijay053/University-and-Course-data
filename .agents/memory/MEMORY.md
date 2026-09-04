@@ -120,5 +120,6 @@
 - [Audience-scoped study mode](audience-scoped-study-mode.md) — international Location/Delivery is authoritative; Online must block synthetic campus defaults.
 - [SEGi current catalogue transport](segi-current-catalogue.md) — use university.segi.edu.my via an exact-host TLS exception; old archives are incomplete and current pages omit tuition.
 - [UNE recipe and fee authority](une-recipe-fee-authority.md) — keep slug/ID recipes aligned; current pages mix international tuition with CSP/scholarship blocks, so ambiguous fees must fail to review.
+- [UNE research offerings](une-research-offerings.md) — availability pivots use duplicated responsive labels; retain Research Period 1/2 and apply UNE’s research-specific English profile.
 - [Pilot training cost fee safety](pilot-training-fee-safety.md) — extra flight licences, ratings, and training costs are not tuition; BNU undergraduate blanks use its published annual fallback.
 - [Verified scraper recipe contracts](verified-scraper-recipe-contracts.md) — sitemap allow rules see full URLs; lock critical verified YAML paths against stale generated/operator overrides.
