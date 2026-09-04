@@ -7524,10 +7524,20 @@ async def extract_course(
             _fee_missing = any(payload.get(k) in (None, "", 0) for k in ("international_fee",))
             if _fee_missing and _central_fees:
                 _course_name_for_fee = payload.get("course_name") or ""
+                _central_fee_exact_only = False
+                try:
+                    _fee_match_cfg = get_uni_config()
+                    if _fee_match_cfg is not None:
+                        _central_fee_exact_only = bool(
+                            _fee_match_cfg.extraction.fees.central_fee_exact_match_only
+                        )
+                except Exception:  # noqa: BLE001
+                    pass
                 matched, _fee_confidence = match_central_fee(
                     _course_name_for_fee,
                     _central_fees,
                     degree_level=payload.get("degree_level"),
+                    exact_only=_central_fee_exact_only,
                 )
                 if matched and _fee_confidence != "none":
                     _prog = matched.get("program_pattern", "?")

@@ -6,6 +6,7 @@ import pytest
 
 from app.services.scraper.config import set_uni_config
 from app.services.scraper.config.loader import load_uni_config
+from app.services.scraper.central_pages import _parse_fee_page_html, match_central_fee
 
 
 @pytest.mark.parametrize("university_id", [15, 2288])
@@ -53,6 +54,11 @@ def test_une_duplicate_recipes_resolve_to_same_hardened_strategy(
     assert config.extraction.recovery_sweep_max_items == 3
     assert config.extraction.recovery_sweep_time_budget_seconds == 120
     assert config.extraction.fees.force_central_fee_stage is True
+    assert config.extraction.fees.central_fee_exact_match_only is True
+    assert config.extraction.fees.central_page == (
+        "https://www.une.edu.au/international/fees-and-scholarships/"
+        "course-fees-2027"
+    )
     assert (
         config.extraction.fees.require_explicit_international_context is True
     )
@@ -116,3 +122,71 @@ async def test_une_discovery_fetch_goes_directly_to_render() -> None:
     assert scrape_do.call_args.kwargs["render"] is True
     direct.assert_not_called()
     cffi.assert_not_awaited()
+
+
+def test_une_central_fee_table_accepts_declared_aud_annual_bare_amounts() -> None:
+    html = """
+    <main>
+      <h1>Course fees - 2027</h1>
+      <p>All fees are quoted in Australian (AUD) dollars.</p>
+      <p>*Annual course fees only cover the cost of tuition.</p>
+      <table>
+        <tr>
+          <th>Courses available to International Students in 2027</th>
+          <th>Intakes</th><th>CRICOS</th><th>Fee</th>
+        </tr>
+        <tr>
+          <td>Courses available to International Students in 2027 Bachelor of Biomedical Science</td>
+          <td>Intakes 1 &amp; 2 &amp; 3</td><td>CRICOS 061315J</td><td>Fee 35,808*</td>
+        </tr>
+        <tr>
+          <td>Courses available to International Students in 2027 Master of Professional Accounting</td>
+          <td>Intakes 1 &amp; 2</td><td>CRICOS 084168C</td><td>Fee 37,296*</td>
+        </tr>
+      </table>
+    </main>
+    """
+
+    records = _parse_fee_page_html(
+        html,
+        "https://www.une.edu.au/international/fees-and-scholarships/"
+        "course-fees-2027",
+    )
+
+    assert [(r["program_pattern"], r["international_fee"], r["per"]) for r in records] == [
+        ("Bachelor of Biomedical Science", 35_808, "Annual"),
+        ("Master of Professional Accounting", 37_296, "Annual"),
+    ]
+
+
+def test_une_exact_only_fee_matching_rejects_nearby_award_name() -> None:
+    central_fees = [
+        {
+            "program_pattern": "Graduate Certificate in Business",
+            "international_fee": 17_736,
+            "currency": "AUD",
+            "per": "Annual",
+        },
+        {
+            "program_pattern": "Graduate Certificate in Data Science",
+            "international_fee": 17_904,
+            "currency": "AUD",
+            "per": "Annual",
+        },
+    ]
+
+    exact, confidence = match_central_fee(
+        "Graduate Certificate in Data Science",
+        central_fees,
+        exact_only=True,
+    )
+    assert confidence == "exact"
+    assert exact["international_fee"] == 17_904
+
+    absent, confidence = match_central_fee(
+        "Graduate Certificate in Agribusiness",
+        central_fees,
+        exact_only=True,
+    )
+    assert absent is None
+    assert confidence == "none"

@@ -64,6 +64,7 @@ _CURRENCY_RE = re.compile(
     r"(?:A\$|AUD\s*|NZ\$|CA\$|US\$|GBP\s*|£|\$)\s*([\d,]+(?:\.\d+)?)",
     re.IGNORECASE,
 )
+_BARE_FEE_RE = re.compile(r"^\s*([\d]{1,3}(?:,\d{3})+(?:\.\d+)?)\s*\*?\s*$")
 
 _PER_TRIMESTER_RE = re.compile(r"\b(per\s*trimester|per\s*tri)\b", re.IGNORECASE)
 _PER_SEMESTER_RE = re.compile(r"\b(per\s*semester|per\s*sem)\b", re.IGNORECASE)
@@ -112,6 +113,18 @@ def _parse_fee_amount(text: str) -> float | None:
         if _FEE_MIN <= val <= _FEE_MAX:
             return val
     return None
+
+
+def _parse_bare_fee_amount(text: str) -> float | None:
+    """Parse a bare table-cell amount after its currency/audience is proven."""
+    match = _BARE_FEE_RE.match(text)
+    if not match:
+        return None
+    try:
+        value = float(match.group(1).replace(",", ""))
+    except ValueError:
+        return None
+    return value if _FEE_MIN <= value <= _FEE_MAX else None
 
 
 def _infer_per_term(text: str) -> str | None:
@@ -166,6 +179,15 @@ def _parse_fee_page_html(html: str, page_url: str) -> list[CentralFeeRecord]:
         return []
 
     records: list[CentralFeeRecord] = []
+    page_text = soup.get_text(" ", strip=True)
+    page_declares_aud = bool(
+        re.search(
+            r"\ball\s+fees\b.{0,80}\b(?:Australian\s*\(AUD\)\s*dollars|AUD\b)",
+            page_text,
+            re.IGNORECASE,
+        )
+    )
+    page_fee_term = _infer_per_term(page_text)
 
     # ── Strategy 1: <table> rows ────────────────────────────────────────────
     for table in soup.find_all("table"):
@@ -191,7 +213,15 @@ def _parse_fee_page_html(html: str, page_url: str) -> list[CentralFeeRecord]:
             row1_text = " ".join(row1_cells)
             row0_has_fee = any(k in " ".join(header_cells) for k in ("fee", "tuition", "international", "domestic"))
             row1_has_fee_col = any(k in row1_text for k in ("subject fee", "course fee", "unit fee", "international", "total fee", "program fee"))
-            if row1_has_fee_col and not any(k in " ".join(header_cells) for k in ("subject fee", "course fee", "unit fee", "total fee", "program fee")):
+            row1_has_data_amount = bool(
+                _CURRENCY_RE.search(row1_text)
+                or re.search(r"\b\d{1,3}(?:,\d{3})+(?:\.\d+)?\b", row1_text)
+            )
+            if (
+                row1_has_fee_col
+                and not row1_has_data_amount
+                and not any(k in " ".join(header_cells) for k in ("subject fee", "course fee", "unit fee", "total fee", "program fee"))
+            ):
                 # rows[0] is a title/label row; rows[1] contains real column headers
                 effective_header_cells = row1_cells
                 data_start = 2
@@ -224,6 +254,22 @@ def _parse_fee_page_html(html: str, page_url: str) -> list[CentralFeeRecord]:
              if any(k in h for k in ("subject fee", "unit fee", "per subject", "per unit"))),
             None,
         )
+        plain_fee_col = next(
+            (
+                i
+                for i, h in enumerate(effective_header_cells)
+                if h.strip() in {"fee", "fees", "tuition fee", "tuition fees"}
+            ),
+            None,
+        )
+        table_is_international = "international" in " ".join(
+            effective_header_cells
+        )
+        safe_plain_fee_col = (
+            plain_fee_col
+            if page_declares_aud and table_is_international
+            else None
+        )
 
         # Column priority: explicit intl > total-course > per-unit > domestic > scan-all
         # KBS: intl_col may match the *title* row "International..." and point to col 0
@@ -234,13 +280,15 @@ def _parse_fee_page_html(html: str, page_url: str) -> list[CentralFeeRecord]:
 
         primary_fee_col = intl_col if intl_col is not None else (
             total_col if total_col is not None else (
-                unit_col if unit_col is not None else None
+                unit_col if unit_col is not None else safe_plain_fee_col
             )
         )
 
         # Sniff the per-term from the header row text.
         header_text = " ".join(effective_header_cells)
         per_term = _infer_per_term(header_text)
+        if safe_plain_fee_col is not None:
+            per_term = per_term or page_fee_term
         # "Course fee" column = full program total → "Full Course";
         # "Subject fee" column = per-unit enrolment → "Per Unit".
         # These match the controlled enum used by fee.py and the UI dropdown.
@@ -301,6 +349,20 @@ def _parse_fee_page_html(html: str, page_url: str) -> list[CentralFeeRecord]:
             if not cells:
                 continue
             cell_texts = [c.get_text(" ", strip=True) for c in cells]
+            # Responsive tables often repeat the column header inside every
+            # data cell (e.g. UNE: "Fee 35,472*" and "Courses available to
+            # International Students in 2027 Advanced Diploma in Accounting").
+            # Strip only an exact header prefix from the matching column.
+            for cell_idx, cell_text in enumerate(cell_texts):
+                if cell_idx >= len(effective_header_cells):
+                    continue
+                header_prefix = effective_header_cells[cell_idx].strip()
+                if (
+                    header_prefix
+                    and cell_text.lower().startswith(header_prefix)
+                    and len(cell_text) > len(header_prefix)
+                ):
+                    cell_texts[cell_idx] = cell_text[len(header_prefix):].strip()
             if len(cell_texts) <= prog_col:
                 continue
 
@@ -370,6 +432,13 @@ def _parse_fee_page_html(html: str, page_url: str) -> list[CentralFeeRecord]:
 
             if primary_fee_col is not None and primary_fee_col < len(cell_texts):
                 intl_fee = _parse_fee_amount(cell_texts[primary_fee_col])
+                if (
+                    intl_fee is None
+                    and primary_fee_col == safe_plain_fee_col
+                ):
+                    intl_fee = _parse_bare_fee_amount(
+                        cell_texts[primary_fee_col]
+                    )
             if dom_col is not None and dom_col < len(cell_texts):
                 dom_fee = _parse_fee_amount(cell_texts[dom_col])
 
@@ -2186,6 +2255,7 @@ def match_central_fee(
     degree_level: str | None = None,
     *,
     threshold: float = 80.0,
+    exact_only: bool = False,
 ) -> tuple[CentralFeeRecord | None, str]:
     """Find the best-matching fee record for a course name.
 
@@ -2369,6 +2439,9 @@ def match_central_fee(
                 rec.get("international_fee"),
             )
             return rec, "exact"
+
+    if exact_only:
+        return None, "none"
 
     # ── Pass 2: WRatio fuzzy match ───────────────────────────────────────────
     for rec in central_fees:

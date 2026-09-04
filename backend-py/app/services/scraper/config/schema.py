@@ -2111,6 +2111,15 @@ class FeesConfig(BaseModel):
             "Canterbury (NZ) — where the bucket fee IS the correct fee."
         ),
     )
+    central_fee_exact_match_only: bool = Field(
+        default=False,
+        description=(
+            "When true, central fee schedule rows are applied only when the "
+            "normalised course title matches exactly. Use for schedules where "
+            "nearby award names can have different availability or prices. "
+            "Default false preserves guarded fuzzy matching."
+        ),
+    )
     follow_links: list[str] = Field(
         default_factory=list,
         description=(

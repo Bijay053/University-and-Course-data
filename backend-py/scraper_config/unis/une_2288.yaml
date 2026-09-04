@@ -92,8 +92,10 @@ extraction:
   recovery_sweep_time_budget_seconds: 120
 
   fees:
+    central_page: https://www.une.edu.au/international/fees-and-scholarships/course-fees-2027
     default_currency: AUD
     force_central_fee_stage: true
+    central_fee_exact_match_only: true
     require_explicit_international_context: true
 
   english:
