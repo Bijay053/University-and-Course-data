@@ -19,10 +19,11 @@ discovery:
   allowed_extra_hostnames:
     - "university.segi.edu.my"
 
-  # Static proxy calls cannot complete the target's redirect/TLS path, but
-  # Scrape.do's browser renderer succeeds.
-  scrape_do_skip_fallbacks: true
-  scrape_do_render: true
+  # The official host presents an incomplete TLS chain. Production probes
+  # confirm direct verify=False fetches are fast and stable; scope the exception
+  # to this exact hostname and never fall through to proxies or stale archives.
+  insecure_tls_direct_hostnames:
+    - "university.segi.edu.my"
 
   expected_min_courses: 80
   max_candidates: 150
@@ -34,12 +35,9 @@ discovery:
     - "^https?://university\\.segi\\.edu\\.my/course-search(?:/|$)"
 
 extraction:
-  scrape_do_render: true
-  scrape_do_skip_fallbacks: true
-  scrape_do_render_only: true
   skip_browser_rescue: true
   skip_per_course_browser: true
-  max_parallel_fetch: 2
+  max_parallel_fetch: 4
 
   fees:
     default_currency: MYR

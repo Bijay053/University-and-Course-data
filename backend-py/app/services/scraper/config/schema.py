@@ -1477,6 +1477,16 @@ class DiscoveryConfig(BaseModel):
             "SCRAPE_DO_TOKEN is set and discovery.scrape_do_skip_fallbacks is True."
         ),
     )
+    insecure_tls_direct_hostnames: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Exact hostnames that must be fetched with TLS certificate "
+            "verification disabled because the official server presents an "
+            "incomplete certificate chain. Matching hosts use a bounded direct "
+            "httpx transport and do not fall through to proxies or archives. "
+            "Keep this list narrowly scoped to verified official hosts."
+        ),
+    )
     scrape_do_super: bool = Field(
         default=False,
         description=(
@@ -3336,15 +3346,6 @@ class ExtractionConfig(BaseModel):
             "a challenge page (e.g. UWL) — skipping the two doomed attempts saves "
             "~1-2s per course which compounds to several minutes across a full run. "
             "Has no effect unless SCRAPE_DO_TOKEN is set and scrape_do_render is True."
-        ),
-    )
-    scrape_do_render_only: bool = Field(
-        default=False,
-        description=(
-            "When True (with scrape_do_render and scrape_do_skip_fallbacks), "
-            "never retry course pages through Scrape.do static or Wayback after "
-            "rendered-proxy failures. Use when static cannot reach the current "
-            "official host and archived pages are stale or incomplete."
         ),
     )
     scrape_do_static: bool = Field(

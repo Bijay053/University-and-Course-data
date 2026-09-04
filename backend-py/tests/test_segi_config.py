@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -38,8 +39,11 @@ def test_segi_production_config_uses_current_official_catalogue() -> None:
     assert config.discovery.allowed_extra_hostnames == [
         "university.segi.edu.my"
     ]
-    assert config.discovery.scrape_do_skip_fallbacks is True
-    assert config.discovery.scrape_do_render is True
+    assert config.discovery.scrape_do_skip_fallbacks is False
+    assert config.discovery.scrape_do_render is False
+    assert config.discovery.insecure_tls_direct_hostnames == [
+        "university.segi.edu.my"
+    ]
     assert config.discovery.allow_url_patterns == [
         r"^https?://university\.segi\.edu\.my/course/[^/?#]+/?$"
     ]
@@ -55,9 +59,8 @@ def test_segi_production_config_uses_current_official_catalogue() -> None:
         config.discovery.allow_url_patterns[0],
         "https://www.segi.edu.my/course/master-of-accountancy/",
     )
-    assert config.extraction.scrape_do_render is True
-    assert config.extraction.scrape_do_skip_fallbacks is True
-    assert config.extraction.scrape_do_render_only is True
+    assert config.extraction.scrape_do_render is False
+    assert config.extraction.scrape_do_skip_fallbacks is False
     assert config.extraction.staging.require_international_fee is False
     assert config.extraction.staging.stage_on_parser_error is True
     assert config.extraction.fees.default_currency == "MYR"
@@ -65,7 +68,7 @@ def test_segi_production_config_uses_current_official_catalogue() -> None:
 
 
 @pytest.mark.asyncio
-async def test_segi_course_fetch_routes_directly_to_rendered_proxy() -> None:
+async def test_segi_course_fetch_uses_exact_host_tls_exception() -> None:
     from app.services.scraper.config import set_uni_config
     from app.services.scraper import http_fetcher
 
@@ -79,34 +82,38 @@ async def test_segi_course_fetch_routes_directly_to_rendered_proxy() -> None:
 
     with (
         patch.object(
+            http_fetcher.httpx.AsyncClient,
+            "get",
+            new=AsyncMock(
+                return_value=SimpleNamespace(
+                    status_code=200,
+                    text="<html>" + ("course " * 200) + "</html>",
+                )
+            ),
+        ) as direct,
+        patch.object(
             http_fetcher,
             "fetch_html_scrape_do",
-            new=AsyncMock(return_value="<html>" + ("course " * 200) + "</html>"),
+            new=AsyncMock(side_effect=AssertionError("proxy must not run")),
         ) as scrape_do,
         patch.object(
             http_fetcher,
             "fetch_html_cffi",
             new=AsyncMock(side_effect=AssertionError("curl_cffi must not run")),
         ) as cffi,
-        patch.object(
-            http_fetcher.httpx.AsyncClient,
-            "get",
-            new=AsyncMock(side_effect=AssertionError("direct HTTP must not run")),
-        ) as direct,
     ):
         html = await http_fetcher.fetch_html(
             "https://university.segi.edu.my/course/bachelor-of-psychology-honours/"
         )
 
     assert html
-    scrape_do.assert_awaited_once()
-    assert scrape_do.call_args.kwargs["render"] is True
+    direct.assert_awaited_once()
+    scrape_do.assert_not_awaited()
     cffi.assert_not_awaited()
-    direct.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_segi_failed_render_never_uses_static_or_wayback() -> None:
+async def test_segi_tls_exception_failure_never_uses_proxy_or_wayback() -> None:
     from app.services.scraper.config import set_uni_config
     from app.services.scraper import http_fetcher
 
@@ -119,17 +126,18 @@ async def test_segi_failed_render_never_uses_static_or_wayback() -> None:
     set_uni_config(config)
 
     with (
-        http_fetcher.scrape_do_render_scope(),
         patch.object(
-            http_fetcher,
-            "fetch_html_scrape_do",
-            new=AsyncMock(return_value=None),
-        ) as scrape_do,
-        patch.object(
-            http_fetcher,
-            "fetch_html_wayback",
-            new=AsyncMock(side_effect=AssertionError("stale archive must not run")),
-        ) as wayback,
+            http_fetcher.httpx.AsyncClient,
+            "get",
+            new=AsyncMock(
+                side_effect=httpx.ConnectError(
+                    "official host temporarily unavailable"
+                )
+            ),
+        ) as direct,
+        patch.object(http_fetcher, "fetch_html_scrape_do", new=AsyncMock()) as scrape_do,
+        patch.object(http_fetcher, "fetch_html_wayback", new=AsyncMock()) as wayback,
+        patch.object(http_fetcher, "fetch_html_cffi", new=AsyncMock()) as cffi,
         patch.object(http_fetcher.asyncio, "sleep", new=AsyncMock()),
     ):
         html = await http_fetcher.fetch_html(
@@ -137,13 +145,14 @@ async def test_segi_failed_render_never_uses_static_or_wayback() -> None:
         )
 
     assert html is None
-    assert scrape_do.await_count == 4
-    assert all(call.kwargs["render"] is True for call in scrape_do.await_args_list)
+    assert direct.await_count == 3
+    scrape_do.assert_not_awaited()
     wayback.assert_not_awaited()
+    cffi.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_segi_discovery_fetch_is_render_only() -> None:
+async def test_segi_tls_exception_rejects_cross_host_redirect() -> None:
     from app.services.scraper.config import set_uni_config
     from app.services.scraper import http_fetcher
 
@@ -157,30 +166,116 @@ async def test_segi_discovery_fetch_is_render_only() -> None:
 
     with (
         patch.object(
-            http_fetcher,
-            "fetch_html_scrape_do",
-            new=AsyncMock(return_value=None),
-        ) as scrape_do,
+            http_fetcher.httpx.AsyncClient,
+            "get",
+            new=AsyncMock(
+                return_value=SimpleNamespace(
+                    status_code=302,
+                    headers={"location": "https://attacker.example/internal"},
+                    text="",
+                )
+            ),
+        ) as direct,
+        patch.object(http_fetcher, "fetch_html_scrape_do", new=AsyncMock()) as scrape_do,
+        patch.object(http_fetcher, "fetch_html_wayback", new=AsyncMock()) as wayback,
+        patch.object(http_fetcher, "fetch_html_cffi", new=AsyncMock()) as cffi,
+    ):
+        html = await http_fetcher.fetch_html(
+            "https://university.segi.edu.my/course/current-course/"
+        )
+
+    assert html is None
+    direct.assert_awaited_once()
+    assert http_fetcher.get_last_fetch_failure() == {
+        "kind": "unsafe_redirect",
+        "reason": (
+            "Exact-host TLS exception rejected redirect from "
+            "'https://university.segi.edu.my/course/current-course/' "
+            "to 'https://attacker.example/internal'."
+        ),
+        "retryable": False,
+        "transport": "direct_insecure_tls",
+        "terminal": True,
+        "status_code": 302,
+    }
+    scrape_do.assert_not_awaited()
+    wayback.assert_not_awaited()
+    cffi.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_segi_tls_exception_allows_same_host_https_redirect() -> None:
+    from app.services.scraper.config import set_uni_config
+    from app.services.scraper import http_fetcher
+
+    config = load_uni_config(
+        slug="segi",
+        scrape_url="https://www.segi.edu.my/",
+        university_id=13,
+        name="SEGi University & Colleges",
+    )
+    set_uni_config(config)
+    final_html = "<html>" + ("course " * 200) + "</html>"
+
+    with patch.object(
+        http_fetcher.httpx.AsyncClient,
+        "get",
+        new=AsyncMock(
+            side_effect=[
+                SimpleNamespace(
+                    status_code=301,
+                    headers={"location": "/course/canonical/"},
+                    text="",
+                ),
+                SimpleNamespace(status_code=200, headers={}, text=final_html),
+            ]
+        ),
+    ) as direct:
+        html = await http_fetcher.fetch_html(
+            "https://university.segi.edu.my/course/current-course/"
+        )
+
+    assert html == final_html
+    assert [call.args[0] for call in direct.await_args_list] == [
+        "https://university.segi.edu.my/course/current-course/",
+        "https://university.segi.edu.my/course/canonical/",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_segi_tls_exception_does_not_apply_to_other_hosts() -> None:
+    from app.services.scraper.config import set_uni_config
+    from app.services.scraper import http_fetcher
+
+    config = load_uni_config(
+        slug="segi",
+        scrape_url="https://www.segi.edu.my/",
+        university_id=13,
+        name="SEGi University & Colleges",
+    )
+    set_uni_config(config)
+
+    with (
         patch.object(
             http_fetcher.httpx.AsyncClient,
             "get",
-            new=AsyncMock(side_effect=AssertionError("direct HTTP must not run")),
+            new=AsyncMock(
+                side_effect=AssertionError(
+                    "one-off insecure client must not run for another host"
+                )
+            ),
         ) as direct,
         patch.object(
             http_fetcher,
-            "fetch_html_cffi",
-            new=AsyncMock(side_effect=AssertionError("curl_cffi must not run")),
-        ) as cffi,
+            "_get_shared_client",
+            side_effect=RuntimeError("normal verified path reached"),
+        ) as shared_client,
     ):
-        html = await http_fetcher.fetch_html(
-            "https://university.segi.edu.my/site-map/"
-        )
+        html = await http_fetcher.fetch_html("https://other.example/course/x/")
 
-    assert html == ""
-    scrape_do.assert_awaited_once()
-    assert scrape_do.call_args.kwargs["render"] is True
+    assert html is None
+    assert shared_client.call_count == 3
     direct.assert_not_awaited()
-    cffi.assert_not_awaited()
 
 
 @pytest.mark.asyncio

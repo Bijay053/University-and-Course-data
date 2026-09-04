@@ -1276,6 +1276,151 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
     _scrape_do_static = _scrape_do_static_active.get()
     _has_scrape_do = bool(os.environ.get("SCRAPE_DO_TOKEN"))
 
+    # Exact-host TLS exception for official servers with an incomplete
+    # certificate chain. This route is deliberately terminal: once configured,
+    # a failure must not fall through to paid proxies or stale archives.
+    _insecure_tls_hosts: set[str] = set()
+    try:
+        from app.services.scraper.config.context import get_uni_config as _guc_tls
+        _insecure_tls_hosts = {
+            str(host).strip().lower().rstrip(".")
+            for host in _guc_tls().discovery.insecure_tls_direct_hostnames
+            if str(host).strip()
+        }
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        _url_host = (urllib.parse.urlsplit(url).hostname or "").lower().rstrip(".")
+    except (TypeError, ValueError):
+        _url_host = ""
+    if _url_host and _url_host in _insecure_tls_hosts:
+        _attempts = max(1, int(retries) + 1)
+        for _attempt in range(1, _attempts + 1):
+            try:
+                async with _get_sem():
+                    async with httpx.AsyncClient(
+                        timeout=30,
+                        follow_redirects=False,
+                        verify=False,
+                        headers={
+                            "User-Agent": _BROWSER_UA,
+                            "Accept": (
+                                "text/html,application/xhtml+xml,"
+                                "application/xml;q=0.9,*/*;q=0.8"
+                            ),
+                            "Accept-Language": "en-AU,en;q=0.9",
+                        },
+                    ) as _tls_client:
+                        _tls_url = url
+                        _tls_seen_urls = {url}
+                        for _redirect_count in range(6):
+                            _tls_response = await _tls_client.get(_tls_url)
+                            if _tls_response.status_code not in {
+                                301, 302, 303, 307, 308
+                            }:
+                                break
+                            _location = _tls_response.headers.get("location", "")
+                            try:
+                                _redirect_url = urllib.parse.urljoin(
+                                    _tls_url, _location
+                                )
+                                _redirect_parts = urllib.parse.urlsplit(_redirect_url)
+                                _redirect_host = (
+                                    _redirect_parts.hostname or ""
+                                ).lower().rstrip(".")
+                            except (TypeError, ValueError):
+                                _redirect_url = ""
+                                _redirect_parts = urllib.parse.SplitResult(
+                                    "", "", "", "", ""
+                                )
+                                _redirect_host = ""
+                            if (
+                                _redirect_parts.scheme.lower() != "https"
+                                or _redirect_host not in _insecure_tls_hosts
+                            ):
+                                _record_fetch_failure(
+                                    kind="unsafe_redirect",
+                                    reason=(
+                                        "Exact-host TLS exception rejected redirect "
+                                        f"from {_tls_url!r} to {_redirect_url!r}."
+                                    ),
+                                    retryable=False,
+                                    transport="direct_insecure_tls",
+                                    status_code=_tls_response.status_code,
+                                    terminal=True,
+                                )
+                                log.error(
+                                    "fetch %s: exact-host TLS exception rejected "
+                                    "non-HTTPS or non-allowlisted redirect to %s",
+                                    url,
+                                    _redirect_url or "<invalid>",
+                                )
+                                return None
+                            if (
+                                _redirect_url in _tls_seen_urls
+                                or _redirect_count == 5
+                            ):
+                                _record_fetch_failure(
+                                    kind="redirect_loop",
+                                    reason=(
+                                        "Exact-host TLS exception exceeded its "
+                                        "same-host redirect limit."
+                                    ),
+                                    retryable=False,
+                                    transport="direct_insecure_tls",
+                                    status_code=_tls_response.status_code,
+                                    terminal=True,
+                                )
+                                return None
+                            _tls_seen_urls.add(_redirect_url)
+                            _tls_url = _redirect_url
+                if (
+                    _tls_response.status_code == 200
+                    and len(_tls_response.text) > 500
+                    and not is_challenge_shell(_tls_response.text)
+                ):
+                    _last_fetch_failure.set(None)
+                    from app.services.scraper.snapshot_context import (
+                        stage_snapshot as _stage,
+                    )
+                    _stage(url, _tls_response.text, "direct_insecure_tls")
+                    log.info(
+                        "fetch %s -> 200 via exact-host TLS exception "
+                        "(%d chars, attempt %d/%d)",
+                        url,
+                        len(_tls_response.text),
+                        _attempt,
+                        _attempts,
+                    )
+                    return _tls_response.text
+                _status = _tls_response.status_code
+                _record_fetch_failure(
+                    kind="origin_http_error",
+                    reason=(
+                        f"Exact-host TLS exception returned HTTP {_status} "
+                        "or unusable HTML."
+                    ),
+                    retryable=_status in {429, 500, 502, 503, 504},
+                    transport="direct_insecure_tls",
+                    status_code=_status,
+                )
+            except (httpx.TimeoutException, httpx.TransportError) as _tls_exc:
+                _record_fetch_failure(
+                    kind="network_error",
+                    reason=f"Exact-host TLS exception failed: {_tls_exc}",
+                    retryable=True,
+                    transport="direct_insecure_tls",
+                )
+            if _attempt < _attempts:
+                await asyncio.sleep(float(_attempt))
+        log.warning(
+            "fetch %s: exact-host TLS exception exhausted after %d attempt(s); "
+            "not falling through to proxy/archive transports",
+            url,
+            _attempts,
+        )
+        return None
+
     # Read per-university geo code (ISO 3166-1 alpha-2) for Scrape.do pinning.
     _scrape_do_geo: str | None = None
     if _scrape_do_static or _scrape_do_render:
@@ -1310,13 +1455,11 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
     # Cloudflare WAF (e.g. UWL) every direct-HTTP attempt returns a challenge
     # page — skipping them saves ~1-2s per course (several minutes per full run).
     if _scrape_do_render and _has_scrape_do:
-        _render_only = False
         _allow_wayback_last_resort = True
         try:
             from app.services.scraper.config.context import get_uni_config
             _active_config = get_uni_config()
             _skip_fallbacks = _active_config.extraction.scrape_do_skip_fallbacks
-            _render_only = _active_config.extraction.scrape_do_render_only
             _allow_wayback_last_resort = (
                 _active_config.discovery.use_wayback is not False
             )
@@ -1334,15 +1477,14 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
             # concurrent load).  Fall back to Scrape.do static before giving up —
             # for many Cloudflare-protected SPAs (e.g. UWL) the residential proxy
             # path returns fully hydrated HTML even without headless Chrome.
-            if not _render_only:
-                log.info(
-                    "fetch %s: scrape_do_skip_fallbacks fast-path: render=True failed"
-                    " — falling back to Scrape.do static",
-                    url,
-                )
-                _static = await fetch_html_scrape_do(url, render=False)
-                if _static is not None and not _is_spa_shell(_static):
-                    return _static
+            log.info(
+                "fetch %s: scrape_do_skip_fallbacks fast-path: render=True failed"
+                " — falling back to Scrape.do static",
+                url,
+            )
+            _static = await fetch_html_scrape_do(url, render=False)
+            if _static is not None and not _is_spa_shell(_static):
+                return _static
             # Both render AND static failed on the first pass.  For universities
             # that ALSO have skip_browser_rescue=true (e.g. QMUL — datacenter IP
             # is blocked for both httpx and our own Playwright pool, so browser
@@ -1366,11 +1508,7 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
             # spread across ~26s of backoff, giving transient saturation time
             # to clear.
             _retry_backoffs = (3.0, 8.0, 15.0)
-            _retry_modes = (
-                (True, True, True)
-                if _render_only
-                else (True, False, True)
-            )
+            _retry_modes = (True, False, True)
             _rendered_retry: str | None = None
             for _attempt, (_backoff, _use_render) in enumerate(
                 zip(_retry_backoffs, _retry_modes), start=1
@@ -1405,7 +1543,7 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
             # AND static AND the render-retry all failed transiently. This
             # only fires after 3 Scrape.do attempts already failed, so the
             # extra archive.org round-trip cost is negligible.
-            if not _render_only and _allow_wayback_last_resort:
+            if _allow_wayback_last_resort:
                 log.info(
                     "fetch %s: scrape_do_skip_fallbacks fast-path exhausted"
                     " after render retry — trying Wayback Machine as last resort",
@@ -1418,9 +1556,8 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
                     return _wayback_last_resort
             log.info(
                 "fetch %s: scrape_do_skip_fallbacks fast-path exhausted"
-                " (render_only=%s, wayback_allowed=%s) — giving up (fetch_failed)",
+                " (wayback_allowed=%s) — giving up (fetch_failed)",
                 url,
-                _render_only,
                 _allow_wayback_last_resort,
             )
             return None
