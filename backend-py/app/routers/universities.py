@@ -1457,7 +1457,7 @@ async def add_university_by_url(
     # the header and Locations tab even during a transient proxy failure.
     if not discovered_locations and _stripped_hostname == "segi.edu.my":
         discovered_locations = [{
-            "display_name": "SEGi University, Kota Damansara",
+            "display_name": "SEGi University & Colleges",
             "full_address": (
                 "No 9, Jalan Teknologi, Taman Sains Selangor, Kota Damansara "
                 "PJU 5, 47810 Petaling Jaya, Selangor Darul Ehsan, Malaysia"
