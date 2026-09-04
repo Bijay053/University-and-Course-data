@@ -9,9 +9,13 @@ from __future__ import annotations
 import importlib
 import inspect
 import asyncio
+from datetime import datetime, timedelta, timezone
+import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from fastapi import HTTPException
+from sqlalchemy import delete, select, update
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -198,6 +202,163 @@ async def test_discovery_failure_alert_uses_runtime_job_id_and_delivers(
     assert persisted.delivery_attempted_at is not None
     assert delivered[0]["diagnostic"]["job_id"] == "stable-runtime-job"
     assert delivered[0]["candidates_found"] == candidates_found
+
+
+@pytest.mark.asyncio
+async def test_overlapping_discovery_alert_retry_keeps_newest_attempt_authoritative(
+    monkeypatch,
+) -> None:
+    """A stale initial send cannot overwrite a completed retry."""
+    from app.database import AsyncSessionLocal, engine
+    from app.models.discovery_failure_alert import DiscoveryFailureAlert
+    from app.models.scrape_runtime import ScrapeRuntimeJob
+    from app.models.university import University
+    from app.routers import discovery_failure_alerts as alerts_router
+    from app.services.scraper import alert_delivery
+    from app.services.scraper.orchestrator import (
+        _persist_and_deliver_discovery_failure_alert,
+    )
+
+    await engine.dispose()
+    suffix = uuid.uuid4().hex[:12]
+    initial_started = asyncio.Event()
+    release_initial = asyncio.Event()
+    delivery_calls = 0
+
+    async def _interleaved_to_thread(function, *args, **kwargs):
+        nonlocal delivery_calls
+        assert function is alert_delivery.deliver_discovery_failure_alert
+        delivery_calls += 1
+        if delivery_calls == 1:
+            initial_started.set()
+            await release_initial.wait()
+            return {
+                "status": "failed",
+                "transports": {"test": {"success": False}},
+                "generation": 1,
+            }
+        return {
+            "status": "delivered",
+            "transports": {"test": {"success": True}},
+            "generation": 2,
+        }
+
+    monkeypatch.setattr(asyncio, "to_thread", _interleaved_to_thread)
+    monkeypatch.setattr(
+        alerts_router,
+        "deliver_discovery_failure_alert",
+        alert_delivery.deliver_discovery_failure_alert,
+    )
+
+    university_id: int | None = None
+    alert_id: int | None = None
+    try:
+        async with AsyncSessionLocal() as db:
+            university = University(
+                name=f"Alert Interleaving University {suffix}",
+                country="Test",
+                city="Test",
+                scrape_url="https://alerts.example.test/courses",
+            )
+            db.add(university)
+            await db.commit()
+            await db.refresh(university)
+            university_id = university.id
+
+            job = ScrapeRuntimeJob(
+                runtime_job_id=f"alert_interleave_{suffix}",
+                university_id=university.id,
+                university_name=university.name,
+                url=university.scrape_url,
+                job_type="scrape",
+                status="running",
+            )
+            tasks_before = set(asyncio.all_tasks())
+            await _persist_and_deliver_discovery_failure_alert(
+                db,
+                job=job,
+                uni_id=university.id,
+                uni_name=university.name,
+                scrape_url=university.scrape_url or "",
+                candidates_found=0,
+                diagnostic={"source": "overlap-regression"},
+            )
+            background_tasks = set(asyncio.all_tasks()) - tasks_before
+
+        assert len(background_tasks) == 1
+        initial_task = background_tasks.pop()
+        await asyncio.wait_for(initial_started.wait(), timeout=2)
+
+        async with AsyncSessionLocal() as db:
+            alert = (
+                await db.execute(
+                    select(DiscoveryFailureAlert).where(
+                        DiscoveryFailureAlert.university_id == university_id
+                    )
+                )
+            ).scalar_one()
+            alert_id = alert.id
+            assert alert.delivery_status == "pending"
+            assert alert.delivery_attempts == 1
+
+        async with AsyncSessionLocal() as db:
+            with pytest.raises(HTTPException) as conflict:
+                await alerts_router.retry_discovery_failure_alert(
+                    alert_id=alert_id,
+                    _user={"id": "test"},
+                    db=db,
+                )
+            assert conflict.value.status_code == 409
+        assert delivery_calls == 1
+
+        async with AsyncSessionLocal() as db:
+            await db.execute(
+                update(DiscoveryFailureAlert)
+                .where(DiscoveryFailureAlert.id == alert_id)
+                .values(
+                    delivery_attempted_at=(
+                        datetime.now(timezone.utc) - timedelta(seconds=31)
+                    )
+                )
+            )
+            await db.commit()
+
+        async with AsyncSessionLocal() as db:
+            retry_result = await alerts_router.retry_discovery_failure_alert(
+                alert_id=alert_id,
+                _user={"id": "test"},
+                db=db,
+            )
+        assert retry_result["deliveryStatus"] == "delivered"
+        assert retry_result["deliveryAttempts"] == 2
+        assert retry_result["deliveryDetail"]["generation"] == 2
+
+        release_initial.set()
+        await asyncio.wait_for(initial_task, timeout=2)
+
+        async with AsyncSessionLocal() as db:
+            final_alert = await db.get(DiscoveryFailureAlert, alert_id)
+            assert final_alert is not None
+            assert final_alert.delivery_status == "delivered"
+            assert final_alert.delivery_attempts == 2
+            assert final_alert.delivery_detail["generation"] == 2
+        assert delivery_calls == 2
+    finally:
+        release_initial.set()
+        if alert_id is not None or university_id is not None:
+            async with AsyncSessionLocal() as db:
+                if alert_id is not None:
+                    await db.execute(
+                        delete(DiscoveryFailureAlert).where(
+                            DiscoveryFailureAlert.id == alert_id
+                        )
+                    )
+                if university_id is not None:
+                    await db.execute(
+                        delete(University).where(University.id == university_id)
+                    )
+                await db.commit()
+        await engine.dispose()
 
 
 def test_deliver_drift_alert_noop_when_clean(monkeypatch) -> None:
