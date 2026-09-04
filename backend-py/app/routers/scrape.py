@@ -5543,14 +5543,13 @@ async def extraction_quality_report(
             ],
             "fix_type": "recipe_fix",
             "suggested_fix": (
-                "In the Recipe Editor → Fee Rules, set 'Fee Calculation Mode' to "
-                "'Use source value only' and enable 'Prevent Full Course rollup'. "
-                "Then add the fee schedule page URL so the scraper reads the correct annual fee directly."
+                "If the source publishes only a full-course total, preserve it as "
+                "'Full Course' or explicitly select 'Full course to annual' to divide "
+                "it by duration. Never relabel an unchanged total as Annual."
             ),
             "suggested_recipe": {
-                "fee_calculation_mode": "use_source_value_only",
-                "fee_prevent_full_course_rollup": True,
-                "fee_term": "Annual",
+                "fee_calculation_mode": "full_course_to_annual",
+                "fee_prevent_full_course_rollup": False,
             },
         })
 

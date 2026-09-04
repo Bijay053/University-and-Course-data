@@ -123,3 +123,4 @@
 - [UNE research offerings](une-research-offerings.md) — availability pivots use duplicated responsive labels; retain Research Period 1/2 and apply UNE’s research-specific English profile.
 - [Pilot training cost fee safety](pilot-training-fee-safety.md) — extra flight licences, ratings, and training costs are not tuition; BNU undergraduate blanks use its published annual fallback.
 - [Verified scraper recipe contracts](verified-scraper-recipe-contracts.md) — sitemap allow rules see full URLs; lock critical verified YAML paths against stale generated/operator overrides.
+- [Fee-term conversion safety](fee-term-conversion-safety.md) — never relabel an unchanged Full Course total as Annual; annual conversion must divide by authoritative duration.

@@ -2152,10 +2152,8 @@ class FeesConfig(BaseModel):
     fee_prevent_full_course_rollup: Optional[bool] = Field(
         default=None,
         description=(
-            "Override the recipe-level fee_prevent_full_course_rollup flag. "
-            "Set false when fee_calculation_mode='full_course_to_annual' so the "
-            "Full Course → Annual conversion can see the original fee_term. "
-            "When None (default), the recipe setting or global default applies."
+            "Deprecated compatibility field. Full Course values are always "
+            "preserved unless fee_calculation_mode explicitly converts them."
         ),
     )
     max_annual_fee: Optional[int] = Field(
@@ -3890,13 +3888,10 @@ class RecipeConfig(BaseModel):
         ),
     )
     fee_prevent_full_course_rollup: bool = Field(
-        default=True,
+        default=False,
         description=(
-            "Prevent the scraper from multiplying an annual fee by the course duration "
-            "to produce a Full Course total. When True (default), the extracted value "
-            "is stored as-is and fee_term is set to 'Annual'. "
-            "Set False when fee_calculation_mode='full_course_to_annual' so the "
-            "conversion can see the original 'Full Course' term."
+            "Deprecated compatibility field. Full Course values are preserved "
+            "as Full Course unless fee_calculation_mode explicitly converts them."
         ),
     )
     max_annual_fee: Optional[int] = Field(

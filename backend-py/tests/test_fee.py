@@ -473,6 +473,47 @@ def test_uts_total_is_annualised_by_duration_not_session_wording():
     assert final["fee_term"] == "Annual"
 
 
+def test_recipe_default_preserves_full_course_total_and_term():
+    from app.services.scraper.config.schema import RecipeConfig
+    from app.services.scraper.recipe_rules import apply_recipe_rules
+
+    payload = {
+        "international_fee": 206_670,
+        "fee_term": "Full Course",
+        "duration": 4,
+        "duration_term": "Year",
+    }
+    recipe = RecipeConfig().model_dump()
+
+    final = apply_recipe_rules(payload, recipe)
+
+    assert final["international_fee"] == 206_670
+    assert final["fee_term"] == "Full Course"
+    assert recipe["fee_prevent_full_course_rollup"] is False
+
+
+def test_legacy_prevent_rollup_flag_never_relabels_total_as_annual():
+    from app.services.scraper.recipe_rules import apply_recipe_rules
+
+    payload = {
+        "international_fee": 189_430,
+        "fee_term": "Full Course",
+        "duration": 4,
+        "duration_term": "Year",
+    }
+
+    final = apply_recipe_rules(
+        payload,
+        {
+            "fee_calculation_mode": "use_source_value_only",
+            "fee_prevent_full_course_rollup": True,
+        },
+    )
+
+    assert final["international_fee"] == 189_430
+    assert final["fee_term"] == "Full Course"
+
+
 def test_nearest_audience_label_wins_when_both_fee_rows_are_visible():
     html = """
     <div>Indicative total tuition fee for domestic students $74,949.60</div>

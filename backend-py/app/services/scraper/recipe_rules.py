@@ -9,7 +9,7 @@ Rule sections:
   - IELTS component mapping  (overall → each-band lookup)
   - location cleanup  (replace, reject, allowed-values filter)
   - study mode derivation from location  (optional)
-  - fee term override  (prevent Full Course rollup)
+  - fee term override and explicit fee conversion
 """
 from __future__ import annotations
 
@@ -95,9 +95,9 @@ def _apply_currency_override(payload: dict, recipe: dict) -> None:
 def _apply_fee_term_override(payload: dict, recipe: dict) -> None:
     """Apply fee_term and fee_calculation_mode rules.
 
-    fee_prevent_full_course_rollup=True (default):
-      If fee_term on the payload is 'Full Course', mark it as 'Annual' and keep
-      the amount as-is (trust the source page value).
+    fee_prevent_full_course_rollup:
+      Legacy compatibility field. It must never relabel a Full Course total as
+      Annual while keeping the amount unchanged.
 
     fee_term override:
       Forces fee_term to the configured value regardless of what was extracted.
@@ -115,18 +115,6 @@ def _apply_fee_term_override(payload: dict, recipe: dict) -> None:
         if payload["fee_term"] != forced_term:
             log.info("[RECIPE] fee_term forced %r → %r", payload["fee_term"], forced_term)
         payload["fee_term"] = forced_term
-
-    # Prevent Full Course rollup (default True): relabel Full Course → Annual,
-    # amount kept as-is.  Set False when fee_calculation_mode=full_course_to_annual
-    # so the conversion can see the original 'Full Course' term.
-    if recipe.get("fee_prevent_full_course_rollup", True):
-        if payload.get("fee_term") == "Full Course":
-            payload["fee_term"] = "Annual"
-            log.info(
-                "[RECIPE] fee_prevent_full_course_rollup: fee_term Full Course → Annual "
-                "(amount %s kept as-is)",
-                payload.get("international_fee"),
-            )
 
     # fee_calculation_mode: use_source_value_only (default) — no conversion
     mode = recipe.get("fee_calculation_mode", "use_source_value_only")
