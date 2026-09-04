@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -35,8 +36,12 @@ def test_segi_production_config_is_archive_first_and_path_scoped() -> None:
     assert config.discovery.archive_only is True
     assert config.discovery.wayback_cdx_prefix == "www.segi.edu.my/course/*"
     assert config.discovery.allow_url_patterns == [
-        r"^/course/(?!search(?:/|$))[^/?#]+/?$"
+        r"^https?://(?:www\.)?segi\.edu\.my/course/(?!search(?:/|$))[^/?#]+/?$"
     ]
+    assert re.search(
+        config.discovery.allow_url_patterns[0],
+        "https://www.segi.edu.my/course/master-of-accountancy/",
+    )
     assert config.extraction.force_wayback_first is True
     assert config.extraction.wayback_miss_fallback == "none"
     assert config.extraction.fees.default_currency == "MYR"

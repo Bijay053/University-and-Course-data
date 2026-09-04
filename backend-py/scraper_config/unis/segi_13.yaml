@@ -19,11 +19,11 @@ discovery:
   wayback_cdx_prefix: "www.segi.edu.my/course/*"
   max_candidates: 500
   allow_url_patterns:
-    - "^/course/(?!search(?:/|$))[^/?#]+/?$"
+    - "^https?://(?:www\\.)?segi\\.edu\\.my/course/(?!search(?:/|$))[^/?#]+/?$"
   course_detail_url_patterns:
     - "^https?://(?:www\\.)?segi\\.edu\\.my/course/(?!search(?:/|$))[^/?#]+/?$"
   block_url_patterns:
-    - "^/course-search(?:/|$)"
+    - "^https?://(?:www\\.)?segi\\.edu\\.my/course-search(?:/|$)"
 
 extraction:
   # CDX discovery preloads exact snapshot timestamps. Never wait on the live
