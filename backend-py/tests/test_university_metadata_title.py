@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 from app.services.scraper import http_fetcher
 from app.routers.universities import (
+    _can_upgrade_to_official_name,
     _campus_index_links,
     _campus_page_links,
     _campus_page_location,
@@ -10,11 +11,13 @@ from app.routers.universities import (
     _decode_metadata_text,
     _extract_structured_locations,
     _metadata_title_segments,
+    _onboarding_ai_evidence,
     _hostname_fallback_label,
     _fetch_onboarding_homepage,
     _is_hostname_fallback_name,
     _is_onboarding_challenge,
     _normalise_metadata_locality,
+    _resolve_university_identity_openai,
     _upsert_discovered_locations,
 )
 
@@ -436,3 +439,141 @@ def test_finds_postcode_locality_after_commas_inside_street_address() -> None:
     assert location["city"] == "Subang Jaya"
     assert location["state_region"] == "Selangor"
     assert location["country"] is None
+
+
+def test_allows_only_conservative_official_name_expansion() -> None:
+    hostname = "www.notredame.edu.au"
+    assert _can_upgrade_to_official_name(
+        "Notre Dame",
+        "The University of Notre Dame Australia",
+        hostname,
+    )
+    assert not _can_upgrade_to_official_name(
+        "Notre Dame",
+        "Completely Unrelated University",
+        hostname,
+    )
+    assert not _can_upgrade_to_official_name(
+        "Operator Chosen University",
+        "The University of Notre Dame Australia",
+        hostname,
+    )
+
+
+def test_ai_evidence_includes_official_description_and_footer() -> None:
+    page_html = """
+    <html>
+      <head>
+        <title>Notre Dame | Notre Dame</title>
+        <meta property="og:site_name" content="Notre Dame">
+        <meta name="description" content="The University of Notre Dame Australia
+          has Campuses in Fremantle and Broome in Western Australia, and Sydney
+          in New South Wales.">
+      </head>
+      <body><footer>© 2026 The University of Notre Dame Australia</footer></body>
+    </html>
+    """
+    evidence = _onboarding_ai_evidence(page_html)
+    assert "The University of Notre Dame Australia" in evidence
+    assert "Fremantle" in evidence
+    assert "Sydney" in evidence
+
+
+@pytest.mark.asyncio
+async def test_openai_resolves_notre_dame_official_name_and_locations(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_chat_json(**_kwargs):
+        return {
+            "website_hostname": "notredame.edu.au",
+            "official_name": "The University of Notre Dame Australia",
+            "country": "Australia",
+            "primary_city": "Fremantle",
+            "locations": [
+                {
+                    "display_name": "Fremantle Campus",
+                    "city": "Fremantle",
+                    "state_region": "Western Australia",
+                    "country": "Australia",
+                    "full_address": None,
+                },
+                {
+                    "display_name": "Broome Campus",
+                    "city": "Broome",
+                    "state_region": "Western Australia",
+                    "country": "Australia",
+                    "full_address": None,
+                },
+                {
+                    "display_name": "Sydney Campus",
+                    "city": "Sydney",
+                    "state_region": "New South Wales",
+                    "country": "Australia",
+                    "full_address": None,
+                },
+            ],
+            "confidence": 0.98,
+            "evidence_quotes": [
+                "The University of Notre Dame Australia has Campuses in "
+                "Fremantle and Broome in Western Australia, and Sydney in "
+                "New South Wales."
+            ],
+        }
+
+    monkeypatch.setattr(
+        "app.services.ai.openai_client.chat_json",
+        fake_chat_json,
+    )
+    page_html = """
+    <html><head>
+      <title>Notre Dame | Notre Dame</title>
+      <meta name="description" content="The University of Notre Dame Australia
+        has Campuses in Fremantle and Broome in Western Australia, and Sydney
+        in New South Wales.">
+    </head></html>
+    """
+    result = await _resolve_university_identity_openai(
+        root_url="https://www.notredame.edu.au",
+        hostname="www.notredame.edu.au",
+        page_html=page_html,
+        expected_country="Australia",
+    )
+    assert result is not None
+    assert result["official_name"] == "The University of Notre Dame Australia"
+    assert result["primary_city"] == "Fremantle"
+    assert [location["city"] for location in result["locations"]] == [
+        "Fremantle", "Broome", "Sydney",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_openai_identity_rejects_country_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_chat_json(**_kwargs):
+        return {
+            "website_hostname": "notredame.edu.au",
+            "official_name": "University of Notre Dame",
+            "country": "United States",
+            "primary_city": "Notre Dame",
+            "locations": [],
+            "confidence": 0.99,
+            "evidence_quotes": [
+                "The University of Notre Dame Australia is a national university."
+            ],
+        }
+
+    monkeypatch.setattr(
+        "app.services.ai.openai_client.chat_json",
+        fake_chat_json,
+    )
+    result = await _resolve_university_identity_openai(
+        root_url="https://www.notredame.edu.au",
+        hostname="www.notredame.edu.au",
+        page_html=(
+            "<meta name='description' content='The University of Notre Dame "
+            "Australia is a national university.'>"
+        ),
+        expected_country="Australia",
+    )
+    assert result is None
