@@ -170,19 +170,22 @@ discovery:
     - https://www.utas.edu.au/courses/arts-soc/courses/e7g-master-of-teaching
 
 extraction:
-  # Use Scrape.do residential render for per-course pages instead of local Playwright.
-  # Evidence: M7D returned 139KB static HTML with full international fee + IELTS in
-  # the DOM (hidden CSS panel, not behind a JS tab-click). Gemini extracts all fields
-  # from the raw HTML text without needing the International tab to be clicked visually.
-  # Scrape.do render (~3s/call, residential IP) replaces Playwright (~18s/call,
-  # datacenter IP that Cloudflare rate-limits to 1 concurrent session).
-  scrape_do_render: true
+  # Course pages are server-rendered: their hidden international panels are
+  # already present in the static response. Do NOT use Scrape.do render here.
+  # Live verification after job_cf4a1ad6e2db:
+  #   - static: 4/4 failed samples returned 112–166KB in 10–26s
+  #   - render: 4/4 took ~58s and returned 502 ROTATION_FAILED
+  # Render remains enabled above for Funnelback discovery, which genuinely
+  # requires JavaScript. Course extraction uses the faster residential static
+  # transport and still bypasses UTAS's direct-request Cloudflare block.
+  scrape_do_render: false
+  scrape_do_static: true
   scrape_do_skip_fallbacks: true
   # The 8-way primary pass caused Scrape.do contention: more than half of one
-  # live catalogue run hit the old 20s deadline, while the same URLs recovered
-  # almost immediately in the sequential sweep. Four slots keep provider
-  # latency stable; 30s still bounds genuinely stuck requests.
-  per_course_timeout_seconds: 30
+  # live catalogue run hit the old 20s deadline. Static requests stay below
+  # 30s in representative live probes, but 45s leaves network jitter headroom
+  # without allowing one stuck request to monopolise a slot.
+  per_course_timeout_seconds: 45
   # Local Playwright uses the same blocked datacenter route and cannot safely
   # improve rendered Scrape.do HTML, so do not spend another 10-60s rescuing it.
   skip_browser_rescue: true
