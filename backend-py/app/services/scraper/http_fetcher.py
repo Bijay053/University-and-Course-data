@@ -452,6 +452,32 @@ def get_last_fetch_failure() -> dict[str, object] | None:
     return dict(info) if info else None
 
 
+def _reject_direct_challenge_html(
+    html: str,
+    *,
+    url: str,
+    transport: str,
+    status_code: int = 200,
+) -> bool:
+    """Classify an HTTP-200 anti-bot shell as a retryable fetch failure."""
+    if not is_challenge_shell(html):
+        return False
+    _record_fetch_failure(
+        kind="challenge_page",
+        reason=f"{transport} returned an anti-bot challenge shell.",
+        retryable=True,
+        transport=transport,
+        status_code=status_code,
+    )
+    log.warning(
+        "fetch %s -> %s via %s (anti-bot challenge shell) — rejecting response",
+        url,
+        status_code,
+        transport,
+    )
+    return True
+
+
 
 def set_wayback_timestamps(
     url_timestamps: dict[str, str | tuple[str, str]],
@@ -803,6 +829,7 @@ async def fetch_html_scrape_do(
                     html_result,
                     fetch_method="scrape_do_render" if render else "scrape_do_static",
                 )
+                _last_fetch_failure.set(None)
                 return html_result
             # 401/403 from Scrape.do itself = bad token or credits exhausted.
             # Raise immediately — no retry will fix a bad account state, and
@@ -973,6 +1000,13 @@ async def fetch_html_cffi(url: str) -> str | None:
                 },
             )
             if r.status_code == 200:
+                if _reject_direct_challenge_html(
+                    r.text,
+                    url=url,
+                    transport="curl_cffi",
+                ):
+                    return None
+                _last_fetch_failure.set(None)
                 log.info("cffi fetch %s -> 200 (Cloudflare bypassed)", url)
                 return r.text
             log.warning("cffi fetch %s -> %s", url, r.status_code)
@@ -1374,10 +1408,18 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
                                 return None
                             _tls_seen_urls.add(_redirect_url)
                             _tls_url = _redirect_url
+                _tls_challenge = (
+                    _tls_response.status_code == 200
+                    and _reject_direct_challenge_html(
+                        _tls_response.text,
+                        url=url,
+                        transport="direct_insecure_tls",
+                    )
+                )
                 if (
                     _tls_response.status_code == 200
                     and len(_tls_response.text) > 500
-                    and not is_challenge_shell(_tls_response.text)
+                    and not _tls_challenge
                 ):
                     _last_fetch_failure.set(None)
                     from app.services.scraper.snapshot_context import (
@@ -1394,16 +1436,17 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
                     )
                     return _tls_response.text
                 _status = _tls_response.status_code
-                _record_fetch_failure(
-                    kind="origin_http_error",
-                    reason=(
-                        f"Exact-host TLS exception returned HTTP {_status} "
-                        "or unusable HTML."
-                    ),
-                    retryable=_status in {429, 500, 502, 503, 504},
-                    transport="direct_insecure_tls",
-                    status_code=_status,
-                )
+                if not _tls_challenge:
+                    _record_fetch_failure(
+                        kind="origin_http_error",
+                        reason=(
+                            f"Exact-host TLS exception returned HTTP {_status} "
+                            "or unusable HTML."
+                        ),
+                        retryable=_status in {429, 500, 502, 503, 504},
+                        transport="direct_insecure_tls",
+                        status_code=_status,
+                    )
             except (httpx.TimeoutException, httpx.TransportError) as _tls_exc:
                 _record_fetch_failure(
                     kind="network_error",
@@ -1818,8 +1861,18 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
                     r = await c.get(url, cookies=cookies_for_url(url))
                     last_status = r.status_code
                     if r.status_code == 200:
-                        html_200 = r.text
-                        break  # exit loop; post-loop logic decides what to return
+                        if _reject_direct_challenge_html(
+                            r.text,
+                            url=url,
+                            transport="httpx",
+                        ):
+                            got_cloudflare_block = True
+                            cf_block_status = 200
+                            if attempt == retries:
+                                break
+                        else:
+                            html_200 = r.text
+                            break  # post-loop logic decides what to return
                     if _is_cloudflare_block(r):
                         got_cloudflare_block = True
                         cf_block_status = r.status_code
@@ -1890,6 +1943,7 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
                 url,
             )
         from app.services.scraper.snapshot_context import stage_snapshot as _stage
+        _last_fetch_failure.set(None)
         _stage(url, html_200, "httpx")
         return html_200
 
@@ -1923,9 +1977,16 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
                         async with _client() as _rl_c:
                             _rl_r = await _rl_c.get(url, cookies=cookies_for_url(url))
                             if _rl_r.status_code == 200:
+                                if _reject_direct_challenge_html(
+                                    _rl_r.text,
+                                    url=url,
+                                    transport="httpx",
+                                ):
+                                    continue
                                 from app.services.scraper.snapshot_context import (
                                     stage_snapshot as _stage,
                                 )
+                                _last_fetch_failure.set(None)
                                 _stage(url, _rl_r.text, "httpx")
                                 return _rl_r.text
                             if not _is_cloudflare_block(_rl_r):
@@ -1940,6 +2001,7 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
         cffi_result = await fetch_html_cffi(url)
         if cffi_result is not None:
             from app.services.scraper.snapshot_context import stage_snapshot as _stage
+            _last_fetch_failure.set(None)
             _stage(url, cffi_result, "cffi")
             return cffi_result
         # Both httpx AND cffi failed → record host as always-CF-blocked so

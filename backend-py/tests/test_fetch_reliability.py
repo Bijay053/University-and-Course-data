@@ -12,8 +12,11 @@ All network calls are mocked — no real Scrape.do traffic.
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 import logging
 import os
+import sys
+from types import ModuleType
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -160,24 +163,211 @@ class TestFetchHtmlScrapeDoRetry:
         mock_client.__aexit__ = _mock_exit
         mock_client.get = _mock_get
 
+        async def run_and_capture_failure():
+            result = await m.fetch_html_scrape_do(
+                "https://example.com/course",
+                render=True,
+                super_mode=True,
+                rate_limit=False,
+                max_retries=1,
+            )
+            return result, m.get_last_fetch_failure()
+
         with patch.object(m, "_unescape_json_html", side_effect=lambda x: x), \
              patch("app.services.scraper.snapshot_context.stage_snapshot", lambda *a, **kw: None), \
              patch("httpx.AsyncClient", return_value=mock_client), \
-             patch("asyncio.sleep", new_callable=AsyncMock):
-            result = asyncio.run(
-                m.fetch_html_scrape_do(
-                    "https://example.com/course",
-                    render=True,
-                    super_mode=True,
-                    rate_limit=False,
-                    max_retries=1,
-                )
-            )
+             patch("asyncio.sleep", new_callable=AsyncMock), \
+             m.scrape_do_counter_scope() as counters:
+            result, failure = asyncio.run(run_and_capture_failure())
 
         assert result == good_html
+        assert failure is None
+        assert counters == {"render": 1, "static": 0}
         assert call_count == 2
         assert all(params.get("render") == "true" for params in seen_params)
         assert all(params.get("super") == "true" for params in seen_params)
+
+
+class TestDirectChallengeFallback:
+    """HTTP-200 challenge shells must continue through the direct fetch ladder."""
+
+    @staticmethod
+    def _f5_shell() -> str:
+        return (
+            "<html><head><script>"
+            'document.cookie="cookiesession8341=blocked";'
+            "eval(function(){var request=new XMLHttpRequest();"
+            "setTimeout(function(){request.open('GET','/challenge');},10);});"
+            "</script></head><body>blocked</body></html>"
+        )
+
+    @staticmethod
+    def _packed_shell() -> str:
+        return (
+            "<html><head><script>"
+            "eval(function(p,a,c,k,e,d){return p}('challenge',1,1,'x'.split('|'),0,{}));"
+            "</script></head><body></body></html>"
+        )
+
+    def test_httpx_f5_shell_falls_through_to_cffi(self, monkeypatch):
+        import app.services.scraper.http_fetcher as m
+
+        direct = _make_response(200, self._f5_shell())
+        cffi_html = "<html><body><main><h1>Real course</h1></main></body></html>"
+        client = AsyncMock()
+        client.get.return_value = direct
+
+        @asynccontextmanager
+        async def fake_client():
+            yield client
+
+        monkeypatch.delenv("SCRAPE_DO_TOKEN", raising=False)
+        monkeypatch.setattr(m, "_client", fake_client)
+        monkeypatch.setattr(m, "fetch_html_cffi", AsyncMock(return_value=cffi_html))
+        monkeypatch.setattr(m, "fetch_html_wayback", AsyncMock(return_value=None))
+        monkeypatch.setattr(m.asyncio, "sleep", AsyncMock())
+        monkeypatch.setattr(
+            "app.services.scraper.snapshot_context.stage_snapshot",
+            lambda *args, **kwargs: None,
+        )
+
+        result = asyncio.run(m.fetch_html("https://example.edu/course", retries=0))
+
+        assert result == cffi_html
+        m.fetch_html_cffi.assert_awaited_once()
+        assert m.get_last_fetch_failure() is None
+
+    def test_httpx_f5_shell_retries_same_tier_before_fallback(self, monkeypatch):
+        import app.services.scraper.http_fetcher as m
+
+        real_html = "<html><body><main><h1>Recovered course</h1></main></body></html>"
+        client = AsyncMock()
+        client.get.side_effect = [
+            _make_response(200, self._f5_shell()),
+            _make_response(200, real_html),
+        ]
+
+        @asynccontextmanager
+        async def fake_client():
+            yield client
+
+        monkeypatch.delenv("SCRAPE_DO_TOKEN", raising=False)
+        monkeypatch.setattr(m, "_client", fake_client)
+        cffi = AsyncMock(return_value=None)
+        monkeypatch.setattr(m, "fetch_html_cffi", cffi)
+        monkeypatch.setattr(m.asyncio, "sleep", AsyncMock())
+        monkeypatch.setattr(
+            "app.services.scraper.snapshot_context.stage_snapshot",
+            lambda *args, **kwargs: None,
+        )
+
+        async def run_and_capture_failure():
+            result = await m.fetch_html("https://example.edu/course", retries=1)
+            return result, m.get_last_fetch_failure()
+
+        result, failure = asyncio.run(run_and_capture_failure())
+        assert result == real_html
+        assert failure is None
+        assert client.get.await_count == 2
+        cffi.assert_not_awaited()
+
+    def test_httpx_and_cffi_packed_shells_fall_through_to_wayback(self, monkeypatch):
+        import app.services.scraper.http_fetcher as m
+
+        packed = self._packed_shell()
+        archived = "<html><body><h1>Archived real course page</h1></body></html>"
+        client = AsyncMock()
+        client.get.return_value = _make_response(200, packed)
+
+        @asynccontextmanager
+        async def fake_client():
+            yield client
+
+        monkeypatch.delenv("SCRAPE_DO_TOKEN", raising=False)
+        monkeypatch.setattr(m, "_client", fake_client)
+        monkeypatch.setattr(m, "fetch_html_cffi", AsyncMock(return_value=None))
+        monkeypatch.setattr(m, "fetch_html_wayback", AsyncMock(return_value=archived))
+        monkeypatch.setattr(m.asyncio, "sleep", AsyncMock())
+        monkeypatch.setattr(
+            "app.services.scraper.snapshot_context.stage_snapshot",
+            lambda *args, **kwargs: None,
+        )
+
+        result = asyncio.run(m.fetch_html("https://example.edu/course", retries=0))
+
+        assert result == archived
+        m.fetch_html_wayback.assert_awaited_once()
+
+    def test_cffi_packed_shell_is_rejected_and_classified(self, monkeypatch):
+        import app.services.scraper.http_fetcher as m
+
+        response = _make_response(200, self._packed_shell())
+
+        class FakeSession:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def get(self, *args, **kwargs):
+                return response
+
+        requests_module = ModuleType("curl_cffi.requests")
+        requests_module.AsyncSession = lambda **kwargs: FakeSession()
+        package_module = ModuleType("curl_cffi")
+        package_module.requests = requests_module
+
+        monkeypatch.setitem(sys.modules, "curl_cffi", package_module)
+        monkeypatch.setitem(sys.modules, "curl_cffi.requests", requests_module)
+        m._last_fetch_failure.set(None)
+
+        async def run_and_capture_failure():
+            result = await m.fetch_html_cffi("https://example.edu/course")
+            return result, m.get_last_fetch_failure()
+
+        result, failure = asyncio.run(run_and_capture_failure())
+        assert result is None
+        assert failure == {
+            "kind": "challenge_page",
+            "reason": "curl_cffi returned an anti-bot challenge shell.",
+            "retryable": True,
+            "transport": "curl_cffi",
+            "status_code": 200,
+            "terminal": False,
+        }
+
+    def test_visible_page_with_packed_script_is_accepted_by_httpx(self, monkeypatch):
+        import app.services.scraper.http_fetcher as m
+
+        html = (
+            "<html><head><script>"
+            "eval(function(p,a,c,k,e,d){return p}('analytics',1,1,'x'.split('|'),0,{}));"
+            "</script></head><body><main><h1>Bachelor of Nursing</h1>"
+            "<p>Fees, duration, entry requirements and course details.</p>"
+            "</main></body></html>"
+        )
+        client = AsyncMock()
+        client.get.return_value = _make_response(200, html)
+
+        @asynccontextmanager
+        async def fake_client():
+            yield client
+
+        monkeypatch.delenv("SCRAPE_DO_TOKEN", raising=False)
+        monkeypatch.setattr(m, "_client", fake_client)
+        cffi = AsyncMock(return_value=None)
+        monkeypatch.setattr(m, "fetch_html_cffi", cffi)
+        monkeypatch.setattr(m.asyncio, "sleep", AsyncMock())
+        monkeypatch.setattr(
+            "app.services.scraper.snapshot_context.stage_snapshot",
+            lambda *args, **kwargs: None,
+        )
+
+        result = asyncio.run(m.fetch_html("https://example.edu/course", retries=0))
+
+        assert result == html
+        cffi.assert_not_awaited()
 
     def test_all_retries_exhausted_returns_none(self, monkeypatch):
         """If all 4 attempts return 503, returns None."""
