@@ -27,6 +27,7 @@ defaults only (plus the DB scrape_config backwards-compat translation).
 """
 from __future__ import annotations
 
+import copy
 import logging
 import re
 from datetime import date
@@ -379,6 +380,32 @@ def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any
     return result
 
 
+def _get_config_path(config: dict[str, Any], path: str) -> Any:
+    """Return a dotted config path, or the private sentinel when absent."""
+    current: Any = config
+    for part in path.split("."):
+        if not isinstance(current, dict) or part not in current:
+            return _MISSING_CONFIG_PATH
+        current = current[part]
+    return current
+
+
+def _set_config_path(config: dict[str, Any], path: str, value: Any) -> None:
+    """Set a dotted config path, creating intermediate mappings as needed."""
+    parts = path.split(".")
+    current = config
+    for part in parts[:-1]:
+        child = current.get(part)
+        if not isinstance(child, dict):
+            child = {}
+            current[part] = child
+        current = child
+    current[parts[-1]] = copy.deepcopy(value)
+
+
+_MISSING_CONFIG_PATH = object()
+
+
 def _translate_db_scrape_config(db_cfg: dict[str, Any]) -> dict[str, Any]:
     """Translate the legacy DB ``university.scrape_config`` JSONB into the new schema.
 
@@ -519,6 +546,7 @@ def load_uni_config(
         scrape_url=scrape_url,
     )
     per_uni = _load_yaml_file(uni_yaml_path)
+    locked_config_values: dict[str, Any] = {}
     if per_uni:
         # Hostname guard — prevents a shared-slug YAML from being applied to the
         # wrong university.  If the YAML declares ``hostname_guard: "www.foo.ac.nz"``
@@ -550,6 +578,14 @@ def load_uni_config(
                 per_uni = {}
 
         if per_uni:
+            locked_paths = per_uni.pop("locked_config_paths", [])
+            if isinstance(locked_paths, list):
+                for path in locked_paths:
+                    if not isinstance(path, str) or not path or ".." in path:
+                        continue
+                    value = _get_config_path(per_uni, path)
+                    if value is not _MISSING_CONFIG_PATH:
+                        locked_config_values[path] = copy.deepcopy(value)
             if _is_id_yaml:
                 log.debug(
                     "Per-uni YAML loaded for slug=%r uni_id=%r (id-specific file)",
@@ -594,6 +630,13 @@ def load_uni_config(
         if admin_cfg:
             merged = _deep_merge(merged, admin_cfg)
             log.debug("Admin UI config applied for slug=%r (highest priority)", slug)
+
+    # Verified recipes may lock a small set of safety-critical paths. This is
+    # intentionally applied after admin_config so stale AI/operator patches
+    # cannot replace a known-good catalogue with a category or domestic-only
+    # section. All unlocked fields retain normal admin-highest precedence.
+    for path, value in locked_config_values.items():
+        _set_config_path(merged, path, value)
 
     # 5. Inject identity fields (these are not in YAML, they come from the DB row)
     merged.pop("slug", None)

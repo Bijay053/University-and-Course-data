@@ -621,6 +621,21 @@ _DEGREE_QUALIFIER_RE = re.compile(
 # "Ict50220" also match.
 _QUAL_CODE_PREFIX_RE = re.compile(r"^[A-Za-z]{2,6}\d{4,6}\s+", re.I)
 
+# Delivery labels frequently prefix a genuine award title in an H1, for
+# example "Online Graduate Certificate in Leadership" or
+# "Full-time Bachelor of Engineering". They describe delivery, not the award.
+# Strip them only for qualifier recognition; the separate online/full-time
+# eligibility guards still make the final audience decision.
+_DELIVERY_PREFIX_RE = re.compile(
+    r"^(?:(?:online|on-campus|on campus|full-time|full time|part-time|part time|"
+    r"distance(?:\s+learning)?|blended|accelerated)\s*[-:|–—]?\s+)+",
+    re.IGNORECASE,
+)
+_DELIVERY_CATEGORY_SUFFIX_RE = re.compile(
+    r"\b(?:courses|degrees|programmes|programs)\s*$",
+    re.IGNORECASE,
+)
+
 # ---------------------------------------------------------------------------
 # Punctuation / spacing normalisers applied before qualifier matching so that
 # universities that write the same award in different ways all resolve to the
@@ -764,16 +779,27 @@ def _name_has_degree_qualifier(name: str) -> bool:
     """
     raw = (name or "").strip()
     normed = _normalise_for_qualifier_match(raw)
+    delivery_stripped = _DELIVERY_PREFIX_RE.sub("", normed)
+    code_stripped = _QUAL_CODE_PREFIX_RE.sub("", normed)
+    code_then_delivery = _DELIVERY_PREFIX_RE.sub("", code_stripped)
+    delivery_then_code = _QUAL_CODE_PREFIX_RE.sub("", delivery_stripped)
 
     # 1. Leading check — qualifier at the START of the title (fastest path,
     #    catches the majority of courses, e.g. "MSc Computer Science").
     if _DEGREE_QUALIFIER_RE.match(normed):
         return True
-    # 2. Leading check after stripping a national qualification code prefix
-    #    (e.g. "ICT50220 Diploma of Information Technology").
-    stripped = _QUAL_CODE_PREFIX_RE.sub("", normed)
-    if stripped != normed and _DEGREE_QUALIFIER_RE.match(stripped):
-        return True
+    # 1b. Delivery-prefixed category headings remain category pages even when
+    #     they contain award words ("Online Bachelor degrees").
+    if (
+        delivery_stripped != normed
+        and _DELIVERY_CATEGORY_SUFFIX_RE.search(delivery_stripped)
+    ):
+        return False
+    # 2. Leading checks after removing delivery and/or national qualification
+    #    code prefixes in either order.
+    for stripped in (delivery_stripped, code_stripped, code_then_delivery, delivery_then_code):
+        if stripped != normed and _DEGREE_QUALIFIER_RE.match(stripped):
+            return True
     # 3. Trailing check — qualifier at the END of the title, with optional
     #    "(Hons)" / "Top-up" suffix (e.g. "Business Management MBA (Hons)").
     if _TRAILING_QUALIFIER_RE.search(normed):

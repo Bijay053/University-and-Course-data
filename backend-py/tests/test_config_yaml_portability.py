@@ -83,3 +83,41 @@ discovery:
 
     assert config.discovery.allow_url_patterns == []
     assert (tmp_path / "portable_11.yaml").exists()
+
+
+def test_verified_yaml_paths_override_stale_admin_discovery_rules(
+    monkeypatch, tmp_path
+) -> None:
+    monkeypatch.setattr(loader, "_UNIS_DIR", tmp_path)
+    _write(
+        tmp_path / "portable.yaml",
+        """hostname_guard: portable.edu
+locked_config_paths:
+  - discovery.sitemap_url
+  - discovery.allow_url_patterns
+discovery:
+  sitemap_url: https://portable.edu/study-sitemap.xml
+  allow_url_patterns: ["/verified-course/"]
+  bfs_page_budget: 2
+""",
+    )
+
+    config = loader.load_uni_config(
+        slug="portable",
+        name="Portable Test University",
+        scrape_url="https://portable.edu/",
+        university_id=11,
+        db_scrape_config={
+            "admin_config": {
+                "discovery": {
+                    "sitemap_url": "https://portable.edu/wrong.xml",
+                    "allow_url_patterns": ["/online/category/"],
+                    "bfs_page_budget": 9,
+                }
+            }
+        },
+    )
+
+    assert config.discovery.sitemap_url == "https://portable.edu/study-sitemap.xml"
+    assert config.discovery.allow_url_patterns == ["/verified-course/"]
+    assert config.discovery.bfs_page_budget == 9

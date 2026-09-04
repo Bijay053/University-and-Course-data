@@ -55,6 +55,13 @@ class TestNameHasDegreeQualifier:
             "Certificate IV in Information Technology",
             "Certificate of Higher Education",
             "Certificate in Data Analytics",
+            # Delivery labels before genuine award names
+            "Online Graduate Certificate in Leadership",
+            "Full-time Bachelor of Engineering",
+            "Part-time Master of Business Administration",
+            "Distance Learning Postgraduate Diploma in Law",
+            "Blended Advanced Diploma of Building Design",
+            "ICT50220 Online Diploma of Information Technology",
             # Leading whitespace
             "  Bachelor of Arts",
         ],
@@ -94,6 +101,9 @@ class TestNameHasDegreeQualifier:
             # "Graduate" alone (not followed by Certificate/Diploma)
             "Graduate courses",
             "Graduate",
+            "Online Bachelor degrees",
+            "Online Masters courses",
+            "Online Graduate Certificate courses",
         ],
     )
     def test_rejects_non_degree_names(self, name: str) -> None:

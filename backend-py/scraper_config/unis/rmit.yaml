@@ -1,11 +1,20 @@
-# RMIT — stub created for Week 4 scale-up.
-# Hostname: www.rmit.edu.au  (course catalogue under /study-with-us)
-#
-# Bug history: none yet — fill in after first scrape.
-# Note: RMIT is heavily JS-rendered; expect to need browser_timeout adjustments
-# and possibly skip_static_fetch:true if Cloudflare blocks the static fetch.
+# RMIT publishes exact course-detail URLs in its study sitemap. Homepage
+# discovery can incorrectly route to the separate RMIT Online catalogue, so
+# use the sitemap and require the institution's trailing award code.
+locked_config_paths:
+  - discovery
 discovery:
+  sitemap_url: "https://www.rmit.edu.au/study-with-us/sitemap.xml"
   always_sitemap_supplement: true
+  skip_sitemap_fallback: false
+  bfs_page_budget: 0
+  skip_browser_discovery: true
+  allow_url_patterns:
+    - '^/study-with-us/levels-of-study/(?:undergraduate-study|postgraduate-study)/.+-[a-z]{1,3}\d{3,5}[a-z]?/?$'
+  course_detail_url_patterns:
+    - '^/study-with-us/levels-of-study/(?:undergraduate-study|postgraduate-study)/.+-[a-z]{1,3}\d{3,5}[a-z]?/?$'
+  block_url_patterns:
+    - '/levels-of-study/online/'
 extraction:
   filters:
     domestic_only:
