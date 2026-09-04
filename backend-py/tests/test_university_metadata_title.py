@@ -1,4 +1,5 @@
 import pytest
+from types import SimpleNamespace
 
 from app.services.scraper import http_fetcher
 from app.routers.universities import (
@@ -13,6 +14,8 @@ from app.routers.universities import (
     _fetch_onboarding_homepage,
     _is_hostname_fallback_name,
     _is_onboarding_challenge,
+    _normalise_metadata_locality,
+    _upsert_discovered_locations,
 )
 
 
@@ -47,6 +50,95 @@ async def test_blocked_homepage_escalates_to_rendered_metadata(monkeypatch) -> N
         "rate_limit": False,
         "max_retries": 1,
     }]
+
+
+@pytest.mark.asyncio
+async def test_refreshes_unverified_discovered_location_metadata() -> None:
+    existing = SimpleNamespace(
+        display_name="SEGi University & Colleges",
+        full_address="Old address",
+        city="Kota Damansara PJU 5, Petaling Jaya,",
+        state_region="Selangor",
+        country="MY",
+        latitude=None,
+        longitude=None,
+        is_verified=False,
+    )
+
+    class Result:
+        def scalars(self):
+            return [existing]
+
+    class Db:
+        async def execute(self, _statement):
+            return Result()
+
+        def add(self, _row):
+            raise AssertionError("Matching location should be refreshed, not added")
+
+    changed = await _upsert_discovered_locations(
+        Db(),
+        13,
+        [{
+            "display_name": "SEGi University & Colleges",
+            "full_address": "No 9, Jalan Teknologi, Kota Damansara, Malaysia",
+            "city": "Kota Damansara",
+            "state_region": "Selangor",
+            "country": "Malaysia",
+            "latitude": 3.15,
+            "longitude": 101.58,
+        }],
+        "Malaysia",
+    )
+
+    assert changed == 1
+    assert existing.city == "Kota Damansara"
+    assert existing.country == "Malaysia"
+    assert existing.latitude == 3.15
+
+
+@pytest.mark.asyncio
+async def test_does_not_overwrite_verified_location_metadata() -> None:
+    existing = SimpleNamespace(
+        display_name="Main Campus",
+        full_address="Operator-corrected address",
+        city="Petaling Jaya",
+        state_region="Selangor",
+        country="Malaysia",
+        latitude=3.1,
+        longitude=101.5,
+        is_verified=True,
+    )
+
+    class Result:
+        def scalars(self):
+            return [existing]
+
+    class Db:
+        async def execute(self, _statement):
+            return Result()
+
+        def add(self, _row):
+            raise AssertionError("Verified location should not be added again")
+
+    changed = await _upsert_discovered_locations(
+        Db(),
+        13,
+        [{
+            "display_name": "Main Campus",
+            "full_address": "Website changed address",
+            "city": "Kota Damansara",
+            "state_region": "Selangor",
+            "country": "Malaysia",
+            "latitude": 4.0,
+            "longitude": 102.0,
+        }],
+        "Malaysia",
+    )
+
+    assert changed == 0
+    assert existing.full_address == "Operator-corrected address"
+    assert existing.city == "Petaling Jaya"
 
 
 def test_decodes_html_entities_in_metadata_text() -> None:
@@ -87,6 +179,12 @@ def test_identifies_hostname_derived_names_for_later_repair() -> None:
         "SEGi University & Colleges",
         "www.segi.edu.my",
     )
+
+
+def test_normalizes_compound_malaysian_locality_for_header() -> None:
+    assert _normalise_metadata_locality(
+        "Kota Damansara PJU 5, Petaling Jaya,"
+    ) == "Kota Damansara"
 
 
 def test_detects_encoded_entities_in_existing_university_name() -> None:
@@ -197,6 +295,41 @@ def test_prefers_branded_jsonld_owner_and_expands_country_code() -> None:
         "city": "Kota Damansara",
         "state_region": "Selangor",
         "country": "Malaysia",
+    }]
+
+
+def test_preserves_full_address_and_coordinates_while_cleaning_city() -> None:
+    page_html = """
+    <script type="application/ld+json">
+    {
+      "@type": "CollegeOrUniversity",
+      "name": "SEGi University & Colleges",
+      "geo": {
+        "latitude": "3.150150354886943",
+        "longitude": "101.5811306094481"
+      },
+      "address": {
+        "streetAddress": "No 9, Jalan Teknologi,",
+        "addressLocality": "Kota Damansara PJU 5, Petaling Jaya,",
+        "addressRegion": "Selangor Darul Ehsan",
+        "postalCode": "47810",
+        "addressCountry": "MY"
+      }
+    }
+    </script>
+    """
+
+    assert _extract_structured_locations(page_html) == [{
+        "display_name": "SEGi University & Colleges",
+        "full_address": (
+            "No 9, Jalan Teknologi, Kota Damansara PJU 5, Petaling Jaya, "
+            "Selangor Darul Ehsan, 47810, Malaysia"
+        ),
+        "city": "Kota Damansara",
+        "state_region": "Selangor Darul Ehsan",
+        "country": "Malaysia",
+        "latitude": 3.150150354886943,
+        "longitude": 101.5811306094481,
     }]
 
 

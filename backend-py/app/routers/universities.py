@@ -55,6 +55,19 @@ def _normalise_metadata_country(value: str) -> str:
     return _COUNTRY_CODE_NAMES.get(cleaned.upper(), cleaned)
 
 
+def _normalise_metadata_locality(value: str) -> str:
+    """Reduce compound/zoned localities to a clean city/campus label."""
+    cleaned = _decode_metadata_text(value).strip(" ,.")
+    primary = cleaned.split(",", 1)[0].strip()
+    primary = re.sub(
+        r"\s+(?:PJU|SS)\s*\d+(?:[/-]\d+)*$",
+        "",
+        primary,
+        flags=re.I,
+    ).strip()
+    return primary or cleaned
+
+
 def _is_onboarding_challenge(status_code: int, page_html: str) -> bool:
     """Detect block/challenge responses that must not become metadata."""
     if status_code >= 400:
@@ -136,21 +149,36 @@ def _contains_encoded_html_entity(value: str | None) -> bool:
     )
 
 
-def _extract_structured_locations(page_html: str) -> list[dict[str, str | None]]:
+def _extract_structured_locations(
+    page_html: str,
+) -> list[dict[str, str | float | None]]:
     """Extract every distinct JSON-LD postal address exposed by a homepage."""
     locations: list[dict[str, str | None]] = []
     seen: set[tuple[str, str, str, str, str]] = set()
     address_indexes: dict[tuple[str, str, str, str, str], int] = {}
 
-    def add_address(address: dict[str, Any], owner_name: str | None) -> None:
-        city = _decode_metadata_text(str(address.get("addressLocality") or ""))
-        region = _decode_metadata_text(str(address.get("addressRegion") or ""))
+    def add_address(
+        address: dict[str, Any],
+        owner_name: str | None,
+        geo: dict[str, Any] | None = None,
+    ) -> None:
+        locality = _decode_metadata_text(
+            str(address.get("addressLocality") or "")
+        ).strip(" ,.")
+        city = _normalise_metadata_locality(locality)
+        region = _decode_metadata_text(
+            str(address.get("addressRegion") or "")
+        ).strip(" ,.")
         country_value = address.get("addressCountry") or ""
         if isinstance(country_value, dict):
             country_value = country_value.get("name") or country_value.get("@id") or ""
         country = _normalise_metadata_country(str(country_value))
-        street = _decode_metadata_text(str(address.get("streetAddress") or ""))
-        postal = _decode_metadata_text(str(address.get("postalCode") or ""))
+        street = _decode_metadata_text(
+            str(address.get("streetAddress") or "")
+        ).strip(" ,.")
+        postal = _decode_metadata_text(
+            str(address.get("postalCode") or "")
+        ).strip(" ,.")
         if not any((city, region, country, street)):
             return
 
@@ -161,10 +189,11 @@ def _extract_structured_locations(page_html: str) -> list[dict[str, str | None]]
         if not display_name:
             display_name = street or region or country
         full_address = ", ".join(
-            part for part in (street, city, region, postal, country) if part
+            part for part in (street, locality or city, region, postal, country) if part
         )
         address_key = tuple(
-            part.casefold() for part in (street, city, region, postal, country)
+            part.casefold()
+            for part in (street, locality or city, region, postal, country)
         )
         if any(address_key) and address_key in address_indexes:
             existing = locations[address_indexes[address_key]]
@@ -183,13 +212,20 @@ def _extract_structured_locations(page_html: str) -> list[dict[str, str | None]]
         if key in seen:
             return
         seen.add(key)
-        locations.append({
+        location: dict[str, str | float | None] = {
             "display_name": display_name,
             "full_address": full_address or None,
             "city": city or None,
             "state_region": region or None,
             "country": country or None,
-        })
+        }
+        if isinstance(geo, dict):
+            try:
+                location["latitude"] = float(geo.get("latitude"))
+                location["longitude"] = float(geo.get("longitude"))
+            except (TypeError, ValueError):
+                pass
+        locations.append(location)
         if any(address_key):
             address_indexes[address_key] = len(locations) - 1
 
@@ -205,12 +241,15 @@ def _extract_structured_locations(page_html: str) -> list[dict[str, str | None]]
         if not isinstance(current_name, str):
             current_name = owner_name
         address = value.get("address")
+        geo = value.get("geo")
+        if not isinstance(geo, dict):
+            geo = None
         if isinstance(address, dict):
-            add_address(address, current_name)
+            add_address(address, current_name, geo)
         elif isinstance(address, list):
             for item in address:
                 if isinstance(item, dict):
-                    add_address(item, current_name)
+                    add_address(item, current_name, geo)
 
         for key in ("location", "campus", "department", "subOrganization"):
             if key in value:
@@ -367,22 +406,43 @@ async def _upsert_discovered_locations(
     """Add homepage-discovered locations without replacing operator edits."""
     if not locations:
         return 0
-    existing_names = {
-        name.casefold()
-        for name in (
+    existing_by_name = {
+        row.display_name.casefold(): row
+        for row in (
             await db.execute(
-                select(UniversityLocation.display_name).where(
+                select(UniversityLocation).where(
                     UniversityLocation.university_id == university_id
                 )
             )
         ).scalars()
     }
-    added = 0
+    changed = 0
     for values in locations:
         display_name = str(values["display_name"])
-        if display_name.casefold() in existing_names:
+        existing = existing_by_name.get(display_name.casefold())
+        if existing:
+            # Automatically discovered rows may be refreshed as site metadata
+            # improves. Never overwrite a location an operator has verified.
+            if not existing.is_verified:
+                updates = {
+                    "full_address": values["full_address"],
+                    "city": values["city"],
+                    "state_region": values["state_region"],
+                    "country": values["country"] or (
+                        fallback_country if fallback_country != "Unknown" else None
+                    ),
+                    "latitude": values.get("latitude"),
+                    "longitude": values.get("longitude"),
+                }
+                row_changed = False
+                for field, value in updates.items():
+                    if value is not None and getattr(existing, field) != value:
+                        setattr(existing, field, value)
+                        row_changed = True
+                if row_changed:
+                    changed += 1
             continue
-        db.add(UniversityLocation(
+        row = UniversityLocation(
             university_id=university_id,
             display_name=display_name,
             full_address=values["full_address"],
@@ -395,10 +455,11 @@ async def _upsert_discovered_locations(
             longitude=values.get("longitude"),
             course_count=0,
             is_verified=False,
-        ))
-        existing_names.add(display_name.casefold())
-        added += 1
-    return added
+        )
+        db.add(row)
+        existing_by_name[display_name.casefold()] = row
+        changed += 1
+    return changed
 
 
 def _to_read(u: University, course_count: int = 0) -> UniversityRead:
@@ -1429,7 +1490,15 @@ async def add_university_by_url(
             _needs_update = True
         _eff_city    = existing.city
         _eff_country = existing.country
-        if (not existing.city or existing.city == "Unknown") and city != "Unknown":
+        _normalised_existing_city = _normalise_metadata_locality(existing.city or "")
+        if (
+            (not existing.city or existing.city == "Unknown")
+            or (
+                city != "Unknown"
+                and existing.city != city
+                and _normalised_existing_city == city
+            )
+        ) and city != "Unknown":
             existing.city = city
             _eff_city = city
             _needs_update = True
