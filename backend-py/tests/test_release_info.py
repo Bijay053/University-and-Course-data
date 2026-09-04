@@ -14,6 +14,7 @@ def test_release_revision_prefers_deployment_metadata(monkeypatch: pytest.Monkey
     monkeypatch.setattr(release_info.subprocess, "run", run)
 
     assert release_info.get_release_revision() == "deploy-abc123"
+    run.assert_not_called()
 
 
 def test_stale_sha_metadata_yields_checked_out_revision(
@@ -32,6 +33,26 @@ def test_stale_sha_metadata_yields_checked_out_revision(
     )
 
     assert release_info.get_release_revision() == checked_out[:12]
+
+
+def test_git_lookup_allows_the_known_repo_across_service_ownership(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    release_info.get_release_revision.cache_clear()
+    for name in release_info._REVISION_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+    checked_out = "75586d538f50ba60ed4878c92da02be32482b17c"
+    run = MagicMock(
+        return_value=type("Result", (), {"stdout": checked_out})()
+    )
+    monkeypatch.setattr(release_info.subprocess, "run", run)
+
+    assert release_info.get_release_revision() == checked_out[:12]
+    command = run.call_args.args[0]
+    assert command[:2] == ["git", "-c"]
+    assert command[2] == f"safe.directory={release_info._REPO_ROOT}"
+    assert command[3:5] == ["-C", str(release_info._REPO_ROOT)]
+    assert command[-2:] == ["rev-parse", "HEAD"]
 
 
 def test_release_revision_is_explicit_when_lookup_fails(

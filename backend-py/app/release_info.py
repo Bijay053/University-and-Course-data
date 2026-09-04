@@ -5,6 +5,7 @@ import os
 import re
 import subprocess
 from functools import lru_cache
+from pathlib import Path
 
 UNKNOWN_RELEASE = "unknown (revision metadata unavailable)"
 _REVISION_ENV_VARS = (
@@ -15,6 +16,7 @@ _REVISION_ENV_VARS = (
     "BUILD_REVISION",
 )
 _GIT_SHA_RE = re.compile(r"^[0-9a-fA-F]{7,40}$")
+_REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _safe_value(value: str) -> str:
@@ -34,8 +36,21 @@ def get_release_revision() -> str:
                 env_revision = value
                 break
 
+        # Preserve deployment IDs and other intentionally non-Git metadata.
+        # Only SHA-shaped environment values need reconciliation against HEAD.
+        if env_revision and not _GIT_SHA_RE.fullmatch(env_revision):
+            return env_revision
+
         result = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
+            [
+                "git",
+                "-c",
+                f"safe.directory={_REPO_ROOT}",
+                "-C",
+                str(_REPO_ROOT),
+                "rev-parse",
+                "HEAD",
+            ],
             check=True,
             capture_output=True,
             text=True,
