@@ -19,6 +19,7 @@
 - [Phase 13 monitoring engine](phase13-monitoring.md) — university_watchers + lightweight probes; smart scheduling from change_frequency_days EMA; 30-min Celery beat; bulk-enable auto-creates watchers from scrape_url.
 - [Scrape.do discovery timeout mismatch](scrape-do-discovery-timeout-mismatch.md) — generic short per-page timeout wrapping a slow-but-successful rendering-proxy call discards every response; widen timeout + prefetch seeds concurrently.
 - [Slug derivation for non-www subdomains](slug-subdomain-fix.md) — study.csu.edu.au → slug 'study' not 'csu'; loader needs _GENERIC_SUBDOMAINS stripping.
+- [Protected-site URL onboarding](url-onboarding-protected-sites.md) — reject challenge HTML, render as fallback, and let re-added URLs repair weak names and unverified locations.
 - [Year-based URL deduplication pipeline](year-dedup-pipeline.md) — Phase A.5c pre-extraction: ignore_urls→ignore_years→slug_without_year dedup; prefer_urls_matching is tiebreaker in Step 3.
 - [JCU Cloudflare Enterprise escalation](jcu-cloudflare-lesson.md) — all transports dead except Scrape.do render=true; static 502 ROTATION_FAILED = fail fast, go render-first in discovery+extraction.
 - [SCU year URL regex fix](scu-year-regex-fix.md) — 4-digit course codes (e.g. 5350) fool `\d{4}` regex; use `20\d{2}` to restrict to real years.
