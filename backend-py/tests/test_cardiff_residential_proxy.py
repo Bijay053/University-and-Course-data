@@ -279,6 +279,54 @@ class TestScrapeDoSkipFallbacks:
         )
 
     @pytest.mark.asyncio
+    async def test_discovery_super_mode_is_opt_in_and_propagated(self):
+        """The mobile/residential super pool is discovery-only and opt-in."""
+        cfg = _cardiff_uni_config()
+        cfg.discovery = DiscoveryConfig(
+            scrape_do_skip_fallbacks=True,
+            scrape_do_render=True,
+            scrape_do_super=True,
+        )
+        set_uni_config(cfg)
+        calls: list[dict[str, object]] = []
+
+        async def _mock_scrape_do(
+            url: str,
+            *,
+            render: bool = False,
+            super_mode: bool = False,
+            **kwargs: Any,
+        ) -> str:
+            calls.append(
+                {
+                    "url": url,
+                    "render": render,
+                    "super_mode": super_mode,
+                }
+            )
+            return _MINIMAL_HTML
+
+        with (
+            patch(
+                "app.services.scraper.http_fetcher.fetch_html_scrape_do",
+                side_effect=_mock_scrape_do,
+            ),
+            patch.dict(os.environ, {"SCRAPE_DO_TOKEN": "test-token-xyz"}),
+        ):
+            from app.services.scraper.http_fetcher import fetch_html
+
+            result = await fetch_html("https://www.cardiff.ac.uk/study/courses/")
+
+        assert result == _MINIMAL_HTML
+        assert calls == [
+            {
+                "url": "https://www.cardiff.ac.uk/study/courses/",
+                "render": True,
+                "super_mode": True,
+            }
+        ]
+
+    @pytest.mark.asyncio
     async def test_discovery_rate_limit_false_actually_skips_acquire(self):
         """rate_limit=False on fetch_html_scrape_do must skip acquire_scrape_do()."""
         from app.services.scraper.http_fetcher import fetch_html_scrape_do
@@ -310,6 +358,38 @@ class TestScrapeDoSkipFallbacks:
         assert not acquire_called, (
             "acquire_scrape_do() must NOT be called when rate_limit=False"
         )
+
+    @pytest.mark.asyncio
+    async def test_scrape_do_super_query_parameter_is_not_sent_by_default(self):
+        from app.services.scraper.http_fetcher import fetch_html_scrape_do
+
+        with (
+            patch.dict(os.environ, {"SCRAPE_DO_TOKEN": "test-token-xyz"}),
+            patch("httpx.AsyncClient.get") as mock_get,
+        ):
+            mock_resp = MagicMock()
+            mock_resp.status_code = 200
+            mock_resp.text = _MINIMAL_HTML
+            mock_get.return_value = mock_resp
+
+            await fetch_html_scrape_do(
+                "https://www.cardiff.ac.uk/study/courses/",
+                render=True,
+                rate_limit=False,
+            )
+            default_params = mock_get.call_args.kwargs["params"]
+
+            mock_get.reset_mock()
+            await fetch_html_scrape_do(
+                "https://www.cardiff.ac.uk/study/courses/",
+                render=True,
+                super_mode=True,
+                rate_limit=False,
+            )
+            super_params = mock_get.call_args.kwargs["params"]
+
+        assert "super" not in default_params
+        assert super_params["super"] == "true"
 
     @pytest.mark.asyncio
     async def test_skip_fallbacks_static_fallback_when_render_fails(self):

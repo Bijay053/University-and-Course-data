@@ -739,7 +739,7 @@ def probe_and_configure(  # noqa: ANN001
         import uuid
         from datetime import datetime, timezone
 
-        from sqlalchemy import update
+        from sqlalchemy import select, text, update
 
         from app.models import ScrapeRuntimeJob, University
         from app.services.scraper.auto_config_generator import (
@@ -873,17 +873,26 @@ def probe_and_configure(  # noqa: ANN001
             existing_cfg: dict = uni.scrape_config or {}
             updated_cfg = {**existing_cfg, "auto_config": auto_cfg}
 
+            configured = bool(auto_cfg)
             await db.execute(
                 update(University)
                 .where(University.id == university_id)
                 .values(
                     probe_result=profile.to_dict(),
-                    probe_status="configured",
+                    probe_status="configured" if configured else "failed",
                     probe_updated_at=datetime.now(timezone.utc),
                     scrape_config=updated_cfg,
                 )
             )
             await db.commit()
+
+            if not configured:
+                return {
+                    "ok": False,
+                    "university_id": university_id,
+                    "reason": "config_generation_failed",
+                    "triggered_by": triggered_by,
+                }
 
             log.info(
                 "[PROBE] Done uni_id=%d strategy=%s confidence=%.2f blocked=%s apis=%d",
@@ -907,47 +916,104 @@ def probe_and_configure(  # noqa: ANN001
                 "triggered_by": triggered_by,
             }
 
-            # ── Stage 5: CASCADE self-heal — auto-queue a retry scrape ─────────
-            # When triggered by the orchestrator's poor-quality cascade, the
-            # auto_config we just wrote is live.  Queue a new scrape job so the
-            # operator doesn't have to manually re-trigger — the next run
-            # will use the newly-generated config automatically.
-            # Skip if the site is Cloudflare-blocked (retrying won't help yet).
-            if triggered_by == "cascade" and not profile.is_cloudflare_blocked:
+            # ── Stage 5: queue only after the generated config is live ─────────
+            # New-university onboarding and CASCADE repairs must never race the
+            # probe. Acquire the same per-university advisory lock used by the
+            # public scrape-start route, then reuse an active job or create one.
+            should_queue = (
+                triggered_by == "onboarding"
+                or (triggered_by == "cascade" and not profile.is_cloudflare_blocked)
+            )
+            if should_queue:
                 try:
-                    new_job_id = f"job_{uuid.uuid4().hex[:12]}"
-                    retry_job = ScrapeRuntimeJob(
-                        runtime_job_id=new_job_id,
-                        university_id=university_id,
-                        university_name=uni.name,
-                        url=str(probe_url),
-                        job_type="single",
-                        status="queued",
-                        fast_mode=False,
-                        request_payload={
-                            "url": str(probe_url),
-                            "universityId": university_id,
-                            "universityName": uni.name,
-                            "triggeredBy": "cascade_self_heal",
-                            "autoConfig": True,
-                        },
-                    )
                     async with AsyncSessionLocal() as db2:
-                        db2.add(retry_job)
-                        await db2.commit()
-                    # Dispatch AFTER commit so the row is visible to the worker.
-                    celery_app.send_task("scrape.university", args=[new_job_id])
-                    log.info(
-                        "[PROBE] CASCADE self-heal: queued retry scrape %s for "
-                        "uni_id=%d (strategy=%s)",
-                        new_job_id, university_id, profile.recommended_strategy,
-                    )
-                    result["retry_job_id"] = new_job_id
+                        await db2.execute(
+                            text("SELECT pg_advisory_xact_lock(:uid)"),
+                            {"uid": university_id},
+                        )
+                        from datetime import datetime as _dt
+                        from datetime import timedelta as _td
+                        from datetime import timezone as _tz
+
+                        fresh_cutoff = _dt.now(_tz.utc) - _td(minutes=2)
+                        active_job_id = (
+                            await db2.execute(
+                                select(ScrapeRuntimeJob.runtime_job_id)
+                                .where(
+                                    ScrapeRuntimeJob.university_id == university_id,
+                                    (
+                                        ScrapeRuntimeJob.status.in_(
+                                            ["running", "awaiting_approval"]
+                                        )
+                                        | (
+                                            (ScrapeRuntimeJob.status == "queued")
+                                            & (
+                                                ScrapeRuntimeJob.created_at
+                                                > fresh_cutoff
+                                            )
+                                        )
+                                    ),
+                                )
+                                .order_by(ScrapeRuntimeJob.created_at.desc())
+                                .limit(1)
+                            )
+                        ).scalar_one_or_none()
+                        if active_job_id:
+                            await db2.commit()
+                            new_job_id = active_job_id
+                            created_job = False
+                        else:
+                            new_job_id = f"job_{uuid.uuid4().hex[:12]}"
+                            retry_job = ScrapeRuntimeJob(
+                                runtime_job_id=new_job_id,
+                                university_id=university_id,
+                                university_name=uni.name,
+                                url=str(probe_url),
+                                job_type="single",
+                                status="queued",
+                                fast_mode=False,
+                                request_payload={
+                                    "url": str(probe_url),
+                                    "universityId": university_id,
+                                    "universityName": uni.name,
+                                    "triggeredBy": (
+                                        "onboarding_first_scrape"
+                                        if triggered_by == "onboarding"
+                                        else "cascade_self_heal"
+                                    ),
+                                    "autoConfig": True,
+                                },
+                            )
+                            db2.add(retry_job)
+                            await db2.commit()
+                            created_job = True
+                    if created_job:
+                        # Dispatch AFTER commit so the row is visible to the worker.
+                        celery_app.send_task("scrape.university", args=[new_job_id])
+                        log.info(
+                            "[PROBE] %s: queued scrape %s for uni_id=%d (strategy=%s)",
+                            triggered_by,
+                            new_job_id,
+                            university_id,
+                            profile.recommended_strategy,
+                        )
+                    else:
+                        log.info(
+                            "[PROBE] %s: reusing active scrape %s for uni_id=%d",
+                            triggered_by,
+                            new_job_id,
+                            university_id,
+                        )
+                    result[
+                        "first_scrape_job_id"
+                        if triggered_by == "onboarding"
+                        else "retry_job_id"
+                    ] = new_job_id
                 except Exception as _retry_exc:
                     log.warning(
-                        "[PROBE] CASCADE self-heal: failed to queue retry scrape "
+                        "[PROBE] %s: failed to queue scrape "
                         "for uni_id=%d: %s",
-                        university_id, _retry_exc,
+                        triggered_by, university_id, _retry_exc,
                     )
 
             return result

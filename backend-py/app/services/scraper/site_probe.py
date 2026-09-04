@@ -388,6 +388,19 @@ def _detect_spa(html: str, profile: SiteProfile) -> None:
 
 # ── Phase 4A: CMS platform fingerprinting ────────────────────────────────────
 
+_NON_COURSE_XHR_MARKERS = (
+    "unibuddy.",
+    "/unibuddy/",
+    "ambassador",
+)
+
+
+def _is_non_course_xhr_url(url: str) -> bool:
+    """Return True for known third-party engagement APIs, not catalogues."""
+    lowered = (url or "").lower()
+    return any(marker in lowered for marker in _NON_COURSE_XHR_MARKERS)
+
+
 async def _capture_xhr_stage(profile: SiteProfile) -> None:
     """Stage 4.5 — XHR capture + API classification + schema analysis (Phase 4B).
 
@@ -411,8 +424,24 @@ async def _capture_xhr_stage(profile: SiteProfile) -> None:
             return
 
         profile.xhr_captures = captures
+        course_captures = [
+            capture
+            for capture in captures
+            if not _is_non_course_xhr_url(getattr(capture, "url", ""))
+        ]
+        ignored_count = len(captures) - len(course_captures)
+        if ignored_count:
+            profile.notes.append(
+                f"Ignored {ignored_count} non-course engagement API capture(s)"
+            )
+        if not course_captures:
+            log.debug(
+                "[PROBE] Stage 4.5: all %d XHR calls were non-course engagement APIs",
+                len(captures),
+            )
+            return
 
-        classified = classify_captures(captures)
+        classified = classify_captures(course_captures)
         if classified is None:
             log.debug(
                 "[PROBE] Stage 4.5: %d XHR calls found but none classified confidently",

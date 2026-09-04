@@ -1469,6 +1469,16 @@ class DiscoveryConfig(BaseModel):
             "SCRAPE_DO_TOKEN is set and discovery.scrape_do_skip_fallbacks is True."
         ),
     )
+    scrape_do_super: bool = Field(
+        default=False,
+        description=(
+            "Pass Scrape.do's super=true option only for discovery-phase proxy "
+            "calls. Use for WAF-protected catalogue pages that return a challenge "
+            "shell through the standard residential/render pool but return the "
+            "real course listing through Scrape.do's mobile/residential super pool. "
+            "Has no effect on ordinary course extraction calls."
+        ),
+    )
     scrape_do_wait_for_ms: int = Field(
         default=3000,
         description=(

@@ -667,6 +667,38 @@ class TestCaptureXhrStageContract:
         assert profile.detected_apis == []
 
     @pytest.mark.asyncio
+    async def test_ignores_unibuddy_ambassador_graphql(self):
+        from app.services.scraper.site_probe import SiteProfile, _capture_xhr_stage
+        from app.services.scraper.xhr_interceptor import XhrCapture
+
+        profile = SiteProfile(
+            url="https://www.example.edu", probed_at="2026-01-01T00:00:00Z"
+        )
+        capture = XhrCapture(
+            url="https://gateway.unibuddy.co/graphql?opname=GetRandomAmbassadors",
+            content_type="application/json",
+            body_size=1500,
+            sample_body='{"data":{"ambassadors":[]}}',
+        )
+
+        with (
+            patch(
+                "app.services.scraper.xhr_interceptor.capture_xhr_signals",
+                AsyncMock(return_value=[capture]),
+            ),
+            patch(
+                "app.services.scraper.api_classifier.classify_captures"
+            ) as classify,
+        ):
+            await _capture_xhr_stage(profile)
+
+        classify.assert_not_called()
+        assert profile.xhr_captures == [capture]
+        assert profile.detected_apis == []
+        assert profile.api_field_mapping is None
+        assert any("non-course engagement" in note for note in profile.notes)
+
+    @pytest.mark.asyncio
     async def test_playwright_failure_is_non_fatal(self):
         from app.services.scraper.site_probe import SiteProfile, _capture_xhr_stage
 

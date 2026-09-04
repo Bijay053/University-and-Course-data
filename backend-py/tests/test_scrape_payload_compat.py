@@ -11,6 +11,7 @@ schema (camelCase keys, including ``url``). This test pins that contract.
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
 import pytest
@@ -27,6 +28,9 @@ class _FakeSession:
         self.jobs: dict[str, ScrapeRuntimeJob] = {}
         self.added: list[ScrapeRuntimeJob] = []
         self.committed = False
+        self.rolled_back = False
+        self.active_job: ScrapeRuntimeJob | None = None
+        self.executed: list[object] = []
 
     async def get(self, model, pk):  # noqa: ARG002
         if model is University and pk == self._uni.id:
@@ -36,16 +40,22 @@ class _FakeSession:
         return None
 
     async def execute(self, stmt, *args, **kwargs):  # noqa: ARG002
-        # bulk path doesn't hit the orm select on uni; single-uni path uses .get
+        self.executed.append(stmt)
         result = MagicMock()
-        result.scalar_one_or_none.return_value = None
+        result.scalar_one_or_none.return_value = self.active_job
         return result
+
+    async def refresh(self, obj, **kwargs):  # noqa: ARG002
+        return None
 
     def add(self, obj):
         self.added.append(obj)
 
     async def commit(self):
         self.committed = True
+
+    async def rollback(self):
+        self.rolled_back = True
 
 
 @pytest.fixture
@@ -64,7 +74,11 @@ def client_with_uni():
         yield fake
 
     def _user_override():
-        return {"sub": "test", "role": "admin"}
+        return {
+            "sub": "test",
+            "role": "admin",
+            "permissions": ["scraping.trigger"],
+        }
 
     app.dependency_overrides[get_db] = _db_override
     app.dependency_overrides[get_current_user] = _user_override
@@ -77,6 +91,41 @@ def client_with_uni():
 def _post_start(client, body):
     # Mounted under /api/scrape (see app.main router include).
     return client.post("/api/scrape/start", json=body)
+
+
+@pytest.mark.parametrize(
+    ("path", "body"),
+    [
+        (
+            "/api/scrape/start",
+            {
+                "university_id": 42,
+                "url": "https://test.example.edu/",
+                "fast_mode": False,
+            },
+        ),
+        (
+            "/api/scrape/bulk",
+            {"university_ids": [42], "fast_mode": False},
+        ),
+    ],
+)
+def test_scrape_starts_require_trigger_permission(
+    client_with_uni,
+    path,
+    body,
+):
+    client, fake = client_with_uni
+
+    def _limited_user():
+        return {"sub": "limited-user", "permissions": []}
+
+    app.dependency_overrides[get_current_user] = _limited_user
+    response = client.post(path, json=body)
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Missing permission: scraping.trigger"
+    assert fake.added == []
 
 
 def test_start_scrape_payload_includes_node_compatible_keys(client_with_uni, monkeypatch):
@@ -159,6 +208,84 @@ def test_bulk_scrape_payload_is_node_compatible(client_with_uni, monkeypatch):
     assert payload.get("url") == "https://test.example.edu/"
     assert payload.get("universityId") == 42
     assert payload.get("bulkMode") is True
+
+
+@pytest.mark.parametrize("probe_status", ["pending", "probing"])
+def test_bulk_scrape_waits_for_onboarding_configuration(
+    client_with_uni,
+    monkeypatch,
+    probe_status,
+):
+    client, fake = client_with_uni
+    fake._uni.probe_status = probe_status
+    fake_task = MagicMock()
+    fake_task.delay = MagicMock()
+    fake_lock = MagicMock()
+    monkeypatch.setattr(
+        "app.tasks.scrape_tasks.scrape_university",
+        fake_task,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "app.tasks.scrape_tasks.set_initial_dispatch_lock",
+        fake_lock,
+        raising=False,
+    )
+
+    response = client.post(
+        "/api/scrape/bulk",
+        json={"university_ids": [42], "fast_mode": False},
+    )
+
+    assert response.status_code == 409
+    assert "still being configured" in response.json()["detail"]
+    assert fake.added == []
+    assert fake.committed is False
+    fake_task.delay.assert_not_called()
+    fake_lock.assert_not_called()
+
+
+def test_bulk_scrape_reuses_active_job_under_advisory_lock(
+    client_with_uni,
+    monkeypatch,
+):
+    client, fake = client_with_uni
+    fake._uni.probe_status = "configured"
+    fake.active_job = ScrapeRuntimeJob(
+        runtime_job_id="job_active",
+        university_id=42,
+        university_name="Test University",
+        url="https://test.example.edu/",
+        job_type="bulk",
+        status="queued",
+        created_at=datetime.now(timezone.utc),
+        request_payload={},
+    )
+    fake_task = MagicMock()
+    fake_task.delay = MagicMock()
+    fake_lock = MagicMock()
+    monkeypatch.setattr(
+        "app.tasks.scrape_tasks.scrape_university",
+        fake_task,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "app.tasks.scrape_tasks.set_initial_dispatch_lock",
+        fake_lock,
+        raising=False,
+    )
+
+    response = client.post(
+        "/api/scrape/bulk",
+        json={"university_ids": [42], "fast_mode": False},
+    )
+
+    assert response.status_code == 202, response.text
+    assert response.json()["queued"] == 0
+    assert fake.added == []
+    assert any("pg_advisory_xact_lock" in str(stmt) for stmt in fake.executed)
+    fake_task.delay.assert_not_called()
+    fake_lock.assert_not_called()
 
 
 def test_status_returns_options_needed_to_continue_after_reload(client_with_uni):

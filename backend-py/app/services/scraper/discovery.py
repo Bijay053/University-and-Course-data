@@ -24,6 +24,18 @@ from app.services.scraper.url_identity import canonical_course_url_key
 
 log = logging.getLogger(__name__)
 
+_SEMANTIC_PAGINATION_QUERY_KEYS = frozenset(
+    {
+        "page",
+        "p",
+        "offset",
+        "start",
+        "pageindex",
+        "pagenumber",
+        "currentpage",
+    }
+)
+
 
 _COURSE_URL_HINTS = (
     "/course/",
@@ -1225,8 +1237,10 @@ async def discover_course_links(
         # move on) instead of consuming the whole budget.
         async def _bounded_fetch(_u: str) -> str | None:
             _cached = _seed_prefetch_cache.pop(_u, _SEED_PREFETCH_MISS)
-            if _cached is not _SEED_PREFETCH_MISS:
+            if _cached is not _SEED_PREFETCH_MISS and _cached:
                 return _cached
+            # A failed seed prefetch must get one real queued visit to the same
+            # URL. Returning the cached None here silently skipped that retry.
             try:
                 return await asyncio.wait_for(
                     fetch_html(_u, retries=0),
@@ -1272,9 +1286,15 @@ async def discover_course_links(
         # Issue 3: if still nothing and the URL had a query string (e.g.
         # ?studentType=international), retry with the bare path once — some
         # servers reject the param but serve the page fine without it.
+        _query_keys = {
+            part.partition("=")[0].lower()
+            for part in urlparse(url).query.split("&")
+            if part
+        }
         if (
             not html
             and "?" in url
+            and not (_query_keys & _SEMANTIC_PAGINATION_QUERY_KEYS)
             and _remaining_budget_s()
             > (_page_fetch_timeout_s + _SITEMAP_FALLBACK_MIN_BUDGET_S)
         ):

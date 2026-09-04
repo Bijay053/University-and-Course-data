@@ -1,0 +1,75 @@
+# Buckinghamshire New University
+# Hostname: www.bucks.ac.uk
+#
+# The Drupal course search paginates with ?page=0..20. The homepage and first
+# result page alone expose only a small, misleading subset, while generic BFS
+# also follows student-profile and marketing links. Seed every catalogue page
+# and allow only the stable /courses/<level>/<slug> detail URL shape.
+
+discovery:
+  seed_urls:
+    - "https://www.bucks.ac.uk/search/courses?page=0"
+    - "https://www.bucks.ac.uk/search/courses?page=1"
+    - "https://www.bucks.ac.uk/search/courses?page=2"
+    - "https://www.bucks.ac.uk/search/courses?page=3"
+    - "https://www.bucks.ac.uk/search/courses?page=4"
+    - "https://www.bucks.ac.uk/search/courses?page=5"
+    - "https://www.bucks.ac.uk/search/courses?page=6"
+    - "https://www.bucks.ac.uk/search/courses?page=7"
+    - "https://www.bucks.ac.uk/search/courses?page=8"
+    - "https://www.bucks.ac.uk/search/courses?page=9"
+    - "https://www.bucks.ac.uk/search/courses?page=10"
+    - "https://www.bucks.ac.uk/search/courses?page=11"
+    - "https://www.bucks.ac.uk/search/courses?page=12"
+    - "https://www.bucks.ac.uk/search/courses?page=13"
+    - "https://www.bucks.ac.uk/search/courses?page=14"
+    - "https://www.bucks.ac.uk/search/courses?page=15"
+    - "https://www.bucks.ac.uk/search/courses?page=16"
+    - "https://www.bucks.ac.uk/search/courses?page=17"
+    - "https://www.bucks.ac.uk/search/courses?page=18"
+    - "https://www.bucks.ac.uk/search/courses?page=19"
+    - "https://www.bucks.ac.uk/search/courses?page=20"
+
+  bfs_page_budget: 21
+  max_candidates: 170
+  expected_min_courses: 135
+  listing_only_patterns:
+    - "^https://www\\.bucks\\.ac\\.uk/search/courses(?:\\?.*)?$"
+  allow_url_patterns:
+    - "^https://www\\.bucks\\.ac\\.uk/(?:search/courses|courses/(?:undergraduate|postgraduate|professional|foundation|htq)/[^/?#]+)"
+  course_detail_url_patterns:
+    - "^https://www\\.bucks\\.ac\\.uk/courses/(?:undergraduate|postgraduate|professional|foundation|htq)/[^/?#]+/?$"
+  block_url_patterns:
+    - "/courses/(?:short|apprenticeship)/"
+  scrape_do_skip_fallbacks: true
+  scrape_do_render: true
+  scrape_do_super: true
+  scrape_do_wait_for_ms: 3000
+  skip_browser_discovery: true
+  skip_sitemap_fallback: true
+  use_wayback: false
+  discovery_phase_timeout_s: 600
+  always_sitemap_supplement: false
+  always_browser_discover: false
+
+extraction:
+  max_parallel_fetch: 6
+  skip_per_course_browser: true
+  skip_browser_rescue: true
+  fees:
+    default_currency: GBP
+    prefer_international: true
+  english:
+    central_page: "https://www.bucks.ac.uk/study/general-entry-requirements"
+    default_ielts: 6.0
+    degree_level_defaults:
+      undergraduate:
+        ielts: 6.0
+      postgraduate:
+        ielts: 6.0
+      doctorate:
+        ielts: 6.0
+  staging:
+    reject_if_missing:
+      - course_name
+      - international_fee

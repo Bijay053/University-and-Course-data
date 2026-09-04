@@ -39,6 +39,20 @@ _CHALLENGE_SHELL_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"\b_Incapsula_Resource\b"),
 )
 
+_F5_COOKIE_ASSIGNMENT_PATTERN = re.compile(
+    r"\bdocument\.cookie\s*=\s*[\"'][^\"']*\bcookiesession\d+=",
+    re.IGNORECASE,
+)
+_F5_EVAL_PATTERN = re.compile(r"\beval\s*\(", re.IGNORECASE)
+_F5_NETWORK_PATTERN = re.compile(
+    r"\b(?:XMLHttpRequest|setTimeout)\b",
+    re.IGNORECASE,
+)
+_PACKED_SCRIPT_PATTERN = re.compile(
+    r"eval\s*\(\s*function\s*\(\s*p\s*,\s*a\s*,\s*c\s*,\s*k\s*,\s*e\s*,\s*d\s*\)",
+    re.IGNORECASE,
+)
+
 _CHALLENGE_SHELL_SAMPLE = 4096  # chars; challenge markers are always in <head>
 
 
@@ -59,4 +73,25 @@ def is_challenge_shell(html: str) -> bool:
     if not html:
         return False
     sample = html[:_CHALLENGE_SHELL_SAMPLE]
-    return any(pat.search(sample) for pat in _CHALLENGE_SHELL_PATTERNS)
+    if any(pat.search(sample) for pat in _CHALLENGE_SHELL_PATTERNS):
+        return True
+    if (
+        _F5_COOKIE_ASSIGNMENT_PATTERN.search(sample)
+        and _F5_EVAL_PATTERN.search(sample)
+        and _F5_NETWORK_PATTERN.search(sample)
+    ):
+        return True
+    if _PACKED_SCRIPT_PATTERN.search(sample):
+        # Protected domains can return a complete-looking 200 document whose
+        # body contains only a Dean-Edwards-packed challenge script. The same
+        # packer may legitimately appear on real pages, so require the document
+        # to have no visible content after scripts/styles/tags are removed.
+        visible = re.sub(
+            r"(?is)<(?:script|style)\b[^>]*>.*?</(?:script|style)>",
+            " ",
+            sample,
+        )
+        visible = re.sub(r"(?s)<[^>]+>", " ", visible)
+        if not visible.strip():
+            return True
+    return False

@@ -36,6 +36,7 @@ from contextvars import ContextVar
 import httpx
 
 from app.config import settings
+from app.services.scraper.challenge_shell import is_challenge_shell
 from app.services.scraper.course_deadline import clamp_timeout, has_budget, remaining_seconds
 from app.services.scraper.extractors.curtin_session import cookies_for_url
 from app.services.scraper.url_identity import canonical_course_url_key
@@ -580,6 +581,7 @@ async def fetch_html_scrape_do(
     url: str,
     *,
     render: bool = False,
+    super_mode: bool = False,
     wait_for_ms: int = 3000,
     geo_code: str | None = None,
     rate_limit: bool = True,
@@ -652,6 +654,8 @@ async def fetch_html_scrape_do(
     if render:
         params["render"] = "true"
         params["waitFor"] = str(wait_for_ms)
+    if super_mode:
+        params["super"] = "true"
     if play_with_browser:
         params["playWithBrowser"] = json.dumps(
             play_with_browser,
@@ -732,6 +736,41 @@ async def fetch_html_scrape_do(
                     timeout=_request_timeout,
                 )
             _status = _last_sd_r.status_code
+            if _status == 200 and is_challenge_shell(_last_sd_r.text):
+                _record_fetch_error(
+                    url,
+                    status=_status,
+                    tier="scrape_do",
+                    detail="anti-bot challenge shell",
+                )
+                _record_fetch_failure(
+                    kind="challenge_page",
+                    reason=(
+                        "Scrape.do returned an anti-bot challenge shell instead "
+                        "of the requested page."
+                    ),
+                    retryable=True,
+                    transport="scrape_do_render" if render else "scrape_do_static",
+                    status_code=_status,
+                )
+                if _sd_attempt < len(_SD_BACKOFFS):
+                    log.warning(
+                        "[FETCH FAIL] scrape.do %s render=%s → HTTP 200 "
+                        "challenge shell on attempt %d/%d — retrying",
+                        url,
+                        render,
+                        _sd_attempt + 1,
+                        len(_SD_BACKOFFS) + 1,
+                    )
+                    continue
+                log.warning(
+                    "[FETCH FAIL] scrape.do %s render=%s → HTTP 200 "
+                    "challenge shell after %d attempt(s) — exhausted",
+                    url,
+                    render,
+                    _sd_attempt + 1,
+                )
+                return None
             if _status == 200 and len(_last_sd_r.text) > 500:
                 log.info(
                     "scrape.do fetch %s render=%s -> 200 (%d chars)",
@@ -1437,12 +1476,14 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
     if not _scrape_do_render and not _scrape_do_static and _has_scrape_do:
         _disc_skip = False
         _disc_render_first = False
+        _disc_super = False
         _disc_wait_for_ms = 3000
         try:
             from app.services.scraper.config.context import get_uni_config as _guc_disc
             _disc_cfg = _guc_disc().discovery
             _disc_skip = _disc_cfg.scrape_do_skip_fallbacks
             _disc_render_first = _disc_cfg.scrape_do_render
+            _disc_super = _disc_cfg.scrape_do_super
             _disc_wait_for_ms = _disc_cfg.scrape_do_wait_for_ms
         except Exception:  # noqa: BLE001
             pass
@@ -1464,7 +1505,11 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
                 # 502 that will never turn into a 200 — fail fast and spend
                 # the discovery time budget on the render=True tier instead.
                 _disc_static = await fetch_html_scrape_do(
-                    url, render=False, rate_limit=False, max_retries=0
+                    url,
+                    render=False,
+                    super_mode=_disc_super,
+                    rate_limit=False,
+                    max_retries=0,
                 )
             else:
                 log.info(
@@ -1506,7 +1551,11 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
             # reliably fit inside 150s and matches what that budget was
             # originally sized for.
             _disc_rendered = await fetch_html_scrape_do(
-                url, render=True, rate_limit=False, max_retries=1,
+                url,
+                render=True,
+                super_mode=_disc_super,
+                rate_limit=False,
+                max_retries=1,
                 wait_for_ms=_disc_wait_for_ms,
             )
             if _disc_rendered is not None and not _is_spa_shell(_disc_rendered):

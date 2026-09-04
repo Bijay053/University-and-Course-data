@@ -1543,24 +1543,50 @@ async def add_university_by_url(
 
     # ── Step 4: Dispatch probe_and_configure ──────────────────────────────
     task_id: str | None = None
+    from sqlalchemy import update as _upd
+
+    # Persist the transitional state before publishing the Celery task. A fast
+    # worker may finish before this request returns; publishing first would let
+    # this request overwrite its final "configured" state back to "probing".
+    await db.execute(
+        _upd(University)
+        .where(University.id == uni.id)
+        .values(probe_status="probing", probe_updated_at=datetime.now(timezone.utc))
+    )
+    await db.commit()
+
     try:
         from app.tasks.scrape_tasks import probe_and_configure
-        task = probe_and_configure.delay(uni.id)
+
+        task = probe_and_configure.delay(uni.id, triggered_by="onboarding")
         task_id = task.id
-        # Mark as probing
-        from sqlalchemy import update as _upd
-        await db.execute(
-            _upd(University)
-            .where(University.id == uni.id)
-            .values(probe_status="probing", probe_updated_at=datetime.now(timezone.utc))
-        )
-        await db.commit()
     except Exception as exc:
         # Non-fatal: university is created; user can trigger probe manually
         import logging as _log
         _log.getLogger(__name__).warning(
             "add-by-url: probe dispatch failed for uni_id=%d: %s", uni.id, exc
         )
+        try:
+            await db.execute(
+                _upd(University)
+                .where(
+                    University.id == uni.id,
+                    University.probe_status == "probing",
+                )
+                .values(
+                    probe_status="failed",
+                    probe_updated_at=datetime.now(timezone.utc),
+                )
+            )
+            await db.commit()
+        except Exception as state_exc:
+            await db.rollback()
+            _log.getLogger(__name__).error(
+                "add-by-url: failed to persist probe dispatch failure for "
+                "uni_id=%d: %s",
+                uni.id,
+                state_exc,
+            )
 
     return {
         "university_id": uni.id,
@@ -1570,9 +1596,16 @@ async def add_university_by_url(
         "city": city,
         "already_exists": False,
         "message": (
-            "University created and probe queued. "
-            "The system will detect the platform, generate a scrape config, "
-            "and queue the first scrape automatically."
+            (
+                "University created and probe queued. "
+                "The system will detect the platform, generate a scrape config, "
+                "and queue the first scrape automatically."
+            )
+            if task_id
+            else (
+                "University created, but automatic configuration could not be "
+                "queued. Retry the probe from the university settings."
+            )
         ),
     }
 

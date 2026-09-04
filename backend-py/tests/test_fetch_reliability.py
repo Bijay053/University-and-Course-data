@@ -124,6 +124,61 @@ class TestFetchHtmlScrapeDoRetry:
         # Must have slept at least once between attempts
         assert len(sleep_calls) >= 1
 
+    def test_200_f5_challenge_then_real_page_retries(self, monkeypatch):
+        """A provider HTTP 200 challenge shell is not a successful fetch."""
+        import app.services.scraper.http_fetcher as m
+
+        call_count = 0
+        seen_params: list[dict[str, str]] = []
+        challenge_html = (
+            "<html><head><script>"
+            'document.cookie="cookiesession8341=blocked";'
+            "eval(function(){var request=new XMLHttpRequest();"
+            "setTimeout(function(){request.open('GET','/challenge');},10);});"
+            "</script></head><body>"
+            + ("blocked " * 100)
+            + "</body></html>"
+        )
+        good_html = "<html><body>" + ("real course content " * 50) + "</body></html>"
+
+        async def _mock_enter(self_):
+            return self_
+
+        async def _mock_exit(self_, *a):
+            return False
+
+        async def _mock_get(url, params=None):
+            nonlocal call_count
+            call_count += 1
+            seen_params.append(dict(params or {}))
+            if call_count == 1:
+                return _make_response(200, challenge_html)
+            return _make_response(200, good_html)
+
+        mock_client = MagicMock()
+        mock_client.__aenter__ = _mock_enter
+        mock_client.__aexit__ = _mock_exit
+        mock_client.get = _mock_get
+
+        with patch.object(m, "_unescape_json_html", side_effect=lambda x: x), \
+             patch("app.services.scraper.snapshot_context.stage_snapshot", lambda *a, **kw: None), \
+             patch("httpx.AsyncClient", return_value=mock_client), \
+             patch("asyncio.sleep", new_callable=AsyncMock):
+            result = asyncio.run(
+                m.fetch_html_scrape_do(
+                    "https://example.com/course",
+                    render=True,
+                    super_mode=True,
+                    rate_limit=False,
+                    max_retries=1,
+                )
+            )
+
+        assert result == good_html
+        assert call_count == 2
+        assert all(params.get("render") == "true" for params in seen_params)
+        assert all(params.get("super") == "true" for params in seen_params)
+
     def test_all_retries_exhausted_returns_none(self, monkeypatch):
         """If all 4 attempts return 503, returns None."""
         import app.services.scraper.http_fetcher as m

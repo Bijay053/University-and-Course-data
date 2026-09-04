@@ -116,3 +116,4 @@
 - [INTI duration badge authority](inti-duration-authority.md) — use the current programme’s top facts badge; related product cards repeat other courses’ durations and corrupt generic extraction.
 - [AI extraction is fill-only](ai-extraction-fill-only.md) — across all universities, deterministic static extraction owns populated values; AI is requested only for remaining gaps.
 - [Live catalogue removal safety](live-catalogue-removal-safety.md) — never auto-hide courses solely because they are absent from one approved scrape; removals need explicit audited review.
+- [Protected catalogue onboarding](protected-catalogue-onboarding.md) — commit probe state before task publish; reject engagement APIs/200 shells; preserve pagination queries and exact retries.

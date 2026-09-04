@@ -238,6 +238,53 @@ async def test_create_university_then_scrape_start_does_not_fail_missing_scrape_
             await _delete_uni(created_id)
 
 
+@pytest.mark.asyncio
+async def test_scrape_start_waits_for_new_university_probe() -> None:
+    """A new university cannot race its first scrape ahead of auto-config."""
+    name = _unique_name()
+    website = _unique_website("-probing")
+    created_id: int | None = None
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as ac:
+        create_resp = await ac.post(
+            "/api/universities",
+            json={
+                "name": name,
+                "website": website,
+                "country": "Australia",
+                "city": "Melbourne",
+            },
+        )
+    assert create_resp.status_code in (200, 201)
+    created_id = create_resp.json()["id"]
+
+    try:
+        async with AsyncSessionLocal() as db:
+            await db.execute(
+                text(
+                    "UPDATE universities SET probe_status = 'probing' "
+                    "WHERE id = :university_id"
+                ),
+                {"university_id": created_id},
+            )
+            await db.commit()
+
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as ac2:
+            response = await ac2.post(
+                "/api/scrape/start",
+                json={"universityId": created_id, "url": website},
+            )
+
+        assert response.status_code == 409
+        assert "still being configured" in response.json()["detail"]
+    finally:
+        if created_id:
+            await _delete_uni(created_id)
+
+
 # ---------------------------------------------------------------------------
 # Test 2: POST /api/universities — duplicate website returns 409 + existing id
 # ---------------------------------------------------------------------------

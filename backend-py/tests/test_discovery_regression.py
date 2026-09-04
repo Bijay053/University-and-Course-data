@@ -526,3 +526,34 @@ async def test_scrape_do_seeds_get_full_timeout_and_run_concurrently(monkeypatch
         f"seed fetch start times spread over {spread:.2f}s — expected "
         "concurrent dispatch, not sequential"
     )
+
+
+@pytest.mark.asyncio
+async def test_failed_paginated_seed_retries_exact_url_without_dropping_page(
+    monkeypatch,
+):
+    """A failed ?page=N prefetch must retry page N, never duplicate page 0."""
+    from app.services.scraper.config.schema import DiscoveryConfig
+
+    seed = "https://example.edu/search/courses?page=7"
+    calls: list[str] = []
+
+    async def always_fail(url, **kwargs):
+        calls.append(url)
+        return None
+
+    monkeypatch.setattr(discovery, "fetch_html", always_fail)
+    cfg = DiscoveryConfig(
+        scrape_do_skip_fallbacks=True,
+        seed_urls=[seed],
+        skip_sitemap_fallback=True,
+    )
+
+    await discovery.discover_course_links(
+        seed,
+        max_pages=1,
+        max_courses=50,
+        discovery_config=cfg,
+    )
+
+    assert calls == [seed, seed]

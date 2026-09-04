@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_user, get_db
 from app.models import ScrapeRuntimeJob, University
+from app.permissions import require_permission
 from app.schemas.scrape import (
     BulkScrapeBody,
     BulkScrapeResponse,
@@ -380,7 +381,44 @@ async def get_job(job_id: str, db: Annotated[AsyncSession, Depends(get_db)]) -> 
     return ScrapeJobRead.model_validate(job)
 
 
-@router.post("/start", response_model=ScrapeStartResponse, status_code=status.HTTP_202_ACCEPTED)
+async def _lock_and_find_active_job(
+    db: AsyncSession,
+    university_id: int,
+) -> ScrapeRuntimeJob | None:
+    """Serialize scrape starts and return any job that is still active."""
+    from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+    from sqlalchemy import text as _text
+
+    await db.execute(
+        _text("SELECT pg_advisory_xact_lock(:uid)"),
+        {"uid": university_id},
+    )
+    fresh_cutoff = _dt.now(_tz.utc) - _td(minutes=2)
+    return (
+        await db.execute(
+            select(ScrapeRuntimeJob)
+            .where(
+                ScrapeRuntimeJob.university_id == university_id,
+                or_(
+                    ScrapeRuntimeJob.status.in_(["running", "awaiting_approval"]),
+                    and_(
+                        ScrapeRuntimeJob.status == "queued",
+                        ScrapeRuntimeJob.created_at > fresh_cutoff,
+                    ),
+                ),
+            )
+            .order_by(ScrapeRuntimeJob.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+
+@router.post(
+    "/start",
+    response_model=ScrapeStartResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(require_permission("scraping.trigger"))],
+)
 async def start_scrape(
     body: StartScrapeBody,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -431,50 +469,20 @@ async def start_scrape(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=err_msg,
         )
-    # Serialise concurrent start_scrape calls for the same university with a
-    # PostgreSQL advisory lock so the check-and-insert below is atomic even
-    # when two browser tabs or a retry loop fire simultaneously.
-    # pg_advisory_xact_lock() is transaction-scoped and releases automatically
-    # when the current transaction commits or rolls back — no manual unlock.
-    from sqlalchemy import text as _text
-    await db.execute(_text("SELECT pg_advisory_xact_lock(:uid)"), {"uid": uni.id})
-
-    # Deduplication: prevent starting a second scrape while one is already
-    # active for the same university.
-    #
-    # Rules:
-    #   running / awaiting_approval — always block regardless of age.  Two
-    #     workers scraping the same university at the same time produce
-    #     duplicate scraped_courses rows and split log streams.
-    #
-    #   queued — only block if the job is fresh (< 2 minutes old).  A queued
-    #     job older than 2 minutes was almost certainly orphaned: either
-    #     .delay() failed silently (Redis hiccup) or all 8 Celery workers
-    #     were briefly saturated and the lock expired before a slot freed up.
-    #     Returning the stale job traps the operator in "Queued" forever;
-    #     allowing a fresh dispatch lets the new task race the orphan —
-    #     the atomic claim UPDATE ("WHERE status = 'queued'") in run_scrape
-    #     ensures only one of them wins even when both tasks arrive together.
-    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
-    _fresh_cutoff = _dt.now(_tz.utc) - _td(minutes=2)
-    existing_job = (
-        await db.execute(
-            select(ScrapeRuntimeJob)
-            .where(
-                ScrapeRuntimeJob.university_id == uni.id,
-                or_(
-                    ScrapeRuntimeJob.status.in_(["running", "awaiting_approval"]),
-                    and_(
-                        ScrapeRuntimeJob.status == "queued",
-                        ScrapeRuntimeJob.created_at > _fresh_cutoff,
-                    ),
-                ),
-            )
-            .order_by(ScrapeRuntimeJob.created_at.desc())
-            .limit(1)
+    existing_job = await _lock_and_find_active_job(db, uni.id)
+    await db.refresh(uni, attribute_names=["probe_status"])
+    probe_status = (uni.probe_status or "").strip().lower()
+    if probe_status in {"pending", "probing"}:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "This university is still being configured. "
+                "The first scrape will start automatically when configuration completes."
+            ),
         )
-    ).scalar_one_or_none()
     if existing_job:
+        await db.commit()
         return ScrapeStartResponse(
             job_id=existing_job.runtime_job_id,
             runtime_job_id=existing_job.runtime_job_id,
@@ -553,17 +561,54 @@ async def start_scrape(
     return ScrapeStartResponse(job_id=job_id, runtime_job_id=job_id, status="queued")
 
 
-@router.post("/bulk", response_model=BulkScrapeResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/bulk",
+    response_model=BulkScrapeResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(require_permission("scraping.trigger"))],
+)
 async def start_bulk(
     body: BulkScrapeBody,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> BulkScrapeResponse:
     session_id = f"bulk_{uuid.uuid4().hex[:12]}"
     job_ids: list[str] = []
-    for uid in body.university_ids:
+    universities: dict[int, University] = {}
+
+    # Prevalidate before creating any rows so a probing university cannot cause
+    # a partially queued bulk session.
+    for uid in dict.fromkeys(body.university_ids):
         uni = await db.get(University, uid)
         if not uni:
             continue
+        if (uni.probe_status or "").strip().lower() in {"pending", "probing"}:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"{uni.name} is still being configured. Its first scrape "
+                    "will start automatically when configuration completes."
+                ),
+            )
+        universities[uid] = uni
+
+    # Acquire locks in stable order to avoid deadlocks between overlapping bulk
+    # requests, then use the same active-job policy as the single-start route.
+    for uid in sorted(universities):
+        uni = universities[uid]
+        existing_job = await _lock_and_find_active_job(db, uid)
+        await db.refresh(uni, attribute_names=["probe_status"])
+        if (uni.probe_status or "").strip().lower() in {"pending", "probing"}:
+            await db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"{uni.name} is still being configured. Its first scrape "
+                    "will start automatically when configuration completes."
+                ),
+            )
+        if existing_job:
+            continue
+
         job_id = f"job_{uuid.uuid4().hex[:12]}"
         # See start_scrape comment: payload must be Node-compatible because the
         # Node worker may also claim queued jobs in prod.
@@ -595,16 +640,19 @@ async def start_bulk(
     # Commit BEFORE enqueueing so the worker can never race ahead of the row insert.
     await db.commit()
 
-    try:
-        from app.tasks.scrape_tasks import scrape_university, set_initial_dispatch_lock
-
-        for jid in job_ids:
+    from app.tasks.scrape_tasks import scrape_university, set_initial_dispatch_lock
+    for jid in job_ids:
+        try:
             scrape_university.delay(jid)
             set_initial_dispatch_lock(jid)
-    except Exception:
-        # Broker unavailable: rows stay 'queued' for retry by the next start call
-        # or the periodic reaper.
-        pass
+        except Exception as exc:
+            # Broker unavailable: the row stays queued for the periodic reaper.
+            log.warning(
+                "start_bulk: broker enqueue failed for job %s — row stays "
+                "queued for requeue recovery: %s",
+                jid,
+                exc,
+            )
     return BulkScrapeResponse(session_id=session_id, queued=len(job_ids))
 
 

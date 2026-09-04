@@ -100,6 +100,21 @@ _IMPERVA = (
     "</script></body></html>"
 )
 
+_F5_COOKIE_CHALLENGE = (
+    "<!DOCTYPE html><html><head><script>"
+    'document.cookie="cookiesession8341=blocked";'
+    "eval(function(){var request=new XMLHttpRequest();"
+    "setTimeout(function(){request.open('GET','/challenge');},10);});"
+    "</script></head><body></body></html>"
+)
+
+_PACKED_SCRIPT_ONLY_CHALLENGE = (
+    "<!DOCTYPE html><html><head></head><body><script>"
+    "eval(function(p,a,c,k,e,d){return p;}"
+    "('challenge payload',62,95,'tokens'.split('|'),0,{}));"
+    "</script></body></html>"
+)
+
 _REAL_COURSE_PAGE = (
     "<!DOCTYPE html><html lang='en'><head>"
     "<title>Bachelor of Science (Computer Science) | Example University</title>"
@@ -135,6 +150,12 @@ _REAL_PAGE_WITH_INCIDENTAL_MOMENT = (
 
 
 class TestChallengeShellDetected:
+    def test_f5_cookie_challenge(self):
+        assert is_challenge_shell(_F5_COOKIE_CHALLENGE) is True
+
+    def test_packed_script_only_challenge(self):
+        assert is_challenge_shell(_PACKED_SCRIPT_ONLY_CHALLENGE) is True
+
     def test_cloudflare_spinner_title(self):
         assert is_challenge_shell(_CF_SPINNER) is True
 
@@ -172,6 +193,32 @@ class TestChallengeShellDetected:
 
 
 class TestChallengeShellNotDetected:
+    def test_f5_cookie_marker_alone(self):
+        html = "<script>document.cookie='cookiesession8341=preferences';</script>"
+        assert is_challenge_shell(html) is False
+
+    def test_eval_and_xhr_without_f5_cookie_marker(self):
+        html = "<script>eval(code); new XMLHttpRequest();</script>"
+        assert is_challenge_shell(html) is False
+
+    def test_legitimate_page_that_mentions_f5_cookie_and_uses_xhr(self):
+        html = (
+            "<html><head>"
+            '<meta name="cookie-name" content="cookiesession8341">'
+            "<script>const loader=eval; const request=new XMLHttpRequest();</script>"
+            "</head><body><h1>Computer Science</h1></body></html>"
+        )
+        assert is_challenge_shell(html) is False
+
+    def test_legitimate_page_with_packed_script_and_visible_content(self):
+        html = (
+            "<html><body><h1>Computer Science</h1><script>"
+            "eval(function(p,a,c,k,e,d){return p;}"
+            "('analytics',62,1,'x'.split('|'),0,{}));"
+            "</script></body></html>"
+        )
+        assert is_challenge_shell(html) is False
+
     def test_real_course_page(self):
         assert is_challenge_shell(_REAL_COURSE_PAGE) is False
 
