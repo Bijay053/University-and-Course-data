@@ -119,3 +119,4 @@
 - [Protected catalogue onboarding](protected-catalogue-onboarding.md) — commit probe state before task publish; reject engagement APIs/200 shells; preserve pagination queries and exact retries.
 - [Audience-scoped study mode](audience-scoped-study-mode.md) — international Location/Delivery is authoritative; Online must block synthetic campus defaults.
 - [SEGi current catalogue transport](segi-current-catalogue.md) — use university.segi.edu.my via an exact-host TLS exception; old archives are incomplete and current pages omit tuition.
+- [UNE recipe and fee authority](une-recipe-fee-authority.md) — keep slug/ID recipes aligned; current pages mix international tuition with CSP/scholarship blocks, so ambiguous fees must fail to review.
