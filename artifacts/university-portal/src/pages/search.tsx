@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { MultiSelect } from "@/components/multi-select";
+import { appendAcademicCredentialParams } from "./search-query";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 const COMPARE_KEY = "courseCompareTray";
@@ -203,10 +204,12 @@ export default function SearchPage() {
     if (eListening) params.set("english_listening", eListening);
     if (eSpeaking) params.set("english_speaking", eSpeaking);
     if (country) params.set("country", country);
-    if (qualification) params.set("highest_qualification", qualification);
-    if (scheme) params.set("grading_scheme", scheme);
-    if (outOf) params.set("grading_out_of", outOf);
-    if (gradingScore) params.set("grading_score", gradingScore);
+    appendAcademicCredentialParams(params, {
+      qualification,
+      scheme,
+      outOf,
+      gradingScore,
+    });
     if (otherExam.trim()) params.set("other_exam", otherExam.trim());
     if (sort) params.set("sort", sort);
     if (page > 1) params.set("page", String(page));
@@ -442,13 +445,18 @@ export default function SearchPage() {
                 {!qualification && (
                   <p className="text-[11px] text-gray-500">Select a qualification above to enter your grade.</p>
                 )}
+                {qualification && (
+                  <p className="text-[11px] text-gray-500">
+                    Courses with unpublished academic requirements remain included.
+                  </p>
+                )}
 
                 {/* Out of + GPA score — only when GPA chosen */}
                 {qualification && scheme === "GPA" && (
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <Label className="text-xs text-gray-600 mb-1 block">Out of</Label>
-                      <Select value={outOf || "any"} onValueChange={(v) => { setOutOf(v === "any" ? "" : v); resetPage(); }}>
+                      <Select value={outOf || "any"} onValueChange={(v) => { setOutOf(v === "any" ? "" : v); setGradingScore(""); resetPage(); }}>
                         <SelectTrigger className="h-9"><SelectValue placeholder="—" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="any">— Any —</SelectItem>
@@ -462,6 +470,8 @@ export default function SearchPage() {
                       <Label className="text-xs text-gray-600 mb-1 block">{qualification} GPA</Label>
                       <Input
                         type="number" step="0.01" min="0"
+                        max={outOf ? Number(outOf) : undefined}
+                        disabled={!outOf}
                         value={gradingScore}
                         onChange={(e) => { setGradingScore(e.target.value); resetPage(); }}
                         placeholder="e.g. 3.5"

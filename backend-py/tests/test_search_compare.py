@@ -107,6 +107,8 @@ def test_search_row_source_is_live_base_tables_not_retired_node_view():
     assert "FROM fees f" in normalized
     assert "FROM intakes i" in normalized
     assert "FROM english_requirements er" in normalized
+    assert "FROM academic_requirements ar" in normalized
+    assert "ORDER BY ar.created_at DESC NULLS LAST, ar.id DESC" in normalized
     assert "max(er.overall)" in normalized
     assert "upper(er.test_type) = 'IELTS'" in normalized
 
@@ -137,6 +139,11 @@ async def test_search_cte_executes_against_production_base_table_shape():
                 """CREATE TEMP TABLE english_requirements (
                     course_id integer, test_type text, overall real
                 ) ON COMMIT DROP""",
+                """CREATE TEMP TABLE academic_requirements (
+                    id integer, course_id integer, academic_level text,
+                    academic_score real, score_type text, academic_country text,
+                    created_at timestamptz
+                ) ON COMMIT DROP""",
             ):
                 await db.execute(text(ddl))
 
@@ -163,13 +170,20 @@ async def test_search_cte_executes_against_production_base_table_shape():
                    (10, 'ielts', 6.5),
                    (10, 'IELTS', 7.0)"""
             ))
+            await db.execute(text(
+                """INSERT INTO academic_requirements VALUES
+                   (1, 10, 'Year 12', 70, '%', 'Australia', '2025-01-01'),
+                   (2, 10, 'Bachelor''s degree', 4, 'GPA/5', 'Australia',
+                    '2026-01-01')"""
+            ))
 
             row = (
                 await db.execute(
                     text(
                         f"""WITH {_COURSE_SEARCH_CTE}
                             SELECT id, course_name, university_country,
-                                   international_fee, ielts_overall, intakes
+                                    international_fee, ielts_overall, intakes,
+                                    academic_level, academic_score, score_type
                             FROM course_search_view
                             WHERE university_country = :country
                               AND :intake = ANY(intakes)"""
@@ -185,7 +199,65 @@ async def test_search_cte_executes_against_production_base_table_shape():
                 "international_fee": 42000.0,
                 "ielts_overall": 7.0,
                 "intakes": ["February"],
+                "academic_level": "Bachelor's degree",
+                "academic_score": 4.0,
+                "score_type": "GPA/5",
             }
+
+            ratio_rows = (
+                await db.execute(
+                    text(
+                        """
+                        WITH requirements(score, score_type) AS (
+                            VALUES
+                                (4.0::real, 'GPA/5'),
+                                (4.5::real, 'GPA / 5.0'),
+                                (3.0::real, NULL),
+                                (3.8::real, NULL),
+                                (70.0::real, NULL),
+                                (3.0::real, 'GPA'),
+                                (3.8::real, 'GPA'),
+                                (70.0::real, 'GPA/0'),
+                                (3.8::real, 'GPA/4')
+                        )
+                        SELECT score, score_type
+                        FROM requirements
+                        WHERE (
+                              score_type IS NULL
+                              AND (score > CAST(:scale AS double precision)
+                                   OR score <= CAST(:score AS double precision))
+                           )
+                           OR (
+                              score_type ~* '^gpa'
+                              AND score_type !~ '/\\s*[0-9]+(?:\\.[0-9]+)?\\s*$'
+                              AND score <= CAST(:score AS double precision)
+                           )
+                           OR (regexp_match(
+                               score_type,
+                               '/\\s*([0-9]+(?:\\.[0-9]+)?)\\s*$'
+                           ))[1]::double precision <= 0
+                           OR (score / NULLIF((
+                               regexp_match(
+                                   score_type,
+                                   '/\\s*([0-9]+(?:\\.[0-9]+)?)\\s*$'
+                               )
+                           )[1]::double precision, 0)) <= (
+                               CAST(:score AS double precision)
+                               / CAST(:scale AS double precision)
+                           )
+                        ORDER BY score
+                        """
+                    ),
+                    {"score": 3.5, "scale": 4.0},
+                )
+            ).mappings().all()
+            assert [(r["score"], r["score_type"]) for r in ratio_rows] == [
+                (3.0, None),
+                (3.0, "GPA"),
+                (4.0, "GPA/5"),
+                (70.0, None),
+                (70.0, "GPA/0"),
+            ]
         finally:
             await db.rollback()
 
@@ -221,6 +293,170 @@ def test_search_destination_country_filters_university_country():
     for sql, params in session.calls:
         assert "lower(c.university_country) = lower(:country)" in sql
         assert params["country"] == "Malaysia"
+
+
+def test_search_combined_academic_credentials_filter_latest_requirement():
+    session = _SequentialSession([[], [0]])
+
+    async def _db_override():
+        yield session
+
+    app.dependency_overrides[get_db] = _db_override
+    response = TestClient(app).get(
+        "/api/search/courses"
+        "?highest_qualification=Associate%20Degree%20or%20Equivalent"
+        "&grading_scheme=GPA&grading_out_of=5&grading_score=4.2"
+    )
+
+    assert response.status_code == 200
+    for sql, params in session.calls:
+        assert "c.academic_level IS NULL" in sql
+        assert "<= (" in sql
+        assert "lower(c.score_type) LIKE 'gpa%'" in sql
+        assert "regexp_match(c.score_type" in sql
+        assert "CAST(:grading_score AS double precision)" in sql
+        assert "CAST(:grading_out_of AS double precision)" in sql
+        assert params["highest_qualification"] == "Associate Degree or Equivalent"
+        assert params["grading_out_of"] == 5.0
+        assert params["grading_score"] == 4.2
+
+
+def test_search_qualification_uses_attainment_hierarchy():
+    session = _SequentialSession([[], [0]])
+
+    async def _db_override():
+        yield session
+
+    app.dependency_overrides[get_db] = _db_override
+    response = TestClient(app).get(
+        "/api/search/courses?highest_qualification=Bachelor%27s%20degree"
+    )
+
+    assert response.status_code == 200
+    sql = session.calls[0][0]
+    assert "'year 12'" in sql
+    assert "'diploma'" in sql
+    assert "'bachelor''s degree'" in sql
+    assert "'doctorate'" in sql
+    assert "<= (" in sql
+
+
+def test_search_academic_policy_keeps_unknown_requirements():
+    session = _SequentialSession([[], [0]])
+
+    async def _db_override():
+        yield session
+
+    app.dependency_overrides[get_db] = _db_override
+    response = TestClient(app).get(
+        "/api/search/courses?highest_qualification=Year%2012"
+        "&grading_scheme=Percentage&grading_score=75"
+    )
+
+    assert response.status_code == 200
+    sql = session.calls[0][0]
+    assert "c.academic_level IS NULL" in sql
+    assert "c.score_type IS NULL" in sql
+    assert "c.academic_score IS NULL" in sql
+
+
+def test_search_gpa_score_requires_applicant_scale():
+    session = _SequentialSession([[], [0]])
+
+    async def _db_override():
+        yield session
+
+    app.dependency_overrides[get_db] = _db_override
+    response = TestClient(app).get(
+        "/api/search/courses?grading_scheme=GPA&grading_score=3.5"
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        "GPA score must be between 0 and the selected scale"
+    )
+    assert session.calls == []
+
+
+def test_search_rejects_gpa_above_selected_scale():
+    session = _SequentialSession([[], [0]])
+
+    async def _db_override():
+        yield session
+
+    app.dependency_overrides[get_db] = _db_override
+    response = TestClient(app).get(
+        "/api/search/courses?grading_scheme=GPA"
+        "&grading_out_of=4&grading_score=4.5"
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        "GPA score must be between 0 and the selected scale"
+    )
+    assert session.calls == []
+
+
+@pytest.mark.parametrize(
+    ("query", "detail"),
+    [
+        (
+            "grading_scheme=GPA&grading_out_of=NaN&grading_score=3.5",
+            "Grading scale must be a finite positive number",
+        ),
+        (
+            "grading_scheme=Percentage&grading_score=NaN",
+            "Grade score must be a finite number",
+        ),
+    ],
+)
+def test_search_rejects_non_finite_academic_numbers(query, detail):
+    session = _SequentialSession([[], [0]])
+
+    async def _db_override():
+        yield session
+
+    app.dependency_overrides[get_db] = _db_override
+    response = TestClient(app).get(f"/api/search/courses?{query}")
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == detail
+    assert session.calls == []
+
+
+@pytest.mark.parametrize("score", ["-1", "100.01"])
+def test_search_rejects_percentage_outside_zero_to_one_hundred(score):
+    session = _SequentialSession([[], [0]])
+
+    async def _db_override():
+        yield session
+
+    app.dependency_overrides[get_db] = _db_override
+    response = TestClient(app).get(
+        f"/api/search/courses?grading_scheme=Percentage&grading_score={score}"
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        "Percentage score must be between 0 and 100"
+    )
+    assert session.calls == []
+
+
+def test_search_list_uses_one_latest_pte_row_per_course():
+    session = _SequentialSession([[], [0]])
+
+    async def _db_override():
+        yield session
+
+    app.dependency_overrides[get_db] = _db_override
+    response = TestClient(app).get("/api/search/courses")
+
+    assert response.status_code == 200
+    list_sql = session.calls[0][0]
+    assert "LEFT JOIN LATERAL" in list_sql
+    assert "upper(er.test_type) = 'PTE'" in list_sql
+    assert "ORDER BY er.id DESC" in list_sql
 
 
 @pytest.mark.parametrize(
@@ -262,6 +498,7 @@ def test_search_options_success_response_is_unchanged():
         ["London", "Sydney"],
         [{"id": 2, "name": "Alpha University"}],
         ["Bachelor", "Master"],
+        ["Bachelor's degree", "Year 12"],
     ])
 
     async def _db_override():
@@ -277,6 +514,12 @@ def test_search_options_success_response_is_unchanged():
         "universities": [{"id": 2, "name": "Alpha University"}],
         "degree_levels": ["Bachelor", "Master"],
         "degreeLevels": ["Bachelor", "Master"],
+        "qualifications": ["Bachelor's degree", "Year 12"],
+        "grading_schemes": [
+            {"scheme": "GPA", "out_of": ["4", "5", "10"]},
+            {"scheme": "Percentage", "out_of": ["100"]},
+        ],
+        "english_exams": ["IELTS", "PTE", "TOEFL", "CAE", "DUOLINGO"],
         "intake_months": [
             "January", "February", "March", "April", "May", "June",
             "July", "August", "September", "October", "November", "December",

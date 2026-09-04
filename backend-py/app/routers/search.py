@@ -13,6 +13,7 @@ Search-row columns:
 from __future__ import annotations
 
 import logging
+import math
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -82,6 +83,10 @@ course_search_view AS MATERIALIZED (
         english_scores.toefl_overall,
         english_scores.cae_overall,
         english_scores.duolingo_overall,
+        latest_academic.academic_level,
+        latest_academic.academic_score,
+        latest_academic.score_type,
+        latest_academic.academic_country,
         CASE
             WHEN c.duration IS NULL THEN NULL
             WHEN c.duration_term ILIKE 'month%' THEN c.duration / 12.0
@@ -125,6 +130,17 @@ course_search_view AS MATERIALIZED (
         FROM english_requirements er
         WHERE er.course_id = c.id
     ) english_scores ON TRUE
+    LEFT JOIN LATERAL (
+        SELECT
+            ar.academic_level,
+            ar.academic_score,
+            ar.score_type,
+            ar.academic_country
+        FROM academic_requirements ar
+        WHERE ar.course_id = c.id
+        ORDER BY ar.created_at DESC NULLS LAST, ar.id DESC
+        LIMIT 1
+    ) latest_academic ON TRUE
     WHERE coalesce(c.status, 'active') = 'active'
       AND coalesce(c.approval_status, 'approved') = 'approved'
 )
@@ -162,16 +178,16 @@ async def search_courses(
     category: str | None = None,
     sub_category: str | None = None,
     sort: str | None = None,            # relevance|fee_asc|fee_desc|duration|name
-    # Accepted-but-noop (require academic_requirements/english_requirements join):
+    # Accepted-but-noop (require english_requirements join):
     english_reading: float | None = None,        # noqa: ARG001
     english_writing: float | None = None,        # noqa: ARG001
     english_listening: float | None = None,      # noqa: ARG001
     english_speaking: float | None = None,       # noqa: ARG001
     country_residence: str | None = None,        # noqa: ARG001
-    highest_qualification: str | None = None,    # noqa: ARG001
-    grading_scheme: str | None = None,           # noqa: ARG001
-    grading_out_of: str | None = None,           # noqa: ARG001
-    grading_score: str | None = None,            # noqa: ARG001
+    highest_qualification: str | None = None,
+    grading_scheme: str | None = None,
+    grading_out_of: str | None = None,
+    grading_score: str | None = None,
     other_exam: str | None = None,               # noqa: ARG001
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
@@ -279,6 +295,136 @@ async def search_courses(
         where.append("c.sub_category = :sub_cat")
         params["sub_cat"] = sub_category
 
+    # Academic requirement policy: only a known incompatibility excludes a
+    # course. A missing requirement (or a missing individual field) remains
+    # eligible so incomplete university data does not masquerade as a failed
+    # admission check. All comparisons use the latest requirement row.
+    if highest_qualification and highest_qualification.strip():
+        # Applicant qualifications and course prerequisites share this ordered
+        # vocabulary. A higher attained qualification satisfies lower known
+        # prerequisites; unrecognised/Other requirements remain unknown.
+        qualification_rank_sql = """
+            CASE
+                WHEN lower(btrim({value})) IN ('year 12', 'secondary school',
+                    'high school') THEN 1
+                WHEN lower(btrim({value})) IN ('diploma',
+                    'associate degree or equivalent', 'associate degree') THEN 2
+                WHEN lower(btrim({value})) IN ('undergraduate', 'bachelor',
+                    'bachelor''s degree', 'bachelors degree') THEN 3
+                WHEN lower(btrim({value})) IN (
+                    'graduate certificate & diploma',
+                    'graduate certificate', 'graduate diploma') THEN 4
+                WHEN lower(btrim({value})) IN ('postgraduate', 'master',
+                    'master''s degree', 'masters degree') THEN 5
+                WHEN lower(btrim({value})) IN ('doctorate', 'doctoral') THEN 6
+                ELSE NULL
+            END
+        """
+        requirement_rank = qualification_rank_sql.format(value="c.academic_level")
+        applicant_rank = qualification_rank_sql.format(
+            value=":highest_qualification"
+        )
+        where.append(
+            "(c.academic_level IS NULL OR btrim(c.academic_level) = '' "
+            f"OR ({requirement_rank}) IS NULL "
+            f"OR ({applicant_rank}) IS NULL "
+            f"OR ({requirement_rank}) <= ({applicant_rank}))"
+        )
+        params["highest_qualification"] = highest_qualification.strip()
+
+    normalized_scheme = (grading_scheme or "").strip().lower()
+    if normalized_scheme:
+        if normalized_scheme == "gpa":
+            where.append(
+                "(c.score_type IS NULL OR btrim(c.score_type) = '' "
+                "OR lower(c.score_type) LIKE 'gpa%')"
+            )
+        elif normalized_scheme in {"percentage", "%"}:
+            # Historical percentage requirements usually have no score_type.
+            where.append(
+                "(c.score_type IS NULL OR btrim(c.score_type) = '' "
+                "OR lower(c.score_type) IN ('%', 'percentage', 'percent'))"
+            )
+        else:
+            where.append(
+                "(c.score_type IS NULL OR btrim(c.score_type) = '' "
+                "OR lower(c.score_type) = lower(:grading_scheme))"
+            )
+            params["grading_scheme"] = grading_scheme.strip()
+
+    if grading_out_of and grading_out_of.strip():
+        try:
+            grading_scale = float(grading_out_of)
+        except ValueError:
+            grading_scale = math.nan
+        if not math.isfinite(grading_scale) or grading_scale <= 0:
+            raise HTTPException(
+                status_code=422,
+                detail="Grading scale must be a finite positive number",
+            )
+        params["grading_out_of"] = grading_scale
+
+    if grading_score and grading_score.strip():
+        try:
+            achieved_score = float(grading_score)
+        except ValueError:
+            achieved_score = math.nan
+        if not math.isfinite(achieved_score):
+            raise HTTPException(
+                status_code=422,
+                detail="Grade score must be a finite number",
+            )
+        if (
+            normalized_scheme in {"percentage", "%"}
+            and not 0 <= achieved_score <= 100
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail="Percentage score must be between 0 and 100",
+            )
+        if (
+            normalized_scheme == "gpa"
+            and (
+                params.get("grading_out_of") is None
+                or achieved_score < 0
+                or achieved_score > params["grading_out_of"]
+            )
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail="GPA score must be between 0 and the selected scale",
+            )
+        params["grading_score"] = achieved_score
+        if normalized_scheme == "gpa":
+                # GPA values are comparable only when both scales are known.
+                # Stored GPA types use forms such as GPA/5 and GPA / 5.0.
+                # Compare ratios so an applicant on one scale can satisfy a
+                # requirement published on another. Unknown units stay eligible.
+            if params.get("grading_out_of"):
+                where.append(
+                        "(c.academic_score IS NULL "
+                        "OR ((c.score_type IS NULL OR btrim(c.score_type) = '') "
+                        "AND (c.academic_score > CAST(:grading_out_of AS double precision) "
+                        "OR c.academic_score <= CAST(:grading_score AS double precision))) "
+                        "OR c.score_type !~* '^gpa' "
+                        "OR (c.score_type ~* '^gpa' "
+                        "AND c.score_type !~ '/\\s*[0-9]+(?:\\.[0-9]+)?\\s*$' "
+                        "AND c.academic_score <= CAST(:grading_score AS double precision)) "
+                        "OR (regexp_match(c.score_type, "
+                        "'/\\s*([0-9]+(?:\\.[0-9]+)?)\\s*$'))[1]::double precision <= 0 "
+                        "OR (c.academic_score / NULLIF(("
+                        "regexp_match(c.score_type, "
+                        "'/\\s*([0-9]+(?:\\.[0-9]+)?)\\s*$'))[1]::double precision, 0)) "
+                        "<= (CAST(:grading_score AS double precision) / "
+                        "CAST(:grading_out_of AS double precision)))"
+                )
+            # Without the applicant's GPA scale, numeric GPA requirements
+            # cannot be compared safely and therefore remain eligible.
+        else:
+            where.append(
+                    "(c.academic_score IS NULL OR c.academic_score <= :grading_score)"
+            )
+
     where_sql = " AND ".join(where) if where else "TRUE"
 
     # B5: sort param. Default behaviour (no sort) preserves the
@@ -336,8 +482,14 @@ async def search_courses(
                c.intakes      AS intake_months,
                {rank_select}
         FROM course_search_view c
-        LEFT JOIN english_requirements pte_er
-               ON pte_er.course_id = c.id AND pte_er.test_type = 'PTE'
+         LEFT JOIN LATERAL (
+             SELECT er.listening, er.writing
+             FROM english_requirements er
+             WHERE er.course_id = c.id
+               AND upper(er.test_type) = 'PTE'
+             ORDER BY er.id DESC
+             LIMIT 1
+         ) pte_er ON TRUE
         WHERE {where_sql}
         ORDER BY {sort_clause}
         LIMIT :limit OFFSET :offset
@@ -641,6 +793,19 @@ async def search_options(db: Annotated[AsyncSession, Depends(get_db)]) -> Search
             .scalars()
             .all()
         )
+        qualifications = (
+            (
+                await db.execute(
+                    text(
+                        "SELECT DISTINCT academic_level FROM academic_requirements "
+                        "WHERE academic_level IS NOT NULL "
+                        "AND btrim(academic_level) <> '' ORDER BY academic_level"
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
         intake_months = [
             "January",
             "February",
@@ -667,6 +832,12 @@ async def search_options(db: Annotated[AsyncSession, Depends(get_db)]) -> Search
         "cities": list(cities),
         "universities": [dict(u) for u in unis],
         "degree_levels": list(degree_levels), "degreeLevels": list(degree_levels),
+        "qualifications": list(qualifications),
+        "grading_schemes": [
+            {"scheme": "GPA", "out_of": ["4", "5", "10"]},
+            {"scheme": "Percentage", "out_of": ["100"]},
+        ],
+        "english_exams": ["IELTS", "PTE", "TOEFL", "CAE", "DUOLINGO"],
         "intake_months": intake_months, "intakeMonths": intake_months,
     }))
 
