@@ -1207,10 +1207,13 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
     # this job share the same mutable dict via ContextVar, so gather() batches
     # also contribute their counts without any explicit plumbing.
     from app.services.scraper.http_fetcher import (
+        _challenge_job_counters as _challenge_cv,
         _scrape_do_job_counters as _sd_cv,
     )
     _sd_job_ctrs: dict = {"render": 0, "static": 0}
     _sd_cv.set(_sd_job_ctrs)
+    _challenge_job_ctrs: dict = {"rejections": {}, "unresolved": {}}
+    _challenge_cv.set(_challenge_job_ctrs)
 
     # Snapshot context — makes university_id + runtime_job_id available to
     # http_fetcher's _save_html_snapshot() without threading them through every
@@ -6769,6 +6772,42 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         if _html_compaction_stats:
             job.gate_skip_counts = dict(job.gate_skip_counts or {})
             job.gate_skip_counts["html_compaction"] = _html_compaction_stats
+        _challenge_rejections = {
+            str(transport): int(count)
+            for transport, count in _challenge_job_ctrs["rejections"].items()
+            if int(count) > 0
+        }
+        _unresolved_challenges = {
+            str(transport): int(count)
+            for transport, count in _challenge_job_ctrs["unresolved"].items()
+            if int(count) > 0
+        }
+        if _challenge_rejections:
+            job.gate_skip_counts = dict(job.gate_skip_counts or {})
+            job.gate_skip_counts["anti_bot_challenges"] = {
+                "rejections": _challenge_rejections,
+                "unresolved": _unresolved_challenges,
+                "rejection_total": sum(_challenge_rejections.values()),
+                "unresolved_total": sum(_unresolved_challenges.values()),
+            }
+        if _unresolved_challenges:
+            _challenge_total = sum(_unresolved_challenges.values())
+            _challenge_transports = ", ".join(sorted(_unresolved_challenges))
+            _challenge_warning = (
+                f"Anti-bot pages blocked {_challenge_total} fetch"
+                f"{'' if _challenge_total == 1 else 'es'} after all fallbacks "
+                f"(transport: {_challenge_transports})."
+            )
+            log.warning("[ANTI-BOT] run=%s %s", runtime_job_id, _challenge_warning)
+            await emit(
+                "status",
+                _challenge_warning,
+                phase="complete",
+                kind="anti_bot_challenge_unresolved",
+                level="warn",
+                count=_challenge_total,
+                transports=_unresolved_challenges,
+            )
         if _sd_job_ctrs["render"] or _sd_job_ctrs["static"]:
             log.info(
                 "[SCRAPE_DO] run=%s render_calls=%d static_calls=%d cost_est=$%.4f",

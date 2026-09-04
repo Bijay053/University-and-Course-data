@@ -1074,6 +1074,7 @@ async def history_list(
             "latestSnapshotAt": latest_snap_at.isoformat() if latest_snap_at else None,
             "htmlCompaction": (r.gate_skip_counts or {}).get("html_compaction"),
             "htmlCompactionAlerts": compaction_alerts_by_run.get(r.runtime_job_id, []),
+            "antiBotChallenges": (r.gate_skip_counts or {}).get("anti_bot_challenges"),
         })
     return {"runs": runs, "total": int(total), "limit": limit, "offset": offset}
 

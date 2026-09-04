@@ -320,6 +320,13 @@ _scrape_do_job_counters: ContextVar[dict | None] = ContextVar(
     "_scrape_do_job_counters", default=None
 )
 
+# Per-job anti-bot challenge diagnostics. ``rejections`` counts every response
+# rejected as a challenge shell by transport. ``unresolved`` counts only the
+# final challenge failure left after fetch_html's bounded fallback ladder.
+_challenge_job_counters: ContextVar[dict | None] = ContextVar(
+    "_challenge_job_counters", default=None
+)
+
 
 @contextmanager
 def scrape_do_counter_scope() -> "Generator[dict, None, None]":
@@ -436,6 +443,11 @@ def _record_fetch_failure(
     if status_code is not None:
         info["status_code"] = status_code
     _last_fetch_failure.set(info)
+    if kind == "challenge_page":
+        counters = _challenge_job_counters.get()
+        if counters is not None:
+            rejections = counters.setdefault("rejections", {})
+            rejections[transport] = int(rejections.get(transport, 0)) + 1
 
 
 def _mark_last_fetch_failure_terminal() -> None:
@@ -443,6 +455,15 @@ def _mark_last_fetch_failure_terminal() -> None:
     if info:
         terminal_info = dict(info)
         terminal_info["terminal"] = True
+        if (
+            terminal_info.get("kind") == "challenge_page"
+            and not bool(info.get("terminal"))
+        ):
+            counters = _challenge_job_counters.get()
+            if counters is not None:
+                transport = str(terminal_info.get("transport") or "unknown")
+                unresolved = counters.setdefault("unresolved", {})
+                unresolved[transport] = int(unresolved.get(transport, 0)) + 1
         _last_fetch_failure.set(terminal_info)
 
 
@@ -1462,6 +1483,7 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
             url,
             _attempts,
         )
+        _mark_last_fetch_failure_terminal()
         return None
 
     # Read per-university geo code (ISO 3166-1 alpha-2) for Scrape.do pinning.
@@ -1603,6 +1625,7 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
                 url,
                 _allow_wayback_last_resort,
             )
+            _mark_last_fetch_failure_terminal()
             return None
 
     # Force-Wayback-first: use CDX-cached snapshots as the cheap primary
@@ -1822,6 +1845,7 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
                 " (skipping httpx/cffi per discovery.scrape_do_skip_fallbacks)",
                 url,
             )
+            _mark_last_fetch_failure_terminal()
             return ""
 
     # Fast-path: if BOTH httpx and curl_cffi previously failed for this host
@@ -1840,7 +1864,10 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
             return _fast
         if _scrape_do_render:
             _fast_r = await fetch_html_scrape_do(url, render=True, wait_for_ms=wait_for_ms)
+            if _fast_r is None:
+                _mark_last_fetch_failure_terminal()
             return _fast_r
+        _mark_last_fetch_failure_terminal()
         return None
 
     last_exc: Exception | None = None
@@ -2090,6 +2117,7 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
             url, status=cf_block_status, tier="cf_ladder",
             detail="Cloudflare block — httpx/cffi/Wayback/Scrape.do all failed",
         )
+        _mark_last_fetch_failure_terminal()
         return None
 
     if last_exc:
@@ -2103,4 +2131,5 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
             url, status=last_status, tier="httpx",
             detail="non-200 responses on all attempts",
         )
+    _mark_last_fetch_failure_terminal()
     return None

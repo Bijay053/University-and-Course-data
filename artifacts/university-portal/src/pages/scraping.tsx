@@ -765,6 +765,12 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       severity: string;
       message: string;
     }>;
+    antiBotChallenges: {
+      rejections: Record<string, number>;
+      unresolved: Record<string, number>;
+      rejection_total: number;
+      unresolved_total: number;
+    } | null;
   };
   type HistoryLogEntry = { sequence: number; event: string; createdAt: string; message?: string; phase?: string; [k: string]: unknown };
   // History staged course is now the full StagedCourse + evidence array
@@ -3986,6 +3992,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
               const compactionQualityAlert = run.htmlCompactionAlerts?.find(
                 (alert) => alert.ruleId === "html_compaction_critical_coverage_regression",
               );
+              const unresolvedChallengeTransports = Object.keys(
+                run.antiBotChallenges?.unresolved ?? {},
+              );
               return (
                 <div key={run.runtimeJobId} className={`border rounded-xl bg-white overflow-hidden transition-shadow ${historySelected.has(run.runtimeJobId) ? "ring-2 ring-indigo-400" : ""}`}>
                   <div className="p-3 sm:p-4 space-y-2">
@@ -4053,8 +4062,33 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                             HTML −{Math.round(run.htmlCompaction.reduction_rate * 100)}%
                           </span>
                         ) : null}
+                        {(run.antiBotChallenges?.rejection_total ?? 0) > 0 ? (
+                          <span
+                            title={Object.entries(run.antiBotChallenges?.rejections ?? {})
+                              .map(([transport, count]) => `${transport}: ${count}`)
+                              .join(" · ")}
+                            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-medium ${
+                              (run.antiBotChallenges?.unresolved_total ?? 0) > 0
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-slate-100 text-slate-700"
+                            }`}
+                          >
+                            <ShieldCheck className="h-3 w-3" />
+                            Anti-bot {run.antiBotChallenges?.rejection_total}
+                          </span>
+                        ) : null}
                       </div>
 
+                      {(run.antiBotChallenges?.unresolved_total ?? 0) > 0 ? (
+                        <div className="w-full rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                          <strong>Anti-bot pages are blocking this university.</strong>{" "}
+                          {run.antiBotChallenges?.unresolved_total} fetch
+                          {run.antiBotChallenges?.unresolved_total === 1 ? "" : "es"} remained blocked
+                          after all fallbacks. Affected transport
+                          {unresolvedChallengeTransports.length === 1 ? "" : "s"}:{" "}
+                          {unresolvedChallengeTransports.join(", ")}.
+                        </div>
+                      ) : null}
                       {compactionLostSpeedup ? (
                         <div className="w-full rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
                           <strong>HTML speed optimization is no longer useful.</strong>{" "}
