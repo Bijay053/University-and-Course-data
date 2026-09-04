@@ -13,4 +13,10 @@ describe("course search destination-country contract", () => {
     expect(source).toContain("Study Destination Country");
     expect(source).not.toContain("Country of Residence");
   });
+
+  it("shows the number of active filters beside the filter heading", () => {
+    expect(source).toContain("activeFilterCount");
+    expect(source).toContain("{activeFilterCount} active");
+    expect(source).toContain('aria-live="polite"');
+  });
 });

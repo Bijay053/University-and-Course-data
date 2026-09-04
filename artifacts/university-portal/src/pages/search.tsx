@@ -274,6 +274,46 @@ export default function SearchPage() {
     return options.grading_schemes.find((s) => s.scheme === scheme)?.out_of ?? [];
   }, [scheme, options]);
 
+  const activeFilterCount = useMemo(() => {
+    const populatedFilters = [
+      location.trim(),
+      country,
+      qualification,
+      scheme,
+      outOf,
+      gradingScore,
+      englishExam,
+      eOverall,
+      eReading,
+      eWriting,
+      eListening,
+      eSpeaking,
+      otherExam.trim(),
+    ].filter(Boolean).length;
+
+    return populatedFilters
+      + (selectedIntakes.length > 0 ? 1 : 0)
+      + (durationRange[0] > 0 || durationRange[1] < 6 ? 1 : 0)
+      + (feeRange[0] > 0 || feeRange[1] < 100000 ? 1 : 0);
+  }, [
+    location,
+    country,
+    qualification,
+    scheme,
+    outOf,
+    gradingScore,
+    englishExam,
+    eOverall,
+    eReading,
+    eWriting,
+    eListening,
+    eSpeaking,
+    otherExam,
+    selectedIntakes,
+    durationRange,
+    feeRange,
+  ]);
+
   return (
     <div className="space-y-4">
       {/* ── Hero search bar ────────────────────────────────── */}
@@ -319,10 +359,27 @@ export default function SearchPage() {
         {/* ── Filters ──────────────────────────────────────── */}
         <aside className="bg-white rounded-xl border p-4 space-y-4 self-start lg:sticky lg:top-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-sm flex items-center gap-2">
-              <Filter className="w-4 h-4 text-red-600" /> Filters
-            </h2>
-            <Button variant="ghost" size="sm" onClick={clearAllFilters}>Reset</Button>
+            <div className="flex items-center gap-2">
+              <h2 className="font-semibold text-sm flex items-center gap-2">
+                <Filter className="w-4 h-4 text-red-600" /> Filters
+              </h2>
+              {activeFilterCount > 0 && (
+                <span
+                  aria-live="polite"
+                  className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700 ring-1 ring-inset ring-red-200"
+                >
+                  {activeFilterCount} active
+                </span>
+              )}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearAllFilters}
+              disabled={activeFilterCount === 0 && !q.trim()}
+            >
+              Reset
+            </Button>
           </div>
 
           <Accordion
