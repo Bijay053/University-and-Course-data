@@ -11,6 +11,8 @@ import inspect
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. Tier-7 — DiscoveryFailureAlert model + alert delivery helpers
@@ -85,6 +87,65 @@ def test_deliver_discovery_failure_alert_calls_slack(monkeypatch) -> None:
     assert "Bond University" in subject
     assert "1 candidate" in subject
     assert "bond.edu.au" in body
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("candidates_found", [0, 40])
+async def test_discovery_failure_alert_uses_runtime_job_id_and_delivers(
+    monkeypatch,
+    candidates_found: int,
+) -> None:
+    """Zero-course and high-drop alerts persist and deliver without reading job.id."""
+    from app.models.scrape_runtime import ScrapeRuntimeJob
+    from app.services.scraper import alert_delivery
+    from app.services.scraper.orchestrator import (
+        _persist_and_deliver_discovery_failure_alert,
+    )
+
+    db = MagicMock()
+    db.commit = AsyncMock()
+    delivered: list[dict] = []
+
+    monkeypatch.setattr(
+        alert_delivery,
+        "deliver_discovery_failure_alert",
+        lambda **kwargs: delivered.append(kwargs),
+    )
+
+    async def _run_inline(function, *args, **kwargs):
+        return function(*args, **kwargs)
+
+    monkeypatch.setattr(asyncio, "to_thread", _run_inline)
+
+    job = ScrapeRuntimeJob(
+        runtime_job_id="stable-runtime-job",
+        scraping_job_id=None,
+        university_id=99,
+        university_name="Test University",
+        url="https://test.example/courses",
+        job_type="scrape",
+        status="running",
+    )
+    diagnostic = {"source": "regression-test"}
+
+    await _persist_and_deliver_discovery_failure_alert(
+        db,
+        job=job,
+        uni_id=99,
+        uni_name="Test University",
+        scrape_url="https://test.example/courses",
+        candidates_found=candidates_found,
+        diagnostic=diagnostic,
+    )
+    await asyncio.sleep(0)
+
+    db.add.assert_called_once()
+    db.commit.assert_awaited_once()
+    persisted = db.add.call_args.args[0]
+    assert persisted.diagnostic["job_id"] == "stable-runtime-job"
+    assert persisted.candidates_found == candidates_found
+    assert delivered[0]["diagnostic"]["job_id"] == "stable-runtime-job"
+    assert delivered[0]["candidates_found"] == candidates_found
 
 
 def test_deliver_drift_alert_noop_when_clean(monkeypatch) -> None:

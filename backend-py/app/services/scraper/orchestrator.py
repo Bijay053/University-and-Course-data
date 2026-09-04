@@ -49,6 +49,37 @@ _PER_COURSE_EXTRACTION_TIMEOUT_SECONDS = float(
 )
 
 
+async def _persist_and_deliver_discovery_failure_alert(
+    db: AsyncSession,
+    *,
+    job: ScrapeRuntimeJob,
+    uni_id: int,
+    uni_name: str,
+    scrape_url: str,
+    candidates_found: int,
+    diagnostic: dict[str, Any],
+) -> None:
+    """Persist a discovery failure and dispatch its operator notification."""
+    from app.models.discovery_failure_alert import DiscoveryFailureAlert
+    from app.services.scraper.alert_delivery import deliver_discovery_failure_alert
+
+    diagnostic["job_id"] = str(job.runtime_job_id)
+    db.add(DiscoveryFailureAlert(
+        university_id=uni_id,
+        candidates_found=candidates_found,
+        diagnostic=diagnostic,
+    ))
+    await db.commit()
+    asyncio.create_task(asyncio.to_thread(
+        deliver_discovery_failure_alert,
+        uni_name=uni_name,
+        uni_id=uni_id,
+        scrape_url=scrape_url,
+        candidates_found=candidates_found,
+        diagnostic=diagnostic,
+    ))
+
+
 def _extraction_failure_details(
     error: object,
     *,
@@ -2678,14 +2709,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 # for every empty MQ run, so we deliberately exclude 0.
                 if 0 < len(links) < _MQ_DISCOVERY_FLOOR:
                     try:
-                        from app.models.discovery_failure_alert import (
-                            DiscoveryFailureAlert,
-                        )
-                        from app.services.scraper.alert_delivery import (
-                            deliver_discovery_failure_alert,
-                        )
                         _mq_diag = {
-                            "job_id": str(job.id),
                             "scrape_url": scrape_url,
                             "candidates_found": len(links),
                             "discovery_floor": _MQ_DISCOVERY_FLOOR,
@@ -2694,25 +2718,20 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                             "discovered_at": datetime.now(timezone.utc).isoformat(),
                             "uni_slug": _uni_cfg.slug,
                         }
-                        db.add(DiscoveryFailureAlert(
-                            university_id=uni_id,
-                            candidates_found=len(links),
-                            diagnostic=_mq_diag,
-                        ))
-                        await db.commit()
-                        log.warning(
-                            "[MQ DISCOVERY] Below-floor alert persisted "
-                            "(harvested=%d, floor=%d, job=%s)",
-                            len(links), _MQ_DISCOVERY_FLOOR, job.id,
-                        )
-                        asyncio.create_task(asyncio.to_thread(
-                            deliver_discovery_failure_alert,
-                            uni_name=uni_name,
+                        await _persist_and_deliver_discovery_failure_alert(
+                            db,
+                            job=job,
                             uni_id=uni_id,
+                            uni_name=uni_name,
                             scrape_url=scrape_url,
                             candidates_found=len(links),
                             diagnostic=_mq_diag,
-                        ))
+                        )
+                        log.warning(
+                            "[MQ DISCOVERY] Below-floor alert persisted "
+                            "(harvested=%d, floor=%d, job=%s)",
+                            len(links), _MQ_DISCOVERY_FLOOR, job.runtime_job_id,
+                        )
                     except Exception as _mq_alert_exc:  # noqa: BLE001
                         log.error(
                             "[MQ DISCOVERY] Failed to persist below-floor "
@@ -3214,39 +3233,27 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         _TIER7_THRESHOLD = 3
         if len(links) < _TIER7_THRESHOLD:
             try:
-                from app.models.discovery_failure_alert import DiscoveryFailureAlert
-                from app.services.scraper.alert_delivery import deliver_discovery_failure_alert
                 _diag = {
-                    "job_id": str(job.id),
                     "scrape_url": scrape_url,
                     "candidates_found": len(links),
                     "fast_mode": bool(job.fast_mode),
                     "discovered_at": datetime.now(timezone.utc).isoformat(),
                     "uni_slug": _uni_cfg.slug,
                 }
-                _failure_alert = DiscoveryFailureAlert(
-                    university_id=uni_id,
-                    candidates_found=len(links),
-                    diagnostic=_diag,
-                )
-                db.add(_failure_alert)
-                await db.commit()
-                log.warning(
-                    "[TIER7] Discovery failure alert persisted for %s "
-                    "(candidates=%d, job=%s)",
-                    uni_name, len(links), job.id,
-                )
-                # Fire-and-forget Slack/email — offload to a thread so the
-                # sync urllib/smtplib calls (each up to 10s timeout) don't
-                # block the asyncio event loop and freeze the scrape UI.
-                asyncio.create_task(asyncio.to_thread(
-                    deliver_discovery_failure_alert,
-                    uni_name=uni_name,
+                await _persist_and_deliver_discovery_failure_alert(
+                    db,
+                    job=job,
                     uni_id=uni_id,
+                    uni_name=uni_name,
                     scrape_url=scrape_url,
                     candidates_found=len(links),
                     diagnostic=_diag,
-                ))
+                )
+                log.warning(
+                    "[TIER7] Discovery failure alert persisted for %s "
+                    "(candidates=%d, job=%s)",
+                    uni_name, len(links), job.runtime_job_id,
+                )
             except Exception as _t7_exc:  # noqa: BLE001
                 log.error("[TIER7] Failed to persist/deliver discovery alert: %s", _t7_exc)
 
