@@ -6,6 +6,7 @@ import {
   Search, Wrench, User, CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SettingsTabs } from "@/components/settings-tabs";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -248,6 +249,8 @@ export default function CertDashboardPage() {
           Refresh
         </Button>
       </div>
+
+      <SettingsTabs />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">

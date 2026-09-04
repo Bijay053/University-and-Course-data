@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 const tabs = [
   { label: "Academic Levels", href: "/settings/academic-levels" },
   { label: "Course Name Acronyms", href: "/settings/acronyms" },
+  { label: "Certification Dashboard", href: "/cert-dashboard" },
   { label: "Scraper Configs", href: "/settings/scraper-configs" },
 ];
 
