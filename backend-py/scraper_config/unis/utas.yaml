@@ -182,10 +182,12 @@ extraction:
   scrape_do_static: true
   scrape_do_skip_fallbacks: true
   # The 8-way primary pass caused Scrape.do contention: more than half of one
-  # live catalogue run hit the old 20s deadline. Static requests stay below
-  # 30s in representative live probes, but 45s leaves network jitter headroom
-  # without allowing one stuck request to monopolise a slot.
-  per_course_timeout_seconds: 45
+  # This is a whole-course deadline, not just a fetch timeout. Static requests
+  # stay below 30s in representative live probes, but extraction, deterministic
+  # parsing, Gemini fill-only, and bounded vision/fallback work all share this
+  # budget. The production continuation proved 45s still cut off valid courses
+  # after successful static fetches, so retain the global 90s safety cap.
+  per_course_timeout_seconds: 90
   # Local Playwright uses the same blocked datacenter route and cannot safely
   # improve rendered Scrape.do HTML, so do not spend another 10-60s rescuing it.
   skip_browser_rescue: true

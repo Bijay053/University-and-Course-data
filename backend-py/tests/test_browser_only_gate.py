@@ -84,7 +84,7 @@ def test_utas_uses_static_provider_without_local_browser_rescue() -> None:
     assert cfg.scrape_do_static is True
     assert cfg.skip_browser_rescue is True
     assert cfg.skip_per_course_browser is True
-    assert cfg.per_course_timeout_seconds == 45
+    assert cfg.per_course_timeout_seconds == 90
     assert cfg.max_parallel_fetch == 4
     assert cfg.recovery_sweep_max_items == 200
     assert cfg.recovery_sweep_time_budget_seconds == 900
