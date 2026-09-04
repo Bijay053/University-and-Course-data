@@ -20,3 +20,9 @@ Pre-stage extraction snapshots are only a legacy, partial recovery source. Exact
 **Why:** The extractor payload can differ materially from the persisted review row because staging transforms and filters fields. Replaying it cannot reconstruct the historical operator review set exactly.
 
 **How to apply:** Save the final staged values atomically with the review row, refresh the backup after any later verification update, prefer exact backups over legacy snapshots, and restore under the same lock used by approval.
+
+Targeted continuations must also skip discovery-only side trips that inspect course samples, such as automatic central fee-page discovery. They may still prefetch already configured central sources.
+
+**Why:** Explicit course URLs are already the resolved work list. Re-running course-sample discovery can send those URLs through the discovery transport instead of the extraction transport, adding minutes of redundant rendered requests before extraction begins.
+
+**How to apply:** Gate inferred central-page discovery on `not targeted_retry`; keep configured central-page prefetch and the normal extraction/staging safeguards.

@@ -37,3 +37,13 @@ regressing field-fill:
 ContextVar tally is safe under per-course concurrency: a mutable dict is stored
 in the ContextVar before `gather()`, child asyncio tasks inherit the same dict
 reference, and increments are synchronous in one event loop.
+
+4. **The per-course deadline is end-to-end, not a fetch timeout.** It includes
+   transport, deterministic parsing, primary AI fill, vision gates, fallback
+   enrichment, and final normalization. Tune it from full-course timings; a
+   transport-only benchmark cannot justify lowering the whole-course cap.
+   **Why:** fast static fetches can still produce valid courses that exceed a
+   short cap during later enrichment, converting successful fetches into false
+   `per_course_timeout` errors.
+   **How to apply:** keep transport-specific limits inside transport calls and
+   retain enough outer budget for all bounded downstream stages.
