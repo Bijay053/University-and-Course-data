@@ -118,3 +118,4 @@
 - [Live catalogue removal safety](live-catalogue-removal-safety.md) — never auto-hide courses solely because they are absent from one approved scrape; removals need explicit audited review.
 - [Protected catalogue onboarding](protected-catalogue-onboarding.md) — commit probe state before task publish; reject engagement APIs/200 shells; preserve pagination queries and exact retries.
 - [Audience-scoped study mode](audience-scoped-study-mode.md) — international Location/Delivery is authoritative; Online must block synthetic campus defaults.
+- [SEGi current catalogue transport](segi-current-catalogue.md) — use university.segi.edu.my via an exact-host TLS exception; old archives are incomplete and current pages omit tuition.
