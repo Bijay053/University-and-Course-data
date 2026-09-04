@@ -8,8 +8,9 @@
 # primary disambiguation; hostname_guard is a defence-in-depth safety net.
 hostname_guard: "canterbury.ac.nz"
 
-# Discovery: Funnelback search API for UG and PG subject pages.
-# Fix: English scores use degree-level defaults so PG/doctorate do not receive UG scores.
+# Discovery: Funnelback search API for qualification (degree) pages.
+# Subject pages describe majors/minors and do not contain the fields required
+# for publishable courses.
 
 discovery:
   auto_api_discovery: false
@@ -17,9 +18,7 @@ discovery:
   generic_search_api:
     enabled: true
     method: GET
-    url: "https://search.canterbury.ac.nz/s/search.json?s=%21PadreNull&MBL=300&num_ranks=300&profile=all-subjects-results-page&f.Subject+Level%7CucSubjectLevel=Undergraduate+subject&collection=uoc2%7Esp-aem-all-subjects&sort=title"
-    additional_urls:
-      - "https://search.canterbury.ac.nz/s/search.json?s=%21PadreNull&MBL=300&num_ranks=300&profile=all-subjects-results-page&f.Subject+Level%7CucSubjectLevel=Postgraduate+subject&collection=uoc2%7Esp-aem-all-subjects&sort=title"
+    url: "https://search.canterbury.ac.nz/s/search.json?s=%21PadreNull&MBL=300&num_ranks=300&profile=qualifications-results-page&collection=uoc2%7Esp-aem-qualifications&sort=title"
     root_path: "response.resultPacket.results"
     url_fields:
       - "liveUrl"
@@ -31,20 +30,20 @@ discovery:
     normalize_relative_urls: true
     base_url: "https://www.canterbury.ac.nz"
     allow_url_patterns:
-      - "/study/academic-study/subjects/"
       - "/study/academic-study/qualifications/"
     max_pages: 1
     fetch_via_browser: true
-    browser_seed_url: "https://www.canterbury.ac.nz/study/academic-study/subjects"
+    browser_seed_url: "https://www.canterbury.ac.nz/study/academic-study/qualifications"
 
   seed_urls:
     - https://www.canterbury.ac.nz/study/academic-study/qualifications
-    - https://www.canterbury.ac.nz/study/academic-study/subjects
 
-  always_sitemap_supplement: true
+  always_sitemap_supplement: false
   sitemap_url: https://www.canterbury.ac.nz/sitemap.xml
 
-  bfs_page_budget: 80
+  # Direct page requests return 406. Funnelback supplies the full link set;
+  # avoid wasting the discovery budget on known-dead BFS and sitemap probes.
+  bfs_page_budget: 0
   max_candidates: 700
   expected_min_courses: 200
 
@@ -53,9 +52,9 @@ discovery:
 
   allow_url_patterns:
     - "/study/academic-study/qualifications/"
-    - "/study/academic-study/subjects/"
 
   block_url_patterns:
+    - '/study/academic-study/subjects/'
     - '^https://www\.canterbury\.ac\.nz/study/academic-study/qualifications/?$'
     - '^https://www\.canterbury\.ac\.nz/study/academic-study/subjects/?$'
     - '/study/academic-study/arts'
@@ -79,9 +78,12 @@ discovery:
   use_wayback: false
 
 extraction:
+  # Canterbury blocks direct httpx with HTTP 406. Its AEM pages are
+  # server-rendered, so Scrape.do static mode is the authoritative first fetch.
+  scrape_do_static: true
   skip_browser_rescue: true
   skip_per_course_browser: true
-  max_parallel_fetch: 4
+  max_parallel_fetch: 8
 
   fees:
     central_page: https://www.canterbury.ac.nz/study/getting-started/study-and-living-costs/study-costs/international-tuition-fees
