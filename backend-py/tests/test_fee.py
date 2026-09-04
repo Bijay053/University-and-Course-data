@@ -901,6 +901,108 @@ def test_newer_dated_scholarship_never_overrides_international_tuition():
     assert out[0].normalized["fee_year"] == 2027
 
 
+def test_une_travelling_scholarship_is_never_tuition():
+    html = """
+    <main>
+      <p>Postgraduate (Coursework) Financial disadvantage Aboriginal or
+      Torres Strait Islander Students</p>
+      <h3>Dr Peter Hemphill Travelling Scholarship</h3>
+      <p>Value (per annum) Up to $15,000 (for fees or travel costs,
+      including living expenses)</p>
+      <p>Study Type Full-time</p>
+    </main>
+    """
+
+    out = _run(
+        fee.extract(
+            html,
+            "https://www.une.edu.au/study/courses/bachelor-of-biomedical-science",
+            country="Australia",
+        )
+    )
+
+    assert out == []
+
+
+def test_csp_acronym_fee_is_never_international_tuition():
+    html = """
+    <main>
+      <p>UNE has a cap on the number of CSP places that can be granted for
+      certain course types and bands. See CSP availability.</p>
+      <p>$14,721 estimated course fee per year if studying full-time.</p>
+      <p>Estimated amenities fee per year $373.</p>
+    </main>
+    """
+
+    out = _run(
+        fee.extract(
+            html,
+            "https://www.une.edu.au/study/courses/example?international=true",
+            country="Australia",
+        )
+    )
+
+    assert out == []
+
+
+def test_strict_context_keeps_explicit_international_tuition():
+    cfg = UniConfig(
+        slug="une",
+        name="University of New England",
+        base_url="https://www.une.edu.au",
+        scrape_url="https://www.une.edu.au",
+        extraction={
+            "fees": {
+                "require_explicit_international_context": True,
+            }
+        },
+    )
+    token = current_uni_config.set(cfg)
+    try:
+        domestic = _run(
+            fee.extract(
+                "<p>Estimated annual course fee AUD $14,721.</p>",
+                "https://www.une.edu.au/study/courses/example",
+                country="Australia",
+            )
+        )
+        structured_domestic = _run(
+            fee.extract(
+                "<div><strong>Course fee</strong></div>"
+                "<div>CSP estimated course fee: AUD $14,721 per year.</div>",
+                "https://www.une.edu.au/study/courses/example",
+                country="Australia",
+            )
+        )
+        dated_structured_domestic = _run(
+            fee.extract(
+                "<dl>"
+                "<dt>2026 International tuition fee</dt>"
+                "<dd>CSP estimated course fee: AUD $13,000 per year.</dd>"
+                "<dt>2027 International tuition fee</dt>"
+                "<dd>CSP estimated course fee: AUD $14,721 per year.</dd>"
+                "</dl>",
+                "https://www.une.edu.au/study/courses/example",
+                country="Australia",
+            )
+        )
+        international = _run(
+            fee.extract(
+                "<p>International tuition fee AUD $36,800 per year.</p>",
+                "https://www.une.edu.au/study/courses/example",
+                country="Australia",
+            )
+        )
+    finally:
+        current_uni_config.reset(token)
+
+    assert domestic == []
+    assert structured_domestic == []
+    assert dated_structured_domestic == []
+    assert international
+    assert international[0].normalized["international_fee"] == 36_800
+
+
 def test_unpublished_new_year_does_not_attach_to_an_undated_fee():
     html = """
     <main>

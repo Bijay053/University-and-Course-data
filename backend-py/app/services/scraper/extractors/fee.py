@@ -88,6 +88,32 @@ _SCHOLARSHIP_CTX = re.compile(
     r"\b(scholarships?|bursar(?:y|ies)|discounts?|waivers?|prizes?|awards?|grants?|reductions?)\b",
     re.IGNORECASE,
 )
+
+
+def _selected_amount_is_scholarship(amount: int, ctx: str) -> bool:
+    """Return whether the selected currency amount belongs to a scholarship clause.
+
+    Candidate windows intentionally include surrounding text for scoring, so a
+    separate scholarship sentence can appear beside a legitimate tuition
+    sentence. Restrict this terminal safety check to the sentence containing the
+    selected amount rather than rejecting the whole candidate window.
+    """
+    separators = ".!?;\n"
+    for match in _AMOUNT_RE.finditer(ctx):
+        raw_amount = match.group(2) or match.group(3)
+        if _parse_amount(raw_amount) != amount:
+            continue
+        left = max(ctx.rfind(char, 0, match.start()) for char in separators)
+        right_candidates = [
+            pos
+            for char in separators
+            if (pos := ctx.find(char, match.end())) != -1
+        ]
+        right = min(right_candidates, default=len(ctx))
+        clause = ctx[left + 1 : right]
+        if _SCHOLARSHIP_CTX.search(clause):
+            return True
+    return False
 # Full-course-total context — strongly prefer over annual / per-year amounts
 # (Murdoch shows "Full course fee: $125,970" alongside "First year fee: $41,990").
 _FULL_COURSE_LABEL_CTX = re.compile(
@@ -123,6 +149,7 @@ _YEAR_RE = re.compile(r"\b(20\d{2})\b")
 #         (these are module-unit prices, never annual international tuition)
 _CSP_DOMESTIC_CTX = re.compile(
     r"\b(?:commonwealth\s+supported(?:\s+place)?|"
+    r"CSP(?:s|\s+places?)?|"
     r"HECS(?:-HELP)?|"
     r"student\s+contribution(?:\s+amount)?|"
     # Per-module / per-credit / CPD prices (never annual international tuition)
@@ -1211,6 +1238,8 @@ def _select_latest_explicit_dated_fee(
             and _INTL_CTX.search(clause)
             and re.search(r"\btuition\b|\bcost\s+of\s+study\b", clause, re.IGNORECASE)
             and not _SCHOLARSHIP_CTX.search(clause)
+            and not _CSP_DOMESTIC_CTX.search(clause)
+            and not _DOMESTIC_FEE_LABEL_CTX.search(clause)
             and not non_tuition_charge.search(clause)
         )
 
@@ -2168,13 +2197,18 @@ async def extract(
     # Per-uni knob: when set, prefer the year-1 amount over a full-course
     # total when both labels appear on the same per-course page (Curtin).
     prefer_yr1 = False
+    require_explicit_intl_context = False
     try:
         from app.services.scraper.config.context import get_uni_config
         _cfg = get_uni_config()
         if _cfg is not None:
             prefer_yr1 = bool(_cfg.extraction.fees.prefer_year_one_over_total)
+            require_explicit_intl_context = bool(
+                _cfg.extraction.fees.require_explicit_international_context
+            )
     except Exception:  # noqa: BLE001 — defensive; keep extractor working
         prefer_yr1 = False
+        require_explicit_intl_context = False
 
     latest_dated_fee = _select_latest_explicit_dated_fee(
         html,
@@ -2590,6 +2624,28 @@ async def extract(
     structural, snippet = _extract_strong_label_value(html)
     if structural is not None:
         amount, value_ctx = structural
+        structural_ctx = f"{snippet or ''} {value_ctx}"
+        # Structural labels such as "Course fee" are intentionally supported
+        # for sites whose page is already audience-filtered. They must not,
+        # however, promote a domestic CSP or scholarship block to
+        # international tuition. For strict universities, also require the
+        # structured label/value block itself to identify the international
+        # audience rather than trusting a URL query flag.
+        if (
+            _CSP_DOMESTIC_CTX.search(structural_ctx)
+            or _SCHOLARSHIP_CTX.search(structural_ctx)
+            or _DOMESTIC_FEE_LABEL_CTX.search(structural_ctx)
+            or (
+                require_explicit_intl_context
+                and not (
+                    _INTL_CTX.search(structural_ctx)
+                    and _TUITION_CTX.search(structural_ctx)
+                )
+            )
+        ):
+            structural = None
+    if structural is not None:
+        amount, value_ctx = structural
         currency = _detect_currency(value_ctx, country)
         # Bug 10: bare "$" on .ac.nz pages resolves to AUD by default; override
         # with TLD-inferred currency so NZ universities always emit NZD.
@@ -2666,6 +2722,17 @@ async def extract(
     if best is None:
         return []
     score, _candidate_year, amount, ctx = best
+    # A scholarship/award can still become ``best`` when it is the only
+    # currency amount on the page: the scoring penalty changes its rank but
+    # does not make it ineligible. Never emit that amount as tuition. Explicit
+    # labelled tuition structures are handled by the higher-authority passes
+    # above, so failing closed here protects generic text fallback pages.
+    if _selected_amount_is_scholarship(amount, ctx):
+        return []
+    if require_explicit_intl_context and not (
+        _INTL_CTX.search(ctx) and _TUITION_CTX.search(ctx)
+    ):
+        return []
     # Hard gate: never emit a fee unless the amount has at least one tuition
     # OR international cue in its window. This prevents random currency
     # numbers (deposits, scholarships, room costs) from being labelled as

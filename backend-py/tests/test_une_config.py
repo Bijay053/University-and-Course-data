@@ -39,6 +39,10 @@ def test_une_duplicate_recipes_resolve_to_same_hardened_strategy(
     assert config.extraction.per_course_timeout_seconds == 90
     assert config.extraction.recovery_sweep_max_items == 3
     assert config.extraction.recovery_sweep_time_budget_seconds == 120
+    assert config.extraction.fees.force_central_fee_stage is True
+    assert (
+        config.extraction.fees.require_explicit_international_context is True
+    )
 
 
 def test_une_slug_and_id_recipe_files_exist() -> None:

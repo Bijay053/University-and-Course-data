@@ -2011,6 +2011,16 @@ class FeesConfig(BaseModel):
             "extractor in ``extractors/fee.py``."
         ),
     )
+    require_explicit_international_context: bool = Field(
+        default=False,
+        description=(
+            "When true, the generic page-text fee fallback emits a value only "
+            "when its candidate window contains both an international-audience "
+            "cue and tuition/fee wording. Higher-authority structured "
+            "international fee extractors still run normally. Use for pages "
+            "that expose domestic/CSP fee blocks even on international URLs."
+        ),
+    )
     pdf_overrides_page_regex: bool = Field(
         default=False,
         description=(
