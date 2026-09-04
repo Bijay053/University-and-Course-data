@@ -3338,6 +3338,15 @@ class ExtractionConfig(BaseModel):
             "Has no effect unless SCRAPE_DO_TOKEN is set and scrape_do_render is True."
         ),
     )
+    scrape_do_render_only: bool = Field(
+        default=False,
+        description=(
+            "When True (with scrape_do_render and scrape_do_skip_fallbacks), "
+            "never retry course pages through Scrape.do static or Wayback after "
+            "rendered-proxy failures. Use when static cannot reach the current "
+            "official host and archived pages are stale or incomplete."
+        ),
+    )
     scrape_do_static: bool = Field(
         default=False,
         description=(

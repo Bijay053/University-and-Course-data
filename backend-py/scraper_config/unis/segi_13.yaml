@@ -1,37 +1,53 @@
 # SEGi University & Colleges (production university id 13)
 #
-# The live host is Cloudflare-blocked from datacenter IPs. Direct HTTP returns
-# 403 and both Scrape.do static/render return ROTATION_FAILED after ~58 seconds.
-# Discovery and extraction therefore use the latest Wayback snapshots.
+# The current official catalogue moved from www.segi.edu.my to
+# university.segi.edu.my. The new host has an incomplete TLS chain for direct
+# datacenter clients, while Scrape.do render=true returns the complete page.
 hostname_guard: "www.segi.edu.my"
 
 discovery:
-  # Do not spend the 300-second phase budget on known-dead live transports.
-  bfs_page_budget: 0
+  # Skip the obsolete www host and start from the new official site map. It
+  # contains the complete current SEGi University catalogue in one page.
+  bfs_page_budget: 1
   skip_home_page_redirect: true
   skip_sitemap_fallback: true
   skip_browser_discovery: true
-  use_wayback: true
-  archive_only: true
+  use_wayback: false
+  archive_only: false
+  seed_urls:
+    - "https://university.segi.edu.my/site-map/"
+  allowed_extra_hostnames:
+    - "university.segi.edu.my"
 
-  # The domain-wide CDX index reaches its 10,000-row cap on old multilingual
-  # pages. The current WordPress catalogue lives under /course/<slug>/.
-  wayback_cdx_prefix: "www.segi.edu.my/course/*"
-  max_candidates: 500
+  # Static proxy calls cannot complete the target's redirect/TLS path, but
+  # Scrape.do's browser renderer succeeds.
+  scrape_do_skip_fallbacks: true
+  scrape_do_render: true
+
+  expected_min_courses: 80
+  max_candidates: 150
   allow_url_patterns:
-    - "^https?://(?:www\\.)?segi\\.edu\\.my/course/(?!search(?:/|$))[^/?#]+/?$"
+    - "^https?://university\\.segi\\.edu\\.my/course/[^/?#]+/?$"
   course_detail_url_patterns:
-    - "^https?://(?:www\\.)?segi\\.edu\\.my/course/(?!search(?:/|$))[^/?#]+/?$"
+    - "^https?://university\\.segi\\.edu\\.my/course/[^/?#]+/?$"
   block_url_patterns:
-    - "^https?://(?:www\\.)?segi\\.edu\\.my/course-search(?:/|$)"
+    - "^https?://university\\.segi\\.edu\\.my/course-search(?:/|$)"
 
 extraction:
-  # CDX discovery preloads exact snapshot timestamps. Never wait on the live
-  # site when a snapshot is missing; report the archive miss explicitly.
-  force_wayback_first: true
-  wayback_miss_fallback: none
+  scrape_do_render: true
+  scrape_do_skip_fallbacks: true
+  scrape_do_render_only: true
   skip_browser_rescue: true
+  skip_per_course_browser: true
+  max_parallel_fetch: 2
 
   fees:
     default_currency: MYR
     currency_override: MYR
+
+  # SEGi publishes course, campus, intake, duration, and international English
+  # requirements on the official course pages, but not programme tuition.
+  # Keep those rows visible for review instead of rejecting the whole catalogue.
+  staging:
+    require_international_fee: false
+    stage_on_parser_error: true

@@ -1310,9 +1310,16 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
     # Cloudflare WAF (e.g. UWL) every direct-HTTP attempt returns a challenge
     # page — skipping them saves ~1-2s per course (several minutes per full run).
     if _scrape_do_render and _has_scrape_do:
+        _render_only = False
+        _allow_wayback_last_resort = True
         try:
             from app.services.scraper.config.context import get_uni_config
-            _skip_fallbacks = get_uni_config().extraction.scrape_do_skip_fallbacks
+            _active_config = get_uni_config()
+            _skip_fallbacks = _active_config.extraction.scrape_do_skip_fallbacks
+            _render_only = _active_config.extraction.scrape_do_render_only
+            _allow_wayback_last_resort = (
+                _active_config.discovery.use_wayback is not False
+            )
         except Exception:  # noqa: BLE001
             _skip_fallbacks = False
         if _skip_fallbacks:
@@ -1327,14 +1334,15 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
             # concurrent load).  Fall back to Scrape.do static before giving up —
             # for many Cloudflare-protected SPAs (e.g. UWL) the residential proxy
             # path returns fully hydrated HTML even without headless Chrome.
-            log.info(
-                "fetch %s: scrape_do_skip_fallbacks fast-path: render=True failed"
-                " — falling back to Scrape.do static",
-                url,
-            )
-            _static = await fetch_html_scrape_do(url, render=False)
-            if _static is not None and not _is_spa_shell(_static):
-                return _static
+            if not _render_only:
+                log.info(
+                    "fetch %s: scrape_do_skip_fallbacks fast-path: render=True failed"
+                    " — falling back to Scrape.do static",
+                    url,
+                )
+                _static = await fetch_html_scrape_do(url, render=False)
+                if _static is not None and not _is_spa_shell(_static):
+                    return _static
             # Both render AND static failed on the first pass.  For universities
             # that ALSO have skip_browser_rescue=true (e.g. QMUL — datacenter IP
             # is blocked for both httpx and our own Playwright pool, so browser
@@ -1358,7 +1366,11 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
             # spread across ~26s of backoff, giving transient saturation time
             # to clear.
             _retry_backoffs = (3.0, 8.0, 15.0)
-            _retry_modes = (True, False, True)  # render, static, render
+            _retry_modes = (
+                (True, True, True)
+                if _render_only
+                else (True, False, True)
+            )
             _rendered_retry: str | None = None
             for _attempt, (_backoff, _use_render) in enumerate(
                 zip(_retry_backoffs, _retry_modes), start=1
@@ -1393,20 +1405,23 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
             # AND static AND the render-retry all failed transiently. This
             # only fires after 3 Scrape.do attempts already failed, so the
             # extra archive.org round-trip cost is negligible.
+            if not _render_only and _allow_wayback_last_resort:
+                log.info(
+                    "fetch %s: scrape_do_skip_fallbacks fast-path exhausted"
+                    " after render retry — trying Wayback Machine as last resort",
+                    url,
+                )
+                _wayback_last_resort = await fetch_html_wayback(url)
+                if _wayback_last_resort is not None:
+                    from app.services.scraper.snapshot_context import stage_snapshot as _stage
+                    _stage(url, _wayback_last_resort, "wayback")
+                    return _wayback_last_resort
             log.info(
                 "fetch %s: scrape_do_skip_fallbacks fast-path exhausted"
-                " after render retry — trying Wayback Machine as last resort",
+                " (render_only=%s, wayback_allowed=%s) — giving up (fetch_failed)",
                 url,
-            )
-            _wayback_last_resort = await fetch_html_wayback(url)
-            if _wayback_last_resort is not None:
-                from app.services.scraper.snapshot_context import stage_snapshot as _stage
-                _stage(url, _wayback_last_resort, "wayback")
-                return _wayback_last_resort
-            log.info(
-                "fetch %s: scrape_do_skip_fallbacks fast-path — Wayback Machine"
-                " also failed/empty — giving up (fetch_failed)",
-                url,
+                _render_only,
+                _allow_wayback_last_resort,
             )
             return None
 
