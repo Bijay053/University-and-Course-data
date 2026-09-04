@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import re
 
+from bs4 import BeautifulSoup
+
 from app.services.scraper.extractors.base import ExtractionResult
 
 field_key = "study_mode"
@@ -88,6 +90,81 @@ _NOISE_BLOCK_RE = re.compile(
     r"<(select|form|nav|footer|aside)\b[^>]*>.*?</\1\s*>",
     re.IGNORECASE | re.DOTALL,
 )
+
+
+def _utas_international_location_mode(html: str) -> tuple[str | None, str | None]:
+    """Read delivery mode from UTAS's authoritative international Location card.
+
+    UTAS keeps Domestic and International overview panels in the same HTML.
+    Whole-page keyword matching can therefore select an on-campus value from
+    the domestic panel even when the International panel says ``Online``.
+    """
+    soup = BeautifulSoup(html or "", "html.parser")
+    panel = (
+        soup.find(id="tabInternational")
+        or soup.find(id="tabintl")
+        or soup.find(attrs={"id": re.compile(r"tab.?international", re.I)})
+    )
+    if panel is None:
+        return None, None
+
+    location_column = None
+    for heading in panel.find_all(re.compile(r"^h[1-6]$")):
+        if heading.get_text(" ", strip=True).casefold() != "location":
+            continue
+        location_column = heading.find_parent("div", class_="course__icon-column")
+        if location_column is not None:
+            break
+    if location_column is None:
+        return None, None
+
+    values = [
+        node.get_text(" ", strip=True)
+        for node in location_column.select(".course__location__heading")
+        if node.get_text(" ", strip=True)
+    ]
+    if not values:
+        return None, None
+
+    classified = [
+        (
+            value,
+            bool(re.fullmatch(r"(?:online|distance|external|virtual)", value, re.I)),
+        )
+        for value in values
+    ]
+    online_values = [value for value, is_online in classified if is_online]
+    physical_values = [value for value, is_online in classified if not is_online]
+    snippet = f"International Location: {', '.join(values)}"
+    if online_values and physical_values:
+        return "Blended", snippet
+    if online_values:
+        return "Online", snippet
+    if physical_values:
+        return "On Campus", snippet
+    return None, None
+
+
+def has_authoritative_online_location_evidence(
+    study_mode_value: object,
+    evidence: list[dict],
+) -> bool:
+    """Return True only for UTAS's scoped international Location=Online signal."""
+    if str(study_mode_value or "").strip().casefold() != "online":
+        return False
+    for item in evidence:
+        if item.get("field_key") != "study_mode":
+            continue
+        normalized = item.get("normalized")
+        normalized_value = (
+            normalized.get("study_mode") if isinstance(normalized, dict) else normalized
+        )
+        value = normalized_value or item.get("value")
+        if str(value or "").strip().casefold() != "online":
+            continue
+        if item.get("method") == "study_mode:utas_international_location":
+            return True
+    return False
 
 # Authoritative label-style declarations. Almost every reputable course
 # page surfaces the delivery mode as a key/value pair in the course
@@ -559,6 +636,19 @@ _STUDY_MODE_RULE_SUPPRESSED_HOSTS: frozenset[str] = frozenset({
 async def extract(html: str, url: str) -> list[ExtractionResult]:
     import urllib.parse as _up
     _host = _up.urlparse(url).netloc.lower()
+    if _host == "utas.edu.au" or _host.endswith(".utas.edu.au"):
+        _utas_mode, _utas_snippet = _utas_international_location_mode(html)
+        if _utas_mode:
+            return [
+                ExtractionResult(
+                    field_key=field_key,
+                    value=_utas_mode,
+                    normalized={"study_mode": _utas_mode},
+                    confidence=0.95,
+                    method="study_mode:utas_international_location",
+                    snippet=_utas_snippet,
+                )
+            ]
     # Suppress rule-based study-mode classification when:
     # 1. Per-uni YAML extraction.study_mode.suppress_nav_rule: true (preferred)
     # 2. Host is in the hardcoded _STUDY_MODE_RULE_SUPPRESSED_HOSTS list

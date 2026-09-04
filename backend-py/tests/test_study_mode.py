@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
+
 from app.services.scraper.extractors import study_mode
 
 
@@ -546,6 +548,162 @@ def test_distance_value_in_label_regex_maps_to_online():
     html = "<p>Delivery mode: Distance</p>"
     out, _, _ = study_mode.classify_study_mode(html)
     assert out == "Online", f"Expected Online for 'Delivery mode: Distance', got {out!r}"
+
+
+@pytest.mark.asyncio
+async def test_utas_international_online_location_overrides_domestic_campus():
+    """UTAS international Location=Online must beat domestic/on-page campus text."""
+    html = """
+    <div id="tabDomestic">
+      <div class="course__icon-column">
+        <h3>Location</h3>
+        <div class="course__location__heading">Hobart</div>
+      </div>
+    </div>
+    <div id="tabInternational" hidden>
+      <div class="course__icon-column">
+        <div class="course__icon-column__title"><h3>Location</h3></div>
+        <div class="course__icon-column__content">
+          <div class="course__location">
+            <div class="course__location__heading">Online</div>
+            <div class="course__location__details">Semester 1, Semester 2</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    """
+    results = await study_mode.extract(
+        html,
+        "https://www.utas.edu.au/courses/health/courses/m7x-master-of-dementia",
+    )
+    assert len(results) == 1
+    assert results[0].normalized == {"study_mode": "Online"}
+    assert results[0].confidence == 0.95
+    assert results[0].method == "study_mode:utas_international_location"
+
+
+@pytest.mark.asyncio
+async def test_utas_international_physical_location_remains_on_campus():
+    html = """
+    <div id="tabInternational">
+      <div class="course__icon-column">
+        <h3>Location</h3>
+        <div class="course__location__heading">Hobart</div>
+      </div>
+    </div>
+    """
+    results = await study_mode.extract(
+        html,
+        "https://www.utas.edu.au/courses/health/courses/m6e-example",
+    )
+    assert results[0].normalized == {"study_mode": "On Campus"}
+
+
+def test_strong_online_evidence_blocks_synthetic_default_location():
+    evidence = [{
+        "field_key": "study_mode",
+        "value": "Online",
+        "normalized": {"study_mode": "Online"},
+        "method": "study_mode:utas_international_location",
+        "confidence": 0.95,
+    }]
+    assert study_mode.has_authoritative_online_location_evidence("Online", evidence)
+
+
+def test_bare_online_keyword_does_not_block_default_location():
+    evidence = [{
+        "field_key": "study_mode",
+        "value": "Online",
+        "normalized": {"study_mode": "Online"},
+        "method": "study_mode:rule",
+        "confidence": 0.5,
+    }]
+    assert not study_mode.has_authoritative_online_location_evidence("Online", evidence)
+
+
+@pytest.mark.asyncio
+async def test_utas_online_location_survives_full_pipeline_and_is_rejected():
+    """Regression for live M7X: no synthetic Hobart and no staging as campus."""
+    from app.services.scraper.config.context import set_uni_config
+    from app.services.scraper.config.loader import get_config_for_host
+    from app.services.scraper.guards import should_stage_course
+    from app.services.scraper.pipelines.single_course import extract_course
+
+    url = "https://www.utas.edu.au/courses/health/courses/m7x-master-of-dementia"
+    set_uni_config(get_config_for_host(
+        hostname="www.utas.edu.au",
+        name="University of Tasmania",
+        scrape_url="https://www.utas.edu.au/",
+        university_id=5,
+    ))
+    html = """
+    <html><body>
+      <h1>Master of Dementia (M7X)</h1>
+      <div id="tabDomestic">
+        <div class="course__icon-column">
+          <h3>Location</h3>
+          <div class="course__location__heading">Hobart</div>
+        </div>
+      </div>
+      <div id="tabInternational" hidden>
+        <div class="course__icon-columns">
+          <div class="course__icon-column">
+            <div class="course__icon-column__title"><h3>Location</h3></div>
+            <div class="course__icon-column__content">
+              <div class="course__locations">
+                <div class="course__location">
+                  <div class="course__location__heading">Online</div>
+                  <div class="course__location__details">Semester 1, Semester 2</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <main>
+        <p>International students are eligible to apply.</p>
+        <p>Indicative total tuition fee for international students: $23,256 AUD.</p>
+        <p>Duration: 1.5 years full-time.</p>
+        <p>Intake: February and July.</p>
+        <p>IELTS overall score of 6.5 with no band below 6.0.</p>
+      </main>
+    </body></html>
+    """
+    result = await extract_course(
+        url,
+        country="Australia",
+        html=html,
+        use_ai_fallback=False,
+    )
+    payload = result["payload"]
+
+    assert payload["study_mode"] == "Online"
+    assert payload.get("course_location") in (None, "")
+    assert payload["extraction_method"]["study_mode"] == (
+        "study_mode:utas_international_location"
+    )
+    assert should_stage_course(payload["course_name"], payload, url) == (
+        False,
+        "online_only",
+    )
+
+
+@pytest.mark.asyncio
+async def test_utas_mixed_international_locations_remain_blended():
+    html = """
+    <div id="tabInternational">
+      <div class="course__icon-column">
+        <h3>Location</h3>
+        <div class="course__location__heading">Online</div>
+        <div class="course__location__heading">Hobart</div>
+      </div>
+    </div>
+    """
+    results = await study_mode.extract(
+        html,
+        "https://www.utas.edu.au/courses/example/courses/x1-example",
+    )
+    assert results[0].normalized == {"study_mode": "Blended"}
 
 
 def test_uow_wollongong_location_with_blank_mode_derives_on_campus():

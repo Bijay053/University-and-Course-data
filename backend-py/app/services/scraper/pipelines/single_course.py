@@ -9107,7 +9107,18 @@ async def extract_course(
             getattr(getattr(_uc, "extraction", None), "default_course_location", None)
             or None
         )
-        if _default_loc and not (payload.get("course_location") or "").strip():
+        from app.services.scraper.extractors.study_mode import (
+            has_authoritative_online_location_evidence as _has_online_location_evidence,
+        )
+        _online_only = _has_online_location_evidence(
+            payload.get("study_mode"),
+            evidence,
+        )
+        if (
+            _default_loc
+            and not (payload.get("course_location") or "").strip()
+            and not _online_only
+        ):
             payload["course_location"] = _default_loc
             evidence.append({
                 "field_key": "course_location",
@@ -9120,6 +9131,13 @@ async def extract_course(
             log.info(
                 "[LOCATION DEFAULT] course=%r — applied YAML default '%s' "
                 "(all extractors returned empty course_location)",
+                payload.get("course_name") or url,
+                _default_loc,
+            )
+        elif _default_loc and _online_only:
+            log.info(
+                "[LOCATION DEFAULT] course=%r — skipped YAML default '%s' "
+                "because structured evidence says the course is Online",
                 payload.get("course_name") or url,
                 _default_loc,
             )
