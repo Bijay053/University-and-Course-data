@@ -34,6 +34,7 @@ def test_une_duplicate_recipes_resolve_to_same_hardened_strategy(
     assert config.extraction.scrape_do_render is True
     assert config.extraction.scrape_do_skip_fallbacks is True
     assert config.extraction.skip_browser_rescue is True
+    assert config.extraction.skip_per_course_browser is True
     assert config.extraction.max_parallel_fetch == 3
     assert config.extraction.per_course_timeout_seconds == 90
     assert config.extraction.recovery_sweep_max_items == 3

@@ -83,6 +83,7 @@ extraction:
   scrape_do_render: true
   scrape_do_skip_fallbacks: true
   skip_browser_rescue: true
+  skip_per_course_browser: true
 
   # Lower parallelism — render calls are ~4-6s each via Scrape.do.
   max_parallel_fetch: 3

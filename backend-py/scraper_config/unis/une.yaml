@@ -37,6 +37,7 @@ extraction:
   scrape_do_render: true
   scrape_do_skip_fallbacks: true
   skip_browser_rescue: true
+  skip_per_course_browser: true
 
   # Rendered course fetches routinely exceed the historical 3-second production
   # default. Pin a safe deadline here so environment overrides cannot regress it.
