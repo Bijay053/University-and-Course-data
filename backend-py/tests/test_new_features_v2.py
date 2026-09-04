@@ -361,6 +361,141 @@ async def test_overlapping_discovery_alert_retry_keeps_newest_attempt_authoritat
         await engine.dispose()
 
 
+@pytest.mark.asyncio
+async def test_concurrent_expired_discovery_alert_retries_start_delivery_once(
+    monkeypatch,
+) -> None:
+    """Two retries of one stale pending alert serialize on the database row lock."""
+    from app.database import AsyncSessionLocal, engine
+    from app.models.discovery_failure_alert import DiscoveryFailureAlert
+    from app.models.university import University
+    from app.routers import discovery_failure_alerts as alerts_router
+
+    await engine.dispose()
+    suffix = uuid.uuid4().hex[:12]
+    first_commit_reached = asyncio.Event()
+    release_first_commit = asyncio.Event()
+    delivery_started = asyncio.Event()
+    release_delivery = asyncio.Event()
+    delivery_calls = 0
+
+    async def _blocked_to_thread(function, *args, **kwargs):
+        nonlocal delivery_calls
+        assert function is alerts_router.deliver_discovery_failure_alert
+        delivery_calls += 1
+        delivery_started.set()
+        await release_delivery.wait()
+        return {
+            "status": "delivered",
+            "transports": {"test": {"success": True}},
+        }
+
+    monkeypatch.setattr(asyncio, "to_thread", _blocked_to_thread)
+
+    university_id: int | None = None
+    alert_id: int | None = None
+    first_retry: asyncio.Task | None = None
+    second_retry: asyncio.Task | None = None
+    try:
+        async with AsyncSessionLocal() as db:
+            university = University(
+                name=f"Concurrent Alert Retry University {suffix}",
+                country="Test",
+                city="Test",
+                scrape_url="https://concurrent-alert.example.test/courses",
+            )
+            db.add(university)
+            await db.flush()
+            university_id = university.id
+
+            alert = DiscoveryFailureAlert(
+                university_id=university.id,
+                candidates_found=0,
+                diagnostic={"source": "concurrent-retry-regression"},
+                delivery_status="pending",
+                delivery_attempts=1,
+                delivery_attempted_at=(
+                    datetime.now(timezone.utc) - timedelta(seconds=31)
+                ),
+            )
+            db.add(alert)
+            await db.commit()
+            await db.refresh(alert)
+            alert_id = alert.id
+
+        async with AsyncSessionLocal() as first_db, AsyncSessionLocal() as second_db:
+            original_first_commit = first_db.commit
+
+            async def _hold_first_commit():
+                first_commit_reached.set()
+                await release_first_commit.wait()
+                await original_first_commit()
+
+            monkeypatch.setattr(first_db, "commit", _hold_first_commit)
+            first_retry = asyncio.create_task(
+                alerts_router.retry_discovery_failure_alert(
+                    alert_id=alert_id,
+                    _user={"id": "operator-one"},
+                    db=first_db,
+                )
+            )
+            await asyncio.wait_for(first_commit_reached.wait(), timeout=2)
+
+            second_retry = asyncio.create_task(
+                alerts_router.retry_discovery_failure_alert(
+                    alert_id=alert_id,
+                    _user={"id": "operator-two"},
+                    db=second_db,
+                )
+            )
+            await asyncio.sleep(0.1)
+            assert not second_retry.done(), (
+                "The concurrent retry must wait for the first transaction's "
+                "row lock to be released"
+            )
+
+            release_first_commit.set()
+            await asyncio.wait_for(delivery_started.wait(), timeout=2)
+            with pytest.raises(HTTPException) as conflict:
+                await asyncio.wait_for(second_retry, timeout=2)
+            assert conflict.value.status_code == 409
+            await second_db.rollback()
+
+            release_delivery.set()
+            first_result = await asyncio.wait_for(first_retry, timeout=2)
+
+        assert first_result["deliveryStatus"] == "delivered"
+        assert first_result["deliveryAttempts"] == 2
+        assert delivery_calls == 1
+
+        async with AsyncSessionLocal() as db:
+            final_alert = await db.get(DiscoveryFailureAlert, alert_id)
+            assert final_alert is not None
+            assert final_alert.delivery_status == "delivered"
+            assert final_alert.delivery_attempts == 2
+    finally:
+        release_first_commit.set()
+        release_delivery.set()
+        for task in (first_retry, second_retry):
+            if task is not None and not task.done():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+        if alert_id is not None or university_id is not None:
+            async with AsyncSessionLocal() as db:
+                if alert_id is not None:
+                    await db.execute(
+                        delete(DiscoveryFailureAlert).where(
+                            DiscoveryFailureAlert.id == alert_id
+                        )
+                    )
+                if university_id is not None:
+                    await db.execute(
+                        delete(University).where(University.id == university_id)
+                    )
+                await db.commit()
+        await engine.dispose()
+
+
 def test_deliver_drift_alert_noop_when_clean(monkeypatch) -> None:
     """deliver_drift_alert must be a no-op when diffs and warnings are both empty."""
     import app.services.scraper.alert_delivery as ad
