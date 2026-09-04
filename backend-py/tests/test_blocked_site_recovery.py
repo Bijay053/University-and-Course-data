@@ -176,6 +176,36 @@ async def test_wayback_cache_replays_exact_http_cdx_original():
 
 
 @pytest.mark.asyncio
+async def test_cached_wayback_snapshot_retries_transient_without_per_url_cdx():
+    clear_wayback_timestamps()
+    url = "https://www.example.edu/programs/business/master-of-x"
+    set_wayback_timestamps({url: "20260404000000"})
+    calls: list[str] = []
+
+    class SnapshotResponse:
+        text = "<html><body>" + ("course " * 200) + "</body></html>"
+
+        def __init__(self, status_code: int):
+            self.status_code = status_code
+
+    responses = [SnapshotResponse(429), SnapshotResponse(200)]
+
+    async def fake_get(self, endpoint_url, **kwargs):
+        calls.append(endpoint_url)
+        assert "cdx/search" not in endpoint_url
+        return responses.pop(0)
+
+    with (
+        patch("httpx.AsyncClient.get", new=fake_get),
+        patch("app.services.scraper.http_fetcher.asyncio.sleep", new=AsyncMock()),
+    ):
+        assert await fetch_html_wayback(url)
+
+    assert len(calls) == 2
+    assert calls[0] == calls[1]
+
+
+@pytest.mark.asyncio
 async def test_wayback_no_snapshot_is_a_permanent_typed_failure():
     clear_wayback_timestamps()
     url = "https://www.example.edu/programs/missing-course"
@@ -248,8 +278,9 @@ async def test_wayback_network_failure_remains_retryable():
 
     failure = get_last_fetch_failure()
     assert failure is not None
-    assert failure["kind"] == "wayback_cdx_unavailable"
+    assert failure["kind"] == "wayback_transient"
     assert failure["retryable"] is True
+    assert failure["transport"] == "wayback_snapshot"
 
 
 @pytest.mark.asyncio

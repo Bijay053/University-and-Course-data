@@ -197,6 +197,11 @@ def _get_sem() -> asyncio.Semaphore:
     return _loop_sem("http", settings.max_http_concurrency)
 
 
+def _get_wayback_sem() -> asyncio.Semaphore:
+    """Keep Internet Archive snapshot replay below its burst-rate limit."""
+    return _loop_sem("wayback_snapshot", 2)
+
+
 def _get_scrape_do_sem(
     local_concurrency_limit: int | None = None,
 ) -> asyncio.Semaphore:
@@ -1021,42 +1026,82 @@ async def fetch_html_wayback(url: str) -> str | None:
             f"https://web.archive.org/web/{cached_ts}id_/"
             f"{cached_original_url}"
         )
-        try:
-            async with httpx.AsyncClient(timeout=25, follow_redirects=True) as c:
-                r = await c.get(raw_url, headers={"User-Agent": _BROWSER_UA})
-                if r.status_code == 200:
-                    _last_fetch_failure.set(None)
-                    log.info(
-                        "wayback fetch %s -> 200 (CDX-cached snapshot %s, %d chars)",
-                        url, cached_ts, len(r.text),
-                    )
-                    return r.text
+        _snapshot_transient = False
+        async with _get_wayback_sem():
+            try:
+                async with httpx.AsyncClient(timeout=25, follow_redirects=True) as c:
+                    for _snapshot_attempt in range(1, 4):
+                        r = await c.get(
+                            raw_url,
+                            headers={"User-Agent": _BROWSER_UA},
+                        )
+                        if r.status_code == 200:
+                            _last_fetch_failure.set(None)
+                            log.info(
+                                "wayback fetch %s -> 200 (CDX-cached snapshot %s, "
+                                "%d chars, attempt %d)",
+                                url,
+                                cached_ts,
+                                len(r.text),
+                                _snapshot_attempt,
+                            )
+                            return r.text
+                        _snapshot_transient = r.status_code in {
+                            429, 500, 502, 503, 504
+                        }
+                        if _snapshot_transient and _snapshot_attempt < 3:
+                            _wait = (1, 3)[_snapshot_attempt - 1]
+                            log.info(
+                                "wayback fetch %s -> %s (cached snapshot) — "
+                                "retrying in %ss",
+                                url,
+                                r.status_code,
+                                _wait,
+                            )
+                            await asyncio.sleep(_wait)
+                            continue
+                        log.warning(
+                            "wayback fetch %s -> %s (CDX-cached snapshot %s)",
+                            url,
+                            r.status_code,
+                            cached_ts,
+                        )
+                        _record_fetch_failure(
+                            kind=(
+                                "wayback_transient"
+                                if _snapshot_transient
+                                else "wayback_snapshot_unavailable"
+                            ),
+                            reason=(
+                                f"Cached Wayback snapshot returned HTTP "
+                                f"{r.status_code}."
+                            ),
+                            retryable=_snapshot_transient,
+                            transport="wayback_snapshot",
+                            status_code=r.status_code,
+                        )
+                        break
+            except Exception as exc:
+                _snapshot_transient = True
                 log.warning(
-                    "wayback fetch %s -> %s (CDX-cached snapshot %s) — "
-                    "falling through to Availability API",
-                    url, r.status_code, cached_ts,
+                    "wayback fetch %s (CDX-cached snapshot %s) failed: %s",
+                    url,
+                    cached_ts,
+                    exc,
                 )
                 _record_fetch_failure(
-                    kind="wayback_snapshot_unavailable",
-                    reason=(
-                        f"Cached Wayback snapshot returned HTTP {r.status_code}."
-                    ),
-                    retryable=r.status_code not in (404, 410),
+                    kind="wayback_transient",
+                    reason=f"Cached Wayback snapshot fetch failed: {exc}",
+                    retryable=True,
                     transport="wayback_snapshot",
-                    status_code=r.status_code,
                 )
-        except Exception as exc:
-            log.warning(
-                "wayback fetch %s (CDX-cached snapshot %s) failed: %s — "
-                "falling through to Availability API",
-                url, cached_ts, exc,
-            )
-            _record_fetch_failure(
-                kind="wayback_transient",
-                reason=f"Cached Wayback snapshot fetch failed: {exc}",
-                retryable=True,
-                transport="wayback_snapshot",
-            )
+
+        # A transient replay failure does not invalidate the exact CDX result.
+        # Querying CDX again for every course only amplifies archive.org load and
+        # caused 203/215 SEGi courses to fail in one burst. Let the bounded sweep
+        # retry the same cached timestamp later instead.
+        if _snapshot_transient:
+            return None
 
     if not cached_entry and _wayback_scope_is_authoritative(url):
         log.info(
