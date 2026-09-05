@@ -32,3 +32,17 @@ cleanup. Always place cleanup in an outer `finally`, retry it, and verify the
 exact key returns 404. Lifecycle rollback must pass
 `TransitionDefaultMinimumObjectSize` as a top-level put-bucket-lifecycle
 parameter, never inside `LifecycleConfiguration`.
+
+Routine encrypted-parameter rotations must bind each fixed SSM invocation to
+the exact non-secret parameter version returned by its write, serialize host
+transactions with an exclusive lock, and verify that version is still current
+before reporting success.
+
+**Why:** A single atomic SecureString does not prevent two rotation callers
+from overwriting the pointer between write and retrieval, sharing rollback
+files, or reporting success for another caller's values.
+
+**How to apply:** Pass only the expected version (never secret data) to a
+fixed-purpose document, fetch that version explicitly, lock backup/apply/
+verify/rollback as one host transaction, and check current-version equality
+both before and after the service smoke test.

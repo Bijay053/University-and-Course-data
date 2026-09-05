@@ -1,6 +1,6 @@
 # Deploy artifacts
 
-Three files, two secure OpenAI rotation tools, plus the cutover runbook
+Service files, secure credential rotation tools, plus the cutover runbook
 in `../README.md`.
 
 | File | Where it goes on production |
@@ -12,6 +12,8 @@ in `../README.md`.
 | `install_snapshot_storage_via_ssm.py` | Securely install production snapshot storage and run a disposable round-trip check |
 | `rotate_openai_fallback_via_parameter_store.py` | Routine credential rotation from a trusted deployment workspace |
 | `openai-parameter-store-iam.yaml` | One-time least-privilege IAM and KMS setup |
+| `rotate_snapshot_storage_via_parameter_store.py` | Routine snapshot credential rotation from a trusted deployment workspace |
+| `snapshot-parameter-store-iam.yaml` | One-time least-privilege snapshot IAM, KMS, and fixed SSM document setup |
 
 ## Rotate the OpenAI fallback routinely
 
@@ -84,7 +86,42 @@ If `AWS_SSM_ACCESS_KEY_ID` and `AWS_SSM_SECRET_ACCESS_KEY` are set, the installe
 uses that dedicated deployment principal; otherwise it uses the default AWS
 credential chain.
 
-## Install production snapshot storage
+## Rotate snapshot storage routinely
+
+An AWS administrator must deploy `snapshot-parameter-store-iam.yaml` once. It
+creates a dedicated rotating KMS key, one SecureString bundle at
+`/university-portal/snapshot-storage/configuration`, a fixed-purpose SSM
+rotation document, and narrowly scoped deployment-user and instance-role
+policies. Supply the production instance ID to the stack. Do not add broader
+parameter read or command permissions to the deployment identity.
+
+For each routine rotation, inject `AWS_S3_BUCKET_NAME`, `AWS_S3_REGION`,
+`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and optional
+`AWS_S3_ENDPOINT_URL` into the deployment process through the CI secret store:
+
+```bash
+python backend-py/deploy/rotate_snapshot_storage_via_parameter_store.py \
+  --instance-id "$UNIVERSITY_PORTAL_INSTANCE_ID" \
+  --region ap-south-1
+```
+
+The client writes one encrypted, versioned JSON bundle so a partial credential
+set can never become active. It then invokes only the fixed-purpose SSM
+document, with only the non-secret SecureString version as a command parameter.
+The host takes an exclusive rotation lock, verifies that exact parameter version
+is still current before and after the transaction, atomically
+replaces the existing mode-`0600` environment file, restarts API and worker
+together, verifies the exact effective values in both running processes, and
+runs a disposable write/read/delete storage canary. Any failure restores the
+prior environment and restarts both services before the command reports
+failure. Output contains status only.
+
+Never put a credential in a command-line option, shell assignment, redirected
+file, debug trace, CI log, or arbitrary SSM Run Command. Parameter Store is the
+routine path; the installer below remains the documented emergency path when
+the scoped rotation control plane is unavailable.
+
+## Emergency snapshot-storage installation
 
 Run the snapshot installer only from a trusted deployment workspace whose
 process environment contains `AWS_S3_BUCKET_NAME`, `AWS_S3_REGION`,

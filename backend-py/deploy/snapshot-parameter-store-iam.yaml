@@ -1,0 +1,262 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Least-privilege snapshot-storage Parameter Store rotation for university-portal
+
+Parameters:
+  DeploymentUserName:
+    Type: String
+    Default: replit-production-ssm
+  ProductionInstanceRoleName:
+    Type: String
+    Default: EC2-SystemsManager-Role
+  ProductionInstanceId:
+    Type: AWS::EC2::Instance::Id
+
+Resources:
+  SnapshotParameterKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: Encrypt university-portal snapshot-storage configuration
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowAccountAdministration
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:root
+            Action: kms:*
+            Resource: "*"
+          - Sid: AllowDeploymentEncryption
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:user/${DeploymentUserName}
+            Action: [kms:Encrypt, kms:GenerateDataKey]
+            Resource: "*"
+            Condition:
+              StringEquals:
+                kms:ViaService: !Sub ssm.${AWS::Region}.amazonaws.com
+                kms:EncryptionContext:PARAMETER_ARN: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/university-portal/snapshot-storage/configuration
+          - Sid: AllowProductionDecryption
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${ProductionInstanceRoleName}
+            Action: kms:Decrypt
+            Resource: "*"
+            Condition:
+              StringEquals:
+                kms:ViaService: !Sub ssm.${AWS::Region}.amazonaws.com
+                kms:EncryptionContext:PARAMETER_ARN: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/university-portal/snapshot-storage/configuration
+
+  SnapshotParameterKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: alias/university-portal-snapshot-storage
+      TargetKeyId: !Ref SnapshotParameterKey
+
+  SnapshotRotationDocument:
+    Type: AWS::SSM::Document
+    Properties:
+      Name: university-portal-snapshot-storage-rotation
+      DocumentType: Command
+      UpdateMethod: NewVersion
+      Content:
+        schemaVersion: "2.2"
+        description: Transactionally rotate university-portal snapshot storage
+        parameters:
+          ExpectedVersion:
+            type: String
+            description: Non-secret SecureString version written by the rotation client
+            allowedPattern: "^[1-9][0-9]*$"
+        mainSteps:
+          - action: aws:runShellScript
+            name: rotateSnapshotStorage
+            inputs:
+              timeoutSeconds: "150"
+              runCommand:
+                - |
+                  set -eu
+                  set +x
+                  umask 077
+                  env_path=/etc/university-portal/snapshot-storage.env
+                  backup_path=/etc/university-portal/snapshot-storage.env.pre-rotation
+                  absent_marker=/etc/university-portal/snapshot-storage.env.pre-rotation-absent
+                  tmp=
+                  python=/root/University-and-Course-data/backend-py/venv/bin/python
+                  workdir=/root/University-and-Course-data/backend-py
+                  region="{{ global:REGION }}"
+                  expected_version="{{ ExpectedVersion }}"
+                  lock_path=/run/lock/university-portal-snapshot-rotation.lock
+                  exec 9>"$lock_path"
+                  flock -x 9
+
+                  verify_services() {
+                    systemctl is-active --quiet uni-api-py uni-celery
+                    curl --fail --silent --show-error http://127.0.0.1:8000/api/health >/dev/null
+                    "$python" - "$env_path" <<'PY_VERIFY'
+                  import os, shlex, subprocess, sys
+                  expected = {}
+                  with open(sys.argv[1], encoding="utf-8") as stream:
+                      for raw_line in stream:
+                          parsed = shlex.split(raw_line, comments=False, posix=True)
+                          key, value = parsed[0].split("=", 1)
+                          expected[key] = value
+                  for unit in ("uni-api-py", "uni-celery"):
+                      pid = subprocess.check_output(
+                          ["systemctl", "show", "--property=MainPID", "--value", unit],
+                          text=True,
+                      ).strip()
+                      assert pid and pid != "0"
+                      process_env = dict(
+                          item.split(b"=", 1)
+                          for item in open(f"/proc/{pid}/environ", "rb").read().split(b"\0")
+                          if b"=" in item
+                      )
+                      for key, value in expected.items():
+                          assert process_env.get(key.encode()) == value.encode()
+                  PY_VERIFY
+                  }
+
+                  restart_and_verify() {
+                    systemctl restart uni-api-py uni-celery
+                    sleep 8
+                    verify_services
+                  }
+
+                  restore_previous() {
+                    if test -f "$backup_path"; then
+                      mv -f "$backup_path" "$env_path"
+                      restart_and_verify
+                    elif test -f "$absent_marker"; then
+                      rm -f "$env_path" "$absent_marker"
+                      systemctl restart uni-api-py uni-celery
+                      sleep 8
+                      systemctl is-active --quiet uni-api-py uni-celery
+                      curl --fail --silent --show-error http://127.0.0.1:8000/api/health >/dev/null
+                    else
+                      return 1
+                    fi
+                  }
+
+                  rollback_on_error() {
+                    rc=$?
+                    trap - EXIT
+                    test -z "$tmp" || rm -f "$tmp"
+                    if ! restore_previous; then
+                      echo "snapshot rotation and rollback failed; manual recovery required" >&2
+                    fi
+                    exit "$rc"
+                  }
+
+                  install -d -m 700 /etc/university-portal
+                  rm -f "$backup_path" "$absent_marker"
+                  if test -f "$env_path"; then
+                    cp -p "$env_path" "$backup_path"
+                  else
+                    touch "$absent_marker"
+                  fi
+                  trap rollback_on_error EXIT
+                  tmp=$(mktemp /etc/university-portal/snapshot-storage.env.XXXXXX)
+                  "$python" - "$tmp" "$region" "$expected_version" <<'PY_CONFIG'
+                  import json, os, sys
+                  import boto3
+                  name = "/university-portal/snapshot-storage/configuration"
+                  expected_version = int(sys.argv[3])
+                  client = boto3.client("ssm", region_name=sys.argv[2])
+                  current = client.get_parameter(Name=name, WithDecryption=False)["Parameter"]
+                  assert current["Version"] == expected_version
+                  parameter = client.get_parameter(
+                      Name=f"{name}:{expected_version}",
+                      WithDecryption=True,
+                  )["Parameter"]
+                  assert parameter["Version"] == expected_version
+                  config = json.loads(parameter["Value"])
+                  required = {
+                      "schema_version", "bucket_name", "region", "access_key_id",
+                      "secret_access_key", "endpoint_url",
+                  }
+                  assert set(config) == required
+                  assert config["schema_version"] == 1
+                  for key in required - {"schema_version"}:
+                      assert isinstance(config[key], str)
+                      assert "\n" not in config[key] and "\r" not in config[key]
+                  for key in {"bucket_name", "region", "access_key_id", "secret_access_key"}:
+                      assert config[key]
+                  mapping = (
+                      ("AWS_S3_BUCKET_NAME", "bucket_name"),
+                      ("AWS_S3_REGION", "region"),
+                      ("AWS_ACCESS_KEY_ID", "access_key_id"),
+                      ("AWS_SECRET_ACCESS_KEY", "secret_access_key"),
+                      ("AWS_S3_ENDPOINT_URL", "endpoint_url"),
+                  )
+                  with open(sys.argv[1], "w", encoding="utf-8") as stream:
+                      for env_name, config_name in mapping:
+                          value = config[config_name]
+                          escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+                          stream.write(f'{env_name}="{escaped}"\n')
+                      stream.write('SNAPSHOT_ENABLED="true"\n')
+                  os.chmod(sys.argv[1], 0o600)
+                  PY_CONFIG
+                  mv -f "$tmp" "$env_path"
+                  tmp=
+                  restart_and_verify
+                  cd "$workdir"
+                  PYTHONPATH=. "$python" - "$env_path" "$region" "$expected_version" <<'PY_SMOKE'
+                  import asyncio, os, shlex, sys
+                  with open(sys.argv[1], encoding="utf-8") as stream:
+                      for raw_line in stream:
+                          parsed = shlex.split(raw_line, comments=False, posix=True)
+                          key, value = parsed[0].split("=", 1)
+                          os.environ[key] = value
+                  from app.services.snapshot_store import run_storage_canary
+                  result = asyncio.run(run_storage_canary(timeout_seconds=30))
+                  assert result["ok"], result["error_code"]
+                  import boto3
+                  current = boto3.client("ssm", region_name=sys.argv[2]).get_parameter(
+                      Name="/university-portal/snapshot-storage/configuration",
+                      WithDecryption=False,
+                  )["Parameter"]
+                  assert current["Version"] == int(sys.argv[3])
+                  PY_SMOKE
+                  rm -f "$backup_path" "$absent_marker"
+                  trap - EXIT
+                  echo rotated-and-roundtrip-verified
+
+  DeploymentRotationPolicy:
+    Type: AWS::IAM::UserPolicy
+    Properties:
+      UserName: !Ref DeploymentUserName
+      PolicyName: university-portal-snapshot-storage-rotation
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: WriteOnlySnapshotConfiguration
+            Effect: Allow
+            Action: ssm:PutParameter
+            Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/university-portal/snapshot-storage/configuration
+          - Sid: InvokeFixedRotationDocument
+            Effect: Allow
+            Action: ssm:SendCommand
+            Resource:
+              - !Sub arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${ProductionInstanceId}
+              - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:document/${SnapshotRotationDocument}
+          - Sid: ObserveOwnRotationCommand
+            Effect: Allow
+            Action: ssm:GetCommandInvocation
+            Resource: "*"
+
+  ProductionParameterReadPolicy:
+    Type: AWS::IAM::RolePolicy
+    Properties:
+      RoleName: !Ref ProductionInstanceRoleName
+      PolicyName: university-portal-snapshot-storage-parameter-read
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: ReadOnlySnapshotConfiguration
+            Effect: Allow
+            Action: ssm:GetParameter
+            Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/university-portal/snapshot-storage/configuration
+
+Outputs:
+  KmsKeyAlias:
+    Value: !Ref SnapshotParameterKeyAlias
