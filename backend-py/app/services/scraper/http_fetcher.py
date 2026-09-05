@@ -1541,6 +1541,11 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
                 "scrape_do_request_timeout_seconds",
                 None,
             )
+            _fast_local_concurrency = getattr(
+                getattr(_active_config, "extraction", None),
+                "scrape_do_local_concurrency",
+                None,
+            )
             _wayback_after_first_failure = bool(
                 getattr(
                     getattr(_active_config, "extraction", None),
@@ -1554,6 +1559,7 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
                 wait_for_ms=wait_for_ms,
                 max_retries=0 if _wayback_after_first_failure else None,
                 request_timeout_seconds=_fast_request_timeout,
+                local_concurrency_limit=_fast_local_concurrency,
             )
             if _rendered is not None:
                 return _rendered
@@ -1579,6 +1585,7 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
                     wait_for_ms=wait_for_ms,
                     max_retries=0,
                     request_timeout_seconds=_fast_request_timeout,
+                    local_concurrency_limit=_fast_local_concurrency,
                 )
             # Render returned 502 / None (e.g. Scrape.do rate-limited under
             # concurrent load).  Fall back to Scrape.do static before giving up —

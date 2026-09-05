@@ -152,12 +152,16 @@ extraction:
   # preventing the archive fallback from running.
   scrape_do_request_timeout_seconds: 20
   scrape_do_wayback_after_first_failure: true
+  # Pipeline course parsing/AI/Wayback work behind a lower live-provider cap:
+  # more whole courses may progress, but no more than three rendered requests
+  # reach Scrape.do concurrently.
+  scrape_do_local_concurrency: 3
   force_wayback_first: false
 
   # Keep provider concurrency conservative. Four rendered requests in parallel
   # materially reduce wall time without creating a large transient recovery
   # queue; archive fallback shares this same bounded course semaphore.
-  max_parallel_fetch: 4
+  max_parallel_fetch: 8
 
   # Only transient archive/network failures enter recovery. URLs with no
   # 200-status snapshot are permanent misses and are reported immediately.

@@ -340,6 +340,8 @@ async def test_notredame_recipe_falls_back_to_wayback_after_first_render_failure
         university_id=1165,
     )
     set_uni_config(cfg)
+    assert cfg.extraction.max_parallel_fetch == 8
+    assert cfg.extraction.scrape_do_local_concurrency == 3
     url = "https://www.notredame.edu.au/programs/school-of-law/test-course"
     archived = "<html><body>" + ("archived course " * 200) + "</body></html>"
     wayback = AsyncMock(return_value=archived)
@@ -362,6 +364,7 @@ async def test_notredame_recipe_falls_back_to_wayback_after_first_render_failure
     live.assert_awaited_once()
     assert live.await_args.kwargs["max_retries"] == 0
     assert live.await_args.kwargs["request_timeout_seconds"] == 20
+    assert live.await_args.kwargs["local_concurrency_limit"] == 3
     wayback.assert_awaited_once_with(url)
 
 
