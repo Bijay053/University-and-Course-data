@@ -674,21 +674,6 @@ _ALWAYS_SITEMAP_SUPPLEMENT_HOSTS: frozenset[str] = frozenset({
     # of handbook-prefixed sitemap URLs → live /course/<slug> URLs.
     "www.acu.edu.au",
     "acu.edu.au",
-    # CQU: BFS from / (or /courses) burns its budget on /study/* info pages
-    # (apprenticeships landing, why-cqu, tafe-certificates-diplomas, …) and
-    # only stumbles into the ~25 TAFE Certificate URLs visible from those
-    # listings — none of which have international fee/IELTS data. The sitemap
-    # publishes 508 unique /courses/<code>/<slug> URLs including bachelors
-    # and masters whose pages embed an `IFTF` JSON blob ("International
-    # Indicative First Term Fee") plus IELTS scores. Per-uni YAML
-    # (scraper_config/unis/cqu.yaml) restricts the merged set to HE-style
-    # codes only with allow_url_patterns: ['/courses/c[a-z][0-9]{2,3}(/|$)']
-    # (199 of 508 codes — bachelors / masters / grad-cert / grad-dip) and
-    # block_url_patterns: ['/courses/pdc'] (210 PDC micro-credentials). The
-    # remaining 296 TAFE NTP-style codes are domestic-only with no intl fee
-    # or IELTS, so they're correctly excluded. 2026-05-11.
-    "www.cqu.edu.au",
-    "cqu.edu.au",
 })
 
 

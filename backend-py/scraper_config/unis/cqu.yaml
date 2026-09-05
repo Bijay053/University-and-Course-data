@@ -43,6 +43,14 @@
 #
 # ─────────────────────────────────────────────────────────────────────────────
 
+locked_config_paths:
+  # CQU's rendered /courses page exposes only broad /study navigation.
+  # Never let generated/admin config re-enable BFS ahead of the authoritative
+  # sitemap or the crawl can consume the full discovery deadline.
+  - discovery.bfs_page_budget
+  - discovery.sitemap_url
+  - discovery.always_sitemap_supplement
+
 discovery:
   # University-level courses only. The 4-char letter-prefix code is the
   # discriminator that excludes TAFE numeric-ID URLs.
@@ -92,10 +100,11 @@ discovery:
     # degree programs available to international students).
     - "/courses/cl03/"
 
-  # Sitemap supplement is essential here — CQU is a JS-heavy site and
-  # the static BFS pass returns very few course URLs. The 723-entry
-  # sitemap is what surfaces the real bachelor/master pages.
-  always_sitemap_supplement: true
+  # The static residential-proxy tier returns the full 1 MB XML catalogue.
+  # Pin the exact endpoint so discovery does not spend time probing generic
+  # alternatives or parsing Cloudflare-protected HTML pages first.
+  sitemap_url: "https://www.cqu.edu.au/sitemap.xml"
+  always_sitemap_supplement: false
 
   # CQU's ?audience=INTERNATIONAL rewrite causes ~48% of discovered URLs
   # to return 404 — these are legitimate domestic-only combined-degree
@@ -105,10 +114,10 @@ discovery:
   # actual extraction quality rather than the rewrite 404 rate.
   failure_guard_threshold: 0.65
 
-  # BFS budget bumped from default 25 because the bare /courses/ landing
-  # page returned 0 candidates on the most recent run; sitemap is doing
-  # the work but a higher budget gives BFS room to find additional links.
-  bfs_page_budget: 60
+  # The rendered /courses page has only two broad navigation links. BFS then
+  # walks /study information/subject pages and can exhaust the full 300-second
+  # phase deadline before sitemap discovery starts. Skip BFS entirely.
+  bfs_page_budget: 0
 
   # 2026-05-12 fix: the CQU sitemap publishes 199 unique URLs that match
   # our HE allow pattern, but BFS already fills ~54 slots before the
