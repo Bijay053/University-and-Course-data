@@ -21,6 +21,21 @@ but became the dominant latency once Archive.org slowed.
 Skip direct/static tiers, keep primary concurrency conservative, retain cached
 Wayback as last resort, and cap recovery by both item count and wall-clock time.
 
+## Sustained rendered-provider congestion
+
+Cap each rendered live attempt at 20 seconds and move immediately to Wayback
+after the first failure. Do not use the generic static-plus-multi-retry ladder
+for this host. If Wayback has no snapshot, make one final bounded render attempt.
+
+**Why:** Short probes can succeed in 5–19 seconds while sustained production
+loads later produce synchronized provider hangs. Without the inner cap, four
+requests consume the shared 90-second course deadline together, so the archive
+fallback never runs and timeout errors accumulate in waves.
+
+**How to apply:** Judge the policy from a full production batch, not a few fast
+probes. Preserve the outer course deadline, but reserve enough of it for the
+independent archive transport and downstream extraction.
+
 ## Archive identity and completeness
 
 Course deduplication identity and archive-scope identity are different:
