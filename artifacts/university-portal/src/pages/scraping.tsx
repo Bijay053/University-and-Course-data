@@ -28,7 +28,7 @@ import {
   type ReviewEvidenceItem,
 } from "@/components/review-scraped-courses-table";
 import { ScrapeJobCard } from "@/components/scrape-job-card";
-import { DEGREE_LEVELS, STUDY_LOADS, STUDY_MODES } from "@/lib/course-constants";
+import { DEGREE_LEVELS, FEE_TERM_OPTIONS, STUDY_LOADS, STUDY_MODES } from "@/lib/course-constants";
 
 function optionsIncludingCurrent(options: string[], current: string | null): string[] {
   return current && !options.includes(current) ? [current, ...options] : options;
@@ -3756,23 +3756,12 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                   <label className="text-xs font-medium text-gray-500 mb-1 block">Fee Term</label>
                   <Select value={editingCourse.feeTerm || ""} onValueChange={(v) => setEditingCourse({ ...editingCourse, feeTerm: v || null })}>
                     <SelectTrigger><SelectValue placeholder="Term" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Annual">Annual (Per Year)</SelectItem>
-                      <SelectItem value="Full Course">Full Course (Total)</SelectItem>
-                      <SelectItem value="Total">Total</SelectItem>
-                      <SelectItem value="Semester">Per Semester</SelectItem>
-                      <SelectItem value="Trimester">Per Trimester</SelectItem>
-                      <SelectItem value="Term">Per Term</SelectItem>
-                      <SelectItem value="Session">Per Session</SelectItem>
-                      <SelectItem value="Quarter">Per Quarter</SelectItem>
-                      <SelectItem value="Per Unit">Per Unit</SelectItem>
-                      <SelectItem value="Per Credit">Per Credit</SelectItem>
-                      <SelectItem value="Per Credit Hour">Per Credit Hour</SelectItem>
-                      <SelectItem value="Per Subject">Per Subject</SelectItem>
-                      <SelectItem value="Per Module">Per Module</SelectItem>
-                      <SelectItem value="Per Course">Per Course</SelectItem>
-                      <SelectItem value="Per Month">Per Month</SelectItem>
-                      <SelectItem value="Per Week">Per Week</SelectItem>
+                    <SelectContent className="w-[24rem] max-w-[calc(100vw-1rem)]">
+                      <div className="grid grid-cols-2 gap-x-1">
+                        {FEE_TERM_OPTIONS.map(({ value, label }) => (
+                          <SelectItem key={value} value={value}>{label}</SelectItem>
+                        ))}
+                      </div>
                     </SelectContent>
                   </Select>
                 </div>

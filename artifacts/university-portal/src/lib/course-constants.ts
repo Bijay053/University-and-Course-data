@@ -33,7 +33,26 @@ export const INTAKE_MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ];
 
-export const FEE_TERMS = ["Per Year", "Per Semester", "Per Subject", "Total"];
+export const FEE_TERM_OPTIONS = [
+  { value: "Annual", label: "Annual (Per Year)" },
+  { value: "Semester", label: "Per Semester" },
+  { value: "Trimester", label: "Per Trimester" },
+  { value: "Term", label: "Per Term" },
+  { value: "Session", label: "Per Session" },
+  { value: "Quarter", label: "Per Quarter" },
+  { value: "Full Course", label: "Full Course (Total)" },
+  { value: "Total", label: "Total" },
+  { value: "Per Unit", label: "Per Unit" },
+  { value: "Per Credit", label: "Per Credit" },
+  { value: "Per Credit Hour", label: "Per Credit Hour" },
+  { value: "Per Subject", label: "Per Subject" },
+  { value: "Per Module", label: "Per Module" },
+  { value: "Per Course", label: "Per Course" },
+  { value: "Per Month", label: "Per Month" },
+  { value: "Per Week", label: "Per Week" },
+] as const;
+
+export const FEE_TERMS = FEE_TERM_OPTIONS.map(({ value }) => value);
 
 export const CURRENCIES = ["AUD", "USD", "GBP", "EUR", "NZD", "CAD", "SGD"];
 
