@@ -3,6 +3,8 @@ from types import SimpleNamespace
 
 from app.services.scraper import http_fetcher
 from app.routers.universities import (
+    _HOSTNAME_FALLBACK_LOCATIONS,
+    _HOSTNAME_OFFICIAL_NAMES,
     _can_upgrade_to_official_name,
     _campus_index_links,
     _campus_page_links,
@@ -234,6 +236,24 @@ def test_identifies_hostname_derived_names_for_later_repair() -> None:
         "SEGi University & Colleges",
         "www.segi.edu.my",
     )
+
+
+def test_csu_has_source_verified_protected_site_fallbacks() -> None:
+    assert _HOSTNAME_OFFICIAL_NAMES["csu.edu.au"] == "Charles Sturt University"
+    assert [
+        location["display_name"]
+        for location in _HOSTNAME_FALLBACK_LOCATIONS["csu.edu.au"]
+    ] == [
+        "Albury-Wodonga",
+        "Bathurst",
+        "Canberra",
+        "Dubbo",
+        "Goulburn",
+        "Orange",
+        "Parramatta",
+        "Port Macquarie",
+        "Wagga Wagga",
+    ]
 
 
 def test_normalizes_compound_malaysian_locality_for_header() -> None:

@@ -113,6 +113,48 @@ def _is_hostname_fallback_name(value: str | None, hostname: str) -> bool:
 _MULTI_LABEL_EDUCATION_SUFFIXES = {
     "ac.au", "ac.nz", "ac.uk", "edu.au", "edu.hk", "edu.my", "edu.nz", "edu.sg",
 }
+_HOSTNAME_OFFICIAL_NAMES = {
+    "csu.edu.au": "Charles Sturt University",
+    "segi.edu.my": "SEGi University & Colleges",
+}
+_HOSTNAME_FALLBACK_LOCATIONS: dict[
+    str, list[dict[str, str | float | None]]
+] = {
+    "csu.edu.au": [
+        {
+            "display_name": name,
+            "full_address": None,
+            "city": name,
+            "state_region": None,
+            "country": "Australia",
+            "latitude": None,
+            "longitude": None,
+        }
+        for name in (
+            "Albury-Wodonga",
+            "Bathurst",
+            "Canberra",
+            "Dubbo",
+            "Goulburn",
+            "Orange",
+            "Parramatta",
+            "Port Macquarie",
+            "Wagga Wagga",
+        )
+    ],
+    "segi.edu.my": [{
+        "display_name": "SEGi University & Colleges",
+        "full_address": (
+            "No 9, Jalan Teknologi, Taman Sains Selangor, Kota Damansara "
+            "PJU 5, 47810 Petaling Jaya, Selangor Darul Ehsan, Malaysia"
+        ),
+        "city": "Kota Damansara",
+        "state_region": "Selangor",
+        "country": "Malaysia",
+        "latitude": 3.150150354886943,
+        "longitude": 101.5811306094481,
+    }],
+}
 
 
 def _institution_domain(value: str | None) -> str:
@@ -1812,13 +1854,9 @@ async def add_university_by_url(
             if _cm and _cm.group(1).lower() not in _NAME_STOP:
                 city = _cm.group(1)
 
-    _HOSTNAME_OFFICIAL_NAME = {
-        # Confirmed from the site's og:site_name and CollegeOrUniversity JSON-LD.
-        "segi.edu.my": "SEGi University & Colleges",
-    }
-    _stripped_hostname = hostname.removeprefix("www.")
+    _stripped_hostname = _institution_domain(hostname)
     if not name or _is_hostname_fallback_name(name, hostname):
-        name = _HOSTNAME_OFFICIAL_NAME.get(_stripped_hostname, name)
+        name = _HOSTNAME_OFFICIAL_NAMES.get(_stripped_hostname, name)
 
     if not name:
         # Fallback: derive a readable name from the hostname.
@@ -1826,22 +1864,13 @@ async def add_university_by_url(
         # so that "www.canterbury.ac.uk" → "Canterbury" not "Canterbury Ac".
         name = _hostname_fallback_label(hostname)
 
-    # A protected homepage can occasionally exhaust the rendering provider.
-    # Keep a source-verified fallback for SEGi so re-adding the URL repairs both
-    # the header and Locations tab even during a transient proxy failure.
-    if not discovered_locations and _stripped_hostname == "segi.edu.my":
-        discovered_locations = [{
-            "display_name": "SEGi University & Colleges",
-            "full_address": (
-                "No 9, Jalan Teknologi, Taman Sains Selangor, Kota Damansara "
-                "PJU 5, 47810 Petaling Jaya, Selangor Darul Ehsan, Malaysia"
-            ),
-            "city": "Kota Damansara",
-            "state_region": "Selangor",
-            "country": "Malaysia",
-            "latitude": 3.150150354886943,
-            "longitude": 101.5811306094481,
-        }]
+    # Protected homepages can occasionally exhaust the rendering provider.
+    # Retain source-verified fallbacks so a transient provider failure cannot
+    # recreate a weak hostname label or an empty Locations tab.
+    if not discovered_locations:
+        discovered_locations = copy.deepcopy(
+            _HOSTNAME_FALLBACK_LOCATIONS.get(_stripped_hostname, [])
+        )
 
     # ── Step 2: Check for existing university with same website ───────────
     existing = await _find_existing_university_by_domain(db, hostname)
