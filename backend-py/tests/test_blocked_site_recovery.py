@@ -14,6 +14,7 @@ from app.services.scraper.http_fetcher import (
     fetch_html_scrape_do,
     fetch_html_wayback,
     get_last_fetch_failure,
+    scrape_do_render_scope,
     set_wayback_timestamps,
 )
 from app.services.scraper.orchestrator import (
@@ -320,11 +321,48 @@ async def test_notredame_recipe_prefers_rendered_live_with_wayback_fallback():
         ),
         patch.dict(os.environ, {"SCRAPE_DO_TOKEN": "test-token"}),
     ):
-        assert await fetch_html(url) == rendered
+        with scrape_do_render_scope():
+            assert await fetch_html(url) == rendered
 
     wayback.assert_not_awaited()
     live.assert_awaited_once()
     assert live.await_args.kwargs["render"] is True
+
+
+@pytest.mark.asyncio
+async def test_notredame_recipe_falls_back_to_wayback_after_first_render_failure():
+    from app.services.scraper.config import get_config_for_host, set_uni_config
+
+    cfg = get_config_for_host(
+        hostname="www.notredame.edu.au",
+        name="University of Notre Dame Australia",
+        scrape_url="https://www.notredame.edu.au/",
+        university_id=1165,
+    )
+    set_uni_config(cfg)
+    url = "https://www.notredame.edu.au/programs/school-of-law/test-course"
+    archived = "<html><body>" + ("archived course " * 200) + "</body></html>"
+    wayback = AsyncMock(return_value=archived)
+    live = AsyncMock(return_value=None)
+
+    with (
+        patch(
+            "app.services.scraper.http_fetcher.fetch_html_wayback",
+            new=wayback,
+        ),
+        patch(
+            "app.services.scraper.http_fetcher.fetch_html_scrape_do",
+            new=live,
+        ),
+        patch.dict(os.environ, {"SCRAPE_DO_TOKEN": "test-token"}),
+    ):
+        with scrape_do_render_scope():
+            assert await fetch_html(url) == archived
+
+    live.assert_awaited_once()
+    assert live.await_args.kwargs["max_retries"] == 0
+    assert live.await_args.kwargs["request_timeout_seconds"] == 20
+    wayback.assert_awaited_once_with(url)
 
 
 @pytest.mark.asyncio

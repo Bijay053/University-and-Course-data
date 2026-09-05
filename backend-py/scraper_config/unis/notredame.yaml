@@ -147,6 +147,11 @@ extraction:
   # as a last resort when a rendered live request fails.
   scrape_do_render: true
   scrape_do_skip_fallbacks: true
+  # Healthy rendered pages complete in about 5-19 s. A small fraction of
+  # provider requests otherwise hang until the entire 90 s course deadline,
+  # preventing the archive fallback from running.
+  scrape_do_request_timeout_seconds: 20
+  scrape_do_wayback_after_first_failure: true
   force_wayback_first: false
 
   # Keep provider concurrency conservative. Four rendered requests in parallel

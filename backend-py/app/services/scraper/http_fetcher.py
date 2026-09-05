@@ -641,6 +641,7 @@ async def fetch_html_scrape_do(
     play_with_browser: list[dict[str, object]] | None = None,
     unescape_json_html: bool = True,
     local_concurrency_limit: int | None = None,
+    request_timeout_seconds: float | None = None,
 ) -> str | None:
     """Fetch via Scrape.do residential proxy — paid tier-4/5 Cloudflare bypass.
 
@@ -767,7 +768,7 @@ async def fetch_html_scrape_do(
             # rest of the fleet.  account_slot() is a no-op unless
             # scrape_do_account_concurrency > 0 and fails open on any Redis error.
             from app.services.scraper.scrape_do_semaphore import account_slot
-            _request_timeout = clamp_timeout(90.0)
+            _request_timeout = clamp_timeout(request_timeout_seconds or 90.0)
             if _request_timeout is not None and _request_timeout <= 0:
                 return None
 
@@ -1535,9 +1536,50 @@ async def fetch_html(url: str, *, retries: int = 2, wait_for_ms: int = 3000) -> 
                 "fetch %s: scrape_do_skip_fallbacks=True — going straight to Scrape.do render",
                 url,
             )
-            _rendered = await fetch_html_scrape_do(url, render=True, wait_for_ms=wait_for_ms)
+            _fast_request_timeout = getattr(
+                getattr(_active_config, "extraction", None),
+                "scrape_do_request_timeout_seconds",
+                None,
+            )
+            _wayback_after_first_failure = bool(
+                getattr(
+                    getattr(_active_config, "extraction", None),
+                    "scrape_do_wayback_after_first_failure",
+                    False,
+                )
+            )
+            _rendered = await fetch_html_scrape_do(
+                url,
+                render=True,
+                wait_for_ms=wait_for_ms,
+                max_retries=0 if _wayback_after_first_failure else None,
+                request_timeout_seconds=_fast_request_timeout,
+            )
             if _rendered is not None:
                 return _rendered
+            if _wayback_after_first_failure and _allow_wayback_last_resort:
+                log.info(
+                    "fetch %s: first rendered attempt failed — trying Wayback "
+                    "immediately before provider retries",
+                    url,
+                )
+                _early_wayback = await fetch_html_wayback(url)
+                if _early_wayback is not None:
+                    from app.services.scraper.snapshot_context import stage_snapshot as _stage
+                    _stage(url, _early_wayback, "wayback")
+                    return _early_wayback
+                log.info(
+                    "fetch %s: immediate Wayback fallback unavailable — making "
+                    "one final bounded rendered attempt",
+                    url,
+                )
+                return await fetch_html_scrape_do(
+                    url,
+                    render=True,
+                    wait_for_ms=wait_for_ms,
+                    max_retries=0,
+                    request_timeout_seconds=_fast_request_timeout,
+                )
             # Render returned 502 / None (e.g. Scrape.do rate-limited under
             # concurrent load).  Fall back to Scrape.do static before giving up —
             # for many Cloudflare-protected SPAs (e.g. UWL) the residential proxy

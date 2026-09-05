@@ -3404,6 +3404,25 @@ class ExtractionConfig(BaseModel):
             "Has no effect unless scrape_do_render is True. Default: 3000."
         ),
     )
+    scrape_do_request_timeout_seconds: Optional[float] = Field(
+        default=None,
+        gt=0,
+        description=(
+            "Optional wall-clock cap for each extraction-phase Scrape.do HTTP "
+            "attempt. The shared per-course deadline remains the outer ceiling. "
+            "Use on hosts where rendered requests are normally fast but "
+            "occasionally hang long enough to consume the entire course budget."
+        ),
+    )
+    scrape_do_wayback_after_first_failure: bool = Field(
+        default=False,
+        description=(
+            "When True, a failed first rendered Scrape.do attempt falls back "
+            "immediately to the preloaded Wayback snapshot instead of trying "
+            "static mode and the generic multi-attempt retry ladder. If the "
+            "archive has no snapshot, one final bounded rendered attempt is made."
+        ),
+    )
     scrape_do_local_concurrency: Optional[int] = Field(
         default=None,
         ge=1,
