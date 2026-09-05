@@ -6401,6 +6401,25 @@ async def start_ai_repair(
         raise HTTPException(status_code=422, detail=reason)
 
     university_id = int(row["university_id"])
+    active_scrape = (await db.execute(
+        _text(
+            "SELECT runtime_job_id FROM scrape_runtime_jobs "
+            "WHERE university_id = :uid "
+            "AND runtime_job_id <> :job_id "
+            "AND status IN ('queued', 'running', 'awaiting_approval') "
+            "LIMIT 1"
+        ),
+        {"uid": university_id, "job_id": job_id},
+    )).first()
+    if active_scrape:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "A newer scrape is queued or running for this university. "
+                "Wait for it to finish before changing URL filters."
+            ),
+        )
+
     session_id = str(uuid.uuid4())[:8]
     if not acquire_repair_lease(university_id, session_id):
         raise HTTPException(
