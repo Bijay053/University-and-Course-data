@@ -653,6 +653,10 @@ class TestLowValuePdfClassifier:
             "https://www.unisc.edu.au/media/whufdw0f/"
             "2026-units-of-study-1st-half-pgrd-coursework-fees-v2.pdf"
         )
+        assert is_non_tuition_fee_pdf(
+            "https://www.unisc.edu.au/media/0nhbmp5f/"
+            "2026-1st-half-css-student-contribution-fees.pdf"
+        )
 
     def test_unisc_real_international_tuition_schedule_is_kept(self):
         assert not is_non_tuition_fee_pdf(

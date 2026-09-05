@@ -174,6 +174,7 @@ _UNISC_UNIT_FEE_SCHEDULE_URL_RE = re.compile(
     r".*/20\d{2}-(?:"
     r"full-fee-paying-(?:1st|2nd)-half"
     r"|units-of-study-[^/?#]*fees?(?:-v\d+)?"
+    r"|(?:1st|2nd)-half-css-student-contribution-fees"
     r")\.pdf(?:[?#].*)?$",
     re.I,
 )
