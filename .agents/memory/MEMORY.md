@@ -80,7 +80,7 @@
 - [Distributed semaphore lessons](distributed-semaphore-lessons.md) — acquire local semaphore BEFORE fleet-wide Redis slot; cache one redis.asyncio client per event loop (WeakKeyDictionary).
 - [block_url_patterns traversal guard](block-url-patterns-traversal.md) — block_url_patterns is now ALSO a BFS traversal-level guard (compiled early, checked pre-fetch); critical for Scrape.do-backed discovery where each blocked URL saves ~6s.
 - [UC Leeds degree-qualifier false rejection](ucleeds-degree-qualifier-false-positive.md) — H1 lacking degree word wrongly triggers category-landing-page guard on fully-extracted courses; skip_degree_qualifier_check:true YAML flag fixes it.
-- [UniSQ browser timeout + stale-code pattern](unisq-browser-timeout.md) — Next.js SPA times out in Playwright on every page; skip_browser_rescue:true + SSR HTML sufficient; stale worker is always the first suspect for NameError on recently-added locals.
+- [UniSQ SSR and location drift](unisq-browser-timeout.md) — SSR beats Playwright; compare saved location evidence with fresh quick-facts before changing the parser for source drift.
 - [Bond ES API discovery](bond-es-discovery.md) — program finder is React SPA/AJAX; query /api/v1/elasticsearch/bond_prod_default/_search with generic_search_api; _source.url.0 dot-path extracts array fields.
 - [UniSC sitemap + config identity](unisc-sitemap-discovery.md) — XMLsitemap supplies courses; production ID-specific YAML can shadow the verified recipe, so shared name cleanup must not depend on its aliases.
 - [Bond University sitemap discovery](bond-sitemap-discovery.md) — generic_search_api gated by `if not links`; BFS fills it first; sitemap.xml index (5 child pages, 240 URLs) is the correct approach.

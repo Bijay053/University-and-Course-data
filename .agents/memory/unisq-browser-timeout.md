@@ -25,3 +25,20 @@ This gates both browser paths in `single_course.py`:
 - Sparse-static rescue after Gemini-primary (~line 3726): `if not _skip_rescue and fee+duration both blank`
 
 Fees live on the central fee page (`/study/fees-and-scholarships`), not per-course — so skipping browser costs nothing. The companion YAML flags `stage_on_parser_error: true` and `require_international_fee: false` handle the missing-fee case.
+
+## UniSQ-specific: location drift
+
+Treat the primary quick-facts Location list as authoritative, preserving every
+physical campus while removing `Online` and `External` only from the physical
+location output. Before changing that parser for a reported mismatch, compare
+the selected field evidence snippet with a fresh fetch of the same URL.
+
+**Why:** UniSQ changed several published Location lists between two same-day
+checks. The saved evidence proved the scraper had faithfully captured the older
+lists; a fresh scrape correctly captured the newer values. Without checking
+provenance, ordinary source drift looked like a systemic parser defect.
+
+**How to apply:** Audit all staged UniSQ rows against fresh primary quick-facts,
+rerun with forced discovery when the source changed, and reserve parser changes
+for cases where saved raw evidence contained the correct list but normalization
+or selection produced the wrong value.
