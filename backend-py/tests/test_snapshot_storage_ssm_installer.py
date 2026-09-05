@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+import re
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -48,6 +49,32 @@ def test_direct_python_service_cmdline_is_discovered_without_shebang_parsing():
     assert installer._python_from_cmdline(raw) == (
         "/opt/university-portal/backend-py/.venv/bin/python3"
     )
+
+
+def test_lifecycle_restore_passes_transition_default_at_top_level():
+    calls = []
+
+    class _Client:
+        def put_bucket_lifecycle_configuration(self, **kwargs):
+            calls.append(kwargs)
+
+    installer.restore_lifecycle_configuration(
+        _Client(),
+        "bucket",
+        {
+            "Rules": [{"ID": "existing"}],
+            "TransitionDefaultMinimumObjectSize": "all_storage_classes_128K",
+        },
+    )
+
+    assert calls == [{
+        "Bucket": "bucket",
+        "LifecycleConfiguration": {"Rules": [{"ID": "existing"}]},
+        "TransitionDefaultMinimumObjectSize": "all_storage_classes_128K",
+    }]
+    assert "TransitionDefaultMinimumObjectSize" not in calls[0][
+        "LifecycleConfiguration"
+    ]
 
 
 def test_plaintext_secrets_never_enter_ssm_commands_or_output(capsys):
@@ -143,6 +170,8 @@ def test_host_transaction_is_root_only_reversible_and_round_trip_verified():
     assert "systemctl restart uni-api-py uni-celery" in script
     assert 'grep -Fq "[SNAPSHOT] enabled"' in script
     assert "snapshot_round_trip" in script
+    assert "from install_snapshot_storage_via_ssm import" not in script
+    assert "sys.path.insert" not in script
     assert '. "$env_path"' not in script
     assert 'cd "$workdir"' in script
     assert 'PYTHONPATH=. "$python"' in script
@@ -155,6 +184,15 @@ def test_host_transaction_is_root_only_reversible_and_round_trip_verified():
         check=False,
     )
     assert syntax.returncode == 0, syntax.stderr
+
+    heredocs = re.findall(
+        r"<<'([A-Z_]+)'\n(.*?)\n\1",
+        script,
+        flags=re.DOTALL,
+    )
+    assert heredocs
+    for marker, source in heredocs:
+        compile(source, f"<generated-{marker}>", "exec")
 
 
 def test_service_templates_load_snapshot_environment():

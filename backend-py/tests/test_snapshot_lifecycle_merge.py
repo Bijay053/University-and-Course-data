@@ -55,9 +55,12 @@ def test_setup_lifecycle_preserves_unrelated_rules_and_replaces_owned(monkeypatc
     assert len(html_rules) == 1
     assert html_rules[0]["Status"] == "Enabled"
     assert html_rules[0]["Expiration"] == {"Days": 90}
-    assert client.put["LifecycleConfiguration"][
-        "TransitionDefaultMinimumObjectSize"
-    ] == "varies_by_storage_class"
+    assert client.put["TransitionDefaultMinimumObjectSize"] == (
+        "varies_by_storage_class"
+    )
+    assert "TransitionDefaultMinimumObjectSize" not in client.put[
+        "LifecycleConfiguration"
+    ]
 
 
 def test_setup_lifecycle_handles_bucket_without_existing_configuration(monkeypatch):

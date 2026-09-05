@@ -480,14 +480,16 @@ def setup_lifecycle_rules() -> bool:
         rules = [*unrelated_rules, *snapshot_rules]
         if len(rules) > 1000:
             raise RuntimeError("S3 lifecycle rule limit would be exceeded")
-        lifecycle_configuration = {"Rules": rules}
+        put_options = {
+            "Bucket": bucket,
+            "LifecycleConfiguration": {"Rules": rules},
+        }
         if "TransitionDefaultMinimumObjectSize" in current:
-            lifecycle_configuration["TransitionDefaultMinimumObjectSize"] = current[
+            put_options["TransitionDefaultMinimumObjectSize"] = current[
                 "TransitionDefaultMinimumObjectSize"
             ]
         client.put_bucket_lifecycle_configuration(
-            Bucket=bucket,
-            LifecycleConfiguration=lifecycle_configuration,
+            **put_options,
         )
         log.info(
             "S3 lifecycle rules applied to bucket %s (%d unrelated rules preserved)",

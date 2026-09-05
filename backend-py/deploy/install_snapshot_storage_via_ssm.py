@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import base64
+import inspect
 import os
 import shlex
 import textwrap
@@ -43,6 +44,21 @@ def _python_from_cmdline(raw_cmdline: bytes) -> str:
     return first.decode()
 
 
+def restore_lifecycle_configuration(client, bucket: str, configuration: dict) -> None:
+    """Restore the full supported lifecycle shape at the correct API levels."""
+    config = dict(configuration)
+    transition_default = config.pop("TransitionDefaultMinimumObjectSize", None)
+    if set(config) != {"Rules"}:
+        raise ValueError("unexpected lifecycle configuration fields")
+    options = {
+        "Bucket": bucket,
+        "LifecycleConfiguration": config,
+    }
+    if transition_default is not None:
+        options["TransitionDefaultMinimumObjectSize"] = transition_default
+    client.put_bucket_lifecycle_configuration(**options)
+
+
 def _environment_payload() -> bytes:
     values = {
         key: os.environ.get(key)
@@ -72,59 +88,48 @@ async def _delete_smoke_snapshot(snapshot_store, key: str) -> None:
     endpoint = os.environ.get("AWS_S3_ENDPOINT_URL")
     if endpoint:
         extra["endpoint_url"] = endpoint
-    async with session.client("s3", **extra) as s3:
-        bucket = os.environ["AWS_S3_BUCKET_NAME"]
-        versioning = await s3.get_bucket_versioning(Bucket=bucket)
-        for attempt in range(3):
-            try:
-                if versioning.get("Status") in {"Enabled", "Suspended"}:
-                    listing = await s3.list_object_versions(
-                        Bucket=bucket,
-                        Prefix=key,
+    bucket = os.environ["AWS_S3_BUCKET_NAME"]
+    for attempt in range(3):
+        try:
+            async with session.client("s3", **extra) as s3:
+                try:
+                    head = await s3.head_object(Bucket=bucket, Key=key)
+                except Exception as exc:
+                    status = getattr(exc, "response", {}).get(
+                        "ResponseMetadata", {}
+                    ).get("HTTPStatusCode")
+                    code = str(
+                        getattr(exc, "response", {}).get("Error", {}).get("Code", "")
                     )
-                    objects = [
-                        {"Key": key, "VersionId": item["VersionId"]}
-                        for group in ("Versions", "DeleteMarkers")
-                        for item in listing.get(group, [])
-                        if item.get("Key") == key
-                    ]
-                    if objects:
-                        await s3.delete_objects(
-                            Bucket=bucket,
-                            Delete={"Objects": objects, "Quiet": True},
-                        )
-                    remaining = await s3.list_object_versions(
-                        Bucket=bucket,
-                        Prefix=key,
-                    )
-                    assert not any(
-                        item.get("Key") == key
-                        for group in ("Versions", "DeleteMarkers")
-                        for item in remaining.get(group, [])
-                    )
-                else:
-                    await s3.delete_object(Bucket=bucket, Key=key)
-                    try:
-                        await s3.head_object(Bucket=bucket, Key=key)
-                    except Exception as exc:
-                        status = getattr(exc, "response", {}).get(
-                            "ResponseMetadata", {}
-                        ).get("HTTPStatusCode")
-                        code = str(
-                            getattr(exc, "response", {}).get("Error", {}).get("Code", "")
-                        )
-                        assert status == 404 or code in {
-                            "404", "NoSuchKey", "NotFound"
-                        }
-                    else:
-                        raise AssertionError(
-                            "smoke-test snapshot still exists after deletion"
-                        )
-                return
-            except Exception:
-                if attempt == 2:
+                    if status == 404 or code in {"404", "NoSuchKey", "NotFound"}:
+                        return
                     raise
-                await asyncio.sleep(2 ** attempt)
+                version_id = head.get("VersionId")
+                delete_options = {"Bucket": bucket, "Key": key}
+                if version_id:
+                    delete_options["VersionId"] = version_id
+                await s3.delete_object(**delete_options)
+                try:
+                    await s3.head_object(Bucket=bucket, Key=key)
+                except Exception as exc:
+                    status = getattr(exc, "response", {}).get(
+                        "ResponseMetadata", {}
+                    ).get("HTTPStatusCode")
+                    code = str(
+                        getattr(exc, "response", {}).get("Error", {}).get("Code", "")
+                    )
+                    assert status == 404 or code in {
+                        "404", "NoSuchKey", "NotFound"
+                    }
+                else:
+                    raise AssertionError(
+                        "smoke-test snapshot still exists after deletion"
+                    )
+            return
+        except Exception:
+            if attempt == 2:
+                raise
+            await asyncio.sleep(2 ** attempt)
 
 
 async def snapshot_round_trip(snapshot_store=None) -> None:
@@ -167,6 +172,16 @@ def _install_script(
     required_literal = repr(REQUIRED_KEYS)
     allowed_literal = repr((*REQUIRED_KEYS, *OPTIONAL_KEYS, "SNAPSHOT_ENABLED"))
     services = " ".join(SERVICES)
+    restore_helper = textwrap.indent(
+        inspect.getsource(restore_lifecycle_configuration),
+        "        ",
+    )
+    smoke_helpers = textwrap.indent(
+        inspect.getsource(_delete_smoke_snapshot)
+        + "\n\n"
+        + inspect.getsource(snapshot_round_trip),
+        "        ",
+    )
     return textwrap.dedent(
         f"""\
         set -eu
@@ -200,6 +215,7 @@ def _install_script(
         import sys
         import time
 
+{restore_helper}
         env_path, backup_path, absent_path = sys.argv[1:]
         with open(env_path, encoding="utf-8") as stream:
             for raw_line in stream:
@@ -221,10 +237,7 @@ def _install_script(
                 if os.path.exists(backup_path):
                     with open(backup_path, encoding="utf-8") as stream:
                         config = json.load(stream)
-                    client.put_bucket_lifecycle_configuration(
-                        Bucket=bucket,
-                        LifecycleConfiguration=config,
-                    )
+                    restore_lifecycle_configuration(client, bucket, config)
                 elif os.path.exists(absent_path):
                     client.delete_bucket_lifecycle(Bucket=bucket)
                 break
@@ -418,9 +431,9 @@ def _install_script(
         PYTHONPATH=. "$python" - "$env_path" <<'PYSMOKE'
         import asyncio
         import os
-        from pathlib import Path
         import shlex
         import sys
+        import uuid
 
         with open(sys.argv[1], encoding="utf-8") as stream:
             for raw_line in stream:
@@ -428,9 +441,7 @@ def _install_script(
                 key, value = parsed[0].split("=", 1)
                 os.environ[key] = value
 
-        sys.path.insert(0, str(Path.cwd() / "deploy"))
-        from install_snapshot_storage_via_ssm import snapshot_round_trip
-
+{smoke_helpers}
         asyncio.run(snapshot_round_trip())
         PYSMOKE
 
