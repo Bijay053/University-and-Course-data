@@ -380,6 +380,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
   const [pendingReviewCount, setPendingReviewCount] = useState<number | null>(null);
   const pendingReviewCountJobRef = useRef<string | null>(null);
   const [continuingUnresolved, setContinuingUnresolved] = useState(false);
+  const [recoveringSkipped, setRecoveringSkipped] = useState(false);
 
   // Snapshot badge state — loaded after job completes
   type SnapshotSummary = {
@@ -1519,6 +1520,91 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
     }
   }, [completedJobId, continuingUnresolved, pollJobStatus, resultSummary?.errors, slotKey, startTimeKey, toast]);
 
+  const handleRecoverSkipped = useCallback(async () => {
+    if (!completedJobId || recoveringSkipped) return;
+    const universityId = Number.parseInt(selectedUni, 10);
+    const url = scrapeUrl.trim();
+    if (!Number.isFinite(universityId) || universityId <= 0 || !url) {
+      toast({
+        title: "Could not recover skipped courses",
+        description: "Select the university and confirm its course listing URL first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setRecoveringSkipped(true);
+    try {
+      const response = await fetch("/api/scrape/start", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url,
+          universityId,
+          fastMode: false,
+          forceDiscovery: true,
+        }),
+      });
+      if (!response.ok) throw new Error(await getFetchErrorMessage(response));
+      const data = await readResponseJson<{ jobId: string; status?: string; reused?: boolean }>(response);
+      if (!data?.jobId) throw new Error("Server did not return a job ID.");
+      if (data.reused) {
+        toast({
+          title: "University scrape already running",
+          description:
+            `Recovery was not started because ${data.jobId} is already ${data.status ?? "active"}.`,
+        });
+        return;
+      }
+
+      const previousJobId = completedJobId;
+      const skippedCount = resultSummary?.skipped ?? 0;
+      const t0 = Date.now();
+      setActiveJobId(data.jobId);
+      setCompletedJobId(null);
+      setResultSummary(null);
+      pendingReviewCountJobRef.current = null;
+      setPendingReviewCount(null);
+      setPerformanceSavings(null);
+      setProgress(null);
+      extractionStartRef.current = null;
+      setStartTime(t0);
+      setLogs((previous) => [
+        ...previous,
+        {
+          event: "status",
+          message:
+            `══ RECOVERING ${skippedCount} SKIPPED COURSE${skippedCount === 1 ? "" : "S"} ` +
+            `FROM ${previousJobId} AS ${data.jobId} — FRESH DISCOVERY, LATEST SAFETY RULES ══`,
+        },
+      ].slice(-MAX_LOGS));
+      setScraping(true);
+      setPhase("running");
+      sessionStorage.setItem(slotKey, data.jobId);
+      sessionStorage.setItem(startTimeKey, String(t0));
+      pollJobStatus(data.jobId);
+    } catch (error) {
+      toast({
+        title: "Could not recover skipped courses",
+        description: String(error),
+        variant: "destructive",
+      });
+    } finally {
+      setRecoveringSkipped(false);
+    }
+  }, [
+    completedJobId,
+    pollJobStatus,
+    recoveringSkipped,
+    resultSummary?.skipped,
+    scrapeUrl,
+    selectedUni,
+    slotKey,
+    startTimeKey,
+    toast,
+  ]);
+
   // Force-reset when the parent's "Cancel All" fires (forceResetKey increments)
   useEffect(() => {
     if (!forceResetKey) return;
@@ -2114,6 +2200,37 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                   <div className="text-lg font-bold text-red-700">{resultSummary.errors}</div>
                   <div className="text-xs text-red-600">Errors</div>
                 </div>
+              </div>
+            )}
+
+            {completedJobId && resultSummary && resultSummary.skipped >= 10 &&
+              resultSummary.skipped > Math.max(10, resultSummary.imported * 2) && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 space-y-2">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-700 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-amber-900">
+                      Suspicious rejection storm detected
+                    </p>
+                    <p className="text-xs text-amber-800 mt-0.5">
+                      Most discovered courses were skipped. Recover them without developer
+                      access by running a fresh discovery with the latest validated safety rules.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  onClick={handleRecoverSkipped}
+                  disabled={recoveringSkipped}
+                  size="sm"
+                  className="w-full h-8 bg-amber-700 hover:bg-amber-800 text-white"
+                  title="Bypass the discovery cache and re-run this university using the latest scraper rules"
+                >
+                  {recoveringSkipped
+                    ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    : <RotateCcw className="w-3.5 h-3.5 mr-1.5" />}
+                  {recoveringSkipped ? "Starting recovery…" : `Recover ${resultSummary.skipped} skipped courses`}
+                </Button>
               </div>
             )}
 

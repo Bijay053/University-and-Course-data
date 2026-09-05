@@ -62,13 +62,20 @@ class TestValidateAndBuildConfigPatch:
         assert errors == []
         assert extr["text_cleaning"]["location"]["reject_values"] == ["Online", "Distance Learning"]
 
-    def test_dotpath_filters_domestic_only_accepted(self):
-        patches = [
-            {"section": "recipe", "field": "filters.domestic_only.enabled", "value": False}
-        ]
+    @pytest.mark.parametrize(
+        "field",
+        [
+            "filters.domestic_only.enabled",
+            "filters.online_only.enabled",
+        ],
+    )
+    def test_global_delivery_safety_switches_cannot_be_patched(self, field):
+        patches = [{"section": "recipe", "field": field, "value": False}]
         disc, extr, errors = _validate_and_build_config_patch(patches)
-        assert errors == []
-        assert extr["filters"]["domestic_only"]["enabled"] is False
+        assert disc == {}
+        assert extr == {}
+        assert len(errors) == 1
+        assert field in errors[0]
 
     def test_multiple_dotpath_fields_merged_correctly(self):
         """Multiple recipe patches must deep-merge into one nested dict."""

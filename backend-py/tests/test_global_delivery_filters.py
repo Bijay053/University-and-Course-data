@@ -289,6 +289,27 @@ def test_full_time_wins_when_duration_also_mentions_part_time_equivalent() -> No
         _infer_study_load_from_text("3 years, or part-time equivalent")
         == "Full Time"
     )
+    assert (
+        _infer_study_load_from_text("3 years (or part-time equivalent)")
+        == "Full Time"
+    )
+
+
+def test_unisq_parenthesised_part_time_equivalent_is_not_part_time_only() -> None:
+    html = """
+    <ul class="details-listing">
+      <li>
+        <span class="details-listing__title">Duration</span>
+        <span class="details-listing__value">
+          3 years (or part-time equivalent)
+        </span>
+      </li>
+    </ul>
+    """
+    assert _duration_labeled_values(html) == [
+        "3 years (or part-time equivalent)"
+    ]
+    assert _is_parttime_only_page(html) is False
 
 
 def test_explicit_part_time_only_wording_overrides_equivalent_full_time_measure() -> None:

@@ -487,6 +487,7 @@ async def start_scrape(
             job_id=existing_job.runtime_job_id,
             runtime_job_id=existing_job.runtime_job_id,
             status=existing_job.status,
+            reused=True,
         )
 
     job_id = f"job_{uuid.uuid4().hex[:12]}"

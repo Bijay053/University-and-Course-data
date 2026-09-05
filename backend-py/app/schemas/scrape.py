@@ -40,6 +40,7 @@ class ScrapeStartResponse(BaseModel):
     job_id: str = Field(..., serialization_alias="jobId")
     runtime_job_id: str = Field(..., serialization_alias="runtimeJobId")
     status: str = "queued"
+    reused: bool = False
     ok: bool = True
     model_config = ConfigDict(populate_by_name=True)
 

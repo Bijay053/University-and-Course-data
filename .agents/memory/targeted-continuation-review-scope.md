@@ -26,3 +26,9 @@ Targeted continuations must also skip discovery-only side trips that inspect cou
 **Why:** Explicit course URLs are already the resolved work list. Re-running course-sample discovery can send those URLs through the discovery transport instead of the extraction transport, adding minutes of redundant rendered requests before extraction begins.
 
 **How to apply:** Gate inferred central-page discovery on `not targeted_retry`; keep configured central-page prefetch and the normal extraction/staging safeguards.
+
+Reserve `retrySourceJobId` for true targeted/resume continuations. A full fresh rediscovery must remain an independent review set even when an operator starts it from a failed-run recovery button.
+
+**Why:** Review loading follows every explicit retry-source link. Linking a replacement full scrape to the failed run merges stale parent rows into the new review and can show duplicate or obsolete courses.
+
+**How to apply:** Full recovery requests should force fresh discovery without a retry-source link. If the start endpoint reuses an already-active job, report that reuse explicitly and do not present it as a newly created recovery.

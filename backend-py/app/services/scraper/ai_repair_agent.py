@@ -416,8 +416,6 @@ _ALLOWED_EXTRACTION_FIELDS: dict[str, str] = {
     "english.default_ielts":                 "ielts_score_or_null",
     "english.default_pte":                   "pte_score_or_null",
     "english.default_toefl":                 "toefl_score_or_null",
-    "filters.domestic_only.enabled":         "bool",
-    "filters.online_only.enabled":           "bool",
     "text_cleaning.location.strip_patterns": "regex_list",
     "text_cleaning.location.reject_values":  "str_list",
     "text_cleaning.location.allowed_values": "str_list",

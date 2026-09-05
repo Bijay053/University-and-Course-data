@@ -149,6 +149,7 @@ def test_start_scrape_payload_includes_node_compatible_keys(client_with_uni, mon
         {"university_id": 42, "url": "https://test.example.edu/", "fast_mode": False},
     )
     assert r.status_code == 202, r.text
+    assert r.json()["reused"] is False
 
     assert len(fake.added) == 1
     job = fake.added[0]
@@ -169,6 +170,34 @@ def test_start_scrape_payload_includes_node_compatible_keys(client_with_uni, mon
     # The columns must always be populated too — defensive fallback in Node.
     assert job.url == "https://test.example.edu/"
     assert job.university_id == 42
+
+
+def test_start_scrape_reports_when_active_job_is_reused(client_with_uni):
+    client, fake = client_with_uni
+    fake.active_job = ScrapeRuntimeJob(
+        runtime_job_id="job_already_running",
+        university_id=42,
+        university_name="Test University",
+        url="https://test.example.edu/",
+        job_type="single",
+        status="running",
+        request_payload={},
+    )
+
+    response = _post_start(
+        client,
+        {"university_id": 42, "url": "https://test.example.edu/"},
+    )
+
+    assert response.status_code == 202
+    assert response.json() == {
+        "jobId": "job_already_running",
+        "runtimeJobId": "job_already_running",
+        "status": "running",
+        "reused": True,
+        "ok": True,
+    }
+    assert fake.added == []
 
 
 def test_start_scrape_payload_keeps_snake_case_for_python(client_with_uni, monkeypatch):

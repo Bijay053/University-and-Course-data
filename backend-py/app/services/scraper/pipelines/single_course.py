@@ -932,6 +932,16 @@ def _infer_study_load_from_text(text: str) -> str | None:
         _re.IGNORECASE,
     ):
         return "Part Time"
+    # A normal full-time duration followed by "(or part-time equivalent)"
+    # describes an alternative study pace, not a part-time-only course. Keep
+    # explicit "only available part-time" wording above authoritative.
+    if _re.search(
+        r"\b(?:years?|months?|weeks?|sessions?)\b"
+        r"\s*(?:\(\s*)?,?\s*(?:or\s+)?part[- ]?time\s+equivalent\s*\)?",
+        text,
+        _re.IGNORECASE,
+    ):
+        return "Full Time"
     if _PARTTIME_ONLY_FT_RE.search(text):
         return "Full Time"
     # "3 years, or part-time equivalent" states the primary (full-time)
