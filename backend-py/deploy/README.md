@@ -9,6 +9,7 @@ in `../README.md`.
 | `uni-celery.service` | `/etc/systemd/system/uni-celery.service` |
 | `nginx.conf` | `/etc/nginx/sites-available/default` (after backup of current) |
 | `install_openai_fallback_via_ssm.py` | Run from a trusted deployment workspace; do not copy to production |
+| `install_snapshot_storage_via_ssm.py` | Securely install production snapshot storage and run a disposable round-trip check |
 | `rotate_openai_fallback_via_parameter_store.py` | Routine credential rotation from a trusted deployment workspace |
 | `openai-parameter-store-iam.yaml` | One-time least-privilege IAM and KMS setup |
 
@@ -82,6 +83,27 @@ instance and `AWS-RunShellScript`. OpenSSL must be installed on both machines.
 If `AWS_SSM_ACCESS_KEY_ID` and `AWS_SSM_SECRET_ACCESS_KEY` are set, the installer
 uses that dedicated deployment principal; otherwise it uses the default AWS
 credential chain.
+
+## Install production snapshot storage
+
+Run the snapshot installer only from a trusted deployment workspace whose
+process environment contains `AWS_S3_BUCKET_NAME`, `AWS_S3_REGION`,
+`AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY`:
+
+```bash
+python backend-py/deploy/install_snapshot_storage_via_ssm.py \
+  --instance-id "$UNIVERSITY_PORTAL_INSTANCE_ID" \
+  --region ap-south-1
+```
+
+The installer uses the same host-generated-certificate envelope transfer as the
+emergency OpenAI installer. It atomically creates the mode-`0600`
+`/etc/university-portal/snapshot-storage.env`, adds late-loading systemd
+drop-ins for both application services, restarts them, verifies each process
+received the exact configuration, and confirms the API logged snapshot storage
+as enabled. Before committing the transaction it uploads, downloads, and
+deletes a harmless uniquely named test snapshot. On failure it restores the
+previous environment and drop-ins and restarts both services.
 
 ## Record the deployed release
 

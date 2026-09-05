@@ -70,6 +70,14 @@ _RETENTION_DAYS: dict[str, int] = {
     "failed": 30,
     "ai_prompt": 90,
 }
+_SNAPSHOT_LIFECYCLE_RULE_IDS = frozenset({
+    "expire-html-snapshots-90d",
+    "expire-repair-snapshots-180d",
+    "expire-api-snapshots-365d",
+    "expire-pdf-snapshots-365d",
+    "expire-failed-snapshots-30d",
+    "expire-ai-prompt-snapshots-90d",
+})
 
 _BUCKET: str | None = None
 _ENABLED: bool | None = None
@@ -417,7 +425,7 @@ def setup_lifecycle_rules() -> bool:
     bucket = _bucket()
     try:
         client = _make_client()
-        rules = [
+        snapshot_rules = [
             {
                 "ID": "expire-html-snapshots-90d",
                 "Status": "Enabled",
@@ -455,11 +463,37 @@ def setup_lifecycle_rules() -> bool:
                 "Expiration": {"Days": 90},
             },
         ]
+        try:
+            current = client.get_bucket_lifecycle_configuration(Bucket=bucket)
+            existing_rules = current.get("Rules", [])
+        except Exception as exc:
+            code = str(getattr(exc, "response", {}).get("Error", {}).get("Code", ""))
+            if code != "NoSuchLifecycleConfiguration":
+                raise
+            current = {}
+            existing_rules = []
+        unrelated_rules = [
+            rule
+            for rule in existing_rules
+            if rule.get("ID") not in _SNAPSHOT_LIFECYCLE_RULE_IDS
+        ]
+        rules = [*unrelated_rules, *snapshot_rules]
+        if len(rules) > 1000:
+            raise RuntimeError("S3 lifecycle rule limit would be exceeded")
+        lifecycle_configuration = {"Rules": rules}
+        if "TransitionDefaultMinimumObjectSize" in current:
+            lifecycle_configuration["TransitionDefaultMinimumObjectSize"] = current[
+                "TransitionDefaultMinimumObjectSize"
+            ]
         client.put_bucket_lifecycle_configuration(
             Bucket=bucket,
-            LifecycleConfiguration={"Rules": rules},
+            LifecycleConfiguration=lifecycle_configuration,
         )
-        log.info("S3 lifecycle rules applied to bucket %s", bucket)
+        log.info(
+            "S3 lifecycle rules applied to bucket %s (%d unrelated rules preserved)",
+            bucket,
+            len(unrelated_rules),
+        )
         return True
     except Exception as exc:
         log.warning("Failed to apply lifecycle rules to %s: %s", bucket, exc)

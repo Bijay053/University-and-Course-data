@@ -10,6 +10,7 @@ DEPLOY_DIR = BACKEND_ROOT / "deploy"
 GENERAL_ENV = "/root/University-and-Course-data/backend-py/.env"
 RELEASE_ENV = "/root/University-and-Course-data/backend-py/.release.env"
 OPENAI_ENV = "-/etc/university-portal/openai.env"
+SNAPSHOT_ENV = "-/etc/university-portal/snapshot-storage.env"
 
 
 def _environment_files(service_name: str) -> list[str]:
@@ -25,7 +26,12 @@ def _environment_files(service_name: str) -> list[str]:
 def test_service_loads_authoritative_release_environment_last(
     service_name: str,
 ) -> None:
-    assert _environment_files(service_name) == [GENERAL_ENV, OPENAI_ENV, RELEASE_ENV]
+    assert _environment_files(service_name) == [
+        GENERAL_ENV,
+        OPENAI_ENV,
+        RELEASE_ENV,
+        SNAPSHOT_ENV,
+    ]
 
 
 def test_openai_client_is_a_declared_runtime_dependency() -> None:
