@@ -125,3 +125,4 @@
 - [Verified scraper recipe contracts](verified-scraper-recipe-contracts.md) — sitemap allow rules see full URLs; lock critical verified YAML paths against stale generated/operator overrides.
 - [Fee-term conversion safety](fee-term-conversion-safety.md) — never relabel an unchanged Full Course total as Annual; annual conversion must divide by authoritative duration.
 - [Autonomous URL repair safety](autonomous-url-repair-safety.md) — OpenAI may propose URL fixes, but full-filter simulation, fenced ownership, and verified atomic persistence control every write.
+- [Production deployment routing](production-deployment-routing.md) — trust the live Git origin and dedicated SSM identity; stale targets or default AWS credentials can fail.
