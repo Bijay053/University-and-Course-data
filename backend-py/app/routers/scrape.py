@@ -6377,6 +6377,7 @@ async def start_ai_repair(
     from app.services.scraper.ai_repair_agent import (
         _write_session,
         acquire_repair_lease,
+        persist_repair_audit,
         release_repair_lease,
         validate_ai_repair_target,
     )
@@ -6444,7 +6445,7 @@ async def start_ai_repair(
     queued_at = datetime.now(timezone.utc).isoformat()
 
     # Write initial queued state so the poller sees something immediately
-    _write_session(job_id, {
+    queued_session = {
         "session_id":      session_id,
         "job_id":          job_id,
         "status":          "queued",
@@ -6457,7 +6458,9 @@ async def start_ai_repair(
         "queued_at":       queued_at,
         "completed_at":    None,
         "error":           None,
-    })
+    }
+    _write_session(job_id, queued_session)
+    await persist_repair_audit(queued_session, db)
 
     # Enqueue Celery task
     try:
@@ -6469,7 +6472,7 @@ async def start_ai_repair(
     except Exception as exc:
         message = "The OpenAI repair worker could not be queued. Try again shortly."
         log.warning("start_ai_repair: Celery enqueue failed for job=%s: %s", job_id, exc)
-        _write_session(job_id, {
+        failed_session = {
             "session_id": session_id,
             "job_id": job_id,
             "university_id": university_id,
@@ -6481,7 +6484,9 @@ async def start_ai_repair(
             "started_at": None,
             "completed_at": datetime.now(timezone.utc).isoformat(),
             "error": message,
-        })
+        }
+        _write_session(job_id, failed_session)
+        await persist_repair_audit(failed_session, db)
         release_repair_lease(university_id, session_id)
         raise HTTPException(status_code=503, detail=message) from exc
 
@@ -6491,7 +6496,8 @@ async def start_ai_repair(
 @router.get("/jobs/{job_id}/ai-repair-status")
 async def get_ai_repair_status(
     job_id: str,
-    _: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(require_permission("scraping.view"))],
 ) -> dict:
     """Poll the AI repair session state for a job.
 
@@ -6500,13 +6506,19 @@ async def get_ai_repair_status(
     """
     from app.services.scraper.ai_repair_agent import (
         expire_queued_repair,
+        fail_repair_audit,
+        load_repair_audit,
         read_session,
     )
     from datetime import datetime, timezone
 
     session = read_session(job_id)
     if not session:
-        return {"job_id": job_id, "status": "not_started", "attempts": []}
+        session = await load_repair_audit(job_id, db)
+        if not session:
+            return {"job_id": job_id, "status": "not_started", "attempts": []}
+        session["source"] = "durable_audit"
+        return session
     if session.get("status") == "queued" and session.get("queued_at"):
         try:
             queued_at = datetime.fromisoformat(session["queued_at"])
@@ -6522,6 +6534,13 @@ async def get_ai_repair_status(
                 )
                 if expired:
                     session = read_session(job_id)
+                    await fail_repair_audit(
+                        job_id,
+                        int(session["university_id"]),
+                        str(session["session_id"]),
+                        str(session["error"]),
+                        db,
+                    )
         except (TypeError, ValueError):
             pass
     return session

@@ -74,6 +74,21 @@ async def _run_ai_repair(job_id: str, lease_token: str | None = None) -> dict:
         return await run_ai_repair_loop(job_id, db, lease_token=lease_token)
 
 
+async def _persist_ai_repair_failure(
+    job_id: str,
+    university_id: int,
+    lease_token: str,
+    error: str,
+) -> dict:
+    from app.database import AsyncSessionLocal
+    from app.services.scraper.ai_repair_agent import fail_repair_audit
+
+    async with AsyncSessionLocal() as db:
+        return await fail_repair_audit(
+            job_id, university_id, lease_token, error, db
+        )
+
+
 @celery_app.task(
     name="ai_repair.run_loop",
     bind=True,
@@ -99,16 +114,29 @@ def run_ai_scrape_repair(
         read_session,
         release_repair_lease,
     )
+    _sync_dispose()
     if university_id is not None and lease_token is not None:
         if not claim_repair_session(job_id, university_id, lease_token):
+            error = "Repair session ownership expired before the worker started."
+            try:
+                asyncio.run(
+                    _persist_ai_repair_failure(
+                        job_id, university_id, lease_token, error
+                    )
+                )
+            except Exception as audit_exc:  # noqa: BLE001
+                log.error(
+                    "ai_repair.run_loop: could not persist claim failure job=%s: %s",
+                    job_id,
+                    audit_exc,
+                )
             release_repair_lease(university_id, lease_token)
             return {
                 "job_id": job_id,
                 "status": "failed",
-                "error": "Repair session ownership expired before the worker started.",
+                "error": error,
             }
 
-    _sync_dispose()
     try:
         result = asyncio.run(_run_ai_repair(job_id, lease_token))
         log.info("ai_repair.run_loop: completed job=%s status=%s", job_id, result.get("status"))
@@ -119,13 +147,23 @@ def run_ai_scrape_repair(
         try:
             from app.services.scraper.ai_repair_agent import _write_session
             from datetime import datetime, timezone
-            _write_session(job_id, {
+            failure_session = {
+                "session_id": lease_token,
                 "job_id":       job_id,
+                "university_id": university_id,
                 "status":       "failed",
                 "error":        str(exc),
                 "attempts":     [],
                 "completed_at": datetime.now(timezone.utc).isoformat(),
-            })
+            }
+            _write_session(job_id, failure_session)
+            if university_id is not None and lease_token is not None:
+                _sync_dispose()
+                asyncio.run(
+                    _persist_ai_repair_failure(
+                        job_id, university_id, lease_token, str(exc)
+                    )
+                )
         except Exception:  # noqa: BLE001
             pass
         return {"job_id": job_id, "error": str(exc)}

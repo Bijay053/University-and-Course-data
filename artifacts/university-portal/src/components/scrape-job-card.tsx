@@ -140,6 +140,7 @@ type AIRepairAttempt = {
   root_cause:            string;
   confidence:            number;
   explanation:           string;
+  patches_proposed?:     AIRepairPatch[];
   patches_applied:       AIRepairPatch[];
   validation_errors:     string[];
   before_pass_count:     number;
@@ -158,6 +159,7 @@ type AIRepairAttempt = {
   success_criteria?:     SuccessCriteria;
   courses_rescanned?:    number;
   rollback_status?:      "not_needed" | "unchanged" | "restored" | "failed";
+  outcome?:              "accepted" | "rejected" | "no_change" | "rolled_back" | "failed";
   extraction_validation?: {
     accepted: boolean;
     rollback_status: string;
@@ -184,6 +186,8 @@ type AIRepairSession = {
   completed_at:    string | null;
   error:           string | null;
   rollback_status?: "unchanged" | "restored" | "failed";
+  source?: "durable_audit";
+  snapshot_refs?: Array<{ snapshot_id: number; url: string; type: string }>;
 };
 
 // ── AI Diagnostic types ───────────────────────────────────────────────────────
@@ -883,6 +887,22 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
     const id = setInterval(poll, 2500);
     return () => clearInterval(id);
   }, [aiRepairPolling, completedJobId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Hydrate completed repair evidence when an older scrape-history card opens.
+  useEffect(() => {
+    if (!completedJobId || aiRepairPolling) return;
+    let cancelled = false;
+    fetch(`/api/scrape/jobs/${completedJobId}/ai-repair-status`, {
+      credentials: "include",
+      cache: "no-store",
+    })
+      .then(res => res.ok ? readResponseJson<AIRepairSession>(res) : null)
+      .then(data => {
+        if (!cancelled && data && data.status !== "not_started") setAiRepairSession(data);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [completedJobId, aiRepairPolling]);
 
   const handleValidateRepairFix = useCallback(async (candidate: RepairCandidateData) => {
     if (!completedJobId) return;
@@ -3181,6 +3201,13 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                                         ? "rollback blocked to protect a newer config change"
                                         : "config unchanged"
                                     }
+                                  </div>
+                                )}
+                                {aiRepairSession.source === "durable_audit" && (
+                                  <div className="text-[9px] text-gray-500">
+                                    Loaded from the permanent repair audit.
+                                    {(aiRepairSession.snapshot_refs?.length ?? 0) > 0 &&
+                                      ` ${aiRepairSession.snapshot_refs!.length} stored page snapshot reference(s) retained.`}
                                   </div>
                                 )}
 

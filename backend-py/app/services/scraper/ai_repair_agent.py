@@ -80,6 +80,115 @@ def _write_session(job_id: str, session: dict) -> None:
         log.warning("ai_repair: Redis write error: %s", exc)
 
 
+def _audit_urls(session: dict) -> list[str]:
+    urls: set[str] = set()
+    for attempt in session.get("attempts") or []:
+        urls.update(u for u in attempt.get("rescued_sample") or [] if u)
+        validation = attempt.get("extraction_validation") or {}
+        for report in validation.get("reports") or []:
+            urls.update(
+                str(sample["url"])
+                for sample in report.get("samples") or []
+                if sample.get("url")
+            )
+    return sorted(urls)
+
+
+async def persist_repair_audit(session: dict, db) -> None:
+    """Upsert compact repair evidence and link it to existing page snapshots."""
+    from sqlalchemy import text
+
+    session_id = session.get("session_id")
+    job_id = session.get("job_id")
+    university_id = session.get("university_id")
+    if not session_id or not job_id or university_id is None:
+        return
+
+    urls = _audit_urls(session)
+    snapshot_refs: list[dict[str, Any]] = []
+    if urls:
+        rows = (await db.execute(
+            text(
+                "SELECT DISTINCT ON (course_url) id, course_url, snapshot_type "
+                "FROM page_snapshots "
+                "WHERE scrape_job_id = :job_id AND course_url = ANY(CAST(:urls AS TEXT[])) "
+                "ORDER BY course_url, fetched_at DESC"
+            ),
+            {"job_id": job_id, "urls": urls},
+        )).mappings().all()
+        snapshot_refs = [
+            {"snapshot_id": int(row["id"]), "url": row["course_url"], "type": row["snapshot_type"]}
+            for row in rows
+        ]
+
+    evidence = {
+        key: session.get(key)
+        for key in (
+            "session_id", "job_id", "university_id", "uni_name", "status",
+            "current_attempt", "attempts", "final_verdict", "queued_at",
+            "started_at", "completed_at", "error", "quality_before",
+            "rollback_status",
+        )
+    }
+    evidence["snapshot_refs"] = snapshot_refs
+    await db.execute(
+        text(
+            "INSERT INTO ai_repair_audits "
+            "(session_id, scrape_job_id, university_id, status, evidence) "
+            "VALUES (:session_id, :job_id, :university_id, :status, CAST(:evidence AS JSONB)) "
+            "ON CONFLICT (session_id) DO UPDATE SET "
+            "status = EXCLUDED.status, evidence = EXCLUDED.evidence, updated_at = NOW()"
+        ),
+        {
+            "session_id": session_id,
+            "job_id": job_id,
+            "university_id": int(university_id),
+            "status": session.get("status") or "unknown",
+            "evidence": json.dumps(evidence),
+        },
+    )
+    await db.commit()
+
+
+async def load_repair_audit(job_id: str, db, *, session_id: str | None = None) -> dict:
+    """Load the latest durable repair run for a scrape job."""
+    from sqlalchemy import text
+
+    session_filter = "AND session_id = :session_id" if session_id else ""
+    row = (await db.execute(
+        text(
+            "SELECT evidence FROM ai_repair_audits "
+            f"WHERE scrape_job_id = :job_id {session_filter} "
+            "ORDER BY updated_at DESC LIMIT 1"
+        ),
+        {"job_id": job_id, "session_id": session_id},
+    )).scalar_one_or_none()
+    return dict(row or {})
+
+
+async def fail_repair_audit(
+    job_id: str,
+    university_id: int,
+    session_id: str,
+    error: str,
+    db,
+) -> dict:
+    """Persist a terminal worker/queue failure without depending on Redis."""
+    session = await load_repair_audit(job_id, db, session_id=session_id)
+    session.update({
+        "session_id": session_id,
+        "job_id": job_id,
+        "university_id": university_id,
+        "status": "failed",
+        "error": error,
+        "completed_at": datetime.now(timezone.utc).isoformat(),
+        "attempts": session.get("attempts") or [],
+        "rollback_status": session.get("rollback_status") or "unchanged",
+    })
+    await persist_repair_audit(session, db)
+    return session
+
+
 def acquire_repair_lease(university_id: int, lease_token: str) -> bool:
     """Acquire a one-hour, single-flight lease for one university."""
     try:
@@ -1964,7 +2073,9 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
         # True once discovery quality is confirmed acceptable
         _discovery_phase_done: bool = ctx["drop_rate"] <= 20
 
+        current_attempt_evidence: dict[str, Any] | None = None
         for attempt_num in range(1, MAX_ATTEMPTS + 1):
+            current_attempt_evidence = None
             session["current_attempt"] = attempt_num
             _write_session(job_id, session)
             log.info("ai_repair: job=%s attempt=%d/%d phase_done=%s drop_rate=%s%%",
@@ -1977,12 +2088,29 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
             # ② Determine current repair phase (locked once discovery is done)
             discovery_needs_fix = ctx["drop_rate"] > 20 and not _discovery_phase_done
             phase = "discovery" if discovery_needs_fix else "extraction"
+            current_attempt_evidence = {
+                "attempt_number": attempt_num,
+                "phase": phase,
+                "diagnosis": "Unknown",
+                "root_cause": "unknown",
+                "confidence": 0,
+                "explanation": "",
+                "patches_proposed": [],
+                "patches_applied": [],
+                "validation_errors": [],
+                "patch_applied_ok": False,
+                "quality_before": quality_before,
+                "rollback_status": "unchanged",
+                "outcome": "failed",
+            }
 
             # ③ Call OpenAI
             user_msg = _build_user_message(ctx, session["attempts"], phase=phase)
             ai_data  = await chat_json(system=_SYSTEM_PROMPT, user=user_msg, max_tokens=2048)
 
             if ai_data is None:
+                current_attempt_evidence["validation_errors"] = ["OpenAI service unavailable."]
+                session["attempts"].append(current_attempt_evidence)
                 session.update(
                     status="completed",
                     final_verdict=(
@@ -1991,9 +2119,32 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
                     ),
                 )
                 break
+            patches_proposed = [
+                {
+                    "section": patch.get("section"),
+                    "field": patch.get("field"),
+                    "new_value": patch.get("value"),
+                }
+                for patch in (ai_data.get("patches") or [])
+                if isinstance(patch, dict)
+            ]
+            current_attempt_evidence.update({
+                "diagnosis": ai_data.get("diagnosis", "Unknown"),
+                "root_cause": ai_data.get("root_cause", "unknown"),
+                "confidence": ai_data.get("confidence", 0),
+                "explanation": ai_data.get("explanation", ""),
+                "patches_proposed": patches_proposed,
+            })
             try:
                 patches_raw = _validated_ai_patches(ai_data)
             except PatchValidationError as exc:
+                rejection = f"Invalid repair response: {exc}"
+                current_attempt_evidence.update(
+                    validation_errors=[rejection],
+                    patch_error=str(exc),
+                    outcome="rejected",
+                )
+                session["attempts"].append(current_attempt_evidence)
                 session.update(
                     status="failed",
                     error=f"OpenAI returned an invalid repair response: {exc} No config was changed.",
@@ -2286,6 +2437,7 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
                 "root_cause":           ai_data.get("root_cause", "unknown"),
                 "confidence":           ai_data.get("confidence", 0),
                 "explanation":          ai_data.get("explanation", ""),
+                "patches_proposed":     patches_proposed,
                 "patches_applied":      [
                     {"section": p.get("section"), "field": p.get("field"), "new_value": p.get("value")}
                     for p in patches_raw
@@ -2312,9 +2464,26 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
                     "not_needed" if patch_applied_ok
                     else "unchanged"
                 ),
+                "outcome": (
+                    "accepted" if patch_applied_ok
+                    else "rejected" if validation_errors
+                    else "no_change"
+                ),
             }
             session["attempts"].append(attempt_record)
+            current_attempt_evidence = attempt_record
             _write_session(job_id, session)
+            try:
+                await persist_repair_audit(session, db)
+            except Exception as audit_exc:
+                rollback = getattr(db, "rollback", None)
+                if rollback is not None:
+                    await rollback()
+                log.exception(
+                    "ai_repair: durable attempt audit failed for job=%s: %s",
+                    job_id,
+                    audit_exc,
+                )
 
             urls_rescued_enough = sim["total"] > 0 and sim["after"] >= sim["total"] * 0.5
             has_url_patch       = bool(_URL_FILTER_FIELDS.intersection(disc_patch))
@@ -2475,11 +2644,38 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
             error=f"{exc}{rollback_error}",
             rollback_status=rollback_status,
         )
+        recorded_attempts = {
+            attempt.get("attempt_number") for attempt in session["attempts"]
+        }
+        if current_attempt_evidence and session["current_attempt"] not in recorded_attempts:
+            current_attempt_evidence.update({
+                "patches_applied": (
+                    current_attempt_evidence["patches_proposed"]
+                    if locals().get("patch_applied_ok")
+                    else []
+                ),
+                "validation_errors": (
+                    current_attempt_evidence.get("validation_errors") or []
+                ) + [str(exc)],
+                "patch_applied_ok": bool(locals().get("patch_applied_ok")),
+                "patch_error": str(exc),
+                "extraction_validation": locals().get("extraction_validation"),
+                "rollback_status": rollback_status,
+                "outcome": "rolled_back" if rollback_status == "restored" else "failed",
+            })
+            session["attempts"].append(current_attempt_evidence)
         if session["attempts"]:
             session["attempts"][-1]["rollback_status"] = rollback_status
     finally:
         session["completed_at"] = datetime.now(timezone.utc).isoformat()
         _write_session(job_id, session)
+        try:
+            await persist_repair_audit(session, db)
+        except Exception as audit_exc:
+            rollback = getattr(db, "rollback", None)
+            if rollback is not None:
+                await rollback()
+            log.exception("ai_repair: durable audit write failed for job=%s: %s", job_id, audit_exc)
 
     return session
 
