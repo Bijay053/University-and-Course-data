@@ -163,6 +163,37 @@ def deliver_discovery_failure_alert(
     }
 
 
+def deliver_snapshot_storage_alert(
+    *,
+    consecutive_failures: int,
+    error_code: str,
+    error_message: str,
+) -> dict[str, Any]:
+    """Notify operators that replay evidence is at risk, without provider details."""
+    subject = "[CRITICAL] Snapshot storage canary is failing"
+    body = "\n".join([
+        f"Snapshot storage failed {consecutive_failures} consecutive hourly checks.",
+        f"Category: {error_code}",
+        f"Detail: {error_message}",
+        "",
+        "Action: verify the snapshot storage IAM permissions and configuration,",
+        "then confirm the canary returns to healthy in Scraper Configs.",
+    ])
+    if not _notifications_enabled():
+        return {"status": "disabled", "transports": {}}
+    transports: dict[str, dict[str, str | bool]] = {}
+    if SLACK_WEBHOOK_URL:
+        transports["slack"] = _send_slack_raw(SLACK_WEBHOOK_URL, subject, body)
+    if ALERT_EMAIL_TO and SMTP_HOST:
+        transports["email"] = _send_email(to=ALERT_EMAIL_TO, subject=subject, body=body)
+    if not transports:
+        return {"status": "not_configured", "transports": {}}
+    return {
+        "status": "delivered" if any(v["success"] for v in transports.values()) else "failed",
+        "transports": transports,
+    }
+
+
 def deliver_drift_alert(
     *,
     before_date: str,

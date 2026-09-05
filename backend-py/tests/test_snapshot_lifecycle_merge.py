@@ -70,4 +70,9 @@ def test_setup_lifecycle_handles_bucket_without_existing_configuration(monkeypat
     monkeypatch.setattr(snapshot_store, "_make_client", lambda: client)
 
     assert snapshot_store.setup_lifecycle_rules() is True
-    assert len(client.put["LifecycleConfiguration"]["Rules"]) == 6
+    rules = client.put["LifecycleConfiguration"]["Rules"]
+    assert len(rules) == 7
+    canary_rule = next(rule for rule in rules if rule["ID"] == "expire-health-canaries-1d")
+    assert canary_rule["Filter"] == {"Prefix": "_health/"}
+    assert canary_rule["Expiration"] == {"Days": 1}
+    assert canary_rule["NoncurrentVersionExpiration"] == {"NoncurrentDays": 1}

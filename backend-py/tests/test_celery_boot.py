@@ -80,6 +80,10 @@ def test_worker_config_instantiates() -> None:
     snap_entry = schedule.get("snapshot-editable-tables-daily")
     assert snap_entry is not None, "snapshot-editable-tables-daily missing from beat_schedule"
     assert snap_entry["task"] == "tasks.snapshot.editable"
+    storage_entry = schedule.get("snapshot-storage-monitor-hourly")
+    assert storage_entry is not None, "snapshot storage canary missing from beat_schedule"
+    assert storage_entry["task"] == "scrape.snapshot_storage_monitor"
+    assert storage_entry["options"]["queue"] == "beat"
 
 
 def test_snapshot_tasks_does_not_import_psycopg2() -> None:

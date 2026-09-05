@@ -111,6 +111,7 @@ async def snapshot_summary(
 
 @router.get("/snapshots/storage-stats")
 async def storage_stats(
+    _user: Annotated[dict, Depends(require_permission("settings.view"))],
     db: AsyncSession = Depends(get_db),
 ):
     """S3 storage monitor — aggregate counts from page_snapshots DB table.
@@ -169,8 +170,12 @@ async def storage_stats(
         select(func.count(func.distinct(PageSnapshot.scrape_job_id)))
     )).scalar_one()
 
+    from app.services.snapshot_storage_monitor import get_snapshot_storage_health
+    storage_health = await get_snapshot_storage_health(db)
+
     return {
         "s3_enabled": is_enabled(),
+        "storage_health": storage_health,
         "total_snapshots": total_count,
         "distinct_jobs_with_snapshots": int(job_count_row or 0),
         "total_raw_bytes": total_raw_bytes,

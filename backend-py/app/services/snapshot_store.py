@@ -49,10 +49,13 @@ Configuration (env / secrets)
 """
 from __future__ import annotations
 
+import asyncio
 import gzip
 import hashlib
 import logging
 import os
+import secrets
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
@@ -77,6 +80,7 @@ _SNAPSHOT_LIFECYCLE_RULE_IDS = frozenset({
     "expire-pdf-snapshots-365d",
     "expire-failed-snapshots-30d",
     "expire-ai-prompt-snapshots-90d",
+    "expire-health-canaries-1d",
 })
 
 _BUCKET: str | None = None
@@ -177,6 +181,87 @@ def _make_async_session():
         aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),
         aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
     )
+
+
+def _safe_storage_error(exc: Exception) -> tuple[str, str]:
+    """Return an actionable error category without leaking provider details."""
+    response = getattr(exc, "response", {}) or {}
+    code = str((response.get("Error") or {}).get("Code") or "")
+    if code in {"AccessDenied", "InvalidAccessKeyId", "SignatureDoesNotMatch"}:
+        return "permission_denied", "Snapshot storage credentials or IAM permissions are invalid."
+    if code in {"NoSuchBucket", "404", "NotFound"}:
+        return "storage_not_found", "Snapshot storage is unavailable or no longer exists."
+    if isinstance(exc, TimeoutError):
+        return "timeout", "Snapshot storage did not respond before the canary deadline."
+    if isinstance(exc, ValueError) and str(exc) == "canary_payload_mismatch":
+        return "integrity_check_failed", "Snapshot storage returned different data than was saved."
+    if isinstance(exc, ValueError) and str(exc) == "canary_cleanup_failed":
+        return "cleanup_failed", "Snapshot storage could not permanently remove the canary object."
+    return "provider_error", "Snapshot storage could not complete the canary operation."
+
+
+async def run_storage_canary(*, timeout_seconds: float = 20.0) -> dict[str, str | bool]:
+    """Prove that snapshot storage can write, read, and permanently delete.
+
+    The object is tiny, uniquely named, never entered in the snapshot metadata
+    table, and deleted in a ``finally`` block. Provider exception text, bucket
+    names, object keys, and credentials are deliberately excluded from results.
+    """
+    if not is_enabled():
+        return {
+            "ok": False,
+            "error_code": "not_configured",
+            "message": "Snapshot storage is disabled or not fully configured.",
+        }
+
+    payload = secrets.token_bytes(32)
+    key = f"_health/canary-{uuid.uuid4().hex}.bin"
+    uploaded = False
+    deleted = False
+    version_id: str | None = None
+    session = _make_async_session()
+    endpoint = os.environ.get("AWS_S3_ENDPOINT_URL")
+    extra = {"endpoint_url": endpoint} if endpoint else {}
+
+    try:
+        async with asyncio.timeout(timeout_seconds):
+            async with session.client("s3", **extra) as s3:
+                try:
+                    put_response = await s3.put_object(
+                        Bucket=_bucket(),
+                        Key=key,
+                        Body=payload,
+                        ContentType="application/octet-stream",
+                    )
+                    uploaded = True
+                    version_id = put_response.get("VersionId")
+                    response = await s3.get_object(Bucket=_bucket(), Key=key)
+                    stored = await response["Body"].read()
+                    if stored != payload:
+                        raise ValueError("canary_payload_mismatch")
+                finally:
+                    if uploaded:
+                        delete_args = {"Bucket": _bucket(), "Key": key}
+                        if version_id:
+                            delete_args["VersionId"] = version_id
+                        await s3.delete_object(**delete_args)
+                        try:
+                            await s3.head_object(Bucket=_bucket(), Key=key)
+                        except Exception as head_exc:
+                            response = getattr(head_exc, "response", {}) or {}
+                            code = str((response.get("Error") or {}).get("Code") or "")
+                            status = (response.get("ResponseMetadata") or {}).get("HTTPStatusCode")
+                            if code in {"404", "NoSuchKey", "NotFound"} or status == 404:
+                                deleted = True
+                            else:
+                                raise
+        if not deleted:
+            raise RuntimeError("canary_cleanup_failed")
+        return {"ok": True, "error_code": "", "message": "Snapshot storage canary passed."}
+    except Exception as exc:
+        code, message = _safe_storage_error(exc)
+        log.warning("snapshot storage canary failed: code=%s", code)
+        return {"ok": False, "error_code": code, "message": message}
 
 
 def expected_expiry_at(
@@ -455,6 +540,13 @@ def setup_lifecycle_rules() -> bool:
                 "Status": "Enabled",
                 "Filter": {"Tag": {"Key": "snapshot_type", "Value": "failed"}},
                 "Expiration": {"Days": 30},
+            },
+            {
+                "ID": "expire-health-canaries-1d",
+                "Status": "Enabled",
+                "Filter": {"Prefix": "_health/"},
+                "Expiration": {"Days": 1},
+                "NoncurrentVersionExpiration": {"NoncurrentDays": 1},
             },
             {
                 "ID": "expire-ai-prompt-snapshots-90d",

@@ -11,6 +11,17 @@ import { CountrySelect } from "@/components/country-select";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
+type SnapshotStorageHealth = {
+  status: "healthy" | "degraded" | "disabled" | "unknown";
+  last_checked_at: string | null;
+  last_successful_at: string | null;
+  consecutive_failures: number;
+  error_code: string | null;
+  error_message: string | null;
+  alert_active: boolean;
+  alert_last_sent_at: string | null;
+};
+
 const SAMPLE_YAML = `# University Full Name
 # Hostname: www.example.edu.au
 # Country: Australia  |  Currency: AUD
@@ -3155,6 +3166,7 @@ export default function SettingsScraperConfigs() {
   const [healthData, setHealthData] = useState<Record<string, UniversityHealth>>({});
   const [regressionAlerts, setRegressionAlerts]   = useState<Record<string, RegressionAlert[]>>({});
   const [failedDeliveryAlerts, setFailedDeliveryAlerts] = useState<DiscoveryDeliveryAlert[]>([]);
+  const [snapshotStorageHealth, setSnapshotStorageHealth] = useState<SnapshotStorageHealth | null>(null);
   const [retryingDeliveryAlert, setRetryingDeliveryAlert] = useState<number | null>(null);
   const [repairSuggestions, setRepairSuggestions] = useState<Record<string, AutoRepairSuggestion[]>>({});
   const [repairEvidenceOpen, setRepairEvidenceOpen] = useState<Record<number, boolean>>({});
@@ -3261,6 +3273,10 @@ export default function SettingsScraperConfigs() {
       const data = await res.json();
       const cfgs: ConfigEntry[] = data.configs ?? [];
       setConfigs(cfgs);
+      fetchWithAuth(`${BASE}/api/scrape/snapshots/storage-stats`)
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d?.storage_health) setSnapshotStorageHealth(d.storage_health as SnapshotStorageHealth); })
+        .catch(() => { /* storage health is non-critical to config editing */ });
       fetchWithAuth(`${BASE}/api/settings/discovery-failure-alerts?delivery_status=failed,pending,disabled,not_configured`)
         .then(r => r.ok ? r.json() : null)
         .then(d => { if (d?.alerts) setFailedDeliveryAlerts(d.alerts as DiscoveryDeliveryAlert[]); })
@@ -4055,6 +4071,49 @@ export default function SettingsScraperConfigs() {
       </div>
 
       <SettingsTabs />
+
+      {snapshotStorageHealth && (() => {
+        const healthy = snapshotStorageHealth.status === "healthy";
+        const unknown = snapshotStorageHealth.status === "unknown";
+        const tone = healthy
+          ? "border-green-300 bg-green-50 text-green-950"
+          : unknown
+            ? "border-amber-300 bg-amber-50 text-amber-950"
+            : "border-red-300 bg-red-50 text-red-950";
+        const Icon = healthy ? CheckCircle2 : unknown ? Clock : ShieldAlert;
+        return (
+          <div className={cn("rounded-lg border p-4", tone)} data-testid="snapshot-storage-health">
+            <div className="flex items-start gap-3">
+              <Icon className="mt-0.5 h-5 w-5 flex-shrink-0" />
+              <div>
+                <h2 className="font-semibold">
+                  Snapshot storage: {healthy ? "Healthy" : unknown ? "Not checked yet" : "Attention required"}
+                </h2>
+                <p className="mt-0.5 text-sm">
+                  {healthy
+                    ? "The latest canary saved, retrieved, and deleted its test snapshot successfully."
+                    : snapshotStorageHealth.error_message}
+                </p>
+                <div className="mt-1 text-xs opacity-80">
+                  Last checked: {snapshotStorageHealth.last_checked_at
+                    ? new Date(snapshotStorageHealth.last_checked_at).toLocaleString()
+                    : "never"}
+                  {" · "}
+                  Last successful: {snapshotStorageHealth.last_successful_at
+                    ? new Date(snapshotStorageHealth.last_successful_at).toLocaleString()
+                    : "never"}
+                  {!healthy && ` · ${snapshotStorageHealth.consecutive_failures} consecutive failure${snapshotStorageHealth.consecutive_failures === 1 ? "" : "s"}`}
+                </div>
+                {snapshotStorageHealth.alert_active && (
+                  <p className="mt-2 text-sm font-medium">
+                    Operator alert active. Check storage IAM permissions and configuration before repair evidence is lost.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {failedDeliveryAlerts.length > 0 && (
         <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-950">

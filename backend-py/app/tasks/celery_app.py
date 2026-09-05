@@ -157,15 +157,15 @@ celery_app.conf.update(
             "args": (),
             "options": {"queue": "beat"},
         },
-        # S3 snapshot storage monitor — runs every Monday 05:00 UTC.
+        # S3 snapshot storage canary — hourly, bounded write/read/delete proof.
         # Logs per-type and per-university counts + estimated S3 size so
         # operators can spot runaway storage growth after the first 10-20
         # university scrapes without needing AWS Console access.
         # Logs a WARNING if total estimated S3 size exceeds 500 MB.
         # Does NOT delete anything — cleanup is manual after operator review.
-        "snapshot-storage-monitor-weekly": {
+        "snapshot-storage-monitor-hourly": {
             "task": "scrape.snapshot_storage_monitor",
-            "schedule": crontab(hour=5, minute=0, day_of_week=1),
+            "schedule": crontab(minute=15),
             "args": (),
             "options": {"queue": "beat"},
         },

@@ -1364,7 +1364,7 @@ def repair_conflicts(
 
 @celery_app.task(name="scrape.snapshot_storage_monitor", bind=True, max_retries=0)
 def snapshot_storage_monitor(self) -> dict:  # type: ignore[override]
-    """Weekly S3 snapshot storage report (Monday 05:00 UTC).
+    """Bounded snapshot-storage canary plus storage report.
 
     Logs per-type and per-university counts + estimated S3 size.
     Warns if estimated total exceeds 500 MB — operator should review
@@ -1373,15 +1373,12 @@ def snapshot_storage_monitor(self) -> dict:  # type: ignore[override]
     Does NOT delete anything.  Kill switch: set SNAPSHOT_ENABLED=false.
     """
     async def _run() -> dict:
-        from app.services.snapshot_store import is_enabled
-        if not is_enabled():
-            log.info("[SNAPSHOT MONITOR] snapshots disabled — skipping storage report")
-            return {"ok": True, "skipped": True, "reason": "snapshots disabled"}
-
         from sqlalchemy import func, select, text as _text
         from app.models.page_snapshot import PageSnapshot
+        from app.services.snapshot_storage_monitor import check_and_record_snapshot_storage
 
         async with AsyncSessionLocal() as db:
+            health = await check_and_record_snapshot_storage(db)
             # Totals
             total_row = (await db.execute(
                 select(func.count(), func.sum(PageSnapshot.content_length))
@@ -1433,7 +1430,8 @@ def snapshot_storage_monitor(self) -> dict:  # type: ignore[override]
             )
 
         return {
-            "ok": True,
+            "ok": health["status"] == "healthy",
+            "storage_health": health,
             "total_snapshots": total_count,
             "distinct_jobs": int(job_count),
             "total_raw_bytes": total_raw_bytes,

@@ -130,3 +130,4 @@
 - [Autonomous config repair rollback](autonomous-config-repair-rollback.md) — validate without writes; fence both apply and compensating rollback against exact config documents.
 - [Automated repair normalization parity](automated-repair-normalization-parity.md) — quality detection, replay validation, and runtime assignment must share canonicalization and fail closed on valid-value misses.
 - [CQU sitemap-only discovery](cqu-sitemap-only-discovery.md) — rendered /courses links only to broad navigation; skip BFS and use the static-proxy sitemap directly.
+- [Snapshot canary cleanup and locking](snapshot-canary-safety.md) — delete exact S3 versions, verify absence, and use transaction-scoped advisory locks so pooled connections cannot strand monitors.
