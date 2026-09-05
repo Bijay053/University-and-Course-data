@@ -3,7 +3,7 @@
 generate_repair_suggestion — enqueued by health snapshot when regression
   alerts are created, or via manual trigger API.
 
-run_ai_scrape_repair — AI-powered iterative repair loop (Gemini).
+run_ai_scrape_repair — OpenAI-powered iterative repair loop.
   Triggered from POST /api/scrape/jobs/{job_id}/ai-repair.
   Progress stored in Redis under key ``ai_repair:{job_id}`` (TTL 24 h).
 
@@ -66,12 +66,12 @@ def generate_repair_suggestion(
 
 # ── AI-powered repair loop ────────────────────────────────────────────────────
 
-async def _run_ai_repair(job_id: str) -> dict:
+async def _run_ai_repair(job_id: str, lease_token: str | None = None) -> dict:
     from app.database import AsyncSessionLocal
     from app.services.scraper.ai_repair_agent import run_ai_repair_loop
 
     async with AsyncSessionLocal() as db:
-        return await run_ai_repair_loop(job_id, db)
+        return await run_ai_repair_loop(job_id, db, lease_token=lease_token)
 
 
 @celery_app.task(
@@ -83,18 +83,34 @@ async def _run_ai_repair(job_id: str) -> dict:
 def run_ai_scrape_repair(
     self,  # noqa: ANN001
     job_id: str,
+    university_id: int | None = None,
+    lease_token: str | None = None,
 ) -> dict:
     """AI-powered iterative repair loop for a scrape job.
 
-    Analyses discovery failures, generates config patches via Gemini,
+    Analyses discovery failures, generates config patches via OpenAI,
     applies them, simulates URL filter improvement, and repeats up to
     5 times.  Progress is written to Redis after every attempt so the
     frontend can poll ``GET /api/scrape/jobs/{job_id}/ai-repair-status``.
     """
     log.info("ai_repair.run_loop: job=%s", job_id)
+    from app.services.scraper.ai_repair_agent import (
+        claim_repair_session,
+        read_session,
+        release_repair_lease,
+    )
+    if university_id is not None and lease_token is not None:
+        if not claim_repair_session(job_id, university_id, lease_token):
+            release_repair_lease(university_id, lease_token)
+            return {
+                "job_id": job_id,
+                "status": "failed",
+                "error": "Repair session ownership expired before the worker started.",
+            }
+
     _sync_dispose()
     try:
-        result = asyncio.run(_run_ai_repair(job_id))
+        result = asyncio.run(_run_ai_repair(job_id, lease_token))
         log.info("ai_repair.run_loop: completed job=%s status=%s", job_id, result.get("status"))
         return result
     except Exception as exc:  # noqa: BLE001
@@ -113,3 +129,6 @@ def run_ai_scrape_repair(
         except Exception:  # noqa: BLE001
             pass
         return {"job_id": job_id, "error": str(exc)}
+    finally:
+        if university_id is not None and lease_token is not None:
+            release_repair_lease(university_id, lease_token)

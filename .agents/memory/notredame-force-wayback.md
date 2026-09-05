@@ -36,6 +36,34 @@ fallback never runs and timeout errors accumulate in waves.
 probes. Preserve the outer course deadline, but reserve enough of it for the
 independent archive transport and downstream extraction.
 
+## Provider queueing and whole-course pipelining
+
+Use more whole-course pipelines than live-provider slots, but start the
+per-request timeout only after the provider semaphore is acquired.
+
+**Why:** A timeout wrapped around semaphore acquisition made queued courses
+expire before their HTTP request began, causing synchronized fallback waves.
+Keeping eight course pipelines behind three rendered-provider slots overlaps
+fetching with parsing, AI, and archive work without increasing live pressure.
+
+**How to apply:** Keep queue wait under the outer course deadline, keep the
+inner timeout around the actual HTTP call only, and compare complete 100-course
+production batches. Short request-start samples overstate throughput.
+
+## Discovery cache must retain archive timestamps
+
+Persist the Wayback CDX timestamp map in discovery-cache metadata and restore
+it on cache hits. Legacy cache rows should be backfilled with one wildcard CDX
+query before extraction.
+
+**Why:** Caching only course URLs skips Wayback discovery but loses its timestamp
+side output. Every rendered failure then performs a slow per-course CDX lookup.
+A restored timestamp map lets fallback fetch the known snapshot directly.
+
+**How to apply:** Treat URL lists and archive timestamps as one cache contract.
+Verify cache-hit logs restore/backfill the map and fallback logs say
+`CDX-cached snapshot`, with no per-course CDX search.
+
 ## Archive identity and completeness
 
 Course deduplication identity and archive-scope identity are different:

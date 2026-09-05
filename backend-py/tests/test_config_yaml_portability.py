@@ -48,6 +48,32 @@ extraction:
     assert config.extraction.study_mode.suppress_nav_rule is True
 
 
+def test_generated_id_stub_cannot_shadow_matching_numeric_recipe(
+    monkeypatch, tmp_path
+) -> None:
+    monkeypatch.setattr(loader, "_UNIS_DIR", tmp_path)
+    _write(
+        tmp_path / "portable_11.yaml",
+        """# Hostname: portable.edu
+# Auto-generated: 2026-09-05
+# This stub was created automatically on the first scrape of this university.
+discovery:
+  allow_url_patterns: ["/wrong/"]
+""",
+    )
+    _write(
+        tmp_path / "portable_2215.yaml",
+        """hostname_guard: portable.edu
+discovery:
+  allow_url_patterns: ["/verified-course/"]
+""",
+    )
+
+    config = _load(slug="portable", host="portable.edu", university_id=11)
+
+    assert config.discovery.allow_url_patterns == ["/verified-course/"]
+
+
 def test_unique_hostname_recipe_loads_when_database_id_differs(
     monkeypatch, tmp_path
 ) -> None:

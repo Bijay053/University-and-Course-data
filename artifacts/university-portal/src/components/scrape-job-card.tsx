@@ -1935,77 +1935,61 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                       </a>
                     )}
 
-                    {/* ── Smart YAML Fix panel ── */}
+                    {/* ── OpenAI autonomous repair panel ── */}
                     {repairLoading && (
                       <div className="flex items-center gap-1.5 text-[10px] text-gray-500 pt-1">
                         <Loader2 className="w-3 h-3 animate-spin" />
-                        Analysing filter patterns…
+                        Preparing URL evidence…
                       </div>
                     )}
                     {(() => {
                       const smart = (repairCandidates || []).find(c => c.id === "smart_replace_patterns" && c.proposed_yaml);
-                      if (!smart) return null;
+                      if (!smart && !aiRepairSession) return null;
                       return (
                         <div className="space-y-2 pt-1.5 border-t border-amber-200 mt-1.5">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 bg-green-100 text-green-700 rounded-full border border-green-200 shrink-0">✓ Smart Fix Available</span>
-                            <span className="text-[10px] text-gray-600 leading-snug">{smart.description}</span>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded-full border border-violet-200 shrink-0">OpenAI Fix Agent</span>
+                            <span className="text-[10px] text-gray-600 leading-snug">
+                              Diagnoses every active URL gate, tests the complete merged recipe, and applies only a fix that rescues real course URLs.
+                            </span>
                           </div>
-                          {smart.problem_addressed && (
-                            <p className="text-[10px] text-amber-700 font-semibold">{smart.problem_addressed}</p>
+                          <button
+                            type="button"
+                            onClick={handleAiRepair}
+                            disabled={aiRepairLoading || aiRepairPolling}
+                            className="text-[10px] bg-violet-600 hover:bg-violet-700 text-white px-2.5 py-1.5 rounded flex items-center gap-1.5 disabled:opacity-50 font-semibold"
+                          >
+                            {(aiRepairLoading || aiRepairPolling)
+                              ? <Loader2 className="w-3 h-3 animate-spin" />
+                              : <Bot className="w-3 h-3" />
+                            }
+                            {aiRepairPolling
+                              ? `OpenAI repairing… attempt ${aiRepairSession?.current_attempt ?? 0}/5`
+                              : aiRepairSession?.status === "completed"
+                              ? "Run OpenAI Agent Again"
+                              : "Run OpenAI Fix Agent"
+                            }
+                          </button>
+                          {aiRepairSession?.status === "completed" && aiRepairSession.final_verdict && (
+                            <div className="text-[10px] text-green-800 bg-green-50 border border-green-200 rounded px-2 py-1.5">
+                              <strong>OpenAI verdict:</strong> {aiRepairSession.final_verdict}
+                            </div>
                           )}
-                          <div className="space-y-1">
-                            <p className="text-[9px] font-semibold text-gray-500 uppercase tracking-wide">Proposed YAML Fix</p>
-                            <pre className="text-[9px] font-mono bg-gray-900 text-green-300 rounded p-2 overflow-x-auto max-h-[160px] overflow-y-auto whitespace-pre leading-relaxed">{smart.proposed_yaml}</pre>
-                          </div>
-                          {!repairFixApplied ? (
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <button
-                                type="button"
-                                onClick={() => { setValidateResult(null); handleValidateRepairFix(smart); }}
-                                disabled={validateLoading}
-                                className="text-[10px] bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded flex items-center gap-1 disabled:opacity-50"
-                              >
-                                {validateLoading ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Eye className="w-2.5 h-2.5" />}
-                                Validate Fix
-                              </button>
-                              {validateResult !== null && (
-                                <span className="text-[10px] font-semibold">
-                                  {validateResult.after > 0 && validateResult.before === 0 ? (
-                                    <span className="text-green-600">✓ Before: {validateResult.before}/{validateResult.total} pass → After: {validateResult.after}/{validateResult.total} pass</span>
-                                  ) : validateResult.after > validateResult.before ? (
-                                    <span className="text-green-600">↑ Before: {validateResult.before}/{validateResult.total} → After: {validateResult.after}/{validateResult.total}</span>
-                                  ) : (
-                                    <span className="text-amber-600">Before: {validateResult.before}/{validateResult.total} → After: {validateResult.after}/{validateResult.total} — check patterns</span>
-                                  )}
+                          {aiRepairSession?.status === "failed" && (
+                            <div className="text-[10px] text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1.5">
+                              <strong>No change applied:</strong> {aiRepairSession.error || "The proposed repair did not pass validation."}
+                            </div>
+                          )}
+                          {aiRepairSession?.attempts?.map((attempt) => (
+                            <div key={attempt.attempt_number} className="text-[10px] text-gray-700 bg-white border border-amber-200 rounded px-2 py-1.5">
+                              Attempt {attempt.attempt_number}: {attempt.diagnosis}
+                              {attempt.total_test_urls > 0 && (
+                                <span className="font-semibold text-green-700">
+                                  {" "}· URLs passing {attempt.before_pass_count}/{attempt.total_test_urls} → {attempt.after_pass_count}/{attempt.total_test_urls}
                                 </span>
                               )}
-                              <button
-                                type="button"
-                                onClick={() => handleApplyRepairFix(smart)}
-                                disabled={applyingRepairFix || validateResult === null}
-                                title={validateResult === null ? "Validate first to confirm the fix works" : undefined}
-                                className="text-[10px] bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded flex items-center gap-1 disabled:opacity-50"
-                              >
-                                {applyingRepairFix ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <CheckCheck className="w-2.5 h-2.5" />}
-                                Apply Fix
-                              </button>
                             </div>
-                          ) : (
-                            <div className="text-[10px] text-green-700 font-semibold bg-green-50 border border-green-200 rounded px-2 py-1">
-                              ✓ Config saved — validate with Test Discovery to confirm
-                            </div>
-                          )}
-                          {validateResult?.sample_rescued && validateResult.sample_rescued.length > 0 && (
-                            <div className="space-y-0.5">
-                              <p className="text-[9px] font-semibold text-green-700 uppercase tracking-wide">Rescued URLs (new pattern matches)</p>
-                              <div className="bg-green-50 border border-green-200 rounded p-1.5 space-y-0.5 max-h-[60px] overflow-y-auto">
-                                {validateResult.sample_rescued.map((u, i) => (
-                                  <div key={i} className="font-mono text-[9px] text-gray-600 truncate" title={u}>{u.replace(/^https?:\/\/[^/]+/, "")}</div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
+                          ))}
                         </div>
                       );
                     })()}
@@ -3081,7 +3065,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                                 ? <Loader2 className="w-2.5 h-2.5 animate-spin" />
                                 : <Zap className="w-2.5 h-2.5" />
                               }
-                              {aiRepairPolling ? `Repairing… (attempt ${aiRepairSession?.current_attempt ?? 0}/5)` : "Auto Repair with AI"}
+                              {aiRepairPolling ? `OpenAI repairing… (attempt ${aiRepairSession?.current_attempt ?? 0}/5)` : "Auto Repair with OpenAI"}
                             </button>
                             {(diagnoseResult?.university_id || (selectedUni && selectedUni !== ALL)) && (
                               <a
@@ -3135,7 +3119,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                                 {aiRepairSession.status === "running" && (
                                   <div className="flex items-center gap-1.5 text-[10px] text-violet-600">
                                     <Loader2 className="w-3 h-3 animate-spin" />
-                                    Running attempt {aiRepairSession.current_attempt} of {6}…
+                                    Running attempt {aiRepairSession.current_attempt} of 5…
                                   </div>
                                 )}
                                 {aiRepairSession.final_verdict && (
@@ -3422,9 +3406,9 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                                   );
                                 })}
 
-                                {aiRepairSession.status === "completed" && aiRepairSession.attempts.length > 0 && (
+                                {aiRepairSession.status === "completed" && aiRepairSession.attempts.some((attempt) => attempt.patch_applied_ok) && (
                                   <p className="text-[9px] text-gray-500 italic">
-                                    Config patches have been saved. Click <strong>Re-run scrape</strong> (from the main controls) to verify with a live discovery run.
+                                    A validated URL-filter patch was saved. Click <strong>Re-run scrape</strong> to verify live discovery.
                                   </p>
                                 )}
                               </div>

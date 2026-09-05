@@ -4477,7 +4477,7 @@ async def diagnose_scrape_job(
     job_id: str,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict:
-    """Use Gemini to explain why a scrape produced poor results and suggest fixes.
+    """Use OpenAI to explain why a scrape produced poor results and suggest fixes.
 
     Reads:
     - The scrape runtime job row (total_found, imported, errors, status)
@@ -5174,10 +5174,20 @@ MUST_CONTAIN SAFETY RULES (CRITICAL — violating these will break scrapes):
 Return only valid JSON, no markdown fences."""
 
     try:
-        from app.services.ai import gemini_client as _gc
-        resp = await _gc.generate(prompt, max_output_tokens=1200)
+        from app.services.ai.openai_client import chat_json
+        diagnosis = await chat_json(
+            system=(
+                "You are the diagnostic half of an autonomous university scraper "
+                "repair system. Return one conservative JSON diagnosis. Do not "
+                "claim a fix is safe; deterministic validation decides that."
+            ),
+            user=prompt,
+            max_tokens=2048,
+        )
+        if not isinstance(diagnosis, dict):
+            raise RuntimeError("OpenAI returned no structured diagnosis")
     except Exception as exc:
-        log.warning("diagnose_scrape_job: Gemini call failed for job %s: %s", job_id, exc)
+        log.warning("diagnose_scrape_job: OpenAI call failed for job %s: %s", job_id, exc)
         return {
             "ok": False,
             "job_id": job_id,
@@ -5190,19 +5200,6 @@ Return only valid JSON, no markdown fences."""
                 ],
             }
         }
-
-    # Parse Gemini response (it should be JSON)
-    raw_text = (resp.text if resp else "").strip()
-    try:
-        diagnosis = json.loads(raw_text)
-    except Exception:
-        # Gemini occasionally wraps in markdown — strip fences
-        import re as _re2
-        clean = _re2.sub(r"```(?:json)?|```", "", raw_text).strip()
-        try:
-            diagnosis = json.loads(clean)
-        except Exception:
-            diagnosis = {"summary": raw_text, "root_causes": [], "recommended_actions": []}
 
     # Extract suggested_config from diagnosis (may be {} if AI returned nothing)
     suggested_config = diagnosis.pop("suggested_config", {}) or {}
@@ -6367,7 +6364,7 @@ async def start_ai_repair(
 ) -> dict:
     """Trigger the AI-powered iterative repair loop for a completed scrape job.
 
-    Enqueues a Celery task (``ai_repair.run_loop``) that calls Gemini to
+    Enqueues a Celery task (``ai_repair.run_loop``) that calls OpenAI to
     diagnose the job's failures, generates config patches, applies them,
     simulates the URL filter improvement, and repeats up to 5 times.
 
@@ -6377,19 +6374,41 @@ async def start_ai_repair(
     Returns immediately with ``{"session_id": ..., "status": "queued"}``.
     """
     from sqlalchemy import text as _text
-    from app.services.scraper.ai_repair_agent import _write_session
+    from app.services.scraper.ai_repair_agent import (
+        _write_session,
+        acquire_repair_lease,
+        release_repair_lease,
+        validate_url_repair_target,
+    )
+    from datetime import datetime, timezone
     import uuid
 
-    # Verify the job exists
+    # Require a terminal job with concrete URL-filter failure evidence.
     row = (await db.execute(
-        _text("SELECT runtime_job_id FROM scrape_runtime_jobs WHERE runtime_job_id = :j"),
+        _text(
+            "SELECT runtime_job_id, status, university_id, discovered_config "
+            "FROM scrape_runtime_jobs WHERE runtime_job_id = :j"
+        ),
         {"j": job_id},
-    )).first()
+    )).mappings().first()
     if not row:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail=f"Job {job_id!r} not found")
+    repairable, reason = validate_url_repair_target(
+        str(row["status"] or ""),
+        row["discovered_config"] or {},
+    )
+    if not repairable:
+        raise HTTPException(status_code=422, detail=reason)
 
+    university_id = int(row["university_id"])
     session_id = str(uuid.uuid4())[:8]
+    if not acquire_repair_lease(university_id, session_id):
+        raise HTTPException(
+            status_code=409,
+            detail="An OpenAI URL repair is already queued or running for this university.",
+        )
+
+    queued_at = datetime.now(timezone.utc).isoformat()
 
     # Write initial queued state so the poller sees something immediately
     _write_session(job_id, {
@@ -6399,8 +6418,10 @@ async def start_ai_repair(
         "current_attempt": 0,
         "attempts":        [],
         "final_verdict":   None,
+        "university_id":   university_id,
         "uni_name":        None,
         "started_at":      None,
+        "queued_at":       queued_at,
         "completed_at":    None,
         "error":           None,
     })
@@ -6408,9 +6429,28 @@ async def start_ai_repair(
     # Enqueue Celery task
     try:
         from app.tasks.auto_repair_task import run_ai_scrape_repair
-        run_ai_scrape_repair.apply_async(args=[job_id], queue="scrape")
+        run_ai_scrape_repair.apply_async(
+            args=[job_id, university_id, session_id],
+            queue="scrape",
+        )
     except Exception as exc:
+        message = "The OpenAI repair worker could not be queued. Try again shortly."
         log.warning("start_ai_repair: Celery enqueue failed for job=%s: %s", job_id, exc)
+        _write_session(job_id, {
+            "session_id": session_id,
+            "job_id": job_id,
+            "university_id": university_id,
+            "status": "failed",
+            "current_attempt": 0,
+            "attempts": [],
+            "final_verdict": None,
+            "queued_at": queued_at,
+            "started_at": None,
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "error": message,
+        })
+        release_repair_lease(university_id, session_id)
+        raise HTTPException(status_code=503, detail=message) from exc
 
     return {"session_id": session_id, "status": "queued", "job_id": job_id}
 
@@ -6425,11 +6465,32 @@ async def get_ai_repair_status(
     Reads from Redis key ``ai_repair:{job_id}``.  Returns an empty
     ``{"status": "not_started"}`` if no session has been initiated.
     """
-    from app.services.scraper.ai_repair_agent import read_session
+    from app.services.scraper.ai_repair_agent import (
+        expire_queued_repair,
+        read_session,
+    )
+    from datetime import datetime, timezone
 
     session = read_session(job_id)
     if not session:
         return {"job_id": job_id, "status": "not_started", "attempts": []}
+    if session.get("status") == "queued" and session.get("queued_at"):
+        try:
+            queued_at = datetime.fromisoformat(session["queued_at"])
+            if (datetime.now(timezone.utc) - queued_at).total_seconds() > 900:
+                expired = expire_queued_repair(
+                    job_id,
+                    int(session["university_id"]),
+                    str(session["session_id"]),
+                    error=(
+                        "The OpenAI repair worker did not start within 15 minutes. "
+                        "No config was changed; try again."
+                    ),
+                )
+                if expired:
+                    session = read_session(job_id)
+        except (TypeError, ValueError):
+            pass
     return session
 
 

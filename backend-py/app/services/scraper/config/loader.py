@@ -299,18 +299,34 @@ def _select_uni_yaml(
     scrape_host = urlparse(scrape_url).hostname or ""
 
     if exact is not None and exact.exists():
-        if (
-            _is_generated_stub(exact)
-            and shared.exists()
-            and _hosts_match(scrape_host, _declared_yaml_hostname(shared))
-        ):
-            log.warning(
-                "Ignoring generated YAML stub %s because matching shared "
-                "recipe %s exists",
-                exact.name,
-                shared.name,
+        if _is_generated_stub(exact):
+            verified_matches: list[Path] = []
+            if shared.exists() and _hosts_match(
+                scrape_host, _declared_yaml_hostname(shared)
+            ):
+                verified_matches.append(shared)
+            verified_matches.extend(
+                path
+                for path in _UNIS_DIR.glob(f"{slug}_*.yaml")
+                if path != exact
+                and not _is_generated_stub(path)
+                and _hosts_match(scrape_host, _declared_yaml_hostname(path))
             )
-            return shared, False
+            if len(verified_matches) == 1:
+                log.warning(
+                    "Ignoring generated YAML stub %s because matching verified "
+                    "recipe %s exists",
+                    exact.name,
+                    verified_matches[0].name,
+                )
+                return verified_matches[0], verified_matches[0] != shared
+            if len(verified_matches) > 1:
+                log.error(
+                    "Generated YAML stub %s has multiple matching verified "
+                    "recipes; retaining exact stub rather than guessing: %s",
+                    exact.name,
+                    [path.name for path in verified_matches],
+                )
         return exact, True
 
     if shared.exists() and _hosts_match(
@@ -487,6 +503,7 @@ def load_uni_config(
     base_url: str = "",
     university_id: int | None = None,
     db_scrape_config: dict[str, Any] | None = None,
+    create_missing_stub: bool = True,
 ) -> UniConfig:
     """Build a fully-merged UniConfig for one university.
 
@@ -593,7 +610,7 @@ def load_uni_config(
                     university_id,
                 )
             merged = _deep_merge(merged, per_uni)
-    else:
+    elif create_missing_stub:
         # No hand-authored YAML exists yet — auto-create a minimal stub so:
         #   1. The correct fee currency (GBP/NZD/CAD/AUD) is set immediately,
         #      preventing false "possible_domestic_fee" data-quality flags.
@@ -676,6 +693,7 @@ def get_config_for_host(
     scrape_url: str,
     university_id: int | None = None,
     db_scrape_config: dict[str, Any] | None = None,
+    create_missing_stub: bool = True,
 ) -> UniConfig:
     """Convenience wrapper: derive slug from hostname then call ``load_uni_config``."""
     slug = _hostname_to_slug(hostname)
@@ -685,4 +703,5 @@ def get_config_for_host(
         scrape_url=scrape_url,
         university_id=university_id,
         db_scrape_config=db_scrape_config,
+        create_missing_stub=create_missing_stub,
     )

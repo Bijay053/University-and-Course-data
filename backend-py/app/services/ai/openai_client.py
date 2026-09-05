@@ -23,7 +23,7 @@ from app.config import settings
 
 log = logging.getLogger(__name__)
 
-_MODEL = "gpt-5.4"
+_MODEL = "gpt-5.6-terra"
 
 
 def _client():

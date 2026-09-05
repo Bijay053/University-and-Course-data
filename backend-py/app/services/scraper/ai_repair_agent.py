@@ -1,8 +1,9 @@
-"""AI-powered scrape repair agent - OpenAI edition (full quality loop).
+"""OpenAI-powered scrape URL-filter repair agent.
 
 Uses the Replit AI Integrations OpenAI proxy to iteratively diagnose failing
-scrape jobs and apply config patches until BOTH discovery quality AND extraction
-quality improve, or MAX_ATTEMPTS is reached.
+scrape jobs and apply URL-filter patches only after deterministic validation.
+Extraction recipe suggestions remain advisory until they can be validated
+without mutating course data.
 
 Loop per attempt:
   1. Snapshot quality BEFORE  (discovery stats + extraction fill rates)
@@ -31,9 +32,11 @@ from typing import Any
 
 log = logging.getLogger(__name__)
 
-MAX_ATTEMPTS = 6
+MAX_ATTEMPTS = 5
 _REDIS_KEY_PREFIX = "ai_repair:"
+_REDIS_LEASE_PREFIX = "ai_repair_lease:"
 _REDIS_TTL_SEC    = 86_400  # 24 h
+_REDIS_LEASE_TTL_SEC = 3_600
 
 # Success thresholds
 _DISC_DROP_RATE_OK   = 30   # % - acceptable URL drop-rate after filter
@@ -78,6 +81,168 @@ def _write_session(job_id: str, session: dict) -> None:
         log.warning("ai_repair: Redis write error: %s", exc)
 
 
+def acquire_repair_lease(university_id: int, lease_token: str) -> bool:
+    """Acquire a one-hour, single-flight lease for one university."""
+    try:
+        return bool(
+            _redis_client().set(
+                f"{_REDIS_LEASE_PREFIX}{university_id}",
+                lease_token,
+                nx=True,
+                ex=_REDIS_LEASE_TTL_SEC,
+            )
+        )
+    except Exception as exc:
+        log.warning("ai_repair: Redis lease acquire error: %s", exc)
+        return False
+
+
+def release_repair_lease(university_id: int, lease_token: str) -> None:
+    """Release the lease only when it is still owned by this repair job."""
+    try:
+        _redis_client().eval(
+            """
+            if redis.call('get', KEYS[1]) == ARGV[1] then
+              return redis.call('del', KEYS[1])
+            end
+            return 0
+            """,
+            1,
+            f"{_REDIS_LEASE_PREFIX}{university_id}",
+            lease_token,
+        )
+    except Exception as exc:
+        log.warning("ai_repair: Redis lease release error: %s", exc)
+
+
+def renew_repair_lease(university_id: int, lease_token: str) -> bool:
+    """Extend the lease only when the caller still owns the fencing token."""
+    try:
+        return bool(_redis_client().eval(
+            """
+            if redis.call('get', KEYS[1]) == ARGV[1] then
+              return redis.call('expire', KEYS[1], ARGV[2])
+            end
+            return 0
+            """,
+            1,
+            f"{_REDIS_LEASE_PREFIX}{university_id}",
+            lease_token,
+            _REDIS_LEASE_TTL_SEC,
+        ))
+    except Exception as exc:
+        log.warning("ai_repair: Redis lease renew error: %s", exc)
+        return False
+
+
+def claim_repair_session(
+    job_id: str,
+    university_id: int,
+    lease_token: str,
+) -> bool:
+    """Atomically claim queued work only while the matching lease is owned."""
+    try:
+        return bool(_redis_client().eval(
+            """
+            if redis.call('get', KEYS[2]) ~= ARGV[1] then return 0 end
+            local raw = redis.call('get', KEYS[1])
+            if not raw then return 0 end
+            local session = cjson.decode(raw)
+            if session['session_id'] ~= ARGV[1] or session['status'] ~= 'queued' then
+              return 0
+            end
+            session['status'] = 'starting'
+            session['started_at'] = ARGV[2]
+            redis.call('set', KEYS[1], cjson.encode(session), 'EX', ARGV[3])
+            redis.call('expire', KEYS[2], ARGV[4])
+            return 1
+            """,
+            2,
+            _redis_key(job_id),
+            f"{_REDIS_LEASE_PREFIX}{university_id}",
+            lease_token,
+            datetime.now(timezone.utc).isoformat(),
+            _REDIS_TTL_SEC,
+            _REDIS_LEASE_TTL_SEC,
+        ))
+    except Exception as exc:
+        log.warning("ai_repair: Redis session claim error: %s", exc)
+        return False
+
+
+def expire_queued_repair(
+    job_id: str,
+    university_id: int,
+    lease_token: str,
+    *,
+    error: str,
+) -> bool:
+    """Atomically fail only the same still-queued repair and release its lease."""
+    try:
+        return bool(_redis_client().eval(
+            """
+            local raw = redis.call('get', KEYS[1])
+            if not raw then return 0 end
+            local session = cjson.decode(raw)
+            if session['session_id'] ~= ARGV[1] or session['status'] ~= 'queued' then
+              return 0
+            end
+            session['status'] = 'failed'
+            session['error'] = ARGV[2]
+            session['completed_at'] = ARGV[3]
+            redis.call('set', KEYS[1], cjson.encode(session), 'EX', ARGV[4])
+            if redis.call('get', KEYS[2]) == ARGV[1] then
+              redis.call('del', KEYS[2])
+            end
+            return 1
+            """,
+            2,
+            _redis_key(job_id),
+            f"{_REDIS_LEASE_PREFIX}{university_id}",
+            lease_token,
+            error,
+            datetime.now(timezone.utc).isoformat(),
+            _REDIS_TTL_SEC,
+        ))
+    except Exception as exc:
+        log.warning("ai_repair: queued-session expiry error: %s", exc)
+        return False
+
+
+_REPAIR_TERMINAL_STATUSES = {
+    "completed",
+    "completed_with_warnings",
+    "done",
+    "failed",
+    "failed_degraded",
+    "failed_provider",
+    "error",
+    "stopped",
+    "skipped",
+}
+
+
+def validate_url_repair_target(status: str, discovered_config: dict) -> tuple[bool, str]:
+    """Require a terminal job with concrete evidence of a destructive URL gate."""
+    if status not in _REPAIR_TERMINAL_STATUSES:
+        return False, f"Scrape is still {status!r}; wait for it to finish before repair."
+
+    pipeline = (discovered_config or {}).get("pipeline_stats") or {}
+    raw = int(pipeline.get("raw_discovered") or 0)
+    after = int(pipeline.get("after_filter") or 0)
+    pre_block = int(pipeline.get("pre_block_discovered") or raw)
+    block_dropped = int(pipeline.get("block_dropped_count") or 0)
+    has_filter_failure = raw > 5 and (after == 0 or after < raw * 0.5)
+    has_block_failure = pre_block > 5 and block_dropped > pre_block * 0.8
+    dropped_sample = pipeline.get("dropped_sample") or []
+    if not (has_filter_failure or has_block_failure) or not dropped_sample:
+        return (
+            False,
+            "This job has no completed URL-filter failure with dropped URL evidence.",
+        )
+    return True, ""
+
+
 # ── Utilities ─────────────────────────────────────────────────────────────────
 
 def _deep_merge(base: dict, override: dict) -> dict:
@@ -108,6 +273,7 @@ _ALLOWED_DISCOVERY_FIELDS: dict[str, type | tuple] = {
     "allow_url_patterns":   list,
     "block_url_patterns":   list,
     "must_contain":         list,
+    "course_detail_url_patterns": list,
     "bfs_page_budget":      int,
     "use_browser":          bool,
     "sitemap_url":          str,
@@ -165,9 +331,12 @@ def _validate_discovery_patch(field: str, value: Any) -> None:
     exp = _ALLOWED_DISCOVERY_FIELDS[field]
     if not isinstance(value, exp):
         raise PatchValidationError(f"discovery.{field} must be {exp.__name__}, got {type(value).__name__}.")
-    if field in ("allow_url_patterns", "block_url_patterns", "must_contain"):
-        if not value:
-            raise PatchValidationError(f"'{field}' must not be empty.")
+    if field in (
+        "allow_url_patterns",
+        "block_url_patterns",
+        "must_contain",
+        "course_detail_url_patterns",
+    ):
         for i, pat in enumerate(value):
             if not isinstance(pat, str):
                 raise PatchValidationError(f"'{field}[{i}]' must be a string.")
@@ -273,9 +442,12 @@ def _validate_patch(patch: dict) -> dict:
                 f"Discovery field '{field}' must be {expected_type.__name__}, "
                 f"got {type(value).__name__}."
             )
-        if field in ("allow_url_patterns", "block_url_patterns", "must_contain"):
-            if not value:
-                raise PatchValidationError(f"'{field}' must not be an empty list.")
+        if field in (
+            "allow_url_patterns",
+            "block_url_patterns",
+            "must_contain",
+            "course_detail_url_patterns",
+        ):
             for i, pat in enumerate(value):
                 if not isinstance(pat, str):
                     raise PatchValidationError(f"'{field}[{i}]' must be a string.")
@@ -375,6 +547,23 @@ def _validate_and_build_config_patch(patches: list[dict]) -> tuple[dict, dict, l
             log.warning("ai_repair: patch rejected: %s", exc)
 
     return discovery_patch, extraction_patch, errors
+
+
+def _validated_ai_patches(ai_data: Any) -> list[dict]:
+    """Validate the OpenAI response envelope before reading or applying it."""
+    if not isinstance(ai_data, dict):
+        raise PatchValidationError("OpenAI response must be a JSON object.")
+    patches = ai_data.get("patches")
+    if not isinstance(patches, list):
+        raise PatchValidationError("OpenAI response must contain a patches list.")
+    if len(patches) > 3:
+        raise PatchValidationError("OpenAI response contains more than 3 patches.")
+    if any(not isinstance(patch, dict) for patch in patches):
+        raise PatchValidationError("Every OpenAI patch must be a JSON object.")
+    confidence = ai_data.get("confidence", 0)
+    if not isinstance(confidence, int) or not 0 <= confidence <= 100:
+        raise PatchValidationError("OpenAI confidence must be an integer from 0 to 100.")
+    return patches
 
 
 # ── Extraction quality helpers ────────────────────────────────────────────────
@@ -842,8 +1031,48 @@ async def _gather_context(job_id: str, db) -> dict:
     sc           = row["scrape_config_raw"] or {}
     admin_config = sc.get("admin_config") or {}
 
-    unis_dir   = Path(__file__).parent.parent.parent.parent / "scraper_config" / "unis"
-    yaml_files = list(unis_dir.glob(f"*_{uni_id}.yaml"))
+    unis_dir = Path(__file__).parent.parent.parent.parent / "scraper_config" / "unis"
+    yaml_files: list[Path] = []
+    effective_discovery: dict = {}
+    try:
+        from urllib.parse import urlparse
+        from app.services.scraper.config.loader import (
+            _hostname_to_slug,
+            _select_uni_yaml,
+            get_config_for_host,
+        )
+
+        scrape_url = row["scrape_url"] or ""
+        hostname = urlparse(scrape_url).hostname or ""
+        slug = _hostname_to_slug(hostname)
+        yaml_path, _ = _select_uni_yaml(
+            slug=slug,
+            university_id=uni_id,
+            scrape_url=scrape_url,
+        )
+        if yaml_path.exists():
+            yaml_files = [yaml_path]
+
+        effective_cfg = get_config_for_host(
+            hostname=hostname,
+            name=row["uni_name"] or "Unknown",
+            scrape_url=scrape_url,
+            university_id=uni_id,
+            db_scrape_config=sc,
+            create_missing_stub=False,
+        )
+        effective_discovery = {
+            field: list(getattr(effective_cfg.discovery, field, None) or [])
+            for field in (
+                "allow_url_patterns",
+                "block_url_patterns",
+                "must_contain",
+                "course_detail_url_patterns",
+            )
+        }
+    except Exception as exc:
+        log.warning("ai_repair: effective discovery config load failed: %s", exc)
+
     yaml_content = ""
     if yaml_files:
         try:
@@ -909,6 +1138,7 @@ async def _gather_context(job_id: str, db) -> dict:
         "dropped_sample":  dropped_sample,
         "passed_sample":   passed_sample,
         "admin_config":    admin_config,
+        "effective_discovery": effective_discovery,
         "yaml_content":    yaml_content[:4000],
         "quality":         quality,
         "unis_dir":        unis_dir,
@@ -977,6 +1207,7 @@ DISCOVERY PATCHES (section="discovery"):
   allow_url_patterns   list[regex]  — rescue filtered-out course URLs
   block_url_patterns   list[regex]  — block non-course URLs leaking through
   must_contain         list[str]    — only keep URLs containing these strings
+  course_detail_url_patterns list[regex] — final post-discovery course-page gate
   bfs_page_budget      int 5-300    — raise when too few pages crawled
   use_browser          bool         — enable for JS-rendered SPAs
   sitemap_url          str (URL)    — override sitemap URL
@@ -1001,7 +1232,8 @@ RECIPE PATCHES (section="recipe"):
   staging.reject_if_missing              list[known_fields]
 
 RULES:
-- All regex patterns must be valid Python re.search() patterns (no ^ anchors)
+- Regex patterns must be valid Python re.search() patterns
+- An empty list is allowed when the correct repair is to clear a broken URL filter
 - field must use exact dot-notation paths from the tables above
 - Do NOT repeat a fix from any previous attempt listed in context
 - Return up to 3 patches per attempt; prioritise highest-impact fix first
@@ -1019,7 +1251,13 @@ def _is_course_url(u: str) -> bool:
     return not _MEDIA_EXT.search(u) and not _ASSET_PATH.search(u)
 
 
-def _simulate_filter(dropped: list[str], allow_pats: list[str], block_pats: list[str]) -> dict:
+def _simulate_filter(
+    dropped: list[str],
+    allow_pats: list[str],
+    block_pats: list[str],
+    must_contain: list[str] | None = None,
+    course_detail_pats: list[str] | None = None,
+) -> dict:
     course_urls = [u for u in dropped if _is_course_url(u)]
     if not course_urls:
         return {"before": 0, "after": 0, "total": 0, "rescued": []}
@@ -1035,12 +1273,18 @@ def _simulate_filter(dropped: list[str], allow_pats: list[str], block_pats: list
 
     allow_c = _c(allow_pats)
     block_c = _c(block_pats)
+    detail_c = _c(course_detail_pats or [])
+    must_lower = [value.lower() for value in (must_contain or []) if value]
     passing = []
     for u in course_urls:
         ok = True
         if allow_c and not any(c.search(u) for c in allow_c):
             ok = False
+        if ok and must_lower and not any(value in u.lower() for value in must_lower):
+            ok = False
         if ok and block_c and any(c.search(u) for c in block_c):
+            ok = False
+        if ok and detail_c and not any(c.search(u) for c in detail_c):
             ok = False
         if ok:
             passing.append(u)
@@ -1050,7 +1294,18 @@ def _simulate_filter(dropped: list[str], allow_pats: list[str], block_pats: list
 
 # ── Patch application ─────────────────────────────────────────────────────────
 
-async def _apply_to_db(uni_id: int, config_patch: dict, db) -> None:
+def _merge_repair_patch(base: dict, patch: dict) -> dict:
+    """Merge an approved repair patch, preserving explicit empty-list clears."""
+    result = dict(base)
+    for key, value in patch.items():
+        if isinstance(value, dict) and isinstance(result.get(key), dict):
+            result[key] = _merge_repair_patch(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
+async def _apply_to_db(uni_id: int, config_patch: dict, db) -> dict:
     """Merge config_patch into universities.scrape_config.admin_config and commit."""
     from sqlalchemy import text
     import json as _json
@@ -1063,26 +1318,47 @@ async def _apply_to_db(uni_id: int, config_patch: dict, db) -> None:
     sc       = dict((row.get("scrape_config") or {}) if row else {})
     existing = sc.get("admin_config") or {}
     sc["_prev_admin_config"] = existing
-    sc["admin_config"]       = _deep_merge(existing, config_patch)
+    original_sc = dict(sc)
+    sc["admin_config"] = _merge_repair_patch(existing, config_patch)
 
     await db.execute(
         text("UPDATE universities SET scrape_config = CAST(:cfg AS jsonb) WHERE id = :id"),
         {"cfg": _json.dumps(sc), "id": uni_id},
     )
     await db.commit()
+    return original_sc
 
 
-async def _apply_discovery_to_db(uni_id: int, disc_patch: dict, db) -> None:
+async def _restore_db_config(uni_id: int, original_sc: dict, db) -> None:
+    """Restore the exact pre-repair scrape_config after a failed durable apply."""
+    from sqlalchemy import text
+    import json as _json
+
+    await db.rollback()
+    await db.execute(
+        text("UPDATE universities SET scrape_config = CAST(:cfg AS jsonb) WHERE id = :id"),
+        {"cfg": _json.dumps(original_sc), "id": uni_id},
+    )
+    await db.commit()
+
+
+async def _apply_discovery_to_db(uni_id: int, disc_patch: dict, db) -> dict:
     """Write discovery-section patch into admin_config.discovery."""
-    await _apply_to_db(uni_id, {"discovery": disc_patch}, db)
+    return await _apply_to_db(uni_id, {"discovery": disc_patch}, db)
 
 
-async def _apply_recipe_to_db(uni_id: int, recipe_patch: dict, db) -> None:
+async def _apply_recipe_to_db(uni_id: int, recipe_patch: dict, db) -> dict:
     """Write recipe-section patch into admin_config.extraction."""
-    await _apply_to_db(uni_id, {"extraction": recipe_patch}, db)
+    return await _apply_to_db(uni_id, {"extraction": recipe_patch}, db)
 
 
-def _apply_to_yaml(yaml_file: Any, unis_dir: Path, uni_id: int, scrape_url: str, config_patch: dict) -> None:
+def _apply_to_yaml(
+    yaml_file: Any,
+    unis_dir: Path,
+    uni_id: int,
+    scrape_url: str,
+    config_patch: dict,
+) -> tuple[Path, str | None]:
     import yaml as _yaml
 
     if not yaml_file:
@@ -1097,19 +1373,72 @@ def _apply_to_yaml(yaml_file: Any, unis_dir: Path, uni_id: int, scrape_url: str,
                     except Exception:
                         continue
         if not candidates:
-            log.warning("ai_repair: no YAML for uni_id=%s", uni_id); return
-        yaml_file = candidates[0]
+            from urllib.parse import urlparse
+            from app.services.scraper.config.loader import _hostname_to_slug
 
-    try:
-        existing_text = yaml_file.read_text(encoding="utf-8")
-        comment_lines = [ln for ln in existing_text.splitlines() if ln.strip().startswith("#")]
-        header  = ("\n".join(comment_lines) + "\n") if comment_lines else ""
-        merged  = _deep_merge(_yaml.safe_load(existing_text) or {}, config_patch)
-        new_txt = header + _yaml.dump(merged, default_flow_style=False, allow_unicode=True, sort_keys=False)
-        yaml_file.write_text(new_txt, encoding="utf-8")
-        log.info("ai_repair: wrote config patch to %s", yaml_file.name)
-    except Exception as exc:
-        log.warning("ai_repair: YAML write failed: %s", exc)
+            hostname = urlparse(scrape_url).hostname or "university"
+            yaml_file = unis_dir / f"{_hostname_to_slug(hostname)}_{uni_id}.yaml"
+        else:
+            yaml_file = candidates[0]
+
+    original_text = yaml_file.read_text(encoding="utf-8") if yaml_file.exists() else None
+    existing_text = original_text or ""
+    comment_lines = [ln for ln in existing_text.splitlines() if ln.strip().startswith("#")]
+    header = ("\n".join(comment_lines) + "\n") if comment_lines else ""
+    merged = _merge_repair_patch(_yaml.safe_load(existing_text) or {}, config_patch)
+    new_txt = header + _yaml.dump(
+        merged,
+        default_flow_style=False,
+        allow_unicode=True,
+        sort_keys=False,
+    )
+    tmp_path = yaml_file.with_suffix(yaml_file.suffix + ".ai-repair.tmp")
+    tmp_path.write_text(new_txt, encoding="utf-8")
+    tmp_path.replace(yaml_file)
+    log.info("ai_repair: wrote config patch to %s", yaml_file.name)
+    return yaml_file, original_text
+
+
+def _restore_yaml(yaml_file: Path, original_text: str | None) -> None:
+    """Restore or remove a YAML file after a failed durable apply."""
+    if original_text is None:
+        yaml_file.unlink(missing_ok=True)
+    else:
+        yaml_file.write_text(original_text, encoding="utf-8")
+
+
+async def _assert_effective_discovery_patch(uni_id: int, disc_patch: dict, db) -> None:
+    """Reload the merged config and prove every approved URL field is effective."""
+    from urllib.parse import urlparse
+    from sqlalchemy import text
+    from app.services.scraper.config.loader import get_config_for_host
+
+    row = (await db.execute(
+        text(
+            "SELECT name, scrape_url, scrape_config "
+            "FROM universities WHERE id = :id"
+        ),
+        {"id": uni_id},
+    )).mappings().first()
+    if not row:
+        raise RuntimeError(f"University {uni_id} disappeared while applying repair.")
+
+    scrape_url = row["scrape_url"] or ""
+    cfg = get_config_for_host(
+        hostname=urlparse(scrape_url).hostname or "",
+        name=row["name"] or "Unknown",
+        scrape_url=scrape_url,
+        university_id=uni_id,
+        db_scrape_config=row["scrape_config"] or {},
+        create_missing_stub=False,
+    )
+    for field, expected in disc_patch.items():
+        actual = getattr(cfg.discovery, field)
+        if actual != expected:
+            raise RuntimeError(
+                f"Effective config verification failed for discovery.{field}: "
+                f"expected {expected!r}, got {actual!r}"
+            )
 
 
 # ── Quality delta computation ─────────────────────────────────────────────────
@@ -1264,7 +1593,7 @@ def _patch_fingerprint(p: dict) -> str:
     return f"{p.get('section')}:{p.get('field')}:{json.dumps(p.get('value'), sort_keys=True)[:120]}"
 
 
-async def run_ai_repair_loop(job_id: str, db) -> dict:
+async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None) -> dict:
     """Run the OpenAI-powered full quality repair loop.
 
     After each patch: simulates discovery improvement AND runs a real extraction
@@ -1283,14 +1612,17 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
     """
     from app.services.ai.openai_client import chat_json
 
+    queued_session = read_session(job_id)
     session: dict = {
-        "session_id":      str(uuid.uuid4())[:8],
+        "session_id":      lease_token or queued_session.get("session_id") or str(uuid.uuid4())[:8],
         "job_id":          job_id,
         "status":          "running",
         "current_attempt": 0,
         "attempts":        [],
         "final_verdict":   None,
+        "university_id":   queued_session.get("university_id"),
         "uni_name":        None,
+        "queued_at":       queued_session.get("queued_at"),
         "started_at":      datetime.now(timezone.utc).isoformat(),
         "completed_at":    None,
         "error":           None,
@@ -1342,11 +1674,17 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
                     ),
                 )
                 break
+            try:
+                patches_raw = _validated_ai_patches(ai_data)
+            except PatchValidationError as exc:
+                session.update(
+                    status="failed",
+                    error=f"OpenAI returned an invalid repair response: {exc} No config was changed.",
+                )
+                break
 
             # ④ Validate patches → (disc_patch, extr_patch, errors)
             #    extr_patch is already a NESTED dict (dotpath fields expanded)
-            patches_raw: list[dict] = ai_data.get("patches") or []
-
             # ── Duplicate-patch filter ────────────────────────────────────────
             # Skip patches whose (section, field, value) fingerprint was already
             # applied in a previous attempt to prevent the loop from repeating
@@ -1385,10 +1723,23 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
                 validation_errors.append(
                     f"Discovery patches blocked (extraction phase active): {', '.join(disc_only_blocked)}"
                 )
+            if extr_patch:
+                validation_errors.append(
+                    "Extraction recipe suggestions are advisory only and were not applied: "
+                    "the repair agent currently auto-applies URL-filter fixes only after "
+                    "deterministic full-filter validation."
+                )
+                extr_patch = {}
 
             # ⑤ URL filter simulation (discovery patches only — no live re-scrape needed)
             sim: dict = {"before": 0, "after": 0, "total": 0, "rescued": []}
-            if "allow_url_patterns" in disc_patch or "block_url_patterns" in disc_patch:
+            _URL_FILTER_FIELDS = {
+                "allow_url_patterns",
+                "block_url_patterns",
+                "must_contain",
+                "course_detail_url_patterns",
+            }
+            if _URL_FILTER_FIELDS.intersection(disc_patch):
                 from sqlalchemy import text as _text
                 dc_row = (await db.execute(
                     _text("SELECT discovered_config FROM scrape_runtime_jobs WHERE runtime_job_id = :j"),
@@ -1396,13 +1747,43 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
                 )).first()
                 dc: dict = (dc_row[0] or {}) if dc_row else {}
                 dropped  = dc.get("pipeline_stats", {}).get("dropped_sample") or ctx["dropped_sample"]
+                current_disc = dict(ctx.get("effective_discovery") or {})
+                baseline_sim = _simulate_filter(
+                    dropped,
+                    current_disc.get("allow_url_patterns", []),
+                    current_disc.get("block_url_patterns", []),
+                    current_disc.get("must_contain", []),
+                    current_disc.get("course_detail_url_patterns", []),
+                )
+                proposed_disc = {**current_disc, **disc_patch}
                 sim = _simulate_filter(
                     dropped,
-                    disc_patch.get("allow_url_patterns", []),
-                    disc_patch.get("block_url_patterns", []),
+                    proposed_disc.get("allow_url_patterns", []),
+                    proposed_disc.get("block_url_patterns", []),
+                    proposed_disc.get("must_contain", []),
+                    proposed_disc.get("course_detail_url_patterns", []),
                 )
+                sim["before"] = baseline_sim["after"]
+
+                minimum_rescue = max(1, (sim["total"] + 1) // 2)
+                if (
+                    sim["total"] == 0
+                    or sim["after"] <= sim["before"]
+                    or (ctx["after_filter"] == 0 and sim["after"] < minimum_rescue)
+                ):
+                    validation_errors.append(
+                        "OpenAI URL patch rejected: full effective-filter simulation "
+                        f"rescued {sim['after']}/{sim['total']} URLs "
+                        f"(before {sim['before']}); at least {minimum_rescue} required."
+                    )
+                    log.warning(
+                        "ai_repair: rejecting non-improving URL patch before apply: %s",
+                        validation_errors[-1],
+                    )
+                    disc_patch = {}
+
                 # Update ctx drop_rate immediately so next iteration uses the improved value
-                if sim.get("after", 0) > 0:
+                if disc_patch and sim.get("after", 0) > sim.get("before", 0):
                     _raw      = ctx["raw_discovered"]
                     _new_after = ctx["after_filter"] + sim["after"]
                     ctx["drop_rate"] = max(0, round(100 * (1 - _new_after / _raw))) if _raw > 0 else 0
@@ -1418,11 +1799,33 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
             patch_error: str  = ""
             extr_patch_applied_keys: list = []
             if disc_patch:
+                yaml_state: tuple[Path, str | None] | None = None
+                db_before: dict | None = None
                 try:
-                    await _apply_discovery_to_db(ctx["university_id"], disc_patch, db)
-                    _apply_to_yaml(ctx.get("yaml_file"), ctx["unis_dir"],
-                                   ctx["university_id"], ctx["scrape_url"],
-                                   {"discovery": disc_patch})
+                    if lease_token and not renew_repair_lease(
+                        ctx["university_id"],
+                        lease_token,
+                    ):
+                        raise RuntimeError(
+                            "Repair ownership was lost before config apply; no change was saved."
+                        )
+                    yaml_state = _apply_to_yaml(
+                        ctx.get("yaml_file"),
+                        ctx["unis_dir"],
+                        ctx["university_id"],
+                        ctx["scrape_url"],
+                        {"discovery": disc_patch},
+                    )
+                    db_before = await _apply_discovery_to_db(
+                        ctx["university_id"],
+                        disc_patch,
+                        db,
+                    )
+                    await _assert_effective_discovery_patch(
+                        ctx["university_id"],
+                        disc_patch,
+                        db,
+                    )
                     patch_applied_ok = True
                     # Register fingerprints so this exact patch is not repeated
                     for p in patches_raw:
@@ -1432,8 +1835,29 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
                 except Exception as exc:
                     log.warning("ai_repair: discovery patch apply error: %s", exc)
                     patch_error = str(exc)
+                    if db_before is not None:
+                        try:
+                            await _restore_db_config(
+                                ctx["university_id"],
+                                db_before,
+                                db,
+                            )
+                        except Exception as rollback_exc:
+                            patch_error += f"; DB rollback failed: {rollback_exc}"
+                    else:
+                        await db.rollback()
+                    if yaml_state is not None:
+                        try:
+                            _restore_yaml(*yaml_state)
+                        except Exception as rollback_exc:
+                            patch_error += f"; YAML rollback failed: {rollback_exc}"
+                    validation_errors.append(
+                        f"Approved URL patch was not saved: {patch_error}"
+                    )
+                    disc_patch = {}
 
-            # ⑦ Apply extraction patch (dotpath fields already expanded to nested dict)
+            # ⑦ Extraction patches are not written until a non-mutating
+            # field-level validation path exists.  See the guard above.
             if extr_patch:
                 try:
                     await _apply_recipe_to_db(ctx["university_id"], extr_patch, db)
@@ -1457,7 +1881,16 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
                 config_patch_combined["discovery"] = disc_patch
             if extr_patch:
                 config_patch_combined["extraction"] = extr_patch
-            scan_fills = await _run_extraction_scan(ctx, config_patch_combined, db, max_courses=8)
+            scan_fills = (
+                await _run_extraction_scan(ctx, config_patch_combined, db, max_courses=8)
+                if extr_patch
+                else {
+                    "courses_rescanned": 0,
+                    "ielts_fills": 0,
+                    "fee_fills": 0,
+                    "location_clears": 0,
+                }
+            )
 
             # ⑨ Real quality snapshot AFTER the extraction scan
             quality_after = await _quality_snapshot(job_id, ctx["university_id"], db)
@@ -1498,12 +1931,9 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
                 "patches_applied":      [
                     {"section": p.get("section"), "field": p.get("field"), "new_value": p.get("value")}
                     for p in patches_raw
-                    if p.get("section") in _ALLOWED_SECTIONS
-                    and (
-                        p.get("field") in _ALLOWED_DISCOVERY_FIELDS
-                        or p.get("field") in _ALLOWED_RECIPE_FIELDS
-                        or p.get("field") in _ALLOWED_EXTRACTION_FIELDS
-                    )
+                    if patch_applied_ok
+                    and p.get("section") == "discovery"
+                    and p.get("field") in disc_patch
                 ],
                 "validation_errors":    validation_errors,
                 "before_pass_count":    sim["before"],
@@ -1524,7 +1954,7 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
             _write_session(job_id, session)
 
             urls_rescued_enough = sim["total"] > 0 and sim["after"] >= sim["total"] * 0.5
-            has_url_patch       = bool("allow_url_patterns" in disc_patch or "block_url_patterns" in disc_patch)
+            has_url_patch       = bool(_URL_FILTER_FIELDS.intersection(disc_patch))
             discovery_now_ok    = (
                 _discovery_phase_done
                 or urls_rescued_enough
@@ -1539,6 +1969,17 @@ async def run_ai_repair_loop(job_id: str, db) -> dict:
                 log.info("ai_repair: discovery confirmed OK — locking into extraction phase")
 
             # ⑪ Termination checks
+            if patch_applied_ok and has_url_patch and urls_rescued_enough:
+                session.update(
+                    status="completed",
+                    final_verdict=(
+                        f"OpenAI repaired and saved the URL filters. Deterministic "
+                        f"validation rescued {sim['after']}/{sim['total']} known course URLs. "
+                        "Re-run the scrape to verify live discovery."
+                    ),
+                )
+                break
+
             if not patches_raw and not dup_skipped and not disc_only_blocked:
                 if discovery_now_ok and extraction_ok:
                     verdict = "No issues detected — discovery and extraction quality are both acceptable."

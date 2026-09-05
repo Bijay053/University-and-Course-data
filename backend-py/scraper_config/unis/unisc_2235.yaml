@@ -49,6 +49,14 @@
 #   - Name does not contain a standard degree qualifier (DQ check disabled)
 # ─────────────────────────────────────────────────────────────────────────────
 
+hostname_guard: "www.unisc.edu.au"
+locked_config_paths:
+  - discovery.seed_urls
+  - discovery.allow_url_patterns
+  - discovery.block_url_patterns
+  - discovery.sitemap_url
+  - discovery.always_sitemap_supplement
+
 discovery:
   # Start BFS from the main courses listing page and both category pages.
   # The main page links to the UG and PG listing pages; seeding all three
