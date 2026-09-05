@@ -1375,6 +1375,15 @@ _GEMINI_PRIMARY_CANONICAL_FIELDS = {
 }
 
 
+def _gemini_primary_field_blocked(payload: dict, field: str) -> bool:
+    """Return whether authoritative deterministic evidence forbids an AI fill."""
+    canonical = _GEMINI_PRIMARY_CANONICAL_FIELDS.get(field, field)
+    return bool(
+        canonical == "international_fee"
+        and payload.get("fee_table_confirmed_no_international")
+    )
+
+
 def _gemini_primary_missing_fields(
     payload: dict,
     candidate_fields: list[str] | tuple[str, ...],
@@ -1383,6 +1392,8 @@ def _gemini_primary_missing_fields(
     missing: list[str] = []
     for field in candidate_fields:
         canonical = _GEMINI_PRIMARY_CANONICAL_FIELDS.get(field, field)
+        if _gemini_primary_field_blocked(payload, field):
+            continue
         value = payload.get(canonical)
         if value is None or value == "" or value == 0 or value == [] or value == {}:
             missing.append(field)
@@ -4703,6 +4714,14 @@ async def extract_course(
                 #            an explicit DOM label and is more reliable than
                 #            Gemini's prose read.  Generic sites with no
                 #            structural label still get Gemini's value.
+                if _gemini_primary_field_blocked(payload, _gp_k):
+                    log.info(
+                        "[GEMINI FIELD BLOCKED] %s: authoritative "
+                        "no-international evidence prevents fee fill",
+                        url,
+                    )
+                    continue
+
                 if _gp_k == "course_location":
                     # BCU hard block: NEVER allow Gemini PRIMARY to set
                     # course_location for bcu.ac.uk pages.  The structural

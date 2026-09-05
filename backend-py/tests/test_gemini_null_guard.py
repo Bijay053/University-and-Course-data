@@ -22,6 +22,7 @@ import pytest
 from app.services.scraper.extractors import ai_fallback
 from app.services.scraper.extractors import gemini_primary
 from app.services.scraper.pipelines.single_course import (
+    _gemini_primary_field_blocked,
     _gemini_primary_missing_fields,
 )
 
@@ -134,6 +135,19 @@ def test_gemini_primary_requests_only_canonical_missing_fields():
     )
 
     assert missing == ["mode", "ielts_overall"]
+
+
+def test_gemini_cannot_refill_fee_after_authoritative_no_international_signal():
+    payload = {
+        "international_fee": None,
+        "fee_table_confirmed_no_international": True,
+    }
+
+    assert _gemini_primary_field_blocked(payload, "international_fee")
+    assert _gemini_primary_missing_fields(
+        payload,
+        ("international_fee", "ielts_overall"),
+    ) == ["ielts_overall"]
 
 
 @pytest.mark.asyncio

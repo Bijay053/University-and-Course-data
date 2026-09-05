@@ -602,6 +602,7 @@ from app.services.scraper.pdf_classifier import (
     is_low_value_pdf,
     is_non_tuition_fee_pdf,
 )
+from app.services.scraper.central_pages import _is_non_tuition_central_fee_pdf
 
 
 class TestLowValuePdfClassifier:
@@ -654,6 +655,10 @@ class TestLowValuePdfClassifier:
             "2026-units-of-study-1st-half-pgrd-coursework-fees-v2.pdf"
         )
         assert is_non_tuition_fee_pdf(
+            "https://www.unisc.edu.au/media/0nhbmp5f/"
+            "2026-1st-half-css-student-contribution-fees.pdf"
+        )
+        assert _is_non_tuition_central_fee_pdf(
             "https://www.unisc.edu.au/media/0nhbmp5f/"
             "2026-1st-half-css-student-contribution-fees.pdf"
         )

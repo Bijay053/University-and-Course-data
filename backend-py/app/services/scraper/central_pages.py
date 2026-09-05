@@ -1105,6 +1105,16 @@ _CACHE_TTL_DAYS = 30
 _ENGLISH_CACHE_SCHEMA_VERSION = 2
 
 
+def _is_non_tuition_central_fee_pdf(
+    url: str,
+    first_page_text: str = "",
+) -> bool:
+    """Keep central-page PDF probing aligned with per-course PDF safety."""
+    from app.services.scraper.pdf_classifier import is_non_tuition_fee_pdf
+
+    return is_non_tuition_fee_pdf(url, first_page_text)
+
+
 def _english_cache_is_current(parsed_data: dict[str, Any]) -> bool:
     """Return whether cached English data was produced by the current parser."""
     return (
@@ -1395,12 +1405,29 @@ async def prefetch_central_pages(
                             )
                         for _pdf_url in _pdf_links[:3]:  # cap at 3 PDFs
                             try:
+                                if _is_non_tuition_central_fee_pdf(_pdf_url):
+                                    log.info(
+                                        "central_pages: skipping non-tuition fee "
+                                        "PDF before download: %s",
+                                        _pdf_url,
+                                    )
+                                    continue
                                 from app.services.scraper.pdf_fetcher import (
                                     download_pdf_text,
                                 )
 
                                 _pdf_text = await download_pdf_text(_pdf_url)
                                 if not _pdf_text or len(_pdf_text) < 50:
+                                    continue
+                                if _is_non_tuition_central_fee_pdf(
+                                    _pdf_url,
+                                    _pdf_text[:12000],
+                                ):
+                                    log.info(
+                                        "central_pages: skipping non-tuition fee "
+                                        "PDF after text classification: %s",
+                                        _pdf_url,
+                                    )
                                     continue
                                 # Wrap in <pre> so html_to_text strips tags
                                 # correctly and Strategy-2 line scan runs.
