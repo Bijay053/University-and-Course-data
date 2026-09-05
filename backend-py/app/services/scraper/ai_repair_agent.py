@@ -318,6 +318,7 @@ _ALLOWED_EXTRACTION_FIELDS: dict[str, str] = {
     "extraction_rules.ielts_overall":        "extraction_rule",
     "extraction_rules.duration":             "extraction_rule",
     "extraction_rules.course_location":      "extraction_rule",
+    "extraction_rules.course_name":          "extraction_rule",
 }
 
 _SAFE_REPAIR_FIELDS = {
@@ -325,6 +326,7 @@ _SAFE_REPAIR_FIELDS = {
     "ielts_overall",
     "duration",
     "course_location",
+    "course_name",
 }
 
 _KNOWN_STAGING_FIELDS = {
@@ -482,12 +484,20 @@ def _normalise_repair_value(field: str, value: Any) -> Any:
             number = float(re.search(r"\d+(?:\.\d+)?", text).group(0))
             return round(number, 2) if 0 < number <= 20 else None
         if field == "course_location":
+            if re.search(r"\{\{[^{}]*\}\}", text):
+                return None
             cleaned = re.sub(r"\s+", " ", text).strip(" ,;|")
             if not cleaned or len(cleaned) > 200 or cleaned.casefold() in {
                 "location", "campus", "study", "apply", "contact us",
             }:
                 return None
             return cleaned.casefold()
+        if field == "course_name":
+            from app.services.scraper.course_name_cleaner import (
+                normalise_generated_course_name_with_config,
+            )
+            cleaned = normalise_generated_course_name_with_config(text)
+            return cleaned.casefold() if cleaned else None
     except (AttributeError, TypeError, ValueError):
         return None
     return None
@@ -505,19 +515,24 @@ def validate_extraction_rule_on_samples(
     from app.services.scraper.ai_extractor_run import apply_extraction_rules
 
     tested: list[dict[str, Any]] = []
-    filled_missing = regressions = valid_outputs = populated_tested = 0
+    filled_missing = corrected_invalid = regressions = valid_outputs = populated_tested = 0
     for sample in samples:
-        baseline = _normalise_repair_value(field, sample.get("before"))
+        raw_before = sample.get("before")
+        baseline = _normalise_repair_value(field, raw_before)
+        invalid_before = raw_before not in (None, "") and baseline is None
         result = apply_extraction_rules(sample.get("html") or "", {field: rule})
         raw_after = result.get(field, (None, "ai_rule:miss"))[0]
         after = _normalise_repair_value(field, raw_after)
-        preserved = baseline is None or after is None or after == baseline
+        preserved = baseline is None or after == baseline
         if baseline is not None:
             populated_tested += 1
-        if baseline is not None and after is not None and after != baseline:
+        if baseline is not None and after != baseline:
             regressions += 1
         if baseline is None and after is not None:
-            filled_missing += 1
+            if invalid_before:
+                corrected_invalid += 1
+            else:
+                filled_missing += 1
         if after is not None:
             valid_outputs += 1
         tested.append({
@@ -526,15 +541,19 @@ def validate_extraction_rule_on_samples(
             "after": raw_after,
             "method": result.get(field, (None, "ai_rule:miss"))[1],
             "preserved": preserved,
+            "corrected_invalid": invalid_before and after is not None,
         })
 
     reasons: list[str] = []
     if len(samples) < 2:
         reasons.append("At least two stored HTML samples are required.")
-    if filled_missing < 1:
-        reasons.append("The rule did not fill any missing values.")
-    if populated_tested < 1:
-        reasons.append("No populated baseline value was available to prove preservation.")
+    if filled_missing + corrected_invalid < 1:
+        reasons.append("The rule did not fill a missing value or correct an invalid value.")
+    if populated_tested < 1 and corrected_invalid < 2:
+        reasons.append(
+            "No populated baseline value was available to prove preservation, "
+            "and fewer than two invalid values were corrected."
+        )
     if valid_outputs < 2:
         reasons.append("The rule produced too few plausible values.")
     if regressions:
@@ -545,6 +564,7 @@ def validate_extraction_rule_on_samples(
         "confidence": float(rule["confidence"]),
         "samples_tested": len(samples),
         "missing_filled": filled_missing,
+        "invalid_corrected": corrected_invalid,
         "valid_outputs": valid_outputs,
         "populated_tested": populated_tested,
         "regressions": regressions,
@@ -763,6 +783,8 @@ def _extraction_quality_ok(quality: dict) -> bool:
     """True when average key-field fill rate is acceptable."""
     if not quality or quality.get("total_staged", 0) == 0:
         return True  # No staged courses yet - don't block on extraction
+    if quality.get("bad_course_names", 0) or quality.get("bad_locations", 0):
+        return False
     key_pcts = [
         quality.get("fee_pct", 0),
         quality.get("ielts_pct", 0),
@@ -789,6 +811,8 @@ def _quality_summary(quality: dict) -> str:
         f" degree_level={quality.get('degree_level_pct', 0)}%"
         f" mode={quality.get('mode_pct', 0)}%"
         f" duration={quality.get('duration_pct', 0)}%"
+        f" invalid_names={quality.get('bad_course_names', 0)}"
+        f" invalid_locations={quality.get('bad_locations', 0)}"
     )
 
 
@@ -805,16 +829,32 @@ async def _quality_snapshot(job_id: str, uni_id: int, db) -> dict:
                    COUNT(ielts_overall)                          AS has_ielts,
                    COUNT(intake_months)                          AS has_intakes,
                    COUNT(course_location)                        AS has_location,
+                   COUNT(*) FILTER (
+                     WHERE course_location LIKE '%%{{%%'
+                   )                                             AS bad_locations,
                    COUNT(degree_level)                           AS has_degree_level,
                    COUNT(study_mode)                             AS has_mode,
                    COUNT(duration)                               AS has_duration,
+                   COUNT(course_name)                            AS has_course_name,
+                   COUNT(*) FILTER (
+                     WHERE course_name LIKE '%%{{%%'
+                         OR course_name ~* '\\|\\s*(university|unisc)'
+                   )                                             AS bad_course_names,
                    COUNT(academic_level)                         AS has_academic_level,
                    array_agg(DISTINCT course_location)
                      FILTER (WHERE course_location IS NOT NULL)  AS sample_locations,
+                   array_agg(DISTINCT course_location)
+                     FILTER (WHERE course_location LIKE '%%{{%%')
+                                                                 AS sample_bad_locations,
                    array_agg(DISTINCT degree_level)
                      FILTER (WHERE degree_level IS NOT NULL)     AS sample_degrees,
                    array_agg(DISTINCT study_mode)
-                     FILTER (WHERE study_mode IS NOT NULL)       AS sample_modes
+                     FILTER (WHERE study_mode IS NOT NULL)       AS sample_modes,
+                   array_agg(DISTINCT course_name)
+                     FILTER (
+                       WHERE course_name LIKE '%%{{%%'
+                           OR course_name ~* '\\|\\s*(university|unisc)'
+                     )                                           AS sample_bad_course_names
             FROM   scraped_courses
             WHERE  university_id = :uid
               AND  scrape_job_id = :jid
@@ -829,7 +869,10 @@ async def _quality_snapshot(job_id: str, uni_id: int, db) -> dict:
             "total_staged": 0, "fee_pct": 0, "ielts_pct": 0, "intakes_pct": 0,
             "location_pct": 0, "degree_level_pct": 0, "mode_pct": 0,
             "duration_pct": 0, "academic_level_pct": 0,
+            "course_name_pct": 0, "bad_course_names": 0,
+            "bad_locations": 0,
             "sample_locations": [], "sample_degrees": [], "sample_modes": [],
+            "sample_bad_course_names": [], "sample_bad_locations": [],
         }
 
     pct = lambda n: round(100 * (n or 0) / total)
@@ -838,14 +881,19 @@ async def _quality_snapshot(job_id: str, uni_id: int, db) -> dict:
         "fee_pct":            pct(q["has_fee"]),
         "ielts_pct":          pct(q["has_ielts"]),
         "intakes_pct":        pct(q["has_intakes"]),
-        "location_pct":       pct(q["has_location"]),
+        "location_pct":       pct((q["has_location"] or 0) - (q["bad_locations"] or 0)),
         "degree_level_pct":   pct(q["has_degree_level"]),
         "mode_pct":           pct(q["has_mode"]),
         "duration_pct":       pct(q["has_duration"]),
+        "course_name_pct":    pct((q["has_course_name"] or 0) - (q["bad_course_names"] or 0)),
+        "bad_course_names":   int(q["bad_course_names"] or 0),
+        "bad_locations":      int(q["bad_locations"] or 0),
         "academic_level_pct": pct(q["has_academic_level"]),
         "sample_locations":   list((q["sample_locations"]  or [])[:8]),
+        "sample_bad_locations": list((q["sample_bad_locations"] or [])[:8]),
         "sample_degrees":     list((q["sample_degrees"]    or [])[:8]),
         "sample_modes":       list((q["sample_modes"]      or [])[:8]),
+        "sample_bad_course_names": list((q["sample_bad_course_names"] or [])[:8]),
     }
 
 
@@ -1386,7 +1434,7 @@ Return ONLY a valid JSON object — no markdown, no text outside the JSON.
 Schema:
 {
   "diagnosis": "one sentence describing the root problem",
-  "root_cause": "one of: allow_url_patterns | block_url_patterns | bfs_page_budget | use_browser | fees | english | location | study_mode | filters | duration | unknown",
+  "root_cause": "one of: allow_url_patterns | block_url_patterns | bfs_page_budget | use_browser | fees | english | location | course_name | study_mode | filters | duration | unknown",
   "confidence": <integer 0-100>,
   "explanation": "2-3 sentences explaining why this fix will work",
   "patches": [
@@ -1408,6 +1456,7 @@ RECIPE PATCHES (section="recipe"):
   extraction_rules.ielts_overall      object — CSS/XPath/regex Stage-0 rule
   extraction_rules.duration           object — CSS/XPath/regex Stage-0 rule
   extraction_rules.course_location    object — CSS/XPath/regex Stage-0 rule
+  extraction_rules.course_name        object — CSS/XPath/regex Stage-0 rule
 
 RULES:
 - Regex patterns must be valid Python re.search() patterns
@@ -1417,7 +1466,8 @@ RULES:
 - Return up to 3 patches per attempt; prioritise highest-impact fix first
 - Return empty patches if no safe automatic fix is possible
 - Extraction rule objects require confidence >= 0.85 and at least one of css/xpath/regex.
-- Prefer extraction_rules patches for missing fee, IELTS, duration, or location values.
+- Prefer extraction_rules patches for missing or invalid fee, IELTS, duration,
+  location, or course-name values.
 """
 
 
@@ -1749,12 +1799,24 @@ def _build_user_message(ctx: dict, previous_attempts: list[dict], phase: str = "
     mode_pct = q.get("mode_pct",         0)
     deg_pct  = q.get("degree_level_pct", 0)
     int_pct  = q.get("intakes_pct",      0)
+    bad_names = q.get("bad_course_names", 0)
+    bad_locations = q.get("bad_locations", 0)
     if fee_pct   < _FEE_PCT_OK:    _failing_hints.append(f"fees ({fee_pct}% < {_FEE_PCT_OK}% target)")
     if ielts_pct < _IELTS_PCT_OK:  _failing_hints.append(f"IELTS ({ielts_pct}% < {_IELTS_PCT_OK}% target)")
     if loc_pct   < _LOCATION_PCT_OK: _failing_hints.append(f"location ({loc_pct}% < {_LOCATION_PCT_OK}% target)")
     if mode_pct  < _MODE_PCT_OK:   _failing_hints.append(f"study_mode ({mode_pct}% < {_MODE_PCT_OK}% target)")
     if deg_pct   < _DEGREE_PCT_OK: _failing_hints.append(f"degree_level ({deg_pct}% < {_DEGREE_PCT_OK}% target)")
     if int_pct   < 40:             _failing_hints.append(f"intakes ({int_pct}% fill rate)")
+    if bad_names:
+        _failing_hints.append(
+            f"course_name ({bad_names} contaminated values; examples: "
+            f"{q.get('sample_bad_course_names', [])[:3]})"
+        )
+    if bad_locations:
+        _failing_hints.append(
+            f"location ({bad_locations} template-contaminated values; examples: "
+            f"{q.get('sample_bad_locations', [])[:3]})"
+        )
     failing_str = ", ".join(_failing_hints) if _failing_hints else "all fields meeting targets"
 
     if phase == "extraction":
@@ -1766,7 +1828,8 @@ def _build_user_message(ctx: dict, previous_attempts: list[dict], phase: str = "
             "Suggest ONLY section='recipe' patches targeting the failing fields above.\n"
             "Valid recipe fields: extraction_rules.international_fee,\n"
             "  extraction_rules.ielts_overall, extraction_rules.duration,\n"
-            "  extraction_rules.course_location. Each value must be a rule object\n"
+            "  extraction_rules.course_location, extraction_rules.course_name. "
+            "Each value must be a rule object\n"
             "  with confidence >= 0.85 and at least one of css, xpath, or regex."
         )
         diag_priority = (
@@ -1776,8 +1839,9 @@ def _build_user_message(ctx: dict, previous_attempts: list[dict], phase: str = "
             "2. ielts_pct low   → extraction_rules.ielts_overall\n"
             "3. duration low    → extraction_rules.duration\n"
             "4. location low   → extraction_rules.course_location\n"
-            "5. Other fields   → note in explanation only; do not propose an unsupported patch\n"
-            "6. Nothing fixable → return empty patches with a clear explanation"
+            "5. contaminated course names → extraction_rules.course_name\n"
+            "6. Other fields   → note in explanation only; do not propose an unsupported patch\n"
+            "7. Nothing fixable → return empty patches with a clear explanation"
         )
     else:
         focus_block = (

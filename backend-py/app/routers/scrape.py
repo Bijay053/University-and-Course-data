@@ -6399,7 +6399,10 @@ async def start_ai_repair(
             "WHERE scrape_job_id = :j "
             "AND status IN ('pending', 'review', 'approved') "
             "AND (international_fee IS NULL OR ielts_overall IS NULL "
-            "OR duration IS NULL OR course_location IS NULL)"
+            "OR duration IS NULL OR course_location IS NULL "
+            "OR course_location LIKE '%%{{%%' "
+            "OR course_name IS NULL OR course_name LIKE '%%{{%%' "
+            "OR course_name ~* '\\|\\s*(university|unisc)')"
         ),
         {"j": job_id},
     )).scalar() or 0

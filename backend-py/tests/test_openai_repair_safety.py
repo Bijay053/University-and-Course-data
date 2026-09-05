@@ -9,6 +9,7 @@ import pytest
 from app.services.scraper.ai_repair_agent import (
     PatchValidationError,
     _apply_to_yaml,
+    _extraction_quality_ok,
     _restore_yaml,
     _simulate_filter,
     _validate_and_build_config_patch,
@@ -221,6 +222,116 @@ def test_extraction_repair_rejects_rule_that_overwrites_good_value() -> None:
     )
     assert report["accepted"] is False
     assert report["regressions"] == 1
+
+
+def test_extraction_repair_rejects_rule_that_misses_good_value() -> None:
+    report = validate_extraction_rule_on_samples(
+        "course_location",
+        {"css": ".campus", "confidence": .95},
+        [
+            {
+                "url": "https://example.edu/a",
+                "html": '<b class="campus">Sunshine Coast</b>',
+                "before": None,
+            },
+            {
+                "url": "https://example.edu/b",
+                "html": "<b>Moreton Bay</b>",
+                "before": "Moreton Bay",
+            },
+        ],
+    )
+    assert report["accepted"] is False
+    assert report["regressions"] == 1
+    assert report["samples"][1]["preserved"] is False
+
+
+def test_course_name_repair_corrects_contamination_and_preserves_clean_names() -> None:
+    rule = {"css": "h1", "confidence": .95}
+    report = validate_extraction_rule_on_samples(
+        "course_name",
+        rule,
+        [
+            {
+                "url": "https://example.edu/a",
+                "html": "<h1>Bachelor of Business</h1>",
+                "before": "Bachelor of Business|UniSC",
+            },
+            {
+                "url": "https://example.edu/b",
+                "html": "<h1>Master of Teaching</h1>",
+                "before": "Master of Teaching | UniSC",
+            },
+            {
+                "url": "https://example.edu/c",
+                "html": "<h1>Bachelor of Laws</h1>",
+                "before": "Bachelor of Laws",
+            },
+        ],
+    )
+
+    assert report["accepted"] is True
+    assert report["invalid_corrected"] == 2
+    assert report["populated_tested"] == 1
+    assert report["regressions"] == 0
+
+
+def test_course_name_repair_rejects_still_branded_output() -> None:
+    report = validate_extraction_rule_on_samples(
+        "course_name",
+        {"css": "title", "confidence": .95},
+        [
+            {
+                "url": "https://example.edu/a",
+                "html": "<title>Bachelor of Business | UniSC</title>",
+                "before": "Bachelor of Business | UniSC",
+            },
+            {
+                "url": "https://example.edu/b",
+                "html": "<title>Master of Teaching | UniSC</title>",
+                "before": "Master of Teaching | UniSC",
+            },
+        ],
+    )
+    assert report["accepted"] is False
+    assert report["invalid_corrected"] == 0
+
+
+def test_course_name_repair_rejects_dash_brand_suffix() -> None:
+    report = validate_extraction_rule_on_samples(
+        "course_name",
+        {"css": "title", "confidence": .95},
+        [
+            {
+                "url": "https://example.edu/a",
+                "html": "<title>Bachelor of Business - UniSC</title>",
+                "before": None,
+            },
+            {
+                "url": "https://example.edu/b",
+                "html": "<title>Master of Teaching - UniSC</title>",
+                "before": None,
+            },
+        ],
+    )
+    assert report["accepted"] is False
+    assert report["valid_outputs"] == 0
+
+
+@pytest.mark.parametrize("bad_field", ["bad_course_names", "bad_locations"])
+def test_contaminated_text_keeps_system_ai_repair_eligible(bad_field: str) -> None:
+    quality = {
+        "total_staged": 10,
+        "fee_pct": 100,
+        "ielts_pct": 100,
+        "intakes_pct": 100,
+        "location_pct": 100,
+        "degree_level_pct": 100,
+        "mode_pct": 100,
+        "duration_pct": 100,
+        bad_field: 1,
+    }
+    assert _extraction_quality_ok(quality) is False
 
 
 class _FakeMappings:

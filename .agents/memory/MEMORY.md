@@ -127,3 +127,4 @@
 - [Autonomous URL repair safety](autonomous-url-repair-safety.md) — OpenAI may propose URL fixes, but full-filter simulation, fenced ownership, and verified atomic persistence control every write.
 - [Production deployment routing](production-deployment-routing.md) — trust the live Git origin and dedicated SSM identity; stale targets or default AWS credentials can fail.
 - [Autonomous config repair rollback](autonomous-config-repair-rollback.md) — validate without writes; fence both apply and compensating rollback against exact config documents.
+- [Automated repair normalization parity](automated-repair-normalization-parity.md) — quality detection, replay validation, and runtime assignment must share canonicalization and fail closed on valid-value misses.

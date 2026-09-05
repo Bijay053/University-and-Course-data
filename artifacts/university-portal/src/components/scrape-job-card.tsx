@@ -3074,13 +3074,14 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                               type="button"
                               onClick={handleAiRepair}
                               disabled={aiRepairLoading || aiRepairPolling}
+                              title="System AI checks missing or contaminated course names, locations, English scores, fees, and durations, then validates proposed rules against stored page snapshots before applying them."
                               className="text-[10px] bg-violet-600 hover:bg-violet-700 text-white px-2 py-1 rounded flex items-center gap-1 disabled:opacity-50 font-semibold"
                             >
                               {(aiRepairLoading || aiRepairPolling)
                                 ? <Loader2 className="w-2.5 h-2.5 animate-spin" />
                                 : <Zap className="w-2.5 h-2.5" />
                               }
-                              {aiRepairPolling ? `OpenAI repairing… (attempt ${aiRepairSession?.current_attempt ?? 0}/5)` : "Auto Repair with OpenAI"}
+                              {aiRepairPolling ? `System AI repairing… (attempt ${aiRepairSession?.current_attempt ?? 0}/5)` : "Run System AI Fix"}
                             </button>
                             {(diagnoseResult?.university_id || (selectedUni && selectedUni !== ALL)) && (
                               <a

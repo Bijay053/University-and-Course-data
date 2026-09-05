@@ -783,19 +783,37 @@ def _parse_column_keyed_english_table(
     # "postgraduate" and "undergraduate" (same value for both in most
     # institutions); the "Diploma" column maps to "diploma" only.
     _COL_LEVEL_MAP: list[tuple[list[str], list[str], int]] = [
-        (["research degree", "research"], ["doctorate"], 5),
-        (["bachelor", "postgraduate"], ["postgraduate", "undergraduate"], 4),
-        (["diploma", "advanced diploma", "associate diploma"], ["diploma"], 3),
+        (["higher degrees by research", "research degree", "research"], ["doctorate"], 5),
+        # Combined Bachelor/Postgraduate columns must be recognised before the
+        # standalone level tokens below.  KBS publishes one shared column,
+        # whereas UniSC publishes separate Undergraduate and Postgraduate
+        # columns with different values.
+        (
+            [
+                "bachelor and all postgraduate",
+                "bachelor and postgraduate",
+                "bachelor & postgraduate",
+                "bachelor/postgraduate",
+            ],
+            ["postgraduate", "undergraduate"],
+            4,
+        ),
+        (["postgraduate"], ["postgraduate"], 4),
+        (["undergraduate", "bachelor"], ["undergraduate"], 3),
+        (["diploma", "advanced diploma", "associate diploma"], ["diploma"], 2),
         # EAP/ELICOS columns are pathway-level — excluded from by_level (level_keys=[])
         # so they don't override degree-level requirements in single_course.py.
-        (["eap 2", "eap2", "academic purposes 2", "purposes 2"], [], 2),
-        (["eap 1", "eap1", "academic purposes 1", "purposes 1"], [], 1),
+        (["eap 2", "eap2", "academic purposes 2", "purposes 2"], [], 1),
+        (["eap 1", "eap1", "academic purposes 1", "purposes 1"], [], 0),
     ]
 
     # (row-header token, slot_key, score regex)
     _TEST_ROWS: list[tuple[str, str, "_re.Pattern[str]"]] = [
         ("ielts", "ielts_overall",
-         _re.compile(r"overall\s+(\d\.?\d*)", _re.I)),
+         _re.compile(
+             r"\boverall(?:\s+score)?(?:\s+of)?\s+(\d(?:\.\d+)?)\b",
+             _re.I,
+         )),
         ("pte", "pte_overall",
          _re.compile(r"(?:academic\s+)?score\s+of\s+(\d{2,3})", _re.I)),
         ("toefl", "toefl_overall",

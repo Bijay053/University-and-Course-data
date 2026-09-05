@@ -161,6 +161,10 @@ extraction:
       - " | Unisc"
       - " | UniSC"
       - " | University of the Sunshine Coast"
+    university_aliases:
+      - "University of the Sunshine Coast, Queensland, Australia"
+      - "University of the Sunshine Coast"
+      - "UniSC"
 
   filters:
     # ── User requirement: extract ALL international courses ──────────────────

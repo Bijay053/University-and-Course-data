@@ -472,12 +472,25 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
         pass
 
     for method, raw, conf in candidates:
-        # Apply per-uni suffix strips before any regex cleaning.
+        # Apply per-uni suffix strips before any regex cleaning.  CMS branding
+        # varies in case and whitespace and can be appended more than once, so
+        # match flexibly and repeat until the candidate is stable.
         _raw = raw
-        for _suffix in _strip_suffixes:
-            if _raw.endswith(_suffix):
-                _raw = _raw[: -len(_suffix)].rstrip()
-                break  # only one suffix per candidate
+        while _raw and _strip_suffixes:
+            _matched_suffix = False
+            for _suffix in sorted(_strip_suffixes, key=len, reverse=True):
+                _suffix_pattern = re.escape(_suffix.strip()).replace(r"\ ", r"\s+")
+                _match = re.search(
+                    rf"\s*{_suffix_pattern}\s*$",
+                    _raw,
+                    flags=re.IGNORECASE,
+                )
+                if _match and _match.start() > 0:
+                    _raw = _raw[: _match.start()].rstrip()
+                    _matched_suffix = True
+                    break
+            if not _matched_suffix:
+                break
         cleaned = _clean(_raw)
         if cleaned:
             # If this is an MBA specialisation sub-page and the extracted

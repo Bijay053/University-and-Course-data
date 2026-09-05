@@ -42,6 +42,36 @@ def test_strong_location_sibling_div_classifies_via_structural_pass():
     assert out[0].method == "location.strong"
 
 
+def test_unresolved_location_interpolation_is_not_a_location():
+    html = (
+        '<div><strong>Location</strong></div>'
+        '<div>{{ vm.location }}</div>'
+    )
+    assert _run(location.extract(html, "https://www.unisc.edu.au/study/course")) == []
+    assert location._classify_location_value("{{ vm.location }}") is None
+
+
+def test_unresolved_location_interpolation_preserves_adjacent_campuses():
+    html = (
+        '<div><strong>Location</strong></div>'
+        '<div>{{ vm.location }} Sunshine Coast, Moreton Bay</div>'
+    )
+    out = _run(location.extract(html, "https://www.unisc.edu.au/study/course"))
+    assert out
+    assert out[0].value == "Sunshine Coast, Moreton Bay"
+    assert "{{" not in out[0].value
+
+
+def test_gemini_display_sanitizer_removes_location_interpolation():
+    assert (
+        location._sanitise_for_display(
+            "{{ vm.location }} Sunshine Coast, Moreton Bay"
+        )
+        == "Sunshine Coast, Moreton Bay"
+    )
+    assert location._sanitise_for_display("{{ vm.location }}") is None
+
+
 def test_dt_dd_location_classifies_via_existing_dl_path():
     """Definition-list shape — already covered by `_from_dl`, locked
     in here so a future refactor of the cascade can't regress it."""

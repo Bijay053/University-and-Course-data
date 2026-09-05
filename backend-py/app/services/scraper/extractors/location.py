@@ -509,6 +509,12 @@ def _is_only_delivery_method(text: str) -> bool:
 def _normalise(raw: str | None) -> str | None:
     if not raw:
         return None
+    # Remove unresolved Angular/Handlebars interpolation expressions before
+    # location classification.  UniSC's static HTML can expose
+    # "{{ vm.location }}" beside real campus names; the token is template
+    # source, not a campus.  Replacing it (rather than rejecting the whole
+    # value) preserves adjacent valid locations.
+    raw = re.sub(r"\{\{[^{}]{0,500}\}\}", " ", raw)
     # Strip leading CMS section markers like "(s)" that Contensis / similar
     # CMSes inject into page headings.  These bleed into Gemini's location_text
     # as "(s)Canterbury Scroll to top" — strip before any other cleaning.
@@ -594,6 +600,12 @@ _CAMPUS_AVAILABILITY_SUFFIX_RE = re.compile(
 
 
 def _sanitise_for_display(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    # This function is also called directly for Gemini-primary values, so
+    # unresolved template expressions must be removed here as well as in
+    # _normalise().  Preserve any legitimate adjacent campus text.
+    raw = re.sub(r"\{\{[^{}]{0,500}\}\}", " ", raw).strip()
     if not raw:
         return None
     if _NON_LOCATION_VALUE_RE.match(raw):

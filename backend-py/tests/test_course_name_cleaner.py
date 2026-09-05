@@ -10,13 +10,17 @@ Covers:
   - clean_course_name_with_config contextvar path
 """
 
+import asyncio
+
 import pytest
 from app.services.scraper.config.context import current_uni_config
 from app.services.scraper.config.loader import get_config_for_host
 from app.services.scraper.course_name_cleaner import (
     clean_course_name,
     clean_course_name_with_config,
+    normalise_generated_course_name_with_config,
 )
+from app.services.scraper.extractors import course_name
 
 
 UNI = "University of East London"
@@ -258,3 +262,73 @@ def test_federation_config_strips_production_course_title_suffix() -> None:
 
     assert cleaned == "Bachelor of Psychological Science (Honours)"
     assert suffix == " | Federation University"
+
+
+@pytest.mark.parametrize(
+    "raw_title",
+    [
+        (
+            "Bachelor of Business | Unisc | University of the Sunshine Coast, "
+            "Queensland, Australia"
+        ),
+        (
+            "Bachelor of Business   |   UNISC   |   UNIVERSITY OF THE SUNSHINE "
+            "COAST, QUEENSLAND, AUSTRALIA   "
+        ),
+        (
+            "Bachelor of Business | UniSC | University of the Sunshine Coast, "
+            "Queensland, Australia | Unisc | University of the Sunshine Coast, "
+            "Queensland, Australia"
+        ),
+    ],
+)
+def test_unisc_extractor_strips_case_whitespace_and_duplicate_branding(
+    raw_title: str,
+) -> None:
+    config = get_config_for_host(
+        hostname="www.unisc.edu.au",
+        name="University of the Sunshine Coast",
+        scrape_url="https://www.unisc.edu.au/",
+        university_id=2235,
+        db_scrape_config={"admin_config": {}},
+    )
+    token = current_uni_config.set(config)
+    try:
+        out = asyncio.run(
+            course_name.extract(
+                f"<html><head><title>{raw_title}</title></head><body></body></html>",
+                "https://www.unisc.edu.au/study/courses-and-programs/"
+                "bachelor-degrees-undergraduate-programs/bachelor-of-business",
+            )
+        )
+    finally:
+        current_uni_config.reset(token)
+
+    assert out
+    assert out[0].value == "Bachelor of Business"
+
+
+def test_unisc_generated_course_name_uses_canonical_configured_cleaner() -> None:
+    config = get_config_for_host(
+        hostname="www.unisc.edu.au",
+        name="University of the Sunshine Coast",
+        scrape_url="https://www.unisc.edu.au/",
+        university_id=2235,
+        db_scrape_config={"admin_config": {}},
+    )
+    token = current_uni_config.set(config)
+    try:
+        assert (
+            normalise_generated_course_name_with_config(
+                "Bachelor of Business - UniSC"
+            )
+            == "Bachelor of Business"
+        )
+        assert (
+            normalise_generated_course_name_with_config(
+                "Bachelor of Business|UniSC|University of the Sunshine Coast"
+            )
+            == "Bachelor of Business"
+        )
+    finally:
+        current_uni_config.reset(token)

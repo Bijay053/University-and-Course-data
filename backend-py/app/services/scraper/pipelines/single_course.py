@@ -1144,6 +1144,32 @@ _CENTRAL_ENGLISH_PG_LEVELS: frozenset[str] = frozenset({
 })
 
 
+def _select_central_english_level(
+    english_by_level: dict,
+    degree_level: str,
+) -> tuple[str, dict]:
+    """Select the level-specific central-English values for one course.
+
+    Research doctorates use the dedicated ``doctorate`` column when present;
+    older central-page parsers only emitted ``postgraduate``, so that remains
+    the explicit fallback.  Diploma and standard PG/UG routing retains the
+    existing behavior.
+    """
+    if degree_level == "Doctorate":
+        bucket = "doctorate"
+    elif degree_level in {"Diploma", "Advanced Diploma", "Associate Diploma"}:
+        bucket = "diploma"
+    elif degree_level in _CENTRAL_ENGLISH_PG_LEVELS:
+        bucket = "postgraduate"
+    else:
+        bucket = "undergraduate"
+
+    values = english_by_level.get(bucket) or {}
+    if bucket == "doctorate" and not values:
+        values = english_by_level.get("postgraduate") or {}
+    return bucket, values
+
+
 # ── Week 2 P5: SKIP_CENTRAL_ENGLISH_PROPAGATION toggle ─────────────────────
 # When enabled, the central-page English values (UG-only IELTS/PTE/TOEFL
 # extracted from the university-wide /english-language-requirements/ page)
@@ -3075,6 +3101,11 @@ async def extract_course(
             for _s0_field, (_s0_value, _s0_method) in _stage0_results.items():
                 if _s0_field in _s0_manual_override_fields:
                     continue
+                if _s0_field == "course_name" and _s0_value is not None:
+                    from app.services.scraper.course_name_cleaner import (
+                        normalise_generated_course_name_with_config as _normalise_s0_name,
+                    )
+                    _s0_value = _normalise_s0_name(_s0_value)
                 if _s0_value is not None and _s0_field not in payload:
                     payload[_s0_field] = _s0_value
                     _stage0_covered.add(_s0_field)
@@ -4505,9 +4536,7 @@ async def extract_course(
                         # "Australia" is not a campus, must be removed).  Mirrors
                         # the same _sanitise_for_display call the structural
                         # location extractor cascade already runs.
-                        _loc_sane = _sfd(_loc)
-                        if _loc_sane:
-                            _loc = _loc_sane
+                        _loc = _sfd(_loc) or ""
                     except Exception:
                         pass  # never block on import/runtime error
                 if _loc and _loc.lower() not in _STUDY_MODE_KEYWORDS:
@@ -7721,17 +7750,10 @@ async def extract_course(
             # at KBS).  Without this bucket, the Diploma column value would be
             # overwritten by the higher-priority Bachelor+PG column (6.0)
             # because both previously shared the "undergraduate" key.
-            _DIPLOMA_LEVELS: frozenset[str] = frozenset(
-                {"Diploma", "Advanced Diploma", "Associate Diploma"}
+            _level_bucket, _level_english = _select_central_english_level(
+                _english_by_level,
+                _course_dl,
             )
-            _level_bucket = (
-                "postgraduate"
-                if _course_dl in _CENTRAL_ENGLISH_PG_LEVELS
-                else "diploma"
-                if _course_dl in _DIPLOMA_LEVELS
-                else "undergraduate"
-            )
-            _level_english: dict = _english_by_level.get(_level_bucket) or {}
 
             # Pathway guard: pathway programs (Foundation Studies, ELICOS,
             # UniPrep, bridging courses) must not inherit the university-wide
@@ -7811,7 +7833,9 @@ async def extract_course(
                     # Prefer the level-specific source URL when separate UG/PG pages
                     # are configured — gives reviewers a direct link to the right page.
                     _level_src_url = (
-                        _central_eng_url_pg if _level_bucket == "postgraduate" else _central_eng_url_ug
+                        _central_eng_url_pg
+                        if _level_bucket in {"postgraduate", "doctorate"}
+                        else _central_eng_url_ug
                     ) or _central_eng_url or url
                     evidence.append({
                         "field_key": _k,

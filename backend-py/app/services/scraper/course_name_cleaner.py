@@ -30,6 +30,13 @@ _SEP_PAT = r"(?:\s*[\|\-\u2013\u2014:•@]\s*|\s+at\s+)"
 _MIN_LEN = 5
 
 
+_UNRESOLVED_TEMPLATE_RE = re.compile(r"\{\{[^{}]*\}\}")
+_UNRESOLVED_BRAND_SUFFIX_RE = re.compile(
+    r"\s[-\u2013\u2014:]\s*(?:university\b|unisc\b).*$",
+    re.IGNORECASE,
+)
+
+
 def clean_course_name(
     name: str,
     *,
@@ -73,17 +80,29 @@ def clean_course_name(
     # Sort longest-first: "University of East London" tried before "University" / "uel".
     all_tokens.sort(key=len, reverse=True)
 
-    for token in all_tokens:
-        pat = re.compile(
-            _SEP_PAT + re.escape(token) + r"\s*$",
-            re.IGNORECASE,
-        )
-        m = pat.search(name)
-        if m and m.start() > 0:
-            candidate = name[: m.start()].strip(" \t\u2013\u2014|:•@-")
-            if candidate and len(candidate) >= _MIN_LEN:
-                return candidate, name[m.start():]
+    cleaned = name
+    stripped_any = False
+    while cleaned:
+        matched = False
+        for token in all_tokens:
+            pat = re.compile(
+                _SEP_PAT + re.escape(token) + r"\s*$",
+                re.IGNORECASE,
+            )
+            m = pat.search(cleaned)
+            if m and m.start() > 0:
+                candidate = cleaned[: m.start()].strip(" \t\u2013\u2014|:•@-")
+                if candidate and len(candidate) >= _MIN_LEN:
+                    cleaned = candidate
+                    stripped_any = True
+                    matched = True
+                    break
+        if not matched:
+            break
 
+    if stripped_any:
+        suffix = name[len(cleaned):] if name.startswith(cleaned) else name
+        return cleaned, suffix
     return name, None
 
 
@@ -136,3 +155,30 @@ def clean_course_name_with_config(
         aliases=[*aliases, *configured_aliases],
         extra_tokens=extra_tokens,
     )
+
+
+def normalise_generated_course_name_with_config(name: str | None) -> str | None:
+    """Return a safe canonical name for generated Stage-0 extraction rules.
+
+    Generated selectors bypass the normal course-name extractor, so apply the
+    same configured university/alias cleanup here and fail closed if template
+    source or an unresolved brand suffix remains.
+    """
+    if not name:
+        return None
+    cleaned, _ = clean_course_name_with_config(str(name))
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" \t,;")
+    if (
+        len(cleaned) < _MIN_LEN
+        or len(cleaned) > 250
+        or _UNRESOLVED_TEMPLATE_RE.search(cleaned)
+        or "|" in cleaned
+        or _UNRESOLVED_BRAND_SUFFIX_RE.search(cleaned)
+        or cleaned.casefold() in {
+            "course", "courses", "program", "programs", "study",
+            "course details", "search courses",
+        }
+        or cleaned.startswith(("http://", "https://"))
+    ):
+        return None
+    return cleaned
