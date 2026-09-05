@@ -898,6 +898,20 @@ def _parse_column_keyed_english_table(
                 )
                 if value_first:
                     m = value_first
+                # UniSC's live level-aware table sometimes starts each IELTS
+                # cell with the bare overall value, e.g. "6.5 with minimum
+                # 6.0 in each subtest".  The row header already proves this is
+                # IELTS, so the leading score is authoritative.  Restrict the
+                # fallback to IELTS and to its valid score range; other test
+                # rows keep their explicit "overall/score of" requirements.
+                if not m and slot_key == "ielts_overall":
+                    bare_ielts = _re.search(
+                        r"^\s*(\d(?:\.\d+)?)\b",
+                        cell_text,
+                        _re.I,
+                    )
+                    if bare_ielts and 4.0 <= float(bare_ielts.group(1)) <= 9.0:
+                        m = bare_ielts
                 if not m:
                     continue
                 try:

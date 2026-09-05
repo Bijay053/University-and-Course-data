@@ -598,7 +598,10 @@ class TestLowValueLinkDiscoverer:
 # Low-value PDF filter — pdf_classifier.is_low_value_pdf
 # ─────────────────────────────────────────────────────────────────────────────
 
-from app.services.scraper.pdf_classifier import is_low_value_pdf
+from app.services.scraper.pdf_classifier import (
+    is_low_value_pdf,
+    is_non_tuition_fee_pdf,
+)
 
 
 class TestLowValuePdfClassifier:
@@ -640,6 +643,18 @@ class TestLowValuePdfClassifier:
         result = classify_by_keywords("https://uni.edu/2026-tuition-fees.pdf", text)
         assert not is_low_value_pdf(result.url, text)
         assert result.category == "fee_schedule"
+
+    def test_unisc_unit_fee_schedule_cannot_fill_degree_tuition(self):
+        assert is_non_tuition_fee_pdf(
+            "https://www.unisc.edu.au/media/z11pysvy/"
+            "2026-full-fee-paying-1st-half.pdf"
+        )
+
+    def test_unisc_real_international_tuition_schedule_is_kept(self):
+        assert not is_non_tuition_fee_pdf(
+            "https://www.unisc.edu.au/media/fees/"
+            "2026-international-tuition-fee-schedule.pdf"
+        )
 
     def test_fee_schedule_not_blocked(self):
         assert not is_low_value_pdf("https://uni.edu/2025-fee-schedule.pdf")

@@ -68,3 +68,35 @@ def test_doctorate_uses_research_requirement_with_postgraduate_fallback() -> Non
     )
     assert bucket == "doctorate"
     assert values == {"ielts_overall": 6.5}
+
+
+def test_unisc_bare_ielts_cells_are_kept_in_each_level_profile() -> None:
+    html = """
+    <table>
+      <tr>
+        <th>Test</th>
+        <th>Undergraduate</th>
+        <th>Postgraduate coursework</th>
+        <th>Higher Degrees by Research</th>
+      </tr>
+      <tr>
+        <td>IELTS (Academic)</td>
+        <td>6.0 with minimum 5.5 in each subtest</td>
+        <td>6.5 with minimum 6.0 in each subtest</td>
+        <td>6.5 with minimum 6.0 in each subtest</td>
+      </tr>
+      <tr>
+        <td>Pearson Test of English (PTE)</td>
+        <td>Overall score of 50</td>
+        <td>Overall score of 58</td>
+        <td>Overall score of 58</td>
+      </tr>
+    </table>
+    """
+
+    flat, by_level = _parse_column_keyed_english_table(html)
+
+    assert by_level["undergraduate"]["ielts_overall"] == 6.0
+    assert by_level["postgraduate"]["ielts_overall"] == 6.5
+    assert by_level["doctorate"]["ielts_overall"] == 6.5
+    assert flat["ielts_overall"] == 6.5

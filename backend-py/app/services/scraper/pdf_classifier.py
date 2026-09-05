@@ -164,6 +164,16 @@ _NON_TUITION_FEE_URL_RE = re.compile(
     r"|(?:materials?|equipment)[-_\s]*(?:fees?|costs?)",
     re.I,
 )
+# UniSC's "full fee paying" PDFs are schedules for individual units of study,
+# not annual degree-program tuition.  Their amounts (for example A$3,566) can
+# fuzzy-match a programme name and must never fill the programme fee field.
+# Keep this host/file rule exact so genuine international tuition schedules at
+# UniSC and similarly named documents at other universities are unaffected.
+_UNISC_UNIT_FEE_SCHEDULE_URL_RE = re.compile(
+    r"https?://(?:www\.)?unisc\.edu\.au/"
+    r".*/20\d{2}-full-fee-paying-(?:1st|2nd)-half\.pdf(?:[?#].*)?$",
+    re.I,
+)
 _NON_TUITION_FEE_TITLE_RE = re.compile(
     r"\b(?:incidental(?:s)?|ancillary|non[-\s]?tuition)\s+(?:fees?|costs?|charges?)\b"
     r"|\bstudent\s+services\s+(?:and|&)\s+amenities\s+fees?\b"
@@ -192,7 +202,10 @@ def is_non_tuition_fee_pdf(url: str, first_page_text: str = "") -> bool:
     materials, and equipment fee documents whose dollar amounts must never be
     used as international tuition.
     """
-    if _NON_TUITION_FEE_URL_RE.search(url or ""):
+    if (
+        _NON_TUITION_FEE_URL_RE.search(url or "")
+        or _UNISC_UNIT_FEE_SCHEDULE_URL_RE.search(url or "")
+    ):
         return True
     sample = (first_page_text or "")[:600]
     title = next((line.strip() for line in sample.splitlines() if line.strip()), "")
