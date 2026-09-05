@@ -348,8 +348,14 @@ class TestDiscoveryUrlCacheC1:
         assert 'and not _lk.get("fee_page")' in _ORCH_SRC
         assert 'and not _lk.get("cache_meta")' in _ORCH_SRC
         i = _ORCH_SRC.index("_disc_cache_hit = True")
-        pre = _ORCH_SRC[max(0, i - 800) : i]
+        pre = _ORCH_SRC[max(0, i - 5000) : i]
         assert "_discover_blocked_fee_urls.extend(" in pre
+
+    def test_orchestrator_persists_and_restores_wayback_timestamps(self):
+        assert '_c1_meta.get("wayback_timestamps")' in _ORCH_SRC
+        assert "_restore_wayback_timestamps(_c1_wayback_timestamps)" in _ORCH_SRC
+        assert '_c1_metadata["wayback_timestamps"]' in _ORCH_SRC
+        assert "_preload_wayback_timestamps(" in _ORCH_SRC
 
     def test_orchestrator_requires_matching_cache_scope(self):
         assert "discovery_cache_scope_key as _discovery_cache_scope_key" in _ORCH_SRC

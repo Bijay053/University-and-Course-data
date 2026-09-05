@@ -12,6 +12,7 @@ import pytest
 
 from app.services.scraper.http_fetcher import (
     clear_wayback_timestamps,
+    export_wayback_timestamps,
     fetch_html,
     fetch_html_scrape_do,
     fetch_html_wayback,
@@ -51,6 +52,22 @@ def test_course_url_identity_preserves_semantic_query_and_sorts_pairs():
     domestic = canonical_course_url_key("https://example.edu/course/x?year=2027")
     assert first == second
     assert first != domestic
+
+
+def test_wayback_timestamp_snapshot_is_json_safe_and_restorable():
+    clear_wayback_timestamps()
+    url = "https://www.example.edu/course/test"
+    set_wayback_timestamps({url: ("20260102030405", url)})
+
+    snapshot = export_wayback_timestamps()
+    assert snapshot == {
+        "example.edu/course/test": ["20260102030405", url],
+    }
+
+    clear_wayback_timestamps()
+    set_wayback_timestamps(snapshot)
+    assert export_wayback_timestamps() == snapshot
+    clear_wayback_timestamps()
 
 
 @pytest.mark.asyncio

@@ -501,7 +501,7 @@ def _reject_direct_challenge_html(
 
 
 def set_wayback_timestamps(
-    url_timestamps: dict[str, str | tuple[str, str]],
+    url_timestamps: dict[str, str | tuple[str, str] | list[str]],
     *,
     authoritative_prefixes: list[str] | None = None,
 ) -> None:
@@ -512,7 +512,7 @@ def set_wayback_timestamps(
     may still pass ``url → timestamp``; that URL is then used as the original.
     """
     for url, value in url_timestamps.items():
-        if isinstance(value, tuple):
+        if isinstance(value, (tuple, list)) and len(value) >= 2:
             timestamp, original_url = value
         else:
             timestamp, original_url = value, url
@@ -523,6 +523,15 @@ def set_wayback_timestamps(
         prefix_key = _wayback_archive_scope_key(prefix)
         if prefix_key:
             _wayback_authoritative_prefixes.add(prefix_key)
+
+
+def export_wayback_timestamps() -> dict[str, list[str]]:
+    """Return a JSON-safe snapshot for the persistent discovery cache."""
+    return {
+        key: [timestamp, original_url]
+        for key, (timestamp, original_url) in _wayback_ts_cache.items()
+        if key and timestamp and original_url
+    }
 
 
 def clear_wayback_timestamps() -> None:

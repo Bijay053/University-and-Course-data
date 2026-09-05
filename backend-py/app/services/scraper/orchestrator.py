@@ -1969,6 +1969,60 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                                 and _lk.get("fee_page")
                             )
                         )
+                        _c1_wayback_timestamps = (
+                            _c1_meta.get("wayback_timestamps") or {}
+                        )
+                        if _c1_wayback_timestamps:
+                            from app.services.scraper.http_fetcher import (
+                                set_wayback_timestamps as _restore_wayback_timestamps,
+                            )
+                            _restore_wayback_timestamps(_c1_wayback_timestamps)
+                            log.info(
+                                "[DISCOVER] restored %d cached Wayback timestamps",
+                                len(_c1_wayback_timestamps),
+                            )
+                        elif getattr(_uni_cfg.discovery, "use_wayback", False):
+                            # Legacy URL-cache rows predate timestamp persistence.
+                            # One wildcard CDX query restores every timestamp at
+                            # once; without it, each rendered-fetch failure pays
+                            # for an individual archive lookup during extraction.
+                            from app.services.scraper.wayback_discover import (
+                                wayback_discover as _preload_wayback_timestamps,
+                            )
+                            from app.services.scraper.http_fetcher import (
+                                export_wayback_timestamps as _export_wayback_timestamps,
+                            )
+                            await _preload_wayback_timestamps(
+                                scrape_url,
+                                max_courses=5,
+                                emit=emit,
+                                cdx_url_prefix=getattr(
+                                    _uni_cfg.discovery,
+                                    "wayback_cdx_prefix",
+                                    None,
+                                ),
+                            )
+                            _c1_wayback_timestamps = _export_wayback_timestamps()
+                            if _c1_wayback_timestamps:
+                                _updated_meta = dict(_c1_meta)
+                                _updated_meta["wayback_timestamps"] = (
+                                    _c1_wayback_timestamps
+                                )
+                                _c1_row.links = [
+                                    (
+                                        _updated_meta
+                                        if isinstance(_lk, dict)
+                                        and _lk.get("cache_meta")
+                                        else _lk
+                                    )
+                                    for _lk in _c1_row.links
+                                ]
+                                await db.commit()
+                                log.info(
+                                    "[DISCOVER] preloaded and backfilled %d "
+                                    "Wayback timestamps into legacy cache row",
+                                    len(_c1_wayback_timestamps),
+                                )
                         _disc_cache_hit = True
                         _always_browser = False
                         log.info(
@@ -3231,12 +3285,17 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             from app.services.scraper.discovery_cache_scope import (
                 discovery_cache_metadata as _discovery_cache_metadata,
             )
-            _c1_links_for_cache.append(
-                _discovery_cache_metadata(
-                    scrape_url=scrape_url,
-                    scope_key=_c1_scope_key,
-                )
+            _c1_metadata = _discovery_cache_metadata(
+                scrape_url=scrape_url,
+                scope_key=_c1_scope_key,
             )
+            from app.services.scraper.http_fetcher import (
+                export_wayback_timestamps as _export_wayback_timestamps_for_cache,
+            )
+            _c1_wayback_timestamps = _export_wayback_timestamps_for_cache()
+            if _c1_wayback_timestamps:
+                _c1_metadata["wayback_timestamps"] = _c1_wayback_timestamps
+            _c1_links_for_cache.append(_c1_metadata)
         elif _c1_links_for_cache:
             # A cache row without scope metadata would be intentionally
             # unreadable. Avoid writing one when fingerprinting failed.
