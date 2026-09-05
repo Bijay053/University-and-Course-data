@@ -1,8 +1,10 @@
 """Regression coverage for blocked/archive-only scrape recovery."""
 from __future__ import annotations
 
+import asyncio
 import json
 import os
+from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -366,6 +368,65 @@ async def test_notredame_recipe_falls_back_to_wayback_after_first_render_failure
     assert live.await_args.kwargs["request_timeout_seconds"] == 20
     assert live.await_args.kwargs["local_concurrency_limit"] == 3
     wayback.assert_awaited_once_with(url)
+
+
+@pytest.mark.asyncio
+async def test_scrape_do_attempt_timeout_starts_after_local_provider_slot():
+    shared_slot = asyncio.Semaphore(1)
+
+    @asynccontextmanager
+    async def account_slot():
+        yield
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, url, params):
+            await asyncio.sleep(0.03)
+            return httpx.Response(200, text="<html>" + ("course " * 200) + "</html>")
+
+    with (
+        patch.dict(os.environ, {"SCRAPE_DO_TOKEN": "test-token"}),
+        patch(
+            "app.services.scraper.http_fetcher._get_scrape_do_sem",
+            return_value=shared_slot,
+        ),
+        patch(
+            "app.services.scraper.scrape_do_semaphore.account_slot",
+            new=account_slot,
+        ),
+        patch(
+            "app.services.scraper.http_fetcher.httpx.AsyncClient",
+            new=FakeClient,
+        ),
+    ):
+        results = await asyncio.gather(
+            fetch_html_scrape_do(
+                "https://example.edu/course/a",
+                render=True,
+                rate_limit=False,
+                max_retries=0,
+                request_timeout_seconds=0.05,
+                local_concurrency_limit=1,
+            ),
+            fetch_html_scrape_do(
+                "https://example.edu/course/b",
+                render=True,
+                rate_limit=False,
+                max_retries=0,
+                request_timeout_seconds=0.05,
+                local_concurrency_limit=1,
+            ),
+        )
+
+    assert all(results)
 
 
 @pytest.mark.asyncio

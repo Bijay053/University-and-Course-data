@@ -768,26 +768,39 @@ async def fetch_html_scrape_do(
             # rest of the fleet.  account_slot() is a no-op unless
             # scrape_do_account_concurrency > 0 and fails open on any Redis error.
             from app.services.scraper.scrape_do_semaphore import account_slot
-            _request_timeout = clamp_timeout(request_timeout_seconds or 90.0)
-            if _request_timeout is not None and _request_timeout <= 0:
-                return None
+            _effective_request_timeout: list[float | None] = [
+                request_timeout_seconds or 90.0
+            ]
 
             async def _request() -> httpx.Response:
                 async with _get_scrape_do_sem(local_concurrency_limit):
                     async with account_slot():
+                        # Start the per-attempt clock only after both provider
+                        # slots are acquired. A queue wait is not an HTTP attempt
+                        # and must not trigger a false timeout/fallback wave when
+                        # whole-course concurrency exceeds provider concurrency.
+                        _inner_timeout = clamp_timeout(
+                            request_timeout_seconds or 90.0
+                        )
+                        _effective_request_timeout[0] = _inner_timeout
+                        if _inner_timeout is not None and _inner_timeout <= 0:
+                            raise asyncio.TimeoutError
                         async with httpx.AsyncClient(
-                            timeout=_request_timeout or 90.0,
+                            timeout=_inner_timeout or 90.0,
                             follow_redirects=True,
                         ) as c:
-                            return await c.get("https://api.scrape.do", params=params)
+                            _get = c.get(
+                                "https://api.scrape.do",
+                                params=params,
+                            )
+                            if _inner_timeout is None:
+                                return await _get
+                            return await asyncio.wait_for(
+                                _get,
+                                timeout=_inner_timeout,
+                            )
 
-            if _request_timeout is None:
-                _last_sd_r = await _request()
-            else:
-                _last_sd_r = await asyncio.wait_for(
-                    _request(),
-                    timeout=_request_timeout,
-                )
+            _last_sd_r = await _request()
             _status = _last_sd_r.status_code
             if _status == 200 and is_challenge_shell(_last_sd_r.text):
                 _record_fetch_error(
@@ -941,7 +954,7 @@ async def fetch_html_scrape_do(
         except asyncio.TimeoutError:
             log.warning(
                 "[COURSE DEADLINE] Scrape.do request exceeded remaining %.3fs for %s",
-                _request_timeout or 0.0,
+                _effective_request_timeout[0] or 0.0,
                 url,
             )
             _record_fetch_failure(
