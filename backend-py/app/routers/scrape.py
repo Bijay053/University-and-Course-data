@@ -6360,7 +6360,7 @@ async def apply_scrape_fix(
 async def start_ai_repair(
     job_id: str,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[dict, Depends(get_current_user)],
+    _: Annotated[dict, Depends(require_permission("scraping.trigger"))],
 ) -> dict:
     """Trigger the AI-powered iterative repair loop for a completed scrape job.
 
@@ -6378,7 +6378,7 @@ async def start_ai_repair(
         _write_session,
         acquire_repair_lease,
         release_repair_lease,
-        validate_url_repair_target,
+        validate_ai_repair_target,
     )
     from datetime import datetime, timezone
     import uuid
@@ -6393,9 +6393,20 @@ async def start_ai_repair(
     )).mappings().first()
     if not row:
         raise HTTPException(status_code=404, detail=f"Job {job_id!r} not found")
-    repairable, reason = validate_url_repair_target(
+    missing_repairable = (await db.execute(
+        _text(
+            "SELECT COUNT(*) FROM scraped_courses "
+            "WHERE scrape_job_id = :j "
+            "AND status IN ('pending', 'review', 'approved') "
+            "AND (international_fee IS NULL OR ielts_overall IS NULL "
+            "OR duration IS NULL OR course_location IS NULL)"
+        ),
+        {"j": job_id},
+    )).scalar() or 0
+    repairable, reason = validate_ai_repair_target(
         str(row["status"] or ""),
         row["discovered_config"] or {},
+        has_extraction_gap=missing_repairable > 0,
     )
     if not repairable:
         raise HTTPException(status_code=422, detail=reason)
@@ -6416,7 +6427,7 @@ async def start_ai_repair(
             status_code=409,
             detail=(
                 "A newer scrape is queued or running for this university. "
-                "Wait for it to finish before changing URL filters."
+                "Wait for it to finish before changing scraper configuration."
             ),
         )
 
@@ -6424,7 +6435,7 @@ async def start_ai_repair(
     if not acquire_repair_lease(university_id, session_id):
         raise HTTPException(
             status_code=409,
-            detail="An OpenAI URL repair is already queued or running for this university.",
+            detail="An OpenAI repair is already queued or running for this university.",
         )
 
     queued_at = datetime.now(timezone.utc).isoformat()

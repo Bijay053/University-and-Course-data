@@ -2,8 +2,8 @@
 
 Uses the Replit AI Integrations OpenAI proxy to iteratively diagnose failing
 scrape jobs and apply URL-filter patches only after deterministic validation.
-Extraction recipe suggestions remain advisory until they can be validated
-without mutating course data.
+Extraction-rule suggestions are replayed against stored HTML snapshots and are
+persisted only when they improve missing fields without changing known values.
 
 Loop per attempt:
   1. Snapshot quality BEFORE  (discovery stats + extraction fill rates)
@@ -11,9 +11,8 @@ Loop per attempt:
   3. Strict patch validation  (whitelist, type, regex, range)
   4. Apply validated patches  (DB admin_config + YAML on disk)
   5. URL filter simulation    (discovery patches only — fast, no live re-scrape)
-  6. Real extraction scan     (re-fetch up to 5 staged course URLs with patched config;
-                               SQL fast-path for default_ielts / reject_values)
-  7. Real quality snapshot    (DB fill rates AFTER scan — not predicted, actual)
+  6. Snapshot extraction scan (replay stored HTML; never mutate course rows)
+  7. Validation report        (field-specific fill gain + populated-value preservation)
   8. Evaluate success         (6-dimensional: discovery, fee, IELTS, location, mode, degree)
   9. Record attempt           (Redis, TTL 24 h)
  10. Terminate if overall_ok OR no more patches OR MAX_ATTEMPTS
@@ -243,6 +242,24 @@ def validate_url_repair_target(status: str, discovered_config: dict) -> tuple[bo
     return True, ""
 
 
+def validate_ai_repair_target(
+    status: str,
+    discovered_config: dict,
+    *,
+    has_extraction_gap: bool,
+) -> tuple[bool, str]:
+    """Allow terminal URL-filter failures or jobs with missing repairable fields."""
+    if status not in _REPAIR_TERMINAL_STATUSES:
+        return False, f"Scrape is still {status!r}; wait for it to finish before repair."
+    url_repairable, _ = validate_url_repair_target(status, discovered_config)
+    if url_repairable or has_extraction_gap:
+        return True, ""
+    return False, (
+        "This job has neither a URL-filter failure nor missing fee, IELTS, "
+        "duration, or location values that OpenAI can repair safely."
+    )
+
+
 # ── Utilities ─────────────────────────────────────────────────────────────────
 
 def _deep_merge(base: dict, override: dict) -> dict:
@@ -297,6 +314,17 @@ _ALLOWED_EXTRACTION_FIELDS: dict[str, str] = {
     "text_cleaning.location.allowed_values": "str_list",
     "text_cleaning.duration.split_on_slash": "bool",
     "staging.reject_if_missing":             "known_field_list",
+    "extraction_rules.international_fee":    "extraction_rule",
+    "extraction_rules.ielts_overall":        "extraction_rule",
+    "extraction_rules.duration":             "extraction_rule",
+    "extraction_rules.course_location":      "extraction_rule",
+}
+
+_SAFE_REPAIR_FIELDS = {
+    "international_fee",
+    "ielts_overall",
+    "duration",
+    "course_location",
 }
 
 _KNOWN_STAGING_FIELDS = {
@@ -412,6 +440,169 @@ def _validate_extraction_patch(field: str, value: Any) -> None:
                 raise PatchValidationError(
                     f"'{v}' is not a known staging field. Allowed: {sorted(_KNOWN_STAGING_FIELDS)}"
                 )
+    elif tag == "extraction_rule":
+        if not isinstance(value, dict):
+            raise PatchValidationError(f"extraction.{field} must be a rule object.")
+        if not any(value.get(key) for key in ("css", "xpath", "regex")):
+            raise PatchValidationError(
+                f"extraction.{field} needs at least one CSS, XPath, or regex selector."
+            )
+        confidence = value.get("confidence")
+        if not isinstance(confidence, (int, float)) or not 0.85 <= float(confidence) <= 1:
+            raise PatchValidationError(
+                f"extraction.{field} confidence must be between 0.85 and 1.0."
+            )
+        for key in ("css", "xpath", "regex", "attribute", "transform", "quoted_text"):
+            item = value.get(key)
+            if item is not None and (not isinstance(item, str) or len(item) > 1000):
+                raise PatchValidationError(f"extraction.{field}.{key} must be a string ≤1000 chars.")
+        pattern = value.get("regex")
+        if pattern:
+            try:
+                re.compile(pattern)
+            except re.error as exc:
+                raise PatchValidationError(
+                    f"extraction.{field}.regex is invalid: {exc}"
+                ) from exc
+
+
+def _normalise_repair_value(field: str, value: Any) -> Any:
+    """Return a comparison-safe, field-specific value or None when implausible."""
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None
+    text = str(value).strip()
+    try:
+        if field == "international_fee":
+            number = float(re.sub(r"[^\d.]", "", text.replace(",", "")))
+            return round(number, 2) if 100 <= number <= 1_000_000 else None
+        if field == "ielts_overall":
+            number = float(text)
+            return round(number, 1) if 4 <= number <= 9 else None
+        if field == "duration":
+            number = float(re.search(r"\d+(?:\.\d+)?", text).group(0))
+            return round(number, 2) if 0 < number <= 20 else None
+        if field == "course_location":
+            cleaned = re.sub(r"\s+", " ", text).strip(" ,;|")
+            if not cleaned or len(cleaned) > 200 or cleaned.casefold() in {
+                "location", "campus", "study", "apply", "contact us",
+            }:
+                return None
+            return cleaned.casefold()
+    except (AttributeError, TypeError, ValueError):
+        return None
+    return None
+
+
+def validate_extraction_rule_on_samples(
+    field: str,
+    rule: dict[str, Any],
+    samples: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Replay one rule without side effects and prove fill gain + preservation."""
+    if field not in _SAFE_REPAIR_FIELDS:
+        raise PatchValidationError(f"Field {field!r} is not safe for automatic extraction repair.")
+    _validate_extraction_patch(f"extraction_rules.{field}", rule)
+    from app.services.scraper.ai_extractor_run import apply_extraction_rules
+
+    tested: list[dict[str, Any]] = []
+    filled_missing = regressions = valid_outputs = populated_tested = 0
+    for sample in samples:
+        baseline = _normalise_repair_value(field, sample.get("before"))
+        result = apply_extraction_rules(sample.get("html") or "", {field: rule})
+        raw_after = result.get(field, (None, "ai_rule:miss"))[0]
+        after = _normalise_repair_value(field, raw_after)
+        preserved = baseline is None or after is None or after == baseline
+        if baseline is not None:
+            populated_tested += 1
+        if baseline is not None and after is not None and after != baseline:
+            regressions += 1
+        if baseline is None and after is not None:
+            filled_missing += 1
+        if after is not None:
+            valid_outputs += 1
+        tested.append({
+            "url": sample.get("url"),
+            "before": sample.get("before"),
+            "after": raw_after,
+            "method": result.get(field, (None, "ai_rule:miss"))[1],
+            "preserved": preserved,
+        })
+
+    reasons: list[str] = []
+    if len(samples) < 2:
+        reasons.append("At least two stored HTML samples are required.")
+    if filled_missing < 1:
+        reasons.append("The rule did not fill any missing values.")
+    if populated_tested < 1:
+        reasons.append("No populated baseline value was available to prove preservation.")
+    if valid_outputs < 2:
+        reasons.append("The rule produced too few plausible values.")
+    if regressions:
+        reasons.append(f"The rule changed {regressions} already-populated value(s).")
+    return {
+        "field": field,
+        "accepted": not reasons,
+        "confidence": float(rule["confidence"]),
+        "samples_tested": len(samples),
+        "missing_filled": filled_missing,
+        "valid_outputs": valid_outputs,
+        "populated_tested": populated_tested,
+        "regressions": regressions,
+        "rejection_reasons": reasons,
+        "samples": tested,
+    }
+
+
+async def _validate_extraction_patch_on_snapshots(
+    job_id: str,
+    extr_patch: dict[str, Any],
+    db,
+    *,
+    max_samples: int = 12,
+) -> dict[str, Any]:
+    """Load representative stored HTML and validate proposed Stage-0 rules."""
+    from sqlalchemy import select
+    from app.models.page_snapshot import PageSnapshot
+    from app.services.snapshot_store import download_snapshot
+
+    rules = extr_patch.get("extraction_rules") or {}
+    reports: list[dict[str, Any]] = []
+    accepted_rules: dict[str, Any] = {}
+    snapshots = list((await db.execute(
+        select(PageSnapshot)
+        .where(PageSnapshot.scrape_job_id == job_id)
+        .where(PageSnapshot.snapshot_type.in_(["html", "repair"]))
+        .where(PageSnapshot.storage_path.isnot(None))
+        .order_by(PageSnapshot.fetched_at.desc())
+        .limit(max_samples)
+    )).scalars().all())
+
+    for field, rule in rules.items():
+        samples: list[dict[str, Any]] = []
+        # Prefer a balanced set: missing rows prove gain, populated rows prove preservation.
+        ordered = sorted(
+            snapshots,
+            key=lambda snap: (snap.original_extraction or {}).get(field) is not None,
+        )
+        for snap in ordered:
+            raw = await download_snapshot(snap.storage_path)
+            if not raw:
+                continue
+            samples.append({
+                "url": snap.course_url,
+                "html": raw.decode("utf-8", errors="replace"),
+                "before": (snap.original_extraction or {}).get(field),
+            })
+        report = validate_extraction_rule_on_samples(field, rule, samples)
+        reports.append(report)
+        if report["accepted"]:
+            accepted_rules[field] = rule
+    return {
+        "accepted": bool(rules) and len(accepted_rules) == len(rules),
+        "rules": accepted_rules,
+        "reports": reports,
+        "rollback_status": "not_needed",
+    }
 
 
 def _validate_patch(patch: dict) -> dict:
@@ -1213,23 +1404,10 @@ DISCOVERY PATCHES (section="discovery"):
   sitemap_url          str (URL)    — override sitemap URL
 
 RECIPE PATCHES (section="recipe"):
-  fees.central_page                  str (URL) or null   — fee schedule page
-  fees.fees_pdf_url                  str (URL) or null   — fee schedule PDF
-  fees.default_currency              str (ISO-3)         — e.g. AUD, GBP, USD
-  fees.credit_points_per_unit        int 1-200 or null
-  english.central_page               str (URL) or null   — IELTS/English req page
-  english.requirements_pdf_url       str (URL) or null
-  english.trust_vision_ocr           bool                — false = disable OCR
-  english.default_ielts              float 4.0-9.0 or null
-  english.default_pte                int 30-90 or null
-  english.default_toefl              int 30-120 or null
-  filters.domestic_only.enabled      bool
-  filters.online_only.enabled        bool
-  text_cleaning.location.strip_patterns  list[regex]
-  text_cleaning.location.reject_values   list[str]
-  text_cleaning.location.allowed_values  list[str]
-  text_cleaning.duration.split_on_slash  bool
-  staging.reject_if_missing              list[known_fields]
+  extraction_rules.international_fee  object — CSS/XPath/regex Stage-0 rule
+  extraction_rules.ielts_overall      object — CSS/XPath/regex Stage-0 rule
+  extraction_rules.duration           object — CSS/XPath/regex Stage-0 rule
+  extraction_rules.course_location    object — CSS/XPath/regex Stage-0 rule
 
 RULES:
 - Regex patterns must be valid Python re.search() patterns
@@ -1237,7 +1415,9 @@ RULES:
 - field must use exact dot-notation paths from the tables above
 - Do NOT repeat a fix from any previous attempt listed in context
 - Return up to 3 patches per attempt; prioritise highest-impact fix first
-- Return empty patches if no safe automatic fix is possible\
+- Return empty patches if no safe automatic fix is possible
+- Extraction rule objects require confidence >= 0.85 and at least one of css/xpath/regex.
+- Prefer extraction_rules patches for missing fee, IELTS, duration, or location values.
 """
 
 
@@ -1329,16 +1509,41 @@ async def _apply_to_db(uni_id: int, config_patch: dict, db) -> dict:
     return original_sc
 
 
-async def _restore_db_config(uni_id: int, original_sc: dict, db) -> None:
-    """Restore the exact pre-repair scrape_config after a failed durable apply."""
+async def _restore_db_config(
+    uni_id: int,
+    original_sc: dict,
+    db,
+    *,
+    expected_current: dict | None = None,
+) -> None:
+    """Restore pre-repair config, optionally fenced against concurrent edits."""
     from sqlalchemy import text
     import json as _json
 
     await db.rollback()
-    await db.execute(
-        text("UPDATE universities SET scrape_config = CAST(:cfg AS jsonb) WHERE id = :id"),
-        {"cfg": _json.dumps(original_sc), "id": uni_id},
-    )
+    if expected_current is None:
+        result = await db.execute(
+            text("UPDATE universities SET scrape_config = CAST(:cfg AS jsonb) WHERE id = :id"),
+            {"cfg": _json.dumps(original_sc), "id": uni_id},
+        )
+    else:
+        result = await db.execute(
+            text(
+                "UPDATE universities SET scrape_config = CAST(:cfg AS jsonb) "
+                "WHERE id = :id AND scrape_config = CAST(:expected AS jsonb)"
+            ),
+            {
+                "cfg": _json.dumps(original_sc),
+                "expected": _json.dumps(expected_current),
+                "id": uni_id,
+            },
+        )
+        if result.rowcount != 1:
+            await db.rollback()
+            raise RuntimeError(
+                "Scraper config changed after repair; automatic rollback refused "
+                "to overwrite the newer config."
+            )
     await db.commit()
 
 
@@ -1347,9 +1552,59 @@ async def _apply_discovery_to_db(uni_id: int, disc_patch: dict, db) -> dict:
     return await _apply_to_db(uni_id, {"discovery": disc_patch}, db)
 
 
-async def _apply_recipe_to_db(uni_id: int, recipe_patch: dict, db) -> dict:
-    """Write recipe-section patch into admin_config.extraction."""
-    return await _apply_to_db(uni_id, {"extraction": recipe_patch}, db)
+async def _read_scrape_config(uni_id: int, db) -> dict:
+    """Capture the exact config document used as the validation fence."""
+    from sqlalchemy import text
+
+    row = (await db.execute(
+        text("SELECT scrape_config FROM universities WHERE id = :id"),
+        {"id": uni_id},
+    )).mappings().first()
+    if not row:
+        raise RuntimeError(f"University {uni_id} no longer exists.")
+    return dict(row.get("scrape_config") or {})
+
+
+async def _apply_recipe_to_db(
+    uni_id: int,
+    recipe_patch: dict,
+    db,
+    *,
+    expected_config: dict | None = None,
+) -> dict:
+    """Atomically merge validated Stage-0 rules into the runtime auto_config."""
+    from sqlalchemy import text
+    import json as _json
+
+    original_sc = (
+        dict(expected_config)
+        if expected_config is not None
+        else await _read_scrape_config(uni_id, db)
+    )
+    updated_sc = dict(original_sc)
+    auto_config = dict(updated_sc.get("auto_config") or {})
+    current_rules = dict(auto_config.get("extraction_rules") or {})
+    proposed_rules = dict(recipe_patch.get("extraction_rules") or {})
+    auto_config["extraction_rules"] = _merge_repair_patch(current_rules, proposed_rules)
+    auto_config["_extraction_rules_source"] = "openai_validated_snapshot_replay"
+    auto_config["_extraction_rules_repaired_at"] = datetime.now(timezone.utc).isoformat()
+    updated_sc["auto_config"] = auto_config
+    result = await db.execute(
+        text(
+            "UPDATE universities SET scrape_config = CAST(:after AS jsonb) "
+            "WHERE id = :id AND scrape_config = CAST(:before AS jsonb)"
+        ),
+        {
+            "after": _json.dumps(updated_sc),
+            "before": _json.dumps(original_sc),
+            "id": uni_id,
+        },
+    )
+    if result.rowcount != 1:
+        await db.rollback()
+        raise RuntimeError("Scraper config changed during validation; no repair was saved.")
+    await db.commit()
+    return {"before": original_sc, "applied": updated_sc}
 
 
 def _apply_to_yaml(
@@ -1509,23 +1764,20 @@ def _build_user_message(ctx: dict, previous_attempts: list[dict], phase: str = "
             "The problem is that staged courses are missing key fields.\n"
             f"FAILING FIELDS: {failing_str}\n"
             "Suggest ONLY section='recipe' patches targeting the failing fields above.\n"
-            "Valid recipe fields: fees.central_page, fees.fees_pdf_url, fees.default_currency,\n"
-            "  english.central_page, english.default_ielts, english.default_pte,\n"
-            "  filters.domestic_only.enabled, filters.online_only.enabled,\n"
-            "  text_cleaning.location.reject_values, text_cleaning.location.strip_patterns,\n"
-            "  text_cleaning.duration.split_on_slash, staging.reject_if_missing"
+            "Valid recipe fields: extraction_rules.international_fee,\n"
+            "  extraction_rules.ielts_overall, extraction_rules.duration,\n"
+            "  extraction_rules.course_location. Each value must be a rule object\n"
+            "  with confidence >= 0.85 and at least one of css, xpath, or regex."
         )
         diag_priority = (
             "DIAGNOSIS PRIORITY (extraction phase — pick the lowest-fill field first):\n"
             f"  Failing: {failing_str}\n"
-            "1. fee_pct low     → section='recipe', field='fees.central_page', value='<URL to fee schedule page>'\n"
-            "2. ielts_pct low   → section='recipe', field='english.central_page', value='<URL>' OR\n"
-            "                     section='recipe', field='english.default_ielts', value=6.0\n"
-            "3. location noise  → section='recipe', field='text_cleaning.location.reject_values', value=[<nav labels>]\n"
-            "4. mode_pct low    → section='recipe', field='filters.online_only.enabled', value=false\n"
-            "5. degree_level low→ note in explanation only (degree level is scraped from page H-tags)\n"
-            "6. intakes low     → note in explanation only (intakes are scraped from individual course pages)\n"
-            "7. Nothing fixable → return empty patches with a clear explanation"
+            "1. fee_pct low     → extraction_rules.international_fee\n"
+            "2. ielts_pct low   → extraction_rules.ielts_overall\n"
+            "3. duration low    → extraction_rules.duration\n"
+            "4. location low   → extraction_rules.course_location\n"
+            "5. Other fields   → note in explanation only; do not propose an unsupported patch\n"
+            "6. Nothing fixable → return empty patches with a clear explanation"
         )
     else:
         focus_block = (
@@ -1629,6 +1881,7 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
         "quality_before":  None,
     }
     _write_session(job_id, session)
+    pending_extraction_rollback: dict[str, dict[str, Any]] | None = None
 
     try:
         ctx = await _gather_context(job_id, db)
@@ -1723,13 +1976,38 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
                 validation_errors.append(
                     f"Discovery patches blocked (extraction phase active): {', '.join(disc_only_blocked)}"
                 )
+            extraction_validation: dict[str, Any] | None = None
+            extraction_config_before: dict[str, Any] | None = None
             if extr_patch:
-                validation_errors.append(
-                    "Extraction recipe suggestions are advisory only and were not applied: "
-                    "the repair agent currently auto-applies URL-filter fixes only after "
-                    "deterministic full-filter validation."
-                )
-                extr_patch = {}
+                unsupported = set(extr_patch) - {"extraction_rules"}
+                if unsupported:
+                    validation_errors.append(
+                        "Extraction patch rejected: automatic repair supports only tested "
+                        f"Stage-0 extraction_rules, not {', '.join(sorted(unsupported))}."
+                    )
+                    extr_patch = {}
+                elif int(ai_data.get("confidence") or 0) < 85:
+                    validation_errors.append(
+                        "Extraction patch rejected: OpenAI confidence was below 85%."
+                    )
+                    extr_patch = {}
+                else:
+                    # Capture before replay starts. The eventual write must CAS
+                    # against this exact document so operator edits made during
+                    # snapshot validation can never be overwritten.
+                    extraction_config_before = await _read_scrape_config(
+                        ctx["university_id"], db
+                    )
+                    extraction_validation = await _validate_extraction_patch_on_snapshots(
+                        job_id, extr_patch, db
+                    )
+                    if not extraction_validation["accepted"]:
+                        for report in extraction_validation["reports"]:
+                            validation_errors.extend(
+                                f"{report['field']}: {reason}"
+                                for reason in report["rejection_reasons"]
+                            )
+                        extr_patch = {}
 
             # ⑤ URL filter simulation (discovery patches only — no live re-scrape needed)
             sim: dict = {"before": 0, "after": 0, "total": 0, "rescued": []}
@@ -1797,6 +2075,7 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
             # ⑥ Apply discovery patch
             patch_applied_ok  = False
             patch_error: str  = ""
+            extraction_apply_failed = False
             extr_patch_applied_keys: list = []
             if disc_patch:
                 yaml_state: tuple[Path, str | None] | None = None
@@ -1856,11 +2135,21 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
                     )
                     disc_patch = {}
 
-            # ⑦ Extraction patches are not written until a non-mutating
-            # field-level validation path exists.  See the guard above.
+            # ⑦ Persist only rules that passed non-mutating snapshot validation.
             if extr_patch:
                 try:
-                    await _apply_recipe_to_db(ctx["university_id"], extr_patch, db)
+                    if lease_token and not renew_repair_lease(
+                        ctx["university_id"], lease_token
+                    ):
+                        raise RuntimeError(
+                            "Repair ownership was lost before extraction config apply."
+                        )
+                    pending_extraction_rollback = await _apply_recipe_to_db(
+                        ctx["university_id"],
+                        extr_patch,
+                        db,
+                        expected_config=extraction_config_before,
+                    )
                     extr_patch_applied_keys = _flatten_dotpaths(extr_patch)
                     patch_applied_ok = True
                     # Register fingerprints
@@ -1870,30 +2159,35 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
                     log.info("ai_repair: extraction patch applied: %s", extr_patch_applied_keys)
                 except Exception as exc:
                     log.warning("ai_repair: extraction patch apply error: %s", exc)
+                    await db.rollback()
+                    extraction_apply_failed = True
+                    extr_patch = {}
                     if not patch_error:
                         patch_error = str(exc)
+                    validation_errors.append(
+                        f"Validated extraction patch was not saved: {exc}. "
+                        "No scraper config was changed."
+                    )
 
-            # ⑧ Real extraction scan:
-            #    Phase 1 — SQL fast-path (default_ielts fills, reject_values clears)
-            #    Phase 2 — re-fetch up to 8 staged course detail URLs with patched config
+            # Extraction-rule patches were already replayed against stored HTML.
+            # Never mutate staged/production course rows during repair validation.
             config_patch_combined: dict = {}
             if disc_patch:
                 config_patch_combined["discovery"] = disc_patch
             if extr_patch:
                 config_patch_combined["extraction"] = extr_patch
-            scan_fills = (
-                await _run_extraction_scan(ctx, config_patch_combined, db, max_courses=8)
-                if extr_patch
-                else {
-                    "courses_rescanned": 0,
-                    "ielts_fills": 0,
-                    "fee_fills": 0,
-                    "location_clears": 0,
-                }
-            )
+            scan_fills = {
+                "courses_rescanned": sum(
+                    report.get("samples_tested", 0)
+                    for report in (extraction_validation or {}).get("reports", [])
+                ),
+                "ielts_fills": 0,
+                "fee_fills": 0,
+                "location_clears": 0,
+            }
 
             # ⑨ Real quality snapshot AFTER the extraction scan
-            quality_after = await _quality_snapshot(job_id, ctx["university_id"], db)
+            quality_after = dict(quality_before)
             if sim.get("total", 0) > 0:
                 _raw   = ctx["raw_discovered"]
                 _after = ctx["after_filter"] + sim.get("after", 0)
@@ -1949,6 +2243,11 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
                 "predicted_fills":      predicted_fills,
                 "success_criteria":     success_criteria,
                 "courses_rescanned":    scan_fills.get("courses_rescanned", 0),
+                "extraction_validation": extraction_validation,
+                "rollback_status": (
+                    "not_needed" if patch_applied_ok
+                    else "unchanged"
+                ),
             }
             session["attempts"].append(attempt_record)
             _write_session(job_id, session)
@@ -1969,6 +2268,18 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
                 log.info("ai_repair: discovery confirmed OK — locking into extraction phase")
 
             # ⑪ Termination checks
+            if extraction_apply_failed:
+                session.update(
+                    status="failed",
+                    error=(
+                        f"Validated extraction patch was not saved: {patch_error}. "
+                        "No scraper config was changed."
+                    ),
+                    final_verdict="No extraction repair was applied; scraper config is unchanged.",
+                    rollback_status="unchanged",
+                )
+                break
+
             if patch_applied_ok and has_url_patch and urls_rescued_enough:
                 session.update(
                     status="completed",
@@ -2015,6 +2326,7 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
                         "Re-run a full scrape to confirm extraction improvements."
                     ),
                 )
+                pending_extraction_rollback = None
                 break
 
             if overall:
@@ -2080,7 +2392,27 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
 
     except Exception as exc:
         log.exception("ai_repair: unexpected error job=%s: %s", job_id, exc)
-        session.update(status="failed", error=str(exc))
+        rollback_status = "unchanged"
+        rollback_error = ""
+        if pending_extraction_rollback is not None:
+            try:
+                await _restore_db_config(
+                    int(session["university_id"]),
+                    pending_extraction_rollback["before"],
+                    db,
+                    expected_current=pending_extraction_rollback["applied"],
+                )
+                rollback_status = "restored"
+            except Exception as rollback_exc:
+                rollback_status = "failed"
+                rollback_error = f" Config rollback failed: {rollback_exc}"
+        session.update(
+            status="failed",
+            error=f"{exc}{rollback_error}",
+            rollback_status=rollback_status,
+        )
+        if session["attempts"]:
+            session["attempts"][-1]["rollback_status"] = rollback_status
     finally:
         session["completed_at"] = datetime.now(timezone.utc).isoformat()
         _write_session(job_id, session)

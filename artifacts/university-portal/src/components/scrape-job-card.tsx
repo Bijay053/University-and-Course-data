@@ -157,6 +157,20 @@ type AIRepairAttempt = {
   predicted_fills?:      PredictedFills;
   success_criteria?:     SuccessCriteria;
   courses_rescanned?:    number;
+  rollback_status?:      "not_needed" | "unchanged" | "restored" | "failed";
+  extraction_validation?: {
+    accepted: boolean;
+    rollback_status: string;
+    reports: Array<{
+      field: string;
+      accepted: boolean;
+      samples_tested: number;
+      missing_filled: number;
+      regressions: number;
+      rejection_reasons: string[];
+      samples: Array<{ url?: string; before: unknown; after: unknown; method: string; preserved: boolean }>;
+    }>;
+  } | null;
 };
 type AIRepairSession = {
   session_id:      string;
@@ -169,6 +183,7 @@ type AIRepairSession = {
   started_at:      string | null;
   completed_at:    string | null;
   error:           string | null;
+  rollback_status?: "unchanged" | "restored" | "failed";
 };
 
 // ── AI Diagnostic types ───────────────────────────────────────────────────────
@@ -3150,6 +3165,23 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                                     </div>
                                   );
                                 })()}
+                                {aiRepairSession.rollback_status && (
+                                  <div className={`text-[9px] rounded border px-2 py-1 ${
+                                    aiRepairSession.rollback_status === "restored"
+                                      ? "bg-green-50 border-green-200 text-green-700"
+                                      : aiRepairSession.rollback_status === "failed"
+                                      ? "bg-red-50 border-red-200 text-red-700"
+                                      : "bg-gray-50 border-gray-200 text-gray-600"
+                                  }`}>
+                                    Rollback status: {
+                                      aiRepairSession.rollback_status === "restored"
+                                        ? "previous scraper config restored"
+                                        : aiRepairSession.rollback_status === "failed"
+                                        ? "rollback blocked to protect a newer config change"
+                                        : "config unchanged"
+                                    }
+                                  </div>
+                                )}
 
                                 {/* Attempt cards */}
                                 {aiRepairSession.attempts.map((att, i) => {
@@ -3271,12 +3303,51 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                                           </div>
                                         )}
 
+                                        {att.extraction_validation?.reports.map((report) => (
+                                          <div key={report.field} className={`mt-1 rounded border px-1.5 py-1 ${
+                                            report.accepted ? "border-green-100 bg-green-50" : "border-red-100 bg-red-50"
+                                          }`}>
+                                            <div className="flex items-center justify-between text-[9px] font-semibold">
+                                              <span>{report.field} · {report.samples_tested} stored samples tested</span>
+                                              <span className={report.accepted ? "text-green-700" : "text-red-700"}>
+                                                {report.accepted ? `Accepted · +${report.missing_filled} fills` : "Rejected"}
+                                              </span>
+                                            </div>
+                                            {report.rejection_reasons.map((reason) => (
+                                              <div key={reason} className="text-[8.5px] text-red-600">• {reason}</div>
+                                            ))}
+                                            <div className="mt-1 max-h-24 overflow-y-auto space-y-0.5">
+                                              {report.samples.map((sample, sampleIndex) => (
+                                                <div key={`${sample.url}-${sampleIndex}`} className="bg-white/70 rounded px-1 py-0.5 text-[8px]">
+                                                  {sample.url && (
+                                                    <a href={sample.url} target="_blank" rel="noreferrer" className="block truncate text-blue-600 hover:underline" title={sample.url}>
+                                                      {sample.url}
+                                                    </a>
+                                                  )}
+                                                  <div className="grid grid-cols-[1fr_1fr_auto] gap-1">
+                                                    <span className="truncate" title={String(sample.before ?? "Missing")}>Before: {String(sample.before ?? "Missing")}</span>
+                                                    <span className="truncate" title={String(sample.after ?? "Missing")}>After: {String(sample.after ?? "Missing")}</span>
+                                                    <span className={sample.preserved ? "text-green-700" : "text-red-700"}>
+                                                      {sample.preserved ? sample.method : "changed good data"}
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        ))}
+                                        {att.rollback_status && (
+                                          <div className="text-[8px] text-gray-500">
+                                            Rollback status: {att.rollback_status === "unchanged" ? "config unchanged" : att.rollback_status.replaceAll("_", " ")}
+                                          </div>
+                                        )}
+
                                         {/* ── Quality before → after table ── */}
                                         {hasQuality && (
                                           <div className="mt-1.5">
                                             <div className="flex items-center justify-between">
                                               <span className="text-[9px] font-semibold text-gray-500 uppercase tracking-wide">
-                                                Quality scan — before → after (real re-extraction)
+                                                Staged quality unchanged — validation used stored snapshots
                                               </span>
                                               {rescanned > 0 && (
                                                 <span className="text-[8px] text-violet-600 font-medium">
