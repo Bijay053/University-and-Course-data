@@ -6506,6 +6506,7 @@ async def get_ai_repair_status(
     ``{"status": "not_started"}`` if no session has been initiated.
     """
     from app.services.scraper.ai_repair_agent import (
+        attach_repair_snapshot_availability,
         expire_queued_repair,
         fail_repair_audit,
         load_repair_audit,
@@ -6519,6 +6520,7 @@ async def get_ai_repair_status(
         runs = await load_repair_audits(job_id, db)
         if not runs:
             return {"job_id": job_id, "status": "not_started", "attempts": []}
+        runs = await attach_repair_snapshot_availability(runs, db)
         session = dict(runs[-1])
         session["source"] = "durable_audit"
         session["runs"] = [{**run, "source": "durable_audit"} for run in runs]
@@ -6548,6 +6550,8 @@ async def get_ai_repair_status(
         except (TypeError, ValueError):
             pass
     runs = await load_repair_audits(job_id, db)
+    if session.get("status") not in {"queued", "running"}:
+        runs = await attach_repair_snapshot_availability(runs, db)
     session_id = session.get("session_id")
     merged_runs = [{**run, "source": "durable_audit"} for run in runs]
     if session_id:
@@ -6555,7 +6559,13 @@ async def get_ai_repair_status(
         replaced = False
         for index, run in enumerate(merged_runs):
             if run.get("session_id") == session_id:
-                merged_runs[index] = live_run
+                # Redis owns live progress fields, while the durable run owns
+                # snapshot references enriched with current S3 availability.
+                merged_run = {**run, **live_run}
+                for durable_field in ("snapshot_refs", "snapshot_reference_counts"):
+                    if durable_field in run:
+                        merged_run[durable_field] = run[durable_field]
+                merged_runs[index] = merged_run
                 replaced = True
                 break
         if not replaced:

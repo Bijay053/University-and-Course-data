@@ -1,10 +1,12 @@
 """Durability contracts for compact AI repair evidence."""
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
 from app.services.scraper.ai_repair_agent import (
     _audit_urls,
+    attach_repair_snapshot_availability,
     fail_repair_audit,
     load_repair_audit,
     load_repair_audits,
@@ -117,6 +119,120 @@ async def test_load_repair_audits_returns_every_run_in_time_order():
 
 
 @pytest.mark.asyncio
+async def test_snapshot_availability_is_attached_without_changing_compact_audit(monkeypatch):
+    import app.services.snapshot_store as snapshot_store
+
+    async def availability(path, **_kwargs):
+        return {
+            "availability": "available" if path == "available-key" else "expired",
+            "available": path == "available-key",
+            "expires_at": "2026-09-01T00:00:00+00:00",
+        }
+
+    monkeypatch.setattr(snapshot_store, "snapshot_availability", availability)
+    original = {
+        "session_id": "repair-1",
+        "snapshot_refs": [
+            {"snapshot_id": 1, "url": "https://example.edu/a", "type": "html"},
+            {"snapshot_id": 2, "url": "https://example.edu/b", "type": "repair"},
+            {"snapshot_id": 3, "url": "https://example.edu/c", "type": "html"},
+            {"snapshot_id": "invalid", "url": "https://example.edu/d", "type": "html"},
+            "malformed-reference",
+        ],
+    }
+    fetched_at = datetime(2026, 6, 1, tzinfo=timezone.utc)
+    db = _DB([_Result(rows=[
+        {
+            "id": 1,
+            "storage_path": "available-key",
+            "snapshot_type": "html",
+            "fetched_at": fetched_at,
+        },
+        {
+            "id": 2,
+            "storage_path": "expired-key",
+            "snapshot_type": "repair",
+            "fetched_at": fetched_at,
+        },
+    ])])
+
+    result = await attach_repair_snapshot_availability([original], db)
+
+    assert result[0]["snapshot_reference_counts"] == {
+        "available": 1,
+        "expired": 1,
+        "missing": 1,
+        "unavailable": 2,
+    }
+    assert [ref["availability"] for ref in result[0]["snapshot_refs"]] == [
+        "available",
+        "expired",
+        "missing",
+        "unavailable",
+        "unavailable",
+    ]
+    assert "availability" not in original["snapshot_refs"][0]
+
+
+@pytest.mark.asyncio
+async def test_snapshot_metadata_failure_never_breaks_compact_audit():
+    class _FailingDB:
+        async def execute(self, *_args, **_kwargs):
+            raise RuntimeError("page_snapshots temporarily unavailable")
+
+    original = {
+        "session_id": "repair-1",
+        "attempts": [{"outcome": "accepted", "before": "old", "after": "new"}],
+        "snapshot_refs": [
+            {"snapshot_id": 42, "url": "https://example.edu/a", "type": "html"},
+            {"snapshot_id": "legacy-invalid", "url": "https://example.edu/b", "type": "html"},
+        ],
+    }
+
+    result = await attach_repair_snapshot_availability([original], _FailingDB())
+
+    assert result[0]["attempts"] == original["attempts"]
+    assert result[0]["snapshot_reference_counts"]["unavailable"] == 2
+    assert [ref["availability"] for ref in result[0]["snapshot_refs"]] == [
+        "unavailable",
+        "unavailable",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_one_availability_check_failure_only_marks_that_reference_unavailable(monkeypatch):
+    import app.services.snapshot_store as snapshot_store
+
+    async def availability(path, **_kwargs):
+        if path == "broken-key":
+            raise RuntimeError("provider timeout")
+        return {
+            "availability": "available",
+            "available": True,
+            "expires_at": None,
+        }
+
+    monkeypatch.setattr(snapshot_store, "snapshot_availability", availability)
+    fetched_at = datetime(2026, 6, 1, tzinfo=timezone.utc)
+    db = _DB([_Result(rows=[
+        {"id": 1, "storage_path": "good-key", "snapshot_type": "html", "fetched_at": fetched_at},
+        {"id": 2, "storage_path": "broken-key", "snapshot_type": "html", "fetched_at": fetched_at},
+    ])])
+    runs = [{
+        "session_id": "repair-1",
+        "snapshot_refs": [
+            {"snapshot_id": 1, "url": "https://example.edu/a", "type": "html"},
+            {"snapshot_id": 2, "url": "https://example.edu/b", "type": "html"},
+        ],
+    }]
+
+    result = await attach_repair_snapshot_availability(runs, db)
+
+    assert result[0]["snapshot_reference_counts"]["available"] == 1
+    assert result[0]["snapshot_reference_counts"]["unavailable"] == 1
+
+
+@pytest.mark.asyncio
 async def test_worker_failure_updates_the_existing_durable_run():
     queued = {
         "session_id": "repair-1",
@@ -194,6 +310,14 @@ def test_migration_and_status_endpoint_keep_audit_private():
     assert 'require_permission("scraping.view")' in status_block
     assert "load_repair_audits" in status_block
     assert 'session["runs"]' in status_block
+    assert "attach_repair_snapshot_availability" in status_block
+    assert 'for durable_field in ("snapshot_refs", "snapshot_reference_counts")' in status_block
+    snapshot_router = Path("app/routers/snapshots.py").read_text(encoding="utf-8")
+    text_block = snapshot_router[
+        snapshot_router.index("async def get_snapshot_text"):
+        snapshot_router.index("return PlainTextResponse", snapshot_router.index("async def get_snapshot_text"))
+    ]
+    assert 'require_permission("scraping.view")' in text_block
 
 
 def test_history_card_hydrates_durable_audit():
@@ -201,6 +325,9 @@ def test_history_card_hydrates_durable_audit():
     assert 'data.status !== "not_started"' in source
     assert "Loaded from the permanent repair audit." in source
     assert "Compare repair runs" in source
+    assert "source page{counts.expired === 1" in source
+    assert "Compact before/after repair evidence is still preserved." in source
+    assert "/api/scrape/snapshot/text/${ref.snapshot_id}" in source
 
 
 def test_worker_claim_failure_is_persisted_without_redis():

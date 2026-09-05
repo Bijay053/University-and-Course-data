@@ -53,11 +53,23 @@ import gzip
 import hashlib
 import logging
 import os
+from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 log = logging.getLogger(__name__)
 
 SnapshotType = Literal["html", "json", "pdf", "repair", "failed", "ai_prompt"]
+SnapshotAvailability = Literal["available", "expired", "missing", "unavailable"]
+
+_RETENTION_DAYS: dict[str, int] = {
+    "html": 90,
+    "repair": 180,
+    "json": 365,
+    "api": 365,
+    "pdf": 365,
+    "failed": 30,
+    "ai_prompt": 90,
+}
 
 _BUCKET: str | None = None
 _ENABLED: bool | None = None
@@ -157,6 +169,73 @@ def _make_async_session():
         aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),
         aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
     )
+
+
+def expected_expiry_at(
+    snapshot_type: str,
+    fetched_at: datetime | None,
+) -> datetime | None:
+    """Return the lifecycle deadline for a stored snapshot, when known."""
+    retention_days = _RETENTION_DAYS.get(snapshot_type)
+    if retention_days is None or fetched_at is None:
+        return None
+    if fetched_at.tzinfo is None:
+        fetched_at = fetched_at.replace(tzinfo=timezone.utc)
+    return fetched_at + timedelta(days=retention_days)
+
+
+async def snapshot_availability(
+    storage_path: str | None,
+    *,
+    snapshot_type: str,
+    fetched_at: datetime | None,
+    now: datetime | None = None,
+) -> dict[str, str | bool | None]:
+    """Check whether a DB snapshot reference still has a stored S3 object.
+
+    A missing object is considered expired only after its configured lifecycle
+    deadline. Storage configuration and transient provider failures are
+    reported as unavailable rather than falsely labelling the object missing.
+    """
+    expires_at = expected_expiry_at(snapshot_type, fetched_at)
+    result: dict[str, str | bool | None] = {
+        "availability": "missing",
+        "available": False,
+        "expires_at": expires_at.isoformat() if expires_at else None,
+    }
+    if not storage_path:
+        return result
+    if not is_enabled():
+        result["availability"] = "unavailable"
+        return result
+
+    bucket = _bucket()
+    try:
+        session = _make_async_session()
+        endpoint = os.environ.get("AWS_S3_ENDPOINT_URL")
+        extra: dict = {}
+        if endpoint:
+            extra["endpoint_url"] = endpoint
+        async with session.client("s3", **extra) as s3:
+            await s3.head_object(Bucket=bucket, Key=storage_path)
+        result["availability"] = "available"
+        result["available"] = True
+        return result
+    except Exception as exc:
+        error = getattr(exc, "response", {}).get("Error", {})
+        code = str(error.get("Code", ""))
+        status = getattr(exc, "response", {}).get("ResponseMetadata", {}).get("HTTPStatusCode")
+        if code not in {"404", "NoSuchKey", "NotFound"} and status != 404:
+            log.warning("snapshot availability check failed for %s: %s", storage_path, exc)
+            result["availability"] = "unavailable"
+            return result
+
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    if expires_at is not None and current >= expires_at:
+        result["availability"] = "expired"
+    return result
 
 
 async def upload_snapshot(

@@ -181,6 +181,120 @@ async def load_repair_audits(job_id: str, db) -> list[dict]:
     return [dict(row) for row in rows if row]
 
 
+async def attach_repair_snapshot_availability(
+    runs: list[dict],
+    db,
+) -> list[dict]:
+    """Attach live object availability without changing durable audit evidence."""
+    import asyncio
+    from collections.abc import Mapping
+
+    from sqlalchemy import text
+
+    from app.services.snapshot_store import snapshot_availability
+
+    def parse_snapshot_id(ref: Any) -> int | None:
+        if not isinstance(ref, Mapping):
+            return None
+        try:
+            return int(ref["snapshot_id"])
+        except (KeyError, TypeError, ValueError):
+            return None
+
+    refs = [
+        ref
+        for run in runs
+        for ref in (run.get("snapshot_refs") or [])
+    ]
+    snapshot_ids = sorted({
+        snapshot_id
+        for ref in refs
+        if (snapshot_id := parse_snapshot_id(ref)) is not None
+    })
+
+    metadata_unavailable = False
+    snapshots: dict[int, Any] = {}
+    if snapshot_ids:
+        try:
+            rows = (await db.execute(
+                text(
+                    "SELECT id, storage_path, snapshot_type, fetched_at "
+                    "FROM page_snapshots WHERE id = ANY(CAST(:snapshot_ids AS BIGINT[]))"
+                ),
+                {"snapshot_ids": snapshot_ids},
+            )).mappings().all()
+            snapshots = {int(row["id"]): row for row in rows}
+        except Exception as exc:
+            metadata_unavailable = True
+            log.warning("repair snapshot metadata unavailable: %s", exc)
+
+    checks: dict[int, dict] = {}
+    snapshot_items = list(snapshots.items())
+
+    async def check(row) -> dict:
+        return await snapshot_availability(
+            row["storage_path"],
+            snapshot_type=str(row["snapshot_type"]),
+            fetched_at=row["fetched_at"],
+        )
+
+    results = await asyncio.gather(*(
+        check(row)
+        for _, row in snapshot_items
+    ), return_exceptions=True)
+    for (snapshot_id, _), result in zip(snapshot_items, results):
+        if isinstance(result, Exception):
+            log.warning(
+                "repair snapshot availability check failed for id %s: %s",
+                snapshot_id,
+                result,
+            )
+            checks[snapshot_id] = {
+                "availability": "unavailable",
+                "available": False,
+                "expires_at": None,
+            }
+        else:
+            checks[snapshot_id] = result
+
+    enriched_runs: list[dict] = []
+    for run in runs:
+        enriched = dict(run)
+        enriched_refs: list[dict] = []
+        counts = {
+            "available": 0,
+            "expired": 0,
+            "missing": 0,
+            "unavailable": 0,
+        }
+        for ref in run.get("snapshot_refs") or []:
+            is_valid_ref = isinstance(ref, Mapping)
+            enriched_ref = (
+                dict(ref)
+                if is_valid_ref
+                else {"snapshot_id": None, "url": "", "type": "unknown"}
+            )
+            snapshot_id = parse_snapshot_id(ref)
+            fallback_availability = (
+                "unavailable"
+                if metadata_unavailable or not is_valid_ref or snapshot_id is None
+                else "missing"
+            )
+            status = checks.get(snapshot_id, {
+                "availability": fallback_availability,
+                "available": False,
+                "expires_at": None,
+            })
+            enriched_ref.update(status)
+            availability = str(status["availability"])
+            counts[availability] = counts.get(availability, 0) + 1
+            enriched_refs.append(enriched_ref)
+        enriched["snapshot_refs"] = enriched_refs
+        enriched["snapshot_reference_counts"] = counts
+        enriched_runs.append(enriched)
+    return enriched_runs
+
+
 async def fail_repair_audit(
     job_id: str,
     university_id: int,

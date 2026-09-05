@@ -187,7 +187,20 @@ type AIRepairSession = {
   error:           string | null;
   rollback_status?: "unchanged" | "restored" | "failed";
   source?: "durable_audit";
-  snapshot_refs?: Array<{ snapshot_id: number; url: string; type: string }>;
+  snapshot_refs?: Array<{
+    snapshot_id: number | null;
+    url: string;
+    type: string;
+    availability?: "available" | "expired" | "missing" | "unavailable";
+    available?: boolean;
+    expires_at?: string | null;
+  }>;
+  snapshot_reference_counts?: {
+    available: number;
+    expired: number;
+    missing: number;
+    unavailable: number;
+  };
   runs?: AIRepairSession[];
 };
 
@@ -3369,13 +3382,84 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                                     }
                                   </div>
                                 )}
-                                {aiRepairSession.source === "durable_audit" && (
-                                  <div className="text-[9px] text-gray-500">
-                                    Loaded from the permanent repair audit.
-                                    {(aiRepairSession.snapshot_refs?.length ?? 0) > 0 &&
-                                      ` ${aiRepairSession.snapshot_refs!.length} stored page snapshot reference(s) retained.`}
-                                  </div>
-                                )}
+                                {aiRepairSession.source === "durable_audit" && (() => {
+                                  const refs = aiRepairSession.snapshot_refs ?? [];
+                                  const counts = aiRepairSession.snapshot_reference_counts ?? {
+                                    available: refs.filter(ref => ref.availability === "available").length,
+                                    expired: refs.filter(ref => ref.availability === "expired").length,
+                                    missing: refs.filter(ref => ref.availability === "missing").length,
+                                    unavailable: refs.filter(ref => ref.availability === "unavailable").length,
+                                  };
+                                  return (
+                                    <div className="space-y-1.5 text-[9px] text-gray-500">
+                                      <div>
+                                        Loaded from the permanent repair audit.
+                                        {refs.length > 0 &&
+                                          ` ${refs.length} stored page snapshot reference(s) retained.`}
+                                      </div>
+                                      {refs.length > 0 && (
+                                        <div className="flex flex-wrap gap-1">
+                                          {counts.available > 0 && (
+                                            <span className="rounded bg-emerald-100 px-1.5 py-0.5 font-medium text-emerald-700">
+                                              {counts.available} source page{counts.available === 1 ? "" : "s"} available
+                                            </span>
+                                          )}
+                                          {counts.expired > 0 && (
+                                            <span className="rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-800">
+                                              {counts.expired} source page{counts.expired === 1 ? "" : "s"} expired
+                                            </span>
+                                          )}
+                                          {counts.missing > 0 && (
+                                            <span className="rounded bg-red-100 px-1.5 py-0.5 font-medium text-red-700">
+                                              {counts.missing} source page{counts.missing === 1 ? "" : "s"} missing
+                                            </span>
+                                          )}
+                                          {counts.unavailable > 0 && (
+                                            <span className="rounded bg-gray-100 px-1.5 py-0.5 font-medium text-gray-600">
+                                              {counts.unavailable} source status unavailable
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                      {(counts.expired > 0 || counts.missing > 0) && (
+                                        <div className="flex items-start gap-1 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-amber-800">
+                                          <AlertTriangle className="mt-0.5 h-2.5 w-2.5 shrink-0" />
+                                          <span>
+                                            Stored source content is no longer available. Compact before/after repair evidence is still preserved.
+                                          </span>
+                                        </div>
+                                      )}
+                                      {refs.length > 0 && (
+                                        <div className="flex flex-wrap gap-x-2 gap-y-1">
+                                          {refs.map((ref, index) => {
+                                            const canView = ref.availability === "available"
+                                              && ["html", "repair", "ai_prompt"].includes(ref.type);
+                                            return canView ? (
+                                              <a
+                                                key={`${ref.snapshot_id ?? "invalid"}-${index}`}
+                                                href={`/api/scrape/snapshot/text/${ref.snapshot_id}`}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                title={ref.url}
+                                                className="font-medium text-violet-700 underline underline-offset-2 hover:text-violet-900"
+                                              >
+                                                View stored source
+                                              </a>
+                                            ) : (
+                                              <span
+                                                key={`${ref.snapshot_id ?? "invalid"}-${index}`}
+                                                title={ref.url}
+                                                className={ref.availability === "expired" ? "text-amber-700" : "text-gray-400"}
+                                              >
+                                                Source {ref.availability ?? "status unknown"}
+                                              </span>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
 
                                 {/* Attempt cards */}
                                 {aiRepairSession.attempts.map((att, i) => {

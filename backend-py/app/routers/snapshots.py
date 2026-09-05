@@ -29,6 +29,7 @@ from app.services.snapshot_store import (
     is_enabled,
     list_snapshots_for_job,
     presign_url,
+    snapshot_availability,
     setup_lifecycle_rules,
     url_hash as _url_hash,
 )
@@ -428,10 +429,18 @@ async def get_snapshots_for_course(
     )
     records = list(result.scalars().all())
 
+    availability_checks = await asyncio.gather(*(
+        snapshot_availability(
+            r.storage_path,
+            snapshot_type=r.snapshot_type,
+            fetched_at=r.fetched_at,
+        )
+        for r in records
+    ))
     snaps = []
-    for r in records:
+    for r, availability in zip(records, availability_checks):
         download_url = None
-        if r.storage_path and is_enabled():
+        if availability["available"]:
             download_url = await presign_url(r.storage_path)
         snaps.append({
             "id": r.id,
@@ -445,6 +454,7 @@ async def get_snapshots_for_course(
             "download_url": download_url,
             "storage_path": r.storage_path,
             "has_text": r.snapshot_type in ("ai_prompt", "html", "repair"),
+            **availability,
         })
 
     return {
@@ -460,6 +470,7 @@ async def get_snapshots_for_course(
 @router.get("/snapshot/text/{snapshot_id}")
 async def get_snapshot_text(
     snapshot_id: int,
+    _user: Annotated[dict, Depends(require_permission("scraping.view"))],
     db: AsyncSession = Depends(get_db),
 ):
     """Return decompressed UTF-8 text content of an ai_prompt, html, or repair snapshot.
@@ -480,8 +491,29 @@ async def get_snapshot_text(
         )
     if not r.storage_path:
         raise HTTPException(status_code=404, detail="No storage path recorded for this snapshot.")
-    if not is_enabled():
-        raise HTTPException(status_code=503, detail="S3 storage not configured.")
+    availability = await snapshot_availability(
+        r.storage_path,
+        snapshot_type=r.snapshot_type,
+        fetched_at=r.fetched_at,
+    )
+    if availability["availability"] == "expired":
+        raise HTTPException(
+            status_code=410,
+            detail=(
+                "The stored source page has expired. "
+                "The compact AI repair audit remains available."
+            ),
+        )
+    if availability["availability"] == "missing":
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "The stored source page is missing. "
+                "The compact AI repair audit remains available."
+            ),
+        )
+    if availability["availability"] == "unavailable":
+        raise HTTPException(status_code=503, detail="Snapshot storage is currently unavailable.")
 
     raw = await get_snapshot_bytes(r.storage_path)
     if raw is None:
