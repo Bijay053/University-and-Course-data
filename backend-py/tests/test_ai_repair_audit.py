@@ -7,6 +7,7 @@ from app.services.scraper.ai_repair_agent import (
     _audit_urls,
     fail_repair_audit,
     load_repair_audit,
+    load_repair_audits,
     persist_repair_audit,
     run_ai_repair_loop,
 )
@@ -25,6 +26,9 @@ class _Result:
 
     def scalar_one_or_none(self):
         return self._scalar
+
+    def scalars(self):
+        return self
 
 
 class _DB:
@@ -98,6 +102,18 @@ async def test_load_repair_audit_returns_latest_evidence():
     evidence = {"job_id": "job-1", "status": "completed", "attempts": [{"outcome": "accepted"}]}
     db = _DB([_Result(scalar=evidence)])
     assert await load_repair_audit("job-1", db) == evidence
+
+
+@pytest.mark.asyncio
+async def test_load_repair_audits_returns_every_run_in_time_order():
+    first = {"session_id": "repair-1", "started_at": "2026-09-05T00:00:00+00:00"}
+    second = {"session_id": "repair-2", "started_at": "2026-09-05T01:00:00+00:00"}
+    db = _DB([_Result(rows=[first, second])])
+
+    assert await load_repair_audits("job-1", db) == [first, second]
+    statement, params = db.calls[0]
+    assert "ORDER BY created_at ASC, session_id ASC" in statement
+    assert params == {"job_id": "job-1"}
 
 
 @pytest.mark.asyncio
@@ -176,12 +192,15 @@ def test_migration_and_status_endpoint_keep_audit_private():
     assert "evidence JSONB NOT NULL" in migration
     status_block = router[router.index('async def get_ai_repair_status'):router.index('@router.post("/jobs/{job_id}/auto-repair-filter")')]
     assert 'require_permission("scraping.view")' in status_block
+    assert "load_repair_audits" in status_block
+    assert 'session["runs"]' in status_block
 
 
 def test_history_card_hydrates_durable_audit():
     source = Path("../artifacts/university-portal/src/components/scrape-job-card.tsx").read_text(encoding="utf-8")
     assert 'data.status !== "not_started"' in source
     assert "Loaded from the permanent repair audit." in source
+    assert "Compare repair runs" in source
 
 
 def test_worker_claim_failure_is_persisted_without_redis():

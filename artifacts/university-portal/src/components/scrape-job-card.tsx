@@ -188,6 +188,7 @@ type AIRepairSession = {
   rollback_status?: "unchanged" | "restored" | "failed";
   source?: "durable_audit";
   snapshot_refs?: Array<{ snapshot_id: number; url: string; type: string }>;
+  runs?: AIRepairSession[];
 };
 
 // ── AI Diagnostic types ───────────────────────────────────────────────────────
@@ -540,9 +541,12 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
 
   // AI Repair Agent state
   const [aiRepairSession, setAiRepairSession] = useState<AIRepairSession | null>(null);
+  const [aiRepairRuns, setAiRepairRuns] = useState<AIRepairSession[]>([]);
+  const [selectedAiRepairRunId, setSelectedAiRepairRunId] = useState<string | null>(null);
   const [aiRepairLoading, setAiRepairLoading] = useState(false);
   const [aiRepairPolling, setAiRepairPolling] = useState(false);
   const [showAiRepairLog, setShowAiRepairLog] = useState(false);
+  const aiRepairRequestRef = useRef(0);
 
   const pollRef = useRef<number | null>(null);
   const logIndexRef = useRef(0);
@@ -552,6 +556,11 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
   const logContainerRef = useRef<HTMLDivElement>(null);
   const doneLogRef = useRef<HTMLDivElement>(null);
   const submittingRef = useRef(false);
+
+  useEffect(() => {
+    const selected = aiRepairRuns.find(run => run.session_id === selectedAiRepairRunId);
+    if (selected) setAiRepairSession(selected);
+  }, [aiRepairRuns, selectedAiRepairRunId]);
 
   // Restore any in-progress job after navigation
   useEffect(() => {
@@ -615,6 +624,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
   }, [replayPhase]);
 
   const resetToIdle = useCallback(() => {
+    ++aiRepairRequestRef.current;
     if (pollRef.current) clearTimeout(pollRef.current);
     pollRef.current = null;
     pollInFlightRef.current = false;
@@ -654,6 +664,11 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
     setValidateLoading(false);
     setApplyingRepairFix(false);
     setRepairFixApplied(false);
+    setAiRepairPolling(false);
+    setAiRepairSession(null);
+    setAiRepairRuns([]);
+    setSelectedAiRepairRunId(null);
+    setShowAiRepairLog(false);
     setCategoryDiagnostics(null);
     setApiDiscJobId(null);
     setApiDiscStatus("idle");
@@ -868,6 +883,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
   useEffect(() => {
     if (!aiRepairPolling || !completedJobId) return;
     const poll = async () => {
+      const requestId = ++aiRepairRequestRef.current;
       try {
         const res = await fetch(`/api/scrape/jobs/${completedJobId}/ai-repair-status`, {
           credentials: "include",
@@ -875,8 +891,12 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
         });
         if (res.ok) {
           const data = await readResponseJson<AIRepairSession>(res);
-          if (data) {
-            setAiRepairSession(data);
+          if (data && requestId === aiRepairRequestRef.current) {
+            const runs = data.runs ?? [data];
+            setAiRepairRuns(runs);
+            setSelectedAiRepairRunId(current =>
+              current && runs.some(run => run.session_id === current) ? current : data.session_id
+            );
             if (data.status === "completed" || data.status === "failed") {
               setAiRepairPolling(false);
             }
@@ -893,13 +913,21 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
   useEffect(() => {
     if (!completedJobId || aiRepairPolling) return;
     let cancelled = false;
+    const requestId = ++aiRepairRequestRef.current;
     fetch(`/api/scrape/jobs/${completedJobId}/ai-repair-status`, {
       credentials: "include",
       cache: "no-store",
     })
       .then(res => res.ok ? readResponseJson<AIRepairSession>(res) : null)
       .then(data => {
-        if (!cancelled && data && data.status !== "not_started") setAiRepairSession(data);
+        if (!cancelled && requestId === aiRepairRequestRef.current && data && data.status !== "not_started") {
+          const runs = data.runs ?? [data];
+          setAiRepairRuns(runs);
+          setSelectedAiRepairRunId(current =>
+            current && runs.some(run => run.session_id === current) ? current : data.session_id
+          );
+          setShowAiRepairLog(true);
+        }
       })
       .catch(() => {});
     return () => { cancelled = true; };
@@ -1008,11 +1036,9 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
 
   const handleAiRepair = useCallback(async () => {
     if (!completedJobId) return;
+    ++aiRepairRequestRef.current;
     setAiRepairLoading(true);
     setShowAiRepairLog(true);
-    setAiRepairSession(prev =>
-      prev ? { ...prev, status: "queued", attempts: [], final_verdict: null, error: null } : null
-    );
     try {
       const res = await fetch(`/api/scrape/jobs/${completedJobId}/ai-repair`, {
         method: "POST",
@@ -1027,7 +1053,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
       }
       const data = await readResponseJson<{ session_id: string; status: string; job_id: string }>(res);
       if (data) {
-        setAiRepairSession({
+        const queuedSession: AIRepairSession = {
           session_id:      data.session_id,
           job_id:          completedJobId,
           status:          "queued",
@@ -1038,7 +1064,10 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
           started_at:      null,
           completed_at:    null,
           error:           null,
-        });
+        };
+        setAiRepairRuns(prev => [...prev.filter(run => run.session_id !== data.session_id), queuedSession]);
+        setSelectedAiRepairRunId(data.session_id);
+        setAiRepairSession(queuedSession);
         setAiRepairPolling(true);
       }
     } catch (e) {
@@ -3262,6 +3291,26 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                               </button>
 
                               <div className="p-2.5 space-y-2">
+                                {aiRepairRuns.length > 1 && (
+                                  <label className="flex items-center justify-between gap-2 text-[9px] text-violet-700">
+                                    <span className="font-semibold">Compare repair runs</span>
+                                    <select
+                                      aria-label="Compare repair runs"
+                                      value={selectedAiRepairRunId ?? aiRepairSession.session_id}
+                                      onChange={(event) => {
+                                        setSelectedAiRepairRunId(event.target.value);
+                                      }}
+                                      disabled={aiRepairPolling}
+                                      className="max-w-[240px] rounded border border-violet-200 bg-white px-1.5 py-1 text-[9px] text-gray-700 disabled:opacity-60"
+                                    >
+                                      {aiRepairRuns.map((run, index) => (
+                                        <option key={run.session_id} value={run.session_id}>
+                                          {`Run ${index + 1} · ${run.status} · ${run.started_at ? new Date(run.started_at).toLocaleString() : "not started"}`}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                )}
                                 {/* Status + verdict */}
                                 {(aiRepairSession.status === "queued") && (
                                   <div className="flex items-center gap-1.5 text-[10px] text-violet-600">

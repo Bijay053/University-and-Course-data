@@ -166,6 +166,21 @@ async def load_repair_audit(job_id: str, db, *, session_id: str | None = None) -
     return dict(row or {})
 
 
+async def load_repair_audits(job_id: str, db) -> list[dict]:
+    """Load every durable repair run for a scrape job in chronological order."""
+    from sqlalchemy import text
+
+    rows = (await db.execute(
+        text(
+            "SELECT evidence FROM ai_repair_audits "
+            "WHERE scrape_job_id = :job_id "
+            "ORDER BY created_at ASC, session_id ASC"
+        ),
+        {"job_id": job_id},
+    )).scalars().all()
+    return [dict(row) for row in rows if row]
+
+
 async def fail_repair_audit(
     job_id: str,
     university_id: int,

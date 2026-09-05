@@ -6509,16 +6509,19 @@ async def get_ai_repair_status(
         expire_queued_repair,
         fail_repair_audit,
         load_repair_audit,
+        load_repair_audits,
         read_session,
     )
     from datetime import datetime, timezone
 
     session = read_session(job_id)
     if not session:
-        session = await load_repair_audit(job_id, db)
-        if not session:
+        runs = await load_repair_audits(job_id, db)
+        if not runs:
             return {"job_id": job_id, "status": "not_started", "attempts": []}
+        session = dict(runs[-1])
         session["source"] = "durable_audit"
+        session["runs"] = [{**run, "source": "durable_audit"} for run in runs]
         return session
     if session.get("status") == "queued" and session.get("queued_at"):
         try:
@@ -6544,6 +6547,20 @@ async def get_ai_repair_status(
                     )
         except (TypeError, ValueError):
             pass
+    runs = await load_repair_audits(job_id, db)
+    session_id = session.get("session_id")
+    merged_runs = [{**run, "source": "durable_audit"} for run in runs]
+    if session_id:
+        live_run = dict(session)
+        replaced = False
+        for index, run in enumerate(merged_runs):
+            if run.get("session_id") == session_id:
+                merged_runs[index] = live_run
+                replaced = True
+                break
+        if not replaced:
+            merged_runs.append(live_run)
+    session["runs"] = merged_runs
     return session
 
 
