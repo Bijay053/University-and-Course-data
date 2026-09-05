@@ -344,6 +344,46 @@ async def test_create_university_duplicate_website_returns_409_with_existing_id(
     )
 
 
+@pytest.mark.asyncio
+async def test_create_university_duplicate_institution_subdomain_returns_existing_id() -> None:
+    """www and study hosts for one academic domain must not create duplicates."""
+    token = uuid.uuid4().hex[:10]
+    root = f"{token}.edu.au"
+    first_url = f"https://www.{root}"
+    second_url = f"https://study.{root}/courses"
+    created_id: int | None = None
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as ac:
+        first = await ac.post(
+            "/api/universities",
+            json={
+                "name": f"Domain Test {token}",
+                "website": first_url,
+                "country": "Australia",
+                "city": "Sydney",
+            },
+        )
+        assert first.status_code in (200, 201), first.text
+        created_id = first.json()["id"]
+
+        try:
+            second = await ac.post(
+                "/api/universities",
+                json={
+                    "name": f"Other Name {token}",
+                    "website": second_url,
+                    "country": "Australia",
+                    "city": "Sydney",
+                },
+            )
+            assert second.status_code == 409, second.text
+            assert second.json()["detail"]["id"] == created_id
+        finally:
+            if created_id:
+                await _delete_uni(created_id)
+
+
 # ---------------------------------------------------------------------------
 # Test 2b: POST /api/universities — duplicate name returns 409 + existing id
 # ---------------------------------------------------------------------------

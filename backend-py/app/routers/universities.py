@@ -55,6 +55,11 @@ _INSTITUTION_KEYWORDS = re.compile(
     r"teknoloji|teknologi|tec\b|tecnológico)\b",
     re.I,
 )
+_GENERIC_TITLE_SEGMENTS = {
+    "home", "welcome", "index", "index page", "default", "untitled",
+    "homepage", "home page", "main", "start", "portal", "site home",
+    "university home", "college home",
+}
 
 
 def _normalise_metadata_country(value: str) -> str:
@@ -102,6 +107,73 @@ def _is_hostname_fallback_name(value: str | None, hostname: str) -> bool:
     return bool(
         value
         and value.strip().casefold() == _hostname_fallback_label(hostname).casefold()
+    )
+
+
+_MULTI_LABEL_EDUCATION_SUFFIXES = {
+    "ac.au", "ac.nz", "ac.uk", "edu.au", "edu.hk", "edu.my", "edu.nz", "edu.sg",
+}
+
+
+def _institution_domain(value: str | None) -> str:
+    """Return the stable institution-owned domain for a URL or hostname."""
+    raw = (value or "").strip().casefold()
+    if not raw:
+        return ""
+    parsed = urlparse(raw if "://" in raw else f"https://{raw}")
+    host = (parsed.hostname or "").strip(".").removeprefix("www.")
+    labels = [label for label in host.split(".") if label]
+    if len(labels) < 2:
+        return host
+    suffix = ".".join(labels[-2:])
+    if suffix in _MULTI_LABEL_EDUCATION_SUFFIXES and len(labels) >= 3:
+        return ".".join(labels[-3:])
+    return suffix
+
+
+async def _find_existing_university_by_domain(
+    db: AsyncSession,
+    value: str,
+) -> University | None:
+    """Find the canonical existing record for any equivalent university subdomain."""
+    domain = _institution_domain(value)
+    if not domain:
+        return None
+    candidates = (
+        await db.execute(
+            select(University).where(
+                or_(
+                    University.website.ilike(f"%{domain}%"),
+                    University.scrape_url.ilike(f"%{domain}%"),
+                )
+            )
+        )
+    ).scalars().all()
+    matches = [
+        university
+        for university in candidates
+        if domain in {
+            _institution_domain(university.website),
+            _institution_domain(university.scrape_url),
+        }
+    ]
+    if not matches:
+        return None
+    ids = [university.id for university in matches]
+    count_rows = (
+        await db.execute(
+            select(Course.university_id, func.count(Course.id))
+            .where(Course.university_id.in_(ids))
+            .group_by(Course.university_id)
+        )
+    ).all()
+    course_counts = {int(university_id): int(count) for university_id, count in count_rows}
+    return max(
+        matches,
+        key=lambda university: (
+            course_counts.get(university.id, 0),
+            -university.id,
+        ),
     )
 
 
@@ -367,9 +439,17 @@ def _metadata_title_segments(value: str) -> list[str]:
     decoded = _decode_metadata_text(value)
     return [
         segment.strip()
-        for segment in re.split(r"\s*[|–—:]\s*", decoded)
+        for segment in re.split(r"(?:\s*[|–—:]\s*|\s+-\s+)", decoded)
         if segment.strip()
     ]
+
+
+def _has_generic_title_prefix(value: str | None) -> bool:
+    segments = _metadata_title_segments(value or "")
+    return bool(
+        len(segments) > 1
+        and segments[0].casefold() in _GENERIC_TITLE_SEGMENTS
+    )
 
 
 def _contains_encoded_html_entity(value: str | None) -> bool:
@@ -502,14 +582,14 @@ def _extract_structured_locations(
 
 
 def _campus_page_links(page_html: str, root_url: str) -> list[str]:
-    """Return same-site campus/location detail links advertised by a page."""
+    """Return same-institution campus/location detail links advertised by a page."""
     links_by_path: dict[str, str] = {}
-    root_host = urlparse(root_url).netloc.casefold()
+    root_domain = _institution_domain(root_url)
     soup = BeautifulSoup(page_html, "html.parser")
     for anchor in soup.find_all("a", href=True):
         absolute = urljoin(root_url + "/", str(anchor["href"]))
         parsed = urlparse(absolute)
-        if parsed.netloc.casefold() != root_host:
+        if _institution_domain(parsed.netloc) != root_domain:
             continue
         path = parsed.path.rstrip("/")
         match = re.search(
@@ -520,26 +600,39 @@ def _campus_page_links(page_html: str, root_url: str) -> list[str]:
         if not match:
             continue
         slug = match.group(1).casefold()
-        if any(token in slug for token in ("counselling", "counseling")):
+        if any(
+            token in slug
+            for token in (
+                "campus-tour", "counselling", "counseling", "history", "wildlife",
+            )
+        ):
             continue
         candidate = f"{parsed.scheme}://{parsed.netloc}{path}/"
         canonical_path = re.sub(r"/our-(campuses|locations)/", r"/\1/", path)
         previous = links_by_path.get(canonical_path.casefold())
         if previous is None or "/our-" not in candidate:
             links_by_path[canonical_path.casefold()] = candidate
-    return list(links_by_path.values())[:12]
+    links = list(links_by_path.values())
+    official_campuses = [
+        link
+        for link in links
+        if "/campuses/" in urlparse(link).path.casefold()
+    ]
+    if official_campuses:
+        return official_campuses[:12]
+    return links[:12]
 
 
 def _campus_index_links(page_html: str, root_url: str) -> list[str]:
-    """Return same-site campus/location landing pages for one bounded follow-up."""
-    root_host = urlparse(root_url).netloc.casefold()
+    """Return same-institution campus/location landing pages for one follow-up."""
+    root_domain = _institution_domain(root_url)
     links: list[str] = []
     seen: set[str] = set()
     soup = BeautifulSoup(page_html, "html.parser")
     for anchor in soup.find_all("a", href=True):
         absolute = urljoin(root_url + "/", str(anchor["href"]))
         parsed = urlparse(absolute)
-        if parsed.netloc.casefold() != root_host:
+        if _institution_domain(parsed.netloc) != root_domain:
             continue
         path = parsed.path.rstrip("/")
         if not re.search(r"/(?:campus(?:es)?|locations?)$", path, re.I):
@@ -550,6 +643,40 @@ def _campus_index_links(page_html: str, root_url: str) -> list[str]:
             links.append(candidate)
             seen.add(key)
     return links[:4]
+
+
+def _campus_link_locations(
+    page_html: str,
+    root_url: str,
+    fallback_country: str,
+) -> dict[str, dict[str, str | float | None]]:
+    """Return source-linked campus names when protected detail pages lack addresses."""
+    detail_links = {
+        link.rstrip("/").casefold(): link
+        for link in _campus_page_links(page_html, root_url)
+    }
+    if not detail_links:
+        return {}
+    locations: dict[str, dict[str, str | float | None]] = {}
+    soup = BeautifulSoup(page_html, "html.parser")
+    for anchor in soup.find_all("a", href=True):
+        absolute = urljoin(root_url + "/", str(anchor["href"])).rstrip("/")
+        canonical = detail_links.get(absolute.casefold())
+        if not canonical:
+            continue
+        label = _decode_metadata_text(anchor.get_text(" ", strip=True))
+        if not label or label.casefold() in {"our locations", "our campuses", "locations"}:
+            continue
+        locations[canonical] = {
+            "display_name": label,
+            "full_address": None,
+            "city": label,
+            "state_region": None,
+            "country": fallback_country if fallback_country != "Unknown" else None,
+            "latitude": None,
+            "longitude": None,
+        }
+    return locations
 
 
 def _campus_page_location(
@@ -945,13 +1072,10 @@ async def create_university(
     # happen to be spelled differently but share the same domain.
     if body.website:
         website_str = str(body.website)
-        url_stmt = select(University).where(
-            or_(
-                University.website == website_str,
-                University.scrape_url == website_str,
-            )
+        existing_by_url = await _find_existing_university_by_domain(
+            db,
+            website_str,
         )
-        existing_by_url = (await db.execute(url_stmt)).scalar_one_or_none()
         if existing_by_url:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -1440,11 +1564,7 @@ async def add_university_by_url(
 
     # Generic page-title values that are not institution names and must be
     # skipped so we fall through to a better source (og:site_name or hostname).
-    _GENERIC_TITLES = {
-        "home", "welcome", "index", "index page", "default", "untitled",
-        "homepage", "home page", "main", "start", "portal", "site home",
-        "university home", "college home",
-    }
+    _GENERIC_TITLES = _GENERIC_TITLE_SEGMENTS
 
     homepage_html = ""
     try:
@@ -1552,23 +1672,30 @@ async def add_university_by_url(
                 # landing page. Follow at most four such indexes, then collect
                 # their explicit detail links; never crawl beyond this level.
                 index_links = _campus_index_links(html, root_url)
+                fallback_locations: dict[
+                    str, dict[str, str | float | None]
+                ] = _campus_link_locations(html, root_url, country)
                 if index_links and len(campus_links) < 12:
                     async def _fetch_index(index_url: str):
-                        try:
-                            index_resp = await client.get(index_url)
-                            if index_resp.status_code < 400:
-                                return _campus_page_links(
-                                    index_resp.text, root_url
-                                )
-                        except Exception:
-                            return []
-                        return []
+                        index_html = await _fetch_onboarding_homepage(
+                            client,
+                            index_url,
+                        )
+                        return (
+                            _campus_page_links(index_html, index_url),
+                            _campus_link_locations(
+                                index_html,
+                                index_url,
+                                country,
+                            ),
+                        )
 
                     index_results = await _asyncio.gather(
                         *(_fetch_index(link) for link in index_links)
                     )
                     seen_campus_links = {link.casefold() for link in campus_links}
-                    for result_links in index_results:
+                    for result_links, result_locations in index_results:
+                        fallback_locations.update(result_locations)
                         for link in result_links:
                             if link.casefold() not in seen_campus_links:
                                 campus_links.append(link)
@@ -1596,7 +1723,9 @@ async def add_university_by_url(
                         str(location["display_name"]).casefold()
                         for location in discovered_locations
                     }
-                    for location in campus_results:
+                    for campus_url, location in zip(campus_links, campus_results):
+                        if location is None:
+                            location = fallback_locations.get(campus_url)
                         if (
                             location
                             and str(location["display_name"]).casefold()
@@ -1715,9 +1844,7 @@ async def add_university_by_url(
         }]
 
     # ── Step 2: Check for existing university with same website ───────────
-    existing = (await db.execute(
-        select(University).where(University.website.ilike(f"%{hostname}%"))
-    )).scalar_one_or_none()
+    existing = await _find_existing_university_by_domain(db, hostname)
 
     if existing:
         # Repair metadata-created names from older versions that persisted raw
@@ -1726,6 +1853,7 @@ async def add_university_by_url(
         if (
             _contains_encoded_html_entity(existing.name)
             or _is_hostname_fallback_name(existing.name, hostname)
+            or _has_generic_title_prefix(existing.name)
             or _can_upgrade_to_official_name(existing.name, name, hostname)
         ) and name and existing.name != name:
             existing.name = name

@@ -13,8 +13,10 @@ from app.routers.universities import (
     _metadata_title_segments,
     _onboarding_ai_evidence,
     _hostname_fallback_label,
+    _has_generic_title_prefix,
     _fetch_onboarding_homepage,
     _is_hostname_fallback_name,
+    _institution_domain,
     _is_onboarding_challenge,
     _normalise_metadata_locality,
     _resolve_university_identity_openai,
@@ -157,6 +159,56 @@ def test_decodes_numeric_dash_before_splitting_seo_title() -> None:
         "INTI International University & Colleges",
         "Your Future Built Today",
     ]
+
+
+def test_splits_plain_hyphen_homepage_title() -> None:
+    assert _metadata_title_segments(
+        "Home - Charles Sturt University"
+    ) == ["Home", "Charles Sturt University"]
+    assert _has_generic_title_prefix("Home - Charles Sturt University")
+    assert not _has_generic_title_prefix("Charles Sturt University")
+
+
+def test_campus_index_allows_equivalent_institution_subdomain() -> None:
+    html = """
+    <a href="https://study.csu.edu.au/why-charles-sturt/locations">
+      View our campuses
+    </a>
+    <a href="https://external.example.edu.au/locations">Not ours</a>
+    """
+    assert _campus_index_links(html, "https://www.csu.edu.au") == [
+        "https://study.csu.edu.au/why-charles-sturt/locations/"
+    ]
+
+
+def test_official_campus_links_outrank_partner_study_locations() -> None:
+    html = """
+    <a href="https://study.csu.edu.au/why-charles-sturt/locations/holmesglen">
+      Holmesglen
+    </a>
+    <a href="https://about.csu.edu.au/locations/campuses/bathurst">
+      Bathurst
+    </a>
+    """
+    assert _campus_page_links(html, "https://study.csu.edu.au") == [
+        "https://about.csu.edu.au/locations/campuses/bathurst/"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("https://www.csu.edu.au", "csu.edu.au"),
+        ("https://study.csu.edu.au/international/courses", "csu.edu.au"),
+        ("www.herts.ac.uk", "herts.ac.uk"),
+        ("https://courses.example.edu.nz", "example.edu.nz"),
+    ],
+)
+def test_normalizes_equivalent_institution_subdomains(
+    value: str,
+    expected: str,
+) -> None:
+    assert _institution_domain(value) == expected
 
 
 def test_normalizes_metadata_whitespace() -> None:
