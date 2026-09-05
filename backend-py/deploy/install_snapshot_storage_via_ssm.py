@@ -82,7 +82,12 @@ def _environment_payload() -> bytes:
     return ("\n".join(lines) + "\n").encode()
 
 
-async def _delete_smoke_snapshot(snapshot_store, key: str) -> None:
+async def _delete_smoke_snapshot(
+    snapshot_store,
+    key: str,
+    *,
+    fault_stage: str | None = None,
+) -> None:
     session = snapshot_store._make_async_session()
     extra = {}
     endpoint = os.environ.get("AWS_S3_ENDPOINT_URL")
@@ -91,24 +96,47 @@ async def _delete_smoke_snapshot(snapshot_store, key: str) -> None:
     bucket = os.environ["AWS_S3_BUCKET_NAME"]
     for attempt in range(3):
         try:
+            if fault_stage == "cleanup" and attempt < 2:
+                raise RuntimeError("forced transient smoke cleanup failure")
             async with session.client("s3", **extra) as s3:
-                try:
-                    head = await s3.head_object(Bucket=bucket, Key=key)
-                except Exception as exc:
-                    status = getattr(exc, "response", {}).get(
-                        "ResponseMetadata", {}
-                    ).get("HTTPStatusCode")
-                    code = str(
-                        getattr(exc, "response", {}).get("Error", {}).get("Code", "")
+                key_marker = None
+                version_marker = None
+                objects = []
+                while True:
+                    options = {"Bucket": bucket, "Prefix": key}
+                    if key_marker is not None:
+                        options["KeyMarker"] = key_marker
+                    if version_marker is not None:
+                        options["VersionIdMarker"] = version_marker
+                    response = await s3.list_object_versions(**options)
+                    for item in (
+                        *response.get("Versions", []),
+                        *response.get("DeleteMarkers", []),
+                    ):
+                        if item.get("Key") != key:
+                            continue
+                        delete = {"Key": key}
+                        version_id = item.get("VersionId")
+                        if version_id and version_id != "null":
+                            delete["VersionId"] = version_id
+                        objects.append(delete)
+                    if not response.get("IsTruncated"):
+                        break
+                    key_marker = response.get("NextKeyMarker")
+                    version_marker = response.get("NextVersionIdMarker")
+                if objects:
+                    await s3.delete_objects(
+                        Bucket=bucket,
+                        Delete={"Objects": objects, "Quiet": True},
                     )
-                    if status == 404 or code in {"404", "NoSuchKey", "NotFound"}:
-                        return
-                    raise
-                version_id = head.get("VersionId")
-                delete_options = {"Bucket": bucket, "Key": key}
-                if version_id:
-                    delete_options["VersionId"] = version_id
-                await s3.delete_object(**delete_options)
+                remaining = await s3.list_object_versions(Bucket=bucket, Prefix=key)
+                assert not any(
+                    item.get("Key") == key
+                    for item in (
+                        *remaining.get("Versions", []),
+                        *remaining.get("DeleteMarkers", []),
+                    )
+                ), "smoke-test snapshot version still exists after deletion"
                 try:
                     await s3.head_object(Bucket=bucket, Key=key)
                 except Exception as exc:
@@ -132,7 +160,11 @@ async def _delete_smoke_snapshot(snapshot_store, key: str) -> None:
             await asyncio.sleep(2 ** attempt)
 
 
-async def snapshot_round_trip(snapshot_store=None) -> None:
+async def snapshot_round_trip(
+    snapshot_store=None,
+    *,
+    fault_stage: str | None = None,
+) -> None:
     """Save, retrieve, and permanently remove one deterministic smoke object."""
     if snapshot_store is None:
         from app.services import snapshot_store as snapshot_store_module
@@ -153,13 +185,21 @@ async def snapshot_round_trip(snapshot_store=None) -> None:
             snapshot_type="html",
             content_type="text/plain; charset=utf-8",
         )
+        if fault_stage == "upload-response":
+            uploaded_key = None
         assert uploaded_key == key
         downloaded = await snapshot_store.download_snapshot(key)
         assert downloaded == marker
     finally:
         # PutObject can commit before a response error is surfaced. Always
         # clean the deterministic key even when upload_snapshot returns None.
-        await _delete_smoke_snapshot(snapshot_store, key)
+        await _delete_smoke_snapshot(
+            snapshot_store,
+            key,
+            fault_stage=fault_stage,
+        )
+    if fault_stage == "cleanup":
+        raise RuntimeError("forced post-cleanup failure")
 
 
 def _install_script(
@@ -167,7 +207,10 @@ def _install_script(
     encrypted_b64: str,
     key_path: str,
     cert_path: str,
+    fault_stage: str | None = None,
 ) -> str:
+    if fault_stage not in {None, "restart", "upload-response", "cleanup"}:
+        raise ValueError(f"unsupported installer fault stage: {fault_stage}")
     env_path = shlex.quote(ENV_PATH)
     required_literal = repr(REQUIRED_KEYS)
     allowed_literal = repr((*REQUIRED_KEYS, *OPTIONAL_KEYS, "SNAPSHOT_ENABLED"))
@@ -182,6 +225,8 @@ def _install_script(
         + inspect.getsource(snapshot_round_trip),
         "        ",
     )
+    restart_fault = "false # forced restart failure" if fault_stage == "restart" else ":"
+    smoke_fault_literal = repr(fault_stage if fault_stage in {"upload-response", "cleanup"} else None)
     return textwrap.dedent(
         f"""\
         set -eu
@@ -192,6 +237,7 @@ def _install_script(
         env_absent="${{env_path}}.pre-install-absent"
         lifecycle_backup=/etc/university-portal/snapshot-lifecycle.pre-install.json
         lifecycle_absent=/etc/university-portal/snapshot-lifecycle.pre-install-absent
+        service_states=/etc/university-portal/snapshot-services.pre-install
         tmp=
 
         workdir=$(systemctl show uni-api-py --property=WorkingDirectory --value)
@@ -205,6 +251,15 @@ def _install_script(
         )
         test -x "$python"
         "$python" -c 'import sys; assert sys.version_info.major == 3'
+        : >"$service_states"
+        chmod 600 "$service_states"
+        for service in {services}; do
+          state=$(systemctl is-active "$service" 2>/dev/null || true)
+          case "$state" in
+            active|inactive) printf '%s %s\\n' "$service" "$state" >>"$service_states" ;;
+            *) echo "unsupported prior service state: $service=$state" >&2; exit 1 ;;
+          esac
+        done
 
         restore_lifecycle() {{
           if test -f "$lifecycle_backup" || test -f "$lifecycle_absent"; then
@@ -272,10 +327,19 @@ def _install_script(
             fi
           done
           systemctl daemon-reload || services_failed=1
-          systemctl restart {services} || services_failed=1
+          while read -r service state; do
+            if test "$state" = active; then
+              systemctl restart "$service" || services_failed=1
+            else
+              systemctl stop "$service" || services_failed=1
+            fi
+          done <"$service_states"
           sleep 8
-          systemctl is-active --quiet {services} || services_failed=1
-          rm -f "$lifecycle_backup" "$lifecycle_absent"
+          while read -r service state; do
+            current=$(systemctl is-active "$service" 2>/dev/null || true)
+            test "$current" = "$state" || services_failed=1
+          done <"$service_states"
+          rm -f "$lifecycle_backup" "$lifecycle_absent" "$service_states"
           if test "$lifecycle_failed" -ne 0 ||
              test "$config_failed" -ne 0 ||
              test "$services_failed" -ne 0; then
@@ -387,6 +451,21 @@ def _install_script(
             os.chmod(backup_path, 0o600)
         PYLIFECYCLE_BACKUP
 
+        cd "$workdir"
+        PYTHONPATH=. "$python" - "$env_path" <<'PYLIFECYCLE_APPLY'
+        import os
+        import shlex
+        import sys
+
+        with open(sys.argv[1], encoding="utf-8") as stream:
+            for raw_line in stream:
+                parsed = shlex.split(raw_line, comments=False, posix=True)
+                key, value = parsed[0].split("=", 1)
+                os.environ[key] = value
+        from app.services import snapshot_store
+        assert snapshot_store.setup_lifecycle_rules()
+        PYLIFECYCLE_APPLY
+
         for service in {services}; do
           dropin="/etc/systemd/system/${{service}}.service.d/{DROPIN_NAME}"
           printf '%s\\n' '[Service]' 'EnvironmentFile={ENV_PATH}' >"$dropin"
@@ -395,6 +474,7 @@ def _install_script(
         systemctl daemon-reload
         restart_since=$(date --iso-8601=seconds)
         systemctl restart {services}
+        {restart_fault}
         sleep 8
         systemctl is-active --quiet {services}
         curl --fail --silent --show-error http://127.0.0.1:8000/api/health >/dev/null
@@ -442,10 +522,10 @@ def _install_script(
                 os.environ[key] = value
 
 {smoke_helpers}
-        asyncio.run(snapshot_round_trip())
+        asyncio.run(snapshot_round_trip(fault_stage={smoke_fault_literal}))
         PYSMOKE
 
-        rm -f "$env_backup" "$env_absent" "$lifecycle_backup" "$lifecycle_absent"
+        rm -f "$env_backup" "$env_absent" "$lifecycle_backup" "$lifecycle_absent" "$service_states"
         for service in {services}; do
           dropin="/etc/systemd/system/${{service}}.service.d/{DROPIN_NAME}"
           rm -f "${{dropin}}.pre-install" "${{dropin}}.pre-install-absent"

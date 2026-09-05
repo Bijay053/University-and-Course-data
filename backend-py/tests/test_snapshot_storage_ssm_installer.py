@@ -9,6 +9,8 @@ import sys
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
+
 
 DEPLOY_DIR = Path(__file__).resolve().parents[1] / "deploy"
 sys.path.insert(0, str(DEPLOY_DIR))
@@ -129,7 +131,7 @@ def test_ambiguous_upload_failure_still_cleans_deterministic_key(monkeypatch):
     async def upload_snapshot(*_args, **_kwargs):
         return None
 
-    async def cleanup(_store, key):
+    async def cleanup(_store, key, **_kwargs):
         cleaned.append(key)
 
     store = SimpleNamespace(
@@ -149,6 +151,62 @@ def test_ambiguous_upload_failure_still_cleans_deterministic_key(monkeypatch):
     assert cleaned == ["deterministic-smoke-key"]
 
 
+@pytest.mark.asyncio
+async def test_cleanup_removes_versions_and_delete_markers_for_exact_key():
+    deleted = []
+    calls = 0
+
+    class _Missing(Exception):
+        response = {
+            "Error": {"Code": "NoSuchKey"},
+            "ResponseMetadata": {"HTTPStatusCode": 404},
+        }
+
+    class _Client:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+        async def list_object_versions(self, **_kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                return {
+                    "Versions": [
+                        {"Key": "smoke", "VersionId": "v1"},
+                        {"Key": "smoke-neighbour", "VersionId": "v2"},
+                    ],
+                    "DeleteMarkers": [{"Key": "smoke", "VersionId": "marker"}],
+                }
+            return {"Versions": [], "DeleteMarkers": []}
+
+        async def delete_objects(self, **kwargs):
+            deleted.extend(kwargs["Delete"]["Objects"])
+
+        async def head_object(self, **_kwargs):
+            raise _Missing()
+
+    client = _Client()
+    store = SimpleNamespace(
+        _make_async_session=lambda: SimpleNamespace(
+            client=lambda *_args, **_kwargs: client
+        )
+    )
+    with patch.dict(
+        installer.os.environ,
+        {"AWS_S3_BUCKET_NAME": "bucket"},
+        clear=True,
+    ):
+        await installer._delete_smoke_snapshot(store, "smoke")
+
+    assert deleted == [
+        {"Key": "smoke", "VersionId": "v1"},
+        {"Key": "smoke", "VersionId": "marker"},
+    ]
+
+
 def test_host_transaction_is_root_only_reversible_and_round_trip_verified():
     script = installer._install_script(
         encrypted_b64="ciphertext",
@@ -166,8 +224,14 @@ def test_host_transaction_is_root_only_reversible_and_round_trip_verified():
     assert '"TransitionDefaultMinimumObjectSize"' in script
     assert "lifecycle_failed=0" in script
     assert "restore_lifecycle || lifecycle_failed=1" in script
+    assert "snapshot_store.setup_lifecycle_rules()" in script
+    assert "list_object_versions" in script
+    assert "DeleteMarkers" in script
     assert "EnvironmentFile=/etc/university-portal/snapshot-storage.env" in script
     assert "systemctl restart uni-api-py uni-celery" in script
+    assert 'systemctl restart "$service"' in script
+    assert 'systemctl stop "$service"' in script
+    assert 'test "$current" = "$state"' in script
     assert 'grep -Fq "[SNAPSHOT] enabled"' in script
     assert "snapshot_round_trip" in script
     assert "from install_snapshot_storage_via_ssm import" not in script
@@ -193,6 +257,36 @@ def test_host_transaction_is_root_only_reversible_and_round_trip_verified():
     assert heredocs
     for marker, source in heredocs:
         compile(source, f"<generated-{marker}>", "exec")
+
+
+@pytest.mark.parametrize(
+    ("fault_stage", "expected"),
+    [
+        ("restart", "false # forced restart failure"),
+        ("upload-response", "fault_stage='upload-response'"),
+        ("cleanup", "fault_stage='cleanup'"),
+    ],
+)
+def test_generated_transaction_has_controlled_integration_failure_points(
+    fault_stage,
+    expected,
+):
+    script = installer._install_script(
+        encrypted_b64="ciphertext",
+        key_path="/tmp/key.pem",
+        cert_path="/tmp/cert.pem",
+        fault_stage=fault_stage,
+    )
+
+    assert expected in script
+    syntax = subprocess.run(
+        ["bash", "-n"],
+        input=script,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert syntax.returncode == 0, syntax.stderr
 
 
 def test_service_templates_load_snapshot_environment():
