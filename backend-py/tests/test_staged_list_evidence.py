@@ -21,7 +21,11 @@ from sqlalchemy import select, text
 
 from app.database import AsyncSessionLocal, engine
 from app.models import ScrapedCourse, ScrapedFieldEvidence, University
-from app.routers.scrape import _attach_evidence_bulk, _staged_row_to_dict
+from app.routers.scrape import (
+    _attach_evidence_bulk,
+    _staged_row_to_dict,
+    staged_update,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -205,5 +209,71 @@ async def test_staged_row_to_dict_seeds_empty_evidence_field():
         d = _staged_row_to_dict(row)
         assert d["evidence"] == []
         assert isinstance(d["evidence"], list)
+    finally:
+        await _cleanup(job_id)
+
+
+@pytest.mark.asyncio
+async def test_staged_update_returns_ui_camelcase_course_shape():
+    """The edit modal replaces its table row with the PUT response.
+
+    Returning only ORM snake_case keys makes the saved row appear blank even
+    though the database update succeeded.
+    """
+    uni_id = await _pick_university()
+    job_id = f"test_staged_edit_{uuid.uuid4().hex[:10]}"
+    try:
+        async with AsyncSessionLocal() as db:
+            sc = ScrapedCourse(
+                scrape_job_id=job_id,
+                university_id=uni_id,
+                course_name="Master of Visible Data",
+                category="Business",
+                course_location="Sydney",
+                duration=2,
+                duration_term="Year",
+                degree_level="Master",
+                international_fee=32000,
+                currency="AUD",
+                ielts_overall=6.5,
+                pte_overall=58,
+                toefl_overall=85,
+                intake_months=["January"],
+                status="pending",
+            )
+            db.add(sc)
+            await db.commit()
+            await db.refresh(sc)
+
+            response = await staged_update(
+                sc.id,
+                db,
+                {
+                    "courseName": sc.course_name,
+                    "category": sc.category,
+                    "courseLocation": "Sunshine Coast Moreton Bay",
+                    "duration": 2,
+                    "durationTerm": "Year",
+                    "degreeLevel": "Master",
+                    "internationalFee": 32000,
+                    "currency": "AUD",
+                    "ieltsOverall": 6.5,
+                    "pteOverall": 58,
+                    "toeflOverall": 85,
+                    "intakeMonths": ["January"],
+                },
+            )
+
+        course = response["course"]
+        assert course["courseName"] == "Master of Visible Data"
+        assert course["courseLocation"] == "Sunshine Coast Moreton Bay"
+        assert course["degreeLevel"] == "Master"
+        assert course["internationalFee"] == pytest.approx(32000)
+        assert course["ieltsOverall"] == pytest.approx(6.5)
+        assert course["pteOverall"] == pytest.approx(58)
+        assert course["toeflOverall"] == pytest.approx(85)
+        assert course["intakeMonths"] == ["January"]
+        # Backward-compatible snake_case aliases remain available.
+        assert course["course_location"] == "Sunshine Coast Moreton Bay"
     finally:
         await _cleanup(job_id)

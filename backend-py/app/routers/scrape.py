@@ -3406,9 +3406,12 @@ async def staged_update(
     await db.refresh(sc)
     return {
         "success": True,
-        "course": {
-            c.name: getattr(sc, c.name) for c in sc.__table__.columns
-        },
+        # Keep the mutation response identical to the staged-list response.
+        # React replaces the edited row in-place with this object and expects
+        # camelCase keys such as courseName, degreeLevel and courseLocation.
+        # Returning only raw ORM/snake_case columns makes every table cell look
+        # blank until the next full reload even though the database save worked.
+        "course": _staged_row_to_dict(sc),
     }
 
 
