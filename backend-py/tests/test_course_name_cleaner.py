@@ -332,3 +332,22 @@ def test_unisc_generated_course_name_uses_canonical_configured_cleaner() -> None
         )
     finally:
         current_uni_config.reset(token)
+
+
+def test_unisc_production_id_path_strips_geographic_brand_suffix_without_yaml_aliases() -> None:
+    """Production uni ID 20 must not depend on the committed ID 2235 recipe."""
+    raw = (
+        "Bachelor of Business | UniSC | University of the Sunshine Coast, "
+        "Queensland, Australia"
+    )
+
+    cleaned, suffix = clean_course_name_with_config(
+        raw,
+        university_name="University of the Sunshine Coast",
+        scrape_url="https://www.unisc.edu.au/",
+    )
+
+    assert cleaned == "Bachelor of Business"
+    assert suffix == (
+        " | UniSC | University of the Sunshine Coast, Queensland, Australia"
+    )

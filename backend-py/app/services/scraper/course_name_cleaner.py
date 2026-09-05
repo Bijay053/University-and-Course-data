@@ -29,6 +29,14 @@ _SEP_PAT = r"(?:\s*[\|\-\u2013\u2014:•@]\s*|\s+at\s+)"
 # Minimum acceptable result length (guards against stripping the whole title).
 _MIN_LEN = 5
 
+# Some university CMS titles append a geographic qualifier after the provider,
+# for example:
+#   "Bachelor of Business | University of the Sunshine Coast, Queensland, Australia"
+# Keep this deliberately bounded and comma-led.  The provider token must still
+# be an exact known name/alias and must follow a supported title separator, so
+# ordinary commas inside a course name cannot trigger the strip.
+_TRAILING_QUALIFIERS_PAT = r"(?:\s*,\s*[^,|\n]{2,80}){0,3}"
+
 
 _UNRESOLVED_TEMPLATE_RE = re.compile(r"\{\{[^{}]*\}\}")
 _UNRESOLVED_BRAND_SUFFIX_RE = re.compile(
@@ -86,7 +94,7 @@ def clean_course_name(
         matched = False
         for token in all_tokens:
             pat = re.compile(
-                _SEP_PAT + re.escape(token) + r"\s*$",
+                _SEP_PAT + re.escape(token) + _TRAILING_QUALIFIERS_PAT + r"\s*$",
                 re.IGNORECASE,
             )
             m = pat.search(cleaned)
