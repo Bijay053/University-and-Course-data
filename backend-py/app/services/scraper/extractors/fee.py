@@ -908,6 +908,53 @@ def _extract_audience_scoped_fee(
     return amount, ctx
 
 
+_UNISC_HOST_RE = re.compile(r"https?://(?:www\.)?unisc\.edu\.au(?:/|$)", re.I)
+_UNISC_NO_INTERNATIONAL_FEE = object()
+
+
+def _from_unisc_international_panel(
+    html: str,
+    url: str,
+) -> tuple[int, str] | object | None:
+    """Read UniSC's explicit international annual-fee panel.
+
+    UniSC uses the unprefixed ``audience`` attribute rather than the generic
+    ``data-audience`` idiom.  When no exclusive international panel exists,
+    return a sentinel so the generic text scanner cannot promote the CSP or
+    other domestic amount displayed on the same page.
+    """
+    if not _UNISC_HOST_RE.search(url or ""):
+        return None
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html or "", "html.parser")
+    except Exception:
+        return _UNISC_NO_INTERNATIONAL_FEE
+
+    candidates: list[tuple[int, str]] = []
+    for block in soup.find_all(attrs={"audience": True}):
+        audience = str(block.attrs.get("audience") or "")
+        if not re.search(r"\binternational\b", audience, re.I):
+            continue
+        if re.search(r"\bdomestic\b", audience, re.I):
+            continue
+        text = block.get_text(" ", strip=True)
+        if not re.search(r"\bannual\s+fees?\b", text, re.I):
+            continue
+        for match in _AMOUNT_RE.finditer(text):
+            raw = match.group(2) or match.group(3) or ""
+            amount = _parse_amount(raw)
+            if amount is not None and 1_000 <= amount <= 500_000:
+                candidates.append((amount, text))
+
+    if not candidates:
+        return _UNISC_NO_INTERNATIONAL_FEE
+    # Responsive desktop/mobile elements can duplicate the same amount.
+    # If they differ, the larger value is safer than the nearby domestic CSP.
+    return max(candidates, key=lambda item: item[0])
+
+
 # ── Structured fee table extractor ───────────────────────────────────────────
 # UK universities (Wolverhampton, Coventry, etc.) publish fee tables with rows
 # shaped like:
@@ -2364,6 +2411,39 @@ async def extract(
                 confidence=min(1.0, 0.4 + score * 0.1),
                 snippet=ctx[:240],
                 method=method,
+            )
+        ]
+
+    unisc_fee = _from_unisc_international_panel(html, url)
+    if unisc_fee is _UNISC_NO_INTERNATIONAL_FEE:
+        return [
+            ExtractionResult(
+                field_key="fee_table_confirmed_no_international",
+                value=True,
+                normalized={"fee_table_confirmed_no_international": True},
+                confidence=0.99,
+                snippet=(
+                    "UniSC page contains no exclusive international annual-fee "
+                    "panel; domestic/CSP amounts are not international tuition."
+                ),
+                method="fee.unisc_no_international_panel",
+            )
+        ]
+    if unisc_fee is not None:
+        amount, ctx = unisc_fee  # type: ignore[misc]
+        return [
+            ExtractionResult(
+                field_key="international_fee",
+                value=amount,
+                normalized={
+                    "international_fee": amount,
+                    "currency": "AUD",
+                    "fee_term": "Annual",
+                    "fee_year": _extract_year(ctx),
+                },
+                confidence=0.99,
+                snippet=ctx[:200],
+                method="fee.unisc_international_panel",
             )
         ]
 

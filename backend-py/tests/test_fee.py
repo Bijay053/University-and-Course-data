@@ -651,6 +651,53 @@ def test_audience_scoped_fee_prefers_international_total_by_default():
     assert out[0].method == "fee.audience_structural"
 
 
+def test_unisc_fee_uses_exclusive_international_audience_panel():
+    html = """
+    <div audience="domestic international">
+      <h3 audience="international">Indicative 2026 fees (A$)</h3>
+      <div audience="domestic">A$14,834 - 2026 Fees CSP</div>
+      <div audience="international">A$28,500 <small>Annual fee</small></div>
+    </div>
+    """
+    out = _run(
+        fee.extract(
+            html,
+            "https://www.unisc.edu.au/study/courses-and-programs/"
+            "bachelor-degrees-undergraduate-programs/bachelor-of-business",
+            country="Australia",
+        )
+    )
+
+    assert out
+    assert out[0].normalized["international_fee"] == 28_500
+    assert out[0].normalized["fee_term"] == "Annual"
+    assert out[0].method == "fee.unisc_international_panel"
+
+
+def test_unisc_csp_only_page_does_not_create_international_fee():
+    html = """
+    <section>
+      <p>Indicative 2026 fees (CSP): A$8,336</p>
+      <p>Commonwealth supported place for domestic students.</p>
+    </section>
+    """
+    out = _run(
+        fee.extract(
+            html,
+            "https://www.unisc.edu.au/study/courses-and-programs/"
+            "bachelor-degrees-undergraduate-programs/example",
+            country="Australia",
+        )
+    )
+
+    assert len(out) == 1
+    assert out[0].field_key == "fee_table_confirmed_no_international"
+    assert out[0].normalized == {
+        "fee_table_confirmed_no_international": True
+    }
+    assert out[0].method == "fee.unisc_no_international_panel"
+
+
 def test_audience_scoped_fee_rejects_ancillary_international_charges():
     """International audience containers also hold non-tuition charges."""
     html = """

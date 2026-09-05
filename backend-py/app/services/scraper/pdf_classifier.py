@@ -171,7 +171,10 @@ _NON_TUITION_FEE_URL_RE = re.compile(
 # UniSC and similarly named documents at other universities are unaffected.
 _UNISC_UNIT_FEE_SCHEDULE_URL_RE = re.compile(
     r"https?://(?:www\.)?unisc\.edu\.au/"
-    r".*/20\d{2}-full-fee-paying-(?:1st|2nd)-half\.pdf(?:[?#].*)?$",
+    r".*/20\d{2}-(?:"
+    r"full-fee-paying-(?:1st|2nd)-half"
+    r"|units-of-study-[^/?#]*fees?(?:-v\d+)?"
+    r")\.pdf(?:[?#].*)?$",
     re.I,
 )
 _NON_TUITION_FEE_TITLE_RE = re.compile(

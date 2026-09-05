@@ -1102,6 +1102,14 @@ async def _fetch_with_browser_fallback(url: str) -> str | None:
 #   "english_requirements"  — english slots + english_page_url + english_by_level
 
 _CACHE_TTL_DAYS = 30
+_ENGLISH_CACHE_SCHEMA_VERSION = 2
+
+
+def _english_cache_is_current(parsed_data: dict[str, Any]) -> bool:
+    """Return whether cached English data was produced by the current parser."""
+    return (
+        parsed_data.get("_parser_version") == _ENGLISH_CACHE_SCHEMA_VERSION
+    )
 
 
 async def _cache_get(university_id: int, page_type: str) -> dict[str, Any] | None:
@@ -1721,6 +1729,16 @@ async def prefetch_central_pages(
         _eng_cached: dict[str, Any] | None = None
         if university_id is not None:
             _eng_cached = await _cache_get(university_id, "english_requirements")
+            if (
+                _eng_cached is not None
+                and not _english_cache_is_current(_eng_cached)
+            ):
+                log.info(
+                    "[CACHE] english_requirements parser version stale for uni %s "
+                    "— re-fetching",
+                    university_id,
+                )
+                _eng_cached = None
             if _eng_cached is not None:
                 result["english"] = _eng_cached.get("english", {})
                 if "english_by_level" in _eng_cached:
@@ -1912,6 +1930,7 @@ async def prefetch_central_pages(
                     # Store in cache
                     if university_id is not None:
                         _to_cache: dict[str, Any] = {
+                            "_parser_version": _ENGLISH_CACHE_SCHEMA_VERSION,
                             "english": english_vals,
                             "english_page_url": english_url,
                         }

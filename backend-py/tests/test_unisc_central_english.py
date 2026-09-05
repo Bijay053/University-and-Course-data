@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from app.services.scraper.central_pages import _parse_column_keyed_english_table
+from app.services.scraper.central_pages import (
+    _ENGLISH_CACHE_SCHEMA_VERSION,
+    _english_cache_is_current,
+    _parse_column_keyed_english_table,
+)
 from app.services.scraper.pipelines.single_course import (
     _select_central_english_level,
 )
@@ -100,3 +104,12 @@ def test_unisc_bare_ielts_cells_are_kept_in_each_level_profile() -> None:
     assert by_level["postgraduate"]["ielts_overall"] == 6.5
     assert by_level["doctorate"]["ielts_overall"] == 6.5
     assert flat["ielts_overall"] == 6.5
+
+
+def test_old_english_cache_is_reparsed_after_parser_change() -> None:
+    assert not _english_cache_is_current(
+        {"english_by_level": {"undergraduate": {"pte_overall": 50.0}}}
+    )
+    assert _english_cache_is_current(
+        {"_parser_version": _ENGLISH_CACHE_SCHEMA_VERSION}
+    )
