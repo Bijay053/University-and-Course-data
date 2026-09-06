@@ -47,6 +47,8 @@ class ScrapeRuntimeJob(Base):
     claim_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     requeue_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     requeue_events: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    release_revision: Mapped[str | None] = mapped_column(Text, nullable=True)
+    release_history: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     cost_ceiling_hit: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     total_gemini_cost_usd: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     avg_verification_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)

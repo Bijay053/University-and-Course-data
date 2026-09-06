@@ -66,4 +66,6 @@ class ScrapeJobRead(BaseModel):
     started_at: datetime | None = None
     completed_at: datetime | None = None
     error_message: str | None = None
+    release_revision: str | None = None
+    release_history: list[dict] | None = None
     model_config = ConfigDict(from_attributes=True)

@@ -744,6 +744,12 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     startedAt: string | null;
     completedAt: string | null;
     errorMessage: string | null;
+    releaseRevision: string | null;
+    releaseHistory: Array<{
+      claim: number;
+      release: string;
+      claimedAt: string;
+    }>;
     durationMs: number | null;
     stagedCount: number;
     approvedCount: number;
@@ -3975,6 +3981,12 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
           <div className="space-y-2">
             {historyRuns.map((run) => {
               const isExpanded = expandedHistoryId === run.runtimeJobId;
+              const releases = Array.from(new Set(
+                (run.releaseHistory ?? [])
+                  .map((claim) => claim.release)
+                  .filter(Boolean),
+              ));
+              const mixedRelease = releases.length > 1;
               const compactionLostSpeedup =
                 (run.htmlCompaction?.attempts ?? 0) >= 10
                 && (run.htmlCompaction?.reduction_rate ?? 0) < 0.10;
@@ -4027,6 +4039,24 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                             ↺ {run.requeueCount}
                           </span>
                         )}
+                        <span
+                          title={
+                            run.releaseHistory?.length
+                              ? run.releaseHistory
+                                .map((claim) => `Claim ${claim.claim}: ${claim.release} at ${claim.claimedAt}`)
+                                .join("\n")
+                              : "This job predates release tracking or the worker could not resolve release metadata."
+                          }
+                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono ${
+                            mixedRelease
+                              ? "bg-orange-100 text-orange-800"
+                              : run.releaseRevision
+                                ? "bg-slate-100 text-slate-700"
+                                : "bg-gray-100 text-gray-400"
+                          }`}
+                        >
+                          {mixedRelease ? "Mixed releases" : "Release"}: {run.releaseRevision ?? "unknown"}
+                        </span>
                         {(run.snapshotCount ?? 0) > 0 ? (
                           <span
                             title={`${run.snapshotCount} snapshot${run.snapshotCount !== 1 ? "s" : ""} saved · Latest: ${run.latestSnapshotAt ? new Date(run.latestSnapshotAt).toISOString().replace("T", " ").slice(0, 16) + " UTC" : "—"}`}

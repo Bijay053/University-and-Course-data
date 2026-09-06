@@ -90,15 +90,19 @@ async def run_repair(db: AsyncSession, runtime_job_id: str) -> dict:
     The job's ``request_payload['repair_targets']`` is a list of
     ``{course_id, url}`` dicts pre-validated by the API endpoint.
     """
+    from app.services.scraper.job_claim import claim_runtime_job
+
+    if not await claim_runtime_job(db, runtime_job_id):
+        log.warning(
+            "run_repair: job %s already claimed or not queued — aborting duplicate run",
+            runtime_job_id,
+        )
+        return {"ok": False, "reason": "already_claimed"}
+
     job = await db.get(ScrapeRuntimeJob, runtime_job_id)
     if not job:
         log.warning("run_repair: no job %s", runtime_job_id)
         return {"ok": False, "reason": "job_not_found"}
-
-    job.status = "running"
-    job.claimed_at = datetime.now(timezone.utc)
-    job.heartbeat_at = datetime.now(timezone.utc)
-    await db.commit()
 
     _seq = [1]
 

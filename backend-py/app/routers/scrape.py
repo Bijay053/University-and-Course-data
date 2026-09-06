@@ -355,6 +355,7 @@ async def _attach_recovery_counts_bulk(
 @router.get("/jobs")
 async def list_jobs(
     db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(require_permission("scraping.view"))],
     status_filter: str | None = Query(default=None, alias="status"),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=1, le=200),
@@ -374,7 +375,11 @@ async def list_jobs(
 
 
 @router.get("/jobs/{job_id}", response_model=ScrapeJobRead)
-async def get_job(job_id: str, db: Annotated[AsyncSession, Depends(get_db)]) -> ScrapeJobRead:
+async def get_job(
+    job_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(require_permission("scraping.view"))],
+) -> ScrapeJobRead:
     job = await db.get(ScrapeRuntimeJob, job_id)
     if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
@@ -979,6 +984,7 @@ async def list_active(db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
 @router.get("/history")
 async def history_list(
     db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(require_permission("scraping.view"))],
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     university_id: int | None = Query(default=None),
@@ -1066,6 +1072,8 @@ async def history_list(
             "startedAt": r.started_at.isoformat() if r.started_at else None,
             "completedAt": r.completed_at.isoformat() if r.completed_at else None,
             "errorMessage": r.error_message,
+            "releaseRevision": r.release_revision,
+            "releaseHistory": r.release_history or [],
             "durationMs": duration_ms,
             "stagedCount": int(staged or 0),
             "approvedCount": int(approved or 0),

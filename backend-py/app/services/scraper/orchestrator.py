@@ -1236,7 +1236,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
     completed/failed). Per-course staging uses a fresh AsyncSession from
     AsyncSessionLocal so we never share a session across coroutines.
     """
-    from sqlalchemy import text as _text
+    from app.services.scraper.job_claim import claim_runtime_job
 
     # Atomic claim: only succeed if the job is still in 'queued' state.
     # Two Celery workers can both dequeue the same Celery task message when
@@ -1247,18 +1247,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
     #
     # The UPDATE returns the claimed row. If it returns 0 rows the job was
     # already claimed by another worker (or cancelled) and we bail immediately.
-    now = datetime.now(timezone.utc)
-    claimed = await db.execute(
-        _text(
-            "UPDATE scrape_runtime_jobs "
-            "SET status = 'running', claimed_at = :now, heartbeat_at = :now "
-            "WHERE runtime_job_id = :jid AND status = 'queued' "
-            "RETURNING runtime_job_id"
-        ),
-        {"jid": runtime_job_id, "now": now},
-    )
-    await db.commit()
-    if not claimed.first():
+    if not await claim_runtime_job(db, runtime_job_id):
         log.warning(
             "run_scrape: job %s already claimed or not queued — aborting duplicate run",
             runtime_job_id,
