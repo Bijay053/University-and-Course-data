@@ -985,6 +985,52 @@ def _parse_program_keyed_english_tables(html: str) -> list[dict[str, Any]]:
                 return value
         return None
 
+    def _ielts_subscores(text: str) -> dict[str, float]:
+        """Parse explicit IELTS skill floors from one named-program row."""
+        normalized = " ".join((text or "").lower().split())
+        fields = {
+            "listening": "ielts_listening",
+            "reading": "ielts_reading",
+            "writing": "ielts_writing",
+            "speaking": "ielts_speaking",
+        }
+        values: dict[str, float] = {}
+
+        # A shared floor may be written as "minimum 7.0 in each subtest",
+        # "no subscore less than 6.5", or "7.0 all other subtests".  Seed all
+        # skills with that floor; explicit skill groups below then override it.
+        shared_patterns = (
+            r"(?:minimum(?:\s+score)?(?:\s+of)?|no\s+(?:subscore|band)\s+(?:is\s+)?less\s+than)"
+            r"\s*([4-9](?:\.\d+)?)\s+(?:in\s+)?(?:each|all)\s+"
+            r"(?:subtests?|skills?|components?|bands?)",
+            r"\b([4-9](?:\.\d+)?)\s+(?:in\s+)?all\s+other\s+"
+            r"(?:subtests?|skills?|components?|bands?)",
+        )
+        for pattern in shared_patterns:
+            match = _re.search(pattern, normalized, _re.I)
+            if not match:
+                continue
+            floor = float(match.group(1))
+            if 4.0 <= floor <= 9.0:
+                values.update({field: floor for field in fields.values()})
+
+        skill_word = r"(?:listening|reading|writing|speaking)"
+        skill_list = (
+            rf"{skill_word}"
+            rf"(?:(?:\s*,\s*|\s+(?:and|or)\s+){skill_word})*"
+        )
+        explicit_group = _re.compile(
+            rf"\b([4-9](?:\.\d+)?)\s+(?:in|for)\s+({skill_list})",
+            _re.I,
+        )
+        for match in explicit_group.finditer(normalized):
+            floor = float(match.group(1))
+            if not 4.0 <= floor <= 9.0:
+                continue
+            for skill in _re.findall(skill_word, match.group(2), _re.I):
+                values[fields[skill.lower()]] = floor
+        return values
+
     profiles: list[dict[str, Any]] = []
     for heading in section.find_all("h6", recursive=False):
         table = heading.find_next_sibling("table")
@@ -1006,9 +1052,21 @@ def _parse_program_keyed_english_tables(html: str) -> list[dict[str, Any]]:
                     value = _score(requirement, low, high)
                     if value is not None:
                         values[slot] = value
+                    if slot == "ielts_overall":
+                        values.update(_ielts_subscores(requirement))
                     break
         if program_names and values:
-            profiles.append({"program_names": program_names, "values": values})
+            profiles.append(
+                {
+                    "program_names": program_names,
+                    "program_aliases": [
+                        alias.strip()
+                        for alias in program_names.split(",")
+                        if alias.strip()
+                    ],
+                    "values": values,
+                }
+            )
     return profiles
 
 
@@ -1178,10 +1236,11 @@ async def _fetch_with_browser_fallback(url: str) -> str | None:
 #
 # page_type constants:
 #   "fee_schedule"          — parsed fee records + fee_page_url
-#   "english_requirements"  — english slots + english_page_url + english_by_level
+#   "english_requirements"  — english slots + english_page_url +
+#                             english_by_level + english_by_program
 
 _CACHE_TTL_DAYS = 30
-_ENGLISH_CACHE_SCHEMA_VERSION = 3
+_ENGLISH_CACHE_SCHEMA_VERSION = 4
 
 
 def _is_non_tuition_central_fee_pdf(
@@ -1849,6 +1908,8 @@ async def prefetch_central_pages(
                 result["english"] = _eng_cached.get("english", {})
                 if "english_by_level" in _eng_cached:
                     result["english_by_level"] = _eng_cached["english_by_level"]
+                if "english_by_program" in _eng_cached:
+                    result["english_by_program"] = _eng_cached["english_by_program"]
                 if emit:
                     _cached_slots = ", ".join(
                         f"{k}={v}"
@@ -1859,10 +1920,16 @@ async def prefetch_central_pages(
                         if _eng_cached.get("english_by_level")
                         else ""
                     )
+                    _by_program_note = (
+                        f" + by_program profiles: {len(_eng_cached.get('english_by_program', []))}"
+                        if _eng_cached.get("english_by_program")
+                        else ""
+                    )
                     await emit(
                         "status",
                         f"[CACHE] english_requirements hit → {_cached_slots}"
-                        f"{_by_level_note} (cached, skipping fetch of {english_url})",
+                        f"{_by_level_note}{_by_program_note} "
+                        f"(cached, skipping fetch of {english_url})",
                         phase="discover",
                         kind="central_english_cache_hit",
                         values=result["english"],
@@ -2051,6 +2118,8 @@ async def prefetch_central_pages(
                         }
                         if by_level:
                             _to_cache["english_by_level"] = by_level
+                        if _program_profiles:
+                            _to_cache["english_by_program"] = _program_profiles
                         await _cache_set(
                             university_id,
                             "english_requirements",

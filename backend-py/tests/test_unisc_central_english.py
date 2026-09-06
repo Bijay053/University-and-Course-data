@@ -132,6 +132,7 @@ def test_unisc_non_standard_tables_match_only_named_programs() -> None:
     )
     assert occupational_therapy == {
         "ielts_overall": 7.0,
+        "ielts_writing": 6.5,
         "toefl_overall": 94.0,
         "pte_overall": 66.0,
     }
@@ -139,6 +140,108 @@ def test_unisc_non_standard_tables_match_only_named_programs() -> None:
         profiles,
         "Diploma in Business Innovation",
     ) == {}
+    assert _select_central_english_program(
+        profiles,
+        "Bachelor of Criminology and Justice",
+    ) == {}
+
+
+def test_unisc_combined_degree_does_not_match_only_one_title_segment() -> None:
+    html = """
+    <div id="table-2-non-standard-requirements">
+      <h6>
+        Bachelor of Education (Secondary)/Bachelor of Arts,
+        Bachelor of Education (Secondary)/Bachelor of Science,
+        Bachelor of Laws/Bachelor of Environmental Management
+      </h6>
+      <table>
+        <tr>
+          <td>IELTS (Academic)</td>
+          <td>Overall score of 7.5 with minimum 7.0 in each subtest</td>
+        </tr>
+      </table>
+    </div>
+    """
+    profiles = _parse_program_keyed_english_tables(html)
+
+    assert _select_central_english_program(
+        profiles,
+        "Bachelor of Education (Secondary) / Bachelor of Science",
+    )["ielts_overall"] == 7.5
+    assert _select_central_english_program(
+        profiles,
+        "Bachelor of Science",
+    ) == {}
+    assert _select_central_english_program(
+        profiles,
+        "Bachelor of Environmental Management",
+    ) == {}
+
+
+def test_unisc_master_of_teaching_uses_named_table_2_requirement() -> None:
+    html = """
+    <div id="table-2-non-standard-requirements">
+      <h6>Master of Teaching (Primary), Master of Teaching (Secondary)</h6>
+      <table>
+        <tr>
+          <td>IELTS (Academic)</td>
+          <td>
+            Overall score of 7.5 with minimum 8.0 in speaking and listening
+            and 7.0 all other subtests
+          </td>
+        </tr>
+      </table>
+    </div>
+    """
+
+    profiles = _parse_program_keyed_english_tables(html)
+
+    assert _select_central_english_program(
+        profiles,
+        "Master of Teaching (Primary)",
+    ) == {
+        "ielts_overall": 7.5,
+        "ielts_listening": 8.0,
+        "ielts_speaking": 8.0,
+        "ielts_reading": 7.0,
+        "ielts_writing": 7.0,
+    }
+    assert _select_central_english_program(
+        profiles,
+        "Master of Teaching (Secondary)",
+    ) == {
+        "ielts_overall": 7.5,
+        "ielts_listening": 8.0,
+        "ielts_speaking": 8.0,
+        "ielts_reading": 7.0,
+        "ielts_writing": 7.0,
+    }
+
+
+def test_unisc_named_ielts_each_subtest_floor_is_preserved() -> None:
+    html = """
+    <div id="table-2-non-standard-requirements">
+      <h6>Master of Psychology (Clinical)</h6>
+      <table>
+        <tr>
+          <td>IELTS (Academic)</td>
+          <td>Overall score of 7.0 with minimum 7.0 in each subtest</td>
+        </tr>
+      </table>
+    </div>
+    """
+
+    profiles = _parse_program_keyed_english_tables(html)
+    assert _select_central_english_program(
+        profiles,
+        "Master of Psychology (Clinical)",
+    ) == {
+        "ielts_overall": 7.0,
+        "ielts_listening": 7.0,
+        "ielts_speaking": 7.0,
+        "ielts_reading": 7.0,
+        "ielts_writing": 7.0,
+    }
 
 
 def test_unisc_bare_ielts_cells_are_kept_in_each_level_profile() -> None:
@@ -175,7 +278,10 @@ def test_unisc_bare_ielts_cells_are_kept_in_each_level_profile() -> None:
 
 def test_old_english_cache_is_reparsed_after_parser_change() -> None:
     assert not _english_cache_is_current(
-        {"english_by_level": {"undergraduate": {"pte_overall": 50.0}}}
+        {
+            "_parser_version": 3,
+            "english_by_level": {"undergraduate": {"pte_overall": 50.0}},
+        }
     )
     assert _english_cache_is_current(
         {"_parser_version": _ENGLISH_CACHE_SCHEMA_VERSION}

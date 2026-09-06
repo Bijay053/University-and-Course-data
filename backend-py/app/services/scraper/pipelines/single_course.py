@@ -1205,11 +1205,19 @@ def _select_central_english_program(
     for profile in profiles:
         if not isinstance(profile, dict):
             continue
-        heading = _normalize(profile.get("program_names"))
         values = profile.get("values")
-        # A heading may list several courses separated by commas.  Match the
-        # complete normalized title with word boundaries, never fuzzy scores.
-        if f" {target} " in f" {heading} " and isinstance(values, dict):
+        raw_aliases = profile.get("program_aliases")
+        if not isinstance(raw_aliases, list):
+            # Backward-compatible reading for profiles created before aliases
+            # were stored explicitly.  UniSC separates named programs with
+            # commas; slashes remain part of combined-degree titles.
+            raw_aliases = str(profile.get("program_names") or "").split(",")
+        aliases = {_normalize(alias) for alias in raw_aliases}
+        aliases.discard("")
+        # Exact alias equality is required.  Substring matching incorrectly
+        # assigned combined-degree exceptions to unrelated simple courses,
+        # e.g. "Bachelor of Science" matching ".../Bachelor of Science".
+        if target in aliases and isinstance(values, dict):
             return values
     return {}
 
