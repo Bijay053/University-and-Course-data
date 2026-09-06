@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+import asyncio
 from unittest.mock import AsyncMock
 
 import pytest
@@ -41,19 +41,62 @@ async def test_runtime_progress_is_persisted_before_terminal_finalization(monkey
     session.commit.assert_awaited_once()
 
 
-def test_completion_progress_is_retry_safe_and_resume_aware():
-    """Retries only advance after settling; resumed work starts at its offset."""
-    source = Path(orchestrator.__file__).read_text(encoding="utf-8")
-    resume_default = source.index("_resume_already_staged = 0")
-    resume_filter = source.index("_already_staged_checkpoint_rows(", resume_default)
-    completion_seed = source.index("completed = [_resume_already_staged]", resume_filter)
-    first_batch = source.index("for _batch_idx, _batch_links", completion_seed)
-    assert resume_default < resume_filter < completion_seed < first_batch
+@pytest.mark.asyncio
+async def test_resumed_mixed_outcomes_advance_once_after_settlement():
+    """The production retry loop keeps durable and emitted progress reconciled."""
+    links = [
+        {"name": "Success", "url": "https://example.test/success"},
+        {"name": "Circuit-breaker skip", "url": "https://example.test/skipped"},
+        {"name": "Timed out", "url": "https://example.test/timeout"},
+        {"name": "Exception", "url": "https://example.test/exception"},
+        {"name": "Cooldown", "url": "https://example.test/cooldown"},
+    ]
+    outcomes = {
+        "Success": [{"name": "Success"}],
+        "Circuit-breaker skip": [{
+            "name": "Circuit-breaker skip",
+            "error": "extract: Scrape.do auth/credits error HTTP 401",
+        }],
+        "Timed out": [{"name": "Timed out", "error": "per_course_timeout", "_timed_out": True}],
+        "Exception": [RuntimeError("extract failed")],
+        "Cooldown": [
+            {"name": "Cooldown", "_retry_after": 0.01, "error": "rate_limited"},
+            {"name": "Cooldown"},
+        ],
+    }
+    attempts: list[str] = []
+    persisted: list[tuple[int, int]] = []
+    emitted: list[dict] = []
+    completed = [7]  # resumed checkpoint offset
+    total = 12
+    lock = asyncio.Lock()
 
-    retry_branch = source.index("result.get(\"_retry_after\")")
-    retry_continue = source.index("continue", retry_branch)
-    completion_call = source.index(
-        "await _record_extraction_complete(link)",
-        retry_continue,
-    )
-    assert retry_branch < retry_continue < completion_call
+    async def record_complete(link: dict) -> None:
+        async with lock:
+            completed[0] += 1
+            payload = {"current": completed[0], "total": total, "url": link["url"]}
+            persisted.append((payload["current"], payload["total"]))
+            emitted.append(payload)
+
+    async def run(link: dict):
+        async def attempt():
+            attempts.append(link["name"])
+            outcome = outcomes[link["name"]].pop(0)
+            if isinstance(outcome, Exception):
+                raise outcome
+            return outcome
+
+        return await orchestrator._settle_course_with_retries(
+            link, attempt, record_complete, sleep=AsyncMock()
+        )
+
+    results = await asyncio.gather(*(run(link) for link in links))
+
+    assert completed == [12]
+    assert [current for current, _ in persisted] == [8, 9, 10, 11, 12]
+    assert persisted == [
+        (payload["current"], payload["total"]) for payload in emitted
+    ]
+    assert attempts.count("Cooldown") == 2
+    assert len(emitted) == len(links)
+    assert isinstance(results[3], RuntimeError)

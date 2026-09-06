@@ -732,6 +732,37 @@ async def _persist_runtime_progress(runtime_job_id: str, current: int) -> None:
         await progress_db.commit()
 
 
+async def _settle_course_with_retries(
+    link: dict,
+    attempt,
+    record_complete,
+    *,
+    sleep=asyncio.sleep,
+    max_retries: int = 2,
+):
+    """Run cooldown retries and advance progress once after the result settles."""
+    retry_delay = 0.0
+    retry_count = 0
+    while True:
+        if retry_delay:
+            await sleep(retry_delay)
+            retry_delay = 0.0
+        try:
+            result = await attempt()
+        except Exception as course_exc:  # noqa: BLE001
+            result = course_exc
+        if (
+            isinstance(result, dict)
+            and result.get("_retry_after")
+            and retry_count < max_retries
+        ):
+            retry_delay = float(result["_retry_after"])
+            retry_count += 1
+            continue
+        await record_complete(link)
+        return result
+
+
 async def _stop_poller(runtime_job_id: str, stop_flag: list[bool]) -> None:
     """Background task: tail ``stop_requested`` so the worker can bail.
 
@@ -4816,17 +4847,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             # BEFORE sleeping N seconds, so other courses can proceed in the
             # meantime.  Previously the sleep happened inside the sem block,
             # freezing every concurrent slot simultaneously on a 429 storm.
-            _retry_delay: float = 0.0
-            _retry_count = 0
-            _max_retries = 2  # two 429-cooldown retries (3 total attempts)
-            while True:
-                if _retry_delay:
-                    log.info(
-                        "[429 COOLDOWN] semaphore released — sleeping %.0fs for %s",
-                        _retry_delay, (link.get("url") or "?")[:70],
-                    )
-                    await asyncio.sleep(_retry_delay)
-                    _retry_delay = 0.0
+            async def _attempt():
                 async with sem:
                     # Stop check INSIDE the semaphore so all queued coroutines
                     # waiting on the sem also short-circuit once the user has
@@ -4848,7 +4869,6 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                             "url": link.get("url"),
                             "error": "extract: Scrape.do auth/credits error HTTP 401 — check SCRAPE_DO_TOKEN and account balance",
                         }
-                        await _record_extraction_complete(link)
                         return result
                     dispatched[0] += 1
                     idx = dispatched[0]
@@ -4926,19 +4946,21 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                             _effective_course_timeout,
                             _timed_url,
                         )
-                # ── semaphore released here ──────────────────────────────────
-                # Check for 429-cooldown retry sentinel AFTER exiting `async
-                # with sem:` so the slot is free during the sleep.
-                if (
-                    isinstance(result, dict)
-                    and result.get("_retry_after")
-                    and _retry_count < _max_retries
-                ):
-                    _retry_delay = float(result["_retry_after"])
-                    _retry_count += 1
-                    continue
-                await _record_extraction_complete(link)
                 return result
+
+            async def _cooldown_sleep(delay: float) -> None:
+                log.info(
+                    "[429 COOLDOWN] semaphore released — sleeping %.0fs for %s",
+                    delay, (link.get("url") or "?")[:70],
+                )
+                await asyncio.sleep(delay)
+
+            return await _settle_course_with_retries(
+                link,
+                _attempt,
+                _record_extraction_complete,
+                sleep=_cooldown_sleep,
+            )
 
         # ── Apply final hard cap so merged link sets (BFS + sitemap supplement
         # + always_sitemap_supplement) never exceed max_courses regardless of
