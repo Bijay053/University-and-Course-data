@@ -175,6 +175,41 @@ def parse_aims_data(html: str) -> dict[str, Any] | None:
     return aims if isinstance(aims, dict) else None
 
 
+def parse_course_schema(html: str) -> dict[str, Any] | None:
+    """Return CQU's schema.org ``Course`` document when present."""
+    for m in _LD_JSON_RE.finditer(html or ""):
+        try:
+            data = json.loads(m.group(1))
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if isinstance(data, dict) and data.get("@type") == "Course":
+            return data
+    return None
+
+
+def has_course_structured_data(html: str) -> bool:
+    """True when the response contains canonical data for one CQU course."""
+    return parse_aims_data(html) is not None or parse_course_schema(html) is not None
+
+
+def is_generic_course_finder_shell(html: str) -> bool:
+    """Detect CQU's 200-OK generic finder response for a course URL.
+
+    The broken audience route often returns a branded page whose title/H1 is
+    simply ``Find a Course``. It contains no course JSON and must not consume
+    browser, OCR, and AI fallback budgets.
+    """
+    if not html or has_course_structured_data(html):
+        return False
+    for pattern in (
+        r"<title[^>]*>\s*Find\s+a\s+Course(?:\s*[-|][^<]*)?\s*</title>",
+        r"<h1[^>]*>\s*(?:<[^>]+>\s*)*Find\s+a\s+Course(?:\s*</[^>]+>\s*)*</h1>",
+    ):
+        if re.search(pattern, html, re.IGNORECASE | re.DOTALL):
+            return True
+    return False
+
+
 def extract_locations(aims: dict[str, Any]) -> list[str]:
     """Return distinct international-eligible campuses, alphabetically.
 
@@ -448,26 +483,20 @@ def _parse_english_from_schema_org(html: str) -> str | None:
     page does not contain a Course LD+JSON block with a populated
     ``coursePrerequisites`` field that mentions at least one test name.
     """
-    for m in _LD_JSON_RE.finditer(html or ""):
-        try:
-            d = json.loads(m.group(1))
-        except (json.JSONDecodeError, ValueError):
-            continue
-        if not isinstance(d, dict) or d.get("@type") != "Course":
-            continue
+    d = parse_course_schema(html)
+    if d:
         prereq = d.get("coursePrerequisites")
-        if not isinstance(prereq, str) or not prereq.strip():
-            continue
-        # coursePrerequisites is double-encoded in CQU's LD+JSON output
-        # (the entire HTML block is JSON-string-encoded AND HTML-entity-escaped).
-        decoded = _html_stdlib.unescape(prereq)
-        # Strip residual HTML tags so the regex extractors get plain text.
-        text = re.sub(r"<[^>]+>", " ", decoded)
-        text = re.sub(r"&nbsp;", " ", text, flags=re.IGNORECASE)
-        text = re.sub(r"\s+", " ", text).strip()
-        # Only return when the block is genuinely about language proficiency.
-        if any(kw in text for kw in ("IELTS", "TOEFL", "PTE", "Duolingo")):
-            return text
+        if isinstance(prereq, str) and prereq.strip():
+            # coursePrerequisites is double-encoded in CQU's LD+JSON output
+            # (the entire HTML block is JSON-string-encoded AND HTML-entity-escaped).
+            decoded = _html_stdlib.unescape(prereq)
+            # Strip residual HTML tags so the regex extractors get plain text.
+            text = re.sub(r"<[^>]+>", " ", decoded)
+            text = re.sub(r"&nbsp;", " ", text, flags=re.IGNORECASE)
+            text = re.sub(r"\s+", " ", text).strip()
+            # Only return when the block is genuinely about language proficiency.
+            if any(kw in text for kw in ("IELTS", "TOEFL", "PTE", "Duolingo")):
+                return text
     return None
 
 
@@ -499,9 +528,34 @@ def apply_overrides(
     fields, strictly more reliable than the noisy text scrape.
     """
     applied: dict[str, Any] = {}
-    aims = parse_aims_data(html)
-    if not aims:
-        return applied
+    aims = parse_aims_data(html) or {}
+
+    def _emit_aims_evidence(
+        field_key: str,
+        value: Any,
+        snippet: str,
+        *,
+        confidence: float = 0.90,
+    ) -> None:
+        if evidence is None:
+            return
+        source_url = url or ""
+        if any(
+            row.get("field_key") == field_key
+            and row.get("method") == "cqu_json:aims"
+            and row.get("source_url") == source_url
+            for row in evidence
+            if isinstance(row, dict)
+        ):
+            return
+        evidence.append({
+            "field_key": field_key,
+            "value": value,
+            "confidence": confidence,
+            "method": "cqu_json:aims",
+            "source_url": source_url,
+            "snippet": snippet,
+        })
 
     # Locations (REPLACE — almost always wrong on CQU regex output).
     # When AIMS lists physical campuses, write the comma-joined list.
@@ -523,6 +577,22 @@ def apply_overrides(
         if prev_loc != new_loc:
             payload["course_location"] = new_loc
             applied["course_location"] = {"old": prev_loc, "new": new_loc}
+        _emit_aims_evidence(
+            "course_location",
+            new_loc,
+            f"CQU AIMS international campus availability: {new_loc}",
+        )
+        prev_mode = payload.get("study_mode")
+        if prev_mode != "On Campus":
+            payload["study_mode"] = "On Campus"
+            applied["study_mode"] = {"old": prev_mode, "new": "On Campus"}
+        _emit_aims_evidence(
+            "study_mode",
+            "On Campus",
+            "CQU AIMS lists at least one physical international campus",
+        )
+        if payload.pop("online_only", None):
+            applied["online_only"] = {"old": True, "new": False}
     elif has_any_location:
         prev_loc = payload.get("course_location")
         prev_mode = payload.get("study_mode")
@@ -532,6 +602,25 @@ def apply_overrides(
         if prev_mode != "Online":
             payload["study_mode"] = "Online"
             applied["study_mode"] = {"old": prev_mode, "new": "Online"}
+        prev_online_only = payload.get("online_only")
+        if prev_online_only is not True:
+            payload["online_only"] = True
+            applied["online_only"] = {"old": prev_online_only, "new": True}
+        _emit_aims_evidence(
+            "course_location",
+            "Online",
+            "CQU AIMS availability contains no physical campus",
+        )
+        _emit_aims_evidence(
+            "study_mode",
+            "Online",
+            "CQU AIMS availability contains no physical campus",
+        )
+        _emit_aims_evidence(
+            "online_only",
+            True,
+            "CQU AIMS availability contains no physical campus",
+        )
 
     # Intake months (REPLACE — the regex pulls "Anytime" / year-only
     # strings on CQU, AI hallucinates from the 57-char text-strip).
@@ -541,6 +630,11 @@ def apply_overrides(
         if prev_in != months:
             payload["intake_months"] = months
             applied["intake_months"] = {"old": prev_in, "new": months}
+        _emit_aims_evidence(
+            "intake_months",
+            months,
+            f"CQU AIMS international term start months: {', '.join(months)}",
+        )
 
     # Duration (REPLACE — JSON is canonical).
     dur_val, dur_term = extract_duration(aims)
@@ -550,6 +644,11 @@ def apply_overrides(
             payload["duration"] = dur_val
             payload["duration_term"] = dur_term
             applied["duration"] = {"old": prev, "new": (dur_val, dur_term)}
+        _emit_aims_evidence(
+            "duration",
+            dur_val,
+            f"CQU AIMS full-time duration: {dur_val:g} {dur_term}",
+        )
 
     # International fee (REPLACE — the regex picks up CSP / domestic
     # rates inadvertently because the page lists multiple fee tables).
@@ -567,6 +666,12 @@ def apply_overrides(
             "source_code": code,
             "fee_year": fee_year,
         }
+        _emit_aims_evidence(
+            "international_fee",
+            amt,
+            f"CQU AIMS {code} international fee for {fee_year}: AUD {amt:g}",
+            confidence=0.95,
+        )
 
     # IELTS / PTE / TOEFL (REPLACE only when a source publishes a valid
     # value — leaves existing values intact when neither source has text).

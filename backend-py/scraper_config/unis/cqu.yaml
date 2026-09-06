@@ -128,6 +128,13 @@ discovery:
   max_candidates: 250
 
 extraction:
+  # Static CQU responses already contain the authoritative AIMS/LD+JSON data.
+  # Production evidence showed that Playwright, vision OCR, and remote AI add
+  # no fields for the generic finder shell and can consume the 90-second
+  # per-course deadline. Keep extraction deterministic and bounded.
+  skip_per_course_browser: true
+  skip_remote_ai_enrichment: true
+
   filters:
     # 2026-05-12 fix: CQU's ?audience=INTERNATIONAL rewrite serves a
     # 200-OK 137-char branded "The server encountered an error" page on
@@ -163,6 +170,10 @@ extraction:
     fees_pdf_url: ""
 
   english:
+    # CQU course pages publish English text in Course LD+JSON. Promotional
+    # images are not authoritative and OCR only adds latency/noise.
+    trust_vision_ocr: false
+
     # IELTS/PTE/TOEFL live in a JS-rendered slide-out panel on per-course
     # pages and are not in the static HTML. Central page has them in prose
     # (NOT in a table) and is itself JS-rendered (returns ~200 chars of

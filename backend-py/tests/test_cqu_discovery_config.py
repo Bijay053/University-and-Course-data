@@ -34,3 +34,6 @@ def test_cqu_verified_sitemap_recipe_overrides_stale_admin_bfs() -> None:
     assert cfg.discovery.always_sitemap_supplement is False
     assert "www.cqu.edu.au" not in _ALWAYS_SITEMAP_SUPPLEMENT_HOSTS
     assert "cqu.edu.au" not in _ALWAYS_SITEMAP_SUPPLEMENT_HOSTS
+    assert cfg.extraction.skip_per_course_browser is True
+    assert cfg.extraction.skip_remote_ai_enrichment is True
+    assert cfg.extraction.english.trust_vision_ocr is False

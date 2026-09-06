@@ -2303,6 +2303,54 @@ async def extract_course(
                     "payload": {},
                     "evidence": [],
                 }
+    # CQU sometimes returns HTTP 200 for the audience URL but serves only its
+    # generic "Find a Course" shell. The bare URL still carries the canonical
+    # Course LD+JSON/AIMS payload. Recover that structured response before the
+    # generic browser/OCR/AI chain can consume the full per-course deadline.
+    if html and "?" in url:
+        from app.services.scraper.extractors import cqu_json as _cqu_prefetch
+
+        if (
+            _cqu_prefetch.is_cqu_host(url)
+            and _cqu_prefetch.is_generic_course_finder_shell(html)
+        ):
+            _cqu_parsed = urlparse(url)
+            _cqu_bare_url = urlunparse(_cqu_parsed._replace(query=""))
+            try:
+                _cqu_bare_html = await fetch_html(_cqu_bare_url)
+            except Exception as _cqu_bare_exc:  # noqa: BLE001
+                log.warning(
+                    "CQU finder-shell bare retry failed for %s: %s",
+                    _cqu_bare_url,
+                    _cqu_bare_exc,
+                )
+                _cqu_bare_html = None
+            if (
+                _cqu_bare_html
+                and _cqu_prefetch.has_course_structured_data(_cqu_bare_html)
+            ):
+                html = _cqu_bare_html
+                # This is not the legacy unsafe bare-page fallback: canonical
+                # course JSON was verified. Make the bare URL the effective
+                # source so payload/evidence provenance is truthful, and do
+                # not activate the domestic-fee blanking heuristic below.
+                url = _cqu_bare_url
+                if emit:
+                    await emit(
+                        "status",
+                        f"[CQU SHELL→BARE] {_cqu_bare_url[:70]} — canonical course JSON recovered",
+                        phase="extract",
+                        kind="cqu_shell_bare_ok",
+                        url=_cqu_bare_url,
+                    )
+            elif emit:
+                await emit(
+                    "status",
+                    f"[CQU SHELL] {url[:70]} — bare URL had no canonical course JSON",
+                    phase="extract",
+                    kind="cqu_shell_bare_missing",
+                    url=url,
+                )
     if not html:
         # HTTP fetch failed (Cloudflare, bot-protection, JS-gate, etc.).
         # Try a real Playwright browser before giving up — this handles any
@@ -2681,6 +2729,33 @@ async def extract_course(
     # Reset per-coroutine Gemini call log accumulator so this course starts fresh.
     from app.services.ai.gemini_client import get_call_log as _gcl_get, reset_call_log as _gcl_reset
     _gcl_reset()
+
+    # CQU's canonical fields live in AIMS/LD+JSON and must be applied before
+    # generic domestic classification or any remote enrichment. A second late
+    # authority pass remains below to restore these values after heuristics.
+    from app.services.scraper.extractors import cqu_json as _cqu_early
+    if _cqu_early.is_cqu_host(url):
+        try:
+            _cqu_aims = _cqu_early.parse_aims_data(html)
+            _cqu_early.apply_overrides(
+                payload,
+                html,
+                url=url,
+                evidence=evidence,
+            )
+            if _cqu_aims and _cqu_early.is_domestic_only(_cqu_aims):
+                payload["domestic_only"] = True
+                if emit:
+                    await emit(
+                        "status",
+                        f"[DOMESTIC ONLY] {url} — CQU AIMS marks this course domestic-only",
+                        phase="extract",
+                        kind="domestic_only_skip",
+                        url=url,
+                    )
+                return {"url": url, "payload": payload, "evidence": evidence}
+        except Exception as _cqu_early_exc:  # noqa: BLE001
+            log.warning("early cqu_json authority failed on %s: %s", url, _cqu_early_exc)
 
     # ── Domestic-only early exit ──────────────────────────────────────────────
     # If the page text explicitly states the course is not available to
@@ -7006,6 +7081,23 @@ async def extract_course(
                     "snippet": f"ai_fallback: {k}={v}",
                 }
             )
+
+    # CQU authority must run after the optional AI branch. The older pass above
+    # is nested inside ``if use_ai_fallback`` and therefore does not run for
+    # CQU's deterministic fast path, where remote AI is intentionally disabled.
+    # Reapply here so AIMS locations/mode/fees and LD+JSON English values remain
+    # authoritative over every generic extractor.
+    from app.services.scraper.extractors import cqu_json as _cqu_final
+    if _cqu_final.is_cqu_host(url):
+        try:
+            _cqu_final.apply_overrides(
+                payload,
+                html,
+                url=url,
+                evidence=evidence,
+            )
+        except Exception as _cqu_final_exc:  # noqa: BLE001
+            log.warning("final cqu_json authority failed on %s: %s", url, _cqu_final_exc)
 
     # Post-AI mode derivation deliberately removed.
     # Inferring "On Campus" from course_location alone produces misleading data:
