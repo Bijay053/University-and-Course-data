@@ -53,6 +53,19 @@ type ScrapeLog = {
   } | null;
 };
 
+export function runtimeProgressFromStatus(data: {
+  current?: number;
+  total?: number;
+  totalFound?: number;
+}): { current: number; total: number } | null {
+  const total = data.totalFound ?? data.total ?? 0;
+  if (total <= 0) return null;
+  return {
+    current: Math.min(Math.max(data.current ?? 0, 0), total),
+    total,
+  };
+}
+
 type QualityAction = {
   action_type: string;
   target_fields: string[];
@@ -1241,6 +1254,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
           fastMode?: boolean; feePageUrl?: string | null; requirementsPageUrl?: string | null;
           logs?: ScrapeLog[]; logIndex?: number;
           status?: string; imported?: number; skipped?: number; errors?: number;
+          current?: number; total?: number; totalFound?: number;
         }>(res);
         if (!data) { schedule(POLL_BASE); return; }
 
@@ -1333,6 +1347,19 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                 };
               });
             }
+          }
+        }
+
+        // The runtime row is authoritative and is returned on every poll,
+        // including reconnect polls that request only logs after a high
+        // sequence number. Keep the visible counter aligned with it rather
+        // than depending on whether this response happened to include the
+        // latest progress event.
+        const statusProgress = runtimeProgressFromStatus(data);
+        if (statusProgress) {
+          setProgress(statusProgress);
+          if (statusProgress.current > 0 && extractionStartRef.current === null) {
+            extractionStartRef.current = Date.now();
           }
         }
 
@@ -1671,7 +1698,10 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
     }
   }, [phase, completedJobId, uniName, onReviewReady]);
 
-  const progressLog = logs.slice().reverse().find((l) => l.event === "progress" && l.total);
+  const latestProgressLog = logs.slice().reverse().find((l) => l.event === "progress" && l.total);
+  const progressLog = progress
+    ? { event: "progress", current: progress.current, total: progress.total }
+    : latestProgressLog;
   const elapsed = startTime ? fmt(now - startTime) : null;
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -1885,19 +1915,19 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
             {/* Progress bar */}
             {progressLog && progressLog.total ? (() => {
               const pct = ((progressLog.current ?? 0) / progressLog.total!) * 100;
-              const allDispatched = (progressLog.current ?? 0) >= progressLog.total!;
+              const allProcessed = (progressLog.current ?? 0) >= progressLog.total!;
               const extractionStart = extractionStartRef.current;
-              const remaining = !allDispatched && extractionStart && (progressLog.current ?? 0) > 0
+              const remaining = !allProcessed && extractionStart && (progressLog.current ?? 0) > 0
                 ? fmt(((now - extractionStart) / (progressLog.current ?? 1)) * ((progressLog.total ?? 1) - (progressLog.current ?? 0)))
                 : null;
               return (
                 <div className="space-y-1">
                   <div className="flex justify-between text-xs text-gray-500">
-                    <span>{allDispatched ? "Completing…" : "Scraping courses…"}</span>
+                    <span>{allProcessed ? "Finalizing…" : "Processing courses…"}</span>
                     <span className="tabular-nums">
                       {progressLog.current}/{progressLog.total}
-                      {allDispatched
-                        ? <span className="ml-2 text-amber-500 font-medium animate-pulse">finishing last batch…</span>
+                      {allProcessed
+                        ? <span className="ml-2 text-amber-500 font-medium animate-pulse">all courses processed…</span>
                         : remaining && <span className="ml-2 text-blue-500 font-medium">~{remaining} left</span>
                       }
                     </span>

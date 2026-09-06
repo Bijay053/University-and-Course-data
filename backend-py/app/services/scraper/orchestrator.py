@@ -715,6 +715,23 @@ async def _heartbeat_pulser(runtime_job_id: str, stop_flag: list[bool]) -> None:
             return
 
 
+async def _persist_runtime_progress(runtime_job_id: str, current: int) -> None:
+    """Write in-flight extraction progress independently of the main session."""
+    from sqlalchemy import text as _text
+
+    async with AsyncSessionLocal() as progress_db:
+        await progress_db.execute(
+            _text(
+                "UPDATE scrape_runtime_jobs "
+                "SET current = :current, updated_at = NOW() "
+                "WHERE runtime_job_id = :job_id "
+                "AND status IN ('running', 'awaiting_approval')"
+            ),
+            {"current": current, "job_id": runtime_job_id},
+        )
+        await progress_db.commit()
+
+
 async def _stop_poller(runtime_job_id: str, stop_flag: list[bool]) -> None:
     """Background task: tail ``stop_requested`` so the worker can bail.
 
@@ -4695,11 +4712,10 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
 
         await emit("status", f"Extracting course details ({len(links)} pages)...", phase="extract")
 
-        # 1) Extraction phase — parallel network calls, no DB shared state.
-        # We share a counter across coroutines so the live log can show
-        # "[EXTRACT] N/total: <name>" as each page is *picked up* (not at the
-        # end). The counter is mutated only inside the semaphore, so it is
-        # effectively serialised.
+        # 1) Extraction phase — parallel network calls, no shared staging state.
+        # Dispatch and completion are deliberately tracked separately.  The
+        # runtime row and structured progress events represent courses that
+        # have FINISHED extraction, not merely coroutines that acquired a slot.
         # Per-uni YAML can tune the semaphore above OR below the global default.
         # Lower it to avoid Cloudflare 429 storms (e.g. UTAS = 2).
         # Raise it for Scrape.do-only sites where network latency is the
@@ -4744,8 +4760,29 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             _effective_course_timeout,
         )
         sem = asyncio.Semaphore(_effective_parallel)
-        total = len(links)
-        progress = [0]
+        # ``total`` is the full discovered catalogue size. On a resumed run,
+        # ``links`` is filtered later to only the remaining work, while progress
+        # must continue against the original catalogue denominator.
+        total = job.total_found or len(links)
+        dispatched = [0]
+        progress_lock = asyncio.Lock()
+
+        async def _record_extraction_complete(link: dict) -> None:
+            """Persist and emit one ordered, course-completion progress step."""
+            async with progress_lock:
+                completed[0] += 1
+                current = min(completed[0], job.total_found or total)
+                nm = (link.get("name") or "").strip() or link.get("url", "?")
+                await _persist_runtime_progress(runtime_job_id, current)
+                await emit(
+                    "progress",
+                    f"Processed {current}/{job.total_found or total}: {nm}",
+                    phase="extract",
+                    current=current,
+                    total=job.total_found or total,
+                    courseName=nm,
+                    url=link.get("url"),
+                )
         # Per-scrape-run vision OCR cache, keyed by absolute image URL.
         # Many universities (ASA being the canonical example) embed the
         # exact same English-requirements screenshot on every variant of
@@ -4806,21 +4843,21 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     # all remaining courses share the same fate — skip them
                     # immediately rather than repeating the doomed fetch.
                     if scrape_do_dead_flag[0]:
-                        return {
+                        result = {
                             "name": (link.get("name") or "").strip() or "?",
                             "url": link.get("url"),
                             "error": "extract: Scrape.do auth/credits error HTTP 401 — check SCRAPE_DO_TOKEN and account balance",
                         }
-                    progress[0] += 1
-                    idx = progress[0]
+                        await _record_extraction_complete(link)
+                        return result
+                    dispatched[0] += 1
+                    idx = dispatched[0]
                     nm = (link.get("name") or "").strip() or link.get("url", "?")
                     # Throttle textual [EXTRACT] status messages for large runs.
                     # For universities with >200 courses, emitting every single
                     # course floods the log table and adds DB pressure.  We emit
                     # every _emit_tick-th course so the live log always shows
                     # ~50 progress lines regardless of total course count.
-                    # The structured "progress" event is ALWAYS emitted (every
-                    # course) so the frontend progress bar stays smooth.
                     _emit_tick = max(1, total // 50) if total > 200 else 1
                     if idx % _emit_tick == 0 or idx == 1 or idx == total:
                         await emit(
@@ -4832,17 +4869,6 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                             total=total,
                             url=link.get("url"),
                         )
-                    # Always emit the structured progress event — the frontend
-                    # progress bar keys off event="progress" with current/total.
-                    await emit(
-                        "progress",
-                        f"Fetching {idx}/{total}: {nm}",
-                        phase="extract",
-                        current=idx,
-                        total=total,
-                        courseName=nm,
-                        url=link.get("url"),
-                    )
                     # Pass the emit hook into extract_course so AI fallback can
                     # stream "[FALLBACK] AI enriching ... (missing: ...)" lines.
                     # central_data is the pre-fetched central-pages payload (Bug 2).
@@ -4887,7 +4913,12 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                             "url": link.get("url"),
                             "error": f"extract: {_sd_auth_exc}",
                         }
-                    if result.get("_timed_out"):
+                    except Exception as _course_exc:  # noqa: BLE001
+                        # Preserve gather's existing per-course error behavior,
+                        # but turn the exception into a settled result so this
+                        # completed course advances the durable progress counter.
+                        result = _course_exc
+                    if isinstance(result, dict) and result.get("_timed_out"):
                         _timed_url = (link.get("url") or "?")[:80]
                         log.warning(
                             "[BOUNDED] per-course extraction exceeded %.1fs"
@@ -4905,8 +4936,8 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 ):
                     _retry_delay = float(result["_retry_after"])
                     _retry_count += 1
-                    progress[0] -= 1  # will be re-incremented on next iteration
                     continue
+                await _record_extraction_complete(link)
                 return result
 
         # ── Apply final hard cap so merged link sets (BFS + sitemap supplement
@@ -5003,6 +5034,15 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     "[RESUME] checkpoint filter failed for uni %s (continuing "
                     "with full link set): %s", job.university_id, _resume_exc,
                 )
+
+        # Resume checkpoints are already-processed courses in this catalogue.
+        # Seed current only AFTER checkpoint filtering computes the final offset,
+        # so the UI begins at e.g. 257/409 rather than 0/409. Retries do not
+        # touch this counter until their final result settles, so each discovered
+        # course contributes exactly once.
+        completed = [_resume_already_staged]
+        job.current = min(_resume_already_staged, job.total_found or 0)
+        await db.commit()
 
         # 2) Extraction + staging split into batches so completed courses are
         # staged and freed before the next batch starts.  For large universities
