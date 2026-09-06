@@ -2736,19 +2736,20 @@ async def extract_course(
     from app.services.scraper.extractors import cqu_json as _cqu_early
     if _cqu_early.is_cqu_host(url):
         try:
-            _cqu_aims = _cqu_early.parse_aims_data(html)
+            _cqu_aims = _cqu_early.parse_aims_data(html) or {}
+            _cqu_schema = _cqu_early.parse_course_schema(html) or {}
             _cqu_early.apply_overrides(
                 payload,
                 html,
                 url=url,
                 evidence=evidence,
             )
-            if _cqu_aims and _cqu_early.is_domestic_only(_cqu_aims):
+            if _cqu_early.is_domestic_only(_cqu_aims, _cqu_schema):
                 payload["domestic_only"] = True
                 if emit:
                     await emit(
                         "status",
-                        f"[DOMESTIC ONLY] {url} — CQU AIMS marks this course domestic-only",
+                        f"[DOMESTIC ONLY] {url} — CQU structured audience marks this course domestic-only",
                         phase="extract",
                         kind="domestic_only_skip",
                         url=url,

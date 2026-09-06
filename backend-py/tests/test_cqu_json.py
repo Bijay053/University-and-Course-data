@@ -15,13 +15,19 @@ from app.services.scraper.extractors import cqu_json
 from app.services.scraper.guards import should_stage_course
 
 
-def _course_schema_html(prerequisites: str = "") -> str:
+def _course_schema_html(
+    prerequisites: str = "",
+    *,
+    audience_type: str | None = None,
+) -> str:
     data = {
         "@context": "https://schema.org",
         "@type": "Course",
         "name": "Bachelor of Example",
         "coursePrerequisites": html.escape(prerequisites),
     }
+    if audience_type is not None:
+        data["audience"] = {"audienceType": audience_type}
     return (
         "<html><head><title>Bachelor of Example - CQUniversity</title>"
         f'<script type="application/ld+json">{json.dumps(data)}</script>'
@@ -112,6 +118,84 @@ def test_aims_domestic_classification_requires_explicit_flag_pair() -> None:
             _aims_html({"is_international": False})
         )
         or {}
+    )
+
+
+def test_course_schema_domestic_audience_overrides_misleading_aims_flags() -> None:
+    page = (
+        _course_schema_html(audience_type="DOMESTIC")
+        + _aims_html(
+            {
+                "is_international": True,
+                "is_domestic": True,
+                "availabilities": [
+                    {
+                        "locations": [
+                            {
+                                "location": "Rockhampton",
+                                "is_international": True,
+                            }
+                        ]
+                    }
+                ],
+            }
+        )
+    )
+    payload: dict = {}
+    evidence: list[dict] = []
+
+    applied = cqu_json.apply_overrides(
+        payload,
+        page,
+        url="https://www.cqu.edu.au/courses/cc12/bachelor-of-education-primary",
+        evidence=evidence,
+    )
+
+    assert cqu_json.is_domestic_only(
+        cqu_json.parse_aims_data(page) or {},
+        cqu_json.parse_course_schema(page),
+    )
+    assert payload["domestic_only"] is True
+    assert applied["domestic_only"]["new"] is True
+    assert any(
+        row["field_key"] == "domestic_only"
+        and row["method"] == "cqu_json:schema_org_audience"
+        and row["confidence"] == 1.0
+        for row in evidence
+    )
+    should_stage, reason = should_stage_course(
+        "Bachelor of Education (Primary)",
+        payload,
+        "https://www.cqu.edu.au/courses/cc12/bachelor-of-education-primary",
+    )
+    assert should_stage is False
+    assert reason == "domestic_only"
+
+
+def test_course_schema_international_audience_overrides_domestic_aims_flags() -> None:
+    page = (
+        _course_schema_html(audience_type="INTERNATIONAL")
+        + _aims_html({"is_international": False, "is_domestic": True})
+    )
+    payload: dict = {}
+    evidence: list[dict] = []
+
+    applied = cqu_json.apply_overrides(
+        payload,
+        page,
+        url="https://www.cqu.edu.au/courses/cc00/international-example",
+        evidence=evidence,
+    )
+
+    assert not cqu_json.is_domestic_only(
+        cqu_json.parse_aims_data(page) or {},
+        cqu_json.parse_course_schema(page),
+    )
+    assert "domestic_only" not in payload
+    assert "domestic_only" not in applied
+    assert not any(
+        row.get("field_key") == "domestic_only"
+        for row in evidence
     )
 
 
@@ -306,6 +390,56 @@ async def test_explicit_aims_domestic_only_exits_before_remote_fallbacks() -> No
         )
 
     assert result["payload"]["domestic_only"] is True
+
+
+@pytest.mark.asyncio
+async def test_schema_domestic_only_exits_before_remote_fallbacks() -> None:
+    cfg = get_config_for_host(
+        hostname="www.cqu.edu.au",
+        name="CQUniversity",
+        scrape_url="https://www.cqu.edu.au",
+        university_id=22,
+        create_missing_stub=False,
+    )
+    set_uni_config(cfg)
+    page = (
+        "<html><head><title>Bachelor of Education (Primary)</title></head>"
+        "<body><h1>Bachelor of Education (Primary)</h1>"
+        + _course_schema_html(audience_type="DOMESTIC")
+        + "</body></html>"
+    )
+
+    async def _must_not_run(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("schema domestic-only course must exit immediately")
+
+    with (
+        patch(
+            "app.services.scraper.browser_pool.pool.fetch_html",
+            side_effect=_must_not_run,
+        ),
+        patch(
+            "app.services.scraper.extractors.gemini_primary.extract_primary",
+            side_effect=_must_not_run,
+        ),
+        patch(
+            "app.services.scraper.extractors.ai_fallback.fill_missing",
+            side_effect=_must_not_run,
+        ),
+        patch(
+            "app.services.scraper.per_course_vision.maybe_vision_refetch",
+            side_effect=_must_not_run,
+        ),
+    ):
+        from app.services.scraper.pipelines.single_course import extract_course
+
+        result = await extract_course(
+            "https://www.cqu.edu.au/courses/cc12/bachelor-of-education-primary",
+            html=page,
+            country="Australia",
+        )
+
+    assert result["payload"]["domestic_only"] is True
+    assert result["payload"].get("international_fee") is None
 
 
 @pytest.mark.asyncio

@@ -500,13 +500,47 @@ def _parse_english_from_schema_org(html: str) -> str | None:
     return None
 
 
-def is_domestic_only(aims: dict[str, Any]) -> bool:
-    """True when the AIMS catalogue flags this course domestic-only.
+def is_domestic_only(
+    aims: dict[str, Any],
+    course_schema: dict[str, Any] | None = None,
+) -> bool:
+    """True when CQU's course-level structured data is explicitly domestic-only.
 
-    Conservative — requires the explicit ``is_international == False``
-    AND ``is_domestic == True`` pair (so a missing flag never causes
-    a false rejection).
+    The schema.org ``Course.audience.audienceType`` value describes the course
+    as a whole and is therefore authoritative over nested AIMS availability
+    flags. CQU can retain international campus flags in AIMS even while the
+    current course page is labelled ``Domestic only``.
+
+    The AIMS fallback remains conservative: it requires the explicit
+    ``is_international == False`` AND ``is_domestic == True`` pair, so missing
+    flags never cause a false rejection.
     """
+    audience = (
+        course_schema.get("audience")
+        if isinstance(course_schema, dict)
+        else None
+    )
+    audience_rows = audience if isinstance(audience, list) else [audience]
+    audience_types: set[str] = set()
+    for row in audience_rows:
+        if not isinstance(row, dict):
+            continue
+        audience_type = re.sub(
+            r"[\s_-]+",
+            " ",
+            str(row.get("audienceType") or ""),
+        ).strip().casefold()
+        if audience_type:
+            audience_types.add(audience_type)
+
+    # A course offered to both audiences is not domestic-only. An explicit
+    # course-level INTERNATIONAL marker therefore wins over both DOMESTIC and
+    # contradictory nested AIMS flags.
+    if audience_types & {"international", "international students"}:
+        return False
+    if audience_types & {"domestic", "domestic only"}:
+        return True
+
     return aims.get("is_international") is False and aims.get("is_domestic") is True
 
 
@@ -529,6 +563,7 @@ def apply_overrides(
     """
     applied: dict[str, Any] = {}
     aims = parse_aims_data(html) or {}
+    course_schema = parse_course_schema(html) or {}
 
     def _emit_aims_evidence(
         field_key: str,
@@ -556,6 +591,40 @@ def apply_overrides(
             "source_url": source_url,
             "snippet": snippet,
         })
+
+    if is_domestic_only(aims, course_schema):
+        previous = payload.get("domestic_only")
+        payload["domestic_only"] = True
+        if previous is not True:
+            applied["domestic_only"] = {"old": previous, "new": True}
+        if evidence is not None and not any(
+            row.get("field_key") == "domestic_only"
+            and str(row.get("method") or "").startswith("cqu_json:")
+            for row in evidence
+            if isinstance(row, dict)
+        ):
+            schema_audience = course_schema.get("audience")
+            schema_marks_domestic = bool(
+                schema_audience
+                and is_domestic_only({}, course_schema)
+            )
+            method = (
+                "cqu_json:schema_org_audience"
+                if schema_marks_domestic
+                else "cqu_json:aims"
+            )
+            evidence.append({
+                "field_key": "domestic_only",
+                "value": True,
+                "confidence": 1.0,
+                "method": method,
+                "source_url": url or "",
+                "snippet": (
+                    "CQU Course schema audienceType is DOMESTIC"
+                    if schema_marks_domestic
+                    else "CQU AIMS explicitly marks domestic-only"
+                ),
+            })
 
     # Locations (REPLACE — almost always wrong on CQU regex output).
     # When AIMS lists physical campuses, write the comma-joined list.
