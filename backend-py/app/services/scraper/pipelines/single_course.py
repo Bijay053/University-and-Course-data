@@ -2744,7 +2744,11 @@ async def extract_course(
                 url=url,
                 evidence=evidence,
             )
-            if _cqu_early.is_domestic_only(_cqu_aims, _cqu_schema):
+            if _cqu_early.is_domestic_only(
+                _cqu_aims,
+                _cqu_schema,
+                html=html,
+            ):
                 payload["domestic_only"] = True
                 if emit:
                     await emit(

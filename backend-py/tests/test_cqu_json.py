@@ -199,6 +199,53 @@ def test_course_schema_international_audience_overrides_domestic_aims_flags() ->
     )
 
 
+def test_course_meta_domestic_overrides_misleading_aims_flags() -> None:
+    page = (
+        '<html><head><meta name="studentType" content="DOMESTIC" '
+        'data-next-head=""/></head><body>'
+        + _aims_html(
+            {
+                "is_international": True,
+                "is_domestic": True,
+                "availabilities": [
+                    {
+                        "locations": [
+                            {
+                                "location": "Rockhampton",
+                                "is_international": True,
+                            }
+                        ]
+                    }
+                ],
+            }
+        )
+        + "</body></html>"
+    )
+    payload: dict = {}
+    evidence: list[dict] = []
+
+    applied = cqu_json.apply_overrides(
+        payload,
+        page,
+        url="https://www.cqu.edu.au/courses/cc12/bachelor-of-education-primary",
+        evidence=evidence,
+    )
+
+    assert cqu_json.is_domestic_only(
+        cqu_json.parse_aims_data(page) or {},
+        cqu_json.parse_course_schema(page),
+        html=page,
+    )
+    assert payload["domestic_only"] is True
+    assert applied["domestic_only"]["new"] is True
+    assert any(
+        row["field_key"] == "domestic_only"
+        and row["method"] == "cqu_json:student_type_meta"
+        and row["confidence"] == 1.0
+        for row in evidence
+    )
+
+
 def test_aims_online_only_sets_online_mode_without_weakening_gate() -> None:
     page = _aims_html(
         {

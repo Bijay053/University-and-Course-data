@@ -126,6 +126,11 @@ _LD_JSON_RE = re.compile(
     r'<script[^>]*type\s*=\s*["\']application/ld\+json["\'][^>]*>(.*?)</script>',
     re.DOTALL | re.IGNORECASE,
 )
+_META_TAG_RE = re.compile(r"<meta\b[^>]*>", re.IGNORECASE)
+_META_ATTR_RE = re.compile(
+    r"""([:\w-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')""",
+    re.IGNORECASE,
+)
 
 
 def is_cqu_host(url: str) -> bool:
@@ -503,6 +508,8 @@ def _parse_english_from_schema_org(html: str) -> str | None:
 def is_domestic_only(
     aims: dict[str, Any],
     course_schema: dict[str, Any] | None = None,
+    *,
+    html: str = "",
 ) -> bool:
     """True when CQU's course-level structured data is explicitly domestic-only.
 
@@ -532,6 +539,29 @@ def is_domestic_only(
         ).strip().casefold()
         if audience_type:
             audience_types.add(audience_type)
+
+    # CQU currently alternates between schema.org Course audience and a NextJS
+    # head meta tag. ``studentType=DOMESTIC`` drives the visible "Domestic
+    # only" badge and is equally course-level authoritative. Parse attributes
+    # without depending on their order.
+    for tag in _META_TAG_RE.findall(html or ""):
+        attrs = {
+            name.casefold(): _html_stdlib.unescape(double or single)
+            for name, double, single in _META_ATTR_RE.findall(tag)
+        }
+        if attrs.get("name", "").strip().casefold() not in {
+            "audience",
+            "studenttype",
+            "student type",
+        }:
+            continue
+        meta_type = re.sub(
+            r"[\s_-]+",
+            " ",
+            attrs.get("content", ""),
+        ).strip().casefold()
+        if meta_type:
+            audience_types.add(meta_type)
 
     # A course offered to both audiences is not domestic-only. An explicit
     # course-level INTERNATIONAL marker therefore wins over both DOMESTIC and
@@ -592,7 +622,7 @@ def apply_overrides(
             "snippet": snippet,
         })
 
-    if is_domestic_only(aims, course_schema):
+    if is_domestic_only(aims, course_schema, html=html):
         previous = payload.get("domestic_only")
         payload["domestic_only"] = True
         if previous is not True:
@@ -608,10 +638,18 @@ def apply_overrides(
                 schema_audience
                 and is_domestic_only({}, course_schema)
             )
+            meta_marks_domestic = bool(
+                not schema_marks_domestic
+                and is_domestic_only({}, {}, html=html)
+            )
             method = (
                 "cqu_json:schema_org_audience"
                 if schema_marks_domestic
-                else "cqu_json:aims"
+                else (
+                    "cqu_json:student_type_meta"
+                    if meta_marks_domestic
+                    else "cqu_json:aims"
+                )
             )
             evidence.append({
                 "field_key": "domestic_only",
@@ -622,7 +660,11 @@ def apply_overrides(
                 "snippet": (
                     "CQU Course schema audienceType is DOMESTIC"
                     if schema_marks_domestic
-                    else "CQU AIMS explicitly marks domestic-only"
+                    else (
+                        "CQU course meta studentType is DOMESTIC"
+                        if meta_marks_domestic
+                        else "CQU AIMS explicitly marks domestic-only"
+                    )
                 ),
             })
 
