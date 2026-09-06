@@ -244,6 +244,9 @@ class TestHtmlCompactionAlertRules:
         await _replace_run_alerts(db, "job_fixed", [])
 
         db.execute.assert_awaited_once()
+        delete_statement = db.execute.await_args.args[0].compile()
+        assert "scrape_run_alerts.rule_id !=" in str(delete_statement)
+        assert "mixed_release_execution" in delete_statement.params.values()
         db.commit.assert_awaited_once()
         db.add_all.assert_not_called()
 

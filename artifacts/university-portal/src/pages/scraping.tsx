@@ -750,6 +750,12 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       release: string;
       claimedAt: string;
     }>;
+    releaseWarnings: Array<{
+      ruleId: string;
+      severity: "warning";
+      message: string;
+      jobHref: string;
+    }>;
     durationMs: number | null;
     stagedCount: number;
     approvedCount: number;
@@ -3997,8 +4003,24 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                 run.antiBotChallenges?.unresolved ?? {},
               );
               return (
-                <div key={run.runtimeJobId} className={`border rounded-xl bg-white overflow-hidden transition-shadow ${historySelected.has(run.runtimeJobId) ? "ring-2 ring-indigo-400" : ""}`}>
+                <div
+                  id={`scrape-history-${run.runtimeJobId}`}
+                  key={run.runtimeJobId}
+                  className={`border rounded-xl bg-white overflow-hidden transition-shadow ${historySelected.has(run.runtimeJobId) ? "ring-2 ring-indigo-400" : ""}`}
+                >
                   <div className="p-3 sm:p-4 space-y-2">
+                    {run.releaseWarnings?.map((warning) => (
+                      <div
+                        key={warning.ruleId}
+                        role="alert"
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-orange-300 bg-orange-50 px-3 py-2 text-sm text-orange-900"
+                      >
+                        <span><strong>Mixed-release warning.</strong> {warning.message}</span>
+                        <a className="font-semibold underline" href={warning.jobHref}>
+                          View affected job
+                        </a>
+                      </div>
+                    ))}
                     {/* ── Row 1: checkbox + status badge + university name/date ── */}
                     <div className="flex items-center gap-2 min-w-0">
                       <input

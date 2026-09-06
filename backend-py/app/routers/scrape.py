@@ -1033,21 +1033,33 @@ async def history_list(
     rows = (await db.execute(stmt)).all()
     run_ids = [r.runtime_job_id for r, *_ in rows]
     compaction_alerts_by_run: dict[str, list[dict]] = {}
+    release_warnings_by_run: dict[str, list[dict]] = {}
     if run_ids:
         alert_rows = (
             await db.execute(
                 _select(ScrapeRunAlert).where(
                     ScrapeRunAlert.scrape_run_id.in_(run_ids),
-                    ScrapeRunAlert.rule_id.like("html_compaction_%"),
+                    (
+                        ScrapeRunAlert.rule_id.like("html_compaction_%")
+                        | (ScrapeRunAlert.rule_id == "mixed_release_execution")
+                    ),
                 )
             )
         ).scalars().all()
         for alert in alert_rows:
-            compaction_alerts_by_run.setdefault(alert.scrape_run_id, []).append({
+            payload = {
                 "ruleId": alert.rule_id,
                 "severity": alert.severity,
                 "message": alert.message,
-            })
+            }
+            if alert.rule_id == "mixed_release_execution":
+                payload["jobHref"] = (
+                    f"/scraping?historyJobId={alert.scrape_run_id}"
+                    f"#scrape-history-{alert.scrape_run_id}"
+                )
+                release_warnings_by_run.setdefault(alert.scrape_run_id, []).append(payload)
+            else:
+                compaction_alerts_by_run.setdefault(alert.scrape_run_id, []).append(payload)
     count_stmt = _select(_func.count()).select_from(ScrapeRuntimeJob)
     if base_where:
         count_stmt = count_stmt.where(*base_where)
@@ -1074,6 +1086,7 @@ async def history_list(
             "errorMessage": r.error_message,
             "releaseRevision": r.release_revision,
             "releaseHistory": r.release_history or [],
+            "releaseWarnings": release_warnings_by_run.get(r.runtime_job_id, []),
             "durationMs": duration_ms,
             "stagedCount": int(staged or 0),
             "approvedCount": int(approved or 0),

@@ -4,6 +4,7 @@ import uuid
 
 import httpx
 import pytest
+from unittest.mock import AsyncMock, MagicMock
 from sqlalchemy import text
 
 from app.database import AsyncSessionLocal, engine
@@ -79,6 +80,30 @@ def test_job_schema_handles_missing_release_for_legacy_jobs() -> None:
 
 
 @pytest.mark.asyncio
+async def test_claim_sql_creates_one_mixed_release_warning(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.services.scraper import job_claim
+
+    db = MagicMock()
+    result = MagicMock()
+    result.first.return_value = ("job-1",)
+    db.execute = AsyncMock(return_value=result)
+    db.commit = AsyncMock()
+    monkeypatch.setattr(job_claim, "get_release_revision", lambda: "release-b")
+
+    assert await claim_runtime_job(db, "job-1") is True
+
+    statement = str(db.execute.await_args.args[0])
+    assert "WITH ORDINALITY" in statement
+    assert "'mixed_release_execution'" in statement
+    assert "NOT EXISTS" in statement
+    assert "string_agg(release, ', ' ORDER BY first_claim)" in statement
+    assert "UPDATE scrape_run_alerts existing" in statement
+    db.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_claims_persist_normal_resumed_and_missing_release_history(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -116,6 +141,36 @@ async def test_claims_persist_normal_resumed_and_missing_release_history(
                 "release-b",
             ]
             assert [entry["claim"] for entry in first.release_history] == [1, 2]
+            warnings = (
+                await db.execute(
+                    text(
+                        "SELECT message FROM scrape_run_alerts "
+                        "WHERE scrape_run_id = :jid "
+                        "AND rule_id = 'mixed_release_execution'"
+                    ),
+                    {"jid": job_id},
+                )
+            ).all()
+            assert len(warnings) == 1
+            assert warnings[0].message == (
+                "Scrape job spans multiple releases: release-a, release-b"
+            )
+
+            # Another claim from the current release does not duplicate the warning.
+            first.status = "queued"
+            await db.commit()
+            assert await claim_runtime_job(db, job_id) is True
+            warning_count = (
+                await db.execute(
+                    text(
+                        "SELECT COUNT(*) FROM scrape_run_alerts "
+                        "WHERE scrape_run_id = :jid "
+                        "AND rule_id = 'mixed_release_execution'"
+                    ),
+                    {"jid": job_id},
+                )
+            ).scalar_one()
+            assert warning_count == 1
 
             # Resolution failures are explicit rather than silently blank.
             first.status = "queued"
@@ -172,6 +227,7 @@ async def test_release_job_endpoints_require_view_permission() -> None:
             )
             assert matching["releaseRevision"] is None
             assert matching["releaseHistory"] == []
+            assert matching["releaseWarnings"] == []
     finally:
         app.dependency_overrides.pop(get_current_user, None)
         async with AsyncSessionLocal() as cleanup:

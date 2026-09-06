@@ -138,7 +138,8 @@ async def _replace_run_alerts(
 
     await db.execute(
         sa_delete(ScrapeRunAlert).where(
-            ScrapeRunAlert.scrape_run_id == scrape_run_id
+            ScrapeRunAlert.scrape_run_id == scrape_run_id,
+            ScrapeRunAlert.rule_id != "mixed_release_execution",
         )
     )
     if alerts:
