@@ -17,6 +17,23 @@ HEAD, working tree, and sanitized origin as the repository owner. Push to that
 verified origin, then run commands through the dedicated SSM identity. Never
 print credentials, signed URLs, or credential-bearing remotes.
 
+AWS-RunShellScript starts commands under `/bin/sh` on this host. Wrap release
+transactions explicitly in Bash when they use `pipefail` or other Bash-only
+features. Under `pipefail`, do not smoke-check journals with
+`journalctl | grep -q`: once `grep -q` finds a match it can close the pipe,
+causing `journalctl` to exit on SIGPIPE and the successful match to look like a
+failed pipeline. Capture the journal first or use a non-short-circuiting grep.
+
+**Why:** A guarded deployment stopped before pulling when `/bin/sh` rejected
+`pipefail`; the corrected Bash transaction deployed successfully but its first
+release-identity check falsely failed even though the matching startup line was
+already present.
+
+**How to apply:** Use an explicit `bash -s` wrapper for SSM release scripts and
+make journal-based identity checks compatible with `pipefail`. Treat a failed
+smoke assertion as incomplete until service state and exact release lines are
+checked directly.
+
 The production storage identity permits object HEAD/get/put/delete but can deny
 bucket-versioning and object-version listing calls. For disposable smoke
 objects, compute a unique key before upload, HEAD that exact key to recover its
