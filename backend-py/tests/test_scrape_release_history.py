@@ -5,12 +5,14 @@ import uuid
 import httpx
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from app.database import AsyncSessionLocal, engine
 from app.dependencies import get_current_user
 from app.main import app
 from app.models.scrape_runtime import ScrapeRuntimeJob
+from app.models.scrape_run_alert import ScrapeRunAlert
+from app.models.university import University
 from app.release_info import UNKNOWN_RELEASE
 from app.schemas.scrape import ScrapeJobRead
 from app.services.scraper.job_claim import claim_runtime_job
@@ -234,6 +236,73 @@ async def test_release_job_endpoints_require_view_permission() -> None:
             await cleanup.execute(
                 text("DELETE FROM scrape_runtime_jobs WHERE runtime_job_id = :jid"),
                 {"jid": job_id},
+            )
+            await cleanup.commit()
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_history_filters_release_mixed_status_university_and_pagination() -> None:
+    prefix = f"test_release_filter_{uuid.uuid4().hex[:12]}"
+    job_ids = [f"{prefix}_{suffix}" for suffix in ("match_old", "match_new", "other_release", "other_uni")]
+    transport = httpx.ASGITransport(app=app)
+    await engine.dispose()
+    try:
+        async with AsyncSessionLocal() as db:
+            university_ids = list(
+                (await db.execute(select(University.id).order_by(University.id).limit(2))).scalars()
+            )
+            if len(university_ids) < 2:
+                pytest.skip("history filter test requires two universities")
+            primary_university_id, other_university_id = university_ids
+            db.add_all([
+                _job(runtime_job_id=job_ids[0], university_id=primary_university_id, release_revision="release-filter-a"),
+                _job(runtime_job_id=job_ids[1], university_id=primary_university_id, release_revision="release-filter-a"),
+                _job(runtime_job_id=job_ids[2], university_id=primary_university_id, release_revision="release-filter-b"),
+                _job(runtime_job_id=job_ids[3], university_id=other_university_id, release_revision="release-filter-a"),
+            ])
+            await db.flush()
+            for job_id in (job_ids[0], job_ids[1], job_ids[3]):
+                db.add(ScrapeRunAlert(
+                    scrape_run_id=job_id,
+                    rule_id="mixed_release_execution",
+                    severity="warning",
+                    message="Scrape job spans multiple releases",
+                ))
+            await db.commit()
+
+        async def view_user() -> dict:
+            return {"permissions": ["scraping.view"]}
+
+        app.dependency_overrides[get_current_user] = view_user
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get(
+                "/api/scrape/history",
+                params={
+                    "release_revision": "release-filter-a",
+                    "mixed_release": "true",
+                    "university_id": primary_university_id,
+                    "limit": 1,
+                    "offset": 1,
+                },
+            )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["total"] == 2
+        assert payload["limit"] == 1
+        assert payload["offset"] == 1
+        assert len(payload["runs"]) == 1
+        assert payload["runs"][0]["runtimeJobId"] in job_ids[:2]
+        assert payload["runs"][0]["releaseRevision"] == "release-filter-a"
+        assert payload["runs"][0]["universityId"] == primary_university_id
+        assert payload["runs"][0]["releaseWarnings"][0]["ruleId"] == "mixed_release_execution"
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+        async with AsyncSessionLocal() as cleanup:
+            await cleanup.execute(
+                text("DELETE FROM scrape_runtime_jobs WHERE runtime_job_id LIKE :prefix"),
+                {"prefix": f"{prefix}%"},
             )
             await cleanup.commit()
         await engine.dispose()

@@ -844,6 +844,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   const [historyTotal, setHistoryTotal] = useState(0);
   const [historyPage, setHistoryPage] = useState(1);
   const [historyPageSize, setHistoryPageSize] = useState<10 | 50 | 100>(10);
+  const [historyUniversityId, setHistoryUniversityId] = useState("all");
+  const [historyReleaseRevision, setHistoryReleaseRevision] = useState("");
+  const [historyMixedReleaseOnly, setHistoryMixedReleaseOnly] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
   const [historyDetailLoading, setHistoryDetailLoading] = useState(false);
@@ -921,7 +924,21 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     setLoadingHistory(true);
     try {
       const offset = (historyPage - 1) * historyPageSize;
-      const res = await fetch(`/api/scrape/history?limit=${historyPageSize}&offset=${offset}`);
+      const params = new URLSearchParams({
+        limit: String(historyPageSize),
+        offset: String(offset),
+      });
+      if (historyUniversityId !== "all") {
+        params.set("university_id", historyUniversityId);
+      }
+      const releaseRevision = historyReleaseRevision.trim();
+      if (releaseRevision) {
+        params.set("release_revision", releaseRevision);
+      }
+      if (historyMixedReleaseOnly) {
+        params.set("mixed_release", "true");
+      }
+      const res = await fetch(`/api/scrape/history?${params.toString()}`);
       const data = await readResponseJson<{ runs: HistoryRun[]; total?: number }>(res);
       setHistoryRuns(data?.runs ?? []);
       setHistoryTotal(data?.total ?? (data?.runs?.length ?? 0));
@@ -930,7 +947,13 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     } finally {
       setLoadingHistory(false);
     }
-  }, [historyPage, historyPageSize]);
+  }, [
+    historyMixedReleaseOnly,
+    historyPage,
+    historyPageSize,
+    historyReleaseRevision,
+    historyUniversityId,
+  ]);
 
   const openHistoryDetail = useCallback(async (runtimeJobId: string, view: "logs" | "courses") => {
     if (expandedHistoryId === runtimeJobId && historyView === view) {
@@ -3905,6 +3928,74 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
 
       {/* ── Scrape History ─────────────────────────────────────────────────── */}
       <div>
+        <div className="mb-3 flex flex-wrap items-end gap-3 rounded-xl border bg-gray-50 p-3">
+          <div className="min-w-[220px] flex-1">
+            <label htmlFor="history-release-filter" className="mb-1 block text-xs font-medium text-gray-600">
+              Exact release revision
+            </label>
+            <Input
+              id="history-release-filter"
+              value={historyReleaseRevision}
+              onChange={(event) => {
+                setHistoryPage(1);
+                setHistoryReleaseRevision(event.target.value);
+              }}
+              placeholder="e.g. abc123def456"
+              className="h-8 bg-white text-xs"
+            />
+          </div>
+          <div className="min-w-[220px] flex-1">
+            <label className="mb-1 block text-xs font-medium text-gray-600">
+              University
+            </label>
+            <Select
+              value={historyUniversityId}
+              onValueChange={(value) => {
+                setHistoryPage(1);
+                setHistoryUniversityId(value);
+              }}
+            >
+              <SelectTrigger className="h-8 bg-white text-xs">
+                <SelectValue placeholder="All universities" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All universities</SelectItem>
+                {(uniData?.data ?? []).map((university) => (
+                  <SelectItem key={university.id} value={String(university.id)}>
+                    {university.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <label className="flex h-8 cursor-pointer items-center gap-2 rounded-md border bg-white px-3 text-xs font-medium text-gray-700">
+            <input
+              type="checkbox"
+              checked={historyMixedReleaseOnly}
+              onChange={(event) => {
+                setHistoryPage(1);
+                setHistoryMixedReleaseOnly(event.target.checked);
+              }}
+              className="h-4 w-4 accent-orange-600"
+            />
+            Mixed-release jobs only
+          </label>
+          {(historyReleaseRevision || historyUniversityId !== "all" || historyMixedReleaseOnly) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => {
+                setHistoryPage(1);
+                setHistoryReleaseRevision("");
+                setHistoryUniversityId("all");
+                setHistoryMixedReleaseOnly(false);
+              }}
+            >
+              Clear filters
+            </Button>
+          )}
+        </div>
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <div className="flex items-center gap-3">
             <h2 className="text-lg font-semibold">Scrape History</h2>
@@ -3981,7 +4072,11 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         ) : historyRuns.length === 0 ? (
           <div className="border rounded-xl p-10 text-center text-gray-400">
             <Clock className="w-8 h-8 mx-auto mb-2 opacity-40" />
-            <p>No scrape runs yet.</p>
+            <p>
+              {historyReleaseRevision || historyUniversityId !== "all" || historyMixedReleaseOnly
+                ? "No scrape runs match these filters."
+                : "No scrape runs yet."}
+            </p>
           </div>
         ) : (
           <div className="space-y-2">

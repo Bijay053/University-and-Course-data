@@ -988,6 +988,8 @@ async def history_list(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     university_id: int | None = Query(default=None),
+    release_revision: str | None = Query(default=None, min_length=1),
+    mixed_release: bool = Query(default=False),
 ) -> dict:
     """Match Node: returns {runs, total, limit, offset} with stagedCount/approvedCount/rejectedCount/snapshotCount."""
     from app.models import ScrapedCourse
@@ -1013,6 +1015,17 @@ async def history_list(
     base_where = []
     if university_id is not None:
         base_where.append(ScrapeRuntimeJob.university_id == university_id)
+    if release_revision is not None:
+        base_where.append(ScrapeRuntimeJob.release_revision == release_revision)
+    if mixed_release:
+        base_where.append(
+            _select(ScrapeRunAlert.id)
+            .where(
+                ScrapeRunAlert.scrape_run_id == ScrapeRuntimeJob.runtime_job_id,
+                ScrapeRunAlert.rule_id == "mixed_release_execution",
+            )
+            .exists()
+        )
 
     stmt = (
         _select(
