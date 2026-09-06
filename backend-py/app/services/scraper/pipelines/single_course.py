@@ -1177,7 +1177,41 @@ def _select_central_english_level(
     values = english_by_level.get(bucket) or {}
     if bucket == "doctorate" and not values:
         values = english_by_level.get("postgraduate") or {}
+    if bucket == "diploma" and not values:
+        # Standard Diploma / Advanced Diploma / Associate Diploma programs are
+        # undergraduate-level unless the institution publishes a dedicated
+        # diploma column.  Graduate Diploma was routed to postgraduate above.
+        values = english_by_level.get("undergraduate") or {}
+        if values:
+            bucket = "undergraduate"
     return bucket, values
+
+
+def _select_central_english_program(
+    profiles: Any,
+    course_name: str,
+) -> dict[str, Any]:
+    """Select an exact named-program profile from a central English page."""
+    if not isinstance(profiles, list) or not course_name:
+        return {}
+
+    def _normalize(value: Any) -> str:
+        normalized = _re.sub(r"[^a-z0-9]+", " ", str(value or "").lower())
+        return " ".join(normalized.split())
+
+    target = _normalize(course_name)
+    if not target:
+        return {}
+    for profile in profiles:
+        if not isinstance(profile, dict):
+            continue
+        heading = _normalize(profile.get("program_names"))
+        values = profile.get("values")
+        # A heading may list several courses separated by commas.  Match the
+        # complete normalized title with word boundaries, never fuzzy scores.
+        if f" {target} " in f" {heading} " and isinstance(values, dict):
+            return values
+    return {}
 
 
 # ── Week 2 P5: SKIP_CENTRAL_ENGLISH_PROPAGATION toggle ─────────────────────
@@ -1233,6 +1267,9 @@ METHOD_AUTHORITY: dict[str, float] = {
     # 1 — university-wide HTML
     "central_page": _AUTHORITY_UNIVERSITY_WIDE,
     "central_page:english": _AUTHORITY_UNIVERSITY_WIDE,
+    # Exact course-name match against a named-program table on the verified
+    # central page.  This is course-specific evidence, not a university default.
+    "central_page:english_program": 4.5,
     "central_page:fees:exact": _AUTHORITY_UNIVERSITY_WIDE,
     "central_page:fees:high": _AUTHORITY_UNIVERSITY_WIDE,
     "central_page:fees:medium": _AUTHORITY_UNIVERSITY_WIDE,
@@ -7783,6 +7820,16 @@ async def extract_course(
                 _english_by_level,
                 _course_dl,
             )
+            _program_profiles: list[dict[str, Any]] = (
+                central_data.get("english_by_program") or []
+            )
+            _program_english = _select_central_english_program(
+                _program_profiles,
+                payload.get("course_name") or "",
+            )
+            if _program_english:
+                _level_bucket = "program"
+                _level_english = _program_english
 
             # Pathway guard: pathway programs (Foundation Studies, ELICOS,
             # UniPrep, bridging courses) must not inherit the university-wide
@@ -7834,6 +7881,12 @@ async def extract_course(
             # Path 1: level-specific values available — use them unconditionally.
             if _level_english and not _is_pathway_course:
                 _eng_filled: list[str] = []
+                _named_program_authority = _level_bucket == "program"
+                _standard_diploma_authority = bool(
+                    _program_profiles
+                    and _level_bucket == "undergraduate"
+                    and _course_dl in {"Diploma", "Advanced Diploma", "Associate Diploma"}
+                )
                 for _k, _v in _level_english.items():
                     if _v in (None, "", 0):
                         continue
@@ -7841,7 +7894,11 @@ async def extract_course(
                     if _curr not in (None, "", 0):
                         # Allow override when existing value came from a
                         # low-authority source (AI guess, Gemini primary).
-                        if _cfg_course_english_priority:
+                        if (
+                            _cfg_course_english_priority
+                            and not _named_program_authority
+                            and not _standard_diploma_authority
+                        ):
                             continue  # course page English always wins
                         _existing_method = next(
                             (
@@ -7851,7 +7908,20 @@ async def extract_course(
                             ),
                             "",
                         )
-                        if _existing_method not in _CENTRAL_ENGLISH_OVERRIDABLE:
+                        _central_program_may_override = bool(
+                            (
+                                _named_program_authority
+                                and _existing_method != "pre_seed"
+                            )
+                            or (
+                                _standard_diploma_authority
+                                and _existing_method.startswith("per_course_vision")
+                            )
+                        )
+                        if (
+                            _existing_method not in _CENTRAL_ENGLISH_OVERRIDABLE
+                            and not _central_program_may_override
+                        ):
                             continue
                         # Drop stale low-authority evidence for this slot so
                         # extraction_method reflects the central page source.
@@ -7866,11 +7936,16 @@ async def extract_course(
                         if _level_bucket in {"postgraduate", "doctorate"}
                         else _central_eng_url_ug
                     ) or _central_eng_url or url
+                    _central_method = (
+                        "central_page:english_program"
+                        if _named_program_authority
+                        else "central_page:english_level"
+                    )
                     evidence.append({
                         "field_key": _k,
                         "value": _v,
-                        "confidence": 0.55,
-                        "method": "central_page:english_level",
+                        "confidence": 0.95 if _named_program_authority else 0.55,
+                        "method": _central_method,
                         "source_url": _level_src_url,
                         "snippet": f"central_page english_level ({_level_bucket}): {_k}={_v}",
                     })

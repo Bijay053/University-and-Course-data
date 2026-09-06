@@ -933,6 +933,85 @@ def _parse_column_keyed_english_table(
     return flat_vals, by_level
 
 
+def _parse_program_keyed_english_tables(html: str) -> list[dict[str, Any]]:
+    """Parse named-program English tables without flattening them globally.
+
+    UniSC publishes one standard level table followed by ``h6 + table`` pairs
+    for programs with non-standard requirements.  Those 7.0/7.5 values must
+    remain attached to the named programs rather than becoming university-wide
+    defaults.
+    """
+    try:
+        from bs4 import BeautifulSoup
+        import re as _re
+    except ImportError:
+        return []
+
+    try:
+        soup = BeautifulSoup(html or "", "html.parser")
+    except Exception:
+        return []
+    section = soup.find(id="table-2-non-standard-requirements")
+    if section is None:
+        return []
+
+    row_specs = (
+        (("ielts",), "ielts_overall", 0.0, 9.0),
+        (("pearson", "pte"), "pte_overall", 0.0, 90.0),
+        (("toefl",), "toefl_overall", 0.0, 120.0),
+        (("c1 advanced", "c2 proficiency", "cambridge"), "cambridge_overall", 100.0, 230.0),
+        (("duolingo",), "duolingo_overall", 10.0, 160.0),
+    )
+
+    def _score(text: str, low: float, high: float) -> float | None:
+        patterns = (
+            r"(?:minimum\s+)?(?:overall|total)(?:\s+score)?\s+(?:of\s+)?(\d+(?:\.\d+)?)",
+            r"\bscore\s+of\s+(\d+(?:\.\d+)?)",
+        )
+        candidates: list[str] = []
+        for pattern in patterns:
+            match = _re.search(pattern, text, _re.I)
+            if match:
+                candidates = [match.group(1)]
+                break
+        if not candidates:
+            candidates = _re.findall(r"(?<!\d)(\d{1,3}(?:\.\d+)?)(?!\d)", text)
+        for raw in candidates:
+            try:
+                value = float(raw)
+            except (TypeError, ValueError):
+                continue
+            if low <= value <= high:
+                return value
+        return None
+
+    profiles: list[dict[str, Any]] = []
+    for heading in section.find_all("h6", recursive=False):
+        table = heading.find_next_sibling("table")
+        if table is None:
+            continue
+        program_names = " ".join(heading.get_text(" ", strip=True).split())
+        values: dict[str, float] = {}
+        for row in table.find_all("tr"):
+            cells = row.find_all(["th", "td"])
+            if len(cells) < 2:
+                continue
+            label = " ".join(cells[0].get_text(" ", strip=True).lower().split())
+            requirement = " ".join(
+                " ".join(cell.get_text(" ", strip=True).split())
+                for cell in cells[1:]
+            )
+            for aliases, slot, low, high in row_specs:
+                if any(_re.search(rf"\b{_re.escape(alias)}\b", label, _re.I) for alias in aliases):
+                    value = _score(requirement, low, high)
+                    if value is not None:
+                        values[slot] = value
+                    break
+        if program_names and values:
+            profiles.append({"program_names": program_names, "values": values})
+    return profiles
+
+
 # ---------------------------------------------------------------------------
 # Browser-backed fetch (for JS-rendered central pages)
 # ---------------------------------------------------------------------------
@@ -1102,7 +1181,7 @@ async def _fetch_with_browser_fallback(url: str) -> str | None:
 #   "english_requirements"  — english slots + english_page_url + english_by_level
 
 _CACHE_TTL_DAYS = 30
-_ENGLISH_CACHE_SCHEMA_VERSION = 2
+_ENGLISH_CACHE_SCHEMA_VERSION = 3
 
 
 def _is_non_tuition_central_fee_pdf(
@@ -1931,6 +2010,15 @@ async def prefetch_central_pages(
                                 values=_ck_by_level,
                                 url=english_url,
                             )
+
+                    _program_profiles = _parse_program_keyed_english_tables(eng_html)
+                    if _program_profiles:
+                        result["english_by_program"] = _program_profiles
+                        log.info(
+                            "central_pages: parsed %d named-program English profiles from %s",
+                            len(_program_profiles),
+                            english_url,
+                        )
 
                     if emit:
                         slots_found = ", ".join(

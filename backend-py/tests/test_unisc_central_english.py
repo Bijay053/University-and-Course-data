@@ -4,8 +4,10 @@ from app.services.scraper.central_pages import (
     _ENGLISH_CACHE_SCHEMA_VERSION,
     _english_cache_is_current,
     _parse_column_keyed_english_table,
+    _parse_program_keyed_english_tables,
 )
 from app.services.scraper.pipelines.single_course import (
+    _select_central_english_program,
     _select_central_english_level,
 )
 
@@ -72,6 +74,71 @@ def test_doctorate_uses_research_requirement_with_postgraduate_fallback() -> Non
     )
     assert bucket == "doctorate"
     assert values == {"ielts_overall": 6.5}
+
+
+def test_diploma_uses_undergraduate_profile_only_when_no_explicit_bucket() -> None:
+    by_level = {
+        "undergraduate": {
+            "ielts_overall": 6.0,
+            "pte_overall": 50.0,
+            "toefl_overall": 76.0,
+        },
+        "postgraduate": {
+            "ielts_overall": 6.5,
+            "pte_overall": 58.0,
+            "toefl_overall": 85.0,
+        },
+    }
+    bucket, values = _select_central_english_level(by_level, "Diploma")
+    assert bucket == "undergraduate"
+    assert values == by_level["undergraduate"]
+
+    by_level["diploma"] = {"ielts_overall": 5.5}
+    bucket, values = _select_central_english_level(by_level, "Diploma")
+    assert bucket == "diploma"
+    assert values == {"ielts_overall": 5.5}
+
+
+def test_graduate_diploma_remains_postgraduate() -> None:
+    by_level = {
+        "undergraduate": {"ielts_overall": 6.0},
+        "postgraduate": {"ielts_overall": 6.5},
+    }
+    bucket, values = _select_central_english_level(by_level, "Graduate Diploma")
+    assert bucket == "postgraduate"
+    assert values == {"ielts_overall": 6.5}
+
+
+def test_unisc_non_standard_tables_match_only_named_programs() -> None:
+    html = """
+    <div id="table-2-non-standard-requirements">
+      <h6>Bachelor of Occupational Therapy (Honours)</h6>
+      <table>
+        <tr><td>IELTS (Academic)</td><td>Overall score of 7.0 with minimum 6.5 in writing</td></tr>
+        <tr><td>TOEFL iBT</td><td>Minimum total score of 94 with minimum score of 24</td></tr>
+        <tr><td>Pearson Test of English (PTE)</td><td>Minimum overall score of 66</td></tr>
+      </table>
+      <h6>Bachelor of Social Work, Master of Social Work (Qualifying)</h6>
+      <table>
+        <tr><td>IELTS (Academic)</td><td>Overall score of 7.0 with minimum 7.0 in each subtest</td></tr>
+      </table>
+    </div>
+    """
+    profiles = _parse_program_keyed_english_tables(html)
+
+    occupational_therapy = _select_central_english_program(
+        profiles,
+        "Bachelor of Occupational Therapy (Honours)",
+    )
+    assert occupational_therapy == {
+        "ielts_overall": 7.0,
+        "toefl_overall": 94.0,
+        "pte_overall": 66.0,
+    }
+    assert _select_central_english_program(
+        profiles,
+        "Diploma in Business Innovation",
+    ) == {}
 
 
 def test_unisc_bare_ielts_cells_are_kept_in_each_level_profile() -> None:
