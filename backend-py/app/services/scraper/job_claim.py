@@ -71,5 +71,11 @@ async def claim_runtime_job(db: AsyncSession, runtime_job_id: str) -> bool:
             "release_revision": release_revision,
         },
     )
+    was_claimed = claimed.first() is not None
     await db.commit()
-    return claimed.first() is not None
+    # The claim is issued as textual SQL, so SQLAlchemy cannot synchronize
+    # already-loaded ScrapeRuntimeJob instances in this session. Expire them
+    # after commit so a later requeue/resume observes the persisted "running"
+    # state before applying another status transition.
+    db.expire_all()
+    return was_claimed
