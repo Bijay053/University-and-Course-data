@@ -1310,6 +1310,7 @@ METHOD_AUTHORITY: dict[str, float] = {
     # 5 — hard-coded site-specific extractor
     "pre_seed": _AUTHORITY_PRE_SEED,
     "csu_static_extract": _AUTHORITY_PRE_SEED,
+    "cdu_static": _AUTHORITY_PRE_SEED,
     "bond_pre_seed": _AUTHORITY_PRE_SEED,
     "ecu_pre_seed": _AUTHORITY_PRE_SEED,
 }
@@ -3378,6 +3379,49 @@ async def extract_course(
                     payload[_guard_k] = None
     except Exception as _csu_exc:  # noqa: BLE001
         log.warning("csu_static_extract pre-seed failed on %s: %s", url, _csu_exc)
+
+    # ── CDU pre-seed: current-course international DOM blocks ───────────────
+    # CDU serves domestic and international values in the same HTML, followed
+    # by many related-course cards. Generic text extraction can choose the
+    # domestic unit price or a related course's campus. Scope these fields to
+    # the current course's explicit international blocks instead.
+    try:
+        from app.services.scraper.cdu_static_extract import (
+            apply_cdu_static_extraction as _cdu_apply,
+            is_cdu_url as _is_cdu,
+        )
+        if _is_cdu(url):
+            _cdu_pre = _cdu_apply(url, html)
+            for _k, _v in _cdu_pre.items():
+                payload[_k] = _v
+                if _v not in (None, "", 0, []):
+                    evidence.append(
+                        {
+                            "field_key": _k,
+                            "value": _v,
+                            "confidence": 0.95,
+                            "method": "cdu_static",
+                            "source_url": url,
+                            "snippet": f"CDU international course block: {_k}={_v}",
+                        }
+                    )
+            if emit:
+                _filled = [
+                    k for k, v in _cdu_pre.items()
+                    if v not in (None, "", 0, [])
+                ]
+                await emit(
+                    "status",
+                    f"[CDU ✓] {url.split('/')[-1][:40]} — "
+                    f"fee={_cdu_pre.get('international_fee')}, "
+                    f"loc={(_cdu_pre.get('course_location') or '')[:40]}",
+                    phase="extract",
+                    kind="cdu_static_preseed",
+                    url=url,
+                    filled=_filled,
+                )
+    except Exception as _cdu_exc:  # noqa: BLE001
+        log.warning("cdu_static_extract pre-seed failed on %s: %s", url, _cdu_exc)
 
     # ── Bond pre-seed: runs BEFORE _EXTRACTORS ───────────────────────────────
     # Bond University (bond.edu.au/program/*) renders all dynamic fields

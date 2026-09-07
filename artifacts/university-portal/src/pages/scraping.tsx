@@ -2114,18 +2114,45 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     setCleaningNames(false);
   };
 
-  const _FIX_BATCH = 50; // max per /analyze and /re-extract call
+  const _FIX_ANALYZE_BATCH = 50;
+  // Re-extraction performs live page fetches. Keep each HTTP request small so
+  // large client selections do not disappear behind a proxy timeout.
+  const _FIX_REEXTRACT_BATCH = 5;
+
+  const reviewUniversityId = () => {
+    if (selectedUni && selectedUni !== ALL) {
+      const explicitId = Number(selectedUni);
+      if (Number.isInteger(explicitId)) return explicitId;
+    }
+    const ids = new Set(
+      stagedCourses
+        .filter((course) => selectedIds.has(course.id))
+        .map((course) => course.universityId),
+    );
+    return ids.size === 1 ? Array.from(ids)[0] : null;
+  };
 
   const handleFixSelected = async () => {
-    if (!selectedUni || selectedUni === ALL || selectedIds.size === 0) return;
-    const uniId = parseInt(selectedUni);
-    if (isNaN(uniId)) return;
+    if (selectedIds.size === 0) return;
+    const uniId = reviewUniversityId();
+    if (uniId == null) {
+      toast({
+        title: "Fix unavailable",
+        description: "Could not determine the university for the selected review rows. Refresh the review and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
     const ids = Array.from(selectedIds);
     setAnalyzingFix(true);
+    toast({
+      title: `Checking ${ids.length} selected course${ids.length === 1 ? "" : "s"}…`,
+      description: "The repair preview will open when the check is complete.",
+    });
     try {
       // Batch analyze in chunks of 50 and merge the results.
       const chunks: number[][] = [];
-      for (let i = 0; i < ids.length; i += _FIX_BATCH) chunks.push(ids.slice(i, i + _FIX_BATCH));
+      for (let i = 0; i < ids.length; i += _FIX_ANALYZE_BATCH) chunks.push(ids.slice(i, i + _FIX_ANALYZE_BATCH));
 
       let merged: FixAnalysis = { total: 0, courses_with_url: 0, issues: [] };
       const issueMap = new Map<string, FixIssue>();
@@ -2134,6 +2161,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         const res = await fetch("/api/scrape/staged/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({ ids: chunk, universityId: uniId }),
         });
         if (!res.ok) {
@@ -2172,16 +2200,20 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   };
 
   const handleConfirmFix = async () => {
-    if (!selectedUni || selectedUni === ALL || !fixAnalysis) return;
-    const uniId = parseInt(selectedUni);
-    if (isNaN(uniId)) return;
+    if (!fixAnalysis) return;
+    const uniId = reviewUniversityId();
+    if (uniId == null) {
+      toast({ title: "Fix unavailable", description: "Refresh the review and try again.", variant: "destructive" });
+      return;
+    }
     const ids = Array.from(selectedIds);
     const beforeIssues = fixAnalysis.issues;
     setFixingSelected(true);
     try {
-      // Process in batches of 50 (backend hard limit per call).
+      // Process in small live-fetch batches so each request stays observable
+      // and below the reverse proxy timeout.
       const chunks: number[][] = [];
-      for (let i = 0; i < ids.length; i += _FIX_BATCH) chunks.push(ids.slice(i, i + _FIX_BATCH));
+      for (let i = 0; i < ids.length; i += _FIX_REEXTRACT_BATCH) chunks.push(ids.slice(i, i + _FIX_REEXTRACT_BATCH));
 
       let totalUpdated = 0, totalSkipped = 0, totalErrors = 0, totalTotal = 0;
       const valueUpdatedFields = new Set<string>();
@@ -2190,6 +2222,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         const res = await fetch("/api/scrape/staged/re-extract", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({ ids: chunk, universityId: uniId }),
         });
         if (!res.ok) {
@@ -2206,6 +2239,10 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
           { valueUpdatedFields, provenanceOnlyFields },
           part.results ?? [],
         );
+        toast({
+          title: `Fixed ${Math.min(totalTotal, ids.length)} of ${ids.length} selected courses`,
+          description: chunks.length > 1 ? "Continuing with the remaining courses…" : undefined,
+        });
       }
       const data = {
         updated: totalUpdated,
