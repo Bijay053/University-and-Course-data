@@ -29,6 +29,7 @@ from app.services.scraper.per_course_vision import (
 )
 from app.services.scraper.http_fetcher import ScrapedoAccountError
 from app.services.scraper.guards import filter_non_degree_candidates
+from app.services.scraper.warning_rules import normalize_skip_reason_key
 from app.services.scraper.pipelines.single_course import extract_course
 from app.services.scraper.pipelines.university_pdfs import load_university_pdf_data
 from app.services.scraper.stage_course import stage_course
@@ -5930,7 +5931,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         )
                     else:
                         summary["skipped"] += 1
-                        _skip_key = (res.reason or "unknown").replace(" ", "_").lower()[:40]
+                        _skip_key = normalize_skip_reason_key(res.reason)
                         skip_reasons[_skip_key] = skip_reasons.get(_skip_key, 0) + 1
                         # Collect sample URLs for category_landing_page_* sub-reasons
                         # so operators can diagnose root causes without reading raw logs.

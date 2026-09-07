@@ -86,8 +86,16 @@ export function countSuspiciousSkipped(
 ): number {
   if (!skipReasons) return totalSkipped;
   const expectedPolicySkips = Object.entries(skipReasons).reduce(
-    (total, [reason, count]) =>
-      total + (EXPECTED_POLICY_SKIP_REASONS.has(reason) ? Math.max(0, count) : 0),
+    (total, [reason, count]) => {
+      const normalizedReason = reason
+        .trim()
+        .toLowerCase()
+        .replace(/^rejected(?::|_)+/, "")
+        .replace(/^_+/, "");
+      return total + (
+        EXPECTED_POLICY_SKIP_REASONS.has(normalizedReason) ? Math.max(0, count) : 0
+      );
+    },
     0,
   );
   return Math.max(0, totalSkipped - expectedPolicySkips);

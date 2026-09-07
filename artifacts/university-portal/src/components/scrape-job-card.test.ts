@@ -46,6 +46,13 @@ describe("countSuspiciousSkipped", () => {
     })).toBe(29);
   });
 
+  it("classifies the legacy prefixed keys emitted by production jobs", () => {
+    expect(countSuspiciousSkipped(208, {
+      "rejected:_online_only": 181,
+      "rejected:_category_landing_page_missing_": 27,
+    })).toBe(27);
+  });
+
   it("keeps the conservative legacy total when reason details are unavailable", () => {
     expect(countSuspiciousSkipped(208)).toBe(208);
   });
