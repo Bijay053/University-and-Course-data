@@ -139,6 +139,28 @@ def test_yaml_apply_preserves_explicit_empty_list_and_can_rollback(tmp_path) -> 
     assert path.read_text(encoding="utf-8") == original
 
 
+def test_yaml_apply_cannot_overwrite_verified_locked_discovery(tmp_path) -> None:
+    yaml_file = tmp_path / "verified_1.yaml"
+    original = (
+        "locked_config_paths:\n"
+        "  - discovery\n"
+        "discovery:\n"
+        "  sitemap_url: https://verified.edu/sitemap.xml\n"
+    )
+    yaml_file.write_text(original, encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="locks 'discovery'"):
+        _apply_to_yaml(
+            yaml_file,
+            tmp_path,
+            1,
+            "https://verified.edu",
+            {"discovery": {"allow_url_patterns": ["/too-broad/"]}},
+        )
+
+    assert yaml_file.read_text(encoding="utf-8") == original
+
+
 def test_repair_target_requires_terminal_job_with_filter_failure_evidence() -> None:
     evidence = {
         "pipeline_stats": {

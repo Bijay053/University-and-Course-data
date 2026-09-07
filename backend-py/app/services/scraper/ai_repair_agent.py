@@ -1971,9 +1971,25 @@ def _apply_to_yaml(
 
     original_text = yaml_file.read_text(encoding="utf-8") if yaml_file.exists() else None
     existing_text = original_text or ""
+    existing_config = _yaml.safe_load(existing_text) or {}
+    locked_paths = existing_config.get("locked_config_paths") or []
+    for locked_path in locked_paths:
+        if not isinstance(locked_path, str) or not locked_path:
+            continue
+        node: Any = config_patch
+        touched = True
+        for part in locked_path.split("."):
+            if not isinstance(node, dict) or part not in node:
+                touched = False
+                break
+            node = node[part]
+        if touched:
+            raise RuntimeError(
+                f"Verified scraper recipe locks '{locked_path}'; automatic repair cannot overwrite it."
+            )
     comment_lines = [ln for ln in existing_text.splitlines() if ln.strip().startswith("#")]
     header = ("\n".join(comment_lines) + "\n") if comment_lines else ""
-    merged = _merge_repair_patch(_yaml.safe_load(existing_text) or {}, config_patch)
+    merged = _merge_repair_patch(existing_config, config_patch)
     new_txt = header + _yaml.dump(
         merged,
         default_flow_style=False,
