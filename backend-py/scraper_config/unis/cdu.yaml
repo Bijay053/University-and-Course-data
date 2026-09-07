@@ -7,10 +7,21 @@
 #     category overview pages (/study/accounting, /study/arts, ...) and never
 #     reaches actual course detail pages.
 #   - Sitemap supplement is the fix: CDU's sitemap contains direct course page URLs.
-#   - No other extraction overrides reported yet; update this stub as bugs are filed.
+#   - Current catalogue pages use /study/course/<slug>-<code>?year=2026.
+
+locked_config_paths:
+  - discovery
 
 discovery:
-  always_sitemap_supplement: true
+  sitemap_url: "https://www.cdu.edu.au/sitemap.xml"
+  always_sitemap_supplement: false
+  skip_sitemap_fallback: false
+  bfs_page_budget: 0
+  skip_browser_discovery: true
+  allow_url_patterns:
+    - '^https?://(?:www\.)?cdu\.edu\.au/study/course/[^/?]+(?:\?year=20\d{2})?$'
+  course_detail_url_patterns:
+    - '^https?://(?:www\.)?cdu\.edu\.au/study/course/[^/?]+(?:\?year=20\d{2})?$'
 
 extraction:
   filters:

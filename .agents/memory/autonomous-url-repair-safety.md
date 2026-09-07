@@ -8,13 +8,22 @@ validate the complete effective allow, block, must-contain, and final
 course-detail filter before any write. A total-loss job must rescue a material
 share of known course URLs, not merely one sample.
 
+Repair evidence must itself pass the production course-page classifier.
+Low-depth jobs often contain only menu, fees, faculty, or category links; probe
+the sitemap outside the broken allowlist to obtain real course candidates.
+After a validated repair is saved, run a fresh scrape and require staged courses
+before presenting the university as recovered.
+
 **Why:** Partial simulations and heuristic regex suggestions can look successful
-while another active gate still drops every course. Model output is evidence,
-not authority to mutate a scraper recipe.
+while another active gate still drops every course. Navigation links can also
+produce a misleading 100%-rescued simulation yet stage zero courses. Model
+output is evidence, not authority to mutate a scraper recipe.
 
 **How to apply:** Reject malformed or non-improving proposals. Persist YAML and
 database state atomically, reload the merged config, and roll both back on any
 mismatch. Use a fenced per-university lease token and verify ownership at the
 write boundary so concurrent or expired repair runs cannot overwrite each other.
 Keep extraction-field proposals advisory until they have a non-mutating,
-field-specific validation path.
+field-specific validation path. Treat a current non-empty simulation as
+authoritative over stale job counters, and fail closed when the verification
+scrape stages nothing.

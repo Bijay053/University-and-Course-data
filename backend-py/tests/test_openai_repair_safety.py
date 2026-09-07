@@ -78,7 +78,22 @@ def test_full_filter_simulation_includes_must_contain_and_detail_gate() -> None:
 
     assert blocked["after"] == 0
     assert repaired["after"] == 2
-    assert repaired["total"] == 3
+    assert repaired["total"] == 2
+
+
+def test_filter_simulation_does_not_count_navigation_pages_as_courses() -> None:
+    result = _simulate_filter(
+        [
+            "https://www.cdu.edu.au/study/essentials/course-fees",
+            "https://www.cdu.edu.au/faculties",
+            "https://www.cdu.edu.au/study/course/master-teaching-secondary-stchs1?year=2026",
+        ],
+        allow_pats=[r"cdu\.edu\.au/"],
+        block_pats=[],
+    )
+
+    assert result["total"] == 1
+    assert result["after"] == 1
 
 
 def test_invalid_openai_envelope_is_rejected_before_patch_processing() -> None:

@@ -21,6 +21,7 @@ Session key: ``ai_repair:{job_id}``
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -1554,8 +1555,37 @@ async def _gather_context(job_id: str, db) -> dict:
                 "course_detail_url_patterns",
             )
         }
+        effective_discovery["sitemap_url"] = (
+            getattr(effective_cfg.discovery, "sitemap_url", None) or ""
+        )
     except Exception as exc:
         log.warning("ai_repair: effective discovery config load failed: %s", exc)
+
+    repair_course_url_sample: list[str] = []
+    if raw_discovered < 10:
+        try:
+            from app.services.scraper.sitemap import discover_from_sitemap
+
+            sitemap_rows = await asyncio.wait_for(
+                discover_from_sitemap(
+                    row["scrape_url"] or "",
+                    sitemap_url=effective_discovery.get("sitemap_url") or None,
+                ),
+                timeout=30,
+            )
+            repair_course_url_sample = [
+                str(item.get("url") or "")
+                for item in sitemap_rows
+                if item.get("url")
+            ][:15]
+            if repair_course_url_sample:
+                log.info(
+                    "ai_repair: job=%s added %d sitemap course candidates to repair evidence",
+                    job_id,
+                    len(repair_course_url_sample),
+                )
+        except Exception as exc:
+            log.warning("ai_repair: sitemap evidence probe failed for job=%s: %s", job_id, exc)
 
     yaml_content = ""
     if yaml_files:
@@ -1620,6 +1650,8 @@ async def _gather_context(job_id: str, db) -> dict:
         "total_errors":    row["total_errors"] or 0,
         "drop_rate":       drop_rate,
         "dropped_sample":  dropped_sample,
+        "repair_course_url_sample": repair_course_url_sample,
+        "repair_url_sample": list(dict.fromkeys(repair_course_url_sample + dropped_sample)),
         "passed_sample":   passed_sample,
         "admin_config":    admin_config,
         "effective_discovery": effective_discovery,
@@ -1723,7 +1755,13 @@ _ASSET_PATH = re.compile(r"/(images?|assets?|globalassets|static|media|uploads?|
 
 
 def _is_course_url(u: str) -> bool:
-    return not _MEDIA_EXT.search(u) and not _ASSET_PATH.search(u)
+    if _MEDIA_EXT.search(u) or _ASSET_PATH.search(u):
+        return False
+    # A dropped navigation page is not proof that an allowlist is broken.
+    # Reuse the production discovery classifier so automatic repair cannot
+    # "rescue" fees, faculties, study-pathway, or other category pages.
+    from app.services.scraper.discovery import _looks_like_course
+    return _looks_like_course(u, "")
 
 
 def _simulate_filter(
@@ -2091,14 +2129,16 @@ def _build_user_message(ctx: dict, previous_attempts: list[dict], phase: str = "
     else:
         focus_block = (
             "CURRENT FOCUS: Fix URL DISCOVERY — the scraper is not finding enough course pages.\n"
-            "Check the drop_rate and dropped URL sample. Fix allow_url_patterns or block_url_patterns.\n"
-            "If raw_discovered is very low (< 10), raise bfs_page_budget or enable use_browser.\n"
+            "First determine whether dropped URLs are real course-detail pages or only navigation pages.\n"
+            "Never broaden an allowlist to rescue navigation/category pages. If raw_discovered is very low "
+            "(< 10), prefer the site's course sitemap or a deeper discovery strategy.\n"
             "Once discovery is fixed (drop_rate < 20%), the next attempt will switch to extraction."
         )
         diag_priority = (
             "DIAGNOSIS PRIORITY (discovery phase):\n"
-            "1. drop_rate > 50% AND dropped_sample non-empty → fix allow_url_patterns or block_url_patterns\n"
-            "2. raw_discovered == 0 OR raw_discovered < 5   → increase bfs_page_budget or enable use_browser\n"
+            "1. dropped_sample contains real course-detail URLs → fix the URL gates narrowly\n"
+            "2. dropped_sample is navigation/category pages OR raw_discovered < 10 → fix discovery depth; "
+            "use a known sitemap_url before increasing browser crawl cost\n"
             "3. staged > 0 but fee_pct < 40%               → also add a fees.central_page recipe patch\n"
             "4. Otherwise → return empty patches with a clear diagnosis\n"
             "\nHOW TO DERIVE allow_url_patterns:\n"
@@ -2120,7 +2160,10 @@ SCRAPE URL: {ctx['scrape_url']}
 DISCOVERY STATS:
   raw_discovered={ctx['raw_discovered']}  after_filter={ctx['after_filter']}  staged={ctx['imported']}  drop_rate={ctx['drop_rate']}%  errors={ctx['total_errors']}
 
-DROPPED URLs (incorrectly blocked — look like real course pages):
+SITEMAP COURSE CANDIDATES (preferred evidence for low-depth repairs):
+{json.dumps(ctx.get('repair_course_url_sample', []), indent=2)}
+
+DROPPED URLs (untrusted: may be course pages OR navigation pages):
 {json.dumps(ctx['dropped_sample'], indent=2)}
 
 PASSED URLs (currently making it through the filter):
@@ -2375,7 +2418,11 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
                     {"j": job_id},
                 )).first()
                 dc: dict = (dc_row[0] or {}) if dc_row else {}
-                dropped  = dc.get("pipeline_stats", {}).get("dropped_sample") or ctx["dropped_sample"]
+                dropped = (
+                    ctx.get("repair_url_sample")
+                    or dc.get("pipeline_stats", {}).get("dropped_sample")
+                    or ctx["dropped_sample"]
+                )
                 current_disc = dict(ctx.get("effective_discovery") or {})
                 baseline_sim = _simulate_filter(
                     dropped,
