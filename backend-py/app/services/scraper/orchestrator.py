@@ -302,7 +302,16 @@ def _recovery_accounting(
         "recovery_unresolved": safe_total - safe_recovered,
     }
 
-
+def _record_skip(
+    summary: dict[str, Any],
+    skip_reasons: dict[str, int],
+    reason: str | None,
+) -> str:
+    """Increment the completed skip total and exactly one stable reason bucket."""
+    key = normalize_skip_reason_key(reason)
+    summary["skipped"] = summary.get("skipped", 0) + 1
+    skip_reasons[key] = skip_reasons.get(key, 0) + 1
+    return key
 def _per_course_timeout_result(
     link: dict,
     timeout_seconds: float = _PER_COURSE_EXTRACTION_TIMEOUT_SECONDS,
@@ -677,7 +686,6 @@ async def _emit(db, runtime_job_id: str, sequence: int, event: str, message: str
             await emit_db.commit()
     except Exception as exc:  # noqa: BLE001
         log.warning("emit log failed: %s", exc)
-
 
 
 _MAX_COURSES_PER_JOB = 1000
@@ -1576,6 +1584,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             imported=_stopped_total,
             skipped=summary.get("skipped", 0),
             errors=summary.get("errors", 0),
+            skip_reasons=skip_reasons,
             level="warn",
         )
         job.status = "stopped"
@@ -5670,18 +5679,23 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         # Dedup rejections are correct behaviour (same course from
                         # multiple URLs — best version kept).  Count as skipped, not
                         # errors, so the DONE line reflects a real error count.
-                        summary["skipped"] += 1
+                        _record_skip(
+                            summary,
+                            skip_reasons,
+                            "duplicate_name_deduplicated",
+                        )
                     elif r["error"].startswith("skipped:"):
                         # Content-based skip (e.g. CPD/short-course detected via
                         # skip_staging_keywords in YAML).  Count as skipped, not
                         # errors — these are intentional drops, not failures.
-                        summary["skipped"] += 1
+                        _content_skip_reason = r["error"].removeprefix("skipped:")
+                        _record_skip(
+                            summary,
+                            skip_reasons,
+                            _content_skip_reason,
+                        )
                         if r["error"] == "skipped:cpd_short_course":
                             _cpd_skipped_count += 1
-                        elif r["error"] == "skipped:non_degree_static_page":
-                            skip_reasons["non_degree_static_page"] = (
-                                skip_reasons.get("non_degree_static_page", 0) + 1
-                            )
                     else:
                         summary["errors"] += 1
                         _counter = "errors"
@@ -5819,8 +5833,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                             ", ".join(_pe_fields) if _pe_fields else "unknown",
                         )
                     else:
-                        summary["skipped"] += 1
-                        skip_reasons["parser_error"] = skip_reasons.get("parser_error", 0) + 1
+                        _record_skip(summary, skip_reasons, "parser_error")
                         log.warning(
                             "[PARSER ERROR] %s — skipped staging; critical fields missing "
                             "after browser render: %s",
@@ -5991,9 +6004,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                             url=r.get("url"),
                         )
                     else:
-                        summary["skipped"] += 1
-                        _skip_key = normalize_skip_reason_key(res.reason)
-                        skip_reasons[_skip_key] = skip_reasons.get(_skip_key, 0) + 1
+                        _skip_key = _record_skip(summary, skip_reasons, res.reason)
                         # Collect sample URLs for category_landing_page_* sub-reasons
                         # so operators can diagnose root causes without reading raw logs.
                         if res.reason and res.reason.startswith("category_landing_page_"):
@@ -6294,7 +6305,11 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                                 phase="sweep", kind="sweep_recovered", url=_sweep_url,
                             )
                         else:
-                            summary["skipped"] += 1
+                            _record_skip(
+                                summary,
+                                skip_reasons,
+                                _sw_res.reason,
+                            )
                             _counter = _sweep_lk.get("counter")
                             if _counter in ("fetch_failed", "errors"):
                                 summary[_counter] = max(0, summary[_counter] - 1)

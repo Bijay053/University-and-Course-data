@@ -43,6 +43,7 @@ from app.models import (
 from app.services.scraper.orchestrator import (
     _emit,
     _extract_only,
+    _record_skip,
     infer_log_level,
 )
 
@@ -123,6 +124,7 @@ async def run_repair(db: AsyncSession, runtime_job_id: str) -> dict:
         "errors": 0,
         "fetch_failed": 0,
     }
+    skip_reasons: dict[str, int] = {}
 
     await emit(
         "status",
@@ -287,7 +289,7 @@ async def run_repair(db: AsyncSession, runtime_job_id: str) -> dict:
             course_id = int(tgt.get("course_id") or 0)
             url = str(tgt.get("url") or "").strip()
             if not course_id or not url:
-                summary["skipped"] += 1
+                _record_skip(summary, skip_reasons, "invalid_repair_target")
                 continue
 
             # If the target URL is itself a PDF, skip it when we have already
@@ -298,7 +300,11 @@ async def run_repair(db: AsyncSession, runtime_job_id: str) -> dict:
                         "[REPAIR] PDF %r already fetched in this run — skipping course %s",
                         url, course_id,
                     )
-                    summary["skipped"] += 1
+                    _record_skip(
+                        summary,
+                        skip_reasons,
+                        "duplicate_pdf_in_repair",
+                    )
                     await emit(
                         "status",
                         f"[STAGE] skipped: course {course_id} "
@@ -316,7 +322,7 @@ async def run_repair(db: AsyncSession, runtime_job_id: str) -> dict:
             # worker actually getting here.
             course = await db.get(Course, course_id)
             if not course:
-                summary["skipped"] += 1
+                _record_skip(summary, skip_reasons, "course_no_longer_exists")
                 await emit(
                     "status",
                     f"[STAGE] skipped: course {course_id} no longer exists",
@@ -448,7 +454,7 @@ async def run_repair(db: AsyncSession, runtime_job_id: str) -> dict:
                         url=url,
                     )
             else:
-                summary["skipped"] += 1
+                _record_skip(summary, skip_reasons, "no_new_data")
                 await emit(
                     "status",
                     f"[STAGE] skipped: {course.name} (no new data)",
@@ -497,6 +503,7 @@ async def run_repair(db: AsyncSession, runtime_job_id: str) -> dict:
             imported=summary["staged"],
             skipped=summary["skipped"],
             errors=summary["errors"],
+            skip_reasons=skip_reasons,
             level="success",
         )
 
@@ -508,6 +515,7 @@ async def run_repair(db: AsyncSession, runtime_job_id: str) -> dict:
                 "ok": False,
                 "reason": f"already_{job.status}",
                 **summary,
+                "skip_reasons": skip_reasons,
             }
         finished_cleanly = summary["errors"] == 0 or summary["staged"] > 0
         job.status = "completed" if finished_cleanly else "failed"
@@ -526,7 +534,11 @@ async def run_repair(db: AsyncSession, runtime_job_id: str) -> dict:
             )[:1000]
         await db.commit()
         log.info("Repair %s %s: %s", runtime_job_id, job.status, summary)
-        return {"ok": finished_cleanly, **summary}
+        return {
+            "ok": finished_cleanly,
+            **summary,
+            "skip_reasons": skip_reasons,
+        }
     except Exception as exc:
         log.exception("Repair job %s failed: %s", runtime_job_id, exc)
         try:
@@ -534,12 +546,22 @@ async def run_repair(db: AsyncSession, runtime_job_id: str) -> dict:
         except Exception:  # noqa: BLE001
             pass
         if job.status in {"stopped", "failed", "completed"}:
-            return {"ok": False, "reason": f"already_{job.status}", **summary}
+            return {
+                "ok": False,
+                "reason": f"already_{job.status}",
+                **summary,
+                "skip_reasons": skip_reasons,
+            }
         job.status = "failed"
         job.completed_at = datetime.now(timezone.utc)
         job.error_message = str(exc)[:1000]
         await db.commit()
-        return {"ok": False, "reason": str(exc), **summary}
+        return {
+            "ok": False,
+            "reason": str(exc),
+            **summary,
+            "skip_reasons": skip_reasons,
+        }
     finally:
         # ── Release the per-university Redis distributed lock ────────────────
         # Only release if we actually hold it (lock value must still match our

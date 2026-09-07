@@ -142,3 +142,4 @@
 - [University onboarding name authority](university-onboarding-name-authority.md) — URL metadata is marketing copy until sanitized; clean official names may replace wrapped phrases even when both contain “University.”
 - [Category-page warning parity](category-page-warning-parity.md) — URL-shape warnings must respect degree-qualifier overrides and be discarded when their candidate count differs from the live job.
 - [WSU international catalogue authority](wsu-algolia-authority.md) — detail pages default to domestic; Algolia owns international fees/durations, while official English profiles require named exceptions.
+- [Skip reason counter conservation](skip-reason-counter-conservation.md) — every completed skipped-course increment must flow through one helper that also increments exactly one stable reason bucket.

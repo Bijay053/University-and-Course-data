@@ -537,11 +537,10 @@ async def test_run_repair_skips_when_course_has_existing_english(
 async def test_repair_pdf_url_only_extracted_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """When two repair targets share the same PDF URL, _extract_only must be
-    called exactly once. The second target must be counted as skipped.
+    """Every repair-only skip branch records a stable reason.
 
-    This mirrors the seen_pdf_urls guard in run_recovery_pass / extract_from_url
-    (Task 160 / Task 165).
+    The fixture also verifies that two targets sharing one PDF URL invoke
+    extraction only for the first PDF target.
     """
     import uuid as _uuid
 
@@ -578,6 +577,21 @@ async def test_repair_pdf_url_only_extracted_once(
                 {"u": uni_id, "n": "Bachelor of PDF Two", "url": pdf_url},
             )
         ).scalar_one()
+        c3 = (
+            await db.execute(
+                text(
+                    "INSERT INTO courses "
+                    "(university_id, name, status, course_website, duration) "
+                    "VALUES (:u, :n, 'active', :url, 3) RETURNING id"
+                ),
+                {
+                    "u": uni_id,
+                    "n": "Already Complete Repair Course",
+                    "url": "https://example.test/already-complete",
+                },
+            )
+        ).scalar_one()
+        deleted_course_id = 999_999_998
         job_id = f"repair_{_uuid.uuid4().hex[:12]}"
         await db.execute(
             text(
@@ -595,8 +609,13 @@ async def test_repair_pdf_url_only_extracted_once(
                 "pl": (
                     '{"universityId": ' + str(uni_id) + ', '
                     '"repair_targets": ['
+                    '{"course_id": 0, "url": ""}, '
                     '{"course_id": ' + str(c1) + ', "url": "' + pdf_url + '"}, '
-                    '{"course_id": ' + str(c2) + ', "url": "' + pdf_url + '"}'
+                    '{"course_id": ' + str(c2) + ', "url": "' + pdf_url + '"}, '
+                    '{"course_id": ' + str(deleted_course_id) + ', '
+                    '"url": "https://example.test/deleted"}, '
+                    '{"course_id": ' + str(c3) + ', '
+                    '"url": "https://example.test/already-complete"}'
                     ']}'
                 ),
             },
@@ -622,14 +641,22 @@ async def test_repair_pdf_url_only_extracted_once(
     async with AsyncSessionLocal() as db:
         result = await repair_mod.run_repair(db, job_id)
 
-    # _extract_only must only have been called once — the second target shares
-    # the same PDF URL and must be skipped by the seen_pdf_urls guard.
-    assert extract_call_count[0] == 1, (
+    # Extraction runs for the first PDF and the complete HTML course only.
+    # The duplicate PDF, invalid target, and deleted course bypass extraction.
+    assert extract_call_count[0] == 2, (
         f"_extract_only called {extract_call_count[0]} times; "
-        "expected exactly 1 (second PDF URL must be deduped)"
+        "expected first PDF plus no-new-data course only"
     )
-    # One target processed, one skipped.
-    assert result["skipped"] >= 1, result
+    # Every non-staging branch contributes exactly one stable reason:
+    # malformed target, repeated PDF, deleted course, and no new data.
+    assert result["skipped"] == 4, result
+    assert result["skip_reasons"] == {
+        "invalid_repair_target": 1,
+        "duplicate_pdf_in_repair": 1,
+        "course_no_longer_exists": 1,
+        "no_new_data": 1,
+    }
+    assert sum(result["skip_reasons"].values()) == result["skipped"]
 
     # Cleanup.
     async with AsyncSessionLocal() as db:
