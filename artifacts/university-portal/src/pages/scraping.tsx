@@ -2029,6 +2029,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   const [bulkRejecting, setBulkRejecting] = useState(false);
   const [fixingSelected, setFixingSelected] = useState(false);
   const [analyzingFix, setAnalyzingFix] = useState(false);
+  const [fixProgress, setFixProgress] = useState<{ completed: number; total: number } | null>(null);
   const [showBulkRejectDialog, setShowBulkRejectDialog] = useState(false);
   const [showFixPreviewDialog, setShowFixPreviewDialog] = useState(false);
   const [showFixResultsDialog, setShowFixResultsDialog] = useState(false);
@@ -2209,6 +2210,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     const ids = Array.from(selectedIds);
     const beforeIssues = fixAnalysis.issues;
     setFixingSelected(true);
+    setFixProgress({ completed: 0, total: ids.length });
     try {
       // Process in small live-fetch batches so each request stays observable
       // and below the reverse proxy timeout.
@@ -2228,6 +2230,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         if (!res.ok) {
           toast({ title: "Fix failed", description: await getFetchErrorMessage(res), variant: "destructive" });
           setFixingSelected(false);
+          setFixProgress(null);
           return;
         }
         const part = await res.json();
@@ -2239,10 +2242,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
           { valueUpdatedFields, provenanceOnlyFields },
           part.results ?? [],
         );
-        toast({
-          title: `Fixed ${Math.min(totalTotal, ids.length)} of ${ids.length} selected courses`,
-          description: chunks.length > 1 ? "Continuing with the remaining courses…" : undefined,
-        });
+        setFixProgress({ completed: Math.min(totalTotal, ids.length), total: ids.length });
       }
       const data = {
         updated: totalUpdated,
@@ -2283,6 +2283,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       toast({ title: "Fix failed", description: "Network error — check your connection.", variant: "destructive" });
     }
     setFixingSelected(false);
+    setFixProgress(null);
   };
 
   const handleDedupPending = async () => {
@@ -3511,6 +3512,13 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                 <strong>Action:</strong> Re-extract {fixAnalysis.courses_with_url} of {fixAnalysis.total} courses using current recipe rules. Gemini AI will attempt to fill missing fields.
               </div>
 
+              {fixingSelected && fixProgress && (
+                <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+                  Re-extracting selected courses: <strong>{fixProgress.completed} of {fixProgress.total}</strong> complete.
+                  Keep this window open until the results appear.
+                </div>
+              )}
+
               {fixAnalysis.issues.length > 0 && (
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Expected Improvement</p>
@@ -3539,7 +3547,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             </Button>
             <Button onClick={handleConfirmFix} disabled={fixingSelected} className="bg-blue-600 hover:bg-blue-700 text-white">
               {fixingSelected ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
-              Confirm Fix ({fixAnalysis?.total ?? 0})
+              {fixingSelected && fixProgress
+                ? `Fixing ${fixProgress.completed}/${fixProgress.total}`
+                : `Confirm Fix (${fixAnalysis?.total ?? 0})`}
             </Button>
           </DialogFooter>
         </DialogContent>
