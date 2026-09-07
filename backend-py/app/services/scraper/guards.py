@@ -530,7 +530,9 @@ _DEGREE_QUALIFIER_RE = re.compile(
     r"^(?:"
     r"bachelor|"
     r"master(?:s|'s)?(?!\s+of\s+ceremonies)|"  # reject "Master of Ceremonies"
+    r"executive\s+master(?:s|'s)?|"             # CSU: Executive Masters in ...
     r"doctor(?:ate)?|"
+    r"undergraduate\s+certificate|"             # CSU: Undergraduate Certificate in ...
     r"graduate\s+(?:certificate|diploma)|"
     r"postgraduate\s+(?:certificate|diploma)|"  # UK PgCert / PgDip (Huddersfield)
     r"pgce\b|"                                    # Postgraduate Certificate of Education (UK)

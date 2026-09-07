@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  countSuspiciousSkipped,
   isCategoryPageWarningStale,
   runtimeProgressFromStatus,
 } from "./scrape-job-card";
@@ -33,5 +34,23 @@ describe("isCategoryPageWarningStale", () => {
 
   it("keeps a warning that describes the current job total", () => {
     expect(isCategoryPageWarningStale(14, 14)).toBe(false);
+  });
+});
+
+describe("countSuspiciousSkipped", () => {
+  it("excludes intentional audience-policy rejections", () => {
+    expect(countSuspiciousSkipped(208, {
+      online_only: 179,
+      category_landing_page_missing_degree_qualifier: 27,
+      other: 2,
+    })).toBe(29);
+  });
+
+  it("keeps the conservative legacy total when reason details are unavailable", () => {
+    expect(countSuspiciousSkipped(208)).toBe(208);
+  });
+
+  it("never returns a negative count when reason totals drift", () => {
+    expect(countSuspiciousSkipped(5, { online_only: 7 })).toBe(0);
   });
 });

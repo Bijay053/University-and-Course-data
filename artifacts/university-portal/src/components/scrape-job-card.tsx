@@ -73,6 +73,26 @@ export function isCategoryPageWarningStale(
   return warningTotal !== undefined && warningTotal !== runtimeTotal;
 }
 
+const EXPECTED_POLICY_SKIP_REASONS = new Set([
+  "online_only",
+  "domestic_only",
+  "part_time_only",
+  "non_degree_program",
+]);
+
+export function countSuspiciousSkipped(
+  totalSkipped: number,
+  skipReasons?: Record<string, number>,
+): number {
+  if (!skipReasons) return totalSkipped;
+  const expectedPolicySkips = Object.entries(skipReasons).reduce(
+    (total, [reason, count]) =>
+      total + (EXPECTED_POLICY_SKIP_REASONS.has(reason) ? Math.max(0, count) : 0),
+    0,
+  );
+  return Math.max(0, totalSkipped - expectedPolicySkips);
+}
+
 type QualityAction = {
   action_type: string;
   target_fields: string[];
@@ -408,6 +428,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
   const extractionStartRef = useRef<number | null>(null);
   const [now, setNow] = useState(Date.now());
   const [resultSummary, setResultSummary] = useState<{ imported: number; skipped: number; errors: number } | null>(null);
+  const [completedSkipReasons, setCompletedSkipReasons] = useState<Record<string, number> | undefined>();
   const [completedJobId, setCompletedJobId] = useState<string | null>(null);
   // `imported` is the total staged by the scrape. The Review screen only shows
   // rows still awaiting a decision, so keep its count independently.
@@ -676,6 +697,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
     setJobStatus(null);
     setLogs([]);
     setResultSummary(null);
+    setCompletedSkipReasons(undefined);
     pendingReviewCountJobRef.current = null;
     setPendingReviewCount(null);
     setPerformanceSavings(null);
@@ -1305,6 +1327,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
               skipped: doneLog.skipped ?? 0,
               errors: doneLog.errors ?? 0,
             });
+            setCompletedSkipReasons(doneLog.skip_reasons);
             // Capture granular category-landing rejection breakdown if present
             if (doneLog.skip_reasons) {
               const catKeys = Object.keys(doneLog.skip_reasons).filter(k => k.startsWith("category_landing_page_"));
@@ -1490,6 +1513,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
     setLogs([]);
     setProgress(null);
     setResultSummary(null);
+    setCompletedSkipReasons(undefined);
     setUrlFilterWarning(null);
     setRepairCandidates(null);
     setRepairFixApplied(false);
@@ -1597,6 +1621,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
       setActiveJobId(data.jobId);
       setCompletedJobId(null);
       setResultSummary(null);
+      setCompletedSkipReasons(undefined);
       pendingReviewCountJobRef.current = null;
       setPendingReviewCount(null);
       setPerformanceSavings(null);
@@ -1676,6 +1701,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
       setActiveJobId(data.jobId);
       setCompletedJobId(null);
       setResultSummary(null);
+      setCompletedSkipReasons(undefined);
       pendingReviewCountJobRef.current = null;
       setPendingReviewCount(null);
       setPerformanceSavings(null);
@@ -2331,8 +2357,10 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
               </div>
             )}
 
-            {completedJobId && resultSummary && resultSummary.skipped >= 10 &&
-              resultSummary.skipped > Math.max(10, resultSummary.imported * 2) && (
+            {completedJobId && resultSummary &&
+              countSuspiciousSkipped(resultSummary.skipped, completedSkipReasons) >= 10 &&
+              countSuspiciousSkipped(resultSummary.skipped, completedSkipReasons) >
+                Math.max(10, resultSummary.imported * 2) && (
               <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 space-y-2">
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="w-4 h-4 text-amber-700 mt-0.5 shrink-0" />
@@ -2357,7 +2385,9 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                   {recoveringSkipped
                     ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                     : <RotateCcw className="w-3.5 h-3.5 mr-1.5" />}
-                  {recoveringSkipped ? "Starting recovery…" : `Recover ${resultSummary.skipped} skipped courses`}
+                  {recoveringSkipped
+                    ? "Starting recovery…"
+                    : `Recover ${countSuspiciousSkipped(resultSummary.skipped, completedSkipReasons)} suspicious skips`}
                 </Button>
               </div>
             )}

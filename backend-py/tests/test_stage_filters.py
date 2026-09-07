@@ -44,6 +44,8 @@ class TestNameHasDegreeQualifier:
             "Doctor of Business Leadership",
             "Graduate Certificate of Public Health",
             "Graduate Certificate in Information Technology",
+            "Undergraduate Certificate in Cyber Security",
+            "Executive Masters in International Police Leadership",
             "Graduate Diploma of Counselling",
             "Graduate Diploma of Psychology",
             "Diploma of Marketing",
@@ -101,6 +103,7 @@ class TestNameHasDegreeQualifier:
             # "Graduate" alone (not followed by Certificate/Diploma)
             "Graduate courses",
             "Graduate",
+            "Access Charles Sturt Entry",
             "Online Bachelor degrees",
             "Online Masters courses",
             "Online Graduate Certificate courses",
