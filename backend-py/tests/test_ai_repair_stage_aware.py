@@ -16,6 +16,7 @@ from app.services.scraper.ai_repair_agent import (
     _patch_fingerprint,
     _flatten_dotpaths,
     _build_user_message,
+    _evaluate_success,
     PatchValidationError,
 )
 
@@ -88,6 +89,48 @@ class TestValidateAndBuildConfigPatch:
         assert errors == []
         assert extr["fees"]["central_page"] == "https://uni.example.com/fees"
         assert extr["english"]["default_ielts"] == 6.0
+
+
+class TestDiscoverySuccessEvidence:
+    def test_live_zero_of_seven_simulation_overrides_stale_good_drop_rate(self):
+        quality = {
+            "drop_rate": 0,
+            "fee_pct": 100,
+            "ielts_pct": 100,
+            "location_pct": 100,
+            "mode_pct": 100,
+            "degree_level_pct": 100,
+        }
+
+        result = _evaluate_success(
+            quality,
+            {"before": 0, "after": 0, "total": 7, "rescued": []},
+            {},
+            {"drop_rate": 0},
+        )
+
+        assert result["discovery_ok"] is False
+        assert result["criteria_pass"] == 5
+        assert result["overall_ok"] is False
+
+    def test_live_four_of_seven_simulation_confirms_discovery(self):
+        quality = {
+            "drop_rate": 100,
+            "fee_pct": 100,
+            "ielts_pct": 100,
+            "location_pct": 100,
+            "mode_pct": 100,
+            "degree_level_pct": 100,
+        }
+
+        result = _evaluate_success(
+            quality,
+            {"before": 0, "after": 4, "total": 7, "rescued": []},
+            {},
+            {"drop_rate": 100},
+        )
+
+        assert result["discovery_ok"] is True
 
     def test_unknown_recipe_field_rejected(self):
         patches = [

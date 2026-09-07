@@ -573,6 +573,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
   const [aiRepairPolling, setAiRepairPolling] = useState(false);
   const [showAiRepairLog, setShowAiRepairLog] = useState(false);
   const aiRepairRequestRef = useRef(0);
+  const aiRepairAutoRetryArmedRef = useRef(false);
 
   const pollRef = useRef<number | null>(null);
   const logIndexRef = useRef(0);
@@ -1079,6 +1080,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
       }
       const data = await readResponseJson<{ session_id: string; status: string; job_id: string }>(res);
       if (data) {
+        aiRepairAutoRetryArmedRef.current = true;
         const queuedSession: AIRepairSession = {
           session_id:      data.session_id,
           job_id:          completedJobId,
@@ -1472,6 +1474,10 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
     setLogs([]);
     setProgress(null);
     setResultSummary(null);
+    setUrlFilterWarning(null);
+    setRepairCandidates(null);
+    setRepairFixApplied(false);
+    setValidateResult(null);
     pendingReviewCountJobRef.current = null;
     setPendingReviewCount(null);
     setPerformanceSavings(null);
@@ -1500,6 +1506,27 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
       setLogs([{ event: "error", message: String(e) }]); setScraping(false); setPhase("error");
     }
   }, [scraping, scrapeUrl, selectedUni, newUniName, newUniCountry, newUniCity, feePageUrl, requirementsPageUrl, fastMode, pollJobStatus, slotKey]);
+
+  // A non-technical operator should not have to understand that an AI config
+  // repair is separate from proving the next scrape works. A repair started
+  // from this card automatically launches one verification scrape only after
+  // deterministic URL simulation confirms at least half the known URLs pass.
+  useEffect(() => {
+    if (!aiRepairAutoRetryArmedRef.current || aiRepairSession?.status !== "completed") return;
+    const urlAttempt = [...(aiRepairSession.attempts || [])]
+      .reverse()
+      .find(attempt => (attempt.total_test_urls ?? 0) > 0);
+    if (!urlAttempt) return;
+    const total = urlAttempt.total_test_urls ?? 0;
+    const passing = urlAttempt.after_pass_count ?? 0;
+    aiRepairAutoRetryArmedRef.current = false;
+    if (passing < Math.ceil(total * 0.5)) return;
+    toast({
+      title: "URL filter repaired",
+      description: `Validation passed ${passing}/${total} known course URLs. Starting a verification scrape now.`,
+    });
+    void handleStart();
+  }, [aiRepairSession, handleStart, toast]);
 
   const handleStop = useCallback(async () => {
     if (!activeJobId) return;
@@ -1985,11 +2012,9 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                         </div>
                       </div>
                     )}
-                    {selectedUni && !isNaN(parseInt(selectedUni)) && (
-                      <a href={`/universities/${selectedUni}/recipe`} className="inline-flex items-center gap-1 text-[10px] text-blue-600 hover:underline font-semibold">
-                        Fix in Recipe Editor →
-                      </a>
-                    )}
+                    <p className="text-[10px] font-semibold text-amber-800">
+                      No technical editing is required. Use automatic repair below, then retry the scrape.
+                    </p>
                   </>
                 )}
               </div>
@@ -2141,9 +2166,9 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                       return (
                         <div className="space-y-2 pt-1.5 border-t border-amber-200 mt-1.5">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded-full border border-violet-200 shrink-0">OpenAI Fix Agent</span>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded-full border border-violet-200 shrink-0">Automatic repair</span>
                             <span className="text-[10px] text-gray-600 leading-snug">
-                              Diagnoses every active URL gate, tests the complete merged recipe, and applies only a fix that rescues real course URLs.
+                              Checks the URL filters and applies a fix only when real course pages pass validation.
                             </span>
                           </div>
                           <button
@@ -2157,20 +2182,35 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                               : <Bot className="w-3 h-3" />
                             }
                             {aiRepairPolling
-                              ? `OpenAI repairing… attempt ${aiRepairSession?.current_attempt ?? 0}/5`
+                              ? `Repairing… attempt ${aiRepairSession?.current_attempt ?? 0}/5`
                               : aiRepairSession?.status === "completed"
-                              ? "Run OpenAI Agent Again"
-                              : "Run OpenAI Fix Agent"
+                              ? "Check and repair again"
+                              : aiRepairSession?.status === "failed"
+                              ? "Try automatic repair again"
+                              : "Fix automatically and retry"
                             }
                           </button>
-                          {aiRepairSession?.status === "completed" && aiRepairSession.final_verdict && (
-                            <div className="text-[10px] text-green-800 bg-green-50 border border-green-200 rounded px-2 py-1.5">
-                              <strong>OpenAI verdict:</strong> {aiRepairSession.final_verdict}
-                            </div>
-                          )}
+                          {aiRepairSession?.status === "completed" && aiRepairSession.final_verdict && (() => {
+                            const lastAttempt = aiRepairSession.attempts?.[aiRepairSession.attempts.length - 1];
+                            const total = lastAttempt?.total_test_urls ?? 0;
+                            const passing = lastAttempt?.after_pass_count ?? 0;
+                            const filterValidated = total === 0 || passing >= Math.ceil(total * 0.5);
+                            return (
+                              <div className={`text-[10px] rounded px-2 py-1.5 border ${
+                                filterValidated
+                                  ? "text-amber-800 bg-amber-50 border-amber-200"
+                                  : "text-red-800 bg-red-50 border-red-200"
+                              }`}>
+                                <strong>{filterValidated ? "Repair saved:" : "Repair not verified:"}</strong>{" "}
+                                {filterValidated
+                                  ? `${aiRepairSession.final_verdict} Retry the scrape to verify courses are imported.`
+                                  : `Only ${passing}/${total} known course URLs pass. The issue is not fixed.`}
+                              </div>
+                            );
+                          })()}
                           {aiRepairSession?.status === "failed" && (
                             <div className="text-[10px] text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1.5">
-                              <strong>No change applied:</strong> {aiRepairSession.error || "The proposed repair did not pass validation."}
+                              <strong>Automatic repair did not fix the scrape:</strong> {aiRepairSession.error || "The proposed repair did not pass validation."}
                             </div>
                           )}
                           {aiRepairSession?.attempts?.map((attempt) => (
@@ -2190,14 +2230,14 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                 )}
                 {/* URL filter test tool */}
                 {completedJobId && (
-                  <div className={`rounded border p-2 space-y-1.5 ${urlFilterWarning.kind === "category_pages" ? "border-red-200 bg-red-25" : "border-amber-200 bg-white"}`} style={{background: "rgba(255,255,255,0.6)"}}>
+                  <details className={`rounded border p-2 space-y-1.5 ${urlFilterWarning.kind === "category_pages" ? "border-red-200 bg-red-25" : "border-amber-200 bg-white"}`} style={{background: "rgba(255,255,255,0.6)"}}>
                     <button
                       type="button"
                       onClick={() => setShowUrlTestPanel(v => !v)}
                       className="flex items-center gap-1 text-[10px] font-semibold text-gray-600 hover:text-gray-800"
                     >
                       <ChevronDown className={`w-2.5 h-2.5 transition-transform ${showUrlTestPanel ? "rotate-180" : ""}`} />
-                      Test URL Filter — simulate which URLs pass/fail the current config
+                      Advanced technical details
                     </button>
                     {showUrlTestPanel && (
                       <div className="space-y-1.5 pt-1">
@@ -2253,7 +2293,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                         )}
                       </div>
                     )}
-                  </div>
+                  </details>
                 )}
               </div>
             )}

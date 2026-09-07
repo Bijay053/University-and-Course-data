@@ -1436,10 +1436,17 @@ def _evaluate_success(
     not estimates.  ``predicted_fills`` is kept as a helper for qualitative flags
     that only take effect on the next full scrape (e.g. fees_central_page_set).
     """
+    sim_total = int(sim.get("total", 0) or 0)
+    sim_after = int(sim.get("after", 0) or 0)
+    # Current URL evidence is authoritative. A stale job-level drop rate must
+    # never turn a live 0/N gate simulation into a successful repair verdict.
     disc_ok = (
-        quality_after.get("drop_rate", 100) < _DISC_DROP_RATE_OK
-        or (sim.get("total", 0) > 0 and sim.get("after", 0) >= sim["total"] * _DISC_RESCUE_OK)
-        or ctx["drop_rate"] < _DISC_DROP_RATE_OK
+        sim_after >= sim_total * _DISC_RESCUE_OK
+        if sim_total > 0
+        else (
+            quality_after.get("drop_rate", 100) < _DISC_DROP_RATE_OK
+            or ctx["drop_rate"] < _DISC_DROP_RATE_OK
+        )
     )
     fee_ok = (
         quality_after.get("fee_pct", 0) >= _FEE_PCT_OK
@@ -1455,7 +1462,9 @@ def _evaluate_success(
 
     all_flags  = [disc_ok, fee_ok, ielts_ok, loc_ok, mode_ok, degree_ok]
     pass_count = sum(1 for f in all_flags if f)
-    overall_ok = pass_count >= _CRITERIA_PASS_MIN
+    # Discovery is mandatory: five healthy extraction metrics cannot compensate
+    # for a filter that prevents every course page from reaching extraction.
+    overall_ok = pass_count >= _CRITERIA_PASS_MIN and disc_ok
 
     return {
         "discovery_ok":    disc_ok,
@@ -2614,10 +2623,16 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
 
             urls_rescued_enough = sim["total"] > 0 and sim["after"] >= sim["total"] * 0.5
             has_url_patch       = bool(_URL_FILTER_FIELDS.intersection(disc_patch))
-            discovery_now_ok    = (
-                _discovery_phase_done
-                or urls_rescued_enough
-                or (not has_url_patch and ctx["drop_rate"] < 20)
+            # If real dropped URLs were supplied, their current simulation is
+            # the source of truth even when stale pipeline stats previously
+            # marked discovery complete.
+            discovery_now_ok = (
+                urls_rescued_enough
+                if sim["total"] > 0
+                else (
+                    _discovery_phase_done
+                    or (not has_url_patch and ctx["drop_rate"] < 20)
+                )
             )
             extraction_ok = _extraction_quality_ok(quality_after)
 
@@ -2652,6 +2667,19 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
                 break
 
             if not patches_raw and not dup_skipped and not disc_only_blocked:
+                if sim["total"] > 0 and not urls_rescued_enough:
+                    verdict = (
+                        f"Automatic repair failed: only {sim['after']}/{sim['total']} "
+                        "known course URLs pass the active filters. No validated URL "
+                        "filter fix was applied."
+                    )
+                    session.update(
+                        status="failed",
+                        error=verdict,
+                        final_verdict=verdict,
+                        rollback_status="unchanged",
+                    )
+                    break
                 if discovery_now_ok and extraction_ok:
                     verdict = "No issues detected — discovery and extraction quality are both acceptable."
                 elif discovery_now_ok:
@@ -2669,7 +2697,7 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
                 session.update(status="completed", final_verdict=verdict)
                 break
 
-            if extr_patch and not disc_patch:
+            if extr_patch and not disc_patch and discovery_now_ok:
                 extraction_note = (
                     "Extraction quality is acceptable."
                     if extraction_ok
