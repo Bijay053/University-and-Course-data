@@ -237,11 +237,16 @@ _EXTRACT_ANCHORS_JS = r"""
 _FUNNELBACK_API_URL = (
     "https://mqu-search.funnelback.squiz.cloud/s/search.json"
     "?collection=mqu~sp-courses&profile=international"
-    "&query=!padrenull&start_rank=1&num_ranks=500"
+    "&query=!padrenull"
 )
+_FUNNELBACK_PAGE_SIZE = 200
+_FUNNELBACK_MAX_PAGES = 10
 # Minimum result count to trust the Funnelback API response (avoids
 # partial/error responses being treated as a real catalogue).
 _FUNNELBACK_MIN_RESULTS = 50
+_RICH_COURSE_MIN_RESULTS = 200
+_PAGE_DATA_MIN_COVERAGE = 0.80
+_INTERNATIONAL_FEE_MIN_COVERAGE = 0.70
 
 # Concurrent page-data.json fetches — 20 parallel keeps a 338-course
 # fetch under ~30s at ~200ms/request.
@@ -254,6 +259,10 @@ _SCRAPE_DO_UA = (
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/131.0.0.0 Safari/537.36"
 )
+
+
+class MqEnrichmentCoverageError(RuntimeError):
+    """MQ catalogue links were found but structured international data was not."""
 
 
 def _page_data_url(live_url: str) -> str:
@@ -406,8 +415,10 @@ def _build_scrapy_result(
                 fee_val = float(raw_fee)
                 payload["international_fee"] = fee_val
                 payload["fee_term"] = "Year"
-                payload["fee_year"] = "2026"
                 payload["currency"] = "AUD"
+                fee_year = fee_item.get("fee_year") or fee_item.get("year")
+                if fee_year:
+                    payload["fee_year"] = str(fee_year)
                 evidence.append(_ev(
                     "international_fee", fee_val, "page_data:fees",
                     page_data_url_str, "course",
@@ -540,8 +551,8 @@ async def _discover_from_funnelback_api(
 
     Steps
     -----
-    1. Fetch the Funnelback JSON API endpoint via Scrape.do (render=False,
-       residential proxy bypasses Cloudflare on the squiz.cloud host).
+    1. Fetch the Funnelback JSON API endpoint via Scrape.do (render=True,
+       required to bypass Cloudflare on the squiz.cloud host).
        Falls back to plain httpx with a browser UA when Scrape.do is
        unavailable.
     2. Parse ``response.resultPacket.results`` → list of courses with
@@ -561,69 +572,116 @@ async def _discover_from_funnelback_api(
 
     await emit_fn("[DISCOVER] MQ: Tier 0 — Funnelback API fetch")
 
-    # ── Step 1: Fetch Funnelback search JSON ────────────────────────────
-    fb_body: str | None = None
-
-    # Try scrape.do first (residential proxy bypasses CF from any IP).
+    # ── Steps 1-2: Fetch and parse every Funnelback result page ─────────
+    # Funnelback caps num_ranks at 200 even when a larger value is supplied.
+    # A single request therefore silently loses roughly half of MQ's catalogue.
+    results: list[dict] = []
+    seen_urls: set[str] = set()
     try:
         from app.services.scraper.http_fetcher import fetch_html_scrape_do
-        fb_body = await fetch_html_scrape_do(
-            _FUNNELBACK_API_URL,
-            render=False,
-            rate_limit=False,  # discovery phase — exempt from fleet limiter
-            max_retries=1,
-        )
-    except Exception as _exc:  # noqa: BLE001
-        log.debug("mq funnelback: scrape.do fetch failed: %s", _exc)
+    except Exception:  # noqa: BLE001
+        fetch_html_scrape_do = None
 
-    # Fallback: plain httpx (works from prod server where IP isn't blocked).
-    if not fb_body:
+    for page_index in range(_FUNNELBACK_MAX_PAGES):
+        start_rank = 1 + page_index * _FUNNELBACK_PAGE_SIZE
+        page_url = (
+            f"{_FUNNELBACK_API_URL}&start_rank={start_rank}"
+            f"&num_ranks={_FUNNELBACK_PAGE_SIZE}"
+        )
+        fb_body: str | None = None
+
+        if fetch_html_scrape_do is not None:
+            try:
+                fb_body = await fetch_html_scrape_do(
+                    page_url,
+                    render=True,
+                    rate_limit=False,  # discovery phase — exempt from fleet limiter
+                    max_retries=1,
+                )
+            except Exception as _exc:  # noqa: BLE001
+                log.debug(
+                    "mq funnelback: scrape.do page %d failed: %s",
+                    page_index + 1,
+                    _exc,
+                )
+
+        # Fallback: plain httpx (works from prod server where IP isn't blocked).
+        if not fb_body:
+            try:
+                async with _httpx.AsyncClient(
+                    headers={"User-Agent": _SCRAPE_DO_UA},
+                    follow_redirects=True,
+                    timeout=30.0,
+                ) as client:
+                    r = await client.get(page_url)
+                    if r.status_code == 200:
+                        fb_body = r.text
+                    else:
+                        log.warning(
+                            "mq funnelback: httpx page %d fallback → HTTP %s",
+                            page_index + 1,
+                            r.status_code,
+                        )
+            except Exception as _exc:  # noqa: BLE001
+                log.warning(
+                    "mq funnelback: httpx page %d fallback failed: %s",
+                    page_index + 1,
+                    _exc,
+                )
+
+        if not fb_body:
+            message = (
+                "Macquarie Funnelback catalogue page "
+                f"{page_index + 1} (start_rank={start_rank}) was unreachable. "
+                "Refusing to supplement with domestic-default HTML."
+            )
+            await emit_fn(f"[DISCOVER] MQ: ERROR — {message}")
+            raise MqEnrichmentCoverageError(message)
+
         try:
-            async with _httpx.AsyncClient(
-                headers={"User-Agent": _SCRAPE_DO_UA},
-                follow_redirects=True,
-                timeout=30.0,
-            ) as client:
-                r = await client.get(_FUNNELBACK_API_URL)
-                if r.status_code == 200:
-                    fb_body = r.text
-                else:
-                    log.warning(
-                        "mq funnelback: httpx fallback → HTTP %s", r.status_code
-                    )
+            fb_data = json.loads(fb_body)
+            page_results = (
+                fb_data
+                .get("response", {})
+                .get("resultPacket", {})
+                .get("results", [])
+            )
         except Exception as _exc:  # noqa: BLE001
-            log.warning("mq funnelback: httpx fallback failed: %s", _exc)
+            message = (
+                "Macquarie Funnelback catalogue page "
+                f"{page_index + 1} returned invalid JSON ({_exc}). "
+                "Refusing to supplement with domestic-default HTML."
+            )
+            await emit_fn(f"[DISCOVER] MQ: ERROR — {message}")
+            raise MqEnrichmentCoverageError(message)
 
-    if not fb_body:
-        await emit_fn(
-            "[DISCOVER] MQ: Tier 0 — Funnelback API unreachable; "
-            "falling through to coursehandbook sitemap"
-        )
-        return []
+        added = 0
+        for result in page_results:
+            live_url = (result.get("liveUrl") or "").strip()
+            if not live_url or live_url in seen_urls:
+                continue
+            seen_urls.add(live_url)
+            results.append(result)
+            added += 1
 
-    # ── Step 2: Parse the JSON response ─────────────────────────────────
-    try:
-        fb_data = json.loads(fb_body)
-        results = (
-            fb_data
-            .get("response", {})
-            .get("resultPacket", {})
-            .get("results", [])
-        )
-    except Exception as _exc:  # noqa: BLE001
-        await emit_fn(
-            f"[DISCOVER] MQ: Tier 0 — Funnelback JSON parse error: {_exc}; "
-            "falling through"
-        )
-        return []
+        if added == 0 and page_results:
+            message = (
+                "Macquarie Funnelback pagination repeated an earlier page at "
+                f"start_rank={start_rank}. Refusing a partial catalogue."
+            )
+            await emit_fn(f"[DISCOVER] MQ: ERROR — {message}")
+            raise MqEnrichmentCoverageError(message)
+        if len(page_results) < _FUNNELBACK_PAGE_SIZE:
+            break
 
     if len(results) < _FUNNELBACK_MIN_RESULTS:
-        await emit_fn(
-            f"[DISCOVER] MQ: Tier 0 — only {len(results)} results "
-            f"(expected ≥{_FUNNELBACK_MIN_RESULTS}); possible API error; "
-            "falling through"
+        message = (
+            f"Macquarie Funnelback returned only {len(results)} raw results "
+            f"(required at least {_FUNNELBACK_MIN_RESULTS}). Refusing to "
+            "supplement with domestic-default HTML."
         )
-        return []
+        await emit_fn(f"[DISCOVER] MQ: ERROR — {message}")
+        raise MqEnrichmentCoverageError(message)
 
     await emit_fn(
         f"[DISCOVER] MQ: Tier 0 — Funnelback returned {len(results)} courses; "
@@ -638,9 +696,9 @@ async def _discover_from_funnelback_api(
         meta = r.get("metaData") or {}
         if not live_url or not title:
             continue
-        # Only keep URLs that are real admissions course pages.
-        parsed_path = live_url.replace("https://www.mq.edu.au", "")
-        if not _SEARCH_COURSE_LINK_RE.match(parsed_path):
+        # Only keep real admissions course pages. This also rejects majors and
+        # specialisations, which have no standalone fee or qualification.
+        if not _is_mq_course_url(live_url):
             continue
         course_triples.append((live_url, title, meta))
 
@@ -648,6 +706,14 @@ async def _discover_from_funnelback_api(
         f"[DISCOVER] MQ: Tier 0 — {len(course_triples)} valid course URLs "
         f"(filtered from {len(results)} Funnelback results)"
     )
+    if len(course_triples) < _RICH_COURSE_MIN_RESULTS:
+        message = (
+            f"Macquarie Funnelback yielded only {len(course_triples)} degree "
+            f"courses after filtering (required at least "
+            f"{_RICH_COURSE_MIN_RESULTS}). Refusing a partial catalogue."
+        )
+        await emit_fn(f"[DISCOVER] MQ: ERROR — {message}")
+        raise MqEnrichmentCoverageError(message)
 
     # ── Step 3: Concurrently fetch page-data.json ────────────────────────
     sem = asyncio.Semaphore(_PAGE_DATA_PARALLEL)
@@ -682,7 +748,8 @@ async def _discover_from_funnelback_api(
         f"{plain_ok}/{len(course_triples)} succeeded"
     )
 
-    # Retry CF-blocked courses via Scrape.do (render=False).
+    # Retry CF-blocked courses via rendered Scrape.do. Static proxy requests
+    # return ROTATION_FAILED/challenge responses for the MQ domain.
     missing_urls = [
         url for url, _, _ in course_triples if url not in programs
     ]
@@ -695,7 +762,7 @@ async def _discover_from_funnelback_api(
                 pd_url = _page_data_url(url)
                 try:
                     body = await fetch_html_scrape_do(
-                        pd_url, render=False, rate_limit=False, max_retries=1,
+                        pd_url, render=True, rate_limit=False, max_retries=1,
                     )
                     if body:
                         prog = _extract_program_from_page_data(body)
@@ -712,6 +779,20 @@ async def _discover_from_funnelback_api(
         except Exception as _exc:  # noqa: BLE001
             log.debug("mq funnelback: scrape.do page-data retry unavailable: %s", _exc)
 
+    page_data_coverage = (
+        len(programs) / len(course_triples) if course_triples else 0.0
+    )
+    if page_data_coverage < _PAGE_DATA_MIN_COVERAGE:
+        message = (
+            "Macquarie structured page-data coverage is too low "
+            f"({len(programs)}/{len(course_triples)}, "
+            f"{page_data_coverage:.0%}; required "
+            f"{_PAGE_DATA_MIN_COVERAGE:.0%}). Refusing to stage "
+            "domestic-default course data."
+        )
+        await emit_fn(f"[DISCOVER] MQ: ERROR — {message}")
+        raise MqEnrichmentCoverageError(message)
+
     # ── Step 4: Build scrapy_result links ───────────────────────────────
     links: list[dict] = []
     for url, name, meta in course_triples[:max_courses]:
@@ -722,6 +803,22 @@ async def _discover_from_funnelback_api(
             "url": url,
             "scrapy_result": scrapy_result,
         })
+
+    fee_count = sum(
+        1
+        for link in links
+        if link["scrapy_result"]["payload"].get("international_fee") is not None
+    )
+    fee_coverage = fee_count / len(links) if links else 0.0
+    if fee_coverage < _INTERNATIONAL_FEE_MIN_COVERAGE:
+        message = (
+            "Macquarie international-fee coverage is too low "
+            f"({fee_count}/{len(links)}, {fee_coverage:.0%}; required "
+            f"{_INTERNATIONAL_FEE_MIN_COVERAGE:.0%}). Refusing to stage "
+            "a misleading low-fee catalogue."
+        )
+        await emit_fn(f"[DISCOVER] MQ: ERROR — {message}")
+        raise MqEnrichmentCoverageError(message)
 
     await emit_fn(
         f"[DISCOVER] MQ: Tier 0 — Funnelback API complete: "
@@ -1697,6 +1794,8 @@ async def browser_discover_mq(
         fb_links = await _discover_from_funnelback_api(
             _emit, max_courses=max_courses,
         )
+    except MqEnrichmentCoverageError:
+        raise
     except Exception as _fb_exc:  # noqa: BLE001
         log.warning(
             "mq_browser_discover: Funnelback API tier raised: %s", _fb_exc,

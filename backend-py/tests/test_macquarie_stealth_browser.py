@@ -63,23 +63,22 @@ def test_mq_yaml_file_exists():
     assert _MQ_YAML.exists(), f"Expected MQ config at {_MQ_YAML}"
 
 
-def test_mq_yaml_uses_rendered_funnelback_api():
+def test_mq_yaml_routes_to_dedicated_rich_provider():
     data = yaml.safe_load(_MQ_YAML.read_text())
     discovery = data.get("discovery") or {}
-    api = discovery.get("generic_search_api") or {}
-    assert api.get("fetch_via_scrape_do") is True
-    assert api.get("scrape_do_render") is True
+    assert discovery.get("generic_search_api") is None
+    assert discovery.get("skip_browser_discovery") is True
 
 
 def test_mq_yaml_skips_browser_discovery():
-    """The rendered Funnelback API replaces the older stealth-browser path."""
+    """The dedicated Funnelback provider replaces the older browser sweep."""
     data = yaml.safe_load(_MQ_YAML.read_text())
     discovery = data.get("discovery") or {}
     assert discovery.get("skip_browser_discovery") is True
     assert discovery.get("use_stealth_browser") in (None, False)
 
 
-def test_mq_loaded_uni_config_uses_rendered_api_not_stealth():
+def test_mq_loaded_uni_config_uses_dedicated_provider_not_stealth():
     """End-to-end: the loaded config must expose the current MQ transport."""
     cfg = load_uni_config(
         slug="mq",
@@ -88,9 +87,17 @@ def test_mq_loaded_uni_config_uses_rendered_api_not_stealth():
     )
     assert cfg.discovery.skip_browser_discovery is True
     assert cfg.discovery.use_stealth_browser is False
-    assert cfg.discovery.generic_search_api is not None
-    assert cfg.discovery.generic_search_api.fetch_via_scrape_do is True
-    assert cfg.discovery.generic_search_api.scrape_do_render is True
+    assert cfg.discovery.generic_search_api is None
+
+
+def test_mq_dedicated_provider_precedes_cache_and_auto_config():
+    orchestrator = (
+        Path(__file__).resolve().parents[1]
+        / "app" / "services" / "scraper" / "orchestrator.py"
+    ).read_text()
+    assert "or _is_mq_host" in orchestrator
+    assert "and not _is_mq_host" in orchestrator
+    assert "except MqEnrichmentCoverageError" in orchestrator
 
 
 def test_other_uni_config_does_not_enable_stealth():

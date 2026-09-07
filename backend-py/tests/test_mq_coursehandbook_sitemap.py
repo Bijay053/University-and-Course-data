@@ -217,6 +217,317 @@ class TestEarlyReturnFloor:
         ), f"Widget sweep should have started; emits: {emits}"
 
 
+class TestFunnelbackRichProvider:
+    @pytest.mark.asyncio
+    async def test_uses_rendered_transport_maps_fee_and_filters_subdegrees(
+        self, monkeypatch,
+    ):
+        import httpx
+        import json
+        import app.services.scraper.http_fetcher as http_fetcher
+
+        results = [
+            {
+                "title": f"Bachelor of Test {i}",
+                "liveUrl": (
+                    "https://www.mq.edu.au/study/find-a-course/"
+                    f"courses/course-{i}"
+                ),
+                "metaData": {
+                    "studyLevel": "Undergraduate",
+                    "courseDuration": "3 years",
+                },
+            }
+            for i in range(48)
+        ]
+        results.extend([
+            {
+                "title": "Major in Test",
+                "liveUrl": (
+                    "https://www.mq.edu.au/study/find-a-course/"
+                    "courses/major/test"
+                ),
+                "metaData": {},
+            },
+            {
+                "title": "Specialisation in Test",
+                "liveUrl": (
+                    "https://www.mq.edu.au/study/find-a-course/"
+                    "courses/specialisation/test"
+                ),
+                "metaData": {},
+            },
+        ])
+        funnelback_body = json.dumps({
+            "response": {"resultPacket": {"results": results}},
+        })
+        page_data_body = json.dumps({
+            "result": {
+                "data": {
+                    "current": {
+                        "fields": {
+                            "json": json.dumps({
+                                "fees": [{
+                                    "fee_type": {"label": "International"},
+                                    "estimated_annual_fee": "43200",
+                                }],
+                                "ielts_overall_score": "6.5",
+                            }),
+                        },
+                    },
+                },
+            },
+        })
+        calls = []
+
+        async def fake_scrape_do(url, **kwargs):
+            calls.append((url, kwargs))
+            if "s/search.json" in url:
+                return funnelback_body
+            return page_data_body
+
+        class FakeResponse:
+            status_code = 403
+            text = ""
+
+        class FakeClient:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def get(self, *args, **kwargs):
+                return FakeResponse()
+
+        monkeypatch.setattr(
+            http_fetcher, "fetch_html_scrape_do", fake_scrape_do,
+        )
+        monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
+        monkeypatch.setattr(mq, "_RICH_COURSE_MIN_RESULTS", 1)
+
+        async def emit(*args, **kwargs):
+            return None
+
+        links = await mq._discover_from_funnelback_api(
+            emit, max_courses=100,
+        )
+
+        assert len(links) == 48
+        assert all(call[1]["render"] is True for call in calls)
+        assert all(
+            "/major/" not in link["url"]
+            and "/specialisation/" not in link["url"]
+            for link in links
+        )
+        payload = links[0]["scrapy_result"]["payload"]
+        assert payload["international_fee"] == 43200.0
+        assert payload["ielts_overall"] == 6.5
+
+    @pytest.mark.asyncio
+    async def test_paginates_past_funnelback_two_hundred_result_cap(
+        self, monkeypatch,
+    ):
+        import httpx
+        import json
+        import app.services.scraper.http_fetcher as http_fetcher
+
+        requested_starts = []
+        page_data_body = json.dumps({
+            "result": {
+                "data": {
+                    "current": {
+                        "fields": {
+                            "json": json.dumps({
+                                "fees": [{
+                                    "fee_type": {"label": "International"},
+                                    "estimated_annual_fee": "43200",
+                                }],
+                            }),
+                        },
+                    },
+                },
+            },
+        })
+
+        def make_results(start, count):
+            return [
+                {
+                    "title": f"Bachelor of Test {i}",
+                    "liveUrl": (
+                        "https://www.mq.edu.au/study/find-a-course/"
+                        f"courses/course-{i}"
+                    ),
+                    "metaData": {},
+                }
+                for i in range(start, start + count)
+            ]
+
+        async def fake_scrape_do(url, **kwargs):
+            if "s/search.json" not in url:
+                return page_data_body
+            if "start_rank=1&" in url:
+                requested_starts.append(1)
+                rows = make_results(0, 200)
+            elif "start_rank=201&" in url:
+                requested_starts.append(201)
+                rows = make_results(200, 175)
+            else:
+                raise AssertionError(f"Unexpected Funnelback page: {url}")
+            return json.dumps({
+                "response": {"resultPacket": {"results": rows}},
+            })
+
+        class FakeResponse:
+            status_code = 403
+            text = ""
+
+        class FakeClient:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def get(self, *args, **kwargs):
+                return FakeResponse()
+
+        async def emit(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(
+            http_fetcher, "fetch_html_scrape_do", fake_scrape_do,
+        )
+        monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
+
+        links = await mq._discover_from_funnelback_api(
+            emit, max_courses=500,
+        )
+
+        assert requested_starts == [1, 201]
+        assert len(links) == 375
+
+    @pytest.mark.asyncio
+    async def test_fails_closed_when_page_data_enrichment_is_missing(
+        self, monkeypatch,
+    ):
+        import httpx
+        import json
+        import app.services.scraper.http_fetcher as http_fetcher
+
+        rows = [
+            {
+                "title": f"Bachelor of Test {i}",
+                "liveUrl": (
+                    "https://www.mq.edu.au/study/find-a-course/"
+                    f"courses/course-{i}"
+                ),
+                "metaData": {},
+            }
+            for i in range(50)
+        ]
+
+        async def fake_scrape_do(url, **kwargs):
+            if "s/search.json" in url:
+                return json.dumps({
+                    "response": {"resultPacket": {"results": rows}},
+                })
+            return None
+
+        class FakeResponse:
+            status_code = 403
+            text = ""
+
+        class FakeClient:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def get(self, *args, **kwargs):
+                return FakeResponse()
+
+        async def emit(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(
+            http_fetcher, "fetch_html_scrape_do", fake_scrape_do,
+        )
+        monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
+        monkeypatch.setattr(mq, "_RICH_COURSE_MIN_RESULTS", 1)
+
+        with pytest.raises(mq.MqEnrichmentCoverageError, match="page-data coverage"):
+            await mq._discover_from_funnelback_api(emit, max_courses=100)
+
+    @pytest.mark.asyncio
+    async def test_fails_closed_when_second_funnelback_page_is_unreachable(
+        self, monkeypatch,
+    ):
+        import httpx
+        import json
+        import app.services.scraper.http_fetcher as http_fetcher
+
+        rows = [
+            {
+                "title": f"Bachelor of Test {i}",
+                "liveUrl": (
+                    "https://www.mq.edu.au/study/find-a-course/"
+                    f"courses/course-{i}"
+                ),
+                "metaData": {},
+            }
+            for i in range(200)
+        ]
+
+        async def fake_scrape_do(url, **kwargs):
+            if "start_rank=1&" in url:
+                return json.dumps({
+                    "response": {"resultPacket": {"results": rows}},
+                })
+            return None
+
+        class FakeResponse:
+            status_code = 403
+            text = ""
+
+        class FakeClient:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def get(self, *args, **kwargs):
+                return FakeResponse()
+
+        async def emit(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(
+            http_fetcher, "fetch_html_scrape_do", fake_scrape_do,
+        )
+        monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
+
+        with pytest.raises(
+            mq.MqEnrichmentCoverageError,
+            match=r"page 2 .* was unreachable",
+        ):
+            await mq._discover_from_funnelback_api(emit, max_courses=500)
+
+
 @pytest.mark.skipif(
     os.environ.get("MQ_LIVE_TEST") != "1",
     reason="MQ live test requires MQ_LIVE_TEST=1 (hits real network)",

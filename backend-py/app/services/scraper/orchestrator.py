@@ -1928,6 +1928,12 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             False if _targeted_retry
             else getattr(_uni_cfg.discovery, "always_browser_discover", False)
         )
+        try:
+            from urllib.parse import urlparse as _urlparse
+            _discovery_hostname = (_urlparse(scrape_url).hostname or "").lower()
+        except Exception:  # noqa: BLE001
+            _discovery_hostname = ""
+        _is_mq_host = _discovery_hostname in {"mq.edu.au", "www.mq.edu.au"}
 
         # ── C1 (fetch-layer brief): 7-day discovery URL cache ────────────────
         # A fresh discovery pass (BFS crawl + sitemap probes + browser + Wayback)
@@ -1977,6 +1983,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             or getattr(_uni_cfg.discovery, "algolia", None) is not None
             or getattr(_uni_cfg.discovery, "tafensw_api", None) is not None
             or getattr(_uni_cfg.discovery, "melbournepolytechnic_api", None) is not None
+            or _is_mq_host
         )
         if (
             not _targeted_retry
@@ -2736,7 +2743,12 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # handled it (the YAML searchstax block above sets links if non-empty).
         # This is what makes "enter URL → autonomous scrape" work for any
         # university whose site embeds a known search API — no YAML required.
-        if not links and not _archive_only and uni_scrape_config:
+        if (
+            not links
+            and not _archive_only
+            and not _is_mq_host
+            and uni_scrape_config
+        ):
             _auto_cfg = uni_scrape_config.get("auto_config") or {}
             _auto_provider = _auto_cfg.get("_api_provider", "")
             _auto_endpoint = _auto_cfg.get("_api_endpoint_hint", "")
@@ -2835,15 +2847,10 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Use canonical hostname parsing (not substring matching) so a URL
         # like "https://example.com/?ref=mq.edu.au" can't accidentally
         # trigger the MQ branch.
-        try:
-            from urllib.parse import urlparse as _urlparse
-            _mq_hostname = (_urlparse(scrape_url).hostname or "").lower()
-        except Exception:  # noqa: BLE001
-            _mq_hostname = ""
-        _is_mq_host = _mq_hostname in {"mq.edu.au", "www.mq.edu.au"}
         if not links and _is_mq_host:
             try:
                 from app.services.scraper.mq_browser_discover import (
+                    MqEnrichmentCoverageError,
                     browser_discover_mq,
                     _DISCOVERY_FLOOR as _MQ_DISCOVERY_FLOOR,
                 )
@@ -2895,6 +2902,16 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                             "[MQ DISCOVERY] Failed to persist below-floor "
                             "alert: %s", _mq_alert_exc,
                         )
+            except MqEnrichmentCoverageError as _mq_coverage_exc:
+                log.error(
+                    "[MQ DISCOVERY] Structured international-data coverage "
+                    "gate failed: %s",
+                    _mq_coverage_exc,
+                )
+                job.status = "failed"
+                job.error_message = str(_mq_coverage_exc)
+                await db.commit()
+                return
             except Exception as _mq_disc_exc:  # noqa: BLE001
                 log.warning(
                     "MQ browser discovery failed: %s — falling back to BFS",
