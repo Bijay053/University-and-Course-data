@@ -14,3 +14,9 @@ CDU's yearless `/study/course/...` route can omit the international fee block. N
 **Why:** The same course returned no fee without a query but included its official annual international tuition at `?year=<current year>`.
 
 **How to apply:** Add the current catalogue year at the shared extraction entry point when a CDU course URL has no existing `year` query; preserve an explicit year unchanged.
+
+CDU duration is authoritative only from the current course's international `block-course-key-fact-duration` child.
+
+**Why:** The generic parser selected “0.5 year of prior study” from admission requirements and then correctly nullified it against the bachelor floor, leaving valid durations blank.
+
+**How to apply:** Parse the international full-time year value from the key-details duration block, ignore domestic/related-course values, and exempt this direct source from the generic bachelor minimum-duration floor.

@@ -9025,10 +9025,21 @@ async def extract_course(
                 and _dur_term == "year"
                 and 0.9 <= _dur_years <= 1.25
             )
+            # CDU's audience-scoped Key details duration is direct,
+            # current-course evidence. Trust it over the generic bachelor
+            # floor, which exists to reject unrelated short durations from
+            # admissions prose and related-course cards.
+            _has_cdu_duration_authority = any(
+                ev.get("field_key") == "duration"
+                and ev.get("method") == "cdu_static"
+                and ev.get("value") not in (None, "", 0, [])
+                for ev in evidence
+            )
             _bachelor_floor_breach = (
                 _is_bachelor_only
                 and not _is_honours_one_year
                 and not _is_topup_one_year
+                and not _has_cdu_duration_authority
                 and 0 < _dur_years < 2.0
             )
             if _dur_years > _SUSPICIOUS_MAX or _dur_years < 0.25 or _bachelor_floor_breach:

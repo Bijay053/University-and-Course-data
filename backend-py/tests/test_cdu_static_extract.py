@@ -4,9 +4,17 @@ from app.services.scraper.cdu_static_extract import (
 )
 
 
-def _html(*, fee: str, location: str) -> str:
+def _html(*, fee: str, location: str, duration: str = "3") -> str:
     return f"""
     <html><body>
+      <div class="block-course-key-fact-duration">
+        <div data-student-type="domestic">
+          <div>6 year/s part-time</div>
+        </div>
+        <div data-student-type="international">
+          <div>{duration} year/s full-time</div>
+        </div>
+      </div>
       <div class="block-course-key-fact-location">
         <div data-student-type="domestic">Wrong campus, Online</div>
         <div data-student-type="international">{location}</div>
@@ -24,7 +32,11 @@ def _html(*, fee: str, location: str) -> str:
       </details>
       <div class="related-course">
         <div data-student-type="international">Unrelated campus</div>
+        <div class="block-course-key-fact-duration">
+          <div data-student-type="international">0.5 year/s full-time</div>
+        </div>
       </div>
+      <p>Entry requires successful completion of 0.5 year of prior study.</p>
     </body></html>
     """
 
@@ -41,6 +53,8 @@ def test_cdu_uses_current_course_international_fee_and_location() -> None:
         "currency": "AUD",
         "course_location": "CDU Sydney, Casuarina campus",
         "study_mode": "On Campus",
+        "duration": 3.0,
+        "duration_term": "Year",
     }
 
 
@@ -70,7 +84,22 @@ def test_cdu_missing_international_values_fail_blank_not_domestic() -> None:
         "international_fee": None,
         "course_location": None,
         "study_mode": None,
+        "duration": None,
+        "duration_term": None,
     }
+
+
+def test_cdu_preserves_authoritative_one_year_graduate_entry_duration() -> None:
+    result = apply_cdu_static_extraction(
+        "https://www.cdu.edu.au/study/course/bachelor-psychological-science-graduate-entry-wpsyg2?year=2026",
+        _html(
+            fee="33,208",
+            location="Casuarina campus",
+            duration="1",
+        ),
+    )
+    assert result["duration"] == 1.0
+    assert result["duration_term"] == "Year"
 
 
 def test_cdu_course_url_gets_catalogue_year_without_losing_query() -> None:

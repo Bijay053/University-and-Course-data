@@ -16,6 +16,10 @@ _ANNUAL_FEE_RE = re.compile(
     r"(?P<amount>\d[\d,]*(?:\.\d{1,2})?)",
     re.IGNORECASE,
 )
+_FULL_TIME_YEARS_RE = re.compile(
+    r"(?P<years>\d+(?:\.\d+)?)\s*year(?:/s|s)?\s*full[\s-]*time",
+    re.IGNORECASE,
+)
 
 
 def is_cdu_url(url: str) -> bool:
@@ -84,8 +88,25 @@ def _location_and_mode(soup: BeautifulSoup) -> tuple[str | None, str | None]:
     return ", ".join(physical) or None, mode
 
 
+def _duration(soup: BeautifulSoup) -> dict[str, Any]:
+    block = soup.select_one(
+        '.block-course-key-fact-duration [data-student-type="international"]'
+    )
+    if block is None:
+        return {}
+
+    text = " ".join(block.get_text(" ", strip=True).split())
+    match = _FULL_TIME_YEARS_RE.search(text)
+    if not match:
+        return {}
+    return {
+        "duration": float(match.group("years")),
+        "duration_term": "Year",
+    }
+
+
 def apply_cdu_static_extraction(url: str, html: str) -> dict[str, Any]:
-    """Return CDU fee/location values scoped to the current international course."""
+    """Return CDU fields scoped to the current international course."""
     if not is_cdu_url(url) or not html:
         return {}
 
@@ -97,6 +118,9 @@ def apply_cdu_static_extraction(url: str, html: str) -> dict[str, Any]:
         "international_fee": None,
         "course_location": location,
         "study_mode": mode,
+        "duration": None,
+        "duration_term": None,
     }
     result.update(_fee(soup))
+    result.update(_duration(soup))
     return result
