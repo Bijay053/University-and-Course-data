@@ -33,6 +33,14 @@ discovery:
     facet_filter: "tags:available-for:international-students"
     url_field: coursePageUrl
     name_field: title
+    # The public international catalogue carries the authoritative values that
+    # the detail page's domestic-default fee panel does not render.
+    payload_fields:
+      - internationalFees
+      - duration
+      - intakeSessions
+      - campuses
+      - cricosCode
     hits_per_page: 100
 
   # WSU pages are not CF-blocked — plain httpx works fine.

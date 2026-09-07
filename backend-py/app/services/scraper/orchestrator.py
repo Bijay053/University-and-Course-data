@@ -928,6 +928,17 @@ async def _extract_only(
             "error_reason": str(exc) or type(exc).__name__,
         }
 
+    # Algolia can carry authoritative international-catalogue metadata alongside
+    # a discovery link. Merge it only after the full HTML/AI pipeline so the
+    # provider corrects WSU's domestic-default fee panel and noisy AI durations.
+    _algolia_payload = link.get("payload")
+    if isinstance(_algolia_payload, dict):
+        try:
+            from app.services.scraper.algolia_provider import merge_algolia_payload
+            out = merge_algolia_payload(out, _algolia_payload, url=url)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("[ALGOLIA] provider payload merge failed for %s: %s", url, exc)
+
     # Save the final HTML snapshot + original extraction result.
     # Fires after extract_course() succeeds — only the winning HTML is saved,
     # not retries or intermediate fallbacks.

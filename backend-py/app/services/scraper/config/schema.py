@@ -398,6 +398,14 @@ class AlgoliaDiscoveryConfig(BaseModel):
         default="title",
         description="Hit field containing the course name.",
     )
+    payload_fields: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Additional hit fields to preserve as authoritative provider metadata "
+            "for the normal per-course extraction pipeline. Payload-bearing links "
+            "are intentionally excluded from the discovery URL cache."
+        ),
+    )
     hits_per_page: int = Field(
         default=100,
         description="Results per Algolia page (max Algolia allows is 1000).",
