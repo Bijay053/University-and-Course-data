@@ -10,6 +10,7 @@ from app.routers.universities import (
     _campus_page_links,
     _campus_page_location,
     _contains_encoded_html_entity,
+    _country_from_hostname,
     _decode_metadata_text,
     _extract_structured_locations,
     _metadata_title_segments,
@@ -205,6 +206,11 @@ def test_known_jcu_domain_has_authoritative_official_name() -> None:
 
 def test_known_unsw_domain_has_authoritative_official_name() -> None:
     assert _HOSTNAME_OFFICIAL_NAMES["unsw.edu.au"] == "UNSW Sydney"
+
+
+def test_monash_dot_edu_is_authoritatively_australian() -> None:
+    assert _country_from_hostname("www.monash.edu") == "Australia"
+    assert _country_from_hostname("www.example.edu") == "United States"
 
 
 def test_campus_index_allows_equivalent_institution_subdomain() -> None:

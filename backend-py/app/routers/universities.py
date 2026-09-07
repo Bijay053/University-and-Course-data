@@ -48,6 +48,27 @@ _COUNTRY_CODE_NAMES = {
     "SG": "Singapore",
     "US": "United States",
 }
+_TLD_COUNTRY_NAMES = {
+    ".edu.au": "Australia",
+    ".ac.au": "Australia",
+    ".ac.uk": "United Kingdom",
+    ".co.uk": "United Kingdom",
+    ".edu.nz": "New Zealand",
+    ".ac.nz": "New Zealand",
+    ".edu": "United States",
+    ".ca": "Canada",
+    ".ie": "Ireland",
+    ".de": "Germany",
+    ".nl": "Netherlands",
+    ".sg": "Singapore",
+    ".my": "Malaysia",
+    ".hk": "Hong Kong",
+}
+_HOSTNAME_COUNTRY_NAMES = {
+    # Monash is an Australian university whose canonical site uses .edu rather
+    # than .edu.au. The generic .edu rule must not classify it as American.
+    "monash.edu": "Australia",
+}
 
 _INSTITUTION_KEYWORDS = re.compile(
     r"\b(university|université|universität|universiteit|institute|"
@@ -65,6 +86,22 @@ _GENERIC_TITLE_SEGMENTS = {
 def _normalise_metadata_country(value: str) -> str:
     cleaned = _decode_metadata_text(value).strip(" ,.")
     return _COUNTRY_CODE_NAMES.get(cleaned.upper(), cleaned)
+
+
+def _country_from_hostname(hostname: str) -> str:
+    institution_domain = _institution_domain(hostname)
+    known_country = _HOSTNAME_COUNTRY_NAMES.get(institution_domain)
+    if known_country:
+        return known_country
+    normalized = (hostname or "").strip().casefold()
+    return next(
+        (
+            country
+            for suffix, country in _TLD_COUNTRY_NAMES.items()
+            if normalized.endswith(suffix)
+        ),
+        "Unknown",
+    )
 
 
 _NON_LOCALITY_LABELS = frozenset({
@@ -1534,24 +1571,7 @@ async def add_university_by_url(
     city: str = "Unknown"
     discovered_locations: list[dict[str, str | float | None]] = []
 
-    # Country from TLD
-    tld_country: dict[str, str] = {
-        ".edu.au": "Australia", ".ac.au": "Australia",
-        ".ac.uk": "United Kingdom", ".co.uk": "United Kingdom",
-        ".edu.nz": "New Zealand", ".ac.nz": "New Zealand",
-        ".edu": "United States",
-        ".ca": "Canada",
-        ".ie": "Ireland",
-        ".de": "Germany",
-        ".nl": "Netherlands",
-        ".sg": "Singapore",
-        ".my": "Malaysia",
-        ".hk": "Hong Kong",
-    }
-    for suffix, cntry in tld_country.items():
-        if hostname.endswith(suffix):
-            country = cntry
-            break
+    country = _country_from_hostname(hostname)
 
     # Name + city from page HTML
     _UNI_KEYWORDS = _INSTITUTION_KEYWORDS
