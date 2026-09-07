@@ -471,6 +471,89 @@ async def test_full_stage_keeps_semantic_query_variants_and_reviewed_alias(
         await _cleanup(prefix)
 
 
+@pytest.mark.asyncio
+async def test_within_job_stage_rejects_true_canonical_url_alias(
+    isolated_universities,
+):
+    uni_a, _ = isolated_universities
+    prefix = f"test_same_job_alias_{uuid.uuid4().hex[:8]}_"
+    scrape_job_id = prefix + "job"
+    course_name = f"Bachelor of Same Job Alias {prefix}"
+    first_url = "http://www.example.edu/course/same-job/?utm_source=catalogue"
+    alias_url = "https://example.edu/course/same-job"
+    try:
+        first_row = await _insert(
+            scrape_job_id,
+            uni_a,
+            course_name,
+            "pending",
+            age_min=0,
+            course_website=first_url,
+        )
+        async with AsyncSessionLocal() as db:
+            result = await stage_course(
+                db,
+                scrape_job_id=scrape_job_id,
+                university_id=uni_a,
+                course_name=course_name,
+                payload={
+                    "course_name": course_name,
+                    "degree_level": "Bachelor's",
+                    "international_fee": 39000,
+                    "course_website": alias_url,
+                },
+                evidence=[],
+                source_url=alias_url,
+            )
+
+        assert not result.saved
+        assert result.reason == "rejected: duplicate_url_in_job"
+        assert await _exists(first_row), "the first same-job alias must remain"
+    finally:
+        await _cleanup(prefix)
+
+
+@pytest.mark.asyncio
+async def test_within_job_stage_keeps_semantic_query_variants(
+    isolated_universities,
+):
+    uni_a, _ = isolated_universities
+    prefix = f"test_same_job_semantic_{uuid.uuid4().hex[:8]}_"
+    scrape_job_id = prefix + "job"
+    course_name = f"Bachelor of Same Job Query {prefix}"
+    city_url = "https://example.edu/course/same-job-query?campus=city"
+    harbour_url = "https://example.edu/course/same-job-query?campus=harbour"
+    try:
+        first_row = await _insert(
+            scrape_job_id,
+            uni_a,
+            course_name,
+            "pending",
+            age_min=0,
+            course_website=city_url,
+        )
+        async with AsyncSessionLocal() as db:
+            result = await stage_course(
+                db,
+                scrape_job_id=scrape_job_id,
+                university_id=uni_a,
+                course_name=course_name,
+                payload={
+                    "course_name": course_name,
+                    "degree_level": "Bachelor's",
+                    "international_fee": 39000,
+                    "course_website": harbour_url,
+                },
+                evidence=[],
+                source_url=harbour_url,
+            )
+
+        assert result.saved, result.reason
+        assert await _exists(first_row), "semantic same-job variants must remain distinct"
+    finally:
+        await _cleanup(prefix)
+
+
 def test_alias_dedup_uses_indexed_identity_without_queue_scan():
     source = __import__(
         "inspect"

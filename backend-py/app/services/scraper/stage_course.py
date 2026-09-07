@@ -395,8 +395,11 @@ async def stage_course(
         if source_url.endswith("/") and source_url.count("/") > 3:
             source_url = source_url.rstrip("/")
 
-    # Within-job URL deduplication: prevent the exact same source URL from
-    # being staged twice in one job (can happen if a BFS bug re-queues a URL).
+    # Within-job URL deduplication: prevent the same canonical source URL from
+    # being staged twice in one job (can happen if discovery finds transport or
+    # tracking aliases, or if a BFS bug re-queues a URL).  The persisted
+    # identity retains semantic query parameters, so genuinely distinct course
+    # variants remain separate.
     # We intentionally do NOT dedup by course_name alone — universities like
     # VIT publish separate pages per specialisation (e.g. /bits/bits-ai,
     # /bits/bits-app-dev) that all share the same parent degree name but are
@@ -406,20 +409,24 @@ async def stage_course(
     # from the URL path so reviewers can distinguish the rows.
     name = _augment_specialization_name(name, source_url)
     try:
-        _dup_q = await db.execute(
-            select(ScrapedCourse.id)
-            .where(
-                ScrapedCourse.scrape_job_id == scrape_job_id,
-                ScrapedCourse.university_id == university_id,
-                ScrapedCourse.course_website == source_url,
+        _source_url_key = canonical_course_url_key(source_url)
+        _dup = None
+        if _source_url_key:
+            _dup_q = await db.execute(
+                select(ScrapedCourse.id)
+                .where(
+                    ScrapedCourse.scrape_job_id == scrape_job_id,
+                    ScrapedCourse.university_id == university_id,
+                    ScrapedCourse.canonical_course_url == _source_url_key,
+                )
+                .limit(1)
             )
-            .limit(1)
-        )
-        _dup = _dup_q.scalar_one_or_none()
+            _dup = _dup_q.scalar_one_or_none()
         if _dup is not None:
             log.info(
-                "stage_course: skipping duplicate URL %r (already staged in job %s)",
-                source_url, scrape_job_id,
+                "stage_course: skipping duplicate canonical URL %r from %r "
+                "(already staged in job %s)",
+                _source_url_key, source_url, scrape_job_id,
             )
             return StageResult(False, "rejected: duplicate_url_in_job")
     except Exception as _dep:  # noqa: BLE001 — never abort on dedup check failure
