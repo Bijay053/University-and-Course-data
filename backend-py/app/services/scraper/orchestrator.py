@@ -43,6 +43,18 @@ from app.services.scraper.course_deadline import (
     set_course_deadline,
 )
 
+
+def _has_authoritative_course_provider(
+    discovery: Any,
+    *,
+    searchstax_active: bool = False,
+) -> bool:
+    """Return whether discovery already produced an authoritative course set."""
+    return searchstax_active or any(
+        getattr(discovery, provider, None) is not None
+        for provider in ("algolia", "swiftype", "manchester_xml", "sruc_api")
+    )
+
 log = logging.getLogger(__name__)
 
 _PER_COURSE_EXTRACTION_TIMEOUT_SECONDS = float(
@@ -4027,18 +4039,15 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     links = _dom_ok_links
         # ── End Domain Safety Guard ───────────────────────────────────────────
 
-        # SearchStax short-circuit: when discovery.searchstax is active, the
-        # Solr query already filters to course docs (fq=sectiontype_ss:course),
-        # so every link IS a course.  allow/block_url_patterns are meant for
-        # BFS/sitemap discovery where arbitrary pages are crawled and must be
-        # filtered — applying them on top of Solr's own filter wrongly drops
-        # real courses (e.g. Durham /business/courses/ via a stale admin_config
-        # allow_url_patterns the YAML cannot override).  Skip both filters here.
-        _skip_url_filters_searchstax = (
-            _searchstax_cfg is not None
-            or (getattr(_uni_cfg.discovery, "swiftype", None) is not None)
-            or (getattr(_uni_cfg.discovery, "manchester_xml", None) is not None)
-            or (getattr(_uni_cfg.discovery, "sruc_api", None) is not None)
+        # Authoritative API-provider short-circuit: these providers already
+        # return course records, so every link IS a course.  allow/block URL
+        # patterns are for BFS/sitemap discovery where arbitrary pages must be
+        # filtered.  Applying stale generated/admin patterns to provider-owned
+        # links drops real courses (for example WSU research degrees whose
+        # international fees are explicitly "To be advised" in Algolia).
+        _skip_url_filters_searchstax = _has_authoritative_course_provider(
+            _uni_cfg.discovery,
+            searchstax_active=_searchstax_cfg is not None,
         )
         if _skip_url_filters_searchstax and links:
             log.info(

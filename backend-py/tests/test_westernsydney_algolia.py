@@ -10,6 +10,7 @@ from app.services.scraper.algolia_provider import (
 )
 from app.services.scraper.config.schema import AlgoliaDiscoveryConfig
 from app.services.scraper.config.loader import load_uni_config
+from app.services.scraper.orchestrator import _has_authoritative_course_provider
 
 
 WSU_URL = (
@@ -34,6 +35,17 @@ def test_wsu_config_preserves_authoritative_algolia_fields() -> None:
         "campuses",
         "cricosCode",
     ]
+
+
+def test_wsu_algolia_is_an_authoritative_post_discovery_provider() -> None:
+    config = load_uni_config(
+        slug="westernsydney",
+        name="Western Sydney University",
+        scrape_url="https://www.westernsydney.edu.au/future/study/courses",
+        create_missing_stub=False,
+    )
+
+    assert _has_authoritative_course_provider(config.discovery)
 
 
 def test_wsu_algolia_overrides_domestic_fee_and_noisy_ai_duration() -> None:
