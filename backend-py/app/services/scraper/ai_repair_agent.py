@@ -2269,6 +2269,7 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
     }
     _write_session(job_id, session)
     pending_extraction_rollback: dict[str, dict[str, Any]] | None = None
+    current_attempt_evidence: dict[str, Any] | None = None
 
     try:
         ctx = await _gather_context(job_id, db)
@@ -2286,7 +2287,7 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
         # asking OpenAI for another mutation. This no-change attempt gives the
         # UI deterministic evidence to launch the fresh verification scrape.
         current_disc = dict(ctx.get("effective_discovery") or {})
-        current_urls = ctx.get("repair_url_sample") or ctx["dropped_sample"]
+        current_urls = ctx.get("repair_url_sample") or ctx.get("dropped_sample") or []
         current_sim = _simulate_filter(
             current_urls,
             current_disc.get("allow_url_patterns", []),
@@ -2296,7 +2297,7 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
         )
         current_minimum = max(1, (current_sim["total"] + 1) // 2)
         if (
-            ctx["imported"] == 0
+            ctx.get("imported", 0) == 0
             and current_sim["total"] > 0
             and current_sim["after"] >= current_minimum
         ):
@@ -2335,7 +2336,6 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
         # True once discovery quality is confirmed acceptable
         _discovery_phase_done: bool = ctx["drop_rate"] <= 20
 
-        current_attempt_evidence: dict[str, Any] | None = None
         for attempt_num in range(1, MAX_ATTEMPTS + 1):
             current_attempt_evidence = None
             session["current_attempt"] = attempt_num

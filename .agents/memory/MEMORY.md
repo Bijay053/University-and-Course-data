@@ -133,3 +133,4 @@
 - [CQU English field drift](cqu-english-field-drift.md) — current course English may live in AIMS requisite conditions while dedicated English/schema fields are empty; TOEFL can list PBT before iBT.
 - [Snapshot canary cleanup and locking](snapshot-canary-safety.md) — delete exact S3 versions, verify absence, and use transaction-scoped advisory locks so pooled connections cannot strand monitors.
 - [Disposable AWS integration safety](disposable-aws-integration-safety.md) — validate every AWS principal’s account and require an explicit disposable-resource tag before destructive integration tests.
+- [CSU duration and offering-year authority](csu-duration-offering-year.md) — use minimum/standard full-time duration and latest-year FPOS modes; embedded maxima and mixed years can corrupt current values.

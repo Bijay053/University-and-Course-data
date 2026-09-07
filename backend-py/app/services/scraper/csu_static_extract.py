@@ -324,7 +324,11 @@ def _csu_default_ielts(course: dict) -> float:
 
 def _duration(course: dict) -> tuple[float | None, str | None]:
     """Return (years, "years") or (None, None)."""
-    for key in ("actual_full_time", "full_time_maximum_years"):
+    # CSU's visible international key-information card labels
+    # ``full_time_minimum_years`` as "Minimum time".  ``actual_full_time`` can
+    # instead contain the maximum enrolment window (Master of Veterinary
+    # Studies publishes actual_full_time=5 but minimum/standard=1.5).
+    for key in ("full_time_minimum_years",):
         raw = course.get(key)
         if raw:
             try:
@@ -340,6 +344,15 @@ def _duration(course: dict) -> tuple[float | None, str | None]:
                 return val, "years"
         except (TypeError, ValueError):
             pass
+    for key in ("actual_full_time", "full_time_maximum_years"):
+        raw = course.get(key)
+        if raw:
+            try:
+                val = float(raw)
+                if val > 0:
+                    return val, "years"
+            except (TypeError, ValueError):
+                pass
     return None, None
 
 
@@ -471,6 +484,29 @@ def _strip_csu_prefix(campus: str) -> str:
     return _CSU_CAMPUS_PREFIX.sub("", campus).strip()
 
 
+def _latest_international_offerings(co_data: dict) -> list[dict]:
+    """Return FPOS offerings from the latest published session year only."""
+    intl = [
+        o for o in co_data.get("course_offering", [])
+        if o.get("fund_source_code") == "FPOS"
+    ]
+    year_by_id: dict[int, int] = {}
+    for offering in intl:
+        raw_year = str(offering.get("session_year") or "").strip()
+        if not raw_year:
+            session_code = str(offering.get("session_code") or "").strip()
+            raw_year = session_code[:4] if len(session_code) >= 4 else ""
+        if raw_year.isdigit() and len(raw_year) == 4:
+            year_by_id[id(offering)] = int(raw_year)
+    if not year_by_id:
+        return intl
+    latest_year = max(year_by_id.values())
+    return [
+        offering for offering in intl
+        if year_by_id.get(id(offering)) == latest_year
+    ]
+
+
 def _locations_and_modes_from_co(co_data: dict) -> tuple[str | None, str | None]:
     """Return ``(course_location, study_mode)`` from the ``course_offerings`` JS variable.
 
@@ -486,10 +522,7 @@ def _locations_and_modes_from_co(co_data: dict) -> tuple[str | None, str | None]
 
     Returns ``(None, None)`` when there are no FPOS offerings.
     """
-    intl = [
-        o for o in co_data.get("course_offering", [])
-        if o.get("fund_source_code") == "FPOS"
-    ]
+    intl = _latest_international_offerings(co_data)
     if not intl:
         return None, None
 
@@ -547,6 +580,9 @@ def _intakes_from_co(co_data: dict, code_to_date: dict[str, str]) -> list[str] |
     Returns ``None`` when no FPOS offerings are found (caller should fall
     back to :func:`_intakes`).
     """
+    # Intakes intentionally span all published sessions. Unlike study mode,
+    # an older session suffix can still represent a valid recurring intake
+    # month and should not disappear merely because a later year exists.
     intl = [
         o for o in co_data.get("course_offering", [])
         if o.get("fund_source_code") == "FPOS"

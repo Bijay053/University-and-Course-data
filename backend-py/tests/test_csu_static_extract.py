@@ -461,9 +461,29 @@ def test_duration_from_actual_full_time() -> None:
 
 
 def test_duration_fractional() -> None:
-    html = _make_html(course_obj={"actual_full_time": "1.5"})
+    html = _make_html(
+        course_obj={
+            "actual_full_time": "1.5",
+            "full_time_maximum_years": "1.5",
+            "full_time_standard_eftsl": [{"short_description": "1.5"}],
+        }
+    )
     result = apply_csu_static_extraction(_CSU_URL, html)
     assert result["duration"] == 1.5
+
+
+def test_duration_prefers_visible_minimum_over_misleading_actual_maximum() -> None:
+    html = _make_html(
+        course_obj={
+            "actual_full_time": "5",
+            "full_time_minimum_years": "1.5",
+            "full_time_maximum_years": "5",
+            "full_time_standard_eftsl": [{"short_description": "1.5"}],
+        }
+    )
+    result = apply_csu_static_extraction(_CSU_URL, html)
+    assert result["duration"] == 1.5
+    assert result["duration_term"] == "years"
 
 
 def test_duration_fallback_to_max_years() -> None:
@@ -898,6 +918,33 @@ def test_locations_and_modes_from_co_mixed_modes() -> None:
     assert loc == "Port Macquarie"
     assert "On Campus" in mode
     assert "Online" in mode
+
+
+def test_locations_and_modes_ignore_online_from_older_year() -> None:
+    """Current international mode must not merge an older year's offering."""
+    co_data = {
+        "course_offering": [
+            {
+                "fund_source_code": "FPOS",
+                "session_year": "2026",
+                "session_code": "202630",
+                "campus_name": "Wagga Wagga",
+                "attendance_mode_code": "2",
+                "attendance_mode_name": "Online",
+            },
+            {
+                "fund_source_code": "FPOS",
+                "session_year": "2027",
+                "session_code": "202730",
+                "campus_name": "Wagga Wagga",
+                "attendance_mode_code": "1",
+                "attendance_mode_name": "On Campus",
+            },
+        ]
+    }
+    loc, mode = _locations_and_modes_from_co(co_data)
+    assert loc == "Wagga Wagga"
+    assert mode == "On Campus"
 
 
 def test_locations_and_modes_from_co_dom_only_returns_none() -> None:
