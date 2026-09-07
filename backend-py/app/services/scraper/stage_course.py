@@ -268,8 +268,8 @@ async def evidence_fields_with_changed_provenance(
     return {
         field_key
         for field_key, fresh in fresh_selected.items()
-        if (old := existing_by_field.get(field_key)) is not None
-        and _evidence_provenance(old) != _evidence_provenance(fresh)
+        if (old := existing_by_field.get(field_key)) is None
+        or _evidence_provenance(old) != _evidence_provenance(fresh)
     }
 
 

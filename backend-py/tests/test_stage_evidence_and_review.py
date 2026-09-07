@@ -534,3 +534,108 @@ async def test_re_extract_refreshes_unchanged_fee_from_newer_canonical_page(monk
         assert fee_evidence.selected is True
     finally:
         await _cleanup(job_id)
+
+
+@pytest.mark.asyncio
+async def test_re_extract_refreshes_when_equal_value_gains_selected_evidence(
+    monkeypatch,
+):
+    uni_id = await _pick_university()
+    job_id = f"test_reextract_select_ev_{uuid.uuid4().hex[:10]}"
+    url = "https://example.edu/courses/master-of-engineering"
+    try:
+        async with AsyncSessionLocal() as db:
+            staged = await stage_course(
+                db,
+                scrape_job_id=job_id,
+                university_id=uni_id,
+                course_name="Master of Engineering",
+                payload={
+                    "course_name": "Master of Engineering",
+                    "international_fee": 41000,
+                    "ielts_listening": 5.5,
+                    "course_website": url,
+                },
+                evidence=[
+                    {
+                        "field_key": "international_fee",
+                        "value": 41000,
+                        "normalized": 41000,
+                        "method": "fee:table",
+                        "source_url": url,
+                        "snippet": "International tuition fee A$41,000",
+                        "decision_status": "selected",
+                    },
+                    {
+                        "field_key": "ielts_listening",
+                        "value": 5.5,
+                        "normalized": 5.5,
+                        "method": "approved_row:inherited",
+                        "source_url": url,
+                        "snippet": "Inherited from an approved row",
+                        "decision_status": "needs_review",
+                    },
+                ],
+                source_url=url,
+            )
+            assert staged.saved
+            sc_id = staged.scraped_course_id
+            old_evidence = (
+                await db.execute(
+                    select(ScrapedFieldEvidence).where(
+                        ScrapedFieldEvidence.scraped_course_id == sc_id,
+                        ScrapedFieldEvidence.field_key == "ielts_listening",
+                    )
+                )
+            ).scalar_one()
+            assert old_evidence.selected is False
+
+        async def _fake_extract_only(*_args, **_kwargs):
+            return {
+                "url": url,
+                "payload": {"ielts_listening": 5.5},
+                "evidence": [{
+                    "field_key": "ielts_listening",
+                    "value": 5.5,
+                    "normalized": 5.5,
+                    "method": "cqu_json:requisite_conditions_text",
+                    "source_url": url,
+                    "snippet": "IELTS minimum 5.5 in each component",
+                    "decision_status": "selected",
+                }],
+            }
+
+        monkeypatch.setattr(
+            "app.services.scraper.orchestrator._extract_only",
+            _fake_extract_only,
+        )
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post(
+                "/api/scrape/staged/re-extract",
+                json={"ids": [sc_id], "universityId": uni_id},
+            )
+
+        assert response.status_code == 200, response.text
+        result = response.json()["results"][0]
+        assert result["updated_fields"] == []
+        assert result["refreshed_evidence_fields"] == ["ielts_listening"]
+
+        async with AsyncSessionLocal() as db:
+            refreshed = (
+                await db.execute(
+                    select(ScrapedFieldEvidence).where(
+                        ScrapedFieldEvidence.scraped_course_id == sc_id,
+                        ScrapedFieldEvidence.field_key == "ielts_listening",
+                    )
+                )
+            ).scalar_one()
+
+        assert refreshed.extraction_method == (
+            "cqu_json:requisite_conditions_text"
+        )
+        assert refreshed.selected is True
+        assert refreshed.decision_status == "selected"
+    finally:
+        await _cleanup(job_id)
