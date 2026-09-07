@@ -33,13 +33,18 @@ from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable
 
 from sqlalchemy import select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import AsyncSessionLocal
 from app.models.page_snapshot import PageSnapshot
 from app.models.course import Course
 from app.models.scrape_runtime import ScrapeRuntimeJob
-from app.models.scraped_course import ScrapedCourse
+from app.models.scraped_course import (
+    REVIEW_URL_IDENTITY_CONSTRAINT,
+    ScrapedCourse,
+    integrity_constraint_name,
+)
 from app.services.snapshot_store import download_snapshot
 from app.services.scraper.url_identity import canonical_course_url_key
 
@@ -292,7 +297,15 @@ async def restore_review_rows(
                 **{key: value for key, value in values.items() if key != "course_name"},
             )
             if commit:
-                db.add(row)
+                try:
+                    async with db.begin_nested():
+                        db.add(row)
+                        await db.flush()
+                except IntegrityError as exc:
+                    if integrity_constraint_name(exc) != REVIEW_URL_IDENTITY_CONSTRAINT:
+                        raise
+                    skipped_existing += 1
+                    continue
             occupied_urls.add(normalized_url)
             occupied_names.add(name.casefold())
             restored += 1

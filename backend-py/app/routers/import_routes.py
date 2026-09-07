@@ -11,12 +11,17 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, File, status
 from openpyxl import load_workbook
 from sqlalchemy import func, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_user, get_db
 from app.models import University
 from app.models.import_job import ImportJob
-from app.models.scraped_course import ScrapedCourse
+from app.models.scraped_course import (
+    REVIEW_URL_IDENTITY_CONSTRAINT,
+    ScrapedCourse,
+    integrity_constraint_name,
+)
 from app.services.scraper.url_identity import canonical_course_url_key
 
 router = APIRouter(prefix="/import", tags=["import"])
@@ -394,15 +399,25 @@ async def import_excel(
             payload["canonical_course_url"] = (
                 canonical_course_url_key(payload.get("course_website")) or None
             )
-            db.add(ScrapedCourse(
-                scrape_job_id=job_id,
-                university_id=uni.id,
-                status="pending",
-                auto_publish_status="pending_review",
-                eligibility_status="unknown",
-                **payload,
-            ))
+            try:
+                async with db.begin_nested():
+                    db.add(ScrapedCourse(
+                        scrape_job_id=job_id,
+                        university_id=uni.id,
+                        status="pending",
+                        auto_publish_status="pending_review",
+                        eligibility_status="unknown",
+                        **payload,
+                    ))
+                    await db.flush()
+            except IntegrityError as exc:
+                if integrity_constraint_name(exc) != REVIEW_URL_IDENTITY_CONSTRAINT:
+                    raise
+                skipped += 1
+                continue
             imported += 1
+        except IntegrityError:
+            raise
         except Exception as exc:  # type-coercion / column mismatch
             errors.append(f"Row {line_no}: {exc.__class__.__name__}: {exc}")
             skipped += 1

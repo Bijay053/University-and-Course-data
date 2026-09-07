@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from io import BytesIO
+from contextlib import asynccontextmanager
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,6 +12,7 @@ from openpyxl import Workbook
 from app.dependencies import get_current_user, get_db
 from app.main import app
 from app.models import University
+from sqlalchemy.exc import IntegrityError
 
 
 # ───────────────────────── fake AsyncSession ─────────────────────────────────
@@ -34,6 +37,7 @@ class _FakeSession:
         self.scraped_courses: list = []
         self.import_jobs: list = []
         self.committed = False
+        self.flush_error = None
 
     async def get(self, model, ident):
         if model is University:
@@ -73,7 +77,14 @@ class _FakeSession:
             self.import_jobs.append(obj)
 
     async def flush(self):
+        if self.flush_error is not None:
+            error, self.flush_error = self.flush_error, None
+            raise error
         return None
+
+    @asynccontextmanager
+    async def begin_nested(self):
+        yield
 
     async def commit(self):
         self.committed = True
@@ -251,3 +262,34 @@ def test_row_missing_course_name_is_skipped_with_error(client):
     assert body["skipped"] == 1
     assert len(body["errors"]) == 1
     assert "missing course name" in body["errors"][0]
+
+
+def _integrity_error(constraint_name: str) -> IntegrityError:
+    orig = SimpleNamespace(
+        diag=SimpleNamespace(constraint_name=constraint_name),
+    )
+    return IntegrityError("insert", {}, orig)
+
+
+def test_duplicate_review_url_collision_is_reported_as_skipped(client, fake_db):
+    fake_db.flush_error = _integrity_error(
+        "uq_scraped_courses_job_review_url_identity"
+    )
+    xlsx = _make_xlsx(
+        ["Course Name", "Course Website"],
+        [["Bachelor of Arts", "https://uni.test/courses/arts"]],
+    )
+
+    response = _post(client, xlsx, fields={"universityId": "1"})
+
+    assert response.status_code == 200
+    assert response.json()["imported"] == 0
+    assert response.json()["skipped"] == 1
+
+
+def test_other_import_integrity_failures_remain_errors(client, fake_db):
+    fake_db.flush_error = _integrity_error("some_other_constraint")
+    xlsx = _make_xlsx(["Course Name"], [["Bachelor of Arts"]])
+
+    with pytest.raises(IntegrityError):
+        _post(client, xlsx, fields={"universityId": "1"})

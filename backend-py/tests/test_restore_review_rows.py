@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from types import SimpleNamespace
 import uuid
@@ -6,6 +7,7 @@ import uuid
 import pytest
 import pytest_asyncio
 from sqlalchemy import func, select, text
+from sqlalchemy.exc import IntegrityError
 
 from app.database import AsyncSessionLocal, engine
 from app.models.course import Course
@@ -39,6 +41,8 @@ class _FakeDb:
         self.published = list(published)
         self.added = []
         self.commits = 0
+        self.rollbacks = 0
+        self.flush_error = None
 
     async def get(self, model, key):
         assert model is ScrapeRuntimeJob
@@ -59,11 +63,20 @@ class _FakeDb:
     def add(self, row):
         self.added.append(row)
 
+    @asynccontextmanager
+    async def begin_nested(self):
+        yield
+
+    async def flush(self):
+        if self.flush_error is not None:
+            error, self.flush_error = self.flush_error, None
+            raise error
+
     async def commit(self):
         self.commits += 1
 
     async def rollback(self):
-        raise AssertionError("rollback was not expected")
+        self.rollbacks += 1
 
 
 def _job(job_id, parent=None):
@@ -105,6 +118,40 @@ def _snapshot(
         fetched_at=datetime(2026, 1, snapshot_id, tzinfo=timezone.utc),
         original_extraction=extraction,
     )
+
+
+def _integrity_error(constraint_name):
+    orig = SimpleNamespace(
+        diag=SimpleNamespace(constraint_name=constraint_name),
+    )
+    return IntegrityError("insert", {}, orig)
+
+
+def test_restore_duplicate_review_url_collision_is_reported_as_skipped():
+    db = _FakeDb(
+        {"parent": _job("parent")},
+        [_snapshot(1, "parent", "https://uni.test/a", "Course A", 31000)],
+    )
+    db.flush_error = _integrity_error(
+        "uq_scraped_courses_job_review_url_identity"
+    )
+
+    result = asyncio.run(restore_review_rows("parent", commit=True, db=db))
+
+    assert result["restored"] == 0
+    assert result["skipped_existing"] == 1
+    assert db.commits == 1
+
+
+def test_restore_other_integrity_failures_remain_loud():
+    db = _FakeDb(
+        {"parent": _job("parent")},
+        [_snapshot(1, "parent", "https://uni.test/a", "Course A", 31000)],
+    )
+    db.flush_error = _integrity_error("some_other_constraint")
+
+    with pytest.raises(IntegrityError):
+        asyncio.run(restore_review_rows("parent", commit=True, db=db))
 
 
 def test_deleted_parent_review_set_is_reconstructed_exactly_and_idempotently():

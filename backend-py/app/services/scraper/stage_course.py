@@ -30,6 +30,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.models import ScrapedCourse, ScrapedFieldEvidence
+from app.models.scraped_course import (
+    REVIEW_URL_IDENTITY_CONSTRAINT,
+    integrity_constraint_name,
+)
 from app.services.auto_publish import should_auto_publish
 from app.services.scraper.category import infer_course_taxonomy
 from app.services.scraper.completeness import compute_completeness, decide_eligibility
@@ -53,23 +57,6 @@ class StageResult:
 
     def __bool__(self) -> bool:  # so existing `if result:` patterns still work
         return self.saved
-
-
-def _integrity_constraint_name(exc: IntegrityError) -> str | None:
-    """Read a PostgreSQL constraint name through SQLAlchemy/asyncpg wrappers."""
-    current: BaseException | None = exc
-    seen: set[int] = set()
-    while current is not None and id(current) not in seen:
-        seen.add(id(current))
-        direct = getattr(current, "constraint_name", None)
-        if direct:
-            return str(direct)
-        diag = getattr(current, "diag", None)
-        diagnosed = getattr(diag, "constraint_name", None)
-        if diagnosed:
-            return str(diagnosed)
-        current = getattr(current, "orig", None) or getattr(current, "__cause__", None)
-    return None
 
 
 def _clean_model_value(field_name: str, value: Any) -> Any:
@@ -969,8 +956,8 @@ async def stage_course(
         await db.flush()  # need sc.id for the FK on evidence rows
     except IntegrityError as exc:
         await db.rollback()
-        constraint_name = _integrity_constraint_name(exc)
-        if constraint_name == "uq_scraped_courses_job_review_url_identity":
+        constraint_name = integrity_constraint_name(exc)
+        if constraint_name == REVIEW_URL_IDENTITY_CONSTRAINT:
             log.info(
                 "stage_course: concurrent duplicate canonical URL %r from %r "
                 "(already staged in job %s)",

@@ -3,17 +3,37 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, Numeric, Text, event, func, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
+
+REVIEW_URL_IDENTITY_CONSTRAINT = "uq_scraped_courses_job_review_url_identity"
+
+
+def integrity_constraint_name(exc: IntegrityError) -> str | None:
+    """Read a PostgreSQL constraint name through SQLAlchemy/asyncpg wrappers."""
+    current: BaseException | None = exc
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        direct = getattr(current, "constraint_name", None)
+        if direct:
+            return str(direct)
+        diag = getattr(current, "diag", None)
+        diagnosed = getattr(diag, "constraint_name", None)
+        if diagnosed:
+            return str(diagnosed)
+        current = getattr(current, "orig", None) or getattr(current, "__cause__", None)
+    return None
 
 
 class ScrapedCourse(Base):
     __tablename__ = "scraped_courses"
     __table_args__ = (
         Index(
-            "uq_scraped_courses_job_review_url_identity",
+            REVIEW_URL_IDENTITY_CONSTRAINT,
             "university_id",
             "canonical_course_url",
             "scrape_job_id",
