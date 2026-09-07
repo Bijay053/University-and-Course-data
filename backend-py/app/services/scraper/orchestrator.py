@@ -732,6 +732,17 @@ async def _persist_runtime_progress(runtime_job_id: str, current: int) -> None:
         await progress_db.commit()
 
 
+def _cumulative_imported(summary: dict[str, Any], resumed: int) -> int:
+    """Courses available from this run plus preserved resume checkpoints."""
+    return int(summary.get("staged", 0) or 0) + max(0, int(resumed or 0))
+
+
+def _attempted_course_count(summary: dict[str, Any], resumed: int) -> int:
+    """Courses this worker invocation actually settled, including skips/errors."""
+    discovered = int(summary.get("discovered", 0) or 0)
+    return max(0, discovered - max(0, int(resumed or 0)))
+
+
 async def _settle_course_with_retries(
     link: dict,
     attempt,
@@ -947,7 +958,7 @@ async def _clear_stale_dedup(
     minutes: int = _STALE_DEDUP_MINUTES,
     current_job_id: str | None = None,
 ) -> int:
-    """Delete *pending* ``scraped_courses`` rows older than ``minutes``.
+    """Delete replaceable *pending* rows older than ``minutes``.
 
     Solves the "0 staged" symptom that surfaces when a previous failed run
     leaves rows behind that pile up in the review UI. ``created_at`` is the
@@ -962,20 +973,11 @@ async def _clear_stale_dedup(
     ``'pending'`` and the scraper never auto-rejects), so narrowing to
     ``pending`` cures the symptom without trampling reviewer history.
 
-    PR-1.5 prod regression: the original query deleted EVERY pending row
-    older than 10 minutes for the university, including rows from a
-    previous *successfully completed* run. This caused the counter-vs-
-    actual-rows mismatch in job_440a0e26c6df (CSU): scrape #1 staged 9
-    rows and reported imported=9; scrape #2 launched >10 min later
-    wiped all 9 pending rows during its own dedup pass before staging
-    started, leaving COUNT(*) FROM scraped_courses WHERE
-    scrape_job_id='job_440a0e26c6df' = 0 against an imported=9 counter.
-    Fix: only clear rows whose source job is NOT completed and NOT
-    currently running. Rows from completed jobs survive (the user is
-    still reviewing them); rows from running jobs survive (a concurrent
-    scrape is still writing them); rows from failed/stopped/orphaned
-    jobs are safe to wipe (they're the genuine left-overs this cleanup
-    was built for).
+    Fresh full scrapes replace old pending rows, including rows from completed
+    jobs, so dedup cannot reduce the new scrape to zero. Reviewer-rejected rows,
+    the current job's checkpoints, running jobs, and recent resumable jobs are
+    preserved. The live message must say ``pending`` only; rejected rows are
+    never eligible for this DELETE.
     """
     from sqlalchemy import text as _text
     from app.config import settings as _settings
@@ -1423,7 +1425,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
 
     _targeted_retry = _is_targeted_retry_payload(job.request_payload)
 
-    # Wipe stale pending/rejected scraped_courses rows for this university so
+    # Wipe replaceable stale pending scraped_courses rows for this university so
     # a previous failed run cannot block dedup on this attempt. Done before
     # discovery so the cleared count is visible early in the live log.
     # Explicit course-URL retries are continuations, not replacement scrapes:
@@ -1443,7 +1445,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             )
             await emit(
                 "status",
-                f"Cleared {cleared} stale pending/rejected scraped_courses rows "
+                f"Cleared {cleared} stale pending scraped_courses rows "
                 f"(>{_STALE_DEDUP_MINUTES}m old) for university {job.university_id}",
                 phase="cleanup",
                 cleared=cleared,
@@ -1496,6 +1498,8 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
     _global_slot_redis: Any | None = None
     _global_slot_acquired: bool = False
     _GLOBAL_SLOT_KEY = "scrape:active_runs"
+    # Must exist before any early stop path can call _finalize_stopped().
+    _resume_already_staged = 0
 
     async def _finalize_stopped() -> dict:
         """Mark the job as user-stopped and emit a terminal log row."""
@@ -1507,11 +1511,11 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             kind="stopped",
             level="warn",
         )
-        _stopped_total = summary.get("staged", 0) + _resume_already_staged
+        _stopped_total = _cumulative_imported(summary, _resume_already_staged)
         await emit(
             "done",
             f"══ STOPPED ══ Found:{summary.get('discovered', 0)} | "
-            f"Staged:{summary.get('staged', 0)} | "
+            f"Staged:{_stopped_total} | "
             f"Skipped:{summary.get('skipped', 0)} | "
             f"Errors:{summary.get('errors', 0)}",
             phase="complete",
@@ -5006,7 +5010,6 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # finalize time (via `_resume_already_staged`) so imported + skipped
         # + errors reconciles against the real total_found with nothing
         # appearing "unaccounted for".
-        _resume_already_staged = 0
         if settings.scrape_resume_enabled and job.university_id and links:
             try:
                 _done_rows = await _already_staged_checkpoint_rows(
@@ -6556,7 +6559,10 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             0,
             int((finished_at - (job.started_at or finished_at)).total_seconds()),
         )
-        course_count = summary.get("staged", 0) or summary.get("discovered", 0) or 1
+        course_count = _attempted_course_count(
+            summary,
+            _resume_already_staged,
+        )
         avg_per_course = elapsed_sec / max(1, course_count)
         mins, secs = divmod(elapsed_sec, 60)
         # Gemini cost summary — emitted before TIMING so it's visible in the
@@ -6707,9 +6713,13 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Always show it explicitly (even when 0) so it can never again be
         # silently absorbed into "the numbers didn't add up".
         _fetch_failed_n = summary.get("fetch_failed", 0)
+        _total_imported = _cumulative_imported(
+            summary,
+            _resume_already_staged,
+        )
         _done_msg = (
             f"══ DONE ══ Found:{summary.get('discovered', 0)} | "
-            f"Staged:{summary.get('staged', 0)} | "
+            f"Staged:{_total_imported} | "
             f"Skipped:{summary.get('skipped', 0)}{_skip_detail} | "
             f"FetchFailed:{_fetch_failed_n} | "
             f"Errors:{summary.get('errors', 0)}"
@@ -6754,7 +6764,6 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # the new ones staged this run.  Without this, a resume-checkpoint run
         # (e.g. 25 new + 105 already-pending = 130 total) shows "Review 25 Courses"
         # but the review panel loads 130.
-        _total_imported = summary.get("staged", 0) + _resume_already_staged
         await emit(
             "done",
             _done_msg,
@@ -6820,7 +6829,13 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 level="warn",
             )
             summary["staged"] = actual_staged
-        await emit("status", f"Staged {summary['staged']} courses, {summary['skipped']} skipped, {summary['fetch_failed']} fetch errors", phase="complete", **summary)
+        await emit(
+            "status",
+            f"Staged {_total_imported} courses, {summary['skipped']} skipped, "
+            f"{summary['fetch_failed']} fetch errors",
+            phase="complete",
+            **{**summary, "staged": _total_imported},
+        )
         # ── T05: Fetch-failure rate guard ─────────────────────────────────────
         # When > threshold % of discovered courses failed the fetch step (e.g.
         # Scrape.do account exhausted mid-run) mark the job 'failed_degraded' so
@@ -6912,7 +6927,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # slice (e.g. 93/152), which looked like most courses were missing.
         job.total_found = summary["discovered"]
         job.current = summary["discovered"]
-        job.imported = summary["staged"] + _resume_already_staged
+        job.imported = _cumulative_imported(summary, _resume_already_staged)
         job.skipped = summary["skipped"]
         job.errors = summary["errors"]
         # Gemini cost tracking (Component 3 & 4)

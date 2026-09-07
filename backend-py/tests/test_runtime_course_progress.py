@@ -41,6 +41,20 @@ async def test_runtime_progress_is_persisted_before_terminal_finalization(monkey
     session.commit.assert_awaited_once()
 
 
+def test_resumed_terminal_totals_include_checkpoints_and_all_attempted_courses():
+    """The CSU 42-resumed/10-new/207-skipped case must never display 10."""
+    summary = {
+        "discovered": 259,
+        "staged": 10,
+        "skipped": 207,
+        "errors": 0,
+    }
+
+    assert orchestrator._cumulative_imported(summary, resumed=42) == 52
+    assert orchestrator._attempted_course_count(summary, resumed=42) == 217
+    assert orchestrator._attempted_course_count({}, resumed=0) == 0
+
+
 @pytest.mark.asyncio
 async def test_resumed_mixed_outcomes_advance_once_after_settlement():
     """The production retry loop keeps durable and emitted progress reconciled."""
