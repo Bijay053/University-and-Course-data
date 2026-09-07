@@ -17,6 +17,7 @@ from app.services.scraper.orchestrator import (
     _should_auto_discover_fee_page,
     _target_course_urls_from_payload,
 )
+from app.services.scraper.stage_course import _should_name_dedup
 
 
 def test_start_scrape_body_accepts_targeted_course_urls() -> None:
@@ -79,6 +80,14 @@ def test_targeted_retry_does_not_probe_course_samples_for_fee_discovery() -> Non
         has_links=True,
         targeted_retry=False,
     )
+
+
+def test_targeted_stage_preserves_same_name_rows_at_unrelated_urls() -> None:
+    assert not _should_name_dedup(targeted_retry=True)
+
+
+def test_full_scrape_retains_university_wide_name_dedup() -> None:
+    assert _should_name_dedup(targeted_retry=False)
 
 
 def test_unresolved_history_entries_keep_latest_reason_per_url() -> None:

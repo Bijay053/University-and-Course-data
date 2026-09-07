@@ -329,6 +329,11 @@ async def refresh_evidence_for_fields(
     )
 
 
+def _should_name_dedup(*, targeted_retry: bool) -> bool:
+    """Name dedup is safe only when the scrape owns the university-wide queue."""
+    return not targeted_retry
+
+
 async def stage_course(
     db: AsyncSession,
     *,
@@ -339,6 +344,7 @@ async def stage_course(
     evidence: list[dict[str, Any]] | None = None,
     source_url: str | None = None,
     skip_url_block: bool = False,
+    targeted_retry: bool = False,
 ) -> StageResult:
     name = (course_name or "").strip()
     if len(name) < 3:
@@ -446,7 +452,11 @@ async def stage_course(
     # share both.  Only status='pending'/'review' rows are touched; approved/
     # published rows are left intact (their data is copied below).
     try:
-        if name and university_id:
+        # A focused retry is allowed to replace only the explicitly selected
+        # URL. Name matching is intentionally disabled because a university can
+        # have another pending row with the same title at a different URL, and
+        # that row is outside the retry's review scope.
+        if name and university_id and _should_name_dedup(targeted_retry=targeted_retry):
             _name_norm = name.strip().lower()
             _degree_norm = (payload.get("degree_level") or "").strip().lower()
             _name_dedup_q = await db.execute(

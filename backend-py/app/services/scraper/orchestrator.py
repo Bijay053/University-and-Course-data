@@ -5862,6 +5862,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                             evidence=r.get("evidence") or [],
                             source_url=r.get("url"),
                             skip_url_block=_skip_url_block,
+                            targeted_retry=_targeted_retry,
                         )
                         # ── Phase 9: Verification Engine ──────────────────────────
                         # Runs inside the same session (already committed by
@@ -6196,6 +6197,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                                     payload=_sw_payload,
                                     evidence=_sw_r.get("evidence") or [],
                                     source_url=_sweep_url,
+                                    targeted_retry=_targeted_retry,
                                 ),
                                 timeout=_remaining_stage_budget,
                             )

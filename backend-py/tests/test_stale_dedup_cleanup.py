@@ -23,11 +23,12 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from app.database import AsyncSessionLocal, engine
 from app.models import ScrapedCourse, University
 from app.services.scraper.orchestrator import _clear_stale_dedup
+from app.services.scraper.stage_course import stage_course
 
 
 @pytest.fixture(autouse=True)
@@ -69,7 +70,15 @@ async def isolated_universities() -> tuple[int, int]:
             await db.commit()
 
 
-async def _insert(scrape_job_id: str, uni_id: int, name: str, status: str, age_min: int) -> int:
+async def _insert(
+    scrape_job_id: str,
+    uni_id: int,
+    name: str,
+    status: str,
+    age_min: int,
+    *,
+    course_website: str | None = None,
+) -> int:
     """Insert one scraped_course row backdated by ``age_min`` minutes; return its id."""
     async with AsyncSessionLocal() as db:
         sc = ScrapedCourse(
@@ -77,6 +86,7 @@ async def _insert(scrape_job_id: str, uni_id: int, name: str, status: str, age_m
             university_id=uni_id,
             course_name=name,
             status=status,
+            course_website=course_website,
         )
         db.add(sc)
         await db.flush()
@@ -250,3 +260,83 @@ async def test_clear_stale_dedup_preserves_rows_from_running_jobs(
     finally:
         await _cleanup(prefix)
         await _delete_runtime_job(running_job)
+
+
+@pytest.mark.asyncio
+async def test_targeted_stage_replaces_selected_url_and_preserves_unrelated_pending_row(
+    isolated_universities,
+):
+    uni_a, _ = isolated_universities
+    prefix = f"test_targeted_{uuid.uuid4().hex[:8]}_"
+    selected_url = "https://example.edu/course/selected"
+    unrelated_url = "https://example.edu/course/unrelated"
+    course_name = f"Bachelor of Example {prefix}"
+    old_job = prefix + "old_job"
+    targeted_job = prefix + "targeted_job"
+
+    try:
+        selected_old = await _insert(
+            old_job,
+            uni_a,
+            course_name,
+            "pending",
+            age_min=30,
+            course_website=selected_url,
+        )
+        unrelated_pending = await _insert(
+            old_job,
+            uni_a,
+            course_name,
+            "pending",
+            age_min=30,
+            course_website=unrelated_url,
+        )
+        await _insert_runtime_job(targeted_job, uni_a, "running")
+
+        payload = {
+            "course_name": course_name,
+            "degree_level": "Bachelor's",
+            "study_mode": "On Campus",
+            "course_location": "Test Campus",
+            "international_fee": 45000,
+            "course_website": selected_url,
+        }
+        evidence = [{
+            "field_key": "international_fee",
+            "value": 45000,
+            "method": "fee:test",
+            "confidence": 1.0,
+            "source_url": selected_url,
+            "snippet": "International tuition: $45,000",
+        }]
+
+        async with AsyncSessionLocal() as db:
+            result = await stage_course(
+                db,
+                scrape_job_id=targeted_job,
+                university_id=uni_a,
+                course_name=course_name,
+                payload=payload,
+                evidence=evidence,
+                source_url=selected_url,
+                targeted_retry=True,
+            )
+
+        assert result.saved, result.reason
+        assert not await _exists(selected_old), "the selected URL's stale row should be replaced"
+        assert await _exists(unrelated_pending), (
+            "a one-course retry must preserve pending rows at unrelated URLs"
+        )
+        async with AsyncSessionLocal() as db:
+            replacement_ids = (
+                await db.execute(
+                    select(ScrapedCourse.id).where(
+                        ScrapedCourse.scrape_job_id == targeted_job,
+                        ScrapedCourse.course_website == selected_url,
+                    )
+                )
+            ).scalars().all()
+        assert replacement_ids == [result.scraped_course_id]
+    finally:
+        await _cleanup(prefix)
+        await _delete_runtime_job(targeted_job)
