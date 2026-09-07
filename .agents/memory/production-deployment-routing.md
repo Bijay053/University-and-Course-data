@@ -63,3 +63,14 @@ files, or reporting success for another caller's values.
 fixed-purpose document, fetch that version explicitly, lock backup/apply/
 verify/rollback as one host transaction, and check current-version equality
 both before and after the service smoke test.
+
+The production Nginx virtual host is hostname-scoped, so a bare
+`http://127.0.0.1/` frontend smoke request can return 404 even when the public
+portal is healthy.
+
+**Why:** A successful frontend build and Nginx reload appeared to fail only
+because the verification request omitted the portal hostname.
+
+**How to apply:** Verify frontend releases through the public portal URL or send
+the configured Host header to localhost. Read the generated index to discover
+the current hashed asset path rather than assuming its prefix format.
