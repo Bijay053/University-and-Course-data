@@ -18,6 +18,7 @@ from app.services.scraper.ai_repair_agent import (
     validate_ai_repair_target,
     _apply_recipe_to_db,
     _restore_db_config,
+    _rank_repair_course_urls,
     run_ai_repair_loop,
     validate_url_repair_target,
 )
@@ -94,6 +95,20 @@ def test_filter_simulation_does_not_count_navigation_pages_as_courses() -> None:
 
     assert result["total"] == 1
     assert result["after"] == 1
+
+
+def test_repair_sitemap_evidence_prioritises_course_detail_paths() -> None:
+    ranked = _rank_repair_course_urls([
+        "https://www.cdu.edu.au/study/essentials/course-fees",
+        "https://www.cdu.edu.au/study/postgraduate/health",
+        "https://www.cdu.edu.au/study/course/master-teaching-secondary-stchs1?year=2026",
+        "https://www.cdu.edu.au/study/course/bachelor-business-wbus03?year=2026",
+    ])
+
+    assert ranked == [
+        "https://www.cdu.edu.au/study/course/master-teaching-secondary-stchs1?year=2026",
+        "https://www.cdu.edu.au/study/course/bachelor-business-wbus03?year=2026",
+    ]
 
 
 def test_invalid_openai_envelope_is_rejected_before_patch_processing() -> None:

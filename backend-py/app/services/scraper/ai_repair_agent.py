@@ -1573,11 +1573,11 @@ async def _gather_context(job_id: str, db) -> dict:
                 ),
                 timeout=30,
             )
-            repair_course_url_sample = [
+            repair_course_url_sample = _rank_repair_course_urls([
                 str(item.get("url") or "")
                 for item in sitemap_rows
                 if item.get("url")
-            ][:15]
+            ])
             if repair_course_url_sample:
                 log.info(
                     "ai_repair: job=%s added %d sitemap course candidates to repair evidence",
@@ -1762,6 +1762,25 @@ def _is_course_url(u: str) -> bool:
     # "rescue" fees, faculties, study-pathway, or other category pages.
     from app.services.scraper.discovery import _looks_like_course
     return _looks_like_course(u, "")
+
+
+def _rank_repair_course_urls(urls: list[str], limit: int = 15) -> list[str]:
+    """Prioritise detail-shaped sitemap URLs over broad course-related pages."""
+    detail_urls = list(dict.fromkeys(url for url in urls if _is_course_url(url)))
+
+    def score(url: str) -> tuple[int, int]:
+        from urllib.parse import urlparse
+
+        path = urlparse(url).path.lower()
+        detail_segment = bool(re.search(r"/(?:course|courses|program|programs|programme|programmes)/[^/]+", path))
+        award_word = bool(re.search(
+            r"(?:bachelor|master|doctor|diploma|certificate|associate|honours|degree)",
+            path,
+        ))
+        depth = len([part for part in path.split("/") if part])
+        return (100 * detail_segment + 30 * award_word + min(depth, 10), len(path))
+
+    return sorted(detail_urls, key=score, reverse=True)[:limit]
 
 
 def _simulate_filter(
