@@ -222,6 +222,7 @@ class TestFunnelbackRichProvider:
     async def test_uses_rendered_transport_maps_fee_and_filters_subdegrees(
         self, monkeypatch,
     ):
+        import html
         import httpx
         import json
         import app.services.scraper.http_fetcher as http_fetcher
@@ -283,7 +284,12 @@ class TestFunnelbackRichProvider:
         async def fake_scrape_do(url, **kwargs):
             calls.append((url, kwargs))
             if "s/search.json" in url:
-                return funnelback_body
+                return (
+                    "<html><head></head><body>"
+                    '<pre style="word-wrap: break-word">'
+                    f"{html.escape(funnelback_body)}"
+                    "</pre></body></html>"
+                )
             return page_data_body
 
         class FakeResponse:

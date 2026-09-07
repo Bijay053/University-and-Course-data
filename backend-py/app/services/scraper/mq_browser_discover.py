@@ -58,12 +58,21 @@ accepts (the user's local machine, the prod droplet, etc.)::
 from __future__ import annotations
 
 import asyncio
+from html import unescape as html_unescape
 import json
 import logging
 import re
 from urllib.parse import urlparse
 
 log = logging.getLogger(__name__)
+
+
+def _unwrap_rendered_json(text: str) -> str:
+    """Strip the HTML ``<pre>`` wrapper Chrome adds around JSON responses."""
+    match = re.search(r"<pre[^>]*>([\s\S]*?)</pre>", text, re.IGNORECASE)
+    if match:
+        return html_unescape(match.group(1)).strip()
+    return text
 
 # Faculty subpages — the 4 MQ faculties each publish a per-faculty course
 # index.  Tried FIRST because they render course anchors in plain HTML
@@ -639,7 +648,7 @@ async def _discover_from_funnelback_api(
             raise MqEnrichmentCoverageError(message)
 
         try:
-            fb_data = json.loads(fb_body)
+            fb_data = json.loads(_unwrap_rendered_json(fb_body))
             page_results = (
                 fb_data
                 .get("response", {})
