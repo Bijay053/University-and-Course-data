@@ -334,6 +334,7 @@ async def test_re_extract_staged_refreshes_changed_fee_evidence(monkeypatch):
                     "international_fee": 41000,
                     "fee_year": 2025,
                     "course_website": old_url,
+                    "scrape_warnings": ["suspicious_duration"],
                 },
                 evidence=[
                     {
@@ -366,6 +367,8 @@ async def test_re_extract_staged_refreshes_changed_fee_evidence(monkeypatch):
                     "international_fee": 45000,
                     "fee_year": 2026,
                     "course_website": new_url,
+                    "duration": 3,
+                    "duration_term": "Year",
                 },
                 "evidence": [
                     {
@@ -409,6 +412,8 @@ async def test_re_extract_staged_refreshes_changed_fee_evidence(monkeypatch):
             assert course.international_fee == 45000
             assert course.fee_year == 2026
             assert course.course_website == new_url
+            assert "suspicious_duration" not in course.scrape_warnings
+            assert "confidence_low" in course.scrape_warnings
             fee_evidence = (
                 await db.execute(
                     select(ScrapedFieldEvidence).where(

@@ -2023,6 +2023,20 @@ async def re_extract_staged(
             results.append({"id": sc_id, "ok": False, "error": "extractor returned empty payload"})
             errors += 1
             continue
+        # Scrape warnings describe the extraction attempt that raised them.
+        # Remove a stale duration warning only when this attempt actually
+        # resolved duration; preserve unrelated warnings for operator review.
+        if "scrape_warnings" in payload:
+            payload["scrape_warnings"] = list(payload.get("scrape_warnings") or [])
+        elif (
+            payload.get("duration") not in (None, "", 0)
+            and "suspicious_duration" in (row.scrape_warnings or [])
+        ):
+            payload["scrape_warnings"] = [
+                warning
+                for warning in row.scrape_warnings
+                if warning != "suspicious_duration"
+            ]
 
         # Apply payload fields to the existing row.
         changed_fields: list[str] = []
