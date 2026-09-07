@@ -18,12 +18,13 @@ ourselves with a unique ``scrape_job_id`` prefix and clean up in a
 """
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, text
 
 from app.database import AsyncSessionLocal, engine
 from app.models import ScrapedCourse, University
@@ -552,6 +553,82 @@ async def test_within_job_stage_keeps_semantic_query_variants(
         assert await _exists(first_row), "semantic same-job variants must remain distinct"
     finally:
         await _cleanup(prefix)
+
+
+@pytest.mark.asyncio
+async def test_concurrent_within_job_aliases_create_one_review_row(
+    isolated_universities,
+):
+    uni_a, _ = isolated_universities
+    prefix = f"test_concurrent_alias_{uuid.uuid4().hex[:8]}_"
+    scrape_job_id = prefix + "job"
+    course_name = f"Bachelor of Concurrent Alias {prefix}"
+    urls = (
+        "http://www.example.edu/course/concurrent/?utm_source=catalogue",
+        "https://example.edu/course/concurrent",
+    )
+
+    async def stage(url: str):
+        async with AsyncSessionLocal() as db:
+            return await stage_course(
+                db,
+                scrape_job_id=scrape_job_id,
+                university_id=uni_a,
+                course_name=course_name,
+                payload={
+                    "course_name": course_name,
+                    "degree_level": "Bachelor's",
+                    "international_fee": 39000,
+                    "course_website": url,
+                },
+                evidence=[],
+                source_url=url,
+            )
+
+    try:
+        results = await asyncio.gather(*(stage(url) for url in urls))
+        assert sum(result.saved for result in results) == 1
+        assert sorted(result.reason for result in results) == [
+            "rejected: duplicate_url_in_job",
+            "staged",
+        ]
+
+        async with AsyncSessionLocal() as db:
+            rows = (
+                await db.execute(
+                    select(ScrapedCourse).where(
+                        ScrapedCourse.university_id == uni_a,
+                        ScrapedCourse.scrape_job_id == scrape_job_id,
+                    )
+                )
+            ).scalars().all()
+        assert len(rows) == 1
+    finally:
+        await _cleanup(prefix)
+
+
+@pytest.mark.asyncio
+async def test_review_url_unique_index_preserves_cross_job_lookup_prefix():
+    async with AsyncSessionLocal() as db:
+        index_definition = (
+            await db.execute(
+                text(
+                    """
+                    SELECT indexdef
+                    FROM pg_indexes
+                    WHERE tablename = 'scraped_courses'
+                      AND indexname = 'uq_scraped_courses_job_review_url_identity'
+                    """
+                )
+            )
+        ).scalar_one()
+
+    normalized = " ".join(index_definition.split())
+    assert "UNIQUE INDEX" in normalized
+    assert (
+        "(university_id, canonical_course_url, scrape_job_id)" in normalized
+    ), "canonical URL must precede scrape job so cross-job alias cleanup stays index-backed"
+    assert "status <> ALL" in normalized or "status NOT IN" in normalized
 
 
 def test_alias_dedup_uses_indexed_identity_without_queue_scan():

@@ -25,6 +25,7 @@ from typing import Any
 
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -52,6 +53,23 @@ class StageResult:
 
     def __bool__(self) -> bool:  # so existing `if result:` patterns still work
         return self.saved
+
+
+def _integrity_constraint_name(exc: IntegrityError) -> str | None:
+    """Read a PostgreSQL constraint name through SQLAlchemy/asyncpg wrappers."""
+    current: BaseException | None = exc
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        direct = getattr(current, "constraint_name", None)
+        if direct:
+            return str(direct)
+        diag = getattr(current, "diag", None)
+        diagnosed = getattr(diag, "constraint_name", None)
+        if diagnosed:
+            return str(diagnosed)
+        current = getattr(current, "orig", None) or getattr(current, "__cause__", None)
+    return None
 
 
 def _clean_model_value(field_name: str, value: Any) -> Any:
@@ -949,6 +967,23 @@ async def stage_course(
     db.add(sc)
     try:
         await db.flush()  # need sc.id for the FK on evidence rows
+    except IntegrityError as exc:
+        await db.rollback()
+        constraint_name = _integrity_constraint_name(exc)
+        if constraint_name == "uq_scraped_courses_job_review_url_identity":
+            log.info(
+                "stage_course: concurrent duplicate canonical URL %r from %r "
+                "(already staged in job %s)",
+                sc.canonical_course_url,
+                source_url,
+                scrape_job_id,
+            )
+            return StageResult(False, "rejected: duplicate_url_in_job")
+        log.warning(
+            "stage_course: initial flush failed for %r (uni %s): %s — rolling back",
+            name, university_id, exc,
+        )
+        return StageResult(False, f"flush failed: {exc}")
     except Exception as exc:  # noqa: BLE001
         # Explicit rollback prevents returning a poisoned connection to the
         # pool. Without this, asyncpg leaves the connection in a

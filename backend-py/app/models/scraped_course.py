@@ -13,9 +13,11 @@ class ScrapedCourse(Base):
     __tablename__ = "scraped_courses"
     __table_args__ = (
         Index(
-            "ix_scraped_courses_review_url_identity",
+            "uq_scraped_courses_job_review_url_identity",
             "university_id",
             "canonical_course_url",
+            "scrape_job_id",
+            unique=True,
             postgresql_where=text("status NOT IN ('approved', 'published')"),
         ),
     )
