@@ -262,6 +262,21 @@ def test_normalizes_compound_malaysian_locality_for_header() -> None:
     ) == "Kota Damansara"
 
 
+@pytest.mark.parametrize(
+    "label",
+    ["Map", "Maps", "Campus map", "Directions", "Get directions", "View map"],
+)
+def test_navigation_labels_are_never_valid_university_cities(label: str) -> None:
+    assert _normalise_metadata_locality(label) == ""
+
+
+def test_valid_city_repairs_existing_navigation_label() -> None:
+    from app.routers.universities import _should_replace_university_city
+
+    assert _should_replace_university_city("Maps", "Sydney")
+    assert not _should_replace_university_city("Melbourne", "Sydney")
+
+
 def test_detects_encoded_entities_in_existing_university_name() -> None:
     assert _contains_encoded_html_entity(
         "INTI International University &amp; Colleges &#8211; Your Future Built Today"

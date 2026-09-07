@@ -138,3 +138,4 @@
 - [Re-extraction warning lifecycle](reextract-warning-lifecycle.md) — clear only warnings whose condition the new payload proves resolved; preserve unrelated review warnings.
 - [Re-extraction evidence promotion](reextract-evidence-promotion.md) — equal values still refresh when selected evidence replaces previously unselected provenance.
 - [Targeted Fix progress](targeted-fix-progress.md) — count only previewed issue-field updates; job identity includes courses, target fields, and source review.
+- [University onboarding locality safety](university-onboarding-locality.md) — navigation labels are never cities; invalid stored localities may be repaired by verified onboarding fallback.

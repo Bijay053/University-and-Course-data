@@ -67,6 +67,25 @@ def _normalise_metadata_country(value: str) -> str:
     return _COUNTRY_CODE_NAMES.get(cleaned.upper(), cleaned)
 
 
+_NON_LOCALITY_LABELS = frozenset({
+    "map",
+    "maps",
+    "campus map",
+    "site map",
+    "directions",
+    "get directions",
+    "view directions",
+    "view map",
+    "open map",
+    "location",
+    "locations",
+    "contact",
+    "contact us",
+    "find us",
+    "how to get here",
+})
+
+
 def _normalise_metadata_locality(value: str) -> str:
     """Reduce compound/zoned localities to a clean city/campus label."""
     cleaned = _decode_metadata_text(value).strip(" ,.")
@@ -77,7 +96,26 @@ def _normalise_metadata_locality(value: str) -> str:
         primary,
         flags=re.I,
     ).strip()
-    return primary or cleaned
+    locality = primary or cleaned
+    if locality.casefold() in _NON_LOCALITY_LABELS:
+        return ""
+    return locality
+
+
+def _should_replace_university_city(existing: str | None, candidate: str) -> bool:
+    """Allow valid onboarding metadata to repair missing or invalid cities."""
+    normalized_candidate = _normalise_metadata_locality(candidate)
+    if not normalized_candidate:
+        return False
+    normalized_existing = _normalise_metadata_locality(existing or "")
+    return (
+        not normalized_existing
+        or (existing or "").strip().casefold() == "unknown"
+        or (
+            (existing or "").strip() != normalized_candidate
+            and normalized_existing == normalized_candidate
+        )
+    )
 
 
 def _is_onboarding_challenge(status_code: int, page_html: str) -> bool:
@@ -707,12 +745,17 @@ def _campus_link_locations(
         if not canonical:
             continue
         label = _decode_metadata_text(anchor.get_text(" ", strip=True))
-        if not label or label.casefold() in {"our locations", "our campuses", "locations"}:
+        city = _normalise_metadata_locality(label)
+        if (
+            not label
+            or label.casefold() in {"our locations", "our campuses", "locations"}
+            or not city
+        ):
             continue
         locations[canonical] = {
             "display_name": label,
             "full_address": None,
-            "city": label,
+            "city": city,
             "state_region": None,
             "country": fallback_country if fallback_country != "Unknown" else None,
             "latitude": None,
@@ -1803,6 +1846,12 @@ async def add_university_by_url(
         if first_city:
             city = first_city
 
+    # Final source-independent locality gate. Navigation labels such as "Maps"
+    # may arrive through JSON-LD, metadata, AI, or campus-link discovery; none
+    # may suppress the safer hostname/name fallback.
+    if city != "Unknown":
+        city = _normalise_metadata_locality(str(city)) or "Unknown"
+
     # ── City fallback: hostname lookup ────────────────────────────────────────
     if city == "Unknown":
         # Strip www. prefix then try progressively shorter domain suffixes
@@ -1893,15 +1942,10 @@ async def add_university_by_url(
             _needs_update = True
         _eff_city    = existing.city
         _eff_country = existing.country
-        _normalised_existing_city = _normalise_metadata_locality(existing.city or "")
         if (
-            (not existing.city or existing.city == "Unknown")
-            or (
-                city != "Unknown"
-                and existing.city != city
-                and _normalised_existing_city == city
-            )
-        ) and city != "Unknown":
+            city != "Unknown"
+            and _should_replace_university_city(existing.city, city)
+        ):
             existing.city = city
             _eff_city = city
             _needs_update = True
