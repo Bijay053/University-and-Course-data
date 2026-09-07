@@ -742,8 +742,9 @@ async def extract_primary(
     *,
     timeout: float | None = None,
     fields: list[str] | tuple[str, ...] | None = None,
+    provider: str = "gemini",
 ) -> tuple[dict[str, Any], float, int, int, dict]:
-    """Run one Gemini Flash call to extract the requested missing hard fields.
+    """Run one AI call to extract the requested missing hard fields.
 
     Parameters
     ----------
@@ -817,33 +818,73 @@ async def extract_primary(
 
     prompt = _PROMPT_TEMPLATE.format(fields_block=fields_block, url=url, text=text)
 
-    # Save exact prompt sent to Gemini — fire-and-forget, never blocks extraction.
+    provider = provider.strip().lower()
+    if provider not in {"gemini", "openai"}:
+        raise ValueError(f"Unsupported primary extraction provider: {provider}")
+
+    # Save the exact prompt sent to the selected provider.
     try:
         from app.services.scraper.snapshot_save import save_ai_prompt_snapshot as _save_ai_prompt
         _asyncio.create_task(
-            _save_ai_prompt(url, prompt, model_name="gemini", call_type="primary")
+            _save_ai_prompt(url, prompt, model_name=provider, call_type="primary")
         )
     except Exception:
         pass
 
-    # Task #233: the timeout now lives INSIDE generate() (around the SDK call,
-    # after the rate-limiter token is acquired) so it measures real API slowness
-    # and trips the circuit breaker via record_timeout().  generate() returns a
-    # skipped response (skip_reason="timeout after Ns") on timeout — handled by
-    # the `resp.skipped` branch below — so no outer wait_for is needed here.
-    try:
-        resp = await gemini_client.generate(
-            prompt, max_output_tokens=768, timeout_s=timeout,
-        )
-    except Exception as exc:
-        log.warning("gemini_primary: generate failed on %s: %s", url, exc)
-        return {}, 0.0, 0, 0, {"skipped": True, "skip_reason": str(exc)}
+    raw_text = ""
+    cost_usd = 0.0
+    input_tokens = 0
+    output_tokens = 0
+    if provider == "openai":
+        from app.services.ai.openai_client import chat_json
 
-    if resp.skipped:
-        log.warning("gemini_primary: skipped on %s (%s)", url, resp.skip_reason)
-        return {}, 0.0, resp.input_tokens, 0, {"skipped": True, "skip_reason": resp.skip_reason}
+        try:
+            raw_data = await _asyncio.wait_for(
+                chat_json(
+                    system=(
+                        "You extract university course facts only from supplied "
+                        "page text. Return one JSON object, use null when evidence "
+                        "is absent, and never infer or guess."
+                    ),
+                    user=prompt,
+                    max_tokens=768,
+                ),
+                timeout=timeout,
+            )
+        except Exception as exc:
+            log.warning("openai_primary: generate failed on %s: %s", url, exc)
+            return {}, 0.0, 0, 0, {
+                "skipped": True,
+                "skip_reason": str(exc),
+                "provider": provider,
+            }
+        if not raw_data:
+            return {}, 0.0, 0, 0, {
+                "skipped": True,
+                "skip_reason": "empty_response",
+                "provider": provider,
+            }
+        raw_text = json.dumps(raw_data, ensure_ascii=False)
+    else:
+        # Task #233: the timeout lives inside generate() so Gemini timeouts trip
+        # its circuit breaker. OpenAI is bounded above with wait_for instead.
+        try:
+            resp = await gemini_client.generate(
+                prompt, max_output_tokens=768, timeout_s=timeout,
+            )
+        except Exception as exc:
+            log.warning("gemini_primary: generate failed on %s: %s", url, exc)
+            return {}, 0.0, 0, 0, {"skipped": True, "skip_reason": str(exc)}
 
-    raw_data = _parse_json(resp.text)
+        if resp.skipped:
+            log.warning("gemini_primary: skipped on %s (%s)", url, resp.skip_reason)
+            return {}, 0.0, resp.input_tokens, 0, {"skipped": True, "skip_reason": resp.skip_reason}
+
+        raw_text = resp.text or ""
+        raw_data = _parse_json(raw_text)
+        cost_usd = resp.cost_usd
+        input_tokens = resp.input_tokens
+        output_tokens = resp.output_tokens
     filled: dict[str, Any] = {}
     for fk in requested_fields:
         coerced = _coerce(fk, raw_data.get(fk))
@@ -893,10 +934,11 @@ async def extract_primary(
                 filled["fee_term"] = "Annual"
 
     log.info(
-        "gemini_primary: %s → %d fields filled, cost=$%.6f",
+        "%s_primary: %s → %d fields filled, cost=$%.6f",
+        provider,
         url,
         len(filled),
-        resp.cost_usd,
+        cost_usd,
     )
     # Debug dict — returned to caller so it can emit via the SSE/Celery log path.
     # text_snippet extended to 2000 chars so operators can see whether the
@@ -905,6 +947,7 @@ async def extract_primary(
         "html_len": len(html) if html else 0,
         "text_len": len(text),
         "text_snippet": text[:2000],
-        "raw_response": (resp.text or "")[:600],
+        "raw_response": raw_text[:600],
+        "provider": provider,
     }
-    return filled, resp.cost_usd, resp.input_tokens, resp.output_tokens, _dbg
+    return filled, cost_usd, input_tokens, output_tokens, _dbg

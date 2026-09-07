@@ -814,6 +814,7 @@ async def _extract_only(
     central_data: dict | None = None,
     extraction_rules: dict | None = None,
     seen_pdf_urls: set[str] | None = None,
+    ai_provider: str = "gemini",
 ) -> dict:
     """Network-bound work — safe to parallelise across coroutines.
 
@@ -910,6 +911,7 @@ async def _extract_only(
             extraction_rules=extraction_rules,
             seen_pdf_urls=seen_pdf_urls,
             discovery_title=name,
+            ai_provider=ai_provider,
         )
     except ScrapedoAccountError:
         raise  # propagate — caller sets scrape_do_dead_flag to abort remaining courses

@@ -3544,7 +3544,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
               </div>
 
               <div className="text-sm text-muted-foreground border-t pt-3">
-                <strong>Action:</strong> Re-extract {fixAnalysis.courses_with_url} of {fixAnalysis.total} courses using current recipe rules. Gemini AI will attempt to fill missing fields.
+                <strong>Action:</strong> Re-extract {fixAnalysis.courses_with_url} of {fixAnalysis.total} courses using current recipe rules. OpenAI will attempt to fill missing fields and retry unresolved fee, location, or duration once.
               </div>
 
               {fixingSelected && fixProgress && (

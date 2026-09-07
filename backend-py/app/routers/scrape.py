@@ -1922,7 +1922,9 @@ async def re_extract_staged(
 
     Returns ``{ total, updated, skipped, errors, results }``.
     """
+    import asyncio as _asyncio
     import math as _math
+    import time as _time
 
     from app.models import ScrapedCourse, University
     from app.services.auto_publish import should_auto_publish
@@ -1934,6 +1936,12 @@ async def re_extract_staged(
         evidence_fields_with_changed_provenance,
         refresh_evidence_for_fields,
     )
+
+    if len(body.ids) > 5:
+        raise HTTPException(
+            status_code=400,
+            detail="Re-extraction accepts at most 5 courses per request",
+        )
 
     uni = await db.get(University, body.university_id)
     if uni is None:
@@ -1988,8 +1996,23 @@ async def re_extract_staged(
     updated = 0
     errors = 0
     skipped = 0
+    _ONE_GO_RETRY_FIELDS = (
+        "international_fee",
+        "course_location",
+        "duration",
+    )
+    operation_deadline = _time.monotonic() + 240.0
 
     for sc_id in body.ids:
+        remaining_operation_s = operation_deadline - _time.monotonic()
+        if remaining_operation_s <= 0:
+            results.append({
+                "id": sc_id,
+                "ok": False,
+                "error": "repair batch exceeded its 240 second deadline",
+            })
+            errors += 1
+            continue
         row = rows_by_id.get(sc_id)
         if row is None:
             results.append({"id": sc_id, "ok": False, "error": "not found"})
@@ -2002,27 +2025,115 @@ async def re_extract_staged(
             skipped += 1
             continue
 
-        # Run extraction.
-        try:
-            out = await _extract_only(
-                {"url": url, "name": row.course_name or ""},
-                country=country,
-            )
-        except Exception as exc:  # noqa: BLE001
-            results.append({"id": sc_id, "ok": False, "error": f"extraction error: {exc}"})
-            errors += 1
-            continue
+        # Review → Fix is an operator-requested recovery path. Keep normal
+        # scrapes on their configured provider, but use OpenAI here and make one
+        # bounded second attempt when the first response still leaves the
+        # headline review fields unresolved.
+        out: dict = {}
+        payload: dict = {}
+        selected_evidence_by_field: dict[str, dict] = {}
+        other_evidence: dict[tuple, dict] = {}
+        extraction_passes = 0
+        last_error = "extractor returned empty payload"
+        retry_merge_fields: set[str] | None = None
+        for pass_number in range(1, 3):
+            try:
+                pass_out = await _asyncio.wait_for(
+                    _extract_only(
+                        {"url": url, "name": row.course_name or ""},
+                        country=country,
+                        ai_provider="openai",
+                    ),
+                    timeout=min(
+                        120.0,
+                        max(1.0, operation_deadline - _time.monotonic()),
+                    ),
+                )
+            except Exception as exc:  # noqa: BLE001
+                last_error = f"extraction error: {exc}"
+                if pass_number == 1:
+                    continue
+                break
 
-        if out.get("error"):
-            results.append({"id": sc_id, "ok": False, "error": out["error"]})
-            errors += 1
-            continue
+            if pass_out.get("error"):
+                last_error = str(pass_out["error"])
+                if pass_number == 1:
+                    continue
+                break
 
-        payload: dict = out.get("payload") or {}
+            pass_payload = pass_out.get("payload") or {}
+            if not pass_payload:
+                if pass_number == 1:
+                    continue
+                break
+
+            extraction_passes = pass_number
+            out = pass_out
+            if not payload:
+                payload = dict(pass_payload)
+            else:
+                # A retry may be a partial edge response. It can add or improve
+                # only the fields that remained unresolved after the first pass;
+                # it must not replace unrelated first-pass values.
+                for field_key, value in pass_payload.items():
+                    if (
+                        retry_merge_fields is not None
+                        and field_key in retry_merge_fields
+                        and value not in (None, "", [])
+                    ):
+                        payload[field_key] = value
+
+            for item in pass_out.get("evidence") or []:
+                field_key = str(item.get("field_key") or "")
+                if not field_key:
+                    continue
+                if (
+                    pass_number > 1
+                    and retry_merge_fields is not None
+                    and field_key not in retry_merge_fields
+                ):
+                    continue
+                if item.get("decision_status") == "selected":
+                    selected_evidence_by_field[field_key] = item
+                else:
+                    signature = (
+                        field_key,
+                        str(item.get("value")),
+                        str(item.get("method")),
+                        str(item.get("source_url")),
+                    )
+                    other_evidence[signature] = item
+
+            unresolved = [
+                field_key
+                for field_key in _ONE_GO_RETRY_FIELDS
+                if not getattr(row, field_key, None)
+                and not payload.get(field_key)
+            ]
+            if not unresolved:
+                break
+            if pass_number == 1:
+                retry_merge_fields = set(unresolved)
+                if "international_fee" in retry_merge_fields:
+                    retry_merge_fields.update({"fee_term", "fee_year", "currency"})
+                if "duration" in retry_merge_fields:
+                    retry_merge_fields.add("duration_term")
+                if "course_location" in retry_merge_fields:
+                    retry_merge_fields.update({"study_mode", "delivery_mode"})
+
         if not payload:
-            results.append({"id": sc_id, "ok": False, "error": "extractor returned empty payload"})
+            results.append({"id": sc_id, "ok": False, "error": last_error})
             errors += 1
             continue
+
+        out = {
+            **out,
+            "payload": payload,
+            "evidence": [
+                *other_evidence.values(),
+                *selected_evidence_by_field.values(),
+            ],
+        }
         # Scrape warnings describe the extraction attempt that raised them.
         # Remove a stale duration warning only when this attempt actually
         # resolved duration; preserve unrelated warnings for operator review.
@@ -2090,28 +2201,27 @@ async def re_extract_staged(
         except Exception as exc:  # noqa: BLE001
             log.warning("re-extract: completeness scoring failed for sc %s: %s", sc_id, exc)
 
+        try:
+            # Commit each course independently. A slow later course cannot keep
+            # earlier successful repairs in one long-lived transaction.
+            await db.commit()
+        except Exception as exc:  # noqa: BLE001
+            await db.rollback()
+            log.warning("re-extract: commit failed for sc %s: %s", sc_id, exc)
+            results.append({"id": sc_id, "ok": False, "error": "commit failed"})
+            errors += 1
+            continue
+
         results.append({
             "id": sc_id,
             "ok": True,
             "updated_fields": changed_fields,
             "refreshed_evidence_fields": sorted(evidence_refreshed_fields),
             "new_completeness": row.completeness,
+            "extraction_passes": extraction_passes,
+            "ai_provider": "openai",
         })
         updated += 1
-
-    if updated > 0:
-        try:
-            await db.commit()
-        except Exception as exc:  # noqa: BLE001
-            await db.rollback()
-            log.warning("re-extract: commit failed for uni %s: %s", body.university_id, exc)
-            return {
-                "total": len(body.ids),
-                "updated": 0,
-                "skipped": skipped,
-                "errors": len(body.ids),
-                "results": [{"id": r["id"], "ok": False, "error": "commit failed"} for r in results],
-            }
 
     return {
         "total": len(body.ids),

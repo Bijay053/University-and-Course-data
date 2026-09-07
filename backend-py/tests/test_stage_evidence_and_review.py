@@ -310,6 +310,7 @@ async def test_re_extract_staged_refreshes_changed_fee_evidence(monkeypatch):
     job_id = f"test_reextract_ev_{uuid.uuid4().hex[:10]}"
     old_url = "https://example.edu/courses/2025/computer-science"
     new_url = "https://example.edu/courses/computer-science?year=2026"
+    extract_calls: list[dict] = []
     try:
         async with AsyncSessionLocal() as db:
             db.add(
@@ -360,7 +361,9 @@ async def test_re_extract_staged_refreshes_changed_fee_evidence(monkeypatch):
         sc_id = staged.scraped_course_id
         assert sc_id is not None
 
-        async def _fake_extract_only(*_args, **_kwargs):
+        async def _fake_extract_only(*_args, **kwargs):
+            extract_calls.append(kwargs)
+            is_retry = len(extract_calls) == 2
             return {
                 "url": new_url,
                 "payload": {
@@ -369,6 +372,8 @@ async def test_re_extract_staged_refreshes_changed_fee_evidence(monkeypatch):
                     "course_website": new_url,
                     "duration": 3,
                     "duration_term": "Year",
+                    "category": "Business" if is_retry else "Science",
+                    **({"course_location": "Sydney"} if is_retry else {}),
                 },
                 "evidence": [
                     {
@@ -389,6 +394,15 @@ async def test_re_extract_staged_refreshes_changed_fee_evidence(monkeypatch):
                         "snippet": "Fees shown are for 2026",
                         "decision_status": "selected",
                     },
+                    {
+                        "field_key": "category",
+                        "value": "Business" if is_retry else "Science",
+                        "normalized": "Business" if is_retry else "Science",
+                        "method": "openai_primary",
+                        "source_url": new_url,
+                        "snippet": "Course discipline",
+                        "decision_status": "selected",
+                    },
                 ],
             }
 
@@ -405,6 +419,10 @@ async def test_re_extract_staged_refreshes_changed_fee_evidence(monkeypatch):
             )
         assert response.status_code == 200, response.text
         assert response.json()["updated"] == 1
+        assert len(extract_calls) == 2
+        assert all(call["ai_provider"] == "openai" for call in extract_calls)
+        assert response.json()["results"][0]["extraction_passes"] == 2
+        assert response.json()["results"][0]["ai_provider"] == "openai"
 
         async with AsyncSessionLocal() as db:
             course = await db.get(ScrapedCourse, sc_id)
@@ -412,6 +430,8 @@ async def test_re_extract_staged_refreshes_changed_fee_evidence(monkeypatch):
             assert course.international_fee == 45000
             assert course.fee_year == 2026
             assert course.course_website == new_url
+            assert course.category == "Science"
+            assert course.course_location == "Sydney"
             assert "suspicious_duration" not in course.scrape_warnings
             assert "confidence_low" in course.scrape_warnings
             fee_evidence = (

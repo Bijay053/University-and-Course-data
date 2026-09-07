@@ -1294,6 +1294,7 @@ METHOD_AUTHORITY: dict[str, float] = {
     "uni_pdf:cricos_match:requirements": 2.5,
     # 3 — course-specific text
     "gemini_primary": _AUTHORITY_COURSE_SPECIFIC,
+    "openai_primary": _AUTHORITY_COURSE_SPECIFIC,
     "rule:fee": _AUTHORITY_COURSE_SPECIFIC,
     "rule:english": _AUTHORITY_COURSE_SPECIFIC,
     "rule:duration": _AUTHORITY_COURSE_SPECIFIC,
@@ -1847,6 +1848,7 @@ async def extract_course(
     extraction_rules: dict[str, Any] | None = None,
     seen_pdf_urls: set[str] | None = None,
     discovery_title: str = "",
+    ai_provider: str = "gemini",
 ) -> dict[str, Any]:
     """Fetch (if needed) and run all extractors. Returns merged payload + raw evidence.
 
@@ -4432,7 +4434,7 @@ async def extract_course(
                         url=url,
                     )
 
-            elif _gate_reason == "classification_only":
+            elif _gate_reason == "classification_only" and ai_provider == "gemini":
                 # Only category/sub_category missing — use cheap 100-token prompt.
                 _class_fields = tuple(
                     _gemini_primary_missing_fields(
@@ -4635,6 +4637,7 @@ async def extract_course(
                             url,
                             timeout=_gp_inner_timeout,
                             fields=_gp_requested_fields,
+                            provider=ai_provider,
                         ),
                         timeout=_gp_stage_timeout_s,
                     )
@@ -5032,15 +5035,16 @@ async def extract_course(
                 for _prior_ev in evidence:
                     if _prior_ev.get("field_key") == _gp_k:
                         _prior_ev["decision_status"] = "superseded"
+                _primary_method = f"{ai_provider}_primary"
                 evidence.append({
                     "field_key": _gp_k,
                     "value": _gp_v,
                     "confidence": 0.75,
-                    "method": "gemini_primary",
+                    "method": _primary_method,
                     # enforce_source_evidence requires both source_url and snippet
                     # to keep a critical field; without them, fee/IELTS are dropped.
                     "source_url": url,
-                    "snippet": f"gemini_primary: {_gp_k}={_gp_v}",
+                    "snippet": f"{_primary_method}: {_gp_k}={_gp_v}",
                     "decision_status": "selected",
                 })
 
@@ -5057,10 +5061,10 @@ async def extract_course(
                 )
                 await emit(
                     "status",
-                    f"[GEMINI] {url[:60]} → {len(_gp_filled)} field(s) "
+                    f"[{ai_provider.upper()}] {url[:60]} → {len(_gp_filled)} field(s) "
                     f"(cost=${_gp_cost:.6f}, in={_gp_in_tok} out={_gp_out_tok}){_gp_skip_note}",
                     phase="extract",
-                    kind="gemini_primary_done",
+                    kind=f"{ai_provider}_primary_done",
                     filled=list(_gp_filled.keys()),
                     cost_usd=_gp_cost,
                     input_tokens=_gp_in_tok,
@@ -5838,7 +5842,16 @@ async def extract_course(
             return {"url": url, "payload": payload, "evidence": evidence}
 
     try:
-        if not _vision_ocr_trusted():
+        if ai_provider == "openai":
+            # Review → Fix promises an OpenAI-only AI path. The current vision
+            # implementation is Gemini-backed, so leave image-only evidence for
+            # normal scrapes instead of leaking this repair request to Gemini.
+            log.info(
+                "[VISION SKIP] OpenAI repair provider active on %s",
+                url,
+            )
+            vision_filled, vision_evidence = {}, []
+        elif not _vision_ocr_trusted():
             # trust_vision_ocr: false in per-uni YAML — skip all vision OCR for
             # this university.  Stub empty containers so the downstream merge /
             # suppression logic in this try-block runs harmlessly (empty-dict
@@ -6424,6 +6437,12 @@ async def extract_course(
                     "payload": {},
                     "evidence": [],
                 }
+
+    if ai_provider == "openai" and use_ai_fallback:
+        # Review → Fix already ran the hard-field AI stage through OpenAI.
+        # Do not fall through to the legacy Gemini-only enrichment pass.
+        use_ai_fallback = False
+        log.info("[FALLBACK SKIP] OpenAI repair provider active on %s", url)
 
     if use_ai_fallback and required_course_fields_complete(payload):
         use_ai_fallback = False
