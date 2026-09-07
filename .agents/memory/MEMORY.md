@@ -135,3 +135,4 @@
 - [Disposable AWS integration safety](disposable-aws-integration-safety.md) — validate every AWS principal’s account and require an explicit disposable-resource tag before destructive integration tests.
 - [CSU duration and offering-year authority](csu-duration-offering-year.md) — use minimum/standard full-time duration and latest-year FPOS modes; embedded maxima and mixed years can corrupt current values.
 - [CDU audience-scoped course fields](cdu-audience-scoped-fields.md) — fees and locations must come from the current course’s international DOM blocks, never domestic siblings or related-course cards.
+- [Re-extraction warning lifecycle](reextract-warning-lifecycle.md) — clear only warnings whose condition the new payload proves resolved; preserve unrelated review warnings.
