@@ -950,9 +950,16 @@ async def fetch_html_scrape_do(
                 url, status=_status, tier="scrape_do",
                 detail=_redact_scrape_do_log_text(_last_sd_r.text[:200], token=token),
             )
+            _short_success = _status == 200
+            _short_length = len(_last_sd_r.text)
             _record_fetch_failure(
                 kind="scrape_do_unavailable",
-                reason=f"Scrape.do returned HTTP {_status}.",
+                reason=(
+                    "Scrape.do returned an empty or suspiciously short "
+                    f"HTTP 200 response ({_short_length} chars)."
+                    if _short_success
+                    else f"Scrape.do returned HTTP {_status}."
+                ),
                 retryable=_status in _SD_RETRY_STATUSES,
                 transport="scrape_do_render" if render else "scrape_do_static",
                 status_code=_status,

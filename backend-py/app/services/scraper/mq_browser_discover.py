@@ -64,6 +64,8 @@ import logging
 import re
 from urllib.parse import urlparse
 
+from app.services.scraper.challenge_shell import is_challenge_shell
+
 log = logging.getLogger(__name__)
 
 
@@ -73,6 +75,42 @@ def _unwrap_rendered_json(text: str) -> str:
     if match:
         return html_unescape(match.group(1)).strip()
     return text
+
+
+def _safe_render_failure_summary(failure: dict[str, object] | None) -> str:
+    """Describe a rendered transport failure without response bodies or URLs."""
+    if not failure:
+        return "rendered Scrape.do transport returned no usable body"
+
+    kind = str(failure.get("kind") or "")
+    status = failure.get("status_code")
+    if kind == "challenge_page":
+        return "rendered Scrape.do transport returned an anti-bot challenge"
+    if kind == "scrape_do_timeout":
+        return "rendered Scrape.do transport timed out"
+    if kind == "origin_not_found":
+        return f"rendered Scrape.do transport returned HTTP {status or '404/410'}"
+    if kind == "scrape_do_unavailable" and status == 200:
+        return (
+            "rendered Scrape.do transport returned an empty or suspiciously "
+            "short HTTP 200 response"
+        )
+    if status is not None:
+        return f"rendered Scrape.do transport returned HTTP {status}"
+    return "rendered Scrape.do transport was unavailable"
+
+
+def _direct_fallback_failure(body: str, status_code: int) -> str | None:
+    """Classify the direct fallback without including its response body."""
+    if status_code != 200:
+        return f"direct HTTP fallback returned HTTP {status_code}"
+    if is_challenge_shell(body):
+        return "direct HTTP fallback returned an anti-bot challenge"
+    try:
+        json.loads(_unwrap_rendered_json(body))
+    except (TypeError, ValueError):
+        return "direct HTTP fallback returned a non-JSON response"
+    return None
 
 # Faculty subpages — the 4 MQ faculties each publish a per-faculty course
 # index.  Tried FIRST because they render course anchors in plain HTML
@@ -598,6 +636,8 @@ async def _discover_from_funnelback_api(
             f"&num_ranks={_FUNNELBACK_PAGE_SIZE}"
         )
         fb_body: str | None = None
+        rendered_failure: str | None = None
+        direct_failure: str | None = None
 
         if fetch_html_scrape_do is not None:
             try:
@@ -607,12 +647,23 @@ async def _discover_from_funnelback_api(
                     rate_limit=False,  # discovery phase — exempt from fleet limiter
                     max_retries=1,
                 )
+                if not fb_body:
+                    from app.services.scraper.http_fetcher import get_last_fetch_failure
+                    rendered_failure = _safe_render_failure_summary(
+                        get_last_fetch_failure()
+                    )
             except Exception as _exc:  # noqa: BLE001
+                rendered_failure = (
+                    "rendered Scrape.do transport raised "
+                    f"{type(_exc).__name__}"
+                )
                 log.debug(
                     "mq funnelback: scrape.do page %d failed: %s",
                     page_index + 1,
-                    _exc,
+                    type(_exc).__name__,
                 )
+        else:
+            rendered_failure = "rendered Scrape.do transport was unavailable"
 
         # Fallback: plain httpx (works from prod server where IP isn't blocked).
         if not fb_body:
@@ -625,23 +676,40 @@ async def _discover_from_funnelback_api(
                     r = await client.get(page_url)
                     if r.status_code == 200:
                         fb_body = r.text
+                        direct_failure = _direct_fallback_failure(
+                            r.text,
+                            r.status_code,
+                        )
                     else:
+                        direct_failure = _direct_fallback_failure(
+                            r.text,
+                            r.status_code,
+                        )
                         log.warning(
                             "mq funnelback: httpx page %d fallback → HTTP %s",
                             page_index + 1,
                             r.status_code,
                         )
             except Exception as _exc:  # noqa: BLE001
+                direct_failure = (
+                    f"direct HTTP fallback raised {type(_exc).__name__}"
+                )
                 log.warning(
                     "mq funnelback: httpx page %d fallback failed: %s",
                     page_index + 1,
-                    _exc,
+                    type(_exc).__name__,
                 )
 
         if not fb_body:
+            failure_detail = "; ".join(
+                detail
+                for detail in (rendered_failure, direct_failure)
+                if detail
+            )
             message = (
                 "Macquarie Funnelback catalogue page "
                 f"{page_index + 1} (start_rank={start_rank}) was unreachable. "
+                f"Transport detail: {failure_detail or 'no usable response'}. "
                 "Refusing to supplement with domestic-default HTML."
             )
             await emit_fn(f"[DISCOVER] MQ: ERROR — {message}")
@@ -656,9 +724,15 @@ async def _discover_from_funnelback_api(
                 .get("results", [])
             )
         except Exception as _exc:  # noqa: BLE001
+            failure_detail = "; ".join(
+                detail
+                for detail in (rendered_failure, direct_failure)
+                if detail
+            )
             message = (
                 "Macquarie Funnelback catalogue page "
                 f"{page_index + 1} returned invalid JSON ({_exc}). "
+                f"Transport detail: {failure_detail or 'response was not valid JSON'}. "
                 "Refusing to supplement with domestic-default HTML."
             )
             await emit_fn(f"[DISCOVER] MQ: ERROR — {message}")

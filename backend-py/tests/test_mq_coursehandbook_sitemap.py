@@ -533,6 +533,66 @@ class TestFunnelbackRichProvider:
         ):
             await mq._discover_from_funnelback_api(emit, max_courses=500)
 
+    @pytest.mark.asyncio
+    async def test_reports_render_failure_when_direct_fallback_is_challenge(
+        self, monkeypatch,
+    ):
+        import httpx
+        import app.services.scraper.http_fetcher as http_fetcher
+
+        async def fake_scrape_do(url, **kwargs):
+            return None
+
+        def fake_last_failure():
+            return {
+                "kind": "scrape_do_unavailable",
+                "reason": "SECRET_TOKEN must never appear",
+                "retryable": True,
+                "transport": "scrape_do_render",
+                "status_code": 200,
+            }
+
+        class FakeResponse:
+            status_code = 200
+            text = "<html><head><title>Just a moment...</title></head></html>"
+
+        class FakeClient:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def get(self, *args, **kwargs):
+                return FakeResponse()
+
+        async def emit(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(
+            http_fetcher, "fetch_html_scrape_do", fake_scrape_do,
+        )
+        monkeypatch.setattr(
+            http_fetcher, "get_last_fetch_failure", fake_last_failure,
+        )
+        monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
+
+        with pytest.raises(mq.MqEnrichmentCoverageError) as raised:
+            await mq._discover_from_funnelback_api(emit, max_courses=500)
+
+        message = str(raised.value)
+        assert (
+            "rendered Scrape.do transport returned an empty or suspiciously "
+            "short HTTP 200 response"
+        ) in message
+        assert "direct HTTP fallback returned an anti-bot challenge" in message
+        assert "Refusing to supplement with domestic-default HTML" in message
+        assert "SECRET_TOKEN" not in message
+        assert "search.json?" not in message
+
 
 @pytest.mark.skipif(
     os.environ.get("MQ_LIVE_TEST") != "1",
