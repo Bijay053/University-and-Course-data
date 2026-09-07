@@ -187,6 +187,47 @@ def test_cdu_vet_ignores_preceding_related_course_duration() -> None:
     assert result["duration_term"] == "Year"
 
 
+def test_cdu_uses_course_specific_english_overalls_not_component_floors() -> None:
+    result = apply_cdu_static_extraction(
+        "https://www.cdu.edu.au/study/course/doctor-pharmacy-spha01?year=2026",
+        """
+        <h2>English Language requirements</h2>
+        <table>
+          <tr>
+            <td>IELTS Academic Module (including One Skill Retake)</td>
+            <td>A minimum overall score of 6.5 with no band less than 6.0.</td>
+          </tr>
+          <tr>
+            <td>Cambridge Advanced English (CAE)</td>
+            <td>A minimum overall score of 176, with no skill below 169.</td>
+          </tr>
+          <tr>
+            <td>Pearson Test of English (PTE) Academic module</td>
+            <td>A minimum overall score of 58 with no score lower than 50.</td>
+          </tr>
+          <tr>
+            <td>TOEFL Internet-based Test (iBT)</td>
+            <td>A minimum overall score of 79 with a minimum writing score of 21.</td>
+          </tr>
+        </table>
+        """,
+    )
+
+    assert result["ielts_overall"] == 6.5
+    assert result["ielts_listening"] == 6.0
+    assert result["ielts_reading"] == 6.0
+    assert result["ielts_writing"] == 6.0
+    assert result["ielts_speaking"] == 6.0
+    assert result["pte_overall"] == 58
+    assert result["pte_listening"] == 50
+    assert result["pte_reading"] == 50
+    assert result["pte_writing"] == 50
+    assert result["pte_speaking"] == 50
+    assert result["toefl_overall"] == 79
+    assert result["toefl_writing"] == 21
+    assert result["cambridge_overall"] == 176
+
+
 def test_cdu_course_url_gets_catalogue_year_without_losing_query() -> None:
     url = ensure_cdu_catalogue_year(
         "https://www.cdu.edu.au/study/course/bachelor-nursing-wnur02?source=sitemap",

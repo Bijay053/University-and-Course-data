@@ -25,6 +25,26 @@ _YEARS_RE = re.compile(
     r"(?P<years>\d+(?:\.\d+)?)\s*year(?:/s|s)?\b",
     re.IGNORECASE,
 )
+_OVERALL_SCORE_RE = re.compile(
+    r"\b(?:minimum\s+)?overall\s+(?:band\s+)?(?:score|grade)\s+(?:of\s+)?"
+    r"(?P<score>\d+(?:\.\d+)?)\b",
+    re.IGNORECASE,
+)
+_IELTS_BAND_RE = re.compile(
+    r"\bno\s+(?:individual\s+)?band\s+(?:score\s+)?"
+    r"(?:below|less\s+than|lower\s+than)\s+(?P<score>\d+(?:\.\d+)?)\b",
+    re.IGNORECASE,
+)
+_PTE_COMPONENT_RE = re.compile(
+    r"\bno\s+(?:individual\s+)?score\s+"
+    r"(?:below|less\s+than|lower\s+than)\s+(?P<score>\d+(?:\.\d+)?)\b",
+    re.IGNORECASE,
+)
+_TOEFL_WRITING_RE = re.compile(
+    r"\bminimum\s+writing\s+score\s+(?:of\s+)?"
+    r"(?P<score>\d+(?:\.\d+)?)\b",
+    re.IGNORECASE,
+)
 
 
 def is_cdu_url(url: str) -> bool:
@@ -165,6 +185,56 @@ def _duration(soup: BeautifulSoup) -> dict[str, Any]:
     }
 
 
+def _english_scores(soup: BeautifulSoup) -> dict[str, Any]:
+    """Extract CDU's course-specific overall and component English scores."""
+    result: dict[str, Any] = {}
+    for row in soup.select("tr"):
+        cells = row.find_all(["th", "td"])
+        if len(cells) < 2:
+            continue
+        label = " ".join(cells[0].get_text(" ", strip=True).split()).lower()
+        requirement = " ".join(cells[-1].get_text(" ", strip=True).split())
+        overall_match = _OVERALL_SCORE_RE.search(requirement)
+        if overall_match is None:
+            continue
+        overall = float(overall_match.group("score"))
+
+        if "ielts" in label:
+            if not 4 <= overall <= 9:
+                continue
+            result["ielts_overall"] = overall
+            band_match = _IELTS_BAND_RE.search(requirement)
+            if band_match:
+                band = float(band_match.group("score"))
+                if 4 <= band <= overall:
+                    for skill in ("listening", "reading", "writing", "speaking"):
+                        result[f"ielts_{skill}"] = band
+        elif "pearson" in label or re.search(r"\bpte\b", label):
+            if not 10 <= overall <= 90:
+                continue
+            result["pte_overall"] = overall
+            component_match = _PTE_COMPONENT_RE.search(requirement)
+            if component_match:
+                component = float(component_match.group("score"))
+                if 10 <= component <= overall:
+                    for skill in ("listening", "reading", "writing", "speaking"):
+                        result[f"pte_{skill}"] = component
+        elif "toefl" in label:
+            if not 30 <= overall <= 120:
+                continue
+            result["toefl_overall"] = overall
+            writing_match = _TOEFL_WRITING_RE.search(requirement)
+            if writing_match:
+                writing = float(writing_match.group("score"))
+                if 0 <= writing <= 30:
+                    result["toefl_writing"] = writing
+        elif "cambridge" in label or re.search(r"\bcae\b", label):
+            if 140 <= overall <= 230:
+                result["cambridge_overall"] = overall
+
+    return result
+
+
 def apply_cdu_static_extraction(url: str, html: str) -> dict[str, Any]:
     """Return CDU fields scoped to the current international course."""
     if not is_cdu_url(url) or not html:
@@ -183,4 +253,5 @@ def apply_cdu_static_extraction(url: str, html: str) -> dict[str, Any]:
     }
     result.update(_fee(soup))
     result.update(_duration(soup))
+    result.update(_english_scores(soup))
     return result

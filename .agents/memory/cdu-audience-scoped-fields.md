@@ -1,6 +1,6 @@
 ---
 name: CDU audience-scoped course fields
-description: Authority rules for CDU international fees, locations, and study mode.
+description: Authority rules for CDU international fees, locations, duration, and course-specific English scores.
 ---
 
 CDU course pages publish domestic and international values in the same static HTML and append many related-course cards. Scope fees and locations to the current course’s explicit `data-student-type="international"` blocks.
@@ -26,3 +26,9 @@ CDU VET pages use a different duration contract: the headline year value is in t
 **Why:** The international child contains no number, so requiring the higher-education phrase left valid VET durations blank; whole-page fallback can select related-course durations.
 
 **How to apply:** Anchor to the current `#key-details` VET block, pair its headline years with the international full-time statement, and reject related-course candidates. VET student-visa fees use “commencing student visa holders” wording inside the international Fees child.
+
+CDU English tables distinguish overall scores from lower component floors; both must remain separately authoritative for the current course.
+
+**Why:** Generic/default extraction showed component floors as overalls (for example IELTS 6.0 instead of 6.5, PTE 50 instead of 58, and TOEFL 60 instead of 79).
+
+**How to apply:** Parse each current-course table row by test label. Store IELTS/PTE overall plus uniform component floors, TOEFL overall plus only explicitly published skills, and Cambridge overall independently.
