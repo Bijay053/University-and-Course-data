@@ -188,7 +188,7 @@ _RESET_SQL = (
     "SET status = 'failed', "
     "    completed_at = now(), "
     "    error_message = 'Worker restarted — slot freed on startup' "
-    "WHERE status = 'running'"
+    "WHERE status = 'running' AND job_type <> 'bulk_fix'"
 )
 
 

@@ -83,6 +83,7 @@ _REQUEUE_LOCK_TTL_S = _STALE_QUEUED_MINUTES * 60
 # Maximum number of automatic re-dispatches before a job is declared failed.
 # Prevents infinite requeue loops when a worker crashes before claiming the job.
 _MAX_REQUEUES = 5
+_BULK_FIX_STALE_HEARTBEAT_MINUTES = 10
 
 
 def _requeue_lock_key(runtime_job_id: str) -> str:
@@ -174,6 +175,116 @@ async def _async_repair(runtime_job_id: str) -> None:
         await run_repair(db, runtime_job_id)
 
 
+async def _async_bulk_fix(runtime_job_id: str) -> None:
+    """Run selected staged-course fixes in durable five-course batches."""
+    from app.models import ScrapeRuntimeJob
+    from app.routers.scrape import ReExtractBody, re_extract_staged
+    from app.services.scraper.job_claim import claim_runtime_job
+
+    async with AsyncSessionLocal() as db:
+        if not await claim_runtime_job(db, runtime_job_id):
+            return
+        job = await db.get(ScrapeRuntimeJob, runtime_job_id)
+        if job is None:
+            return
+        payload = job.request_payload or {}
+        ids = [int(value) for value in payload.get("courseIds") or []]
+        university_id = int(job.university_id or 0)
+        persisted_summary = job.approval_summary or {}
+        results: list[dict] = list(persisted_summary.get("results") or [])
+        persisted_counts = persisted_summary.get("counts") or {}
+        completed = int(persisted_counts.get("completed") or job.imported or 0)
+        no_progress = int(persisted_counts.get("noProgress") or job.skipped or 0)
+        failed = int(persisted_counts.get("failed") or job.errors or 0)
+        resume_at = min(max(int(job.current or 0), 0), len(ids))
+
+        for offset in range(resume_at, len(ids), 5):
+            chunk = ids[offset : offset + 5]
+            job.approval_summary = {
+                "counts": {
+                    "queued": len(ids) - offset - len(chunk),
+                    "running": len(chunk),
+                    "completed": completed,
+                    "noProgress": no_progress,
+                    "failed": failed,
+                },
+                "results": results,
+            }
+            job.current = offset
+            job.heartbeat_at = datetime.now(timezone.utc)
+            await db.commit()
+
+            try:
+                part = await re_extract_staged(
+                    ReExtractBody(ids=chunk, universityId=university_id),
+                    db,
+                )
+            except Exception as exc:  # noqa: BLE001
+                log.exception(
+                    "Bulk Fix batch failed job=%s ids=%s: %s",
+                    runtime_job_id,
+                    chunk,
+                    exc,
+                )
+                await db.rollback()
+                part = {
+                    "results": [
+                        {"id": course_id, "ok": False, "error": str(exc)}
+                        for course_id in chunk
+                    ]
+                }
+            for result in part.get("results") or []:
+                item = {
+                    **result,
+                    "ai_provider": result.get("ai_provider") or "openai",
+                    "extraction_passes": result.get("extraction_passes", 0),
+                }
+                if not item.get("ok") and "no course_website" in str(item.get("error") or ""):
+                    item["outcome"] = "no_progress"
+                    no_progress += 1
+                elif not item.get("ok"):
+                    item["outcome"] = "failed"
+                    failed += 1
+                elif item.get("updated_fields") or item.get("refreshed_evidence_fields"):
+                    item["outcome"] = "completed"
+                    completed += 1
+                else:
+                    item["outcome"] = "no_progress"
+                    no_progress += 1
+                results.append(item)
+
+            job.current = min(offset + len(chunk), len(ids))
+            job.imported = completed
+            job.skipped = no_progress
+            job.errors = failed
+            job.heartbeat_at = datetime.now(timezone.utc)
+            job.approval_summary = {
+                "counts": {
+                    "queued": max(0, len(ids) - job.current),
+                    "running": 0,
+                    "completed": completed,
+                    "noProgress": no_progress,
+                    "failed": failed,
+                },
+                "results": list(results),
+            }
+            await db.commit()
+
+        job.status = "completed" if failed == 0 else "completed_with_errors"
+        job.completed_at = datetime.now(timezone.utc)
+        job.approval_summary = {
+            "counts": {
+                "queued": 0,
+                "running": 0,
+                "completed": completed,
+                "noProgress": no_progress,
+                "failed": failed,
+            },
+            "results": results,
+        }
+        await db.commit()
+
+
 def _immediate_requeue_hook() -> None:
     """Post-completion hook: immediately re-dispatch any queued jobs that have
     no Celery task in the broker.
@@ -227,6 +338,8 @@ def _immediate_requeue_hook() -> None:
         try:
             if jtype == "repair":
                 repair_university.delay(jid)
+            elif jtype == "bulk_fix":
+                bulk_fix_staged_courses.delay(jid)
             else:
                 scrape_university.delay(jid)
             log.warning(
@@ -335,6 +448,25 @@ def repair_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
         _immediate_requeue_hook()
 
 
+@celery_app.task(name="scrape.bulk_fix_staged", bind=True, max_retries=0)
+def bulk_fix_staged_courses(self, runtime_job_id: str) -> dict:  # noqa: ANN001
+    log.info("Celery bulk Fix task start id=%s", runtime_job_id)
+    _sync_dispose()
+    try:
+        asyncio.run(_async_bulk_fix(runtime_job_id))
+        return {"ok": True, "id": runtime_job_id}
+    except Exception as exc:
+        log.exception("Bulk Fix task failed id=%s: %s", runtime_job_id, exc)
+        try:
+            _sync_dispose()
+            _run_in_fresh_loop(_mark_failed(runtime_job_id, str(exc)))
+        except Exception:
+            pass
+        return {"ok": False, "id": runtime_job_id, "error": str(exc)}
+    finally:
+        _immediate_requeue_hook()
+
+
 async def _async_find_all_queued() -> list[tuple[str, str, int]]:
     """Return (runtime_job_id, job_type, requeue_count) for every job currently
     in ``queued`` status, with no time cutoff.
@@ -388,6 +520,35 @@ async def _async_find_stale() -> list[tuple[str, str, int]]:
         await db.commit()
 
     return [(j.runtime_job_id, j.job_type, j.requeue_count) for j in stale_jobs]
+
+
+async def _async_requeue_abandoned_bulk_fixes() -> list[str]:
+    """Lease-recover bulk Fix jobs whose worker stopped heartbeating.
+
+    A healthy job refreshes its heartbeat before and after every bounded
+    five-course batch. The age predicate prevents a worker-ready event on a
+    second healthy worker from stealing active work.
+    """
+    from sqlalchemy import text
+
+    cutoff = datetime.now(tz=timezone.utc) - timedelta(
+        minutes=_BULK_FIX_STALE_HEARTBEAT_MINUTES
+    )
+    async with AsyncSessionLocal() as db:
+        rows = await db.execute(
+            text(
+                "UPDATE scrape_runtime_jobs "
+                "SET status = 'queued', updated_at = now(), "
+                "    error_message = 'Fix worker heartbeat expired — queued to resume' "
+                "WHERE job_type = 'bulk_fix' AND status = 'running' "
+                "  AND COALESCE(heartbeat_at, claimed_at, started_at) < :cutoff "
+                "RETURNING runtime_job_id"
+            ),
+            {"cutoff": cutoff},
+        )
+        recovered = [str(row[0]) for row in rows]
+        await db.commit()
+        return recovered
 
 
 async def _async_increment_requeue(runtime_job_id: str) -> None:
@@ -477,6 +638,17 @@ def requeue_stale_queued(self) -> dict:  # noqa: ANN001
     log.info("requeue_stale_queued: checking for stuck queued jobs")
     _sync_dispose()
     try:
+        recovered = asyncio.run(_async_requeue_abandoned_bulk_fixes())
+        if recovered:
+            log.warning(
+                "requeue_stale_queued: lease-recovered %d abandoned bulk Fix job(s)",
+                len(recovered),
+            )
+    except Exception as exc:  # noqa: BLE001
+        recovered = []
+        log.warning("requeue_stale_queued: bulk Fix lease recovery failed: %s", exc)
+        _sync_dispose()
+    try:
         stale = asyncio.run(_async_find_stale())
     except Exception as exc:
         log.exception("requeue_stale_queued DB query failed: %s", exc)
@@ -525,6 +697,8 @@ def requeue_stale_queued(self) -> dict:  # noqa: ANN001
         try:
             if jtype == "repair":
                 repair_university.delay(jid)
+            elif jtype == "bulk_fix":
+                bulk_fix_staged_courses.delay(jid)
             else:
                 scrape_university.delay(jid)
         except Exception as exc:
@@ -554,7 +728,12 @@ def requeue_stale_queued(self) -> dict:  # noqa: ANN001
         )
         dispatched.append(jid)
 
-    return {"ok": True, "requeued": dispatched, "exhausted": exhausted}
+    return {
+        "ok": True,
+        "recoveredBulkFixes": recovered,
+        "requeued": dispatched,
+        "exhausted": exhausted,
+    }
 
 
 async def _mark_failed(runtime_job_id: str, err: str) -> None:

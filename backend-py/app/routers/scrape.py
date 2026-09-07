@@ -2232,6 +2232,148 @@ async def re_extract_staged(
     }
 
 
+class StartBulkFixBody(BaseModel):
+    """Create a durable background Fix job for selected staged courses."""
+
+    ids: list[int] = Field(..., min_length=1, max_length=2000)
+    university_id: int = Field(..., alias="universityId")
+    source_job_id: str | None = Field(default=None, alias="sourceJobId")
+    model_config = {"populate_by_name": True}
+
+
+def _bulk_fix_job_dict(job: ScrapeRuntimeJob) -> dict:
+    summary = dict(job.approval_summary or {})
+    counts = summary.get("counts") or {}
+    return {
+        "jobId": job.runtime_job_id,
+        "sourceJobId": (job.request_payload or {}).get("sourceJobId"),
+        "status": job.status,
+        "total": job.total_found,
+        "queued": counts.get("queued", max(0, job.total_found - job.current)),
+        "running": counts.get("running", 0),
+        "completed": counts.get("completed", job.imported),
+        "noProgress": counts.get("noProgress", job.skipped),
+        "failed": counts.get("failed", job.errors),
+        "processed": job.current,
+        "results": summary.get("results") or [],
+        "errorMessage": job.error_message,
+        "createdAt": job.created_at.isoformat() if job.created_at else None,
+        "completedAt": job.completed_at.isoformat() if job.completed_at else None,
+    }
+
+
+@router.post("/staged/fix-jobs", status_code=202)
+async def start_bulk_fix_job(
+    body: StartBulkFixBody,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(require_permission("scraping.trigger"))],
+) -> dict:
+    """Persist and enqueue Review → Fix work independently of the browser."""
+    from app.models import ScrapedCourse
+    from app.tasks.scrape_tasks import bulk_fix_staged_courses, set_initial_dispatch_lock
+
+    uni = await db.get(University, body.university_id)
+    if uni is None:
+        raise HTTPException(status_code=404, detail=f"University {body.university_id} not found")
+
+    found_ids = list(
+        (
+            await db.execute(
+                select(ScrapedCourse.id).where(
+                    ScrapedCourse.university_id == body.university_id,
+                    ScrapedCourse.id.in_(body.ids),
+                )
+            )
+        ).scalars()
+    )
+    if not found_ids:
+        raise HTTPException(status_code=404, detail="No selected staged courses were found")
+
+    # Return the active equivalent job on a double-click/retry instead of
+    # running the same selected rows twice.
+    active = (
+        await db.execute(
+            select(ScrapeRuntimeJob)
+            .where(
+                ScrapeRuntimeJob.job_type == "bulk_fix",
+                ScrapeRuntimeJob.university_id == body.university_id,
+                ScrapeRuntimeJob.status.in_(("queued", "running")),
+            )
+            .order_by(ScrapeRuntimeJob.created_at.desc())
+        )
+    ).scalars().first()
+    if active and set((active.request_payload or {}).get("courseIds") or []) == set(found_ids):
+        return _bulk_fix_job_dict(active)
+
+    job_id = f"fix-{uuid.uuid4()}"
+    job = ScrapeRuntimeJob(
+        runtime_job_id=job_id,
+        university_id=body.university_id,
+        university_name=uni.name,
+        url=uni.scrape_url or uni.website,
+        job_type="bulk_fix",
+        status="queued",
+        request_payload={
+            "courseIds": found_ids,
+            "sourceJobId": body.source_job_id,
+            "aiProvider": "openai",
+            "maxPasses": 2,
+        },
+        approval_summary={
+            "counts": {
+                "queued": len(found_ids),
+                "running": 0,
+                "completed": 0,
+                "noProgress": 0,
+                "failed": 0,
+            },
+            "results": [],
+        },
+        total_found=len(found_ids),
+    )
+    db.add(job)
+    await db.commit()
+
+    try:
+        bulk_fix_staged_courses.delay(job_id)
+        set_initial_dispatch_lock(job_id)
+    except Exception as exc:
+        job.status = "failed"
+        job.error_message = f"Could not queue Fix job: {exc}"
+        await db.commit()
+        raise HTTPException(status_code=503, detail="The Fix worker could not be queued") from exc
+    return _bulk_fix_job_dict(job)
+
+
+@router.get("/staged/fix-jobs/{job_id}")
+async def get_bulk_fix_job(
+    job_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(require_permission("scraping.view"))],
+) -> dict:
+    job = await db.get(ScrapeRuntimeJob, job_id)
+    if job is None or job.job_type != "bulk_fix":
+        raise HTTPException(status_code=404, detail="Fix job not found")
+    return _bulk_fix_job_dict(job)
+
+
+@router.get("/staged/fix-jobs")
+async def get_latest_bulk_fix_job(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(require_permission("scraping.view"))],
+    university_id: int = Query(alias="universityId"),
+    source_job_id: str | None = Query(default=None, alias="sourceJobId"),
+) -> dict | None:
+    query = select(ScrapeRuntimeJob).where(
+        ScrapeRuntimeJob.job_type == "bulk_fix",
+        ScrapeRuntimeJob.university_id == university_id,
+    )
+    if source_job_id:
+        query = query.where(ScrapeRuntimeJob.request_payload["sourceJobId"].astext == source_job_id)
+    job = (await db.execute(query.order_by(ScrapeRuntimeJob.created_at.desc()).limit(1))).scalars().first()
+    return _bulk_fix_job_dict(job) if job else None
+
+
 # Fields checked by /staged/analyze, in priority order.
 _ANALYZE_FIELDS: list[tuple[str, str]] = [
     ("ielts_overall",       "Missing IELTS"),

@@ -320,6 +320,29 @@ interface FixResults {
   beforeIssues: FixIssue[];
   afterIssues: FixIssue[];
 }
+interface BulkFixJob {
+  jobId: string;
+  sourceJobId: string | null;
+  status: string;
+  total: number;
+  queued: number;
+  running: number;
+  completed: number;
+  noProgress: number;
+  failed: number;
+  processed: number;
+  results: Array<{
+    id: number;
+    ok: boolean;
+    outcome: "completed" | "no_progress" | "failed";
+    updated_fields?: string[];
+    refreshed_evidence_fields?: string[];
+    extraction_passes?: number;
+    ai_provider?: string;
+    error?: string;
+  }>;
+  errorMessage: string | null;
+}
 
 const FIX_FIELD_LABELS: Record<string, string> = {
   ielts_overall: "IELTS",
@@ -2065,6 +2088,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   const [showFixResultsDialog, setShowFixResultsDialog] = useState(false);
   const [fixAnalysis, setFixAnalysis] = useState<FixAnalysis | null>(null);
   const [fixResults, setFixResults] = useState<FixResults | null>(null);
+  const [bulkFixJob, setBulkFixJob] = useState<BulkFixJob | null>(null);
   const [cleaningNames, setCleaningNames] = useState(false);
 
   const handleBulkRejectAll = async () => {
@@ -2146,10 +2170,6 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   };
 
   const _FIX_ANALYZE_BATCH = 50;
-  // Re-extraction performs live page fetches. Keep each HTTP request small so
-  // large client selections do not disappear behind a proxy timeout.
-  const _FIX_REEXTRACT_BATCH = 5;
-
   const reviewUniversityId = () => {
     if (selectedUni && selectedUni !== ALL) {
       const explicitId = Number(selectedUni);
@@ -2238,83 +2258,111 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       return;
     }
     const ids = Array.from(selectedIds);
-    const beforeIssues = fixAnalysis.issues;
     setFixingSelected(true);
     setFixProgress({ completed: 0, total: ids.length });
     try {
-      // Process in small live-fetch batches so each request stays observable
-      // and below the reverse proxy timeout.
-      const chunks: number[][] = [];
-      for (let i = 0; i < ids.length; i += _FIX_REEXTRACT_BATCH) chunks.push(ids.slice(i, i + _FIX_REEXTRACT_BATCH));
+      const res = await fetch("/api/scrape/staged/fix-jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ ids, universityId: uniId, sourceJobId: reviewJobId }),
+      });
+      if (!res.ok) throw new Error(await getFetchErrorMessage(res));
+      const job: BulkFixJob = await res.json();
+      setBulkFixJob(job);
+      localStorage.setItem("activeBulkFixJob", job.jobId);
+      setFixProgress({ completed: job.processed, total: job.total });
+      toast({
+        title: "Fix started in the background",
+        description: "You can close this page and return later without stopping it.",
+      });
+    } catch {
+      toast({ title: "Fix failed to start", description: "Check your connection and try again.", variant: "destructive" });
+      setFixingSelected(false);
+      setFixProgress(null);
+    }
+  };
 
-      let totalUpdated = 0, totalSkipped = 0, totalErrors = 0, totalTotal = 0;
-      const valueUpdatedFields = new Set<string>();
-      const provenanceOnlyFields = new Set<string>();
-      for (const chunk of chunks) {
-        const res = await fetch("/api/scrape/staged/re-extract", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+  useEffect(() => {
+    const savedJobId = localStorage.getItem("activeBulkFixJob");
+    if (!savedJobId) return;
+    fetch(`/api/scrape/staged/fix-jobs/${savedJobId}`, {
+      credentials: "include",
+      cache: "no-store",
+    })
+      .then((res) => res.ok ? res.json() : null)
+      .then((job: BulkFixJob | null) => {
+        if (!job) return;
+        setBulkFixJob(job);
+        if (["queued", "running"].includes(job.status)) {
+          setFixingSelected(true);
+          setFixProgress({ completed: job.processed, total: job.total });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!reviewJobId || stagedCourses.length === 0) return;
+    const universityId = stagedCourses[0]?.universityId;
+    if (!universityId) return;
+    fetch(`/api/scrape/staged/fix-jobs?universityId=${universityId}&sourceJobId=${encodeURIComponent(reviewJobId)}`, {
+      credentials: "include",
+      cache: "no-store",
+    })
+      .then((res) => res.ok ? res.json() : null)
+      .then((job: BulkFixJob | null) => {
+        if (job) {
+          setBulkFixJob(job);
+          localStorage.setItem("activeBulkFixJob", job.jobId);
+          if (["queued", "running"].includes(job.status)) {
+            setFixingSelected(true);
+            setFixProgress({ completed: job.processed, total: job.total });
+          }
+        }
+      })
+      .catch(() => {});
+  }, [reviewJobId, stagedCourses.length]);
+
+  useEffect(() => {
+    if (!bulkFixJob || !["queued", "running"].includes(bulkFixJob.status)) return;
+    const timer = window.setInterval(async () => {
+      try {
+        const res = await fetch(`/api/scrape/staged/fix-jobs/${bulkFixJob.jobId}`, {
           credentials: "include",
-          body: JSON.stringify({ ids: chunk, universityId: uniId }),
+          cache: "no-store",
         });
-        if (!res.ok) {
-          toast({ title: "Fix failed", description: await getFetchErrorMessage(res), variant: "destructive" });
+        if (!res.ok) return;
+        const job: BulkFixJob = await res.json();
+        setBulkFixJob(job);
+        setFixProgress({ completed: job.processed, total: job.total });
+        if (!["queued", "running"].includes(job.status)) {
+          window.clearInterval(timer);
+          const valueUpdatedFields = new Set<string>();
+          const provenanceOnlyFields = new Set<string>();
+          mergeReextractFieldResults({ valueUpdatedFields, provenanceOnlyFields }, job.results);
+          setFixResults({
+            total: job.total,
+            updated: job.completed,
+            skipped: job.noProgress,
+            errors: job.failed,
+            valueUpdatedFields: Array.from(valueUpdatedFields).sort(),
+            provenanceOnlyFields: Array.from(provenanceOnlyFields).sort(),
+            beforeIssues: fixAnalysis?.issues ?? [],
+            afterIssues: [],
+          });
           setFixingSelected(false);
           setFixProgress(null);
-          return;
+          setShowFixPreviewDialog(false);
+          setShowFixResultsDialog(true);
+          if (reviewJobId) void loadStagedCourses(reviewJobId);
         }
-        const part = await res.json();
-        totalUpdated += part.updated ?? 0;
-        totalSkipped += part.skipped ?? 0;
-        totalErrors += part.errors ?? 0;
-        totalTotal += part.total ?? 0;
-        mergeReextractFieldResults(
-          { valueUpdatedFields, provenanceOnlyFields },
-          part.results ?? [],
-        );
-        setFixProgress({ completed: Math.min(totalTotal, ids.length), total: ids.length });
+      } catch {
+        // The durable worker continues; polling resumes on the next tick.
       }
-      const data = {
-        updated: totalUpdated,
-        skipped: totalSkipped,
-        errors: totalErrors,
-        total: totalTotal,
-        valueUpdatedFields: Array.from(valueUpdatedFields).sort(),
-        provenanceOnlyFields: Array.from(provenanceOnlyFields).sort(),
-      };
-
-      // Reload staged courses then re-analyze to get accurate after counts.
-      if (reviewJobId) await loadStagedCourses(reviewJobId);
-      let afterIssues: FixIssue[] = [];
-      try {
-        const aRes = await fetch("/api/scrape/staged/analyze", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ids, universityId: uniId }),
-        });
-        if (aRes.ok) afterIssues = (await aRes.json()).issues ?? [];
-      } catch { /* after analysis optional */ }
-
-      // Reload quality map.
-      try {
-        const qRes = await fetch(`/api/scrape/universities/${uniId}/course-quality`);
-        if (qRes.ok) {
-          const qData = await qRes.json();
-          const map: Record<number, CourseQualityData> = {};
-          for (const entry of qData.courses ?? []) map[entry.id] = entry;
-          setCourseQualityMap(map);
-        }
-      } catch { /* quality reload optional */ }
-
-      setFixResults({ ...data, beforeIssues, afterIssues });
-      setShowFixPreviewDialog(false);
-      setShowFixResultsDialog(true);
-    } catch {
-      toast({ title: "Fix failed", description: "Network error — check your connection.", variant: "destructive" });
-    }
-    setFixingSelected(false);
-    setFixProgress(null);
-  };
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [bulkFixJob?.jobId, bulkFixJob?.status, fixAnalysis?.issues, loadStagedCourses, reviewJobId]);
 
   const handleDedupPending = async () => {
     if (!selectedUni || selectedUni === ALL) return;
@@ -2792,6 +2840,32 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         </Card>
       )}
 
+      {bulkFixJob && !showReview && (
+        <Card className={["queued", "running"].includes(bulkFixJob.status) ? "border-blue-200 bg-blue-50" : "border-green-200 bg-green-50"}>
+          <CardContent className="p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 font-medium">
+                {["queued", "running"].includes(bulkFixJob.status)
+                  ? <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                  : <CheckCircle2 className="h-4 w-4 text-green-600" />}
+                Background Fix {bulkFixJob.status.replaceAll("_", " ")}
+              </div>
+              <span className="text-sm">{bulkFixJob.processed}/{bulkFixJob.total} processed</span>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+              <span>{bulkFixJob.queued} queued</span>
+              <span>{bulkFixJob.running} running</span>
+              <span className="text-green-700">{bulkFixJob.completed} completed</span>
+              <span>{bulkFixJob.noProgress} no progress</span>
+              <span className="text-red-700">{bulkFixJob.failed} failed</span>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              This status was restored from the durable repair job. Open the related course review to inspect repaired fields.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {showReview && stagedCourses.length > 0 && (() => {
         const displayedCourses = qualitySortDesc
           ? [...stagedCourses].sort((a, b) => {
@@ -2980,6 +3054,38 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             </p>
           </CardHeader>
           <CardContent>
+            {bulkFixJob && (
+              <div className={`mb-3 rounded-lg border p-3 ${
+                ["queued", "running"].includes(bulkFixJob.status)
+                  ? "border-blue-200 bg-blue-50"
+                  : bulkFixJob.failed > 0
+                    ? "border-orange-200 bg-orange-50"
+                    : "border-green-200 bg-green-50"
+              }`}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    {["queued", "running"].includes(bulkFixJob.status)
+                      ? <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                      : <CheckCircle2 className="h-4 w-4 text-green-600" />}
+                    Background Fix {bulkFixJob.status.replaceAll("_", " ")}
+                  </div>
+                  <span className="text-xs text-muted-foreground">{bulkFixJob.processed}/{bulkFixJob.total} processed</span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                  <span>{bulkFixJob.queued} queued</span>
+                  <span>{bulkFixJob.running} running</span>
+                  <span className="text-green-700">{bulkFixJob.completed} completed</span>
+                  <span className="text-gray-600">{bulkFixJob.noProgress} no progress</span>
+                  <span className="text-red-700">{bulkFixJob.failed} failed</span>
+                </div>
+                {bulkFixJob.errorMessage && (
+                  <p className="mt-2 text-xs text-red-700">{bulkFixJob.errorMessage}</p>
+                )}
+                {["queued", "running"].includes(bulkFixJob.status) && (
+                  <p className="mt-2 text-xs text-blue-700">This job continues if you close or reload the page.</p>
+                )}
+              </div>
+            )}
             {/* Quality summary + root causes bar */}
             {qualityEntries.length > 0 && (
               <div className="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3 flex flex-wrap gap-4 items-start">
@@ -3549,8 +3655,13 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
 
               {fixingSelected && fixProgress && (
                 <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
-                  Re-extracting selected courses: <strong>{fixProgress.completed} of {fixProgress.total}</strong> complete.
-                  Keep this window open until the results appear.
+                  <div>Background Fix progress: <strong>{fixProgress.completed} of {fixProgress.total}</strong> processed.</div>
+                  {bulkFixJob && (
+                    <div className="mt-1 text-xs">
+                      {bulkFixJob.queued} queued · {bulkFixJob.running} running · {bulkFixJob.completed} completed · {bulkFixJob.noProgress} no progress · {bulkFixJob.failed} failed
+                    </div>
+                  )}
+                  <div className="mt-1 text-xs">You can close this page. The repair will keep running.</div>
                 </div>
               )}
 
@@ -3577,8 +3688,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             </div>
           )}
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setShowFixPreviewDialog(false)} disabled={fixingSelected}>
-              Cancel
+            <Button variant="outline" onClick={() => setShowFixPreviewDialog(false)}>
+              {fixingSelected ? "Close" : "Cancel"}
             </Button>
             <Button onClick={handleConfirmFix} disabled={fixingSelected} className="bg-blue-600 hover:bg-blue-700 text-white">
               {fixingSelected ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
