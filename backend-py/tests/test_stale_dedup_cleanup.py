@@ -340,3 +340,85 @@ async def test_targeted_stage_replaces_selected_url_and_preserves_unrelated_pend
     finally:
         await _cleanup(prefix)
         await _delete_runtime_job(targeted_job)
+
+
+@pytest.mark.asyncio
+async def test_full_stage_preserves_distinct_same_title_course_at_different_url(
+    isolated_universities,
+):
+    uni_a, _ = isolated_universities
+    prefix = f"test_full_distinct_{uuid.uuid4().hex[:8]}_"
+    course_name = f"Master of Example {prefix}"
+    old_url = "https://example.edu/course/example-city"
+    new_url = "https://example.edu/course/example-harbour"
+    old_row = await _insert(
+        prefix + "old",
+        uni_a,
+        course_name,
+        "pending",
+        age_min=30,
+        course_website=old_url,
+    )
+    try:
+        async with AsyncSessionLocal() as db:
+            result = await stage_course(
+                db,
+                scrape_job_id=prefix + "new",
+                university_id=uni_a,
+                course_name=course_name,
+                payload={
+                    "course_name": course_name,
+                    "degree_level": "Master's",
+                    "international_fee": 42000,
+                    "course_website": new_url,
+                },
+                evidence=[],
+                source_url=new_url,
+            )
+
+        assert result.saved, result.reason
+        assert await _exists(old_row), (
+            "same-title courses at distinct canonical URLs must both remain reviewable"
+        )
+    finally:
+        await _cleanup(prefix)
+
+
+@pytest.mark.asyncio
+async def test_full_stage_replaces_true_canonical_url_alias(
+    isolated_universities,
+):
+    uni_a, _ = isolated_universities
+    prefix = f"test_full_alias_{uuid.uuid4().hex[:8]}_"
+    course_name = f"Bachelor of Alias {prefix}"
+    old_url = "http://www.example.edu/course/alias/?utm_source=catalogue"
+    new_url = "https://example.edu/course/alias"
+    old_row = await _insert(
+        prefix + "old",
+        uni_a,
+        course_name,
+        "pending",
+        age_min=30,
+        course_website=old_url,
+    )
+    try:
+        async with AsyncSessionLocal() as db:
+            result = await stage_course(
+                db,
+                scrape_job_id=prefix + "new",
+                university_id=uni_a,
+                course_name=course_name,
+                payload={
+                    "course_name": course_name,
+                    "degree_level": "Bachelor's",
+                    "international_fee": 39000,
+                    "course_website": new_url,
+                },
+                evidence=[],
+                source_url=new_url,
+            )
+
+        assert result.saved, result.reason
+        assert not await _exists(old_row), "a true canonical URL alias should be replaced"
+    finally:
+        await _cleanup(prefix)

@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,6 +38,7 @@ from app.services.scraper.guards import (
     is_generic_course_category_name,
     should_stage_course,
 )
+from app.services.scraper.url_identity import canonical_course_url_key
 
 log = logging.getLogger(__name__)
 
@@ -329,11 +330,6 @@ async def refresh_evidence_for_fields(
     )
 
 
-def _should_name_dedup(*, targeted_retry: bool) -> bool:
-    """Name dedup is safe only when the scrape owns the university-wide queue."""
-    return not targeted_retry
-
-
 async def stage_course(
     db: AsyncSession,
     *,
@@ -440,54 +436,41 @@ async def stage_course(
     # preservation block below (lines ~285+) already copies field values from
     # approved rows into the new staging row so no data is lost.
     #
-    # Name-based dedup extension (Bug 5 fix): if a course was staged under a
-    # DIFFERENT URL in a prior run (e.g. after a Cloudflare-triggered resume
-    # that picked up the same course via a slightly different redirect chain),
-    # the URL-keyed dedup above misses it and two rows appear in the review
-    # queue for the same course with conflicting extracted data.  This block
-    # additionally deletes any pending row for the same university whose
-    # normalised course_name + degree_level match the current course, as long
-    # as the row is from a different job.  A matching name+degree_level on the
-    # same university is a strong dedup signal — two distinct courses rarely
-    # share both.  Only status='pending'/'review' rows are touched; approved/
-    # published rows are left intact (their data is copied below).
+    # URL-alias dedup extension: exact URL matching below does not catch harmless
+    # transport variants such as http/https, www/non-www, trailing slashes,
+    # fragments, reordered query pairs, or tracking parameters. Compare prior
+    # review rows using the shared conservative URL identity instead. Semantic
+    # query parameters and different paths remain distinct, even when titles
+    # match, because universities can publish separate courses/specialisations
+    # under the same title.
     try:
-        # A focused retry is allowed to replace only the explicitly selected
-        # URL. Name matching is intentionally disabled because a university can
-        # have another pending row with the same title at a different URL, and
-        # that row is outside the retry's review scope.
-        if name and university_id and _should_name_dedup(targeted_retry=targeted_retry):
-            _name_norm = name.strip().lower()
-            _degree_norm = (payload.get("degree_level") or "").strip().lower()
-            _name_dedup_q = await db.execute(
+        _source_url_key = canonical_course_url_key(source_url)
+        if _source_url_key:
+            _alias_dedup_q = await db.execute(
                 select(ScrapedCourse.id, ScrapedCourse.course_website)
                 .where(
                     ScrapedCourse.university_id == university_id,
                     ScrapedCourse.scrape_job_id != scrape_job_id,
                     ScrapedCourse.status.not_in(["approved", "published"]),
-                    func.lower(ScrapedCourse.course_name) == _name_norm,
                 )
             )
-            _name_stale = [
-                row[0] for row in _name_dedup_q.fetchall()
-                if row[1] != source_url  # URL-keyed dedup already covers same-URL rows
-                and (
-                    not _degree_norm
-                    or _degree_norm == ""
-                    or True  # keep it simple: name alone is sufficient dedup key
-                )
+            _alias_stale = [
+                row[0]
+                for row in _alias_dedup_q.fetchall()
+                if row[1] != source_url
+                and canonical_course_url_key(row[1]) == _source_url_key
             ]
-            if _name_stale:
+            if _alias_stale:
                 await db.execute(
-                    delete(ScrapedCourse).where(ScrapedCourse.id.in_(_name_stale))
+                    delete(ScrapedCourse).where(ScrapedCourse.id.in_(_alias_stale))
                 )
                 log.info(
-                    "stage_course: name-dedup — deleted %d stale row(s) for "
-                    "course_name=%r (uni %s, different URL/job)",
-                    len(_name_stale), name, university_id,
+                    "stage_course: URL-alias dedup — deleted %d stale row(s) "
+                    "for canonical URL %r (uni %s, different URL/job)",
+                    len(_alias_stale), _source_url_key, university_id,
                 )
-    except Exception as _ndep:  # noqa: BLE001 — never abort on dedup check failure
-        log.warning("stage_course: name-dedup check failed for %r: %s", name, _ndep)
+    except Exception as _adep:  # noqa: BLE001 — never abort on dedup check failure
+        log.warning("stage_course: URL-alias dedup check failed for %r: %s", source_url, _adep)
 
     if source_url:
         try:
