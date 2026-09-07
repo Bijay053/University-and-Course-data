@@ -248,8 +248,70 @@ def test_continue_endpoint_retries_every_unresolved_url(monkeypatch) -> None:
     result = asyncio.run(scrape.continue_unresolved_history_urls(
         "job_source",
         _Db(),
+        enable_browser_rescue=False,
     ))
 
     assert result.job_id == "job_continued"
     assert captured["body"].course_urls == ["https://example.edu/course/b"]
     assert captured["body"].retry_source_job_id == "job_source"
+
+
+def test_continue_endpoint_can_enable_browser_rescue_after_proven_skip(monkeypatch) -> None:
+    captured: dict = {}
+    job = SimpleNamespace(
+        university_id=12,
+        url="https://example.edu/courses",
+    )
+    university = SimpleNamespace(
+        scrape_config={
+            "admin_config": {
+                "extraction": {"skip_browser_rescue": True},
+            },
+        },
+    )
+
+    class _Rows:
+        def all(self):
+            return [
+                (
+                    {
+                        "kind": "extract_error",
+                        "url": "https://example.edu/course/a",
+                        "reason": "fetch_failed",
+                        "retryable": True,
+                        "message": "[BROWSER↑ SKIPPED] skip_browser_rescue=true",
+                    },
+                    None,
+                ),
+            ]
+
+    class _Db:
+        committed = False
+
+        async def get(self, model, _row_id):
+            return university if model is scrape.University else job
+
+        async def execute(self, _statement, _params):
+            return _Rows()
+
+        async def commit(self):
+            self.committed = True
+
+    async def _fake_start(body, db):
+        captured["body"] = body
+        captured["db"] = db
+        return ScrapeStartResponse(job_id="job_browser", runtime_job_id="job_browser")
+
+    db = _Db()
+    monkeypatch.setattr(scrape, "start_scrape", _fake_start)
+
+    result = asyncio.run(scrape.continue_unresolved_history_urls(
+        "job_source",
+        db,
+        enable_browser_rescue=True,
+    ))
+
+    assert result.job_id == "job_browser"
+    assert db.committed is True
+    assert university.scrape_config["admin_config"]["extraction"]["skip_browser_rescue"] is False
+    assert captured["body"].course_urls == ["https://example.edu/course/a"]

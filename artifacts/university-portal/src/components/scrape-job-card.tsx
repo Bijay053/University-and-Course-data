@@ -1612,11 +1612,12 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
     }
   }, [activeJobId, pollJobStatus]);
 
-  const handleContinueUnresolved = useCallback(async () => {
+  const handleContinueUnresolved = useCallback(async (enableBrowserRescue = false) => {
     if (!completedJobId || continuingUnresolved) return;
     setContinuingUnresolved(true);
     try {
-      const response = await fetch(`/api/scrape/history/${completedJobId}/continue`, {
+      const query = enableBrowserRescue ? "?enableBrowserRescue=true" : "";
+      const response = await fetch(`/api/scrape/history/${completedJobId}/continue${query}`, {
         method: "POST",
         credentials: "include",
       });
@@ -1645,7 +1646,8 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
         {
           event: "status",
           message:
-            `══ CONTINUING ${unresolvedCount} UNRESOLVED COURSE${unresolvedCount === 1 ? "" : "S"} ` +
+            `══ ${enableBrowserRescue ? "BROWSER RESCUE ENABLED — " : ""}CONTINUING ` +
+            `${unresolvedCount} UNRESOLVED COURSE${unresolvedCount === 1 ? "" : "S"} ` +
             `FROM ${completedJobId} AS ${data.jobId} ══`,
         },
       ].slice(-MAX_LOGS));
@@ -3913,10 +3915,38 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
               )}
             </div>
 
+            {completedJobId && resultSummary && resultSummary.errors > 0 &&
+              logs.some(log => (log.message || "").includes("skip_browser_rescue=true")) && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-600" />
+                    <div className="text-xs text-amber-900">
+                      <p className="font-semibold">Browser rescue was disabled</p>
+                      <p className="mt-0.5 text-amber-800">
+                        A normal Continue will repeat these fetch failures. Enable browser rescue and retry only the unresolved course URLs.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => handleContinueUnresolved(true)}
+                    disabled={continuingUnresolved}
+                    className="w-full bg-amber-600 hover:bg-amber-700 h-9"
+                    size="sm"
+                  >
+                    {continuingUnresolved
+                      ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      : <RefreshCw className="w-3.5 h-3.5 mr-1.5" />}
+                    {continuingUnresolved
+                      ? "Enabling browser rescue…"
+                      : `Enable browser rescue & retry ${resultSummary.errors}`}
+                  </Button>
+                </div>
+              )}
+
             <div className="flex gap-2">
               {completedJobId && resultSummary && resultSummary.errors > 0 && (
                 <Button
-                  onClick={handleContinueUnresolved}
+                  onClick={() => handleContinueUnresolved(false)}
                   disabled={continuingUnresolved}
                   className="flex-1 bg-blue-600 hover:bg-blue-700 h-9"
                   size="sm"
