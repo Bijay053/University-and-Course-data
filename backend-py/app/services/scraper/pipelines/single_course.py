@@ -2745,6 +2745,55 @@ async def extract_course(
                 url=url,
                 evidence=evidence,
             )
+            # CQU's protected edge intermittently serves a complete-looking
+            # course page with the English blocks omitted. Retry the canonical
+            # bare URL once through the residential proxy before institutional
+            # defaults are allowed to fill the gap. The supplemental response
+            # is applied to English only, so a bare-page audience variant
+            # cannot overwrite international fee/location fields.
+            _cqu_english, _, _ = _cqu_early.extract_course_english(html)
+            if (
+                not _cqu_english
+                and not _cqu_early.is_generic_course_finder_shell(html)
+            ):
+                from app.services.scraper.http_fetcher import (
+                    fetch_html_scrape_do as _cqu_fetch_scrape_do,
+                )
+
+                _cqu_url_parts = urlparse(url)
+                _cqu_english_url = urlunparse(_cqu_url_parts._replace(query=""))
+                try:
+                    _cqu_english_html = await asyncio.wait_for(
+                        _cqu_fetch_scrape_do(
+                            _cqu_english_url,
+                            render=False,
+                            max_retries=0,
+                            request_timeout_seconds=40,
+                        ),
+                        timeout=45,
+                    )
+                except Exception as _cqu_english_exc:  # noqa: BLE001
+                    log.warning(
+                        "CQU English supplemental fetch failed for %s: %s",
+                        _cqu_english_url,
+                        _cqu_english_exc,
+                    )
+                    _cqu_english_html = None
+                if _cqu_english_html:
+                    _cqu_recovered = _cqu_early.apply_english_overrides(
+                        payload,
+                        _cqu_english_html,
+                        url=_cqu_english_url,
+                        evidence=evidence,
+                    )
+                    if _cqu_recovered and emit:
+                        await emit(
+                            "status",
+                            f"[CQU ENGLISH RETRY] {_cqu_english_url[:70]} — course requirements recovered",
+                            phase="extract",
+                            kind="cqu_english_retry_ok",
+                            url=_cqu_english_url,
+                        )
             if _cqu_early.is_domestic_only(
                 _cqu_aims,
                 _cqu_schema,

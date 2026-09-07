@@ -608,6 +608,114 @@ def is_domestic_only(
     return aims.get("is_international") is False and aims.get("is_domestic") is True
 
 
+def extract_course_english(
+    html: str,
+) -> tuple[dict[str, float], str, str]:
+    """Return course-specific English values plus their source metadata."""
+    aims = parse_aims_data(html) or {}
+    aims_eng = aims.get("english_proficiency_text")
+    aims_entry = aims.get("entry_requirements_text")
+    aims_requisites = aims.get("requisite_conditions_text")
+    aims_requisites_has_tests = (
+        isinstance(aims_requisites, str)
+        and any(
+            test_name in aims_requisites
+            for test_name in ("IELTS", "TOEFL", "PTE", "Duolingo")
+        )
+    )
+    aims_entry_has_tests = (
+        isinstance(aims_entry, str)
+        and any(
+            test_name in aims_entry
+            for test_name in ("IELTS", "TOEFL", "PTE", "Duolingo")
+        )
+    )
+    raw_eng_text = (
+        aims_eng
+        or (aims_requisites if aims_requisites_has_tests else None)
+        or (aims_entry if aims_entry_has_tests else None)
+        or _parse_english_from_schema_org(html)
+    )
+    eng_source = (
+        "cqu_json:english_proficiency_text"
+        if aims_eng
+        else (
+            "cqu_json:requisite_conditions_text"
+            if aims_requisites_has_tests
+            else (
+                "cqu_json:entry_requirements_text"
+                if aims_entry_has_tests
+                else "cqu_json:schema_org_coursePrerequisites"
+            )
+        )
+    )
+    snippet = (
+        _strip_html(raw_eng_text)[:280].strip()
+        if isinstance(raw_eng_text, str) and raw_eng_text.strip()
+        else "CQU english proficiency requirements"
+    )
+    if not isinstance(raw_eng_text, str) or not raw_eng_text.strip():
+        return {}, eng_source, snippet
+
+    eng_aims = {"english_proficiency_text": raw_eng_text}
+    fields = extract_ielts(eng_aims) or {}
+    pte = extract_pte(eng_aims)
+    if pte is not None:
+        fields["pte_overall"] = pte
+    toefl = extract_toefl(eng_aims)
+    if toefl is not None:
+        fields["toefl_overall"] = toefl
+    return fields, eng_source, snippet
+
+
+def apply_english_overrides(
+    payload: dict[str, Any],
+    html: str,
+    *,
+    url: str = "",
+    evidence: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Apply only CQU's course-specific English fields and evidence."""
+    fields, eng_source, snippet = extract_course_english(html)
+    if not fields:
+        return {}
+
+    applied: dict[str, Any] = {}
+    ielts = {
+        key: value
+        for key, value in fields.items()
+        if key.startswith("ielts_")
+    }
+    if ielts:
+        previous = payload.get("ielts_overall")
+        payload.update(ielts)
+        applied["ielts"] = {
+            "old_overall": previous,
+            "new": ielts,
+            "source": eng_source,
+        }
+
+    for field_key in ("pte_overall", "toefl_overall"):
+        value = fields.get(field_key)
+        if value is None:
+            continue
+        previous = payload.get(field_key)
+        payload[field_key] = value
+        applied[field_key] = {"old": previous, "new": value}
+
+    if evidence is not None:
+        for field_key, value in fields.items():
+            evidence.append({
+                "field_key": field_key,
+                "value": value,
+                "confidence": 0.85,
+                "method": eng_source,
+                "source_url": url,
+                "snippet": snippet,
+            })
+    return applied
+
+
 def apply_overrides(
     payload: dict[str, Any],
     html: str,
@@ -831,108 +939,19 @@ def apply_overrides(
     #      mid-2026; HTML-encoded HTML blob decoded by
     #      _parse_english_from_schema_org()
     #
-    # Evidence rows are appended for the *_overall slots so
+    # Evidence rows are appended for every extracted English slot so
     # guards.enforce_source_evidence keeps the values at staging time —
     # without them every CQU course was getting nulled and then refilled
     # with the YAML institutional default (6.5/58/79) by the ENG-DEFAULT
     # block, fleet-wide.
-    aims_eng = (
-        aims.get("english_proficiency_text")
-        if isinstance(aims, dict)
-        else None
-    )
-    aims_entry = (
-        aims.get("entry_requirements_text")
-        if isinstance(aims, dict)
-        else None
-    )
-    aims_requisites = (
-        aims.get("requisite_conditions_text")
-        if isinstance(aims, dict)
-        else None
-    )
-    aims_requisites_has_tests = (
-        isinstance(aims_requisites, str)
-        and any(
-            test_name in aims_requisites
-            for test_name in ("IELTS", "TOEFL", "PTE", "Duolingo")
+    applied.update(
+        apply_english_overrides(
+            payload,
+            html,
+            url=url,
+            evidence=evidence,
         )
     )
-    aims_entry_has_tests = (
-        isinstance(aims_entry, str)
-        and any(
-            test_name in aims_entry
-            for test_name in ("IELTS", "TOEFL", "PTE", "Duolingo")
-        )
-    )
-    raw_eng_text = (
-        aims_eng
-        or (aims_requisites if aims_requisites_has_tests else None)
-        or (aims_entry if aims_entry_has_tests else None)
-        or _parse_english_from_schema_org(html)
-    )
-    eng_source = (
-        "cqu_json:english_proficiency_text"
-        if aims_eng
-        else (
-            "cqu_json:requisite_conditions_text"
-            if aims_requisites_has_tests
-            else (
-                "cqu_json:entry_requirements_text"
-                if aims_entry_has_tests
-                else "cqu_json:schema_org_coursePrerequisites"
-            )
-        )
-    )
-    eng_snippet_base = (
-        _strip_html(raw_eng_text)[:280].strip()
-        if isinstance(raw_eng_text, str) and raw_eng_text.strip()
-        else "CQU english proficiency requirements"
-    )
-
-    def _emit_eng_evidence(field_key: str, value: float) -> None:
-        if evidence is None:
-            return
-        evidence.append({
-            "field_key": field_key,
-            "value": value,
-            "confidence": 0.85,
-            "method": eng_source,
-            "source_url": url or "",
-            "snippet": eng_snippet_base,
-        })
-
-    # Build a fake aims-like dict keyed to english_proficiency_text so the
-    # extract_* functions (which read aims.get("english_proficiency_text"))
-    # work whether the source is AIMSData OR schema.org coursePrerequisites.
-    _eng_aims: dict[str, Any] = (
-        {"english_proficiency_text": raw_eng_text}
-        if isinstance(raw_eng_text, str) and raw_eng_text.strip()
-        else (aims or {})
-    )
-
-    ielts = extract_ielts(_eng_aims)
-    if ielts:
-        prev_overall = payload.get("ielts_overall")
-        for k, v in ielts.items():
-            payload[k] = v
-        applied["ielts"] = {"old_overall": prev_overall, "new": ielts, "source": eng_source}
-        if "ielts_overall" in ielts:
-            _emit_eng_evidence("ielts_overall", ielts["ielts_overall"])
-
-    pte = extract_pte(_eng_aims)
-    if pte is not None:
-        prev_pte = payload.get("pte_overall")
-        payload["pte_overall"] = pte
-        applied["pte_overall"] = {"old": prev_pte, "new": pte}
-        _emit_eng_evidence("pte_overall", pte)
-
-    toefl = extract_toefl(_eng_aims)
-    if toefl is not None:
-        prev_toefl = payload.get("toefl_overall")
-        payload["toefl_overall"] = toefl
-        applied["toefl_overall"] = {"old": prev_toefl, "new": toefl}
-        _emit_eng_evidence("toefl_overall", toefl)
 
     if applied:
         log.info(

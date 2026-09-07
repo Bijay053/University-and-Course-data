@@ -101,6 +101,10 @@ def test_schema_english_applies_without_aims_data() -> None:
     assert {"ielts", "pte_overall", "toefl_overall"} <= applied.keys()
     assert {row["field_key"] for row in evidence} == {
         "ielts_overall",
+        "ielts_listening",
+        "ielts_reading",
+        "ielts_speaking",
+        "ielts_writing",
         "pte_overall",
         "toefl_overall",
     }
@@ -147,8 +151,110 @@ def test_aims_requisite_conditions_provides_cv82_scores() -> None:
     assert {
         row["method"]
         for row in evidence
-        if row["field_key"] in {"ielts_overall", "pte_overall", "toefl_overall"}
+        if row["field_key"] in {
+            "ielts_overall",
+            "ielts_listening",
+            "ielts_reading",
+            "ielts_speaking",
+            "ielts_writing",
+            "pte_overall",
+            "toefl_overall",
+        }
     } == {"cqu_json:requisite_conditions_text"}
+    assert {
+        row["field_key"]
+        for row in evidence
+        if row["method"] == "cqu_json:requisite_conditions_text"
+    } == {
+        "ielts_overall",
+        "ielts_listening",
+        "ielts_reading",
+        "ielts_speaking",
+        "ielts_writing",
+        "pte_overall",
+        "toefl_overall",
+    }
+
+
+@pytest.mark.asyncio
+async def test_partial_course_page_recovers_english_from_bare_url() -> None:
+    cfg = get_config_for_host(
+        hostname="www.cqu.edu.au",
+        name="CQUniversity",
+        scrape_url="https://www.cqu.edu.au",
+        university_id=22,
+        create_missing_stub=False,
+    )
+    set_uni_config(cfg)
+    partial_page = (
+        "<html><head><title>Master of Engineering - CQUniversity</title></head>"
+        "<body><h1>Master of Engineering</h1><main>"
+        + ("Course information for international students. " * 40)
+        + _aims_html({
+            "product_code": "CV82",
+            "product_name": "Master of Engineering",
+            "is_international": True,
+            "is_domestic": True,
+            "english_proficiency_text": "",
+            "requisite_conditions_text": "",
+        })
+        + "</main></body></html>"
+    )
+    recovered_page = _course_schema_html(
+        "IELTS Academic overall band score of at least 6.0 with a minimum "
+        "5.5 in each subset. PTE Academic overall score of 54. TOEFL iBT "
+        "Requires 75 or better overall."
+    )
+    fetched_urls: list[str] = []
+
+    async def _supplemental_fetch(url: str, **kwargs: Any) -> str:
+        fetched_urls.append(url)
+        assert kwargs["render"] is False
+        assert kwargs["max_retries"] == 0
+        return recovered_page
+
+    with patch(
+        "app.services.scraper.http_fetcher.fetch_html_scrape_do",
+        side_effect=_supplemental_fetch,
+    ):
+        from app.services.scraper.pipelines.single_course import extract_course
+
+        result = await extract_course(
+            "https://www.cqu.edu.au/courses/cv82/master-of-engineering"
+            "?audience=INTERNATIONAL",
+            html=partial_page,
+            country="Australia",
+        )
+
+    assert fetched_urls == [
+        "https://www.cqu.edu.au/courses/cv82/master-of-engineering"
+    ]
+    payload = result["payload"]
+    assert payload["ielts_overall"] == 6.0
+    assert payload["ielts_listening"] == 5.5
+    assert payload["ielts_reading"] == 5.5
+    assert payload["ielts_speaking"] == 5.5
+    assert payload["ielts_writing"] == 5.5
+    assert payload["pte_overall"] == 54
+    assert payload["toefl_overall"] == 75
+    selected = {
+        row["field_key"]: row["method"]
+        for row in result["evidence"]
+        if row.get("decision_status") == "selected"
+        and row["field_key"].startswith(("ielts_", "pte_", "toefl_"))
+    }
+    assert set(selected) == {
+        "ielts_overall",
+        "ielts_listening",
+        "ielts_reading",
+        "ielts_speaking",
+        "ielts_writing",
+        "pte_overall",
+        "toefl_overall",
+    }
+    assert set(selected.values()) == {
+        "cqu_json:schema_org_coursePrerequisites"
+    }
 
 
 def test_aims_domestic_classification_requires_explicit_flag_pair() -> None:
