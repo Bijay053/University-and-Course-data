@@ -524,6 +524,25 @@ def _metadata_title_segments(value: str) -> list[str]:
     ]
 
 
+def _normalise_institution_name(value: str) -> str:
+    """Extract a plausible institution name from page-title metadata."""
+    segments = _metadata_title_segments(value)
+    if not segments:
+        return ""
+    institution_segment = next(
+        (segment for segment in segments if _INSTITUTION_KEYWORDS.search(segment)),
+        None,
+    )
+    if institution_segment:
+        return institution_segment[:200]
+    non_generic = [
+        segment
+        for segment in segments
+        if segment.casefold() not in _GENERIC_TITLE_SEGMENTS
+    ]
+    return (max(non_generic, key=len)[:200] if non_generic else "")
+
+
 def _has_generic_title_prefix(value: str | None) -> bool:
     segments = _metadata_title_segments(value or "")
     return bool(
@@ -1673,7 +1692,7 @@ async def add_university_by_url(
                 ):
                     _og_m = _re.search(_og_pat, html, _re.I)
                     if _og_m:
-                        _candidate = _decode_metadata_text(_og_m.group(1))
+                        _candidate = _normalise_institution_name(_og_m.group(1))
                         # Only accept if it looks like an institution name or is
                         # at least reasonably long (avoids grabbing short codes).
                         if (
@@ -1687,22 +1706,9 @@ async def add_university_by_url(
                 if not name:
                     title_m = _re.search(r"<title[^>]*>([^<]+)</title>", html, _re.I)
                     if title_m:
-                        segments = _metadata_title_segments(title_m.group(1))
-                        if segments:
-                            # Prefer the segment that looks like an institution name
-                            preferred = next(
-                                (s for s in segments if _UNI_KEYWORDS.search(s)),
-                                None,
-                            )
-                            if preferred is None:
-                                # Fall back to the longest non-generic segment
-                                non_generic = [
-                                    s for s in segments
-                                    if s.lower() not in _GENERIC_TITLES
-                                ]
-                                preferred = max(non_generic, key=len) if non_generic else None
-                            if preferred and preferred.lower() not in _GENERIC_TITLES:
-                                name = preferred[:200]
+                        preferred = _normalise_institution_name(title_m.group(1))
+                        if preferred:
+                            name = preferred
 
                 # ── City from JSON-LD structured data ────────────────────────
                 for ld_block in _re.finditer(

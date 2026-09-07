@@ -13,6 +13,7 @@ from app.routers.universities import (
     _decode_metadata_text,
     _extract_structured_locations,
     _metadata_title_segments,
+    _normalise_institution_name,
     _onboarding_ai_evidence,
     _hostname_fallback_label,
     _has_generic_title_prefix,
@@ -169,6 +170,28 @@ def test_splits_plain_hyphen_homepage_title() -> None:
     ) == ["Home", "Charles Sturt University"]
     assert _has_generic_title_prefix("Home - Charles Sturt University")
     assert not _has_generic_title_prefix("Charles Sturt University")
+
+
+@pytest.mark.parametrize(
+    ("metadata_value", "expected"),
+    [
+        ("Home | Western Sydney University", "Western Sydney University"),
+        ("Welcome – University of Canberra", "University of Canberra"),
+        (
+            "Study with us | INTI International University &amp; Colleges",
+            "INTI International University & Colleges",
+        ),
+    ],
+)
+def test_normalises_institution_name_from_any_metadata_source(
+    metadata_value: str,
+    expected: str,
+) -> None:
+    assert _normalise_institution_name(metadata_value) == expected
+
+
+def test_rejects_generic_only_institution_name_metadata() -> None:
+    assert _normalise_institution_name("Home | Welcome") == ""
 
 
 def test_campus_index_allows_equivalent_institution_subdomain() -> None:
