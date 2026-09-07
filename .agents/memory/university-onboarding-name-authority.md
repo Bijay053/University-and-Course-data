@@ -17,3 +17,7 @@ generic wrappers, prefer authoritative domain mappings when available, and
 allow a clean official candidate to replace a longer phrase that contains it as
 a complete name. Keep exact regression cases for both separator-based and
 single-segment marketing titles.
+
+Branded CMS wrappers ending in “Site” or “Sites” are not institution names.
+Known domain mappings must also be allowed to repair older stored names even
+when the official brand and bad wrapper both lack words such as “University.”

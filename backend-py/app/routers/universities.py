@@ -58,7 +58,7 @@ _INSTITUTION_KEYWORDS = re.compile(
 _GENERIC_TITLE_SEGMENTS = {
     "home", "welcome", "index", "index page", "default", "untitled",
     "homepage", "home page", "main", "start", "portal", "site home",
-    "university home", "college home",
+    "university home", "college home", "sites",
 }
 
 
@@ -155,6 +155,7 @@ _HOSTNAME_OFFICIAL_NAMES = {
     "csu.edu.au": "Charles Sturt University",
     "jcu.edu.au": "James Cook University",
     "segi.edu.my": "SEGi University & Colleges",
+    "unsw.edu.au": "UNSW Sydney",
 }
 _HOSTNAME_FALLBACK_LOCATIONS: dict[
     str, list[dict[str, str | float | None]]
@@ -566,6 +567,10 @@ def _normalise_institution_name(value: str) -> str:
         segment
         for segment in segments
         if segment.casefold() not in _GENERIC_TITLE_SEGMENTS
+        and not (
+            re.search(r"\bsites?$", segment, re.I)
+            and not _INSTITUTION_KEYWORDS.search(segment)
+        )
     ]
     return (max(non_generic, key=len)[:200] if non_generic else "")
 
@@ -1969,6 +1974,10 @@ async def add_university_by_url(
             or _is_hostname_fallback_name(existing.name, hostname)
             or _has_generic_title_prefix(existing.name)
             or _can_upgrade_to_official_name(existing.name, name, hostname)
+            or (
+                _known_official_name is not None
+                and existing.name != _known_official_name
+            )
         ) and name and existing.name != name:
             existing.name = name
             _needs_update = True

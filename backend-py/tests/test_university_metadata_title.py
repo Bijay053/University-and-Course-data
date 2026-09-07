@@ -196,10 +196,15 @@ def test_normalises_institution_name_from_any_metadata_source(
 
 def test_rejects_generic_only_institution_name_metadata() -> None:
     assert _normalise_institution_name("Home | Welcome") == ""
+    assert _normalise_institution_name("UNSW Sites") == ""
 
 
 def test_known_jcu_domain_has_authoritative_official_name() -> None:
     assert _HOSTNAME_OFFICIAL_NAMES["jcu.edu.au"] == "James Cook University"
+
+
+def test_known_unsw_domain_has_authoritative_official_name() -> None:
+    assert _HOSTNAME_OFFICIAL_NAMES["unsw.edu.au"] == "UNSW Sydney"
 
 
 def test_campus_index_allows_equivalent_institution_subdomain() -> None:
