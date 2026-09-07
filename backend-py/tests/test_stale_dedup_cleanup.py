@@ -422,3 +422,63 @@ async def test_full_stage_replaces_true_canonical_url_alias(
         assert not await _exists(old_row), "a true canonical URL alias should be replaced"
     finally:
         await _cleanup(prefix)
+
+
+@pytest.mark.asyncio
+async def test_full_stage_keeps_semantic_query_variants_and_reviewed_alias(
+    isolated_universities,
+):
+    uni_a, _ = isolated_universities
+    prefix = f"test_full_semantic_{uuid.uuid4().hex[:8]}_"
+    course_name = f"Bachelor of Query {prefix}"
+    semantic_row = await _insert(
+        prefix + "semantic",
+        uni_a,
+        course_name,
+        "pending",
+        age_min=30,
+        course_website="https://example.edu/course/query?campus=city",
+    )
+    approved_alias = await _insert(
+        prefix + "approved",
+        uni_a,
+        course_name,
+        "approved",
+        age_min=30,
+        course_website="http://www.example.edu/course/query/?utm_source=old",
+    )
+    try:
+        async with AsyncSessionLocal() as db:
+            result = await stage_course(
+                db,
+                scrape_job_id=prefix + "new",
+                university_id=uni_a,
+                course_name=course_name,
+                payload={
+                    "course_name": course_name,
+                    "degree_level": "Bachelor's",
+                    "international_fee": 39000,
+                    "course_website": "https://example.edu/course/query",
+                },
+                evidence=[],
+                source_url="https://example.edu/course/query",
+            )
+
+        assert result.saved, result.reason
+        assert await _exists(semantic_row), "semantic query parameters must remain distinct"
+        assert await _exists(approved_alias), "approved aliases must never be deleted"
+    finally:
+        await _cleanup(prefix)
+
+
+def test_alias_dedup_uses_indexed_identity_without_queue_scan():
+    source = __import__(
+        "inspect"
+    ).getsource(__import__(
+        "app.services.scraper.stage_course",
+        fromlist=["stage_course"],
+    ).stage_course)
+
+    assert "ScrapedCourse.canonical_course_url == _source_url_key" in source
+    assert "select(ScrapedCourse.id, ScrapedCourse.course_website)" not in source
+    assert "canonical_course_url_key(row[1])" not in source

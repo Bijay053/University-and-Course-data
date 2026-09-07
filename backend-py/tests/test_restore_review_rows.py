@@ -205,6 +205,7 @@ def test_restore_preserves_canonical_course_url_from_original_extraction():
 
     assert result["restored"] == 1
     assert db.added[0].course_website == "https://uni.test/canonical-course"
+    assert db.added[0].canonical_course_url == "uni.test/canonical-course"
     assert result["rows"][0]["course_url"] == "https://uni.test/canonical-course"
     assert result["rows"][0]["snapshot_url"] == "https://uni.test/fetched-version"
 

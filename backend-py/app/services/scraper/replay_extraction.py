@@ -282,6 +282,7 @@ async def restore_review_rows(
                 if key in _RESTORABLE_FIELDS
             }
             values["course_website"] = restored_url
+            values["canonical_course_url"] = normalized_url or None
             values["status"] = "pending"
             values["reviewed_at"] = None
             row = ScrapedCourse(

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, Numeric, Text, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, Numeric, Text, event, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -11,6 +11,14 @@ from app.database import Base
 
 class ScrapedCourse(Base):
     __tablename__ = "scraped_courses"
+    __table_args__ = (
+        Index(
+            "ix_scraped_courses_review_url_identity",
+            "university_id",
+            "canonical_course_url",
+            postgresql_where=text("status NOT IN ('approved', 'published')"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     scrape_job_id: Mapped[str] = mapped_column(Text, nullable=False)
@@ -24,6 +32,7 @@ class ScrapedCourse(Base):
     category: Mapped[str | None] = mapped_column(Text)
     sub_category: Mapped[str | None] = mapped_column(Text)
     course_website: Mapped[str | None] = mapped_column(Text)
+    canonical_course_url: Mapped[str | None] = mapped_column(Text)
     duration: Mapped[float | None] = mapped_column(Numeric(6, 2))
     duration_term: Mapped[str | None] = mapped_column(Text)
     study_mode: Mapped[str | None] = mapped_column(Text)
@@ -90,4 +99,19 @@ class ScrapedCourse(Base):
     pub_decision_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+@event.listens_for(ScrapedCourse, "before_insert")
+@event.listens_for(ScrapedCourse, "before_update")
+def _sync_canonical_course_url(
+    _mapper: object,
+    _connection: object,
+    target: ScrapedCourse,
+) -> None:
+    """Keep indexed URL identity synchronized for every ORM write path."""
+    from app.services.scraper.url_identity import canonical_course_url_key
+
+    target.canonical_course_url = (
+        canonical_course_url_key(target.course_website) or None
     )

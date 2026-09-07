@@ -17,6 +17,7 @@ from app.dependencies import get_current_user, get_db
 from app.models import University
 from app.models.import_job import ImportJob
 from app.models.scraped_course import ScrapedCourse
+from app.services.scraper.url_identity import canonical_course_url_key
 
 router = APIRouter(prefix="/import", tags=["import"])
 
@@ -390,6 +391,9 @@ async def import_excel(
         existing_names.add(course_name.lower())
 
         try:
+            payload["canonical_course_url"] = (
+                canonical_course_url_key(payload.get("course_website")) or None
+            )
             db.add(ScrapedCourse(
                 scrape_job_id=job_id,
                 university_id=uni.id,

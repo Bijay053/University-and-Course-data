@@ -436,68 +436,29 @@ async def stage_course(
     # preservation block below (lines ~285+) already copies field values from
     # approved rows into the new staging row so no data is lost.
     #
-    # URL-alias dedup extension: exact URL matching below does not catch harmless
-    # transport variants such as http/https, www/non-www, trailing slashes,
-    # fragments, reordered query pairs, or tracking parameters. Compare prior
-    # review rows using the shared conservative URL identity instead. Semantic
-    # query parameters and different paths remain distinct, even when titles
-    # match, because universities can publish separate courses/specialisations
-    # under the same title.
+    # URL-alias dedup uses a persisted, indexed conservative identity.  This
+    # catches harmless transport variants without loading and normalising the
+    # university's entire review queue in Python. Semantic query parameters and
+    # different paths remain distinct.
     try:
         _source_url_key = canonical_course_url_key(source_url)
         if _source_url_key:
-            _alias_dedup_q = await db.execute(
-                select(ScrapedCourse.id, ScrapedCourse.course_website)
-                .where(
+            _alias_deleted = await db.execute(
+                delete(ScrapedCourse).where(
                     ScrapedCourse.university_id == university_id,
                     ScrapedCourse.scrape_job_id != scrape_job_id,
                     ScrapedCourse.status.not_in(["approved", "published"]),
+                    ScrapedCourse.canonical_course_url == _source_url_key,
                 )
             )
-            _alias_stale = [
-                row[0]
-                for row in _alias_dedup_q.fetchall()
-                if row[1] != source_url
-                and canonical_course_url_key(row[1]) == _source_url_key
-            ]
-            if _alias_stale:
-                await db.execute(
-                    delete(ScrapedCourse).where(ScrapedCourse.id.in_(_alias_stale))
-                )
+            if _alias_deleted.rowcount:
                 log.info(
                     "stage_course: URL-alias dedup — deleted %d stale row(s) "
-                    "for canonical URL %r (uni %s, different URL/job)",
-                    len(_alias_stale), _source_url_key, university_id,
+                    "for canonical URL %r (uni %s, different job)",
+                    _alias_deleted.rowcount, _source_url_key, university_id,
                 )
     except Exception as _adep:  # noqa: BLE001 — never abort on dedup check failure
         log.warning("stage_course: URL-alias dedup check failed for %r: %s", source_url, _adep)
-
-    if source_url:
-        try:
-            _stale_q = await db.execute(
-                select(ScrapedCourse.id)
-                .where(
-                    ScrapedCourse.university_id == university_id,
-                    ScrapedCourse.course_website == source_url,
-                    ScrapedCourse.scrape_job_id != scrape_job_id,
-                    ScrapedCourse.status.not_in(["approved", "published"]),
-                )
-            )
-            _stale_ids = [row[0] for row in _stale_q.fetchall()]
-            if _stale_ids:
-                await db.execute(
-                    delete(ScrapedCourse).where(ScrapedCourse.id.in_(_stale_ids))
-                )
-                log.info(
-                    "stage_course: cross-job dedup — deleted %d stale row(s) for URL %r (uni %s)",
-                    len(_stale_ids),
-                    source_url,
-                    university_id,
-                )
-        except Exception as _cdep:  # noqa: BLE001 — never abort on dedup check failure
-            log.warning(
-                "stage_course: cross-job dedup check failed for %r: %s", source_url, _cdep
-            )
 
     # Phase A: drop critical fields (fee, english tests, location, study_mode,
     # duration) that lack source proof.  Better to publish "unknown" than
@@ -968,10 +929,14 @@ async def stage_course(
         scrape_job_id=scrape_job_id,
         university_id=university_id,
         course_name=name,
+        canonical_course_url=canonical_course_url_key(
+            payload.get("course_website") or source_url
+        ) or None,
         **{
             k: _clean_model_value(k, v)
             for k, v in payload.items()
-            if hasattr(ScrapedCourse, k) and k != "course_name"
+            if hasattr(ScrapedCourse, k)
+            and k not in {"course_name", "canonical_course_url"}
         },
     )
     db.add(sc)
