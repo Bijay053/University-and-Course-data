@@ -221,7 +221,11 @@ async def _async_bulk_fix(runtime_job_id: str) -> None:
 
             try:
                 part = await re_extract_staged(
-                    ReExtractBody(ids=chunk, universityId=university_id),
+                    ReExtractBody(
+                        ids=chunk,
+                        universityId=university_id,
+                        targetFields=sorted(target_fields),
+                    ),
                     db,
                 )
             except Exception as exc:  # noqa: BLE001

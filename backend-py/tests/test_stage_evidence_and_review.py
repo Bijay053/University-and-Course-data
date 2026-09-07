@@ -81,6 +81,104 @@ def test_reextract_warning_cleanup_is_condition_specific():
 
 
 @pytest.mark.asyncio
+async def test_targeted_fee_fix_does_not_persist_unrelated_extraction(monkeypatch):
+    uni_id = await _pick_university()
+    job_id = f"test_targeted_fee_{uuid.uuid4().hex[:10]}"
+    course_url = "https://example.edu/courses/targeted-fee"
+    try:
+        async with AsyncSessionLocal() as db:
+            row = ScrapedCourse(
+                scrape_job_id=job_id,
+                university_id=uni_id,
+                course_name="Bachelor of Targeted Repair",
+                course_website=course_url,
+                status="pending",
+            )
+            db.add(row)
+            await db.commit()
+            await db.refresh(row)
+            sc_id = row.id
+
+        async def _fake_extract_only(*_args, **_kwargs):
+            return {
+                "url": course_url,
+                "payload": {
+                    "international_fee": 32000,
+                    "fee_term": "Annual",
+                    "fee_year": 2026,
+                    "currency": "AUD",
+                    "other_requirement": "Unrelated AI entry requirement",
+                    "category": "Unrelated AI category",
+                },
+                "evidence": [
+                    {
+                        "field_key": "international_fee",
+                        "value": 32000,
+                        "normalized": 32000,
+                        "method": "fee:table",
+                        "source_url": course_url,
+                        "snippet": "International tuition A$32,000",
+                        "decision_status": "selected",
+                    },
+                    {
+                        "field_key": "other_requirement",
+                        "value": "Unrelated AI entry requirement",
+                        "normalized": "Unrelated AI entry requirement",
+                        "method": "openai_primary",
+                        "source_url": course_url,
+                        "snippet": "Entry requirements",
+                        "decision_status": "selected",
+                    },
+                ],
+            }
+
+        monkeypatch.setattr(
+            "app.services.scraper.orchestrator._extract_only",
+            _fake_extract_only,
+        )
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post(
+                "/api/scrape/staged/re-extract",
+                json={
+                    "ids": [sc_id],
+                    "universityId": uni_id,
+                    "targetFields": ["international_fee"],
+                },
+            )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["results"][0]["updated_fields"] == [
+            "international_fee",
+            "fee_term",
+            "fee_year",
+            "currency",
+        ]
+        async with AsyncSessionLocal() as db:
+            course = await db.get(ScrapedCourse, sc_id)
+            assert course is not None
+            assert course.international_fee == 32000
+            assert course.fee_term == "Annual"
+            assert course.fee_year == 2026
+            assert course.currency == "AUD"
+            assert course.other_requirement is None
+            assert course.category is None
+            evidence_fields = set(
+                (
+                    await db.execute(
+                        select(ScrapedFieldEvidence.field_key).where(
+                            ScrapedFieldEvidence.scraped_course_id == sc_id
+                        )
+                    )
+                ).scalars()
+            )
+            assert evidence_fields == {"international_fee"}
+    finally:
+        await _cleanup(job_id)
+
+
+@pytest.mark.asyncio
 async def test_stage_course_persists_completeness_and_evidence():
     uni_id = await _pick_university()
     job_id = f"test_bugcd_{uuid.uuid4().hex[:10]}"

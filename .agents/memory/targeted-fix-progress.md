@@ -9,6 +9,12 @@ A Review Fix counts as progress only when it updates one of the issue fields sho
 
 **How to apply:** Persist target fields with each durable Fix job, filter reported updates to them, classify target-only evidence refresh as no progress, and never label an all-no-progress result successful.
 
+Target fields also constrain writes, not only progress reporting. A targeted Fix may persist the requested fields and explicit semantic companions, but must discard unrelated extracted values and evidence.
+
+**Why:** A fee-only Fix previously wrote AI-inferred entry requirements and refreshed CRICOS/category evidence even though those fields were not under review.
+
+**How to apply:** Pass targets into re-extraction. For fees allow amount, period, year, and currency; define similarly narrow companion sets for duration, location, English subscores, intakes, and academics.
+
 The results dialog must re-run target-field analysis after a job completes and derive its badge from the before/after missing counts. Generic worker completion or unrelated changed fields are not sufficient evidence of success.
 
 **Why:** Older or resumed jobs can report completed work and metadata updates while every requested gap remains missing.

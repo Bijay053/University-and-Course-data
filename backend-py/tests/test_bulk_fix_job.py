@@ -59,6 +59,7 @@ async def test_bulk_fix_persists_post_batch_counts_and_audit_metadata(monkeypatc
 
     async def extract(body, _db):
         assert body.ids == [11, 12]
+        assert body.target_fields == ["duration"]
         return {
             "results": [
                 {
@@ -129,6 +130,17 @@ def test_bulk_fix_active_job_equivalence_includes_targets_and_source_job():
         target_fields=["international_fee"],
         source_job_id="review-b",
     )
+
+
+def test_fee_target_does_not_allow_unrelated_reextract_fields():
+    from app.routers.scrape import _targeted_reextract_fields
+
+    allowed = _targeted_reextract_fields(["international_fee"])
+
+    assert allowed == {"international_fee", "fee_term", "fee_year", "currency"}
+    assert "other_requirement" not in allowed
+    assert "extraction_method" not in allowed
+    assert "cricos_code" not in allowed
 
 
 def test_bulk_fix_retry_finds_older_match_after_newer_nonmatching_job():

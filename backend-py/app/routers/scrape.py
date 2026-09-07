@@ -1924,11 +1924,48 @@ def _filter_resolved_reextract_warnings(
     ]
 
 
+_REEXTRACT_FIELD_COMPANIONS: dict[str, set[str]] = {
+    "international_fee": {"fee_term", "fee_year", "currency"},
+    "duration": {"duration_term"},
+    "course_location": {"study_mode", "delivery_mode"},
+    "ielts_overall": {
+        "ielts_listening", "ielts_speaking", "ielts_writing", "ielts_reading",
+    },
+    "pte_overall": {
+        "pte_listening", "pte_speaking", "pte_writing", "pte_reading",
+    },
+    "toefl_overall": {
+        "toefl_listening", "toefl_speaking", "toefl_writing", "toefl_reading",
+    },
+    "intake_months": {"intake_days"},
+    "academic_level": {"academic_score", "score_type", "academic_country"},
+}
+
+
+def _targeted_reextract_fields(target_fields: list[str]) -> set[str] | None:
+    """Return fields a targeted Fix may persist, or None for a full refresh."""
+    if not target_fields:
+        return None
+
+    from app.models import ScrapedCourse
+
+    targets = {
+        field
+        for field in target_fields
+        if isinstance(field, str) and hasattr(ScrapedCourse, field)
+    }
+    allowed = set(targets)
+    for field in targets:
+        allowed.update(_REEXTRACT_FIELD_COMPANIONS.get(field, set()))
+    return allowed
+
+
 class ReExtractBody(BaseModel):
     """Request body for bulk AI re-extraction of specific staged courses."""
 
     ids: list[int] = Field(..., description="scraped_course IDs to re-extract (max 50)")
     university_id: int = Field(alias="universityId")
+    target_fields: list[str] = Field(default_factory=list, alias="targetFields")
 
     model_config = {"populate_by_name": True}
 
@@ -2034,6 +2071,7 @@ async def re_extract_staged(
         "course_location",
         "duration",
     )
+    targeted_fields = _targeted_reextract_fields(body.target_fields)
     operation_deadline = _time.monotonic() + 240.0
 
     for sc_id in body.ids:
@@ -2140,6 +2178,7 @@ async def re_extract_staged(
             unresolved = [
                 field_key
                 for field_key in _ONE_GO_RETRY_FIELDS
+                if targeted_fields is None or field_key in targeted_fields
                 if not getattr(row, field_key, None)
                 and not payload.get(field_key)
             ]
@@ -2158,6 +2197,26 @@ async def re_extract_staged(
             results.append({"id": sc_id, "ok": False, "error": last_error})
             errors += 1
             continue
+
+        if targeted_fields is not None:
+            # A targeted Fix may use the full extraction pipeline for discovery,
+            # but it must persist only the requested fields and their companions.
+            # Ignore newly generated warnings for unrelated fields as well.
+            payload = {
+                field_key: value
+                for field_key, value in payload.items()
+                if field_key in targeted_fields
+            }
+            selected_evidence_by_field = {
+                field_key: evidence
+                for field_key, evidence in selected_evidence_by_field.items()
+                if field_key in targeted_fields
+            }
+            other_evidence = {
+                signature: evidence
+                for signature, evidence in other_evidence.items()
+                if str(evidence.get("field_key") or "") in targeted_fields
+            }
 
         out = {
             **out,
