@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { runtimeProgressFromStatus } from "./scrape-job-card";
+import {
+  isCategoryPageWarningStale,
+  runtimeProgressFromStatus,
+} from "./scrape-job-card";
 
 describe("runtimeProgressFromStatus", () => {
   it("uses the persisted processed/total values from every status poll", () => {
@@ -20,5 +23,15 @@ describe("runtimeProgressFromStatus", () => {
       current: 411,
       totalFound: 409,
     })).toEqual({ current: 409, total: 409 });
+  });
+});
+
+describe("isCategoryPageWarningStale", () => {
+  it("drops a warning from an obsolete 14-link candidate set when the job has 182 URLs", () => {
+    expect(isCategoryPageWarningStale(14, 182)).toBe(true);
+  });
+
+  it("keeps a warning that describes the current job total", () => {
+    expect(isCategoryPageWarningStale(14, 14)).toBe(false);
   });
 });

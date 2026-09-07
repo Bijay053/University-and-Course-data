@@ -4734,14 +4734,29 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # (names carry no degree qualifier) rather than individual course detail
         # pages.  If >70% look like category pages and staged count is ≤ 30,
         # emit a critical warning so operators see it in the live log immediately.
+        _staging_cfg = getattr(
+            getattr(_uni_cfg, "extraction", None),
+            "staging",
+            None,
+        )
+        _skip_degree_qualifier_warning = bool(
+            getattr(_staging_cfg, "skip_degree_qualifier_check", False)
+        )
         if links:
             from app.services.scraper.guards import _name_has_degree_qualifier  # noqa: PLC0415
+            from app.services.scraper.warning_rules import (  # noqa: PLC0415
+                should_emit_category_pages_warning,
+            )
             _cat_count = sum(
                 1 for _lk in links
                 if not _name_has_degree_qualifier((_lk.get("name") or _lk.get("url") or "").split("/")[-1].replace("-", " "))
             )
             _cat_pct = (_cat_count / len(links) * 100) if links else 0
-            if _cat_pct > 70 and len(links) <= 30:
+            if should_emit_category_pages_warning(
+                category_count=_cat_count,
+                total_count=len(links),
+                skip_degree_qualifier_check=_skip_degree_qualifier_warning,
+            ):
                 log.warning(
                     "[EXTRACT] %d / %d remaining URLs appear to be category/subject-area pages"
                     " (no degree qualifier in name). Expected: individual course detail pages."

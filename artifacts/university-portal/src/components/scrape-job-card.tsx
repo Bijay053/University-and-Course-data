@@ -66,6 +66,13 @@ export function runtimeProgressFromStatus(data: {
   };
 }
 
+export function isCategoryPageWarningStale(
+  warningTotal: number | undefined,
+  runtimeTotal: number,
+): boolean {
+  return warningTotal !== undefined && warningTotal !== runtimeTotal;
+}
+
 type QualityAction = {
   action_type: string;
   target_fields: string[];
@@ -1360,6 +1367,15 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
         const statusProgress = runtimeProgressFromStatus(data);
         if (statusProgress) {
           setProgress(statusProgress);
+          setUrlFilterWarning((previous) => {
+            if (
+              previous?.kind === "category_pages"
+              && isCategoryPageWarningStale(previous.totalKept, statusProgress.total)
+            ) {
+              return null;
+            }
+            return previous;
+          });
           if (statusProgress.current > 0 && extractionStartRef.current === null) {
             extractionStartRef.current = Date.now();
           }
