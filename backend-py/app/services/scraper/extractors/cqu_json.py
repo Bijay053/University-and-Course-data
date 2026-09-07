@@ -139,10 +139,6 @@ _META_ATTR_RE = re.compile(
     r"""([:\w-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')""",
     re.IGNORECASE,
 )
-_JSON_SCRIPT_RE = re.compile(
-    r"<script\b[^>]*>(?P<body>.*?)</script>",
-    re.IGNORECASE | re.DOTALL,
-)
 
 
 def is_cqu_host(url: str) -> bool:
@@ -501,8 +497,6 @@ def extract_toefl(aims: dict[str, Any]) -> float | None:
 
 def _parse_english_from_schema_org(
     html: str,
-    *,
-    course_code: str = "",
 ) -> str | None:
     """Extract and normalise english proficiency text from schema.org LD+JSON.
 
@@ -525,48 +519,6 @@ def _parse_english_from_schema_org(
     d = parse_course_schema(html)
     if d and isinstance(d.get("coursePrerequisites"), str):
         candidates.append(d["coursePrerequisites"])
-
-    # CQU serves multiple cached NextJS/Sitecore response shapes for the same
-    # audience URL. Some retain the authoritative field in another JSON script
-    # while the Course LD+JSON copy is absent or incomplete. Only accept a
-    # fallback object whose own course code matches the URL; related-course
-    # cards and hydration payloads can carry other prerequisites on the page.
-    expected_code = course_code.strip().casefold()
-
-    def _walk_dicts(value: Any):
-        if isinstance(value, dict):
-            yield value
-            for child in value.values():
-                yield from _walk_dicts(child)
-        elif isinstance(value, list):
-            for child in value:
-                yield from _walk_dicts(child)
-
-    if expected_code:
-        for match in _JSON_SCRIPT_RE.finditer(html or ""):
-            body = match.group("body").strip()
-            if not body or body[0] not in "[{":
-                continue
-            try:
-                document = json.loads(body)
-            except (json.JSONDecodeError, ValueError):
-                continue
-            for item in _walk_dicts(document):
-                prereq = item.get("coursePrerequisites")
-                if not isinstance(prereq, str):
-                    continue
-                item_codes = {
-                    str(item.get(key) or "").strip().casefold()
-                    for key in (
-                        "courseCode",
-                        "course_code",
-                        "productCode",
-                        "product_code",
-                        "code",
-                    )
-                }
-                if expected_code in item_codes:
-                    candidates.append(prereq)
 
     for prereq in candidates:
         if not prereq.strip():
@@ -872,7 +824,10 @@ def apply_overrides(
     # Source priority (first non-empty wins):
     #   1. AIMSData.english_proficiency_text  — present when __NEXT_DATA__
     #      still uses the AIMSData schema (pre-mid-2026 Sitecore update)
-    #   2. Schema.org coursePrerequisites      — reliably present as of
+    #   2. AIMSData.requisite_conditions_text  — CV82 and some newer course
+    #      versions embed the English section in the requisite conditions
+    #   3. AIMSData.entry_requirements_text    — alternate current-course field
+    #   4. Schema.org coursePrerequisites      — reliably present as of
     #      mid-2026; HTML-encoded HTML blob decoded by
     #      _parse_english_from_schema_org()
     #
@@ -881,24 +836,53 @@ def apply_overrides(
     # without them every CQU course was getting nulled and then refilled
     # with the YAML institutional default (6.5/58/79) by the ENG-DEFAULT
     # block, fleet-wide.
-    _course_code_match = re.search(
-        r"/courses/(?P<code>[^/?#]+)",
-        url or "",
-        re.IGNORECASE,
+    aims_eng = (
+        aims.get("english_proficiency_text")
+        if isinstance(aims, dict)
+        else None
     )
-    _course_code = (
-        _course_code_match.group("code")
-        if _course_code_match
-        else ""
+    aims_entry = (
+        aims.get("entry_requirements_text")
+        if isinstance(aims, dict)
+        else None
+    )
+    aims_requisites = (
+        aims.get("requisite_conditions_text")
+        if isinstance(aims, dict)
+        else None
+    )
+    aims_requisites_has_tests = (
+        isinstance(aims_requisites, str)
+        and any(
+            test_name in aims_requisites
+            for test_name in ("IELTS", "TOEFL", "PTE", "Duolingo")
+        )
+    )
+    aims_entry_has_tests = (
+        isinstance(aims_entry, str)
+        and any(
+            test_name in aims_entry
+            for test_name in ("IELTS", "TOEFL", "PTE", "Duolingo")
+        )
     )
     raw_eng_text = (
-        (aims.get("english_proficiency_text") if isinstance(aims, dict) else None)
-        or _parse_english_from_schema_org(html, course_code=_course_code)
+        aims_eng
+        or (aims_requisites if aims_requisites_has_tests else None)
+        or (aims_entry if aims_entry_has_tests else None)
+        or _parse_english_from_schema_org(html)
     )
     eng_source = (
         "cqu_json:english_proficiency_text"
-        if (isinstance(aims, dict) and aims.get("english_proficiency_text"))
-        else "cqu_json:schema_org_coursePrerequisites"
+        if aims_eng
+        else (
+            "cqu_json:requisite_conditions_text"
+            if aims_requisites_has_tests
+            else (
+                "cqu_json:entry_requirements_text"
+                if aims_entry_has_tests
+                else "cqu_json:schema_org_coursePrerequisites"
+            )
+        )
     )
     eng_snippet_base = (
         _strip_html(raw_eng_text)[:280].strip()
