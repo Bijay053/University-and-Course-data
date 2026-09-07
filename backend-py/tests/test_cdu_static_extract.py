@@ -1,4 +1,7 @@
-from app.services.scraper.cdu_static_extract import apply_cdu_static_extraction
+from app.services.scraper.cdu_static_extract import (
+    apply_cdu_static_extraction,
+    ensure_cdu_catalogue_year,
+)
 
 
 def _html(*, fee: str, location: str) -> str:
@@ -68,3 +71,19 @@ def test_cdu_missing_international_values_fail_blank_not_domestic() -> None:
         "course_location": None,
         "study_mode": None,
     }
+
+
+def test_cdu_course_url_gets_catalogue_year_without_losing_query() -> None:
+    url = ensure_cdu_catalogue_year(
+        "https://www.cdu.edu.au/study/course/bachelor-nursing-wnur02?source=sitemap",
+        year=2026,
+    )
+    assert url == (
+        "https://www.cdu.edu.au/study/course/bachelor-nursing-wnur02"
+        "?source=sitemap&year=2026"
+    )
+
+
+def test_cdu_existing_catalogue_year_is_preserved() -> None:
+    url = "https://www.cdu.edu.au/study/course/example?year=2025"
+    assert ensure_cdu_catalogue_year(url, year=2026) == url

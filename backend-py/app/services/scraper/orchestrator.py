@@ -865,6 +865,17 @@ async def _extract_only(
 
     name = (link.get("name") or "").strip() or "Unknown course"
     url = link["url"]
+    # CDU's yearless course route omits the international tuition block even
+    # though the current-year route contains it. Normalize at this shared
+    # extraction entry point so full scrapes, repairs, and UI re-extraction
+    # all fetch the same authoritative catalogue variant.
+    try:
+        from app.services.scraper.cdu_static_extract import ensure_cdu_catalogue_year
+        url = ensure_cdu_catalogue_year(url)
+        if url != link["url"]:
+            link = {**link, "url": url}
+    except Exception as exc:  # noqa: BLE001
+        log.debug("CDU catalogue-year normalization failed for %s: %s", url, exc)
 
     # PDF dedup guard — mirrors the seen_pdf_urls check in repair.py and
     # recovery/extractor.py, but operates at the _extract_only level so it

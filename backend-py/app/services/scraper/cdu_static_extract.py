@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime, timezone
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from bs4 import BeautifulSoup
 
@@ -19,6 +20,21 @@ _ANNUAL_FEE_RE = re.compile(
 
 def is_cdu_url(url: str) -> bool:
     return urlparse(url).hostname in _CDU_HOSTS
+
+
+def ensure_cdu_catalogue_year(url: str, *, year: int | None = None) -> str:
+    """Add CDU's active catalogue year to course URLs when it is absent."""
+    parsed = urlparse(url)
+    if (
+        parsed.hostname not in _CDU_HOSTS
+        or not parsed.path.lower().startswith("/study/course/")
+    ):
+        return url
+    query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    if query.get("year"):
+        return url
+    query["year"] = str(year or datetime.now(timezone.utc).year)
+    return urlunparse(parsed._replace(query=urlencode(query)))
 
 
 def _fee(soup: BeautifulSoup) -> dict[str, Any]:
