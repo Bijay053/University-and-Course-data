@@ -112,6 +112,14 @@ _TOEFL_OVERALL_RE = re.compile(
     r"TOEFL[^.<>]{0,200}?overall(?:\s+(?:band\s+)?score)?[^.<>]{0,80}?(?P<score>\d{2,3})",
     re.IGNORECASE,
 )
+_TOEFL_SECTION_RE = re.compile(
+    r"TOEFL(?P<body>.{0,700}?)(?=(?:Pearson|PTE|IELTS|Duolingo|$))",
+    re.IGNORECASE | re.DOTALL,
+)
+_TOEFL_OR_BETTER_SCORE_RE = re.compile(
+    r"(?P<score>\d{2,3})\s+or\s+better\s+overall",
+    re.IGNORECASE,
+)
 # "minimum 5.5 in each subset/band/component" — CQU's schema.org
 # coursePrerequisites uses this phrasing for per-band floors rather than
 # the "no individual band lower than X" form that _IELTS_NO_LOWER_RE matches.
@@ -130,6 +138,10 @@ _META_TAG_RE = re.compile(r"<meta\b[^>]*>", re.IGNORECASE)
 _META_ATTR_RE = re.compile(
     r"""([:\w-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')""",
     re.IGNORECASE,
+)
+_JSON_SCRIPT_RE = re.compile(
+    r"<script\b[^>]*>(?P<body>.*?)</script>",
+    re.IGNORECASE | re.DOTALL,
 )
 
 
@@ -457,20 +469,41 @@ def extract_toefl(aims: dict[str, Any]) -> float | None:
     if not isinstance(raw, str) or not raw.strip():
         return None
     text = _strip_html(raw)
-    # Try "X or better overall" phrasing first (CQU schema.org format).
-    m = _TOEFL_OR_BETTER_RE.search(text) or _TOEFL_OVERALL_RE.search(text)
-    if not m:
-        return None
-    try:
-        score = float(m.group("score"))
-    except ValueError:
-        return None
-    if not 0 <= score <= 120:
-        return None
-    return score
+    # CQU often publishes both paper-based and internet-based values in one
+    # sentence: "550 or better overall ... or 75 or better overall". Search
+    # the complete TOEFL clause and choose the first score in the iBT range
+    # rather than stopping after the invalid-for-iBT paper score.
+    section_match = _TOEFL_SECTION_RE.search(text)
+    if section_match:
+        for candidate in _TOEFL_OR_BETTER_SCORE_RE.finditer(
+            section_match.group("body")
+        ):
+            try:
+                score = float(candidate.group("score"))
+            except ValueError:
+                continue
+            if 0 <= score <= 120:
+                return score
+
+    # Backward-compatible forms with only one published overall score.
+    for pattern in (_TOEFL_OR_BETTER_RE, _TOEFL_OVERALL_RE):
+        m = pattern.search(text)
+        if not m:
+            continue
+        try:
+            score = float(m.group("score"))
+        except ValueError:
+            continue
+        if 0 <= score <= 120:
+            return score
+    return None
 
 
-def _parse_english_from_schema_org(html: str) -> str | None:
+def _parse_english_from_schema_org(
+    html: str,
+    *,
+    course_code: str = "",
+) -> str | None:
     """Extract and normalise english proficiency text from schema.org LD+JSON.
 
     CQU's ``<script type="application/ld+json">`` Course block stores the
@@ -488,20 +521,69 @@ def _parse_english_from_schema_org(html: str) -> str | None:
     page does not contain a Course LD+JSON block with a populated
     ``coursePrerequisites`` field that mentions at least one test name.
     """
+    candidates: list[str] = []
     d = parse_course_schema(html)
-    if d:
-        prereq = d.get("coursePrerequisites")
-        if isinstance(prereq, str) and prereq.strip():
-            # coursePrerequisites is double-encoded in CQU's LD+JSON output
-            # (the entire HTML block is JSON-string-encoded AND HTML-entity-escaped).
+    if d and isinstance(d.get("coursePrerequisites"), str):
+        candidates.append(d["coursePrerequisites"])
+
+    # CQU serves multiple cached NextJS/Sitecore response shapes for the same
+    # audience URL. Some retain the authoritative field in another JSON script
+    # while the Course LD+JSON copy is absent or incomplete. Only accept a
+    # fallback object whose own course code matches the URL; related-course
+    # cards and hydration payloads can carry other prerequisites on the page.
+    expected_code = course_code.strip().casefold()
+
+    def _walk_dicts(value: Any):
+        if isinstance(value, dict):
+            yield value
+            for child in value.values():
+                yield from _walk_dicts(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from _walk_dicts(child)
+
+    if expected_code:
+        for match in _JSON_SCRIPT_RE.finditer(html or ""):
+            body = match.group("body").strip()
+            if not body or body[0] not in "[{":
+                continue
+            try:
+                document = json.loads(body)
+            except (json.JSONDecodeError, ValueError):
+                continue
+            for item in _walk_dicts(document):
+                prereq = item.get("coursePrerequisites")
+                if not isinstance(prereq, str):
+                    continue
+                item_codes = {
+                    str(item.get(key) or "").strip().casefold()
+                    for key in (
+                        "courseCode",
+                        "course_code",
+                        "productCode",
+                        "product_code",
+                        "code",
+                    )
+                }
+                if expected_code in item_codes:
+                    candidates.append(prereq)
+
+    for prereq in candidates:
+        if not prereq.strip():
+            continue
+        try:
+            # coursePrerequisites is JSON-string-encoded and
+            # HTML-entity-escaped.
             decoded = _html_stdlib.unescape(prereq)
-            # Strip residual HTML tags so the regex extractors get plain text.
-            text = re.sub(r"<[^>]+>", " ", decoded)
-            text = re.sub(r"&nbsp;", " ", text, flags=re.IGNORECASE)
-            text = re.sub(r"\s+", " ", text).strip()
-            # Only return when the block is genuinely about language proficiency.
-            if any(kw in text for kw in ("IELTS", "TOEFL", "PTE", "Duolingo")):
-                return text
+        except (TypeError, ValueError):
+            continue
+        # Strip residual HTML tags so the regex extractors get plain text.
+        text = re.sub(r"<[^>]+>", " ", decoded)
+        text = re.sub(r"&nbsp;", " ", text, flags=re.IGNORECASE)
+        text = re.sub(r"\s+", " ", text).strip()
+        # Only return when the block is genuinely about language proficiency.
+        if any(kw in text for kw in ("IELTS", "TOEFL", "PTE", "Duolingo")):
+            return text
     return None
 
 
@@ -799,9 +881,19 @@ def apply_overrides(
     # without them every CQU course was getting nulled and then refilled
     # with the YAML institutional default (6.5/58/79) by the ENG-DEFAULT
     # block, fleet-wide.
+    _course_code_match = re.search(
+        r"/courses/(?P<code>[^/?#]+)",
+        url or "",
+        re.IGNORECASE,
+    )
+    _course_code = (
+        _course_code_match.group("code")
+        if _course_code_match
+        else ""
+    )
     raw_eng_text = (
         (aims.get("english_proficiency_text") if isinstance(aims, dict) else None)
-        or _parse_english_from_schema_org(html)
+        or _parse_english_from_schema_org(html, course_code=_course_code)
     )
     eng_source = (
         "cqu_json:english_proficiency_text"

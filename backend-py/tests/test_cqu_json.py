@@ -106,6 +106,86 @@ def test_schema_english_applies_without_aims_data() -> None:
     }
 
 
+def test_non_ld_json_course_prerequisites_provides_cv82_scores() -> None:
+    prerequisites = (
+        "<p>English Language Proficiency Requirements</p><ul>"
+        "<li>An International English Language Testing System (IELTS Academic) "
+        "overall band score of at least 6.0 with a minimum 5.5 in each subset;</li>"
+        "<li>Test of English as a Foreign Language (TOEFL) - Requires 550 or "
+        "better overall and minimum TWE score of 4.5 (Paper Based Test), or "
+        "75 or better overall and no score less than 17 (Internet Based Test);</li>"
+        "<li>Pearson Test of English Academic (PTE Academic) - Requires an "
+        "overall score of 54 with no sub-score less than 46;</li></ul>"
+    )
+    page = (
+        "<html><head><script type=\"application/json\">"
+        + json.dumps(
+            {
+                "courseCode": "CV82",
+                "coursePrerequisites": prerequisites,
+            }
+        )
+        + "</script></head><body>Master of Engineering</body></html>"
+    )
+    payload: dict = {}
+    evidence: list[dict] = []
+
+    applied = cqu_json.apply_overrides(
+        payload,
+        page,
+        url="https://www.cqu.edu.au/courses/cv82/master-of-engineering"
+        "?audience=INTERNATIONAL",
+        evidence=evidence,
+    )
+
+    assert payload["ielts_overall"] == 6.0
+    assert payload["ielts_listening"] == 5.5
+    assert payload["ielts_reading"] == 5.5
+    assert payload["ielts_speaking"] == 5.5
+    assert payload["ielts_writing"] == 5.5
+    assert payload["pte_overall"] == 54
+    assert payload["toefl_overall"] == 75
+    assert {"ielts", "pte_overall", "toefl_overall"} <= applied.keys()
+    assert {
+        row["method"]
+        for row in evidence
+        if row["field_key"] in {"ielts_overall", "pte_overall", "toefl_overall"}
+    } == {"cqu_json:schema_org_coursePrerequisites"}
+
+
+def test_unrelated_structured_course_prerequisites_are_ignored() -> None:
+    page = (
+        "<html><head><script type=\"application/json\">"
+        + json.dumps(
+            {
+                "courseCode": "ZZ99",
+                "coursePrerequisites": (
+                    "IELTS Academic overall band score of at least 8.0. "
+                    "PTE Academic overall score of at least 79. "
+                    "TOEFL iBT Requires 110 or better overall."
+                ),
+            }
+        )
+        + "</script></head><body>Master of Engineering</body></html>"
+    )
+    payload: dict = {}
+
+    applied = cqu_json.apply_overrides(
+        payload,
+        page,
+        url="https://www.cqu.edu.au/courses/cv82/master-of-engineering"
+        "?audience=INTERNATIONAL",
+        evidence=[],
+    )
+
+    assert "ielts_overall" not in payload
+    assert "pte_overall" not in payload
+    assert "toefl_overall" not in payload
+    assert "ielts" not in applied
+    assert "pte_overall" not in applied
+    assert "toefl_overall" not in applied
+
+
 def test_aims_domestic_classification_requires_explicit_flag_pair() -> None:
     assert cqu_json.is_domestic_only(
         cqu_json.parse_aims_data(
