@@ -87,3 +87,15 @@ and treating the frontend's HTTP→HTTPS redirect as unhealthy.
 **How to apply:** Use `.venv/bin/python` for production scripts, compare the
 full commit or a deliberate prefix, and smoke the public HTTPS URL with
 redirect following (or explicitly accept the local 301).
+
+The production FastAPI service binds to `127.0.0.1:8000`, and its health route
+is `/api/health`; root-level `/health`, `/healthz`, and `/openapi.json` return
+404 by design because application routers are mounted under `/api`.
+
+**Why:** A successful release build and service restart was initially reported
+as a failed smoke check because verification used the development port 8080 and
+then tried root-level health paths.
+
+**How to apply:** Smoke the backend with
+`http://127.0.0.1:8000/api/health`, then independently verify the public portal
+and its generated hashed JavaScript asset return HTTP 200.
