@@ -428,6 +428,9 @@ async def stage_course(
             )
             _dup = _dup_q.scalar_one_or_none()
         if _dup is not None:
+            from app.services.scraper.metrics import note_duplicate_alias_collision
+
+            note_duplicate_alias_collision()
             log.info(
                 "stage_course: skipping duplicate canonical URL %r from %r "
                 "(already staged in job %s)",
@@ -958,6 +961,9 @@ async def stage_course(
         await db.rollback()
         constraint_name = integrity_constraint_name(exc)
         if constraint_name == REVIEW_URL_IDENTITY_CONSTRAINT:
+            from app.services.scraper.metrics import note_duplicate_alias_collision
+
+            note_duplicate_alias_collision()
             log.info(
                 "stage_course: concurrent duplicate canonical URL %r from %r "
                 "(already staged in job %s)",

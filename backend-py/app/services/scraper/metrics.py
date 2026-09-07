@@ -18,6 +18,7 @@ Tracked fields — everything that has evidence rows including:
 from __future__ import annotations
 
 import logging
+from contextvars import ContextVar
 
 from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,6 +28,30 @@ from app.models.evidence import ScrapedFieldEvidence
 from app.models.scrape_run_metrics import ScrapeRunMetrics
 
 log = logging.getLogger(__name__)
+
+_run_event_metrics: ContextVar[dict[str, int] | None] = ContextVar(
+    "run_event_metrics", default=None
+)
+
+
+def reset_run_event_metrics() -> None:
+    """Initialise non-evidence event metrics for a new scrape run."""
+    _run_event_metrics.set({"duplicate_alias_collisions": 0})
+
+
+def note_duplicate_alias_collision() -> None:
+    """Record one canonical-URL alias rejected during staging."""
+    metrics = _run_event_metrics.get()
+    if metrics is not None:
+        metrics["duplicate_alias_collisions"] += 1
+
+
+def get_run_event_metrics() -> dict[str, int]:
+    """Return non-zero informational event metrics for the current run."""
+    metrics = _run_event_metrics.get()
+    if metrics is None:
+        return {}
+    return {key: value for key, value in metrics.items() if value}
 
 TRACKED_FIELDS: frozenset[str] = frozenset({
     # English — overall

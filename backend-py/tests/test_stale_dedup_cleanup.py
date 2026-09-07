@@ -29,6 +29,7 @@ from sqlalchemy import delete, select, text
 from app.database import AsyncSessionLocal, engine
 from app.models import ScrapedCourse, University
 from app.services.scraper.orchestrator import _clear_stale_dedup
+from app.services.scraper.metrics import get_run_event_metrics, reset_run_event_metrics
 from app.services.scraper.stage_course import stage_course
 
 
@@ -567,6 +568,7 @@ async def test_concurrent_within_job_aliases_create_one_review_row(
         "http://www.example.edu/course/concurrent/?utm_source=catalogue",
         "https://example.edu/course/concurrent",
     )
+    reset_run_event_metrics()
 
     async def stage(url: str):
         async with AsyncSessionLocal() as db:
@@ -603,6 +605,7 @@ async def test_concurrent_within_job_aliases_create_one_review_row(
                 )
             ).scalars().all()
         assert len(rows) == 1
+        assert get_run_event_metrics() == {"duplicate_alias_collisions": 1}
     finally:
         await _cleanup(prefix)
 

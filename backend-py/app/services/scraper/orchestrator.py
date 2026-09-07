@@ -1767,6 +1767,8 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         _reset_browser_only()
         from app.services.skip_counters import reset_skip_counters as _reset_skip_counters
         _reset_skip_counters()
+        from app.services.scraper.metrics import reset_run_event_metrics as _reset_run_event_metrics
+        _reset_run_event_metrics()
         from app.services.html_compaction_counters import (
             reset_html_compaction_stats as _reset_html_compaction_stats,
         )
@@ -6624,6 +6626,22 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # ── Task #235: gate skip counters ─────────────────────────────────────
         from app.services.skip_counters import get_skip_counts as _get_skip_counts
         _gate_skips = _get_skip_counts()
+        from app.services.scraper.metrics import get_run_event_metrics as _get_run_event_metrics
+        _run_event_metrics = _get_run_event_metrics()
+        _duplicate_alias_collisions = _run_event_metrics.get("duplicate_alias_collisions", 0)
+        if _duplicate_alias_collisions:
+            await emit(
+                "status",
+                (
+                    f"[DUPLICATE ALIASES] {_duplicate_alias_collisions} canonical-URL "
+                    f"staging collision{'' if _duplicate_alias_collisions == 1 else 's'} "
+                    "safely skipped"
+                ),
+                phase="complete",
+                kind="duplicate_alias_collision_summary",
+                duplicate_alias_collisions=_duplicate_alias_collisions,
+                level="info",
+            )
         from app.services.html_compaction_counters import (
             get_html_compaction_stats as _get_html_compaction_stats,
         )
@@ -6952,6 +6970,9 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         job.scrape_do_render_calls = _sd_job_ctrs["render"]
         job.scrape_do_static_calls = _sd_job_ctrs["static"]
         job.gate_skip_counts = _gate_skips if _nonzero_skips else None
+        if _run_event_metrics:
+            job.gate_skip_counts = dict(job.gate_skip_counts or {})
+            job.gate_skip_counts.update(_run_event_metrics)
         if _html_compaction_stats:
             job.gate_skip_counts = dict(job.gate_skip_counts or {})
             job.gate_skip_counts["html_compaction"] = _html_compaction_stats
