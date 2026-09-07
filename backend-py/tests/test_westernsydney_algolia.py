@@ -1,4 +1,5 @@
 import json
+import re
 
 import httpx
 import pytest
@@ -10,7 +11,10 @@ from app.services.scraper.algolia_provider import (
 )
 from app.services.scraper.config.schema import AlgoliaDiscoveryConfig
 from app.services.scraper.config.loader import load_uni_config
-from app.services.scraper.orchestrator import _has_authoritative_course_provider
+from app.services.scraper.orchestrator import (
+    _link_matches_post_discovery_allow,
+    _link_matches_post_discovery_block,
+)
 
 
 WSU_URL = (
@@ -37,15 +41,37 @@ def test_wsu_config_preserves_authoritative_algolia_fields() -> None:
     ]
 
 
-def test_wsu_algolia_is_an_authoritative_post_discovery_provider() -> None:
-    config = load_uni_config(
-        slug="westernsydney",
-        name="Western Sydney University",
-        scrape_url="https://www.westernsydney.edu.au/future/study/courses",
-        create_missing_stub=False,
-    )
+def test_algolia_research_link_bypasses_stale_post_discovery_filters() -> None:
+    research = {
+        "url": "https://www.westernsydney.edu.au/future/study/courses/research/master-of-research",
+        "payload": {"_provider": "algolia", "internationalFees": "To be advised."},
+    }
+    block = [re.compile(r"/research/")]
+    allow = [re.compile(r"/undergraduate/")]
 
-    assert _has_authoritative_course_provider(config.discovery)
+    assert not _link_matches_post_discovery_block(research, block)
+    assert _link_matches_post_discovery_allow(research, allow)
+
+
+@pytest.mark.parametrize(
+    "link",
+    [
+        {
+            "url": "https://www.westernsydney.edu.au/future/study/courses/research/master-of-research",
+            "name": "BFS fallback",
+        },
+        {
+            "url": "https://www.westernsydney.edu.au/future/study/courses/research/master-of-research",
+            "name": "Targeted retry",
+        },
+    ],
+)
+def test_non_provider_research_links_keep_post_discovery_filters(link: dict) -> None:
+    block = [re.compile(r"/research/")]
+    allow = [re.compile(r"/undergraduate/")]
+
+    assert _link_matches_post_discovery_block(link, block)
+    assert not _link_matches_post_discovery_allow(link, allow)
 
 
 def test_wsu_algolia_overrides_domestic_fee_and_noisy_ai_duration() -> None:

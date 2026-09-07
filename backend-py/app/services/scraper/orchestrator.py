@@ -44,16 +44,32 @@ from app.services.scraper.course_deadline import (
 )
 
 
-def _has_authoritative_course_provider(
-    discovery: Any,
-    *,
-    searchstax_active: bool = False,
+def _link_has_authoritative_course_provenance(link: dict) -> bool:
+    """Return whether this exact link was emitted by a course-record provider."""
+    payload = link.get("payload")
+    return isinstance(payload, dict) and payload.get("_provider") == "algolia"
+
+
+def _link_matches_post_discovery_block(
+    link: dict,
+    patterns: list[re.Pattern[str]],
 ) -> bool:
-    """Return whether discovery already produced an authoritative course set."""
-    return searchstax_active or any(
-        getattr(discovery, provider, None) is not None
-        for provider in ("algolia", "swiftype", "manchester_xml", "sruc_api")
-    )
+    """Provider-owned course records bypass BFS-oriented URL deny rules."""
+    if _link_has_authoritative_course_provenance(link):
+        return False
+    url = link.get("url") or ""
+    return any(pattern.search(url) for pattern in patterns)
+
+
+def _link_matches_post_discovery_allow(
+    link: dict,
+    patterns: list[re.Pattern[str]],
+) -> bool:
+    """Provider-owned course records bypass BFS-oriented URL allow rules."""
+    if _link_has_authoritative_course_provenance(link):
+        return True
+    url = link.get("url") or ""
+    return any(pattern.search(url) for pattern in patterns)
 
 log = logging.getLogger(__name__)
 
@@ -4045,9 +4061,11 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # filtered.  Applying stale generated/admin patterns to provider-owned
         # links drops real courses (for example WSU research degrees whose
         # international fees are explicitly "To be advised" in Algolia).
-        _skip_url_filters_searchstax = _has_authoritative_course_provider(
-            _uni_cfg.discovery,
-            searchstax_active=_searchstax_cfg is not None,
+        _skip_url_filters_searchstax = (
+            _searchstax_cfg is not None
+            or (getattr(_uni_cfg.discovery, "swiftype", None) is not None)
+            or (getattr(_uni_cfg.discovery, "manchester_xml", None) is not None)
+            or (getattr(_uni_cfg.discovery, "sruc_api", None) is not None)
         )
         if _skip_url_filters_searchstax and links:
             log.info(
@@ -4083,6 +4101,12 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 _block_dropped_detail: list[dict] = []
                 for _lk in links:
                     _lk_url = _lk.get("url") or ""
+                    if not _link_matches_post_discovery_block(
+                        _lk,
+                        _compiled_block_a5b,
+                    ):
+                        _block_kept_lks.append(_lk)
+                        continue
                     _drop_rule: str | None = None
                     for _bp_str, _bp_re in zip(_block_pats_raw_a5b, _compiled_block_a5b):
                         if _bp_re.search(_lk_url):
@@ -4143,11 +4167,11 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 _pre_allow = len(links)
                 _kept_links = [
                     _lk for _lk in links
-                    if any(_ap.search(_lk.get("url") or "") for _ap in _compiled_allow)
+                    if _link_matches_post_discovery_allow(_lk, _compiled_allow)
                 ]
                 _dropped_links = [
                     _lk for _lk in links
-                    if not any(_ap.search(_lk.get("url") or "") for _ap in _compiled_allow)
+                    if not _link_matches_post_discovery_allow(_lk, _compiled_allow)
                 ]
                 links = _kept_links
                 _allow_dropped = _pre_allow - len(links)
