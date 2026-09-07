@@ -319,6 +319,7 @@ interface FixResults {
   provenanceOnlyFields: string[];
   beforeIssues: FixIssue[];
   afterIssues: FixIssue[];
+  afterAnalysisComplete: boolean;
 }
 interface BulkFixJob {
   jobId: string;
@@ -350,7 +351,20 @@ export function getFixResultHeading(result: {
   updated: number;
   skipped: number;
   errors: number;
+  beforeIssues?: FixIssue[];
+  afterIssues?: FixIssue[];
+  afterAnalysisComplete?: boolean;
 }): string {
+  if (result.afterAnalysisComplete && result.beforeIssues?.length) {
+    const beforeMissing = result.beforeIssues.reduce((sum, issue) => sum + issue.missing, 0);
+    const afterMissing = result.beforeIssues.reduce(
+      (sum, issue) => sum + (result.afterIssues?.find((after) => after.field === issue.field)?.missing ?? 0),
+      0,
+    );
+    if (afterMissing >= beforeMissing) return "No progress";
+    if (afterMissing === 0 && result.errors === 0) return "Successful";
+    return "Partially successful";
+  }
   if (result.errors === 0 && result.updated === result.total && result.skipped === 0) {
     return "Successful";
   }
@@ -2189,6 +2203,47 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   };
 
   const _FIX_ANALYZE_BATCH = 50;
+  const loadFixAnalysis = useCallback(async (ids: number[], universityId: number): Promise<FixAnalysis> => {
+    const chunks: number[][] = [];
+    for (let i = 0; i < ids.length; i += _FIX_ANALYZE_BATCH) {
+      chunks.push(ids.slice(i, i + _FIX_ANALYZE_BATCH));
+    }
+
+    const merged: FixAnalysis = { total: 0, courses_with_url: 0, issues: [] };
+    const issueMap = new Map<string, FixIssue>();
+    for (const chunk of chunks) {
+      const res = await fetch("/api/scrape/staged/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        cache: "no-store",
+        body: JSON.stringify({ ids: chunk, universityId }),
+      });
+      if (!res.ok) throw new Error(await getFetchErrorMessage(res));
+      const part: FixAnalysis = await res.json();
+      merged.total += part.total;
+      merged.courses_with_url += part.courses_with_url;
+      for (const issue of part.issues) {
+        const existing = issueMap.get(issue.field);
+        if (existing) {
+          const combinedTotal = existing.total + issue.total;
+          const combinedMissing = existing.missing + issue.missing;
+          issueMap.set(issue.field, {
+            ...existing,
+            total: combinedTotal,
+            missing: combinedMissing,
+            current_pct: combinedTotal > 0 ? Math.round(100 * (1 - combinedMissing / combinedTotal)) : 100,
+            expected_fill_pct: Math.round((existing.expected_fill_pct + issue.expected_fill_pct) / 2),
+          });
+        } else {
+          issueMap.set(issue.field, { ...issue });
+        }
+      }
+    }
+    merged.issues = Array.from(issueMap.values());
+    return merged;
+  }, []);
+
   const reviewUniversityId = () => {
     if (selectedUni && selectedUni !== ALL) {
       const explicitId = Number(selectedUni);
@@ -2220,51 +2275,15 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       description: "The repair preview will open when the check is complete.",
     });
     try {
-      // Batch analyze in chunks of 50 and merge the results.
-      const chunks: number[][] = [];
-      for (let i = 0; i < ids.length; i += _FIX_ANALYZE_BATCH) chunks.push(ids.slice(i, i + _FIX_ANALYZE_BATCH));
-
-      let merged: FixAnalysis = { total: 0, courses_with_url: 0, issues: [] };
-      const issueMap = new Map<string, FixIssue>();
-
-      for (const chunk of chunks) {
-        const res = await fetch("/api/scrape/staged/analyze", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ ids: chunk, universityId: uniId }),
-        });
-        if (!res.ok) {
-          toast({ title: "Analysis failed", description: await getFetchErrorMessage(res), variant: "destructive" });
-          setAnalyzingFix(false);
-          return;
-        }
-        const part: FixAnalysis = await res.json();
-        merged.total += part.total;
-        merged.courses_with_url += part.courses_with_url;
-        for (const issue of part.issues) {
-          const existing = issueMap.get(issue.field);
-          if (existing) {
-            // Combine counts; recalculate percentages proportionally.
-            const combinedTotal = existing.total + issue.total;
-            const combinedMissing = existing.missing + issue.missing;
-            issueMap.set(issue.field, {
-              ...existing,
-              total: combinedTotal,
-              missing: combinedMissing,
-              current_pct: combinedTotal > 0 ? Math.round(100 * (1 - combinedMissing / combinedTotal)) : 100,
-              expected_fill_pct: Math.round((existing.expected_fill_pct + issue.expected_fill_pct) / 2),
-            });
-          } else {
-            issueMap.set(issue.field, { ...issue });
-          }
-        }
-      }
-      merged.issues = Array.from(issueMap.values());
+      const merged = await loadFixAnalysis(ids, uniId);
       setFixAnalysis(merged);
       setShowFixPreviewDialog(true);
-    } catch {
-      toast({ title: "Analysis failed", description: "Network error — check your connection.", variant: "destructive" });
+    } catch (error) {
+      toast({
+        title: "Analysis failed",
+        description: error instanceof Error ? error.message : "Network error — check your connection.",
+        variant: "destructive",
+      });
     }
     setAnalyzingFix(false);
   };
@@ -2365,6 +2384,20 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
           const valueUpdatedFields = new Set<string>();
           const provenanceOnlyFields = new Set<string>();
           mergeReextractFieldResults({ valueUpdatedFields, provenanceOnlyFields }, job.results);
+          const resultIds = job.results
+            .map((result) => Number(result.id))
+            .filter((id) => Number.isInteger(id));
+          const uniId = reviewUniversityId();
+          let afterIssues: FixIssue[] = [];
+          let afterAnalysisComplete = false;
+          if (resultIds.length > 0 && uniId != null) {
+            try {
+              afterIssues = (await loadFixAnalysis(resultIds, uniId)).issues;
+              afterAnalysisComplete = true;
+            } catch {
+              // Do not claim target-field success without a fresh comparison.
+            }
+          }
           setFixResults({
             total: job.total,
             updated: job.completed,
@@ -2373,7 +2406,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             valueUpdatedFields: Array.from(valueUpdatedFields).sort(),
             provenanceOnlyFields: Array.from(provenanceOnlyFields).sort(),
             beforeIssues: fixAnalysis?.issues ?? [],
-            afterIssues: [],
+            afterIssues,
+            afterAnalysisComplete,
           });
           setFixingSelected(false);
           setFixProgress(null);
@@ -2386,7 +2420,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       }
     }, 2000);
     return () => window.clearInterval(timer);
-  }, [bulkFixJob?.jobId, bulkFixJob?.status, fixAnalysis?.issues, loadStagedCourses, reviewJobId]);
+  }, [bulkFixJob?.jobId, bulkFixJob?.status, fixAnalysis?.issues, loadFixAnalysis, loadStagedCourses, reviewJobId]);
 
   const handleDedupPending = async () => {
     if (!selectedUni || selectedUni === ALL) return;
@@ -3741,15 +3775,16 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             <div className="space-y-4">
               <div className="bg-muted/50 rounded-lg p-3 flex items-center justify-between text-sm">
                 <div className="flex items-center gap-3">
-                  <span className="font-medium">Re-extracted {fixResults.updated} of {fixResults.total}</span>
+                  <span className="font-medium">Processed {fixResults.total - fixResults.errors} of {fixResults.total}</span>
                   {fixResults.skipped > 0 && <span className="text-muted-foreground">· {fixResults.skipped} skipped</span>}
                   {fixResults.errors > 0 && <span className="text-red-600">· {fixResults.errors} failed</span>}
                 </div>
                 <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${
-                  fixResults.errors === 0 && fixResults.updated === fixResults.total && fixResults.skipped === 0
+                  getFixResultHeading(fixResults) === "Successful"
                     ? "bg-green-50 text-green-700 border-green-200" :
-                  fixResults.updated > 0 ? "bg-orange-50 text-orange-700 border-orange-200" :
-                  fixResults.errors === 0 && fixResults.skipped > 0
+                  getFixResultHeading(fixResults) === "Partially successful"
+                    ? "bg-orange-50 text-orange-700 border-orange-200" :
+                  getFixResultHeading(fixResults) === "No progress"
                     ? "bg-amber-50 text-amber-700 border-amber-200" :
                   "bg-red-50 text-red-700 border-red-200"
                 }`}>
@@ -3757,12 +3792,22 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                 </span>
               </div>
 
+              {getFixResultHeading(fixResults) === "No progress" && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                  The requested fields are still missing. Other metadata or source changes did not fix the selected issues.
+                </div>
+              )}
+
               {(fixResults.valueUpdatedFields.length > 0 || fixResults.provenanceOnlyFields.length > 0) && (
                 <div className="space-y-3">
                   {fixResults.valueUpdatedFields.length > 0 && (
-                    <div className="rounded-lg border border-green-200 bg-green-50 p-3">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-green-800">Values updated</p>
-                      <p className="mt-1 text-sm text-green-700">
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-700">
+                        {fixResults.valueUpdatedFields.some((field) => fixResults.beforeIssues.some((issue) => issue.field === field))
+                          ? "Requested values updated"
+                          : "Other metadata updated — requested fields unchanged"}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-700">
                         {fixResults.valueUpdatedFields.map(field => FIX_FIELD_LABELS[field] ?? field).join(", ")}
                       </p>
                     </div>
@@ -3794,7 +3839,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                       <tbody>
                         {fixResults.beforeIssues.map((before, idx) => {
                           const after = fixResults.afterIssues.find(a => a.field === before.field);
-                          const afterMissing = after?.missing ?? before.missing;
+                          const afterMissing = fixResults.afterAnalysisComplete
+                            ? (after?.missing ?? 0)
+                            : before.missing;
                           const improvement = before.missing - afterMissing;
                           return (
                             <tr key={before.field} className={idx > 0 ? "border-t" : ""}>

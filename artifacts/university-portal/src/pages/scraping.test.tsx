@@ -71,6 +71,26 @@ describe("Scraping repair reviewer", () => {
     })).toBe("No progress");
   });
 
+  it("uses unchanged requested gaps instead of unrelated updates for the result heading", () => {
+    const issue = {
+      field: "international_fee",
+      label: "International Fee",
+      missing: 3,
+      total: 3,
+      current_pct: 0,
+      expected_fill_pct: 80,
+    };
+    expect(getFixResultHeading({
+      total: 3,
+      updated: 3,
+      skipped: 0,
+      errors: 0,
+      beforeIssues: [issue],
+      afterIssues: [issue],
+      afterAnalysisComplete: true,
+    })).toBe("No progress");
+  });
+
   it("forces a fresh authenticated staged-course request when Refresh is clicked", async () => {
     const review = initialReview();
     const stagedRequests: RequestInit[] = [];
@@ -207,8 +227,9 @@ describe("Scraping repair reviewer", () => {
       name: "Fix Results",
       description: "Review the completed re-extraction summary for the selected courses.",
     }, { timeout: 6000 });
-    expect(within(dialog).getByText("Re-extracted 51 of 51")).toBeTruthy();
-    const valueSummary = within(dialog).getByText("Values updated").parentElement;
+    expect(within(dialog).getByText("Processed 51 of 51")).toBeTruthy();
+    expect(within(dialog).getByText("Successful")).toBeTruthy();
+    const valueSummary = within(dialog).getByText("Requested values updated").parentElement;
     const sourceSummary = within(dialog).getByText("Sources refreshed — values unchanged").parentElement;
     expect(valueSummary?.textContent).toContain("IELTS, International Fee");
     expect(sourceSummary?.textContent).toContain("Duration, Study Mode");
