@@ -1891,6 +1891,39 @@ async def clean_course_names(
     }
 
 
+def _filter_resolved_reextract_warnings(
+    warnings: list[object],
+    *,
+    fresh_payload: dict,
+    current_payload: dict,
+) -> list[str]:
+    """Keep review warnings unless this extraction proves them resolved."""
+    from app.services.scraper.confidence import CONFIDENCE_WARN, score_payload
+
+    resolved_codes: set[str] = set()
+
+    try:
+        if float(fresh_payload.get("international_fee") or 0) > 0:
+            resolved_codes.add("fee_section_detected_fee_blank")
+    except (TypeError, ValueError):
+        pass
+
+    try:
+        if float(fresh_payload.get("duration") or 0) > 0:
+            resolved_codes.add("suspicious_duration")
+    except (TypeError, ValueError):
+        pass
+
+    if score_payload(current_payload)["score"] >= CONFIDENCE_WARN:
+        resolved_codes.add("confidence_low")
+
+    return [
+        str(warning)
+        for warning in warnings
+        if str(warning).split(":", 1)[0] not in resolved_codes
+    ]
+
+
 class ReExtractBody(BaseModel):
     """Request body for bulk AI re-extraction of specific staged courses."""
 
@@ -2134,20 +2167,12 @@ async def re_extract_staged(
                 *selected_evidence_by_field.values(),
             ],
         }
-        # Scrape warnings describe the extraction attempt that raised them.
-        # Remove a stale duration warning only when this attempt actually
-        # resolved duration; preserve unrelated warnings for operator review.
-        if "scrape_warnings" in payload:
-            payload["scrape_warnings"] = list(payload.get("scrape_warnings") or [])
-        elif (
-            payload.get("duration") not in (None, "", 0)
-            and "suspicious_duration" in (row.scrape_warnings or [])
-        ):
-            payload["scrape_warnings"] = [
-                warning
-                for warning in row.scrape_warnings
-                if warning != "suspicious_duration"
-            ]
+        # Preserve unrelated historical warnings and add any warnings from this
+        # attempt. Resolution is evaluated after applying the fresh fields.
+        warning_candidates = list(row.scrape_warnings or [])
+        for warning in list(payload.pop("scrape_warnings", []) or []):
+            if warning not in warning_candidates:
+                warning_candidates.append(warning)
 
         # Apply payload fields to the existing row.
         changed_fields: list[str] = []
@@ -2160,6 +2185,19 @@ async def re_extract_staged(
             if getattr(row, field_key) != cleaned:
                 setattr(row, field_key, cleaned)
                 changed_fields.append(field_key)
+
+        current_payload = {
+            column.name: getattr(row, column.name)
+            for column in ScrapedCourse.__table__.columns
+        }
+        filtered_warnings = _filter_resolved_reextract_warnings(
+            warning_candidates,
+            fresh_payload=payload,
+            current_payload=current_payload,
+        )
+        if filtered_warnings != list(row.scrape_warnings or []):
+            row.scrape_warnings = filtered_warnings
+            changed_fields.append("scrape_warnings")
 
         incoming_evidence = out.get("evidence") or []
         unchanged_payload_fields = {

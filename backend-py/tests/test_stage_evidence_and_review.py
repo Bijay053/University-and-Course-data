@@ -21,6 +21,7 @@ from app.main import app
 from app.models import ScrapedCourse, ScrapedFieldEvidence, University
 from app.models.page_snapshot import PageSnapshot
 from app.models.scrape_runtime import ScrapeRuntimeJob
+from app.routers.scrape import _filter_resolved_reextract_warnings
 from app.services.scraper.snapshot_save import staged_row_backup_payload
 from app.services.scraper.stage_course import stage_course
 from app.services.scraper.replay_extraction import restore_review_rows
@@ -53,6 +54,30 @@ async def _cleanup(prefix: str) -> None:
             {"p": f"{prefix}%"},
         )
         await db.commit()
+
+
+def test_reextract_warning_cleanup_is_condition_specific():
+    warnings = _filter_resolved_reextract_warnings(
+        [
+            "fee_section_detected_fee_blank",
+            "suspicious_duration",
+            "confidence_low:55",
+            "manual_operator_review",
+        ],
+        fresh_payload={
+            "international_fee": 17420,
+            "duration": 1.5,
+        },
+        current_payload={
+            "international_fee": 17420,
+            "duration": 1.5,
+            "ielts_overall": 6.0,
+            "intake_months": ["February"],
+            "study_mode": "Full Time",
+        },
+    )
+
+    assert warnings == ["manual_operator_review"]
 
 
 @pytest.mark.asyncio
@@ -335,7 +360,10 @@ async def test_re_extract_staged_refreshes_changed_fee_evidence(monkeypatch):
                     "international_fee": 41000,
                     "fee_year": 2025,
                     "course_website": old_url,
-                    "scrape_warnings": ["suspicious_duration"],
+                    "scrape_warnings": [
+                        "suspicious_duration",
+                        "fee_section_detected_fee_blank",
+                    ],
                 },
                 evidence=[
                     {
@@ -433,6 +461,7 @@ async def test_re_extract_staged_refreshes_changed_fee_evidence(monkeypatch):
             assert course.category == "Science"
             assert course.course_location == "Sydney"
             assert "suspicious_duration" not in course.scrape_warnings
+            assert "fee_section_detected_fee_blank" not in course.scrape_warnings
             assert "confidence_low" in course.scrape_warnings
             fee_evidence = (
                 await db.execute(
