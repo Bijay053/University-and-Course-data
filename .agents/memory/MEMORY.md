@@ -139,4 +139,5 @@
 - [Re-extraction evidence promotion](reextract-evidence-promotion.md) — equal values still refresh when selected evidence replaces previously unselected provenance.
 - [Targeted Fix progress](targeted-fix-progress.md) — count only previewed issue-field updates; job identity includes courses, target fields, and source review.
 - [University onboarding locality safety](university-onboarding-locality.md) — navigation labels are never cities; invalid stored localities may be repaired by verified onboarding fallback.
+- [University onboarding name authority](university-onboarding-name-authority.md) — URL metadata is marketing copy until sanitized; clean official names may replace wrapped phrases even when both contain “University.”
 - [Category-page warning parity](category-page-warning-parity.md) — URL-shape warnings must respect degree-qualifier overrides and be discarded when their candidate count differs from the live job.
