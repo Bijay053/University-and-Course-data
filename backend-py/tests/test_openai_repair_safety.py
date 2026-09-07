@@ -161,6 +161,54 @@ def test_yaml_apply_cannot_overwrite_verified_locked_discovery(tmp_path) -> None
     assert yaml_file.read_text(encoding="utf-8") == original
 
 
+@pytest.mark.asyncio
+async def test_old_zero_result_job_uses_current_validated_recipe_without_openai(monkeypatch) -> None:
+    import app.services.ai.openai_client as openai_client
+    import app.services.scraper.ai_repair_agent as agent
+
+    ctx = {
+        "job_id": "old-job",
+        "university_id": 24,
+        "uni_name": "Current University",
+        "scrape_url": "https://current.edu",
+        "raw_discovered": 7,
+        "after_filter": 0,
+        "imported": 0,
+        "total_errors": 0,
+        "drop_rate": 100,
+        "dropped_sample": ["https://current.edu/faculties"],
+        "repair_url_sample": [
+            "https://current.edu/study/course/bachelor-arts-a1",
+            "https://current.edu/study/course/master-science-m1",
+        ],
+        "passed_sample": [],
+        "admin_config": {},
+        "effective_discovery": {
+            "allow_url_patterns": [r"/study/course/"],
+            "block_url_patterns": [],
+            "must_contain": [],
+            "course_detail_url_patterns": [r"/study/course/[^/]+$"],
+        },
+        "yaml_content": "",
+        "quality": {},
+    }
+
+    async def fail_chat(**_kwargs):
+        raise AssertionError("OpenAI must not run when current deterministic validation passes")
+
+    monkeypatch.setattr(openai_client, "chat_json", fail_chat)
+    monkeypatch.setattr(agent, "read_session", lambda _job: {})
+    monkeypatch.setattr(agent, "_write_session", lambda *_args: None)
+    monkeypatch.setattr(agent, "_gather_context", lambda *_args: _async_value(ctx))
+
+    session = await run_ai_repair_loop("old-job", object())
+
+    assert session["status"] == "completed"
+    assert session["attempts"][0]["after_pass_count"] == 2
+    assert session["attempts"][0]["total_test_urls"] == 2
+    assert "fresh scrape" in session["final_verdict"]
+
+
 def test_repair_target_requires_terminal_job_with_filter_failure_evidence() -> None:
     evidence = {
         "pipeline_stats": {

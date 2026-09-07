@@ -2262,6 +2262,54 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
         session["quality_before"] = quality_baseline
         _write_session(job_id, session)
 
+        # An old failed job may be opened after its university recipe was
+        # repaired elsewhere. Validate the current effective config before
+        # asking OpenAI for another mutation. This no-change attempt gives the
+        # UI deterministic evidence to launch the fresh verification scrape.
+        current_disc = dict(ctx.get("effective_discovery") or {})
+        current_urls = ctx.get("repair_url_sample") or ctx["dropped_sample"]
+        current_sim = _simulate_filter(
+            current_urls,
+            current_disc.get("allow_url_patterns", []),
+            current_disc.get("block_url_patterns", []),
+            current_disc.get("must_contain", []),
+            current_disc.get("course_detail_url_patterns", []),
+        )
+        current_minimum = max(1, (current_sim["total"] + 1) // 2)
+        if (
+            ctx["imported"] == 0
+            and current_sim["total"] > 0
+            and current_sim["after"] >= current_minimum
+        ):
+            session["current_attempt"] = 1
+            session["attempts"].append({
+                "attempt_number": 1,
+                "phase": "discovery",
+                "diagnosis": "The current effective URL configuration already passes validation.",
+                "root_cause": "stale_job_evidence",
+                "confidence": 100,
+                "explanation": "A fresh scrape is required to verify imports.",
+                "patches_proposed": [],
+                "patches_applied": [],
+                "patch_applied_ok": False,
+                "before_pass_count": current_sim["after"],
+                "after_pass_count": current_sim["after"],
+                "total_test_urls": current_sim["total"],
+                "rescued_urls": current_sim["rescued"],
+                "outcome": "no_change",
+                "rollback_status": "unchanged",
+            })
+            session.update(
+                status="completed",
+                final_verdict=(
+                    f"Current URL configuration validates {current_sim['after']}/"
+                    f"{current_sim['total']} real course candidates. Starting a fresh "
+                    "scrape is required to verify that courses are imported."
+                ),
+                rollback_status="unchanged",
+            )
+            return session
+
         # ── Session-level state ────────────────────────────────────────────────
         # Tracks (section:field:value) fingerprints so duplicates are skipped
         _applied_fingerprints: set[str] = set()
@@ -2420,7 +2468,16 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
                         extr_patch = {}
 
             # ⑤ URL filter simulation (discovery patches only — no live re-scrape needed)
-            sim: dict = {"before": 0, "after": 0, "total": 0, "rescued": []}
+            current_disc = dict(ctx.get("effective_discovery") or {})
+            simulation_urls = ctx.get("repair_url_sample") or ctx["dropped_sample"]
+            sim: dict = _simulate_filter(
+                simulation_urls,
+                current_disc.get("allow_url_patterns", []),
+                current_disc.get("block_url_patterns", []),
+                current_disc.get("must_contain", []),
+                current_disc.get("course_detail_url_patterns", []),
+            )
+            sim["before"] = sim["after"]
             _URL_FILTER_FIELDS = {
                 "allow_url_patterns",
                 "block_url_patterns",
@@ -2434,12 +2491,7 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
                     {"j": job_id},
                 )).first()
                 dc: dict = (dc_row[0] or {}) if dc_row else {}
-                dropped = (
-                    ctx.get("repair_url_sample")
-                    or dc.get("pipeline_stats", {}).get("dropped_sample")
-                    or ctx["dropped_sample"]
-                )
-                current_disc = dict(ctx.get("effective_discovery") or {})
+                dropped = simulation_urls or dc.get("pipeline_stats", {}).get("dropped_sample") or []
                 baseline_sim = _simulate_filter(
                     dropped,
                     current_disc.get("allow_url_patterns", []),
@@ -2742,6 +2794,14 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
                         final_verdict=verdict,
                         rollback_status="unchanged",
                     )
+                    break
+                if discovery_now_ok and ctx["imported"] == 0:
+                    verdict = (
+                        f"Current URL configuration validates {sim['after']}/{sim['total']} "
+                        "real course candidates. A fresh scrape is required to verify that "
+                        "courses are imported."
+                    )
+                    session.update(status="completed", final_verdict=verdict)
                     break
                 if discovery_now_ok and extraction_ok:
                     verdict = "No issues detected — discovery and extraction quality are both acceptable."
