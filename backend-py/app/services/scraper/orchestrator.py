@@ -1249,6 +1249,15 @@ def _is_targeted_retry_payload(payload: dict | None) -> bool:
     return bool(_target_course_urls_from_payload(payload))
 
 
+def _is_safe_restart_smoke_payload(payload: dict | None) -> bool:
+    """Return whether this is the one-URL production restart smoke sample."""
+    return bool(
+        isinstance(payload, dict)
+        and payload.get("safeRestartSmoke") is True
+        and len(_target_course_urls_from_payload(payload)) == 1
+    )
+
+
 def _should_auto_discover_fee_page(
     *,
     has_fee_page: bool,
@@ -1485,6 +1494,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
     )
 
     _targeted_retry = _is_targeted_retry_payload(job.request_payload)
+    _safe_restart_smoke = _is_safe_restart_smoke_payload(job.request_payload)
 
     # Wipe replaceable stale pending scraped_courses rows for this university so
     # a previous failed run cannot block dedup on this attempt. Done before
@@ -5111,7 +5121,12 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # finalize time (via `_resume_already_staged`) so imported + skipped
         # + errors reconciles against the real total_found with nothing
         # appearing "unaccounted for".
-        if settings.scrape_resume_enabled and job.university_id and links:
+        if (
+            settings.scrape_resume_enabled
+            and not _safe_restart_smoke
+            and job.university_id
+            and links
+        ):
             try:
                 _done_rows = await _already_staged_checkpoint_rows(
                     db, job.university_id, current_job_id=runtime_job_id
