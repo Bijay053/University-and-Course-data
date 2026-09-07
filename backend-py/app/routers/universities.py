@@ -153,6 +153,7 @@ _MULTI_LABEL_EDUCATION_SUFFIXES = {
 }
 _HOSTNAME_OFFICIAL_NAMES = {
     "csu.edu.au": "Charles Sturt University",
+    "jcu.edu.au": "James Cook University",
     "segi.edu.my": "SEGi University & Colleges",
 }
 _HOSTNAME_FALLBACK_LOCATIONS: dict[
@@ -271,6 +272,15 @@ def _can_upgrade_to_official_name(
         return True
     if current.casefold() == candidate.casefold():
         return False
+    # A source can wrap the official name in homepage marketing copy:
+    # "Study at James Cook University in Queensland" -> "James Cook University".
+    # The shorter candidate is safe when it appears as a complete phrase.
+    if re.search(
+        rf"(?<![A-Za-z0-9]){re.escape(candidate)}(?![A-Za-z0-9])",
+        current,
+        re.I,
+    ):
+        return True
     if _contains_encoded_html_entity(current) or _is_hostname_fallback_name(
         current, hostname
     ):
@@ -534,7 +544,24 @@ def _normalise_institution_name(value: str) -> str:
         None,
     )
     if institution_segment:
-        return institution_segment[:200]
+        cleaned = re.sub(
+            r"^(?:study|learn)\s+at\s+|^(?:welcome\s+to|discover|explore)\s+",
+            "",
+            institution_segment,
+            flags=re.I,
+        ).strip()
+        # Marketing titles often append a location after names that end in an
+        # institution keyword. Do not apply this to "University of ..." names.
+        if not re.match(r"^(?:the\s+)?university\s+of\b", cleaned, re.I):
+            suffix_match = re.match(
+                r"^(.+?\b(?:university|college|institute|academy|polytechnic))"
+                r"\s+in\s+.+$",
+                cleaned,
+                re.I,
+            )
+            if suffix_match:
+                cleaned = suffix_match.group(1).strip()
+        return cleaned[:200]
     non_generic = [
         segment
         for segment in segments
@@ -1910,7 +1937,10 @@ async def add_university_by_url(
                 city = _cm.group(1)
 
     _stripped_hostname = _institution_domain(hostname)
-    if not name or _is_hostname_fallback_name(name, hostname):
+    _known_official_name = _HOSTNAME_OFFICIAL_NAMES.get(_stripped_hostname)
+    if _known_official_name:
+        name = _known_official_name
+    elif not name or _is_hostname_fallback_name(name, hostname):
         name = _HOSTNAME_OFFICIAL_NAMES.get(_stripped_hostname, name)
 
     if not name:

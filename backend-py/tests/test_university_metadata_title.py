@@ -181,6 +181,10 @@ def test_splits_plain_hyphen_homepage_title() -> None:
             "Study with us | INTI International University &amp; Colleges",
             "INTI International University & Colleges",
         ),
+        (
+            "Study at James Cook University in Queensland",
+            "James Cook University",
+        ),
     ],
 )
 def test_normalises_institution_name_from_any_metadata_source(
@@ -192,6 +196,10 @@ def test_normalises_institution_name_from_any_metadata_source(
 
 def test_rejects_generic_only_institution_name_metadata() -> None:
     assert _normalise_institution_name("Home | Welcome") == ""
+
+
+def test_known_jcu_domain_has_authoritative_official_name() -> None:
+    assert _HOSTNAME_OFFICIAL_NAMES["jcu.edu.au"] == "James Cook University"
 
 
 def test_campus_index_allows_equivalent_institution_subdomain() -> None:
@@ -234,6 +242,14 @@ def test_normalizes_equivalent_institution_subdomains(
     expected: str,
 ) -> None:
     assert _institution_domain(value) == expected
+
+
+def test_clean_official_name_can_replace_wrapped_marketing_name() -> None:
+    assert _can_upgrade_to_official_name(
+        "Study at James Cook University in Queensland",
+        "James Cook University",
+        "www.jcu.edu.au",
+    )
 
 
 def test_normalizes_metadata_whitespace() -> None:
