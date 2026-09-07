@@ -646,6 +646,29 @@ def _pte(text: str) -> dict[str, float] | None:
 
 # --- TOEFL (0-120) -----------------------------------------------------------
 def _toefl(text: str) -> dict[str, float] | None:
+    # Explicit single-skill requirement: "TOEFL Internet-based Test (iBT)
+    # minimum overall score of 79 with a minimum writing score of 21".
+    # The generic floor parser must not copy the writing-only minimum into
+    # listening, reading, and speaking.
+    m = re.search(
+        r"toefl(?:\s+(?:internet[-\s]*based\s+test\s*(?:\(ibt\))?|ibt))?"
+        r"[^\n]{0,120}?\boverall\s+score\s+(?:of\s+)?"
+        r"([0-9]{2,3})\b[^\n]{0,100}?"
+        r"\bminimum\s+writing\s+score\s+(?:of\s+)?([0-9]{1,2})\b",
+        text,
+        re.I,
+    )
+    if m:
+        overall, writing = float(m.group(1)), float(m.group(2))
+        if 30 <= overall <= 120 and 0 <= writing <= 30:
+            return {
+                "overall": overall,
+                "listening": None,
+                "reading": None,
+                "writing": writing,
+                "speaking": None,
+            }
+
     # Pattern 1 (rich): "TOEFL iBT 60 with no section below 12"
     # — also matches "TOEFL iBT: Overall score 87, with no section below 17"
     #   (VIT-style prose; same regression class as IELTS pattern 1).

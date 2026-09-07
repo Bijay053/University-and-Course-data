@@ -179,6 +179,39 @@ def test_rich_pattern_still_wins_over_bare_overall():
     assert res.get("listening") == 6.0
 
 
+def test_explicit_overalls_do_not_become_component_floors():
+    ielts = et._ielts(
+        "IELTS Academic Module: A minimum overall score of 6.5 "
+        "with no band less than 6.0."
+    )
+    pte = et._pte(
+        "Pearson Test of English (PTE) Academic module: A minimum overall "
+        "score of 58 with no score lower than 50."
+    )
+    toefl = et._toefl(
+        "TOEFL Internet-based Test (iBT): A minimum overall score of 79 "
+        "with a minimum writing score of 21."
+    )
+
+    assert ielts is not None
+    assert ielts["overall"] == 6.5
+    assert ielts["writing"] == 6.0
+    assert pte is not None
+    assert pte["overall"] == 58
+    assert pte["writing"] == 50
+    assert toefl == {
+        "overall": 79,
+        "listening": None,
+        "reading": None,
+        "writing": 21,
+        "speaking": None,
+    }
+    assert et._cambridge(
+        "Cambridge Advanced English (CAE): A minimum overall score of 176, "
+        "with no skill below 169."
+    ) == 176
+
+
 # ─────────────────────────────────────────────────────────────────────
 # Bug L: Gemini Vision occasionally returns the verbose phrasing
 # "IELTS Academic Overall Band Score: 6.5" / "PTE Academic Overall

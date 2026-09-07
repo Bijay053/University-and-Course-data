@@ -30,3 +30,9 @@ fallback silently downgrades the overall to the band floor.
 **How to apply:** any new "grab the first IELTS score" heuristic in the english
 extractor must run after the split-structure check, or it will regress UWL-style
 pages. See `test_english_ielts_uwl_split_*` for the locked behavior.
+
+The same separation applies to other tests. A named minimum such as “TOEFL overall 79 with writing 21” sets only writing; it is not a uniform floor for listening, reading, and speaking.
+
+**Why:** Generic floor parsing can preserve the overall but fabricate every TOEFL skill from a writing-only requirement.
+
+**How to apply:** Prefer explicit overall-plus-named-skill patterns before generic “minimum score” handling, and leave unpublished skills blank.

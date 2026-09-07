@@ -228,6 +228,14 @@ def test_cdu_uses_course_specific_english_overalls_not_component_floors() -> Non
     assert result["cambridge_overall"] == 176
 
 
+def test_cdu_direct_english_table_cannot_be_overwritten_by_generic_sources() -> None:
+    from app.services.scraper.pipelines.single_course import can_override
+
+    assert not can_override("cdu_static", "regex")
+    assert not can_override("cdu_static", "central_page:english")
+    assert not can_override("cdu_static", "gemini_primary")
+
+
 def test_cdu_course_url_gets_catalogue_year_without_losing_query() -> None:
     url = ensure_cdu_catalogue_year(
         "https://www.cdu.edu.au/study/course/bachelor-nursing-wnur02?source=sitemap",
