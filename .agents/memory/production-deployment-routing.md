@@ -74,3 +74,16 @@ because the verification request omitted the portal hostname.
 **How to apply:** Verify frontend releases through the public portal URL or send
 the configured Host header to localhost. Read the generated index to discover
 the current hashed asset path rather than assuming its prefix format.
+
+The live backend uses its project-local `.venv/bin/python`; neither system
+`python` nor the older `venv/bin/python3` path is available. Local Nginx HTTP
+smokes may return the expected HTTPS redirect, and abbreviated Git hashes can
+be eight characters rather than seven.
+
+**Why:** An idle-check failed on both stale Python paths, and a successful
+release twice stopped on verification-only assumptions: exact short-hash width
+and treating the frontend's HTTP→HTTPS redirect as unhealthy.
+
+**How to apply:** Use `.venv/bin/python` for production scripts, compare the
+full commit or a deliberate prefix, and smoke the public HTTPS URL with
+redirect following (or explicitly accept the local 301).
