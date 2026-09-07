@@ -35,7 +35,11 @@ async def test_bulk_fix_persists_post_batch_counts_and_audit_metadata(monkeypatc
     from app.tasks import scrape_tasks
 
     job = SimpleNamespace(
-        request_payload={"courseIds": [11, 12], "aiProvider": "openai"},
+        request_payload={
+            "courseIds": [11, 12],
+            "targetFields": ["duration"],
+            "aiProvider": "openai",
+        },
         approval_summary={"counts": {"queued": 2}, "results": []},
         university_id=7,
         current=0,
@@ -69,7 +73,7 @@ async def test_bulk_fix_persists_post_batch_counts_and_audit_metadata(monkeypatc
                     "id": 12,
                     "ok": True,
                     "updated_fields": [],
-                    "refreshed_evidence_fields": [],
+                    "refreshed_evidence_fields": ["duration"],
                     "extraction_passes": 1,
                     "ai_provider": "openai",
                 },
@@ -94,6 +98,119 @@ async def test_bulk_fix_persists_post_batch_counts_and_audit_metadata(monkeypatc
     assert post_batch["results"][1]["outcome"] == "no_progress"
     assert job.status == "completed"
     assert job.completed_at <= datetime.now(timezone.utc)
+
+
+def test_bulk_fix_active_job_equivalence_includes_targets_and_source_job():
+    from app.routers.scrape import _bulk_fix_request_matches
+
+    job = SimpleNamespace(
+        request_payload={
+            "courseIds": [11, 12],
+            "targetFields": ["international_fee"],
+            "sourceJobId": "review-a",
+        }
+    )
+
+    assert _bulk_fix_request_matches(
+        job,
+        course_ids=[12, 11],
+        target_fields=["international_fee"],
+        source_job_id="review-a",
+    )
+    assert not _bulk_fix_request_matches(
+        job,
+        course_ids=[11, 12],
+        target_fields=["duration"],
+        source_job_id="review-a",
+    )
+    assert not _bulk_fix_request_matches(
+        job,
+        course_ids=[11, 12],
+        target_fields=["international_fee"],
+        source_job_id="review-b",
+    )
+
+
+def test_bulk_fix_retry_finds_older_match_after_newer_nonmatching_job():
+    from app.routers.scrape import _matching_bulk_fix_job
+
+    older_match = SimpleNamespace(
+        request_payload={
+            "courseIds": [11, 12],
+            "targetFields": ["international_fee"],
+            "sourceJobId": "review-a",
+        }
+    )
+    newer_nonmatch = SimpleNamespace(
+        request_payload={
+            "courseIds": [11, 12],
+            "targetFields": ["duration"],
+            "sourceJobId": "review-a",
+        }
+    )
+
+    assert _matching_bulk_fix_job(
+        [newer_nonmatch, older_match],
+        course_ids=[12, 11],
+        target_fields=["international_fee"],
+        source_job_id="review-a",
+    ) is older_match
+
+
+@pytest.mark.asyncio
+async def test_bulk_fix_ignores_unrelated_updates_when_target_gap_remains(monkeypatch):
+    from app.routers import scrape as scrape_router
+    from app.services.scraper import job_claim
+    from app.tasks import scrape_tasks
+
+    job = SimpleNamespace(
+        request_payload={
+            "courseIds": [11],
+            "targetFields": ["international_fee", "duration"],
+            "aiProvider": "openai",
+        },
+        approval_summary={"counts": {"queued": 1}, "results": []},
+        university_id=7,
+        current=0,
+        imported=0,
+        skipped=0,
+        errors=0,
+        heartbeat_at=None,
+        status="queued",
+        completed_at=None,
+    )
+    session = _Session(job)
+    monkeypatch.setattr(scrape_tasks, "AsyncSessionLocal", lambda: session)
+
+    async def claim(_db, _job_id):
+        job.status = "running"
+        return True
+
+    async def extract(_body, _db):
+        return {
+            "results": [{
+                "id": 11,
+                "ok": True,
+                "updated_fields": ["other_requirement", "extraction_method"],
+                "refreshed_evidence_fields": ["academic_level"],
+            }]
+        }
+
+    monkeypatch.setattr(job_claim, "claim_runtime_job", claim)
+    monkeypatch.setattr(scrape_router, "re_extract_staged", extract)
+
+    await scrape_tasks._async_bulk_fix("fix-targeted")
+
+    result = job.approval_summary["results"][0]
+    assert result["outcome"] == "no_progress"
+    assert result["updated_fields"] == []
+    assert result["refreshed_evidence_fields"] == []
+    assert result["all_updated_fields"] == [
+        "other_requirement",
+        "extraction_method",
+    ]
+    assert job.approval_summary["counts"]["completed"] == 0
+    assert job.approval_summary["counts"]["noProgress"] == 1
 
 
 @pytest.mark.asyncio

@@ -2238,6 +2238,11 @@ class StartBulkFixBody(BaseModel):
     ids: list[int] = Field(..., min_length=1, max_length=2000)
     university_id: int = Field(..., alias="universityId")
     source_job_id: str | None = Field(default=None, alias="sourceJobId")
+    target_fields: list[str] = Field(
+        default_factory=list,
+        alias="targetFields",
+        max_length=20,
+    )
     model_config = {"populate_by_name": True}
 
 
@@ -2247,6 +2252,7 @@ def _bulk_fix_job_dict(job: ScrapeRuntimeJob) -> dict:
     return {
         "jobId": job.runtime_job_id,
         "sourceJobId": (job.request_payload or {}).get("sourceJobId"),
+        "targetFields": (job.request_payload or {}).get("targetFields") or [],
         "status": job.status,
         "total": job.total_found,
         "queued": counts.get("queued", max(0, job.total_found - job.current)),
@@ -2260,6 +2266,43 @@ def _bulk_fix_job_dict(job: ScrapeRuntimeJob) -> dict:
         "createdAt": job.created_at.isoformat() if job.created_at else None,
         "completedAt": job.completed_at.isoformat() if job.completed_at else None,
     }
+
+
+def _bulk_fix_request_matches(
+    job: ScrapeRuntimeJob,
+    *,
+    course_ids: list[int],
+    target_fields: list[str],
+    source_job_id: str | None,
+) -> bool:
+    payload = job.request_payload or {}
+    return (
+        set(payload.get("courseIds") or []) == set(course_ids)
+        and set(payload.get("targetFields") or []) == set(target_fields)
+        and payload.get("sourceJobId") == source_job_id
+    )
+
+
+def _matching_bulk_fix_job(
+    jobs: list[ScrapeRuntimeJob],
+    *,
+    course_ids: list[int],
+    target_fields: list[str],
+    source_job_id: str | None,
+) -> ScrapeRuntimeJob | None:
+    return next(
+        (
+            job
+            for job in jobs
+            if _bulk_fix_request_matches(
+                job,
+                course_ids=course_ids,
+                target_fields=target_fields,
+                source_job_id=source_job_id,
+            )
+        ),
+        None,
+    )
 
 
 @router.post("/staged/fix-jobs", status_code=202)
@@ -2291,8 +2334,9 @@ async def start_bulk_fix_job(
 
     # Return the active equivalent job on a double-click/retry instead of
     # running the same selected rows twice.
-    active = (
-        await db.execute(
+    active_jobs = list(
+        (
+            await db.execute(
             select(ScrapeRuntimeJob)
             .where(
                 ScrapeRuntimeJob.job_type == "bulk_fix",
@@ -2300,9 +2344,16 @@ async def start_bulk_fix_job(
                 ScrapeRuntimeJob.status.in_(("queued", "running")),
             )
             .order_by(ScrapeRuntimeJob.created_at.desc())
-        )
-    ).scalars().first()
-    if active and set((active.request_payload or {}).get("courseIds") or []) == set(found_ids):
+            )
+        ).scalars()
+    )
+    active = _matching_bulk_fix_job(
+        active_jobs,
+        course_ids=found_ids,
+        target_fields=body.target_fields,
+        source_job_id=body.source_job_id,
+    )
+    if active:
         return _bulk_fix_job_dict(active)
 
     job_id = f"fix-{uuid.uuid4()}"
@@ -2316,6 +2367,7 @@ async def start_bulk_fix_job(
         request_payload={
             "courseIds": found_ids,
             "sourceJobId": body.source_job_id,
+            "targetFields": body.target_fields,
             "aiProvider": "openai",
             "maxPasses": 2,
         },

@@ -5,7 +5,11 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ScrapingForTest, type ScrapingInitialReviewState } from "./scraping";
+import {
+  getFixResultHeading,
+  ScrapingForTest,
+  type ScrapingInitialReviewState,
+} from "./scraping";
 
 vi.mock("@workspace/api-client-react", () => ({
   useListUniversities: () => ({
@@ -29,6 +33,7 @@ vi.mock("@/components/scrape-job-card", () => ({
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  localStorage.clear();
 });
 
 function jsonResponse(body: unknown): Response {
@@ -57,6 +62,15 @@ function initialReview(): ScrapingInitialReviewState {
 }
 
 describe("Scraping repair reviewer", () => {
+  it("does not call an all-no-progress Fix successful", () => {
+    expect(getFixResultHeading({
+      total: 3,
+      updated: 0,
+      skipped: 3,
+      errors: 0,
+    })).toBe("No progress");
+  });
+
   it("forces a fresh authenticated staged-course request when Refresh is clicked", async () => {
     const review = initialReview();
     const stagedRequests: RequestInit[] = [];
@@ -91,9 +105,14 @@ describe("Scraping repair reviewer", () => {
     });
   });
 
-  it("renders field summaries from every re-extract batch with value updates taking precedence", async () => {
+  it("renders target field summaries from a completed background Fix job", async () => {
     const review = initialReview();
-    const reextractBodies: Array<{ ids: number[]; universityId: number }> = [];
+    const fixBodies: Array<{
+      ids: number[];
+      universityId: number;
+      sourceJobId: string;
+      targetFields: string[];
+    }> = [];
     let analyzeCalls = 0;
 
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -103,6 +122,7 @@ describe("Scraping repair reviewer", () => {
       if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
       if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
       if (url === "/api/scrape/staged/repair-job") return jsonResponse(review.courses);
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
 
       if (url === "/api/scrape/staged/analyze") {
         analyzeCalls += 1;
@@ -116,24 +136,55 @@ describe("Scraping repair reviewer", () => {
         });
       }
 
-      if (url === "/api/scrape/staged/re-extract") {
+      if (url === "/api/scrape/staged/fix-jobs") {
         const body = JSON.parse(String(init?.body));
-        reextractBodies.push(body);
-        return reextractBodies.length === 1
-          ? jsonResponse({
-              updated: 50, skipped: 0, errors: 0, total: 50,
-              results: [{
-                updated_fields: ["international_fee"],
-                refreshed_evidence_fields: ["duration", "ielts_overall"],
-              }],
-            })
-          : jsonResponse({
-              updated: 1, skipped: 0, errors: 0, total: 1,
-              results: [{
-                updated_fields: ["ielts_overall"],
-                refreshed_evidence_fields: ["study_mode", "international_fee"],
-              }],
-            });
+        fixBodies.push(body);
+        return jsonResponse({
+          jobId: "fix-test",
+          sourceJobId: "repair-job",
+          status: "queued",
+          total: 51,
+          queued: 51,
+          running: 0,
+          completed: 0,
+          noProgress: 0,
+          failed: 0,
+          processed: 0,
+          results: [],
+          errorMessage: null,
+        });
+      }
+
+      if (url === "/api/scrape/staged/fix-jobs/fix-test") {
+        return jsonResponse({
+          jobId: "fix-test",
+          sourceJobId: "repair-job",
+          status: "completed",
+          total: 51,
+          queued: 0,
+          running: 0,
+          completed: 51,
+          noProgress: 0,
+          failed: 0,
+          processed: 51,
+          results: [
+            {
+              id: 1,
+              ok: true,
+              outcome: "completed",
+              updated_fields: ["international_fee", "ielts_overall"],
+              refreshed_evidence_fields: ["duration"],
+            },
+            {
+              id: 51,
+              ok: true,
+              outcome: "completed",
+              updated_fields: ["ielts_overall"],
+              refreshed_evidence_fields: ["study_mode", "international_fee"],
+            },
+          ],
+          errorMessage: null,
+        });
       }
 
       return jsonResponse({});
@@ -155,7 +206,7 @@ describe("Scraping repair reviewer", () => {
     const dialog = await screen.findByRole("dialog", {
       name: "Fix Results",
       description: "Review the completed re-extraction summary for the selected courses.",
-    });
+    }, { timeout: 6000 });
     expect(within(dialog).getByText("Re-extracted 51 of 51")).toBeTruthy();
     const valueSummary = within(dialog).getByText("Values updated").parentElement;
     const sourceSummary = within(dialog).getByText("Sources refreshed — values unchanged").parentElement;
@@ -164,10 +215,12 @@ describe("Scraping repair reviewer", () => {
     expect(sourceSummary?.textContent).not.toContain("IELTS");
     expect(sourceSummary?.textContent).not.toContain("International Fee");
 
-    await waitFor(() => expect(reextractBodies).toHaveLength(2));
-    expect(reextractBodies.map(({ ids }) => ids.length)).toEqual([50, 1]);
-    expect(reextractBodies.flatMap(({ ids }) => ids)).toEqual(
-      Array.from({ length: 51 }, (_, index) => index + 1),
-    );
-  });
+    expect(fixBodies).toHaveLength(1);
+    expect(fixBodies[0]).toEqual({
+      ids: Array.from({ length: 51 }, (_, index) => index + 1),
+      universityId: 7,
+      sourceJobId: "repair-job",
+      targetFields: ["international_fee"],
+    });
+  }, 10_000);
 });

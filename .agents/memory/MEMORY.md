@@ -137,3 +137,4 @@
 - [CDU audience-scoped course fields](cdu-audience-scoped-fields.md) — fees and locations must come from the current course’s international DOM blocks, never domestic siblings or related-course cards.
 - [Re-extraction warning lifecycle](reextract-warning-lifecycle.md) — clear only warnings whose condition the new payload proves resolved; preserve unrelated review warnings.
 - [Re-extraction evidence promotion](reextract-evidence-promotion.md) — equal values still refresh when selected evidence replaces previously unselected provenance.
+- [Targeted Fix progress](targeted-fix-progress.md) — count only previewed issue-field updates; job identity includes courses, target fields, and source review.

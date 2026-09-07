@@ -102,6 +102,91 @@ def test_cdu_preserves_authoritative_one_year_graduate_entry_duration() -> None:
     assert result["duration_term"] == "Year"
 
 
+def test_cdu_vet_uses_student_visa_fee_and_headline_full_time_duration() -> None:
+    result = apply_cdu_static_extraction(
+        "https://www.cdu.edu.au/study/course/"
+        "sit50422-diploma-hospitality-management-sit50422?year=2026",
+        """
+        <div class="block-course-key-fact-duration-vet">
+          <div>
+            <h3>Duration</h3>
+            <div>2 year/s</div>
+            <div data-student-type="domestic">
+              This program is delivered over a period of 6 months to 1 year.
+            </div>
+            <div data-student-type="international">
+              Student Visa holders must study internally full time
+            </div>
+          </div>
+        </div>
+        <details>
+          <summary id="accordion-fees">Fees</summary>
+          <div data-student-type="domestic">
+            <table><tr><td>Full Fee</td><td>$13,917.45</td></tr></table>
+            International non-student visa-holders; fees may vary by visa type.
+          </div>
+          <div data-student-type="international">
+            <h4>International tuition Fees</h4>
+            <p>The annual tuition fee for commencing student visa holders in
+               2026 is AUD $17,420.00.</p>
+          </div>
+        </details>
+        """,
+    )
+    assert result["international_fee"] == 17420.0
+    assert result["fee_term"] == "Annual"
+    assert result["fee_year"] == 2026
+    assert result["currency"] == "AUD"
+    assert result["duration"] == 2.0
+    assert result["duration_term"] == "Year"
+
+
+def test_cdu_vet_does_not_use_headline_duration_without_student_visa_route() -> None:
+    result = apply_cdu_static_extraction(
+        "https://www.cdu.edu.au/study/course/domestic-vet-example?year=2026",
+        """
+        <div class="block-course-key-fact-duration-vet">
+          <div>
+            <h3>Duration</h3>
+            <div>1.5 year/s</div>
+            <div data-student-type="domestic">1.5 years full-time</div>
+          </div>
+        </div>
+        """,
+    )
+    assert result["duration"] is None
+    assert result["duration_term"] is None
+
+
+def test_cdu_vet_ignores_preceding_related_course_duration() -> None:
+    result = apply_cdu_static_extraction(
+        "https://www.cdu.edu.au/study/course/"
+        "sit40521-certificate-iv-kitchen-management-sit40521?year=2026",
+        """
+        <div class="related-course">
+          <div class="block-course-key-fact-duration-vet">
+            <h3>Duration</h3>
+            <div>0.5 year/s</div>
+            <div data-student-type="international">
+              Student Visa holders must study internally full time
+            </div>
+          </div>
+        </div>
+        <section id="key-details">
+          <div class="block-course-key-fact-duration-vet">
+            <h3>Duration</h3>
+            <div>1.5 year/s</div>
+            <div data-student-type="international">
+              Student Visa holders must study internally full time
+            </div>
+          </div>
+        </section>
+        """,
+    )
+    assert result["duration"] == 1.5
+    assert result["duration_term"] == "Year"
+
+
 def test_cdu_course_url_gets_catalogue_year_without_losing_query() -> None:
     url = ensure_cdu_catalogue_year(
         "https://www.cdu.edu.au/study/course/bachelor-nursing-wnur02?source=sitemap",

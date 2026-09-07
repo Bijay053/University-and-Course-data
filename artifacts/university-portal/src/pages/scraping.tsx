@@ -323,6 +323,7 @@ interface FixResults {
 interface BulkFixJob {
   jobId: string;
   sourceJobId: string | null;
+  targetFields: string[];
   status: string;
   total: number;
   queued: number;
@@ -342,6 +343,24 @@ interface BulkFixJob {
     error?: string;
   }>;
   errorMessage: string | null;
+}
+
+export function getFixResultHeading(result: {
+  total: number;
+  updated: number;
+  skipped: number;
+  errors: number;
+}): string {
+  if (result.errors === 0 && result.updated === result.total && result.skipped === 0) {
+    return "Successful";
+  }
+  if (result.updated === 0 && result.skipped > 0 && result.errors === 0) {
+    return "No progress";
+  }
+  if (result.updated > 0) {
+    return "Partially successful";
+  }
+  return "Failed";
 }
 
 const FIX_FIELD_LABELS: Record<string, string> = {
@@ -2265,7 +2284,12 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ ids, universityId: uniId, sourceJobId: reviewJobId }),
+        body: JSON.stringify({
+          ids,
+          universityId: uniId,
+          sourceJobId: reviewJobId,
+          targetFields: fixAnalysis.issues.map((issue) => issue.field),
+        }),
       });
       if (!res.ok) throw new Error(await getFetchErrorMessage(res));
       const job: BulkFixJob = await res.json();
@@ -2292,7 +2316,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     })
       .then((res) => res.ok ? res.json() : null)
       .then((job: BulkFixJob | null) => {
-        if (!job) return;
+        if (!job?.jobId || !job.status) return;
         setBulkFixJob(job);
         if (["queued", "running"].includes(job.status)) {
           setFixingSelected(true);
@@ -2312,7 +2336,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     })
       .then((res) => res.ok ? res.json() : null)
       .then((job: BulkFixJob | null) => {
-        if (job) {
+        if (job?.jobId && job.status) {
           setBulkFixJob(job);
           localStorage.setItem("activeBulkFixJob", job.jobId);
           if (["queued", "running"].includes(job.status)) {
@@ -3722,12 +3746,14 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                   {fixResults.errors > 0 && <span className="text-red-600">· {fixResults.errors} failed</span>}
                 </div>
                 <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${
-                  fixResults.errors === 0 && fixResults.updated > 0 ? "bg-green-50 text-green-700 border-green-200" :
+                  fixResults.errors === 0 && fixResults.updated === fixResults.total && fixResults.skipped === 0
+                    ? "bg-green-50 text-green-700 border-green-200" :
                   fixResults.updated > 0 ? "bg-orange-50 text-orange-700 border-orange-200" :
+                  fixResults.errors === 0 && fixResults.skipped > 0
+                    ? "bg-amber-50 text-amber-700 border-amber-200" :
                   "bg-red-50 text-red-700 border-red-200"
                 }`}>
-                  {fixResults.errors === 0 && fixResults.updated === fixResults.total - fixResults.skipped ? "Successful" :
-                   fixResults.updated > 0 ? "Partially successful" : "Failed"}
+                  {getFixResultHeading(fixResults)}
                 </span>
               </div>
 

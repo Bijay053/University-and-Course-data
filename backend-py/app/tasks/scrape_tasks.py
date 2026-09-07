@@ -189,6 +189,11 @@ async def _async_bulk_fix(runtime_job_id: str) -> None:
             return
         payload = job.request_payload or {}
         ids = [int(value) for value in payload.get("courseIds") or []]
+        target_fields = {
+            str(value)
+            for value in payload.get("targetFields") or []
+            if isinstance(value, str) and value
+        }
         university_id = int(job.university_id or 0)
         persisted_summary = job.approval_summary or {}
         results: list[dict] = list(persisted_summary.get("results") or [])
@@ -239,13 +244,30 @@ async def _async_bulk_fix(runtime_job_id: str) -> None:
                     "ai_provider": result.get("ai_provider") or "openai",
                     "extraction_passes": result.get("extraction_passes", 0),
                 }
+                if target_fields:
+                    all_updated_fields = list(item.get("updated_fields") or [])
+                    all_refreshed_fields = list(
+                        item.get("refreshed_evidence_fields") or []
+                    )
+                    item["all_updated_fields"] = all_updated_fields
+                    item["all_refreshed_evidence_fields"] = all_refreshed_fields
+                    item["updated_fields"] = [
+                        field for field in all_updated_fields if field in target_fields
+                    ]
+                    item["refreshed_evidence_fields"] = [
+                        field
+                        for field in all_refreshed_fields
+                        if field in target_fields
+                    ]
                 if not item.get("ok") and "no course_website" in str(item.get("error") or ""):
                     item["outcome"] = "no_progress"
                     no_progress += 1
                 elif not item.get("ok"):
                     item["outcome"] = "failed"
                     failed += 1
-                elif item.get("updated_fields") or item.get("refreshed_evidence_fields"):
+                elif item.get("updated_fields") or (
+                    not target_fields and item.get("refreshed_evidence_fields")
+                ):
                     item["outcome"] = "completed"
                     completed += 1
                 else:
