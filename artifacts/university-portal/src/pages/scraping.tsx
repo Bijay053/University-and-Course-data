@@ -683,6 +683,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   const [reviewJobId, setReviewJobId] = useState<string | null>(
     initialReviewState?.jobId ?? null,
   );
+  const [reviewRefreshing, setReviewRefreshing] = useState(false);
   const [latestAvailableJobId, setLatestAvailableJobId] = useState<string | null>(null);
   const latestAvailableJobIdRef = useRef<string | null>(null);
   // Refs so callbacks can read current review state without stale closure issues
@@ -1262,12 +1263,17 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     });
   }, []);
 
-  const loadStagedCourses = useCallback(async (jobId: string) => {
+  const loadStagedCourses = useCallback(async (jobId: string): Promise<boolean> => {
     try {
-      const res = await fetch(`/api/scrape/staged/${jobId}`);
-      if (res.ok) {
-        const payload = await readResponseJson<unknown>(res);
-        if (!payload) return;
+      const res = await fetch(`/api/scrape/staged/${jobId}`, {
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        throw new Error(await getFetchErrorMessage(res));
+      }
+      const payload = await readResponseJson<unknown>(res);
+      if (!payload) return false;
         const data: StagedCourse[] = Array.isArray(payload)
           ? (payload as StagedCourse[])
           : ((payload as { courses?: StagedCourse[] }).courses ?? []);
@@ -1280,8 +1286,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         // If this job has been cleared by a newer scrape, auto-load the latest instead.
         const _latestJobId = latestAvailableJobIdRef.current;
         if (pending.length === 0 && _latestJobId && _latestJobId !== jobId) {
-          loadStagedCourses(_latestJobId);
-          return;
+          return loadStagedCourses(_latestJobId);
         }
 
         setStagedCourses(pending);
@@ -1307,9 +1312,34 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             })
             .catch(() => {});
         }
-      }
-    } catch {}
+      return true;
+    } catch (error) {
+      console.error(`Failed to load staged courses for ${jobId}`, error);
+      return false;
+    }
   }, []);
+
+  const handleRefreshReview = useCallback(async () => {
+    if (!reviewJobId || reviewRefreshing) return;
+    setReviewRefreshing(true);
+    try {
+      const refreshed = await loadStagedCourses(reviewJobId);
+      if (refreshed) {
+        toast({
+          title: "Review refreshed",
+          description: "Staged courses and quality scores were reloaded.",
+        });
+      } else {
+        toast({
+          title: "Refresh failed",
+          description: "The latest staged courses could not be loaded.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setReviewRefreshing(false);
+    }
+  }, [loadStagedCourses, reviewJobId, reviewRefreshing, toast]);
 
   const refreshRemovalReconciliation = useCallback(async () => {
     if (!reviewJobId) return;
@@ -2847,11 +2877,16 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                     size="sm"
                     variant="outline"
                     className="text-gray-600 border-gray-200 hover:bg-gray-50"
-                    onClick={() => loadStagedCourses(reviewJobId)}
+                    onClick={handleRefreshReview}
+                    disabled={reviewRefreshing}
                     title="Reload staged courses and refresh quality scores"
                   >
-                    <RefreshCw className="w-3 h-3 mr-1" />
-                    Refresh
+                    {reviewRefreshing ? (
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-3 h-3 mr-1" />
+                    )}
+                    {reviewRefreshing ? "Refreshing…" : "Refresh"}
                   </Button>
                 )}
                 {selectedUni && selectedUni !== ALL && (

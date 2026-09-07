@@ -57,6 +57,40 @@ function initialReview(): ScrapingInitialReviewState {
 }
 
 describe("Scraping repair reviewer", () => {
+  it("forces a fresh authenticated staged-course request when Refresh is clicked", async () => {
+    const review = initialReview();
+    const stagedRequests: RequestInit[] = [];
+
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url === "/api/scrape/staged/repair-job") {
+        stagedRequests.push(init ?? {});
+        return jsonResponse(review.courses);
+      }
+      if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
+      return jsonResponse({});
+    }));
+
+    const user = userEvent.setup();
+    render(<ScrapingForTest initialReviewState={review} />);
+
+    const refreshButton = screen.getByTitle(
+      "Reload staged courses and refresh quality scores",
+    ) as HTMLButtonElement;
+    await user.click(refreshButton);
+
+    await waitFor(() => expect(stagedRequests).toHaveLength(1));
+    expect(stagedRequests[0]).toMatchObject({
+      credentials: "include",
+      cache: "no-store",
+    });
+    await waitFor(() => {
+      expect(refreshButton.disabled).toBe(false);
+    });
+  });
+
   it("renders field summaries from every re-extract batch with value updates taking precedence", async () => {
     const review = initialReview();
     const reextractBodies: Array<{ ids: number[]; universityId: number }> = [];
