@@ -12,7 +12,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Plus, Search, Globe, Building2, Trash2, Pencil, MoreHorizontal, ExternalLink, BookOpen, Star, Upload, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Zap, Loader2, ShieldCheck, FlaskConical as FlaskRound, AlertTriangle, ShieldX, FileEdit } from "lucide-react";
+import { Plus, Search, Globe, Building2, Trash2, Pencil, MoreHorizontal, ExternalLink, BookOpen, Star, Upload, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Zap, Loader2, ShieldCheck, FlaskConical as FlaskRound, AlertTriangle, ShieldX, FileEdit, SlidersHorizontal, X } from "lucide-react";
+import { filterUniversities } from "@/lib/university-filters";
 
 type CertStatus = "draft" | "testing" | "certified" | "needs_review" | "failed";
 const CERT_CONFIG: Record<CertStatus, { label: string; bg: string; text: string; border: string; icon: React.ReactNode }> = {
@@ -58,6 +59,9 @@ const PAGE_SIZES = [10, 25, 50, 100];
 
 export default function Universities() {
   const [search, setSearch] = useState("");
+  const [countryFilter, setCountryFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [featuredFilter, setFeaturedFilter] = useState("all");
   const [open, setOpen] = useState(false);
   const { can } = useCan();
   const canEdit = can("universities.edit");
@@ -227,12 +231,32 @@ export default function Universities() {
 
   const allUniversities = data?.data ?? [];
 
-  const totalPages = Math.max(1, Math.ceil(allUniversities.length / pageSize));
+  const countries = useMemo(
+    () => Array.from(new Set(
+      allUniversities
+        .map((university) => university.country)
+        .filter((country): country is string => !!country),
+    )).sort((a, b) => a.localeCompare(b)),
+    [allUniversities],
+  );
+  const filteredUniversities = useMemo(
+    () => filterUniversities(allUniversities, {
+      country: countryFilter,
+      status: statusFilter,
+      featured: featuredFilter,
+    }),
+    [allUniversities, countryFilter, statusFilter, featuredFilter],
+  );
+  const hasActiveFilters = countryFilter !== "all"
+    || statusFilter !== "all"
+    || featuredFilter !== "all";
+
+  const totalPages = Math.max(1, Math.ceil(filteredUniversities.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const universities = useMemo(() => {
     const start = (safePage - 1) * pageSize;
-    return allUniversities.slice(start, start + pageSize);
-  }, [allUniversities, safePage, pageSize]);
+    return filteredUniversities.slice(start, start + pageSize);
+  }, [filteredUniversities, safePage, pageSize]);
 
   const globalStart = (safePage - 1) * pageSize;
 
@@ -243,6 +267,13 @@ export default function Universities() {
 
   const handlePageSizeChange = (v: string) => {
     setPageSize(Number(v));
+    setPage(1);
+  };
+
+  const clearFilters = () => {
+    setCountryFilter("all");
+    setStatusFilter("all");
+    setFeaturedFilter("all");
     setPage(1);
   };
 
@@ -384,7 +415,7 @@ export default function Universities() {
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
 
         {/* Toolbar */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-gray-50/60">
+        <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-gray-100 bg-gray-50/60">
           <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
             <input
@@ -394,9 +425,57 @@ export default function Universities() {
               onChange={(e) => handleSearchChange(e.target.value)}
             />
           </div>
+          <div className="hidden sm:flex items-center text-gray-400 mr-0.5" aria-hidden="true">
+            <SlidersHorizontal className="h-4 w-4" />
+          </div>
+          <Select value={countryFilter} onValueChange={(value) => { setCountryFilter(value); setPage(1); }}>
+            <SelectTrigger className="h-8 w-[165px] bg-white text-xs" aria-label="Filter by country">
+              <SelectValue placeholder="All countries" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All countries</SelectItem>
+              {countries.map((country) => (
+                <SelectItem key={country} value={country}>
+                  {COUNTRY_FLAGS[country] ?? "🏫"} {country}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={statusFilter} onValueChange={(value) => { setStatusFilter(value); setPage(1); }}>
+            <SelectTrigger className="h-8 w-[145px] bg-white text-xs" aria-label="Filter by status">
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              {Object.entries(CERT_CONFIG).map(([value, config]) => (
+                <SelectItem key={value} value={value}>{config.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={featuredFilter} onValueChange={(value) => { setFeaturedFilter(value); setPage(1); }}>
+            <SelectTrigger className="h-8 w-[140px] bg-white text-xs" aria-label="Filter by featured">
+              <SelectValue placeholder="All featured" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All featured</SelectItem>
+              <SelectItem value="featured">Featured</SelectItem>
+              <SelectItem value="not_featured">Not featured</SelectItem>
+            </SelectContent>
+          </Select>
+          {hasActiveFilters && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1 px-2 text-xs text-gray-500"
+              onClick={clearFilters}
+            >
+              <X className="h-3.5 w-3.5" /> Clear
+            </Button>
+          )}
           {!isLoading && allUniversities.length > 0 && (
             <p className="text-xs text-gray-400 ml-auto shrink-0">
-              {allUniversities.length} {allUniversities.length === 1 ? "university" : "universities"}
+              {filteredUniversities.length} {filteredUniversities.length === 1 ? "university" : "universities"}
               {search && ` matching "${search}"`}
             </p>
           )}
@@ -409,11 +488,13 @@ export default function Universities() {
               Loading universities…
             </div>
           </div>
-        ) : allUniversities.length === 0 ? (
+        ) : filteredUniversities.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-gray-400">
             <Building2 className="w-10 h-10 mb-3 opacity-30" />
             <p className="text-sm font-medium">No universities found</p>
-            {search && <p className="text-xs mt-1">Try a different search term</p>}
+            {(search || hasActiveFilters) && (
+              <p className="text-xs mt-1">Try changing your search or filters</p>
+            )}
           </div>
         ) : (
           <>
