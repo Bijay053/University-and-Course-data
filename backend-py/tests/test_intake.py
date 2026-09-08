@@ -189,6 +189,53 @@ def test_waikato_indigenous_data_uses_published_trimester_months():
     assert out[0].method == "intake.waikato_trimesters"
 
 
+def test_swinburne_semesters_override_unrelated_page_months():
+    html = """
+        <main>
+          <h1>Graduate Certificate of Human Resource Management</h1>
+          <div class="course-summary">
+            <div>6 months full-time</div>
+            <div>Hawthorn</div>
+            <div>Semester 1<br>Semester 2</div>
+            <div>Full-time</div>
+          </div>
+          <section>Applications close in September.</section>
+          <section>Scholarship interviews are held in March and August.</section>
+        </main>
+    """
+
+    out = _run(
+        intake.extract(
+            html,
+            "https://www.swinburne.edu.au/course/postgraduate/"
+            "graduate-certificate-of-human-resource-management/",
+        )
+    )
+
+    assert out
+    assert out[0].normalized["intake_months"] == ["February", "July"]
+    assert out[0].method == "intake.swinburne_semester"
+
+
+def test_swinburne_without_semester_does_not_invent_intake_from_dates():
+    html = """
+        <main>
+          <h1>Example Swinburne course</h1>
+          <section>Applications close in September.</section>
+          <section>Information sessions are held in March and August.</section>
+        </main>
+    """
+
+    out = _run(
+        intake.extract(
+            html,
+            "https://www.swinburne.edu.au/course/postgraduate/example/",
+        )
+    )
+
+    assert out == []
+
+
 def test_waikato_explicit_december_trimester_remains_valid():
     """December is rejected only when incidental, not when explicitly offered."""
     html = """

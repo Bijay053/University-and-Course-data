@@ -496,6 +496,9 @@ def _strip_recently_viewed(text: str) -> str:
 
 
 _UOW_HOSTS: frozenset[str] = frozenset({"www.uow.edu.au", "uow.edu.au"})
+_SWINBURNE_HOSTS: frozenset[str] = frozenset(
+    {"www.swinburne.edu.au", "swinburne.edu.au"}
+)
 
 # ECU (Edith Cowan University) — every coursework programme page publishes
 # its intake calendar as a "Semester availability" / "Availability & Campus
@@ -605,6 +608,7 @@ async def _extract_raw(html: str, url: str) -> list[ExtractionResult]:
     _is_uow = _host in _UOW_HOSTS
     _is_ecu = _host in _ECU_HOSTS
     _is_waikato = _host in _WAIKATO_HOSTS
+    _is_swinburne = _host in _SWINBURNE_HOSTS
 
     # ── Candidate accumulator (regression fix 2026-05-28) ────────────────
     # Previously each content-gated pass below (campus-pivot, structural,
@@ -669,6 +673,34 @@ async def _extract_raw(html: str, url: str) -> list[ExtractionResult]:
     # widget; leaving it in causes months from unrelated courses to be
     # captured as this course's own intake dates.
     text = _strip_recently_viewed(text)
+
+    # Swinburne's authoritative course-summary card publishes intake as
+    # "Semester 1" / "Semester 2", while the rest of the page contains many
+    # application, event and scholarship dates. Generic month scanning turns
+    # those unrelated dates into a long, incorrect intake list. On this fixed
+    # host, semester labels take precedence and map to the Australian academic
+    # calendar before any month-name fallback runs.
+    if _is_swinburne:
+        swinburne_months: list[str] = []
+        for match in _SEMESTER_RE.finditer(text):
+            mapped = _SEMESTER_MONTH_MAP.get(match.group(1))
+            if mapped and mapped not in swinburne_months:
+                swinburne_months.append(mapped)
+        if swinburne_months:
+            ordered = [month for month in _MONTHS if month in set(swinburne_months)]
+            return [
+                ExtractionResult(
+                    field_key="intake_months",
+                    value=ordered,
+                    normalized={"intake_months": ordered, "intake_days": None},
+                    confidence=0.95,
+                    snippet=f"Swinburne semester: {', '.join(ordered)}",
+                    method="intake.swinburne_semester",
+                )
+            ]
+        # The host's page offers no authoritative semester summary. Returning
+        # empty is safer than manufacturing intakes from unrelated page dates.
+        return []
 
     # Waikato's qualification summary is authoritative even when the visual
     # "Start dates" label disappears during text flattening.  Read only explicit
