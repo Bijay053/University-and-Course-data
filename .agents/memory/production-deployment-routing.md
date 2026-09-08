@@ -101,6 +101,17 @@ and Celery restart, causing warm shutdown to exceed its transaction timeout.
 jobs using the protected current database configuration, then replace
 credentials. Preserve queued work; service restart restores consumption.
 
+Production database environment overrides must be lexically last among systemd
+drop-ins, not only last in the base unit.
+
+**Why:** A legacy Celery `env.conf` loaded after the base service and silently
+overrode the rotated URL even though the checked-in unit listed the managed
+database environment last.
+
+**How to apply:** Have the fixed refresh document maintain a `zz-*` service
+drop-in pointing to the root-only database environment, then daemon-reload
+before restart and compare effective process environments.
+
 The production Nginx virtual host is hostname-scoped, so a bare
 `http://127.0.0.1/` frontend smoke request can return 404 even when the public
 portal is healthy.

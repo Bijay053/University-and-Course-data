@@ -79,6 +79,10 @@ services before returning a sanitized operational error. Application engines
 always use certificate-verifying PostgreSQL TLS; URL `sslmode` flags cannot
 disable it.
 
+The document also maintains a lexically-last systemd drop-in for both services
+so older environment drop-ins cannot override the managed database credential
+file.
+
 After installing or updating the stack and confirming the SNS subscription,
 prove the end-to-end notifier and rate limit with a disposable test event:
 

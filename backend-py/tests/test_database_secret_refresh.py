@@ -143,6 +143,11 @@ def test_template_limits_secret_read_and_host_transaction_is_valid() -> None:
     assert "control cancel_consumer scrape" in template
     assert "ScrapeRuntimeJob.status == \"running\"" in template
     assert "control add_consumer scrape" in template
+    assert "zz-database-credentials.conf" in template
+    assert (
+        "'EnvironmentFile=/etc/university-portal/database.env'" in template
+    )
+    assert "systemctl daemon-reload" in template
     assert template.index("pause_and_verify_no_running_scrapes") < template.index(
         'mv -f "$tmp" "$env_path"'
     )
