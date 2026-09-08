@@ -2,12 +2,18 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import os
 from pathlib import Path
 import re
 import subprocess
 import sys
 import textwrap
+import types
 from unittest.mock import patch
+
+from botocore.exceptions import ClientError
+import pytest
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -20,6 +26,22 @@ SPEC = importlib.util.spec_from_file_location(
 assert SPEC and SPEC.loader
 refresh_client = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(refresh_client)
+
+ALERT_SPEC = importlib.util.spec_from_file_location(
+    "database_refresh_alert",
+    DEPLOY_DIR / "prove_database_refresh_alert.py",
+)
+assert ALERT_SPEC and ALERT_SPEC.loader
+alert_client = importlib.util.module_from_spec(ALERT_SPEC)
+ALERT_SPEC.loader.exec_module(alert_client)
+
+
+def _notifier_source() -> str:
+    template = (DEPLOY_DIR / "database-secret-rotation-iam.yaml").read_text()
+    source = template.split("ZipFile: |\n", 1)[1].split(
+        "\n\n  DatabaseRefreshFailureRule:", 1
+    )[0]
+    return textwrap.dedent(source)
 
 
 class _MissingInvocation(Exception):
@@ -145,11 +167,39 @@ def test_template_limits_secret_read_and_host_transaction_is_valid() -> None:
     assert "Arn: arn:aws:scheduler:::aws-sdk:ssm:sendCommand" in template
     assert "Service: scheduler.amazonaws.com" in template
     assert "aws:SourceAccount: !Ref AWS::AccountId" in template
-    assert "Type: AWS::Scheduler::ScheduleGroup" in template
     assert "aws:SourceArn: !GetAtt DatabaseCredentialRefreshScheduleGroup.Arn" in template
+    assert "Type: AWS::Scheduler::ScheduleGroup" in template
     assert "GroupName: !Ref DatabaseCredentialRefreshScheduleGroup" in template
     assert "RoleArn: !GetAtt ScheduledRefreshRole.Arn" in template
     assert "ApplyOnlyAtCronInterval" not in template
+    assert "Type: AWS::Events::Rule" in template
+    assert "EC2 Command Status-change Notification" in template
+    assert "document-name:" in template
+    assert "- Failed" in template
+    assert "- TimedOut" in template
+    assert "- Cancelled" in template
+    assert "Type: AWS::SNS::Topic" in template
+    assert "KmsMasterKeyId: alias/aws/sns" in template
+    assert "Type: AWS::DynamoDB::Table" in template
+    assert "attribute_not_exists(alert_key) OR expires_at < :now" in template
+    assert 'f"test:{nonce}" if is_test else "production"' in template
+    assert '"instanceId": instance_id' in template
+    assert '"documentName": document_name' in template
+    assert '"status": status' in template
+    notifier = _notifier_source()
+    assert "StandardOutputContent" not in notifier
+    assert "StandardErrorContent" not in notifier
+    assert "command-id" not in notifier
+    assert "password" not in notifier.lower()
+    test_publish_policy = template.split(
+        "- Sid: PublishDisposableRefreshAlertTestEvent", 1
+    )[1].split("- Sid: ObserveDisposableRefreshAlertTest", 1)[0]
+    assert "events:source: university-portal.database-refresh-alert-test" in (
+        test_publish_policy
+    )
+    assert "events:detail-type: Database Refresh Alert Test" in test_publish_policy
+    assert "source: aws.ssm" not in test_publish_policy
+    compile(notifier, "<database-refresh-alert>", "exec")
 
     literal = template.split("                - !Sub |\n", 1)[1]
     literal = literal.split("\n\n  ScheduledRefreshRole:", 1)[0]
@@ -164,6 +214,230 @@ def test_template_limits_secret_read_and_host_transaction_is_valid() -> None:
     }
     for name, source in heredocs:
         compile(textwrap.dedent(source), f"<database-refresh-{name}>", "exec")
+
+
+class _NotifierDynamoDB:
+    def __init__(
+        self,
+        *,
+        duplicate: bool = False,
+        fail_update: bool = False,
+    ) -> None:
+        self.duplicate = duplicate
+        self.fail_update = fail_update
+        self.put_calls: list[dict[str, object]] = []
+        self.update_calls: list[dict[str, object]] = []
+        self.delete_calls: list[dict[str, object]] = []
+
+    def put_item(self, **kwargs):
+        self.put_calls.append(kwargs)
+        if self.duplicate:
+            raise ClientError(
+                {"Error": {"Code": "ConditionalCheckFailedException"}},
+                "PutItem",
+            )
+
+    def update_item(self, **kwargs):
+        self.update_calls.append(kwargs)
+        if self.fail_update:
+            raise RuntimeError("simulated marker failure")
+
+    def delete_item(self, **kwargs):
+        self.delete_calls.append(kwargs)
+
+
+class _NotifierSNS:
+    def __init__(self, *, fail: bool = False) -> None:
+        self.fail = fail
+        self.publish_calls: list[dict[str, object]] = []
+
+    def publish(self, **kwargs):
+        self.publish_calls.append(kwargs)
+        if self.fail:
+            raise RuntimeError("simulated SNS failure")
+
+
+def _load_notifier(
+    ddb: _NotifierDynamoDB,
+    sns: _NotifierSNS,
+) -> dict[str, object]:
+    fake_boto3 = types.SimpleNamespace(
+        client=lambda name: {"dynamodb": ddb, "sns": sns}[name]
+    )
+    namespace: dict[str, object] = {}
+    environment = {
+        "ALERT_TOPIC_ARN": "arn:aws:sns:ap-south-1:123456789012:test",
+        "DEDUPLICATION_TABLE": "test-alert-deduplication",
+        "DEDUPLICATION_MINUTES": "60",
+        "EXPECTED_DOCUMENT": "university-portal-database-credential-refresh",
+        "EXPECTED_INSTANCE": "i-production",
+    }
+    with (
+        patch.dict(sys.modules, {"boto3": fake_boto3}),
+        patch.dict(os.environ, environment, clear=False),
+    ):
+        exec(compile(
+            _notifier_source(),
+            "<database-refresh-alert>",
+            "exec",
+        ), namespace)
+    return namespace
+
+
+def _production_failure_event() -> dict[str, object]:
+    return {
+        "source": "aws.ssm",
+        "detail-type": "EC2 Command Status-change Notification",
+        "detail": {
+            "instance-id": "i-production",
+            "document-name": "university-portal-database-credential-refresh",
+            "status": "Failed",
+            "command-id": "must-not-be-published",
+        },
+    }
+
+
+def test_notifier_publishes_only_sanitized_failure_identity() -> None:
+    ddb = _NotifierDynamoDB()
+    sns = _NotifierSNS()
+    handler = _load_notifier(ddb, sns)["handler"]
+
+    assert handler(_production_failure_event(), None) == {"outcome": "published"}
+    assert len(sns.publish_calls) == 1
+    assert json.loads(sns.publish_calls[0]["Message"]) == {
+        "documentName": "university-portal-database-credential-refresh",
+        "instanceId": "i-production",
+        "status": "Failed",
+    }
+    assert len(ddb.put_calls) == 1
+    assert ddb.update_calls == []
+    assert ddb.delete_calls == []
+
+
+def test_notifier_rejects_non_ssm_source_and_suppresses_duplicate() -> None:
+    invalid_ddb = _NotifierDynamoDB()
+    invalid_sns = _NotifierSNS()
+    invalid_handler = _load_notifier(invalid_ddb, invalid_sns)["handler"]
+    invalid_event = _production_failure_event()
+    invalid_event["source"] = "user.forged"
+    assert invalid_handler(invalid_event, None) == {"outcome": "ignored"}
+    assert invalid_ddb.put_calls == []
+    assert invalid_sns.publish_calls == []
+
+    duplicate_ddb = _NotifierDynamoDB(duplicate=True)
+    duplicate_sns = _NotifierSNS()
+    duplicate_handler = _load_notifier(duplicate_ddb, duplicate_sns)["handler"]
+    assert duplicate_handler(_production_failure_event(), None) == {
+        "outcome": "suppressed"
+    }
+    assert duplicate_sns.publish_calls == []
+
+
+def test_notifier_removes_deduplication_record_when_publish_fails() -> None:
+    ddb = _NotifierDynamoDB()
+    sns = _NotifierSNS(fail=True)
+    handler = _load_notifier(ddb, sns)["handler"]
+
+    with pytest.raises(RuntimeError, match="simulated SNS failure"):
+        handler(_production_failure_event(), None)
+    assert len(ddb.delete_calls) == 1
+
+
+def test_notifier_keeps_lock_when_test_marker_update_fails_after_publish() -> None:
+    ddb = _NotifierDynamoDB(fail_update=True)
+    sns = _NotifierSNS()
+    handler = _load_notifier(ddb, sns)["handler"]
+    event = {
+        "source": "university-portal.database-refresh-alert-test",
+        "detail-type": "Database Refresh Alert Test",
+        "detail": {
+            "instance-id": "i-production",
+            "document-name": "university-portal-database-credential-refresh",
+            "status": "Failed",
+            "test-nonce": "a" * 32,
+        },
+    }
+
+    with pytest.raises(RuntimeError, match="simulated marker failure"):
+        handler(event, None)
+    assert len(sns.publish_calls) == 1
+    assert len(ddb.update_calls) == 1
+    assert ddb.delete_calls == []
+
+
+class _Events:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def put_events(self, **kwargs):
+        self.calls.append(kwargs)
+        return {"FailedEntryCount": 0}
+
+
+class _DynamoDB:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def get_item(self, **kwargs):
+        self.calls.append(kwargs)
+        return {
+            "Item": {
+                "published_at": {"N": "1"},
+                "suppressed_count": {"N": "1"},
+            }
+        }
+
+
+class _AlertSession:
+    def __init__(self, events: _Events, ddb: _DynamoDB) -> None:
+        self.events = events
+        self.ddb = ddb
+
+    def client(self, name: str, region_name: str):
+        assert region_name == "ap-south-1"
+        return {"events": self.events, "dynamodb": self.ddb}[name]
+
+
+def test_disposable_alert_proof_publishes_once_and_suppresses_repeat(capsys) -> None:
+    events = _Events()
+    ddb = _DynamoDB()
+    with (
+        patch.object(
+            alert_client, "_session", return_value=_AlertSession(events, ddb)
+        ),
+        patch.object(alert_client.uuid, "uuid4", return_value=type(
+            "_Uuid", (), {"hex": "a" * 32}
+        )()),
+    ):
+        alert_client.prove("i-production", "ap-south-1")
+
+    assert len(events.calls) == 1
+    entries = events.calls[0]["Entries"]
+    assert len(entries) == 2
+    assert entries[0] == entries[1]
+    assert entries[0]["Source"] == alert_client.TEST_SOURCE
+    assert entries[0]["DetailType"] == alert_client.TEST_DETAIL_TYPE
+    assert json.loads(entries[0]["Detail"]) == {
+        "instance-id": "i-production",
+        "document-name": "university-portal-database-credential-refresh",
+        "status": "Failed",
+        "test-nonce": "a" * 32,
+    }
+    assert ddb.calls == [{
+        "TableName": alert_client.DEFAULT_TABLE,
+        "Key": {
+            "alert_key": {
+                "S": (
+                    "i-production|university-portal-database-credential-refresh|"
+                    f"test:{'a' * 32}"
+                )
+            }
+        },
+        "ConsistentRead": True,
+    }]
+    assert capsys.readouterr().out.strip() == (
+        "database-refresh-alert-published-and-repeat-suppressed"
+    )
 
 
 def test_every_database_engine_uses_certificate_verifying_tls() -> None:

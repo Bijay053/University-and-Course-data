@@ -16,6 +16,7 @@ in `../README.md`.
 | `snapshot-parameter-store-iam.yaml` | One-time least-privilege snapshot IAM, KMS, and fixed SSM document setup |
 | `refresh_database_credentials_via_secrets_manager.py` | Requests the fixed host-side refresh of the RDS-managed database credential |
 | `database-secret-rotation-iam.yaml` | One-time least-privilege fixed-secret and SSM-document IAM setup |
+| `prove_database_refresh_alert.py` | Publishes one disposable sanitized database-refresh failure alert and proves repeat suppression |
 
 ## Refresh the RDS-managed database credential
 
@@ -35,6 +36,18 @@ instance—do not add wildcard Secrets Manager or arbitrary Run Command access.
 The stack also creates a fixed EventBridge Scheduler schedule that checks the configured
 secret every five minutes. An unchanged secret version is a no-op; a new
 version runs the atomic restart and smoke transaction below.
+
+The stack routes failed, timed-out, or cancelled executions of only that fixed
+SSM document on only the configured production instance to an encrypted SNS
+topic. `AlertEmail` is a required, masked stack parameter; set it to the operator
+mailbox when creating or updating the stack, then confirm the AWS subscription
+email. Alert messages contain only the
+instance ID, document name, failure status, and whether the event is a test;
+they never include command output or credentials. A DynamoDB conditional write
+suppresses repeated alerts for the same instance and document for 60 minutes by
+default (`AlertDeduplicationMinutes` can be 5–1440). If SNS publication fails,
+the deduplication record is removed so EventBridge can retry instead of hiding
+the failure.
 
 ### First installation (required order)
 
@@ -65,6 +78,25 @@ TLS `SELECT 1`. Any failure restores the last-known-good file and restarts both
 services before returning a sanitized operational error. Application engines
 always use certificate-verifying PostgreSQL TLS; URL `sslmode` flags cannot
 disable it.
+
+After installing or updating the stack and confirming the SNS subscription,
+prove the end-to-end notifier and rate limit with a disposable test event:
+
+```bash
+python backend-py/deploy/prove_database_refresh_alert.py \
+  --instance-id "$UNIVERSITY_PORTAL_INSTANCE_ID" \
+  --region ap-south-1
+```
+
+The command puts two identical events with a unique nonce onto the default
+EventBridge bus. A dedicated test rule invokes the same notifier; the first
+event must publish a clearly labelled test alert and the second must be
+suppressed. The command observes only the non-sensitive publish/suppression
+markers in the deduplication table. Test events use a separate, unique key, so
+the proof is repeatable and cannot suppress a real production failure alert.
+The deployment identity cannot invoke the Lambda directly. The function rejects
+an unexpected event source, instance, document, or non-failure status before
+writing or publishing.
 
 ## Rotate the OpenAI fallback routinely
 
