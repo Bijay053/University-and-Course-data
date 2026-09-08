@@ -9,6 +9,12 @@ Treat a completed scrape and its explicit unresolved-continuation children as on
 
 **How to apply:** Aggregate only explicit parent links and require the same university. Detect explicit course-URL retries before cleanup and preserve their source review rows. Do not broaden ordinary standalone reviews to all historical pending rows for that university.
 
+Continuation cards and status surfaces must show the pending reviewable count across the same explicit chain. Keep the child job's imported counter as run-local diagnostics, not as the user-facing amount of retained data.
+
+**Why:** A child starts at zero imports even while all parent rows remain reviewable, which makes Continue look like it erased the scrape and prompts unnecessary restarts.
+
+**How to apply:** Keep the parent count visible until the child poll arrives, then use a server-computed chain review count that survives reloads and matches the staged-review endpoint.
+
 Automatic checkpoint resumes must persist the exact pending row identities used to skip extraction, and the final review must include those rows alongside rows created by the final attempt. Never infer this review set from the cumulative staged count, timestamps, or every pending row for the university.
 
 **Why:** An automatic resume can report a cumulative staged total while its successful final runtime job owns only a small last batch. Without exact provenance, review shows only that batch; broad university scoping can instead leak unrelated historical reviews.
