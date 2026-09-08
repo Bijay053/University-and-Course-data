@@ -91,6 +91,16 @@ roll back.
 endpoint fields when supplied; otherwise parse host, port, and database path
 from the already protected rollback URL. Never log either source.
 
+Credential-refresh transactions must pause new scrape claims before the final
+idle check; an earlier maintenance-window check is not a sufficient fence.
+
+**Why:** New production scrape requests arrived between an external idle check
+and Celery restart, causing warm shutdown to exceed its transaction timeout.
+
+**How to apply:** Cancel the worker's scrape consumer, query for zero running
+jobs using the protected current database configuration, then replace
+credentials. Preserve queued work; service restart restores consumption.
+
 The production Nginx virtual host is hostname-scoped, so a bare
 `http://127.0.0.1/` frontend smoke request can return 404 even when the public
 portal is healthy.

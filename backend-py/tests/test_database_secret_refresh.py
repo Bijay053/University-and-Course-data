@@ -117,7 +117,13 @@ def test_template_limits_secret_read_and_host_transaction_is_valid() -> None:
     assert 'text("SELECT 1")' in template
     assert 'timeoutSeconds: "300"' in template
     assert template.count("curl --connect-timeout 2 --max-time 10") == 1
-    assert template.count("timeout 30s systemctl restart uni-api-py uni-celery") == 1
+    assert template.count("timeout 60s systemctl restart uni-api-py uni-celery") == 1
+    assert "control cancel_consumer scrape" in template
+    assert "ScrapeRuntimeJob.status == \"running\"" in template
+    assert "control add_consumer scrape" in template
+    assert template.index("pause_and_verify_no_running_scrapes") < template.index(
+        'mv -f "$tmp" "$env_path"'
+    )
     assert "connect_args.update(timeout=10, command_timeout=10)" in template
     assert "asyncio.wait_for(smoke(), timeout=20)" in template
     assert "set +x" in template
@@ -154,7 +160,7 @@ def test_template_limits_secret_read_and_host_transaction_is_valid() -> None:
     assert syntax.returncode == 0, syntax.stderr
     heredocs = re.findall(r"<<'([A-Z_]+)'\n(.*?)\n\s*\1", script, re.DOTALL)
     assert {name for name, _ in heredocs} == {
-        "PY_VERIFY", "PY_BOOTSTRAP", "PY_CONFIG", "PY_SMOKE",
+        "PY_VERIFY", "PY_IDLE", "PY_BOOTSTRAP", "PY_CONFIG", "PY_SMOKE",
     }
     for name, source in heredocs:
         compile(textwrap.dedent(source), f"<database-refresh-{name}>", "exec")
