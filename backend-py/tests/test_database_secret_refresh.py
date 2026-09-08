@@ -125,11 +125,12 @@ def test_template_limits_secret_read_and_host_transaction_is_valid() -> None:
     assert "SecretId=sys.argv[3]" in template
     assert "region='${AWS::Region}'" in template
     assert "{{ global:REGION }}" not in template
-    assert 'required = {"username", "password", "host", "port"}' in template
+    assert 'required = {"username", "password"}' in template
     assert 'config.get("dbname")' in template
-    assert 'urlsplit(existing_url).path.lstrip("/")' in template
+    assert 'config.get("host") or existing_url.hostname' in template
+    assert 'config.get("port") or existing_url.port or 5432' in template
+    assert 'unquote(existing_url.path.lstrip("/"))' in template
     assert '"$backup_path" <<\'PY_CONFIG\'' in template
-    assert 'isinstance(values["port"], (int, str))' in template
     assert 'DATABASE_SECRET_VERSION="{version_id}"' in template
     assert 'DATABASE_REQUIRE_TLS="true"' in template
     assert 'cmp -s "$tmp" "$env_path"' in template
