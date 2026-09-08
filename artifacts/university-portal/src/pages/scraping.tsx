@@ -3716,8 +3716,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
           resetForcedFixFields();
         }
       }}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[calc(100dvh-2rem)] max-w-lg flex-col overflow-hidden">
+          <DialogHeader className="shrink-0 pr-6">
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-blue-600" />
               Review Before Fixing
@@ -3727,7 +3727,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             </DialogDescription>
           </DialogHeader>
           {fixAnalysis && (
-            <div className="space-y-4">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
               <div className="bg-muted/50 rounded-lg p-3 flex items-center justify-between text-sm">
                 <span className="font-medium">{fixAnalysis.total} course{fixAnalysis.total !== 1 ? "s" : ""} selected</span>
                 {fixAnalysis.total - fixAnalysis.courses_with_url > 0 && (
@@ -3843,7 +3843,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
               )}
             </div>
           )}
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="shrink-0 gap-2 border-t bg-background pt-4 sm:gap-0">
             <Button variant="outline" onClick={() => {
               setShowFixPreviewDialog(false);
               resetForcedFixFields();

@@ -313,6 +313,9 @@ describe("Scraping repair reviewer", () => {
     await user.click(screen.getByRole("button", { name: "Fix (51)" }));
 
     const previewDialog = await screen.findByRole("dialog", { name: "Review Before Fixing" });
+    expect(previewDialog.classList.contains("max-h-[calc(100dvh-2rem)]")).toBe(true);
+    expect(previewDialog.classList.contains("overflow-hidden")).toBe(true);
+    expect(within(previewDialog).getByText(/Existing values will be overwritten/).closest(".overflow-y-auto")).not.toBeNull();
     expect(within(previewDialog).getByText(/Existing values will be overwritten/)).toBeTruthy();
     await user.click(within(previewDialog).getByLabelText("Force International Fee"));
     await user.click(within(previewDialog).getByLabelText("Force Course Location"));
