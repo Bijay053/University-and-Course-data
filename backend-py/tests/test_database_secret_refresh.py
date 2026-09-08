@@ -27,6 +27,14 @@ assert SPEC and SPEC.loader
 refresh_client = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(refresh_client)
 
+DEPLOY_SPEC = importlib.util.spec_from_file_location(
+    "database_refresh_deploy",
+    DEPLOY_DIR / "deploy_database_secret_rotation_stack.py",
+)
+assert DEPLOY_SPEC and DEPLOY_SPEC.loader
+deploy_client = importlib.util.module_from_spec(DEPLOY_SPEC)
+DEPLOY_SPEC.loader.exec_module(deploy_client)
+
 ALERT_SPEC = importlib.util.spec_from_file_location(
     "database_refresh_alert",
     DEPLOY_DIR / "prove_database_refresh_alert.py",
@@ -213,6 +221,12 @@ class _SSM:
         self.commands.append(kwargs)
         return {"Command": {"CommandId": "refresh-test"}}
 
+    def get_document(self, **kwargs):
+        return {
+            "DocumentVersion": kwargs.get("DocumentVersion", "7").replace("$DEFAULT", "7"),
+            "Content": '{"description":"template-revision=revision-a"}',
+        }
+
     def get_command_invocation(self, **_kwargs):
         return {
             "Status": self.status,
@@ -241,6 +255,7 @@ def test_refresh_client_has_no_secret_input_or_command_parameter(capsys) -> None
     assert ssm.commands == [{
         "InstanceIds": ["i-production"],
         "DocumentName": "university-portal-database-credential-refresh",
+        "DocumentVersion": "7",
         "Comment": "Refresh university portal RDS database credentials",
     }]
     assert "password" not in repr(ssm.commands).lower()
@@ -261,7 +276,9 @@ def test_refresh_client_failure_is_sanitized() -> None:
         else:
             raise AssertionError("host failure must fail refresh")
 
-
+class _Waiter:
+    def wait(self, **_kwargs):
+        return None
 def test_template_limits_secret_read_and_host_transaction_is_valid() -> None:
     template = (DEPLOY_DIR / "database-secret-rotation-iam.yaml").read_text()
     assert "python=/opt/university-portal/backend-py/.venv/bin/python" in template
@@ -279,6 +296,8 @@ def test_template_limits_secret_read_and_host_transaction_is_valid() -> None:
         "ProductionDatabaseSecretReadPolicy:", 1
     )[0]
     assert "secretsmanager:GetSecretValue" not in deployment_policy
+    assert "cloudformation:" not in deployment_policy
+    assert "iam:PassRole" not in deployment_policy
     assert "Action: ssm:SendCommand" in template
     assert "AWS-RunShellScript" not in template
     assert "trap rollback_on_error EXIT" in template
@@ -740,3 +759,267 @@ def test_services_load_generated_database_environment_last() -> None:
             if line.startswith("EnvironmentFile=")
         ]
         assert files[-1] == "/etc/university-portal/database.env"
+
+class _DeploySSM:
+    def __init__(
+        self,
+        cloudformation: _CloudFormation,
+        region: str = "ap-south-1",
+        secret_arn: str = (
+            "arn:aws:secretsmanager:ap-south-1:123456789012:secret:test"
+        ),
+        template_body: str | None = None,
+    ) -> None:
+        self.cloudformation = cloudformation
+        self.region = region
+        self.secret_arn = secret_arn
+        self.template_body = template_body or (
+            DEPLOY_DIR / "database-secret-rotation-iam.yaml"
+        ).read_text()
+
+    def get_document(self, **_kwargs):
+        content_hash = deploy_client._document_content_hash(
+            self.template_body,
+            self.region,
+            self.secret_arn,
+        )
+        return {
+            "DocumentVersion": "9",
+            "Content": json.dumps(deploy_client._expected_document_content(
+                self.template_body,
+                self.region,
+                self.secret_arn,
+                self.cloudformation.revision,
+                content_hash,
+            )),
+        }
+
+    def describe_document(self, **_kwargs):
+        return {"Document": {"DefaultVersion": "9"}}
+
+class _DeploySession:
+    def __init__(self, cloudformation: _CloudFormation) -> None:
+        self.cloudformation = cloudformation
+        self.ssm = _DeploySSM(cloudformation)
+        self.ddb = _DeployDynamoDB()
+
+    def client(self, name: str, region_name: str):
+        assert region_name == "ap-south-1"
+        return {
+            "cloudformation": self.cloudformation,
+            "ssm": self.ssm,
+            "dynamodb": self.ddb,
+        }[name]
+
+class _CloudFormation:
+    def __init__(self, revision: str | None) -> None:
+        self.revision = revision
+        self.status = "UPDATE_COMPLETE"
+        self.document_name = deploy_client.DOCUMENT_NAME
+        self.update_calls: list[dict[str, object]] = []
+
+    def describe_stacks(self, **_kwargs):
+        outputs = [{
+            "OutputKey": deploy_client.DOCUMENT_OUTPUT,
+            "OutputValue": self.document_name,
+        }]
+        if self.revision is not None:
+            outputs.insert(0, {
+                "OutputKey": deploy_client.REVISION_OUTPUT,
+                "OutputValue": self.revision,
+            })
+        return {
+            "Stacks": [{
+                "StackStatus": self.status,
+                "Outputs": outputs,
+            }]
+        }
+
+    def update_stack(self, **kwargs):
+        self.update_calls.append(kwargs)
+        self.revision = next(
+            item["ParameterValue"]
+            for item in kwargs["Parameters"]
+            if item["ParameterKey"] == "TemplateRevision"
+        )
+
+    def get_waiter(self, name: str):
+        assert name == "stack_update_complete"
+        return _Waiter()
+
+class _DeployDynamoDB:
+    def __init__(self) -> None:
+        self.owner: str | None = None
+
+    def put_item(self, **kwargs):
+        if self.owner is not None:
+            raise ClientError(
+                {"Error": {"Code": "ConditionalCheckFailedException"}},
+                "PutItem",
+            )
+        self.owner = kwargs["Item"]["owner"]["S"]
+
+    def delete_item(self, **kwargs):
+        if kwargs["ExpressionAttributeValues"][":owner"]["S"] != self.owner:
+            raise ClientError(
+                {"Error": {"Code": "ConditionalCheckFailedException"}},
+                "DeleteItem",
+            )
+        self.owner = None
+
+    def update_item(self, **kwargs):
+        if kwargs["ExpressionAttributeValues"][":owner"]["S"] != self.owner:
+            raise ClientError(
+                {"Error": {"Code": "ConditionalCheckFailedException"}},
+                "UpdateItem",
+            )
+
+def test_two_repository_revisions_cannot_silently_overwrite_each_other() -> None:
+    cloudformation = _CloudFormation("revision-old")
+    session = _DeploySession(cloudformation)
+    common = {
+        "stack_name": deploy_client.STACK_NAME,
+        "instance_id": "i-production",
+        "secret_arn": "arn:aws:secretsmanager:ap-south-1:123456789012:secret:test",
+        "alert_email": "operator@example.test",
+        "region": "ap-south-1",
+        "expected_revision": "revision-old",
+        "template_body": (
+            DEPLOY_DIR / "database-secret-rotation-iam.yaml"
+        ).read_text(),
+    }
+    with patch.object(deploy_client, "_session", return_value=session):
+        deploy_client.deploy(revision="revision-newer", **common)
+        with pytest.raises(RuntimeError, match="Stale deployment rejected"):
+            deploy_client.deploy(revision="revision-stale", **common)
+
+    assert cloudformation.revision == "revision-newer"
+    assert len(cloudformation.update_calls) == 1
+    parameters = cloudformation.update_calls[0]["Parameters"]
+    preserved = {
+        item["ParameterKey"]
+        for item in parameters
+        if item.get("UsePreviousValue") is True
+    }
+    assert preserved == {
+        "DeploymentUserName",
+        "ProductionInstanceRoleName",
+        "ScheduleState",
+        "AlertDeduplicationMinutes",
+    }
+
+def test_competing_deployment_cannot_pass_the_conditional_lock() -> None:
+    cloudformation = _CloudFormation("revision-old")
+    session = _DeploySession(cloudformation)
+    session.ddb.owner = "other-deployment"
+    with (
+        patch.object(deploy_client, "_session", return_value=session),
+        pytest.raises(RuntimeError, match="holds the lock"),
+    ):
+        deploy_client.deploy(
+            stack_name=deploy_client.STACK_NAME,
+            instance_id="i-production",
+            secret_arn=(
+                "arn:aws:secretsmanager:ap-south-1:123456789012:secret:test"
+            ),
+            alert_email="operator@example.test",
+            region="ap-south-1",
+            revision="revision-other",
+            expected_revision="revision-old",
+            template_body=(
+                DEPLOY_DIR / "database-secret-rotation-iam.yaml"
+            ).read_text(),
+        )
+    assert cloudformation.update_calls == []
+
+def test_unversioned_stack_can_be_adopted_once_then_requires_fencing() -> None:
+    cloudformation = _CloudFormation(None)
+    session = _DeploySession(cloudformation)
+    common = {
+        "stack_name": deploy_client.STACK_NAME,
+        "instance_id": "i-production",
+        "secret_arn": "arn:aws:secretsmanager:ap-south-1:123456789012:secret:test",
+        "alert_email": "operator@example.test",
+        "region": "ap-south-1",
+        "expected_revision": None,
+        "template_body": (
+            DEPLOY_DIR / "database-secret-rotation-iam.yaml"
+        ).read_text(),
+    }
+    with patch.object(deploy_client, "_session", return_value=session):
+        with pytest.raises(RuntimeError, match="has no revision fence"):
+            deploy_client.deploy(revision="revision-adopted", **common)
+        deploy_client.deploy(
+            revision="revision-adopted",
+            adopt_unversioned_stack=True,
+            **common,
+        )
+        with pytest.raises(RuntimeError, match="only valid before"):
+            deploy_client.deploy(
+                revision="revision-bypass",
+                adopt_unversioned_stack=True,
+                **common,
+            )
+
+    assert cloudformation.revision == "revision-adopted"
+    assert len(cloudformation.update_calls) == 1
+
+def test_changed_template_cannot_reuse_the_checked_out_revision() -> None:
+    with (
+        patch.object(
+            deploy_client.subprocess,
+            "check_output",
+            side_effect=[
+                "",
+                "revision-old\n",
+                "committed template content\n",
+            ],
+        ),
+        patch.object(
+            Path,
+            "read_text",
+            return_value="changed template content\n",
+        ),
+        pytest.raises(RuntimeError, match="does not match the checked-out revision"),
+    ):
+        deploy_client._verified_repository_source()
+
+def test_dirty_repository_cannot_be_deployed() -> None:
+    with (
+        patch.object(
+            deploy_client.subprocess,
+            "check_output",
+            return_value=" M backend-py/deploy/database-secret-rotation-iam.yaml\n",
+        ),
+        pytest.raises(RuntimeError, match="requires a clean"),
+    ):
+        deploy_client._verified_repository_source()
+
+def test_deploy_reuses_verified_template_without_rereading_disk() -> None:
+    template_body = (
+        DEPLOY_DIR / "database-secret-rotation-iam.yaml"
+    ).read_text()
+    cloudformation = _CloudFormation("revision-old")
+    session = _DeploySession(cloudformation)
+    with (
+        patch.object(deploy_client, "_session", return_value=session),
+        patch.object(
+            Path,
+            "read_text",
+            side_effect=AssertionError("mutable template path was reread"),
+        ),
+    ):
+        deploy_client.deploy(
+            stack_name=deploy_client.STACK_NAME,
+            instance_id="i-production",
+            secret_arn=(
+                "arn:aws:secretsmanager:ap-south-1:123456789012:secret:test"
+            ),
+            alert_email="operator@example.test",
+            region="ap-south-1",
+            revision="revision-new",
+            template_body=template_body,
+            expected_revision="revision-old",
+        )
+
+    assert cloudformation.update_calls[0]["TemplateBody"] == template_body

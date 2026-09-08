@@ -18,6 +18,7 @@ in `../README.md`.
 | `database-secret-rotation-iam.yaml` | One-time least-privilege fixed-secret and SSM-document IAM setup |
 | `database-secret-refresh-rehearsal.yaml` | Isolated, tagged disposable RDS/SSM/Scheduler refresh fixture |
 | `rehearse_database_secret_refresh.py` | Explicitly opt-in disposable refresh rehearsal orchestrator |
+| `deploy_database_secret_rotation_stack.py` | Revision-fenced deployment and post-update verification for the database rotation stack |
 | `prove_database_refresh_alert.py` | Publishes one disposable sanitized database-refresh failure alert and proves repeat suppression |
 | `prove_database_refresh_alert_delivery.py` | Temporarily triggers and restores the fixed delivery-failure alarm |
 
@@ -101,8 +102,77 @@ last; it is a root-only (`0600`) generated file containing the active database
 URL and must never be committed, copied into either repository environment
 file, or edited manually.
 
-Deploy `database-secret-rotation-iam.yaml` once with the **exact ARN** of the
-existing RDS-managed master secret and the production instance ID. The instance
+Deploy `database-secret-rotation-iam.yaml` only through the checked-in wrapper,
+with the **exact ARN** of the existing RDS-managed master secret and the production instance ID:
+
+```bash
+python backend-py/deploy/deploy_database_secret_rotation_stack.py \
+  --instance-id "$UNIVERSITY_PORTAL_INSTANCE_ID" \
+  --database-secret-arn "$DATABASE_SECRET_ARN" \
+  --alert-email "$DATABASE_REFRESH_ALERT_EMAIL" \
+  --region ap-south-1
+```
+
+For every later update, also pass the revision reported by the preceding
+successful deployment:
+
+```bash
+python backend-py/deploy/deploy_database_secret_rotation_stack.py \
+  --instance-id "$UNIVERSITY_PORTAL_INSTANCE_ID" \
+  --database-secret-arn "$DATABASE_SECRET_ARN" \
+  --alert-email "$DATABASE_REFRESH_ALERT_EMAIL" \
+  --expected-current-revision "$CURRENT_DEPLOYED_TEMPLATE_REVISION" \
+  --region ap-south-1
+```
+
+For the one-time upgrade of an existing stack created before revision fencing,
+run only from the administrator-controlled infrastructure pipeline and opt in
+explicitly:
+
+```bash
+python backend-py/deploy/deploy_database_secret_rotation_stack.py \
+  --instance-id "$UNIVERSITY_PORTAL_INSTANCE_ID" \
+  --database-secret-arn "$DATABASE_SECRET_ARN" \
+  --alert-email "$DATABASE_REFRESH_ALERT_EMAIL" \
+  --adopt-unversioned-stack \
+  --region ap-south-1
+```
+
+This flag is accepted only when the stack has no `DeployedTemplateRevision`
+output and cannot be combined with `--expected-current-revision`. After that
+single update creates the output, the wrapper rejects the adoption flag and
+requires the exact current revision on every update.
+
+The wrapper takes a conditional lease in the stack's DynamoDB table before it
+reads the current revision and holds that lease through final verification. It
+also rejects an in-progress stack and an expected revision that does not exactly
+match the stack output. Thus two workspaces based on the same older revision
+cannot both deploy: one holds the lease, and after it finishes the other fails
+its stale-revision check. Success is reported only after the stack output and
+the default SSM document version, repository revision, and checked-in command
+content hash all match. Do not use a bare
+`aws cloudformation deploy` command for this stack. The wrapper does not accept
+an alternate stack name or caller-supplied revision. It refuses a dirty
+repository and verifies the submitted template byte-for-byte against the
+immutable checked-out Git HEAD before contacting AWS. That single verified Git
+blob is then reused for hashing, CloudFormation submission, and post-deploy
+document verification. Existing operator-set values for deployment user,
+instance role, schedule state, and alert deduplication interval are retained
+with CloudFormation `UsePreviousValue`; the wrapper changes only its explicit
+inputs. Run it only through the administrator-controlled
+infrastructure deployment identity and protected source/change-approval
+pipeline. Do not grant the routine `DeploymentRefreshPolicy` identity
+CloudFormation update or execution-role permissions: an updater that can submit
+arbitrary template bodies to this IAM-managing stack could escalate its own
+privileges.
+The very first stack creation has no lock table yet; CloudFormation's atomic
+create-by-name operation serializes that bootstrap. On an existing installation
+that predates this safeguard, use the one-time adoption command above; the
+administrator-controlled deployment identity must be able to write the fixed
+lock item. Routine credential refreshes continue to use the scoped deployment
+identity; stack-template updates do not.
+
+The instance
 role receives only `secretsmanager:GetSecretValue` on that ARN. The deployment
 identity cannot read the secret and can only invoke the fixed
 `university-portal-database-credential-refresh` SSM document for that
@@ -152,6 +222,9 @@ TLS `SELECT 1`. Any failure restores the last-known-good file and restarts both
 services before returning a sanitized operational error. Application engines
 always use certificate-verifying PostgreSQL TLS; URL `sslmode` flags cannot
 disable it.
+The refresh client resolves the default SSM document once, invokes that exact
+numeric version, and verifies the same content after the host command succeeds;
+an infrastructure update cannot silently switch the command mid-invocation.
 
 The document also maintains a lexically-last systemd drop-in for both services
 so older environment drop-ins cannot override the managed database credential

@@ -20,9 +20,16 @@ SUCCESS_OUTPUT = "database-credentials-refreshed-and-db-verified"
 def refresh(instance_id: str, region: str) -> None:
     """Invoke only the fixed-purpose document and expose no command output."""
     ssm = _session().client("ssm", region_name=region)
+    document = ssm.get_document(
+        Name=ROTATION_DOCUMENT,
+        DocumentVersion="$DEFAULT",
+    )
+    document_version = document["DocumentVersion"]
+    document_content = document["Content"]
     response = ssm.send_command(
         InstanceIds=[instance_id],
         DocumentName=ROTATION_DOCUMENT,
+        DocumentVersion=document_version,
         Comment="Refresh university portal RDS database credentials",
     )
     command_id = response["Command"]["CommandId"]
@@ -44,6 +51,15 @@ def refresh(instance_id: str, region: str) -> None:
             )
         if result.get("StandardOutputContent", "").strip() != SUCCESS_OUTPUT:
             raise RuntimeError("Database credential refresh returned an unexpected response")
+        verified = ssm.get_document(
+            Name=ROTATION_DOCUMENT,
+            DocumentVersion=document_version,
+        )
+        if (
+            verified.get("DocumentVersion") != document_version
+            or verified.get("Content") != document_content
+        ):
+            raise RuntimeError("Executed SSM document version failed content verification")
         print("Database credentials refreshed; API, Celery, and SELECT 1 verified.")
         return
     raise TimeoutError("Database credential refresh did not finish within 210 seconds")
