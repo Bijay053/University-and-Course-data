@@ -952,8 +952,6 @@ def _parse_program_keyed_english_tables(html: str) -> list[dict[str, Any]]:
     except Exception:
         return []
     section = soup.find(id="table-2-non-standard-requirements")
-    if section is None:
-        return []
 
     row_specs = (
         (("ielts",), "ielts_overall", 0.0, 9.0),
@@ -965,6 +963,7 @@ def _parse_program_keyed_english_tables(html: str) -> list[dict[str, Any]]:
 
     def _score(text: str, low: float, high: float) -> float | None:
         patterns = (
+            r"(\d+(?:\.\d+)?)\s*(?:overall|total)\b",
             r"(?:minimum\s+)?(?:overall|total)(?:\s+score)?\s+(?:of\s+)?(\d+(?:\.\d+)?)",
             r"\bscore\s+of\s+(\d+(?:\.\d+)?)",
         )
@@ -1029,14 +1028,18 @@ def _parse_program_keyed_english_tables(html: str) -> list[dict[str, Any]]:
                 continue
             for skill in _re.findall(skill_word, match.group(2), _re.I):
                 values[fields[skill.lower()]] = floor
+
+        # Murdoch and similar tables use compact rows such as
+        # "7.0 Reading 7.0 Writing 8.0 Speaking 8.0 Listening".
+        for match in _re.finditer(
+            rf"\b([4-9](?:\.\d+)?)\s+({skill_word})\b",
+            normalized,
+            _re.I,
+        ):
+            values[fields[match.group(2).lower()]] = float(match.group(1))
         return values
 
-    profiles: list[dict[str, Any]] = []
-    for heading in section.find_all("h6", recursive=False):
-        table = heading.find_next_sibling("table")
-        if table is None:
-            continue
-        program_names = " ".join(heading.get_text(" ", strip=True).split())
+    def _table_values(table: Any) -> dict[str, float]:
         values: dict[str, float] = {}
         for row in table.find_all("tr"):
             cells = row.find_all(["th", "td"])
@@ -1055,15 +1058,68 @@ def _parse_program_keyed_english_tables(html: str) -> list[dict[str, Any]]:
                     if slot == "ielts_overall":
                         values.update(_ielts_subscores(requirement))
                     break
+        return values
+
+    profiles: list[dict[str, Any]] = []
+    if section is not None:
+        for heading in section.find_all("h6", recursive=False):
+            table = heading.find_next_sibling("table")
+            if table is None:
+                continue
+            program_names = " ".join(heading.get_text(" ", strip=True).split())
+            values = _table_values(table)
+            if program_names and values:
+                profiles.append(
+                    {
+                        "program_names": program_names,
+                        "program_aliases": [
+                            alias.strip()
+                            for alias in program_names.split(",")
+                            if alias.strip()
+                        ],
+                        "values": values,
+                    }
+                )
+
+    # Murdoch publishes non-standard profiles in accordion panels.  The profile
+    # title is broader than the actual course titles ("Bachelor of Education"),
+    # but the same introductory line lists authoritative course codes such as
+    # B1368, B1404, B1405 and B1406.  Preserve those codes so application can
+    # match the exact course URL rather than guessing from title substrings.
+    for body in soup.select(".accordion-item .accordion-body"):
+        table = body.find("table")
+        if table is None:
+            continue
+        preceding_nodes = [
+            node
+            for node in table.find_all_previous(["p", "h5", "h6"], limit=6)
+            if body in node.parents
+        ]
+        intro_text = " ".join(
+            " ".join(node.get_text(" ", strip=True).split())
+            for node in reversed(preceding_nodes)
+        )
+        course_codes = sorted(
+            {
+                code.upper()
+                for code in _re.findall(r"\b[A-Z]{1,3}\d{3,4}\b", intro_text, _re.I)
+            }
+        )
+        if not course_codes:
+            continue
+        program_node = table.find_previous("strong")
+        program_names = (
+            " ".join(program_node.get_text(" ", strip=True).split())
+            if program_node is not None and body in program_node.parents
+            else ""
+        )
+        values = _table_values(table)
         if program_names and values:
             profiles.append(
                 {
                     "program_names": program_names,
-                    "program_aliases": [
-                        alias.strip()
-                        for alias in program_names.split(",")
-                        if alias.strip()
-                    ],
+                    "program_aliases": [program_names],
+                    "course_codes": course_codes,
                     "values": values,
                 }
             )

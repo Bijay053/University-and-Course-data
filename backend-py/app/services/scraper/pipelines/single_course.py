@@ -1190,9 +1190,10 @@ def _select_central_english_level(
 def _select_central_english_program(
     profiles: Any,
     course_name: str,
+    course_url: str = "",
 ) -> dict[str, Any]:
-    """Select an exact named-program profile from a central English page."""
-    if not isinstance(profiles, list) or not course_name:
+    """Select an exact named-program or course-code English profile."""
+    if not isinstance(profiles, list) or (not course_name and not course_url):
         return {}
 
     def _normalize(value: Any) -> str:
@@ -1200,12 +1201,19 @@ def _select_central_english_program(
         return " ".join(normalized.split())
 
     target = _normalize(course_name)
-    if not target:
+    course_code = (str(course_url or "").split("?", 1)[0].rstrip("/").rsplit("/", 1)[-1]).upper()
+    if not target and not course_code:
         return {}
     for profile in profiles:
         if not isinstance(profile, dict):
             continue
         values = profile.get("values")
+        raw_codes = profile.get("course_codes")
+        if isinstance(raw_codes, list):
+            codes = {str(code or "").strip().upper() for code in raw_codes}
+            codes.discard("")
+            if course_code in codes and isinstance(values, dict):
+                return values
         raw_aliases = profile.get("program_aliases")
         if not isinstance(raw_aliases, list):
             # Backward-compatible reading for profiles created before aliases
@@ -8043,6 +8051,7 @@ async def extract_course(
             _program_english = _select_central_english_program(
                 _program_profiles,
                 payload.get("course_name") or "",
+                url,
             )
             if _program_english:
                 _level_bucket = "program"

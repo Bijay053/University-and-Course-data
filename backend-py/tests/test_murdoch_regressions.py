@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.services.scraper.central_pages import _parse_column_keyed_english_table
+from app.services.scraper.central_pages import (
+    _parse_column_keyed_english_table,
+    _parse_program_keyed_english_tables,
+)
 from app.services.scraper.extractors import duration
 from app.services.scraper.pipelines.single_course import (
     _is_structural_course_page_method,
+    _select_central_english_program,
 )
 
 
@@ -80,6 +84,52 @@ def test_value_first_level_table_extracts_all_supported_english_tests() -> None:
     }
     assert by_level["postgraduate"] == by_level["undergraduate"]
     assert by_level["doctorate"] == flat
+
+
+def test_murdoch_higher_education_profile_matches_exact_course_codes() -> None:
+    html = """
+    <div class="accordion-item">
+      <div class="accordion-body">
+        <p><strong>Bachelor of Education</strong> (B1368, B1404, B1405, B1406)</p>
+        <p>These requirements apply to all undergraduate Education courses.</p>
+        <table>
+          <tr>
+            <th>International English Language Testing System (IELTS) Academic</th>
+            <td><strong>7.5 Overall</strong> 7.0 Reading 7.0 Writing 8.0 Speaking 8.0 Listening</td>
+          </tr>
+          <tr><th>Cambridge Advanced English (CAE)</th><td><strong>191 Overall</strong></td></tr>
+          <tr><th>Pearson Test of English (PTE)</th><td><strong>76 Overall</strong></td></tr>
+          <tr><th>TOEFL IBT</th><td><strong>102 Overall</strong></td></tr>
+          <tr><th>Duolingo English Test (DET)</th><td>N/A</td></tr>
+        </table>
+      </div>
+    </div>
+    """
+
+    profiles = _parse_program_keyed_english_tables(html)
+    expected = {
+        "ielts_overall": 7.5,
+        "ielts_reading": 7.0,
+        "ielts_writing": 7.0,
+        "ielts_speaking": 8.0,
+        "ielts_listening": 8.0,
+        "cambridge_overall": 191.0,
+        "pte_overall": 76.0,
+        "toefl_overall": 102.0,
+    }
+
+    for code in ("b1368", "b1404", "b1405", "b1406"):
+        assert _select_central_english_program(
+            profiles,
+            "Bachelor of Education (Primary, 1-10 Health and Physical Education)",
+            f"https://www.murdoch.edu.au/course/undergraduate/{code}",
+        ) == expected
+
+    assert _select_central_english_program(
+        profiles,
+        "Master of Education",
+        "https://www.murdoch.edu.au/course/postgraduate/m1367",
+    ) == {}
 
 
 def test_bare_numeric_full_time_duration_uses_label_semantics() -> None:
