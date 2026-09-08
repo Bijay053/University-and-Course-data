@@ -1296,7 +1296,7 @@ async def _fetch_with_browser_fallback(url: str) -> str | None:
 #                             english_by_level + english_by_program
 
 _CACHE_TTL_DAYS = 30
-_ENGLISH_CACHE_SCHEMA_VERSION = 4
+_ENGLISH_CACHE_SCHEMA_VERSION = 5
 
 
 def _is_non_tuition_central_fee_pdf(
