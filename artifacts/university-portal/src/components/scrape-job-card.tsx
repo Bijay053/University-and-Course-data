@@ -1293,6 +1293,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
           fastMode?: boolean; feePageUrl?: string | null; requirementsPageUrl?: string | null;
           logs?: ScrapeLog[]; logIndex?: number;
           status?: string; imported?: number; skipped?: number; errors?: number;
+          reviewableCount?: number;
           current?: number; total?: number; totalFound?: number;
         }>(res);
         if (!data) { schedule(POLL_BASE); return; }
@@ -1412,6 +1413,14 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
           }
         }
 
+        if (typeof data.reviewableCount === "number") {
+          setResultSummary((previous) => ({
+            imported: data.reviewableCount ?? previous?.imported ?? data.imported ?? 0,
+            skipped: data.skipped ?? previous?.skipped ?? 0,
+            errors: data.errors ?? previous?.errors ?? 0,
+          }));
+        }
+
         // Auto-approve the "awaiting_approval" gate so bulk fetch proceeds without manual confirmation
         if (data.status === "awaiting_approval") {
           fetch(`/api/scrape/approve/${jobId}`, {
@@ -1427,7 +1436,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
           // them as a durable fallback for the completion card and Review button.
           if (!data.logs?.some((l) => l.event === "done")) {
             setResultSummary({
-              imported: data.imported ?? 0,
+              imported: data.reviewableCount ?? data.imported ?? 0,
               skipped: data.skipped ?? 0,
               errors: data.errors ?? 0,
             });
@@ -1629,7 +1638,9 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
       const t0 = Date.now();
       setActiveJobId(data.jobId);
       setCompletedJobId(null);
-      setResultSummary(null);
+      // Keep the completed parent's staged count visible until the child
+      // status poll returns its cumulative reviewableCount. Clearing this made
+      // a continuation appear to have lost all data and briefly show zero.
       setCompletedSkipReasons(undefined);
       pendingReviewCountJobRef.current = null;
       setPendingReviewCount(null);

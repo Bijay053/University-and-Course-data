@@ -114,3 +114,73 @@ async def test_staged_list_is_scoped_to_current_job_id():
         assert body["lastScrape"]["jobId"] == new_job_id
     finally:
         await _cleanup([old_job_id, new_job_id])
+
+
+@pytest.mark.asyncio
+async def test_continuation_status_keeps_parent_rows_visible():
+    uni_id = await _pick_university()
+    parent_job_id = f"test_continue_parent_{uuid.uuid4().hex[:8]}"
+    child_job_id = f"test_continue_child_{uuid.uuid4().hex[:8]}"
+    try:
+        async with AsyncSessionLocal() as db:
+            db.add_all([
+                ScrapeRuntimeJob(
+                    runtime_job_id=parent_job_id,
+                    university_id=uni_id,
+                    university_name="Test Uni",
+                    url="https://example.edu",
+                    job_type="single",
+                    status="completed",
+                    total_found=2,
+                    imported=2,
+                    completed_at=datetime.now(timezone.utc),
+                ),
+                ScrapeRuntimeJob(
+                    runtime_job_id=child_job_id,
+                    university_id=uni_id,
+                    university_name="Test Uni",
+                    url="https://example.edu",
+                    job_type="targeted",
+                    status="running",
+                    total_found=1,
+                    imported=0,
+                    request_payload={
+                        "retrySourceJobId": parent_job_id,
+                        "courseUrls": ["https://example.edu/course/recovered"],
+                    },
+                ),
+                ScrapedCourse(
+                    scrape_job_id=parent_job_id,
+                    university_id=uni_id,
+                    course_name="Bachelor of Preserved One",
+                    course_website="https://example.edu/course/one",
+                    status="pending",
+                ),
+                ScrapedCourse(
+                    scrape_job_id=parent_job_id,
+                    university_id=uni_id,
+                    course_name="Bachelor of Preserved Two",
+                    course_website="https://example.edu/course/two",
+                    status="pending",
+                ),
+                ScrapedCourse(
+                    scrape_job_id=child_job_id,
+                    university_id=uni_id,
+                    course_name="Bachelor of Recovered Course",
+                    course_website="https://example.edu/course/recovered",
+                    status="pending",
+                ),
+            ])
+            await db.commit()
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.get(f"/api/scrape/status/{child_job_id}")
+
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["imported"] == 0
+        assert body["reviewableCount"] == 3
+    finally:
+        await _cleanup([parent_job_id, child_job_id])

@@ -809,6 +809,33 @@ async def get_status(
         logs.append(entry)
 
     request_payload = job.request_payload if isinstance(job.request_payload, dict) else {}
+    reviewable_count: int | None = None
+    if request_payload.get("retrySourceJobId"):
+        from app.models import ScrapedCourse
+        from app.services.scraper.replay_extraction import continuation_review_scope
+
+        review_job_ids, scope_university_id, resume_course_ids, _ = (
+            await continuation_review_scope(db, job_id)
+        )
+        review_scope = ScrapedCourse.scrape_job_id.in_(review_job_ids)
+        if resume_course_ids and scope_university_id is not None:
+            review_scope = or_(
+                review_scope,
+                and_(
+                    ScrapedCourse.id.in_(resume_course_ids),
+                    ScrapedCourse.university_id == scope_university_id,
+                ),
+            )
+        reviewable_count = int(
+            await db.scalar(
+                select(func.count(ScrapedCourse.id)).where(
+                    review_scope,
+                    ScrapedCourse.status == "pending",
+                )
+            )
+            or 0
+        )
+
     return {
         "id": job.runtime_job_id,
         "runtimeJobId": job.runtime_job_id,
@@ -822,6 +849,10 @@ async def get_status(
             "errors": job.errors or 0,
         },
         "imported": job.imported or 0,
+        # A targeted continuation is one operator workflow spread across
+        # multiple runtime jobs. Keep its visible review count cumulative so
+        # clicking Continue never makes already-staged parent rows look lost.
+        "reviewableCount": reviewable_count,
         "skipped": job.skipped or 0,
         "errors": job.errors or 0,
         "current": job.current or 0,
