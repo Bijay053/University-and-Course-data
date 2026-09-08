@@ -147,7 +147,7 @@ def test_template_limits_secret_read_and_host_transaction_is_valid() -> None:
     assert 'text("SELECT 1")' in template
     assert 'timeoutSeconds: "300"' in template
     assert template.count("curl --connect-timeout 2 --max-time 10") == 1
-    assert template.count("timeout 60s systemctl restart uni-api-py uni-celery") == 1
+    assert template.count("timeout 150s systemctl restart uni-api-py uni-celery") == 1
     assert "control cancel_consumer scrape" in template
     assert "ScrapeRuntimeJob.status == \"running\"" in template
     assert "control add_consumer scrape" in template

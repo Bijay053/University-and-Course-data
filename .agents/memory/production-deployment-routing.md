@@ -123,6 +123,15 @@ production TLS requirement.
 validate it as a CA file, combine it with the system bundle, and set
 `SSL_CERT_FILE` for both services. Never disable hostname or certificate checks.
 
+Bounded credential restarts must exceed systemd's configured orderly stop
+window while remaining inside the five-minute SSM transaction.
+
+**Why:** Production units permit 90-second graceful stops; a 60-second outer
+timeout expired during a healthy sequential API/Celery transition.
+
+**How to apply:** Keep the refresh document's restart bound above the unit stop
+timeout plus startup margin, and retain the outer 300-second SSM deadline.
+
 The production Nginx virtual host is hostname-scoped, so a bare
 `http://127.0.0.1/` frontend smoke request can return 404 even when the public
 portal is healthy.
