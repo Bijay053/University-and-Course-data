@@ -66,16 +66,18 @@ both before and after the service smoke test.
 
 Automatic RDS credential refresh should use EventBridge Scheduler for sub-30-
 minute checks; State Manager associations do not support a five-minute rate.
-Bind the scheduler trust to its exact SourceArn and account.
+Bind the scheduler trust to its exact schedule-group ARN and account.
 
 **Why:** State Manager rejects or cannot honor `rate(5 minutes)`, and a scheduler
 role trusted only by the service principal lets unrelated schedules trigger the
-fixed production restart document.
+fixed production restart document. AWS rejects a trust `aws:SourceArn` scoped
+to an individual schedule; Scheduler requires a schedule-group ARN.
 
-**How to apply:** Use a Scheduler universal SSM SendCommand target, scope its
-execution role to the exact instance and document, and constrain AssumeRole with
-both `aws:SourceAccount` and the exact schedule `aws:SourceArn`. Keep unchanged
-secret versions restart-free.
+**How to apply:** Put the refresh schedule in a dedicated schedule group. Use a
+Scheduler universal SSM SendCommand target, scope its execution role to the
+exact instance and document, and constrain AssumeRole with both
+`aws:SourceAccount` and that dedicated group ARN. Keep unchanged secret
+versions restart-free.
 
 The production Nginx virtual host is hostname-scoped, so a bare
 `http://127.0.0.1/` frontend smoke request can return 404 even when the public

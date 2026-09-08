@@ -130,7 +130,9 @@ def test_template_limits_secret_read_and_host_transaction_is_valid() -> None:
     assert "Arn: arn:aws:scheduler:::aws-sdk:ssm:sendCommand" in template
     assert "Service: scheduler.amazonaws.com" in template
     assert "aws:SourceAccount: !Ref AWS::AccountId" in template
-    assert "aws:SourceArn: !Sub arn:${AWS::Partition}:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/default/university-portal-database-credential-auto-refresh" in template
+    assert "Type: AWS::Scheduler::ScheduleGroup" in template
+    assert "aws:SourceArn: !GetAtt DatabaseCredentialRefreshScheduleGroup.Arn" in template
+    assert "GroupName: !Ref DatabaseCredentialRefreshScheduleGroup" in template
     assert "RoleArn: !GetAtt ScheduledRefreshRole.Arn" in template
     assert "ApplyOnlyAtCronInterval" not in template
 
