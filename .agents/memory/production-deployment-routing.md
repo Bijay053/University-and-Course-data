@@ -64,6 +64,19 @@ fixed-purpose document, fetch that version explicitly, lock backup/apply/
 verify/rollback as one host transaction, and check current-version equality
 both before and after the service smoke test.
 
+Production RDS uses an AWS-managed master secret, while API and Celery currently
+read a copied `DATABASE_URL` from the host `.env`; `.release.env` carries release
+identity only. The connection URL must explicitly retain `ssl=require`.
+
+**Why:** A managed password change left the copied host credential stale, and
+RDS began rejecting non-TLS connections. Celery consumed tasks but could not
+claim their database rows, so the UI left them appearing indefinitely queued.
+
+**How to apply:** Diagnose worker-idle/queued mismatches by checking claim errors
+before queue capacity. Recover the active RDS secret only inside the host,
+validate TLS before replacing `.env` atomically, then restart both services and
+redispatch each proven-orphaned job once behind the database claim guard.
+
 The production Nginx virtual host is hostname-scoped, so a bare
 `http://127.0.0.1/` frontend smoke request can return 404 even when the public
 portal is healthy.
