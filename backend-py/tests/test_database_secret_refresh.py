@@ -35,11 +35,19 @@ assert ALERT_SPEC and ALERT_SPEC.loader
 alert_client = importlib.util.module_from_spec(ALERT_SPEC)
 ALERT_SPEC.loader.exec_module(alert_client)
 
+DELIVERY_PROOF_SPEC = importlib.util.spec_from_file_location(
+    "database_refresh_alert_delivery",
+    DEPLOY_DIR / "prove_database_refresh_alert_delivery.py",
+)
+assert DELIVERY_PROOF_SPEC and DELIVERY_PROOF_SPEC.loader
+delivery_proof = importlib.util.module_from_spec(DELIVERY_PROOF_SPEC)
+DELIVERY_PROOF_SPEC.loader.exec_module(delivery_proof)
+
 
 def _notifier_source() -> str:
     template = (DEPLOY_DIR / "database-secret-rotation-iam.yaml").read_text()
     source = template.split("ZipFile: |\n", 1)[1].split(
-        "\n\n  DatabaseRefreshFailureRule:", 1
+        "\n\n  DatabaseRefreshAlertDeadLetterQueue:", 1
     )[0]
     return textwrap.dedent(source)
 
@@ -190,7 +198,20 @@ def test_template_limits_secret_read_and_host_transaction_is_valid() -> None:
     assert "- TimedOut" in template
     assert "- Cancelled" in template
     assert "Type: AWS::SNS::Topic" in template
-    assert "KmsMasterKeyId: alias/aws/sns" in template
+    assert "Type: AWS::KMS::Key" in template
+    assert "EnableKeyRotation: true" in template
+    assert "KmsMasterKeyId: !Ref DatabaseRefreshAlertEncryptionKey" in template
+    assert "alias/aws/sns" not in template
+    assert "alias/aws/sqs" not in template
+    assert "Service: events.amazonaws.com" in template
+    assert "Service: cloudwatch.amazonaws.com" in template
+    assert (
+        "rule/university-portal-database-refresh-*"
+    ) in template
+    assert (
+        "alarm:university-portal-database-refresh-*"
+    ) in template
+    assert "Action:\n                  - kms:Decrypt\n                  - kms:GenerateDataKey" in template
     assert "Type: AWS::DynamoDB::Table" in template
     assert "attribute_not_exists(alert_key) OR expires_at < :now" in template
     assert 'f"test:{nonce}" if is_test else "production"' in template
@@ -210,6 +231,41 @@ def test_template_limits_secret_read_and_host_transaction_is_valid() -> None:
     )
     assert "events:detail-type: Database Refresh Alert Test" in test_publish_policy
     assert "source: aws.ssm" not in test_publish_policy
+    assert "Type: AWS::SQS::Queue" in template
+    assert "MessageRetentionPeriod: 1209600" in template
+    assert "Type: AWS::Lambda::EventInvokeConfig" in template
+    assert "MaximumRetryAttempts: 2" in template
+    assert "Destination: !GetAtt DatabaseRefreshAlertDeadLetterQueue.Arn" in template
+    assert template.count(
+        "DeadLetterConfig:\n            Arn: !GetAtt DatabaseRefreshAlertDeadLetterQueue.Arn"
+    ) == 2
+    assert template.count("InputTransformer:") == 2
+    assert "<instanceId>" in template
+    assert "<documentName>" in template
+    assert "<status>" in template
+    assert "command-id" not in template
+    assert "StandardOutputContent" not in template
+    assert "StandardErrorContent" not in template
+    assert "Type: AWS::CloudWatch::Alarm" in template
+    assert "MetricName: ApproximateNumberOfMessagesVisible" in template
+    assert "MetricName: Errors" in template
+    assert (
+        "AlarmDescription: Database refresh alert delivery exhausted retries; "
+        "inspect the encrypted dead-letter queue"
+    ) in template
+    delivery_observe_policy = template.split(
+        "- Sid: ObserveRefreshAlertDeliveryAlarm", 1
+    )[1].split("- Sid: ProveRefreshAlertDeliveryAlarm", 1)[0]
+    assert "Action: cloudwatch:DescribeAlarms" in delivery_observe_policy
+    assert 'Resource: "*"' in delivery_observe_policy
+    delivery_proof_policy = template.split(
+        "- Sid: ProveRefreshAlertDeliveryAlarm", 1
+    )[1].split("ProductionDatabaseSecretReadPolicy:", 1)[0]
+    assert "Action: cloudwatch:SetAlarmState" in delivery_proof_policy
+    assert "cloudwatch:DescribeAlarms" not in delivery_proof_policy
+    assert (
+        "alarm:university-portal-database-refresh-alert-delivery-failed"
+    ) in delivery_proof_policy
     compile(notifier, "<database-refresh-alert>", "exec")
 
     literal = template.split("                - !Sub |\n", 1)[1]
@@ -455,6 +511,66 @@ def test_disposable_alert_proof_publishes_once_and_suppresses_repeat(capsys) -> 
     assert capsys.readouterr().out.strip() == (
         "database-refresh-alert-published-and-repeat-suppressed"
     )
+
+
+class _CloudWatch:
+    def __init__(self, initial: str = "OK") -> None:
+        self.state = initial
+        self.set_calls: list[dict[str, str]] = []
+
+    def describe_alarms(self, **_kwargs):
+        return {
+            "MetricAlarms": [{
+                "AlarmName": delivery_proof.ALARM_NAME,
+                "StateValue": self.state,
+            }]
+        }
+
+    def set_alarm_state(self, **kwargs):
+        self.set_calls.append(kwargs)
+        self.state = kwargs["StateValue"]
+
+
+class _CloudWatchSession:
+    def __init__(self, cloudwatch: _CloudWatch) -> None:
+        self.cloudwatch = cloudwatch
+
+    def client(self, name: str, region_name: str):
+        assert name == "cloudwatch"
+        assert region_name == "ap-south-1"
+        return self.cloudwatch
+
+
+def test_disposable_delivery_alarm_proof_restores_prior_state(capsys) -> None:
+    cloudwatch = _CloudWatch(initial="INSUFFICIENT_DATA")
+    with patch.object(
+        delivery_proof,
+        "_session",
+        return_value=_CloudWatchSession(cloudwatch),
+    ):
+        delivery_proof.prove("ap-south-1")
+
+    assert [call["StateValue"] for call in cloudwatch.set_calls] == [
+        "ALARM",
+        "INSUFFICIENT_DATA",
+    ]
+    assert cloudwatch.set_calls[0]["StateReason"] == delivery_proof.TEST_REASON
+    assert cloudwatch.set_calls[1]["StateReason"] == delivery_proof.RESTORE_REASON
+    assert capsys.readouterr().out.strip() == (
+        "database-refresh-alert-delivery-alarm-proved"
+    )
+
+
+def test_delivery_alarm_proof_refuses_to_override_real_alarm() -> None:
+    cloudwatch = _CloudWatch(initial="ALARM")
+    with patch.object(
+        delivery_proof,
+        "_session",
+        return_value=_CloudWatchSession(cloudwatch),
+    ):
+        with pytest.raises(RuntimeError, match="investigate instead of testing"):
+            delivery_proof.prove("ap-south-1")
+    assert cloudwatch.set_calls == []
 
 
 def test_every_database_engine_uses_certificate_verifying_tls() -> None:

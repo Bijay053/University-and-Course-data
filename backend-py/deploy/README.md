@@ -17,6 +17,7 @@ in `../README.md`.
 | `refresh_database_credentials_via_secrets_manager.py` | Requests the fixed host-side refresh of the RDS-managed database credential |
 | `database-secret-rotation-iam.yaml` | One-time least-privilege fixed-secret and SSM-document IAM setup |
 | `prove_database_refresh_alert.py` | Publishes one disposable sanitized database-refresh failure alert and proves repeat suppression |
+| `prove_database_refresh_alert_delivery.py` | Temporarily triggers and restores the fixed delivery-failure alarm |
 
 ## Refresh the RDS-managed database credential
 
@@ -104,6 +105,48 @@ the proof is repeatable and cannot suppress a real production failure alert.
 The deployment identity cannot invoke the Lambda directly. The function rejects
 an unexpected event source, instance, document, or non-failure status before
 writing or publishing.
+
+### Alert-delivery failure handling
+
+Both EventBridge target-delivery failures and asynchronous Lambda execution
+failures are retained in the encrypted
+`university-portal-database-refresh-alert-dlq` queue after bounded retries.
+EventBridge input transformers ensure the Lambda and its asynchronous failure
+destination receive only the allowlisted source, detail type, instance ID,
+document name, status, and disposable test nonce. An EventBridge target-delivery
+DLQ record contains the original AWS SSM command-status event plus delivery
+metadata rather than the transformed target input. That AWS event schema
+contains command identity/status metadata but never command stdout, stderr,
+parameters, environment, or credentials. Tests lock this distinction so the
+transformer is not incorrectly treated as protection for the EventBridge DLQ.
+
+The SNS topic and SQS queue use a dedicated rotating customer-managed KMS key.
+Its key policy allows only account administration, the database-refresh
+EventBridge rule prefix for DLQ encryption, and the database-refresh CloudWatch
+alarm prefix for direct alarm publication. The notifier role receives only
+`kms:GenerateDataKey` and `kms:Decrypt` on this key.
+
+The `university-portal-database-refresh-alert-delivery-failed` CloudWatch alarm
+enters ALARM when the queue has any visible message. A second alarm,
+`university-portal-database-refresh-notifier-errors`, detects errors sustained
+across two five-minute periods. Both publish directly to the same encrypted SNS
+operator topic and contain only static resource/metric metadata. Dead-letter
+messages are retained for 14 days for investigation.
+
+After confirming the SNS subscription, prove the secondary alarm-to-operator
+path without creating or consuming a real dead-letter message:
+
+```bash
+python backend-py/deploy/prove_database_refresh_alert_delivery.py \
+  --region ap-south-1
+```
+
+The proof refuses to run while the delivery alarm is already in ALARM, sets only
+that fixed alarm to a clearly labelled disposable ALARM state, waits until AWS
+reports the transition, and restores the exact prior state in `finally`. The
+deployment identity can describe and set only this alarm. The state reason and
+alarm metadata are static and contain no command output, event payload, or
+credentials.
 
 ## Rotate the OpenAI fallback routinely
 
