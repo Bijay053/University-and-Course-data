@@ -93,6 +93,8 @@ def test_disposable_rehearsal_is_explicitly_guarded_and_uses_isolated_fixture() 
         "cf.delete_stack("
     )
     assert "--i-understand-this-creates-disposable-aws-resources" in source
+    assert "--fail-at" in source
+    assert "--state-output" in source
     assert "get_caller_identity" in source
     assert "describe_secret" in source
     assert ".get_secret_value(" in source
@@ -136,6 +138,36 @@ def test_rehearsal_refuses_without_opt_in_before_any_aws_call() -> None:
             second_private_subnet_id="subnet-b",
             stack_name="test",
             opt_in=False,
+        )
+
+
+def test_rehearsal_failure_injection_is_bounded_to_named_checkpoints() -> None:
+    for checkpoint in rehearsal.FAILURE_CHECKPOINTS:
+        with pytest.raises(
+            RuntimeError, match=f"injected rehearsal failure at {checkpoint}"
+        ):
+            rehearsal._inject_failure(checkpoint, checkpoint)
+        rehearsal._inject_failure(None, checkpoint)
+        rehearsal._inject_failure("different-checkpoint", checkpoint)
+
+
+def test_rehearsal_cleanup_failures_remain_visible_with_injected_failure() -> None:
+    primary = RuntimeError("injected rehearsal failure at after-stack-creation")
+    rehearsal._report_cleanup_errors(
+        ["disable scheduler failed: denied", "stack deletion failed: timeout"],
+        primary,
+    )
+    assert primary.__notes__ == [
+        "rehearsal cleanup failed: disable scheduler failed: denied; "
+        "stack deletion failed: timeout"
+    ]
+
+
+def test_rehearsal_cleanup_failure_is_raised_without_primary_failure() -> None:
+    with pytest.raises(RuntimeError, match="stack deletion failed: timeout"):
+        rehearsal._report_cleanup_errors(
+            ["stack deletion failed: timeout"],
+            None,
         )
 
 

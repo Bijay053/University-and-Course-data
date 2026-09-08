@@ -24,6 +24,9 @@ from database_refresh_rehearsal_proof import write_rehearsal_proof
 TAG_KEY = "university-portal:disposable-rehearsal"
 PRODUCTION_ACCOUNT_IDS = frozenset({"905043442097"})
 SUCCESS_OUTPUT = "database-credentials-refreshed-and-db-verified"
+FAILURE_CHECKPOINTS = frozenset(
+    {"after-stack-creation", "after-probe-queueing", "after-password-rotation"}
+)
 
 
 def _session() -> boto3.Session:
@@ -105,10 +108,29 @@ def _wait_command(ssm, instance_id: str, document: str, expected: str) -> None:
     raise TimeoutError("fixed rehearsal preparation command timed out")
 
 
+def _inject_failure(selected: str | None, checkpoint: str) -> None:
+    if selected == checkpoint:
+        raise RuntimeError(f"injected rehearsal failure at {checkpoint}")
+
+
+def _report_cleanup_errors(
+    cleanup_errors: list[str], primary_error: BaseException | None
+) -> None:
+    if not cleanup_errors:
+        return
+    message = "rehearsal cleanup failed: " + "; ".join(cleanup_errors)
+    if primary_error is not None:
+        primary_error.add_note(message)
+    else:
+        raise RuntimeError(message)
+
+
 def rehearse(*, expected_account: str, production_account: str, region: str, vpc_id: str,
              private_subnet_id: str, second_private_subnet_id: str, stack_name: str,
              opt_in: bool, proof_output: Path | None = None,
-             proof_signing_key_id: str | None = None) -> None:
+             proof_signing_key_id: str | None = None,
+             fail_at: str | None = None,
+             state_output: Path | None = None) -> None:
     if not opt_in:
         raise RuntimeError("pass --i-understand-this-creates-disposable-aws-resources")
     if os.environ.get("RUN_DISPOSABLE_AWS_DATABASE_REFRESH_REHEARSAL") != "1":
@@ -117,6 +139,8 @@ def rehearse(*, expected_account: str, production_account: str, region: str, vpc
         )
     if proof_output is not None and not proof_signing_key_id:
         raise RuntimeError("a dedicated disposable KMS proof-signing key is required")
+    if fail_at is not None and fail_at not in FAILURE_CHECKPOINTS:
+        raise RuntimeError("unknown rehearsal failure checkpoint")
     session = _session()
     # Account identity is checked before CloudFormation, Scheduler, SSM, RDS, and SQS mutations.
     if (not production_account or expected_account == production_account
@@ -207,7 +231,21 @@ def rehearse(*, expected_account: str, production_account: str, region: str, vpc
         _require_disposable(session, region, expected_account, rehearsal_id,
                             ec2.describe_tags(Filters=[{"Name": "resource-id", "Values": [host]}])["Tags"])
         outputs = {o["OutputKey"]: o["OutputValue"] for o in cf.describe_stacks(StackName=stack_name)["Stacks"][0]["Outputs"]}
+        if state_output is not None:
+            state_output.write_text(
+                json.dumps(
+                    {
+                        "run_id": rehearsal_id,
+                        "stack_name": stack_name,
+                        "secret_arn": outputs["DatabaseSecretArn"],
+                        "schedule_group": outputs["ScheduleGroup"],
+                        "schedule_name": outputs["ScheduleName"],
+                    }
+                ),
+                encoding="utf-8",
+            )
         secrets = session.client("secretsmanager", region_name=region)
+        _inject_failure(fail_at, "after-stack-creation")
         _require_account(session, region, expected_account, production_account)
         before = _managed_secret_shape(secrets, outputs["DatabaseSecretArn"])
         ssm = session.client("ssm", region_name=region)
@@ -239,6 +277,7 @@ def rehearse(*, expected_account: str, production_account: str, region: str, vpc
             )["Tags"],
         )
         _wait_command(ssm, host, outputs["PrepareDocument"], "rehearsal-probe-queued")
+        _inject_failure(fail_at, "after-probe-queueing")
         rds = session.client("rds", region_name=region)
         db = rds.describe_db_instances(DBInstanceIdentifier=outputs["DatabaseId"])["DBInstances"][0]
         _require_disposable(session, region, expected_account, rehearsal_id,
@@ -254,6 +293,7 @@ def rehearse(*, expected_account: str, production_account: str, region: str, vpc
             time.sleep(10)
         else:
             raise TimeoutError("managed-secret rotation did not expose a new version")
+        _inject_failure(fail_at, "after-password-rotation")
         # Scheduler is the execution path: require a command requested after
         # rotation began, with the fixed document and scheduler-only comment.
         command = None
@@ -364,12 +404,7 @@ def rehearse(*, expected_account: str, production_account: str, region: str, vpc
                         cleanup_errors.append(
                             f"secret residue verification failed: {cleanup_error}"
                         )
-        if cleanup_errors:
-            message = "rehearsal cleanup failed: " + "; ".join(cleanup_errors)
-            if primary_error is not None:
-                primary_error.add_note(message)
-            else:
-                raise RuntimeError(message)
+        _report_cleanup_errors(cleanup_errors, primary_error)
     if proof_output is not None:
         write_rehearsal_proof(
             proof_output,
@@ -399,15 +434,22 @@ def main() -> None:
     parser.add_argument("--region", default="ap-south-1")
     parser.add_argument("--proof-output", type=Path, required=True)
     parser.add_argument("--proof-signing-key-id", required=True)
+    parser.add_argument("--fail-at", choices=sorted(FAILURE_CHECKPOINTS))
+    parser.add_argument("--state-output", type=Path)
+    parser.add_argument("--run-id")
     parser.add_argument("--i-understand-this-creates-disposable-aws-resources", action="store_true")
     args = parser.parse_args()
-    run_id = uuid.uuid4().hex[:16]
+    run_id = args.run_id or uuid.uuid4().hex[:16]
+    if not re.fullmatch(r"[0-9a-f]{16}", run_id):
+        parser.error("--run-id must be exactly 16 lowercase hexadecimal characters")
     rehearse(expected_account=args.expected_account_id, production_account=args.production_account_id,
              region=args.region, vpc_id=args.vpc_id,
               private_subnet_id=args.private_subnet_id, second_private_subnet_id=args.second_private_subnet_id, stack_name=f"up-db-refresh-rehearsal-{run_id}",
               opt_in=args.i_understand_this_creates_disposable_aws_resources,
               proof_output=args.proof_output,
-              proof_signing_key_id=args.proof_signing_key_id)
+               proof_signing_key_id=args.proof_signing_key_id,
+               fail_at=args.fail_at,
+               state_output=args.state_output)
 
 
 if __name__ == "__main__":

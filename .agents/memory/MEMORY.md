@@ -143,3 +143,4 @@
 - [Category-page warning parity](category-page-warning-parity.md) — URL-shape warnings must respect degree-qualifier overrides and be discarded when their candidate count differs from the live job.
 - [WSU international catalogue authority](wsu-algolia-authority.md) — detail pages default to domestic; Algolia owns international fees/durations, while official English profiles require named exceptions.
 - [Skip reason counter conservation](skip-reason-counter-conservation.md) — every completed skipped-course increment must flow through one helper that also increments exactly one stable reason bucket.
+- [Expected-failure teardown proof](expected-failure-teardown-proof.md) — a deliberate nonzero exit can mask cleanup failure; verify resource absence independently.
