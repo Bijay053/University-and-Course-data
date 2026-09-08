@@ -434,6 +434,12 @@ async def test_re_extract_staged_refreshes_changed_fee_evidence(monkeypatch):
     old_url = "https://example.edu/courses/2025/computer-science"
     new_url = "https://example.edu/courses/computer-science?year=2026"
     extract_calls: list[dict] = []
+    expected_central_data = {
+        "fees": [{"program": "Bachelor of Computer Science", "fee": 45000}],
+        "english": {},
+        "fee_page_url": "https://example.edu/fees",
+        "english_page_url": None,
+    }
     try:
         async with AsyncSessionLocal() as db:
             db.add(
@@ -532,9 +538,16 @@ async def test_re_extract_staged_refreshes_changed_fee_evidence(monkeypatch):
                 ],
             }
 
+        async def _fake_prefetch_central_pages(*_args, **_kwargs):
+            return expected_central_data
+
         monkeypatch.setattr(
             "app.services.scraper.orchestrator._extract_only",
             _fake_extract_only,
+        )
+        monkeypatch.setattr(
+            "app.services.scraper.central_pages.prefetch_central_pages",
+            _fake_prefetch_central_pages,
         )
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
@@ -547,6 +560,10 @@ async def test_re_extract_staged_refreshes_changed_fee_evidence(monkeypatch):
         assert response.json()["updated"] == 1
         assert len(extract_calls) == 2
         assert all(call["ai_provider"] == "openai" for call in extract_calls)
+        assert all(
+            call["central_data"] == expected_central_data
+            for call in extract_calls
+        )
         assert response.json()["results"][0]["extraction_passes"] == 2
         assert response.json()["results"][0]["ai_provider"] == "openai"
 

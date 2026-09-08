@@ -2141,8 +2141,17 @@ async def re_extract_staged(
     country = getattr(uni, "country", None)
 
     # Activate per-uni YAML config so the extraction pipeline has context.
+    # Re-extraction must also prefetch the same central fee/English pages used by
+    # a normal scrape.  Without this payload, Review → Fix silently falls back
+    # to per-course/default English values even when the university publishes a
+    # course-specific central profile.
+    central_data: dict | None = None
     try:
+        import copy as _copy
         from urllib.parse import urlparse as _up
+
+        from app.services.scraper.central_pages import prefetch_central_pages
+
         hostname = _up(scrape_url).netloc if scrape_url else ""
         if hostname:
             cfg = get_config_for_host(
@@ -2152,8 +2161,36 @@ async def re_extract_staged(
                 university_id=body.university_id,
             )
             set_uni_config(cfg)
-    except Exception:
-        pass
+
+            central_config = _copy.deepcopy(getattr(uni, "scrape_config", None) or {})
+            central_pages = central_config.setdefault("uniPages", {})
+            fee_cfg = cfg.extraction.fees
+            english_cfg = cfg.extraction.english
+            if fee_cfg.central_page and not central_pages.get("feePage"):
+                central_pages["feePage"] = fee_cfg.central_page
+            if fee_cfg.fees_pdf_url and not central_pages.get("feesPdf"):
+                central_pages["feesPdf"] = fee_cfg.fees_pdf_url
+            if english_cfg.central_page and not (
+                central_pages.get("entryPage")
+                or central_pages.get("requirementsPage")
+            ):
+                central_pages["entryPage"] = english_cfg.central_page
+                central_pages["requirementsPage"] = english_cfg.central_page
+            if english_cfg.central_page_ug and not central_pages.get("entryPageUG"):
+                central_pages["entryPageUG"] = english_cfg.central_page_ug
+            if english_cfg.central_page_pg and not central_pages.get("entryPagePG"):
+                central_pages["entryPagePG"] = english_cfg.central_page_pg
+
+            central_data = await prefetch_central_pages(
+                central_config,
+                university_id=body.university_id,
+            )
+    except Exception as exc:
+        log.warning(
+            "Central-page prefetch failed for staged re-extraction uni=%s: %s",
+            body.university_id,
+            exc,
+        )
 
     # Load all requested rows in one query.
     rows = (
@@ -2273,6 +2310,7 @@ async def re_extract_staged(
                         {"url": url, "name": row.course_name or ""},
                         country=country,
                         ai_provider="openai",
+                        central_data=central_data,
                     ),
                     timeout=min(
                         120.0,
