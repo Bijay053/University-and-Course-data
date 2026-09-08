@@ -678,6 +678,8 @@ async def test_re_extract_refreshes_unchanged_fee_from_newer_canonical_page(monk
         result = response.json()["results"][0]
         assert result["updated_fields"] == []
         assert result["refreshed_evidence_fields"] == ["international_fee"]
+        assert result["made_progress"] is True
+        assert response.json()["updated"] == 1
 
         async with AsyncSessionLocal() as db:
             course = await db.get(ScrapedCourse, sc_id)
@@ -696,6 +698,30 @@ async def test_re_extract_refreshes_unchanged_fee_from_newer_canonical_page(monk
         assert fee_evidence.snippet == "2026 international fee remains A$41,000"
         assert fee_evidence.validation_status == "ok"
         assert fee_evidence.selected is True
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            unchanged_response = await client.post(
+                "/api/scrape/staged/re-extract",
+                json={
+                    "ids": [sc_id],
+                    "universityId": uni_id,
+                    "targetFields": ["international_fee"],
+                },
+            )
+
+        assert unchanged_response.status_code == 200, unchanged_response.text
+        unchanged_body = unchanged_response.json()
+        assert unchanged_body["updated"] == 0
+        unchanged_result = unchanged_body["results"][0]
+        assert unchanged_result["updated_fields"] == []
+        assert unchanged_result["refreshed_evidence_fields"] == []
+        assert unchanged_result["made_progress"] is False
+        assert unchanged_result["outcome"] == "no_progress"
+        assert unchanged_result["reason"] == (
+            "Requested target fields and selected evidence were unchanged"
+        )
     finally:
         await _cleanup(job_id)
 
@@ -785,6 +811,8 @@ async def test_re_extract_refreshes_when_equal_value_gains_selected_evidence(
         result = response.json()["results"][0]
         assert result["updated_fields"] == []
         assert result["refreshed_evidence_fields"] == ["ielts_listening"]
+        assert result["made_progress"] is True
+        assert response.json()["updated"] == 1
 
         async with AsyncSessionLocal() as db:
             refreshed = (

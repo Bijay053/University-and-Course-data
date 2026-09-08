@@ -282,13 +282,18 @@ async def _async_bulk_fix(runtime_job_id: str) -> None:
                 elif not item.get("ok"):
                     item["outcome"] = "failed"
                     failed += 1
-                elif item.get("updated_fields") or (
-                    not target_fields and item.get("refreshed_evidence_fields")
-                ):
+                elif item.get("made_progress", (
+                    bool(item.get("updated_fields"))
+                    or bool(item.get("refreshed_evidence_fields"))
+                )):
                     item["outcome"] = "completed"
                     completed += 1
                 else:
                     item["outcome"] = "no_progress"
+                    item.setdefault(
+                        "reason",
+                        "Requested target fields and selected evidence were unchanged",
+                    )
                     no_progress += 1
                 results.append(item)
 

@@ -2473,9 +2473,7 @@ async def re_extract_staged(
         # field; showing no evidence is safer than showing evidence for old data.
         # Equal normalized values also refresh when their selected source details
         # changed, so canonical newer-year pages replace stale provenance.
-        evidence_refreshed_fields = (
-            set(changed_fields) | provenance_changed_fields | force_targeted_fields
-        )
+        evidence_refreshed_fields = set(changed_fields) | provenance_changed_fields
         await refresh_evidence_for_fields(
             db,
             scraped_course_id=row.id,
@@ -2508,16 +2506,33 @@ async def re_extract_staged(
             errors += 1
             continue
 
-        results.append({
+        progress_fields = (
+            set(changed_fields) | provenance_changed_fields
+        )
+        if targeted_fields is not None:
+            progress_fields &= targeted_fields
+        made_progress = bool(progress_fields)
+        result = {
             "id": sc_id,
             "ok": True,
             "updated_fields": changed_fields,
             "refreshed_evidence_fields": sorted(evidence_refreshed_fields),
+            "progress_fields": sorted(progress_fields),
+            "made_progress": made_progress,
+            "outcome": "updated" if made_progress else "no_progress",
             "new_completeness": row.completeness,
             "extraction_passes": extraction_passes,
             "ai_provider": "openai",
-        })
-        updated += 1
+        }
+        if not made_progress:
+            result["reason"] = (
+                "Requested target fields and selected evidence were unchanged"
+                if targeted_fields is not None
+                else "Extracted values and selected evidence were unchanged"
+            )
+        results.append(result)
+        if made_progress:
+            updated += 1
 
     return {
         "total": len(body.ids),

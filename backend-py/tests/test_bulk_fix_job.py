@@ -75,6 +75,8 @@ async def test_bulk_fix_persists_post_batch_counts_and_audit_metadata(monkeypatc
                     "ok": True,
                     "updated_fields": [],
                     "refreshed_evidence_fields": ["duration"],
+                    "made_progress": False,
+                    "reason": "Requested target fields and selected evidence were unchanged",
                     "extraction_passes": 1,
                     "ai_provider": "openai",
                 },
@@ -97,6 +99,9 @@ async def test_bulk_fix_persists_post_batch_counts_and_audit_metadata(monkeypatc
     assert post_batch["results"][0]["ai_provider"] == "openai"
     assert post_batch["results"][0]["extraction_passes"] == 2
     assert post_batch["results"][1]["outcome"] == "no_progress"
+    assert post_batch["results"][1]["reason"] == (
+        "Requested target fields and selected evidence were unchanged"
+    )
     assert job.status == "completed"
     assert job.completed_at <= datetime.now(timezone.utc)
 
