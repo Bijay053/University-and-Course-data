@@ -97,9 +97,19 @@ idle check; an earlier maintenance-window check is not a sufficient fence.
 **Why:** New production scrape requests arrived between an external idle check
 and Celery restart, causing warm shutdown to exceed its transaction timeout.
 
-**How to apply:** Cancel the worker's scrape consumer, query for zero running
-jobs using the protected current database configuration, then replace
-credentials. Preserve queued work; service restart restores consumption.
+**How to apply:** Cancel the worker's scrape consumer, inspect Celery's active
+tasks over Redis for zero running scrape jobs, then replace credentials.
+Preserve queued work; service restart restores consumption.
+
+The post-rotation idle fence must not query PostgreSQL with the previous secret.
+
+**Why:** Once RDS promoted the new password, the scheduled refresh was detected
+within five minutes but its pre-restart database query failed authentication
+before it could install the new credential.
+
+**How to apply:** Fence and inspect active Celery tasks through the broker,
+which remains available during database rotation. Do not depend on the stale
+database credential anywhere before the new environment is installed.
 
 Production database environment overrides must be lexically last among systemd
 drop-ins, not only last in the base unit.

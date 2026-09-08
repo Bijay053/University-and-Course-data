@@ -149,7 +149,8 @@ def test_template_limits_secret_read_and_host_transaction_is_valid() -> None:
     assert template.count("curl --connect-timeout 2 --max-time 10") == 1
     assert template.count("timeout 150s systemctl restart uni-api-py uni-celery") == 1
     assert "control cancel_consumer scrape" in template
-    assert "ScrapeRuntimeJob.status == \"running\"" in template
+    assert "celery_app.control.inspect(timeout=10).active()" in template
+    assert 'task.get("name") == "scrape.university"' in template
     assert "control add_consumer scrape" in template
     assert "zz-database-credentials.conf" in template
     assert (
