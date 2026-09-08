@@ -79,6 +79,16 @@ exact instance and document, and constrain AssumeRole with both
 `aws:SourceAccount` and that dedicated group ARN. Keep unchanged secret
 versions restart-free.
 
+RDS-managed master secrets may omit `dbname`; credential refresh must preserve
+the database name from the root-only last-known-good connection URL.
+
+**Why:** The live managed secret carried username, password, host, and port but
+not a database name, so requiring `dbname` made the atomic refresh roll back.
+
+**How to apply:** Require the rotating connection fields from Secrets Manager.
+Use `dbname` when supplied; otherwise parse only the database path from the
+already protected rollback URL. Never log either source.
+
 The production Nginx virtual host is hostname-scoped, so a bare
 `http://127.0.0.1/` frontend smoke request can return 404 even when the public
 portal is healthy.
