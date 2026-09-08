@@ -146,3 +146,4 @@
 - [Expected-failure teardown proof](expected-failure-teardown-proof.md) — a deliberate nonzero exit can mask cleanup failure; verify resource absence independently.
 - [QUT static extraction and delivery gates](qut-static-extraction.md) — prefer the usable static payload; browser rescue is blocked, and bare “online” text is not delivery authority.
 - [Central profiles in staged re-extraction](central-profiles-staged-reextract.md) — Review → Fix must prefetch central pages; semantic parser changes must bump the English cache schema.
+- [UQ start-semester intake authority](uq-start-semester-intake.md) — UQ intake comes only from the selected program’s Drupal start_semester fact; page-wide date scanning is unsafe.
