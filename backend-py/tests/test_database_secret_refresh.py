@@ -166,6 +166,12 @@ def test_template_limits_secret_read_and_host_transaction_is_valid() -> None:
     assert '"$backup_path" <<\'PY_CONFIG\'' in template
     assert 'DATABASE_SECRET_VERSION="{version_id}"' in template
     assert 'DATABASE_REQUIRE_TLS="true"' in template
+    assert "https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem" in template
+    assert "system-and-rds-ca-bundle.pem" in template
+    assert 'SSL_CERT_FILE="/etc/university-portal/' in template
+    assert "ssl.create_default_context(cafile=sys.argv[1])" in template
+    assert "CERT_NONE" not in template
+    assert "check_hostname = False" not in template
     assert 'cmp -s "$tmp" "$env_path"' in template
     assert "Type: AWS::Scheduler::Schedule" in template
     assert "ScheduleExpression: rate(5 minutes)" in template
@@ -215,7 +221,13 @@ def test_template_limits_secret_read_and_host_transaction_is_valid() -> None:
     assert syntax.returncode == 0, syntax.stderr
     heredocs = re.findall(r"<<'([A-Z_]+)'\n(.*?)\n\s*\1", script, re.DOTALL)
     assert {name for name, _ in heredocs} == {
-        "PY_VERIFY", "PY_IDLE", "PY_BOOTSTRAP", "PY_CONFIG", "PY_SMOKE",
+        "PY_VERIFY",
+        "PY_IDLE",
+        "PY_BOOTSTRAP",
+        "PY_CA",
+        "PY_CA_COMBINED",
+        "PY_CONFIG",
+        "PY_SMOKE",
     }
     for name, source in heredocs:
         compile(textwrap.dedent(source), f"<database-refresh-{name}>", "exec")

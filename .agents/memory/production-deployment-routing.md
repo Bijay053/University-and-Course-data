@@ -112,6 +112,17 @@ database environment last.
 drop-in pointing to the root-only database environment, then daemon-reload
 before restart and compare effective process environments.
 
+RDS TLS verification on production needs AWS's RDS CA bundle in addition to the
+host OS trust store.
+
+**Why:** Python's default CA set rejected the live RDS chain as self-signed when
+strict TLS was first enabled, even though the same endpoint worked without the
+production TLS requirement.
+
+**How to apply:** Fetch the official AWS global RDS bundle over verified HTTPS,
+validate it as a CA file, combine it with the system bundle, and set
+`SSL_CERT_FILE` for both services. Never disable hostname or certificate checks.
+
 The production Nginx virtual host is hostname-scoped, so a bare
 `http://127.0.0.1/` frontend smoke request can return 404 even when the public
 portal is healthy.

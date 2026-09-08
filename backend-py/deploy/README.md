@@ -82,6 +82,9 @@ disable it.
 The document also maintains a lexically-last systemd drop-in for both services
 so older environment drop-ins cannot override the managed database credential
 file.
+It caches AWS's official global RDS CA bundle, combines it with the operating
+system trust store, and supplies that combined bundle through `SSL_CERT_FILE`;
+hostname and certificate verification remain enabled.
 
 After installing or updating the stack and confirming the SNS subscription,
 prove the end-to-end notifier and rate limit with a disposable test event:
