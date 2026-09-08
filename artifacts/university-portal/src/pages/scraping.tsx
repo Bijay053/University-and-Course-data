@@ -352,6 +352,20 @@ const FORCEABLE_FIX_FIELDS = [
   { field: "intake", label: "Intake" },
 ] as const;
 
+export function annualFeeEquivalentForDisplay(
+  fee: number,
+  duration: number | null,
+  durationTerm: string | null,
+): number | null {
+  if (!duration || duration <= 0) return null;
+  const term = (durationTerm || "year").toLowerCase();
+  const years = term.includes("month") ? duration / 12
+    : term.includes("week") ? duration / 52
+    : term.includes("semester") || term.includes("trimester") ? duration / 2
+    : duration;
+  return years >= 1 ? Math.round(fee / years) : null;
+}
+
 export function getFixResultHeading(result: {
   total: number;
   updated: number;
@@ -3375,15 +3389,10 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                             const currSym = (course.currency && _CURR_MAP[course.currency]) ? _CURR_MAP[course.currency] : (course.currency ? `${course.currency} ` : "A$");
                             const isFullCourse = (course.feeTerm || "").toLowerCase().includes("full");
                             const dur = course.duration;
-                            const durTerm = (course.durationTerm || "year").toLowerCase();
-                            let annualEquiv: number | null = null;
-                            if (isFullCourse && dur && dur > 0) {
-                              const durYears = durTerm.includes("month") ? dur / 12
-                                : durTerm.includes("week") ? dur / 52
-                                : durTerm.includes("semester") || durTerm.includes("trimester") ? dur / 2
-                                : dur;
-                              annualEquiv = Math.round(course.internationalFee / durYears);
-                            }
+                            const hasDuration = Boolean(dur && dur > 0);
+                            const annualEquiv = isFullCourse
+                              ? annualFeeEquivalentForDisplay(course.internationalFee, dur, course.durationTerm)
+                              : null;
                             return (
                               <span>
                                 {isFullCourse ? (
@@ -3402,7 +3411,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                                     ≈ {currSym}{annualEquiv.toLocaleString()}/yr
                                   </span>
                                 )}
-                                {isFullCourse && !annualEquiv && (
+                                {isFullCourse && !hasDuration && (
                                   <span className="block text-[10px] text-red-500 leading-none mt-0.5" title="Cannot compute annual equivalent — duration missing">
                                     ⚠ no duration
                                   </span>

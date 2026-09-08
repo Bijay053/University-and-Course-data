@@ -6,10 +6,23 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  annualFeeEquivalentForDisplay,
   getFixResultHeading,
   ScrapingForTest,
   type ScrapingInitialReviewState,
 } from "./scraping";
+
+describe("annualFeeEquivalentForDisplay", () => {
+  it("does not annualize full-course fees shorter than 12 months", () => {
+    expect(annualFeeEquivalentForDisplay(48_300, 8, "Month")).toBeNull();
+    expect(annualFeeEquivalentForDisplay(24_000, 51, "Week")).toBeNull();
+  });
+
+  it("annualizes full-course fees lasting at least one year", () => {
+    expect(annualFeeEquivalentForDisplay(48_000, 12, "Month")).toBe(48_000);
+    expect(annualFeeEquivalentForDisplay(96_000, 2, "Year")).toBe(48_000);
+  });
+});
 
 vi.mock("@workspace/api-client-react", () => ({
   useListUniversities: () => ({

@@ -144,9 +144,9 @@ def _apply_fee_term_override(payload: dict, recipe: dict) -> None:
 def _convert_full_course_to_annual(payload: dict) -> None:
     """Divide a Full Course total fee by duration to get the annual equivalent.
 
-    Only fires when fee_term == 'Full Course'.  For courses shorter than 1 year
-    the full-course total IS effectively the per-period fee, so we just relabel
-    it Annual without dividing (dividing by e.g. 0.5 would double the number).
+    Only fires when fee_term == 'Full Course'. Courses shorter than one year
+    retain both their original total and the Full Course term; describing an
+    unchanged eight-month total as Annual is inaccurate.
     """
     if payload.get("fee_term") != "Full Course":
         return
@@ -164,11 +164,10 @@ def _convert_full_course_to_annual(payload: dict) -> None:
         years = float(dur) / 52.0
     if years is None or years <= 0:
         return
-    # Sub-annual course: full-course fee == annual/period fee — don't inflate
+    # Sub-annual course: preserve the source total and its source period.
     if years < 1.0:
-        payload["fee_term"] = "Annual"
         log.info(
-            "[RECIPE] full_course_to_annual: duration %.2f yr < 1 — keeping %s as Annual",
+            "[RECIPE] full_course_to_annual: duration %.2f yr < 1 — preserving %s as Full Course",
             years,
             fee,
         )
