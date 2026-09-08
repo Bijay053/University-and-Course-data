@@ -171,12 +171,23 @@ def test_force_fields_are_limited_and_require_nonblank_reasons():
     valid = ReExtractBody(
         ids=[1],
         universityId=7,
-        forceFields=["international_fee"],
-        forceReasons={"international_fee": "Fee was copied from an old page"},
+        forceFields=["international_fee", "intake"],
+        forceReasons={
+            "international_fee": "Fee was copied from an old page",
+            "intake": "Months were collected from unrelated page content",
+        },
     )
     assert valid.force_reasons == {
-        "international_fee": "Fee was copied from an old page"
+        "international_fee": "Fee was copied from an old page",
+        "intake": "Months were collected from unrelated page content",
     }
+    bulk_valid = StartBulkFixBody(
+        ids=[1],
+        universityId=7,
+        forceFields=["intake"],
+        forceReasons={"intake": "Existing intake is incorrect"},
+    )
+    assert bulk_valid.force_fields == ["intake"]
     with pytest.raises(ValidationError):
         StartBulkFixBody(
             ids=[1],

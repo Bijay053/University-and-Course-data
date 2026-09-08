@@ -303,22 +303,25 @@ describe("Scraping repair reviewer", () => {
     expect(within(previewDialog).getByText(/Existing values will be overwritten/)).toBeTruthy();
     await user.click(within(previewDialog).getByLabelText("Force International Fee"));
     await user.click(within(previewDialog).getByLabelText("Force Course Location"));
+    await user.click(within(previewDialog).getByLabelText("Force Intake"));
 
     const confirmButton = within(previewDialog).getByRole("button", { name: "Confirm Fix (51)" });
     expect((confirmButton as HTMLButtonElement).disabled).toBe(true);
     const reasonInputs = within(previewDialog).getAllByLabelText(/Correction reason/);
     fireEvent.change(reasonInputs[0], { target: { value: "Published fee is outdated" } });
     fireEvent.change(reasonInputs[1], { target: { value: "Campus list is incomplete" } });
+    fireEvent.change(reasonInputs[2], { target: { value: "Intake includes unrelated months" } });
     expect((confirmButton as HTMLButtonElement).disabled).toBe(false);
     await user.click(confirmButton);
 
     await waitFor(() => expect(fixBodies).toHaveLength(1));
     expect(fixBodies[0]).toMatchObject({
-      targetFields: ["ielts_overall", "international_fee", "course_location"],
-      forceFields: ["international_fee", "course_location"],
+      targetFields: ["ielts_overall", "international_fee", "course_location", "intake"],
+      forceFields: ["international_fee", "course_location", "intake"],
       forceReasons: {
         international_fee: "Published fee is outdated",
         course_location: "Campus list is incomplete",
+        intake: "Intake includes unrelated months",
       },
     });
   }, 10_000);

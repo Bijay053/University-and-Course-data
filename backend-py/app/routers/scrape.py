@@ -2026,6 +2026,13 @@ def _targeted_reextract_fields(target_fields: list[str]) -> set[str] | None:
     return allowed
 
 
+_FORCEABLE_REEXTRACT_FIELDS = frozenset({
+    "course_location",
+    "international_fee",
+    "intake",
+})
+
+
 class ReExtractBody(BaseModel):
     """Request body for bulk AI re-extraction of specific staged courses."""
 
@@ -2047,7 +2054,7 @@ class ReExtractBody(BaseModel):
     @field_validator("force_fields")
     @classmethod
     def _validate_force_fields(cls, value: list[str]) -> list[str]:
-        allowed = {"course_location", "international_fee"}
+        allowed = _FORCEABLE_REEXTRACT_FIELDS
         if invalid := set(value) - allowed:
             raise ValueError(f"Only {sorted(allowed)} may be forceFields; got {sorted(invalid)}")
         if len(value) != len(set(value)):
@@ -2164,6 +2171,7 @@ async def re_extract_staged(
     _ONE_GO_RETRY_FIELDS = (
         "international_fee",
         "course_location",
+        "intake",
         "duration",
     )
     force_fields = set(body.force_fields)
@@ -2481,7 +2489,7 @@ class StartBulkFixBody(BaseModel):
     @field_validator("force_fields")
     @classmethod
     def _validate_force_fields(cls, value: list[str]) -> list[str]:
-        allowed = {"course_location", "international_fee"}
+        allowed = _FORCEABLE_REEXTRACT_FIELDS
         if invalid := set(value) - allowed:
             raise ValueError(f"Only {sorted(allowed)} may be forceFields; got {sorted(invalid)}")
         if len(value) != len(set(value)):

@@ -349,6 +349,7 @@ interface BulkFixJob {
 const FORCEABLE_FIX_FIELDS = [
   { field: "international_fee", label: "International Fee" },
   { field: "course_location", label: "Course Location" },
+  { field: "intake", label: "Intake" },
 ] as const;
 
 export function getFixResultHeading(result: {
@@ -3743,7 +3744,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
               </div>
 
               <div className="text-sm text-muted-foreground border-t pt-3">
-                <strong>Action:</strong> Re-extract {fixAnalysis.courses_with_url} of {fixAnalysis.total} courses using current recipe rules. OpenAI will attempt to fill missing fields and retry unresolved fee, location, or duration once.
+                <strong>Action:</strong> Re-extract {fixAnalysis.courses_with_url} of {fixAnalysis.total} courses using current recipe rules. OpenAI will attempt to fill missing fields and retry unresolved fee, location, intake, or duration once.
               </div>
 
               <div className="border-t pt-3 space-y-3">
