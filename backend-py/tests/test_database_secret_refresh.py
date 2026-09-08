@@ -92,6 +92,8 @@ def test_template_limits_secret_read_and_host_transaction_is_valid() -> None:
     assert "python=/opt/university-portal/backend-py/.venv/bin/python" in template
     assert "backend-py/venv/bin/python" not in template
     assert "DatabaseSecretArn:" in template
+    assert "ScheduleState:" in template
+    assert "State: !Ref ScheduleState" in template
     assert "[A-Za-z0-9/_+=.@!-]+" in template
     assert "Action: secretsmanager:GetSecretValue" in template
     assert "Resource: !Ref DatabaseSecretArn" in template
@@ -121,6 +123,8 @@ def test_template_limits_secret_read_and_host_transaction_is_valid() -> None:
     assert "set +x" in template
     assert "get_secret_value(" in template
     assert "SecretId=sys.argv[3]" in template
+    assert "region='${AWS::Region}'" in template
+    assert "{{ global:REGION }}" not in template
     assert 'isinstance(values["port"], (int, str))' in template
     assert 'DATABASE_SECRET_VERSION="{version_id}"' in template
     assert 'DATABASE_REQUIRE_TLS="true"' in template
