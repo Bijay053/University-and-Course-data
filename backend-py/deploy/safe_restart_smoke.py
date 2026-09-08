@@ -9,6 +9,8 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
+import shlex
 import subprocess
 import sys
 import urllib.request
@@ -17,6 +19,30 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
+
+MANAGED_DATABASE_ENV_FILE = Path("/etc/university-portal/database.env")
+_MANAGED_DATABASE_KEYS = {
+    "DATABASE_URL",
+    "DATABASE_REQUIRE_TLS",
+    "DATABASE_SECRET_VERSION",
+    "SSL_CERT_FILE",
+}
+
+
+def _load_managed_database_environment() -> None:
+    if not MANAGED_DATABASE_ENV_FILE.is_file():
+        return
+    with MANAGED_DATABASE_ENV_FILE.open(encoding="utf-8") as stream:
+        for raw_line in stream:
+            parsed = shlex.split(raw_line, comments=False, posix=True)
+            if not parsed:
+                continue
+            key, value = parsed[0].split("=", 1)
+            if key in _MANAGED_DATABASE_KEYS:
+                os.environ[key] = value
+
+
+_load_managed_database_environment()
 
 from sqlalchemy import func, select
 

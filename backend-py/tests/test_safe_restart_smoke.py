@@ -1,6 +1,8 @@
 """Focused contracts for the production-safe restart smoke command."""
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from deploy.safe_restart_smoke import (
@@ -83,6 +85,13 @@ def test_checked_in_sample_resolves_university_by_hostname() -> None:
     assert DEFAULT_COURSE_URL == (
         "https://www.torrens.edu.au/courses/business/"
         "bachelor-of-applied-business-marketing-partnership-with-ducere"
+    )
+
+
+def test_managed_database_environment_loads_before_app_imports() -> None:
+    source = Path("deploy/safe_restart_smoke.py").read_text()
+    assert source.index("_load_managed_database_environment()") < source.index(
+        "from app.database import AsyncSessionLocal"
     )
 
 
