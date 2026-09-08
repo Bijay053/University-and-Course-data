@@ -1990,6 +1990,19 @@ def _filter_resolved_reextract_warnings(
     ]
 
 
+_ENGLISH_REEXTRACT_FIELDS = frozenset({
+    "ielts_overall", "ielts_listening", "ielts_speaking", "ielts_writing",
+    "ielts_reading", "pte_overall", "pte_listening", "pte_speaking",
+    "pte_writing", "pte_reading", "toefl_overall", "toefl_listening",
+    "toefl_speaking", "toefl_writing", "toefl_reading", "cambridge_overall",
+    "duolingo_overall", "duolingo_accepted", "cambridge_accepted",
+    "pte_accepted", "toefl_accepted",
+})
+
+_REEXTRACT_FIELD_GROUPS: dict[str, set[str]] = {
+    "english_requirements": set(_ENGLISH_REEXTRACT_FIELDS),
+}
+
 _REEXTRACT_FIELD_COMPANIONS: dict[str, set[str]] = {
     "international_fee": {"fee_term", "fee_year", "currency"},
     "duration": {"duration_term"},
@@ -2015,11 +2028,14 @@ def _targeted_reextract_fields(target_fields: list[str]) -> set[str] | None:
 
     from app.models import ScrapedCourse
 
-    targets = {
-        field
-        for field in target_fields
-        if isinstance(field, str) and hasattr(ScrapedCourse, field)
-    }
+    targets: set[str] = set()
+    for field in target_fields:
+        if not isinstance(field, str):
+            continue
+        if field in _REEXTRACT_FIELD_GROUPS:
+            targets.update(_REEXTRACT_FIELD_GROUPS[field])
+        elif hasattr(ScrapedCourse, field):
+            targets.add(field)
     allowed = set(targets)
     for field in targets:
         allowed.update(_REEXTRACT_FIELD_COMPANIONS.get(field, set()))
@@ -2028,8 +2044,9 @@ def _targeted_reextract_fields(target_fields: list[str]) -> set[str] | None:
 
 _FORCEABLE_REEXTRACT_FIELDS = frozenset({
     "course_location",
+    "english_requirements",
     "international_fee",
-    "intake",
+    "intake_months",
 })
 
 
@@ -2171,10 +2188,12 @@ async def re_extract_staged(
     _ONE_GO_RETRY_FIELDS = (
         "international_fee",
         "course_location",
-        "intake",
+        "intake_months",
         "duration",
+        *_ENGLISH_REEXTRACT_FIELDS,
     )
     force_fields = set(body.force_fields)
+    force_targeted_fields = _targeted_reextract_fields(body.force_fields) or set()
     # A forced field is necessarily a persisted target, even if the caller did
     # not also send it in targetFields.
     targeted_fields = _targeted_reextract_fields([
@@ -2319,7 +2338,7 @@ async def re_extract_staged(
                 field_key
                 for field_key in _ONE_GO_RETRY_FIELDS
                 if targeted_fields is None or field_key in targeted_fields
-                if (field_key in force_fields or not getattr(row, field_key, None))
+                if (field_key in force_targeted_fields or not getattr(row, field_key, None))
                 and not payload.get(field_key)
             ]
             if not unresolved:
@@ -2417,7 +2436,7 @@ async def re_extract_staged(
         # Equal normalized values also refresh when their selected source details
         # changed, so canonical newer-year pages replace stale provenance.
         evidence_refreshed_fields = (
-            set(changed_fields) | provenance_changed_fields | force_fields
+            set(changed_fields) | provenance_changed_fields | force_targeted_fields
         )
         await refresh_evidence_for_fields(
             db,

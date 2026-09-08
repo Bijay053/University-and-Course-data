@@ -349,7 +349,8 @@ interface BulkFixJob {
 const FORCEABLE_FIX_FIELDS = [
   { field: "international_fee", label: "International Fee" },
   { field: "course_location", label: "Course Location" },
-  { field: "intake", label: "Intake" },
+  { field: "english_requirements", label: "English Requirements" },
+  { field: "intake_months", label: "Intake" },
 ] as const;
 
 export function annualFeeEquivalentForDisplay(

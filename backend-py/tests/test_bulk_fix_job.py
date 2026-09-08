@@ -171,23 +171,25 @@ def test_force_fields_are_limited_and_require_nonblank_reasons():
     valid = ReExtractBody(
         ids=[1],
         universityId=7,
-        forceFields=["international_fee", "intake"],
+        forceFields=["international_fee", "english_requirements", "intake_months"],
         forceReasons={
             "international_fee": "Fee was copied from an old page",
-            "intake": "Months were collected from unrelated page content",
+            "english_requirements": "English scores were copied from another course",
+            "intake_months": "Months were collected from unrelated page content",
         },
     )
     assert valid.force_reasons == {
         "international_fee": "Fee was copied from an old page",
-        "intake": "Months were collected from unrelated page content",
+        "english_requirements": "English scores were copied from another course",
+        "intake_months": "Months were collected from unrelated page content",
     }
     bulk_valid = StartBulkFixBody(
         ids=[1],
         universityId=7,
-        forceFields=["intake"],
-        forceReasons={"intake": "Existing intake is incorrect"},
+        forceFields=["intake_months"],
+        forceReasons={"intake_months": "Existing intake is incorrect"},
     )
-    assert bulk_valid.force_fields == ["intake"]
+    assert bulk_valid.force_fields == ["intake_months"]
     with pytest.raises(ValidationError):
         StartBulkFixBody(
             ids=[1],
@@ -202,6 +204,20 @@ def test_force_fields_are_limited_and_require_nonblank_reasons():
             forceFields=["course_location"],
             forceReasons={"course_location": "   "},
         )
+
+
+def test_english_force_group_targets_only_stored_english_fields():
+    from app.routers.scrape import (
+        _ENGLISH_REEXTRACT_FIELDS,
+        _targeted_reextract_fields,
+    )
+
+    targeted = _targeted_reextract_fields(["english_requirements"])
+
+    assert targeted == set(_ENGLISH_REEXTRACT_FIELDS)
+    assert "international_fee" not in targeted
+    assert "course_location" not in targeted
+    assert "intake_months" not in targeted
 
 
 def test_fee_target_does_not_allow_unrelated_reextract_fields():
