@@ -29,7 +29,6 @@ other uni in the fleet.
 """
 from __future__ import annotations
 
-import html as html_lib
 import json
 import logging
 import re
@@ -37,6 +36,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from app.services.scraper.http_fetcher import fetch_html_scrape_do
+from app.services.scraper.rendered_json import parse_rendered_json
 
 log = logging.getLogger("uniportal.scraper.latrobe_json")
 
@@ -114,13 +114,7 @@ def _decode_json_response(raw: str) -> dict[str, Any]:
     present. La Trobe needs rendered requests to pass Cloudflare, so unwrap the
     browser representation before giving up.
     """
-    try:
-        doc = json.loads(raw)
-    except (json.JSONDecodeError, ValueError):
-        match = re.search(r"<pre\b[^>]*>(.*?)</pre>", raw, re.IGNORECASE | re.DOTALL)
-        if not match:
-            raise
-        doc = json.loads(html_lib.unescape(match.group(1)))
+    doc = parse_rendered_json(raw)
 
     if not isinstance(doc, dict):
         raise ValueError("La Trobe detail response must be a JSON object")

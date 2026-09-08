@@ -39,6 +39,8 @@ import os
 import re
 from typing import Any, Callable
 
+from app.services.scraper.rendered_json import parse_rendered_json
+
 log = logging.getLogger(__name__)
 
 # ── Shared field patterns ─────────────────────────────────────────────────────
@@ -1090,7 +1092,7 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
     # render=false → residential proxy only, no JS, much cheaper than render=true.
     # render=true  → real headless Chrome; required when static proxy also gets ROTATION_FAILED.
     #   When Chrome opens a JSON URL it wraps it in <html><body><pre>{…}</pre></body></html>;
-    #   _unwrap_chrome_json() strips that wrapper before JSON-parsing.
+    #   parse_rendered_json() strips that wrapper before JSON-parsing.
     _use_scrape_do: bool = bool(getattr(cfg, "fetch_via_scrape_do", False))
     _scrape_do_render: bool = _use_scrape_do and bool(getattr(cfg, "scrape_do_render", False))
     _scrape_do_token: str = os.environ.get("SCRAPE_DO_TOKEN", "") if _use_scrape_do else ""
@@ -1101,21 +1103,6 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
         )
         _use_scrape_do = False
         _scrape_do_render = False
-
-    def _unwrap_chrome_json(text: str) -> str:
-        """Strip Chrome's <html><body><pre>…</pre> wrapper when it renders a JSON URL.
-
-        When scrape.do render=true opens a bare JSON URL, Chrome displays it as:
-            <html><head>…</head><body><pre style="…">{…json…}</pre></body></html>
-        We extract only the <pre> content so the caller gets raw JSON.
-        Returns text unchanged if no <pre> wrapper is found.
-        """
-        from html import unescape as _html_unescape
-        import re as _re
-        m = _re.search(r"<pre[^>]*>([\s\S]*?)</pre>", text, _re.I)
-        if m:
-            return _html_unescape(m.group(1)).strip()
-        return text
 
     # additional_urls: call each URL in turn with the same config; merge results.
     _all_api_urls = [cfg.url] + list(getattr(cfg, "additional_urls", []))
@@ -1150,7 +1137,6 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
                 # residential proxy to bypass Cloudflare on the API endpoint itself.
                 resp = None
                 _scrape_do_text: str | None = None
-                _used_scrape_do_render = False
                 try:
                     if _use_scrape_do:
                         # Build the full target URL with all query params merged, then
@@ -1163,7 +1149,6 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
                         _target_url = str(_req_obj.url)
                         from app.services.scraper.http_fetcher import fetch_html_scrape_do
 
-                        _used_scrape_do_render = _scrape_do_render
                         _scrape_do_text = await fetch_html_scrape_do(
                             _target_url,
                             render=_scrape_do_render,
@@ -1224,14 +1209,10 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
                         if _scrape_do_text is not None
                         else resp.text
                     )
-                    # When scrape.do render=true opens a JSON URL, Chrome wraps the
-                    # content in <html><body><pre>…</pre></body></html>.  Strip it.
-                    if _used_scrape_do_render:
-                        _raw_text = _unwrap_chrome_json(_raw_text)
                     _strip_prefix = getattr(cfg, "strip_response_prefix", None)
                     if _strip_prefix and _raw_text.startswith(_strip_prefix):
                         _raw_text = _raw_text[len(_strip_prefix):]
-                    data = json.loads(_raw_text)
+                    data = parse_rendered_json(_raw_text)
                 except Exception as exc:
                     _response_text = (
                         _scrape_do_text

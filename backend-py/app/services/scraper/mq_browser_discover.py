@@ -58,23 +58,15 @@ accepts (the user's local machine, the prod droplet, etc.)::
 from __future__ import annotations
 
 import asyncio
-from html import unescape as html_unescape
 import json
 import logging
 import re
 from urllib.parse import urlparse
 
 from app.services.scraper.challenge_shell import is_challenge_shell
+from app.services.scraper.rendered_json import parse_rendered_json
 
 log = logging.getLogger(__name__)
-
-
-def _unwrap_rendered_json(text: str) -> str:
-    """Strip the HTML ``<pre>`` wrapper Chrome adds around JSON responses."""
-    match = re.search(r"<pre[^>]*>([\s\S]*?)</pre>", text, re.IGNORECASE)
-    if match:
-        return html_unescape(match.group(1)).strip()
-    return text
 
 
 def _safe_render_failure_summary(failure: dict[str, object] | None) -> str:
@@ -107,7 +99,7 @@ def _direct_fallback_failure(body: str, status_code: int) -> str | None:
     if is_challenge_shell(body):
         return "direct HTTP fallback returned an anti-bot challenge"
     try:
-        json.loads(_unwrap_rendered_json(body))
+        parse_rendered_json(body)
     except (TypeError, ValueError):
         return "direct HTTP fallback returned a non-JSON response"
     return None
@@ -716,7 +708,7 @@ async def _discover_from_funnelback_api(
             raise MqEnrichmentCoverageError(message)
 
         try:
-            fb_data = json.loads(_unwrap_rendered_json(fb_body))
+            fb_data = parse_rendered_json(fb_body)
             page_results = (
                 fb_data
                 .get("response", {})
