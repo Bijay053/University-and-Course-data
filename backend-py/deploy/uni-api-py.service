@@ -11,7 +11,7 @@ EnvironmentFile=-/etc/university-portal/openai.env
 EnvironmentFile=/opt/university-portal/backend-py/.release.env
 EnvironmentFile=-/etc/university-portal/snapshot-storage.env
 EnvironmentFile=/etc/university-portal/database.env
-ExecStart=/opt/university-portal/backend-py/venv/bin/gunicorn \
+ExecStart=/opt/university-portal/backend-py/.venv/bin/gunicorn \
     app.main:app -w 4 -k uvicorn.workers.UvicornWorker -b 127.0.0.1:8000 --timeout 120 \
     --access-logfile - --error-logfile -
 Restart=always

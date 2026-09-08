@@ -11,7 +11,7 @@ EnvironmentFile=-/etc/university-portal/openai.env
 EnvironmentFile=/opt/university-portal/backend-py/.release.env
 EnvironmentFile=-/etc/university-portal/snapshot-storage.env
 EnvironmentFile=/etc/university-portal/database.env
-ExecStart=/opt/university-portal/backend-py/venv/bin/celery \
+ExecStart=/opt/university-portal/backend-py/.venv/bin/celery \
     -A app.tasks.celery_app worker --concurrency=8 --loglevel=info -Q scrape
 Restart=always
 RestartSec=5

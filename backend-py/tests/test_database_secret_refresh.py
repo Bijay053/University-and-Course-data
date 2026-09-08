@@ -89,6 +89,8 @@ def test_refresh_client_failure_is_sanitized() -> None:
 
 def test_template_limits_secret_read_and_host_transaction_is_valid() -> None:
     template = (DEPLOY_DIR / "database-secret-rotation-iam.yaml").read_text()
+    assert "python=/opt/university-portal/backend-py/.venv/bin/python" in template
+    assert "backend-py/venv/bin/python" not in template
     assert "DatabaseSecretArn:" in template
     assert "[A-Za-z0-9/_+=.@!-]+" in template
     assert "Action: secretsmanager:GetSecretValue" in template
@@ -160,6 +162,8 @@ def test_every_database_engine_uses_certificate_verifying_tls() -> None:
 def test_services_load_generated_database_environment_last() -> None:
     for service in ("uni-api-py.service", "uni-celery.service"):
         source = (DEPLOY_DIR / service).read_text()
+        assert "ExecStart=/opt/university-portal/backend-py/.venv/bin/" in source
+        assert "backend-py/venv/bin/" not in source
         files = [
             line.split("=", 1)[1]
             for line in source.splitlines()
