@@ -16,6 +16,7 @@ import uuid
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from sqlalchemy import func, select
 
@@ -27,11 +28,12 @@ from app.release_info import UNKNOWN_RELEASE, get_release_revision
 ACTIVE_STATUSES = ("queued", "running", "awaiting_approval")
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RELEASE_ENV_FILE = REPO_ROOT / "backend-py" / ".release.env"
-DEFAULT_UNIVERSITY_ID = 22
+DEFAULT_UNIVERSITY_ID = None
 DEFAULT_COURSE_URL = (
     "https://www.torrens.edu.au/courses/business/"
     "bachelor-of-applied-business-marketing-partnership-with-ducere"
 )
+DEFAULT_EXPECTED_SKIP_REASON = "domestic_only"
 
 
 class SmokeFailure(RuntimeError):
@@ -46,7 +48,10 @@ def validate_idle_counts(counts: Mapping[str, int]) -> None:
 
 
 def validate_done_payload(
-    payload: Mapping[str, Any] | None, *, staged_rows: int = 0
+    payload: Mapping[str, Any] | None,
+    *,
+    staged_rows: int = 0,
+    expected_skip_reason: str = DEFAULT_EXPECTED_SKIP_REASON,
 ) -> None:
     if not payload:
         raise SmokeFailure("sample produced no DONE payload")
@@ -61,8 +66,11 @@ def validate_done_payload(
             f"(totalFound={total}, skipped={skipped}, imported={imported}, "
             f"errors={errors}, staged_rows={staged_rows})"
         )
-    if not isinstance(reasons, Mapping) or dict(reasons) != {"online_only": 1}:
-        raise SmokeFailure("DONE payload lacks canonical online_only=1")
+    expected_reasons = {expected_skip_reason: 1}
+    if not isinstance(reasons, Mapping) or dict(reasons) != expected_reasons:
+        raise SmokeFailure(
+            f"DONE payload lacks canonical {expected_skip_reason}=1"
+        )
 
 
 def _run(command: list[str], *, timeout: float = 20) -> str:
@@ -212,6 +220,39 @@ async def _create_and_dispatch(university_id: int, course_url: str) -> str:
     return job_id
 
 
+async def _resolve_university_id(
+    explicit_university_id: int | None, course_url: str
+) -> int:
+    if explicit_university_id is not None:
+        return explicit_university_id
+    course_host = (urlparse(course_url).hostname or "").lower().removeprefix("www.")
+    if not course_host:
+        raise SmokeFailure("sample course URL has no hostname")
+    async with AsyncSessionLocal() as db:
+        universities = (await db.execute(select(University))).scalars().all()
+    matches = []
+    for university in universities:
+        hosts = {
+            (urlparse(value).hostname or "").lower().removeprefix("www.")
+            for value in (university.scrape_url, university.website)
+            if value
+        }
+        if any(
+            course_host == host
+            or course_host.endswith("." + host)
+            or host.endswith("." + course_host)
+            for host in hosts
+            if host
+        ):
+            matches.append(university.id)
+    if len(matches) != 1:
+        raise SmokeFailure(
+            f"sample course hostname matched {len(matches)} universities; "
+            "pass --university-id explicitly"
+        )
+    return matches[0]
+
+
 async def _wait_for_done(
     job_id: str, timeout_seconds: int
 ) -> tuple[Mapping[str, Any], int]:
@@ -263,7 +304,8 @@ async def _main(args: argparse.Namespace) -> None:
 
     # Re-check immediately before the first write to close the long preflight gap.
     validate_idle_counts(await _active_counts())
-    job_id = await _create_and_dispatch(args.university_id, args.course_url)
+    university_id = await _resolve_university_id(args.university_id, args.course_url)
+    job_id = await _create_and_dispatch(university_id, args.course_url)
     payload, staged_rows = await _wait_for_done(job_id, args.timeout_seconds)
     validate_done_payload(payload, staged_rows=staged_rows)
     print(f"safe restart smoke passed: release={release} job_id={job_id}")

@@ -264,11 +264,11 @@ cd /opt/university-portal/backend-py
 PYTHONPATH=. python deploy/safe_restart_smoke.py
 ```
 
-The default sample is Torrens university ID 22 and its known online-only
-Bachelor of Applied Business Marketing (Ducere partnership) page.
-`--university-id` and
-`--course-url` remain available together if that checked-in sample must be
-replaced deliberately.
+The default sample is Torrens' known online-only Bachelor of Applied Business
+Marketing (Ducere partnership) page. The command resolves its university by
+hostname so database ID reordering cannot target another institution.
+`--university-id` and `--course-url` remain available if that checked-in sample
+must be replaced deliberately.
 
 The command is read-only first. It aborts unless queued, running, and
 awaiting-approval scrape counts are all zero; Git/release identity, both
@@ -276,4 +276,4 @@ systemd units, API health, Celery ping, the university, and the sample's HTML
 content type are valid. It then queues exactly one targeted ordinary-HTML
 sample with resume checkpoints disabled and waits for its persisted DONE event.
 Success requires one real attempted course, one policy skip, canonical
-`online_only=1`, no staged row, and no legacy `rejected:_online_only` key.
+`domestic_only=1`, and no staged row.

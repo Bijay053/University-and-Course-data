@@ -4048,8 +4048,8 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         "status": "error",
                         "error": _dom_msg,
                         "summary": summary,
-                        "errors": errors,
-                        "staged": staged,
+                        "errors": summary.get("errors", 0),
+                        "staged": summary.get("staged", 0),
                     }
                 else:
                     log.warning(

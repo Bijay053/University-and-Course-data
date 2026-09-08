@@ -5,6 +5,7 @@ import pytest
 
 from deploy.safe_restart_smoke import (
     DEFAULT_COURSE_URL,
+    DEFAULT_EXPECTED_SKIP_REASON,
     DEFAULT_UNIVERSITY_ID,
     SmokeFailure,
     resolve_expected_release,
@@ -47,13 +48,14 @@ def test_zero_work_or_non_skip_sample_fails(payload: dict | None) -> None:
         validate_done_payload(payload)
 
 
-def test_accepts_exact_canonical_online_only_done_payload() -> None:
+def test_accepts_exact_canonical_default_policy_skip_payload() -> None:
+    assert DEFAULT_EXPECTED_SKIP_REASON == "domestic_only"
     validate_done_payload(
         {
             "totalFound": 1,
             "imported": 0,
             "skipped": 1,
-            "skip_reasons": {"online_only": 1},
+            "skip_reasons": {"domestic_only": 1},
         }
     )
 
@@ -64,7 +66,7 @@ def test_rejects_staged_rows_errors_or_extra_skip_reasons() -> None:
         "imported": 0,
         "skipped": 1,
         "errors": 0,
-        "skip_reasons": {"online_only": 1},
+        "skip_reasons": {"domestic_only": 1},
     }
     with pytest.raises(SmokeFailure, match="staged_rows=1"):
         validate_done_payload(clean, staged_rows=1)
@@ -72,12 +74,12 @@ def test_rejects_staged_rows_errors_or_extra_skip_reasons() -> None:
         validate_done_payload({**clean, "errors": 1})
     with pytest.raises(SmokeFailure, match="canonical"):
         validate_done_payload(
-            {**clean, "skip_reasons": {"online_only": 1, "parser_error": 1}}
+            {**clean, "skip_reasons": {"domestic_only": 1, "parser_error": 1}}
         )
 
 
-def test_checked_in_sample_is_one_explicit_ordinary_course_url() -> None:
-    assert DEFAULT_UNIVERSITY_ID == 22
+def test_checked_in_sample_resolves_university_by_hostname() -> None:
+    assert DEFAULT_UNIVERSITY_ID is None
     assert DEFAULT_COURSE_URL == (
         "https://www.torrens.edu.au/courses/business/"
         "bachelor-of-applied-business-marketing-partnership-with-ducere"
