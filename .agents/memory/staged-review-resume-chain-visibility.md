@@ -17,10 +17,22 @@ This looks like data loss to an operator (e.g. "122 staged, 59 skipped, rest
 missing out of 409" when the true total staged was 350 across 3 job_ids).
 
 **How to apply:** when building a review/list surface for scraped_courses
-tied to a job, scope the query by the job's `university_id` + `status`
-(e.g. `pending`), not by exact `scrape_job_id` equality — unless the surface
-is explicitly a historical/per-run audit view (e.g. the runs-history list's
-per-job `stagedCount`), where per-job_id counts are correct and intentional.
+tied to a job, resolve the explicit retry/resume ancestry and count pending
+rows across that bounded chain. Do not include every older pending run for the
+university, and do not use only the newest child's own imported count. A
+zero-import failed continuation can still have a valid parent review set.
+Per-job counts remain correct for explicitly historical/audit surfaces.
+
+Never age-delete pending rows merely because their runtime job is terminal.
+Known completed/failed/stopped jobs can still own operator review. Fresh
+staging should replace only the same canonical course URL and preserve
+unrelated rows; broad cleanup is limited to true rows whose runtime job no
+longer exists.
+
+**Why:** a completed full scrape's pending rows were deleted by a ten-minute
+cleanup before a one-course continuation ran. The child then imported zero,
+and child-only UI gating hid the surviving parent review even though the
+continuation-chain API could count it.
 
 Diagnostic pattern: compare `scrape_runtime_jobs.total_found` /
 `.imported` / `.skipped` for the job (these should sum correctly) against
