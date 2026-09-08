@@ -7,10 +7,11 @@ import pytest
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 DEPLOY_DIR = BACKEND_ROOT / "deploy"
-GENERAL_ENV = "/root/University-and-Course-data/backend-py/.env"
-RELEASE_ENV = "/root/University-and-Course-data/backend-py/.release.env"
+GENERAL_ENV = "/opt/university-portal/backend-py/.env"
+RELEASE_ENV = "/opt/university-portal/backend-py/.release.env"
 OPENAI_ENV = "-/etc/university-portal/openai.env"
 SNAPSHOT_ENV = "-/etc/university-portal/snapshot-storage.env"
+DATABASE_ENV = "/etc/university-portal/database.env"
 
 
 def _environment_files(service_name: str) -> list[str]:
@@ -31,6 +32,7 @@ def test_service_loads_authoritative_release_environment_last(
         OPENAI_ENV,
         RELEASE_ENV,
         SNAPSHOT_ENV,
+        DATABASE_ENV,
     ]
 
 

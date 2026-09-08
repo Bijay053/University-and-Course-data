@@ -14,6 +14,57 @@ in `../README.md`.
 | `openai-parameter-store-iam.yaml` | One-time least-privilege IAM and KMS setup |
 | `rotate_snapshot_storage_via_parameter_store.py` | Routine snapshot credential rotation from a trusted deployment workspace |
 | `snapshot-parameter-store-iam.yaml` | One-time least-privilege snapshot IAM, KMS, and fixed SSM document setup |
+| `refresh_database_credentials_via_secrets_manager.py` | Requests the fixed host-side refresh of the RDS-managed database credential |
+| `database-secret-rotation-iam.yaml` | One-time least-privilege fixed-secret and SSM-document IAM setup |
+
+## Refresh the RDS-managed database credential
+
+`DATABASE_URL` is not a deployment input on production. `.env` holds
+non-secret, general application defaults and `.release.env` holds only immutable
+release metadata. Both services load `/etc/university-portal/database.env`
+last; it is a root-only (`0600`) generated file containing the active database
+URL and must never be committed, copied into either repository environment
+file, or edited manually.
+
+Deploy `database-secret-rotation-iam.yaml` once with the **exact ARN** of the
+existing RDS-managed master secret and the production instance ID. The instance
+role receives only `secretsmanager:GetSecretValue` on that ARN. The deployment
+identity cannot read the secret and can only invoke the fixed
+`university-portal-database-credential-refresh` SSM document for that
+instance—do not add wildcard Secrets Manager or arbitrary Run Command access.
+The stack also creates a fixed EventBridge Scheduler schedule that checks the configured
+secret every five minutes. An unchanged secret version is a no-op; a new
+version runs the atomic restart and smoke transaction below.
+
+### First installation (required order)
+
+The database environment is intentionally mandatory. For the first cutover,
+copy both updated unit files and run `systemctl daemon-reload`, but **do not
+restart either service yet**. The still-running old API retains the last
+known-good URL in its process environment. Then invoke the fixed refresh command
+below. The document first proves both loaded unit definitions require
+`database.env`, securely captures the running API URL as rollback material when
+the file does not exist yet, creates the managed file, and only then restarts
+both services. If any check fails, it restores that captured URL and starts both
+new units with the last-known-good configuration.
+
+After RDS rotates its managed secret, invoke the refresh from a trusted
+deployment workspace:
+
+```bash
+python backend-py/deploy/refresh_database_credentials_via_secrets_manager.py \
+  --instance-id "$UNIVERSITY_PORTAL_INSTANCE_ID" \
+  --region ap-south-1
+```
+
+No password is accepted by this command, passed as an SSM parameter, printed,
+or placed in command history. On the host, the fixed document reads the secret
+directly, atomically replaces `database.env`, restarts API and Celery together,
+checks service health and effective process configuration, then runs a real
+TLS `SELECT 1`. Any failure restores the last-known-good file and restarts both
+services before returning a sanitized operational error. Application engines
+always use certificate-verifying PostgreSQL TLS; URL `sslmode` flags cannot
+disable it.
 
 ## Rotate the OpenAI fallback routinely
 
@@ -145,12 +196,12 @@ previous environment and drop-ins and restarts both services.
 ## Record the deployed release
 
 Both application services require
-`/root/University-and-Course-data/backend-py/.release.env`. Create it from the
+`/opt/university-portal/backend-py/.release.env`. Create it from the
 immutable revision being deployed, after checking out that revision and before
 restarting either service:
 
 ```bash
-cd /root/University-and-Course-data
+cd /opt/university-portal
 
 # A packaging pipeline that does not include .git must export RELEASE_REVISION
 # to the immutable commit/build revision before running these commands.
@@ -174,6 +225,10 @@ After copying the service and nginx files:
 ```bash
 systemctl daemon-reload
 systemctl enable uni-api-py uni-celery
+
+# On the first database-credential cutover, run the fixed refresh command from
+# the section above here. It creates the mandatory database.env before restart.
+test -s /etc/university-portal/database.env
 
 smoke_since="$(date --iso-8601=seconds)"
 systemctl restart uni-api-py uni-celery
@@ -205,7 +260,7 @@ is supported as long as its deployment pipeline supplies `RELEASE_REVISION`.
 Before a planned production restart, run the checked-in smoke command:
 
 ```bash
-cd /root/University-and-Course-data/backend-py
+cd /opt/university-portal/backend-py
 PYTHONPATH=. python deploy/safe_restart_smoke.py
 ```
 

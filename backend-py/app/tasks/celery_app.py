@@ -196,8 +196,12 @@ async def _reset_via_asyncpg(url: str) -> int:
     """Run the ghost-job reset using a given asyncpg URL."""
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+    from app.database import postgres_tls_connect_args
 
-    _engine = create_async_engine(url, pool_size=1, max_overflow=0, future=True)
+    _engine = create_async_engine(
+        url, pool_size=1, max_overflow=0, future=True,
+        connect_args=postgres_tls_connect_args(),
+    )
     try:
         _Session = async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
         async with _Session() as db:
@@ -211,40 +215,23 @@ async def _reset_via_asyncpg(url: str) -> int:
 async def _reset_ghost_running_jobs() -> int:
     """Mark all scrape_runtime_jobs rows stuck in status='running' as failed.
 
-    Tries the configured DATABASE_URL first; if DNS resolution fails (common
-    when the .env has a cloud DB URL that is unreachable from the server),
-    falls back to the local 127.0.0.1 credentials baked into config.py.
-
     Returns the number of rows reset.
     """
     from app.config import settings
 
-    primary_url = settings.database_url
-
-    # Attempt 1: use the configured URL
-    try:
-        return await _reset_via_asyncpg(primary_url)
-    except OSError as dns_exc:
-        # DNS / network unreachable — fall through to local fallback
-        log.warning("worker_ready: primary DB unreachable (%s) — trying 127.0.0.1 fallback", dns_exc)
-    except Exception as exc:
-        log.warning("worker_ready: primary DB attempt failed (%s) — trying 127.0.0.1 fallback", exc)
-
-    # Attempt 2: local PostgreSQL via 127.0.0.1 (works on the DigitalOcean host
-    # when the .env DATABASE_URL is a cloud endpoint that doesn't resolve locally).
-    # Credentials match the server_default in config.py.
-    fallback_url = (
-        "postgresql+asyncpg://uniportal:Bij%40y12345@127.0.0.1:5432/university_portal"
-    )
-    return await _reset_via_asyncpg(fallback_url)
+    return await _reset_via_asyncpg(settings.database_url)
 
 
 async def _check_job_status_single(job_id: str) -> str | None:
     """Return the DB status of a single scrape_runtime_jobs row, or None."""
     from sqlalchemy import text as _text2
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+    from app.database import postgres_tls_connect_args
     _url = settings.database_url
-    _engine = create_async_engine(_url, pool_size=1, max_overflow=0, future=True)
+    _engine = create_async_engine(
+        _url, pool_size=1, max_overflow=0, future=True,
+        connect_args=postgres_tls_connect_args(),
+    )
     try:
         _Sess = async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
         async with _Sess() as _db:

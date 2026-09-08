@@ -64,18 +64,18 @@ fixed-purpose document, fetch that version explicitly, lock backup/apply/
 verify/rollback as one host transaction, and check current-version equality
 both before and after the service smoke test.
 
-Production RDS uses an AWS-managed master secret, while API and Celery currently
-read a copied `DATABASE_URL` from the host `.env`; `.release.env` carries release
-identity only. The connection URL must explicitly retain `ssl=require`.
+Automatic RDS credential refresh should use EventBridge Scheduler for sub-30-
+minute checks; State Manager associations do not support a five-minute rate.
+Bind the scheduler trust to its exact SourceArn and account.
 
-**Why:** A managed password change left the copied host credential stale, and
-RDS began rejecting non-TLS connections. Celery consumed tasks but could not
-claim their database rows, so the UI left them appearing indefinitely queued.
+**Why:** State Manager rejects or cannot honor `rate(5 minutes)`, and a scheduler
+role trusted only by the service principal lets unrelated schedules trigger the
+fixed production restart document.
 
-**How to apply:** Diagnose worker-idle/queued mismatches by checking claim errors
-before queue capacity. Recover the active RDS secret only inside the host,
-validate TLS before replacing `.env` atomically, then restart both services and
-redispatch each proven-orphaned job once behind the database claim guard.
+**How to apply:** Use a Scheduler universal SSM SendCommand target, scope its
+execution role to the exact instance and document, and constrain AssumeRole with
+both `aws:SourceAccount` and the exact schedule `aws:SourceArn`. Keep unchanged
+secret versions restart-free.
 
 The production Nginx virtual host is hostname-scoped, so a bare
 `http://127.0.0.1/` frontend smoke request can return 404 even when the public

@@ -5,12 +5,13 @@ After=network.target postgresql.service redis-server.service
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/root/University-and-Course-data/backend-py
-EnvironmentFile=/root/University-and-Course-data/backend-py/.env
+WorkingDirectory=/opt/university-portal/backend-py
+EnvironmentFile=/opt/university-portal/backend-py/.env
 EnvironmentFile=-/etc/university-portal/openai.env
-EnvironmentFile=/root/University-and-Course-data/backend-py/.release.env
+EnvironmentFile=/opt/university-portal/backend-py/.release.env
 EnvironmentFile=-/etc/university-portal/snapshot-storage.env
-ExecStart=/root/University-and-Course-data/backend-py/venv/bin/gunicorn \
+EnvironmentFile=/etc/university-portal/database.env
+ExecStart=/opt/university-portal/backend-py/venv/bin/gunicorn \
     app.main:app -w 4 -k uvicorn.workers.UvicornWorker -b 127.0.0.1:8000 --timeout 120 \
     --access-logfile - --error-logfile -
 Restart=always

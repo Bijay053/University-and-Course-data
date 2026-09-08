@@ -25,8 +25,8 @@ def _normalise_db_url(raw: str) -> str:
     1. Force the ``postgresql+asyncpg://`` driver prefix.
     2. Strip query parameters that libpq accepts but asyncpg does not
        (``sslmode``, ``channel_binding``). Replit's DATABASE_URL ships with
-       ``?sslmode=require`` which would crash asyncpg; we drop it (asyncpg
-       negotiates SSL on its own with hosted Postgres providers).
+        ``?sslmode=require`` which would crash asyncpg). TLS itself is
+        enforced by the SSL context supplied at every engine creation site.
     """
     from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -49,10 +49,11 @@ class Settings(BaseSettings):
         default_factory=lambda: _normalise_db_url(
             os.environ.get(
                 "DATABASE_URL",
-                "postgresql+asyncpg://uniportal:Bij%40y12345@127.0.0.1:5432/university_portal",
+                "postgresql+asyncpg://localhost/university_portal",
             )
         )
     )
+    database_require_tls: bool = False
     redis_url: str = Field(default="redis://localhost:6379/0")
     gemini_api_key: str = Field(default="")
     gemini_model: str = Field(default="gemini-2.5-flash-lite")
