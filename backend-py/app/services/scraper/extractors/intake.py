@@ -225,6 +225,51 @@ def _normalise_month(raw: str) -> str | None:
     return None
 
 
+def _from_uq_drupal_settings(
+    html: str,
+    url: str,
+) -> tuple[list[str], int | None, str] | None:
+    """Read UQ's authoritative ``uqGtmInitial.start_semester`` value.
+
+    UQ program pages contain many unrelated dates in navigation, application
+    links, scholarship content, and academic-calendar copy.  The rendered
+    course facts card is backed by a server-rendered Drupal settings document:
+
+        {"uqGtmInitial": {"start_semester": "Semester 1 (22 Feb, 2027)"}}
+
+    Only this field represents the selected program/year/audience combination.
+    """
+    import json
+    from urllib.parse import urlparse
+
+    host = (urlparse(url or "").hostname or "").lower()
+    if host != "study.uq.edu.au":
+        return None
+
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html or "", "html.parser")
+        node = soup.find(
+            "script",
+            attrs={"data-drupal-selector": "drupal-settings-json"},
+        )
+        if node is None:
+            return None
+        settings = json.loads(node.get_text() or "{}")
+        raw = compact(
+            str((settings.get("uqGtmInitial") or {}).get("start_semester") or "")
+        )
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+
+    parsed = _classify_intake_value(raw)
+    if not parsed:
+        return None
+    months, day = parsed
+    return months, day, raw
+
+
 def _classify_intake_value(value: str) -> tuple[list[str], int | None] | None:
     """Parse months (and a leading day-of-month, if present) from a raw
     label-value string. Returns ``(months, day)`` or ``None`` when no
@@ -1155,6 +1200,35 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
     course listings for BOTH Semester 1 AND Semester 2, ensuring that
     programmes with mid-year intake are not reported as February-only.
     """
+    from urllib.parse import urlparse as _up
+
+    _host = (_up(url).hostname or "").lower()
+
+    # UQ's Drupal settings value backs the visible "Start semester" course
+    # fact and is authoritative for the selected year + international audience.
+    # Never let generic regex scanning replace it with unrelated page dates.
+    if _host == "study.uq.edu.au":
+        _uq_intake = _from_uq_drupal_settings(html, url)
+        if _uq_intake:
+            _uq_months, _uq_day, _uq_raw = _uq_intake
+            return [
+                ExtractionResult(
+                    field_key="intake_months",
+                    value=_uq_months,
+                    normalized={
+                        "intake_months": _uq_months,
+                        "intake_days": _uq_day,
+                    },
+                    confidence=0.99,
+                    snippet=f"uq.start_semester: {_uq_raw}",
+                    method="intake.uq_drupal_settings",
+                )
+            ]
+        # A UQ program page without this selected-program fact has no safe
+        # intake source. Page-wide dates are overwhelmingly application and
+        # calendar content, so fail closed rather than inventing intakes.
+        return []
+
     # BCU structural pre-pass — reads the 'Start date' span directly from
     # the course facts panel div.course__key-info__inner.  Runs BEFORE the
     # generic regex cascade to prevent extra month tokens from testimonials,
@@ -1191,8 +1265,6 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
         ]
 
     results = await _extract_raw(html, url)
-    from urllib.parse import urlparse as _up
-
     _host = (_up(url).netloc or "").lower()
     if results and _host.endswith(".ac.nz"):
         from app.services.scraper.extractors._text import compact, html_to_text

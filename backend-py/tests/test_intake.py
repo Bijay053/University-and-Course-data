@@ -343,6 +343,60 @@ def test_waikato_explicit_december_trimester_remains_valid():
     assert out[0].method == "intake.waikato_trimesters"
 
 
+def test_uq_reads_only_selected_program_start_semester_from_drupal_settings():
+    html = """
+      <section>Applications close in April, October and December.</section>
+      <script type="application/json"
+              data-drupal-selector="drupal-settings-json">
+        {
+          "uqGtmInitial": {
+            "program_location": "Gatton",
+            "start_semester": "Semester 1 (22 Feb, 2027)",
+            "program_code": "2378"
+          }
+        }
+      </script>
+      <footer>The academic calendar is updated in January.</footer>
+    """
+
+    out = _run(
+        intake.extract(
+            html,
+            "https://study.uq.edu.au/study-options/programs/"
+            "bachelor-veterinary-science-honours-2378"
+            "?year=2027&studentType=international",
+        )
+    )
+
+    assert out
+    assert out[0].normalized == {
+        "intake_months": ["February"],
+        "intake_days": 22,
+    }
+    assert out[0].method == "intake.uq_drupal_settings"
+
+
+def test_uq_without_selected_program_start_semester_fails_closed():
+    html = """
+      <script type="application/json"
+              data-drupal-selector="drupal-settings-json">
+        {"uqGtmInitial": {"program_code": "9999"}}
+      </script>
+      <section>Applications close in April and October.</section>
+      <footer>Semester 1 calendar published in January.</footer>
+    """
+
+    out = _run(
+        intake.extract(
+            html,
+            "https://study.uq.edu.au/study-options/programs/example-9999"
+            "?year=2027&studentType=international",
+        )
+    )
+
+    assert out == []
+
+
 # ── Issue 3 regression: PGCE/PGCert tier detection ───────────────────────────
 # Teaching qualifications (PGCE, PGDE, PGCert, PGDip) do not contain
 # "master" or "postgraduate" verbatim in their degree_level string, so the
