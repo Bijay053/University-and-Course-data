@@ -68,6 +68,20 @@ discovery:
     - https://www.qut.edu.au/study/postgraduate/communication
 
 extraction:
+  # QUT's static course response is large and contains the usable course
+  # payload.  Playwright is Cloudflare-blocked (rendered=0B) and previously
+  # consumed nearly every shared 90s course deadline after the static fetch.
+  skip_per_course_browser: true
+  study_mode:
+    # Course pages contain site-wide "online" utility/navigation copy.  Do not
+    # classify that bare keyword as an online-only delivery signal; explicit
+    # phrases such as "fully online" remain authoritative.
+    online_only_requires_strong_evidence: true
+  staging:
+    # QUT's canonical /courses/<slug> pages include valid short titles such as
+    # "Data Science" that do not always repeat a degree qualifier in every
+    # title source. Discovery already restricts candidates to /courses/.
+    skip_degree_qualifier_check: true
   filters:
     # 2026-05-18 — enabled. QUT course pages render a hard banner on
     # domestic-only courses: "This course is only available for
