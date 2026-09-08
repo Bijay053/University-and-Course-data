@@ -499,6 +499,47 @@ _UOW_HOSTS: frozenset[str] = frozenset({"www.uow.edu.au", "uow.edu.au"})
 _SWINBURNE_HOSTS: frozenset[str] = frozenset(
     {"www.swinburne.edu.au", "swinburne.edu.au"}
 )
+_SCU_HOSTS: frozenset[str] = frozenset({"www.scu.edu.au", "scu.edu.au"})
+
+
+def _extract_scu_international_start_dates(html: str) -> list[str]:
+    """Read only SCU's International snapshot → Start Date value."""
+    if not html:
+        return []
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:  # pragma: no cover - bs4 is a hard dependency
+        return []
+
+    soup = BeautifulSoup(html, "html.parser")
+    snapshot = None
+    for candidate in soup.select(
+        '.js-course-selector-content[data-course="international"]'
+    ):
+        title = candidate.select_one(".course-snapshot__title")
+        if (
+            title is not None
+            and compact(title.get_text(" ", strip=True)).lower()
+            == "international snapshot"
+        ):
+            snapshot = candidate
+            break
+    if snapshot is None:
+        return []
+
+    for item in snapshot.select(".course-snapshot__item"):
+        label = item.select_one(".course-snapshot__label-text")
+        if label is None or compact(label.get_text(" ", strip=True)).lower() != "start date":
+            continue
+        value = item.select_one(".course-snapshot__text")
+        if value is None:
+            return []
+        parsed = _classify_intake_value(value.get_text(" ", strip=True))
+        if parsed is None:
+            return []
+        months, _day = parsed
+        return [month for month in _MONTHS if month in set(months)]
+    return []
 
 # ECU (Edith Cowan University) — every coursework programme page publishes
 # its intake calendar as a "Semester availability" / "Availability & Campus
@@ -609,6 +650,7 @@ async def _extract_raw(html: str, url: str) -> list[ExtractionResult]:
     _is_ecu = _host in _ECU_HOSTS
     _is_waikato = _host in _WAIKATO_HOSTS
     _is_swinburne = _host in _SWINBURNE_HOSTS
+    _is_scu = _host in _SCU_HOSTS
 
     # ── Candidate accumulator (regression fix 2026-05-28) ────────────────
     # Previously each content-gated pass below (campus-pivot, structural,
@@ -621,6 +663,25 @@ async def _extract_raw(html: str, url: str) -> list[ExtractionResult]:
     # The HOST-gated blocks (UOW / ECU) keep their early returns — they are
     # netloc-scoped and must win for their own host, and cannot bleed.
     candidates: list[ExtractionResult] = []
+
+    # SCU renders domestic and international snapshots together in static
+    # HTML. Generic text scanning merges both Start Date lists and nearby
+    # calendar months. The explicitly audience-scoped international snapshot
+    # is authoritative and must be read before every generic pass.
+    if _is_scu:
+        scu_months = _extract_scu_international_start_dates(html)
+        if not scu_months:
+            return []
+        return [
+            ExtractionResult(
+                field_key="intake_months",
+                value=scu_months,
+                normalized={"intake_months": scu_months, "intake_days": None},
+                confidence=0.99,
+                snippet=f"SCU international Start Date: {', '.join(scu_months)}",
+                method="intake.scu_international_snapshot",
+            )
+        ]
 
     # Campus-pivot pass: handles UNE "Start dates and campus" table where
     # months appear in column headers (e.g. "Trimester 1 – February 2026")

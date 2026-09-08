@@ -236,6 +236,94 @@ def test_swinburne_without_semester_does_not_invent_intake_from_dates():
     assert out == []
 
 
+def test_scu_reads_only_international_snapshot_start_dates():
+    html = """
+      <div class="js-course-selector-content" data-course="default">
+        <h3>Domestic snapshot</h3>
+        <li class="course-snapshot__item">
+          <h4 class="course-snapshot__label-text">Start Date</h4>
+          <div class="course-snapshot__text"><p>March, July, October</p></div>
+        </li>
+      </div>
+      <div class="js-course-selector-content" data-course="international">
+        <h3 class="course-snapshot__title">International snapshot</h3>
+        <li class="course-snapshot__item">
+          <div class="course-snapshot__label">
+            <h4 class="course-snapshot__label-text">Start Date</h4>
+            <button><span>What's this</span></button>
+          </div>
+          <div class="course-snapshot__text"><p>March, June, October</p></div>
+        </li>
+      </div>
+      <section>Applications close in January, May and August.</section>
+    """
+
+    out = _run(
+        intake.extract(
+            html,
+            "https://www.scu.edu.au/study/courses/"
+            "master-of-business-administration-1207290/2027/",
+        )
+    )
+
+    assert out
+    assert out[0].normalized["intake_months"] == ["March", "June", "October"]
+    assert out[0].method == "intake.scu_international_snapshot"
+
+
+def test_scu_online_course_preserves_its_distinct_international_dates():
+    html = """
+      <div class="js-course-selector-content" data-course="international">
+        <h3 class="course-snapshot__title">International snapshot</h3>
+        <div class="course-snapshot__item">
+          <h4 class="course-snapshot__label-text">Start Date</h4>
+          <div class="course-snapshot__text">
+            <p>January, March, April, June, August, October</p>
+          </div>
+        </div>
+      </div>
+    """
+
+    out = _run(
+        intake.extract(
+            html,
+            "https://www.scu.edu.au/study/courses/"
+            "graduate-diploma-in-business-1108100/2027/",
+        )
+    )
+
+    assert out
+    assert out[0].normalized["intake_months"] == [
+        "January",
+        "March",
+        "April",
+        "June",
+        "August",
+        "October",
+    ]
+
+
+def test_scu_without_international_start_date_fails_closed():
+    html = """
+      <div data-course="default">
+        <div class="course-snapshot__item">
+          <h4 class="course-snapshot__label-text">Start Date</h4>
+          <div class="course-snapshot__text"><p>March, July, October</p></div>
+        </div>
+      </div>
+      <section>Applications close in January and May.</section>
+    """
+
+    out = _run(
+        intake.extract(
+            html,
+            "https://www.scu.edu.au/study/courses/example/2027/",
+        )
+    )
+
+    assert out == []
+
+
 def test_waikato_explicit_december_trimester_remains_valid():
     """December is rejected only when incidental, not when explicitly offered."""
     html = """
