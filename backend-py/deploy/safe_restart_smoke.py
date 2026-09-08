@@ -16,6 +16,7 @@ import sys
 import urllib.request
 import uuid
 from collections.abc import Mapping
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -44,6 +45,10 @@ def _load_managed_database_environment() -> None:
 
 _load_managed_database_environment()
 
+try:
+    from . import database_refresh_rehearsal_proof as rehearsal_proof
+except ImportError:  # Direct execution: python deploy/safe_restart_smoke.py
+    import database_refresh_rehearsal_proof as rehearsal_proof
 from sqlalchemy import func, select
 
 from app.database import AsyncSessionLocal
@@ -60,10 +65,43 @@ DEFAULT_COURSE_URL = (
     "bachelor-of-applied-business-marketing-partnership-with-ducere"
 )
 DEFAULT_EXPECTED_SKIP_REASON = "domestic_only"
+DEFAULT_REHEARSAL_PROOF = Path(
+    "/etc/university-portal/database-refresh-rehearsal-proof.json"
+)
+REHEARSAL_TEMPLATE = Path(__file__).with_name(
+    "database-secret-refresh-rehearsal.yaml"
+)
+REHEARSAL_SIGNERS = Path(__file__).with_name(
+    "database-refresh-rehearsal-signers.json"
+)
 
 
 class SmokeFailure(RuntimeError):
     """A safe-restart precondition or proof failed."""
+
+
+def validate_database_rehearsal_requirement(
+    proof_path: Path,
+    *,
+    expected_account_id: str | None,
+    max_age_hours: int,
+) -> None:
+    if not expected_account_id:
+        raise SmokeFailure(
+            "DATABASE_REFRESH_REHEARSAL_ACCOUNT_ID is required before maintenance"
+        )
+    if not 1 <= max_age_hours <= 24:
+        raise SmokeFailure("database refresh rehearsal maximum age must be 1-24 hours")
+    try:
+        rehearsal_proof.validate_rehearsal_proof(
+            proof_path,
+            expected_account_id=expected_account_id,
+            template_path=REHEARSAL_TEMPLATE,
+            signers_path=REHEARSAL_SIGNERS,
+            max_age=timedelta(hours=max_age_hours),
+        )
+    except rehearsal_proof.RehearsalProofError as exc:
+        raise SmokeFailure(str(exc)) from exc
 
 
 def validate_idle_counts(counts: Mapping[str, int]) -> None:
@@ -322,6 +360,11 @@ async def _wait_for_done(
 
 
 async def _main(args: argparse.Namespace) -> None:
+    validate_database_rehearsal_requirement(
+        args.database_rehearsal_proof,
+        expected_account_id=args.expected_rehearsal_account_id,
+        max_age_hours=args.max_rehearsal_age_hours,
+    )
     counts = await _active_counts()
     validate_idle_counts(counts)
     release = _verify_release_and_services()
@@ -345,6 +388,25 @@ def main() -> int:
         "--api-health-url", default="http://127.0.0.1:8000/api/health"
     )
     parser.add_argument("--timeout-seconds", type=int, default=300)
+    parser.add_argument(
+        "--database-rehearsal-proof",
+        type=Path,
+        default=Path(
+            os.environ.get(
+                "DATABASE_REFRESH_REHEARSAL_PROOF",
+                str(DEFAULT_REHEARSAL_PROOF),
+            )
+        ),
+    )
+    parser.add_argument(
+        "--expected-rehearsal-account-id",
+        default=os.environ.get("DATABASE_REFRESH_REHEARSAL_ACCOUNT_ID"),
+    )
+    parser.add_argument(
+        "--max-rehearsal-age-hours",
+        type=int,
+        default=int(os.environ.get("DATABASE_REFRESH_REHEARSAL_MAX_AGE_HOURS", "24")),
+    )
     args = parser.parse_args()
     try:
         asyncio.run(_main(args))

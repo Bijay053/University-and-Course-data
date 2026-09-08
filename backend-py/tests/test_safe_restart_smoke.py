@@ -1,9 +1,14 @@
 """Focused contracts for the production-safe restart smoke command."""
 from __future__ import annotations
 
+import base64
+import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
 from deploy.safe_restart_smoke import (
     DEFAULT_COURSE_URL,
@@ -11,9 +16,11 @@ from deploy.safe_restart_smoke import (
     DEFAULT_UNIVERSITY_ID,
     SmokeFailure,
     resolve_expected_release,
+    validate_database_rehearsal_requirement,
     validate_done_payload,
     validate_idle_counts,
 )
+from deploy.database_refresh_rehearsal_proof import write_rehearsal_proof
 from app.services.scraper.orchestrator import _is_safe_restart_smoke_payload
 
 
@@ -137,4 +144,180 @@ def test_rejects_legacy_online_only_reason_key() -> None:
                 "skipped": 1,
                 "skip_reasons": {"rejected:_online_only": 1},
             }
+        )
+
+
+class _Kms:
+    def __init__(self, private_key) -> None:
+        self.private_key = private_key
+
+    def describe_key(self, **_kwargs):
+        return {
+            "KeyMetadata": {
+                "Arn": "arn:aws:kms:ap-south-1:123456789012:key/test-key",
+                "KeyUsage": "SIGN_VERIFY",
+                "KeySpec": "RSA_2048",
+                "Enabled": True,
+            }
+        }
+
+    def sign(self, *, Message, **_kwargs):
+        return {
+            "Signature": self.private_key.sign(
+                Message,
+                padding.PSS(
+                    mgf=padding.MGF1(hashes.SHA256()),
+                    salt_length=padding.PSS.DIGEST_LENGTH,
+                ),
+                hashes.SHA256(),
+            )
+        }
+
+
+class _SigningSession:
+    def __init__(self, private_key) -> None:
+        self.kms = _Kms(private_key)
+
+    def client(self, name, region_name):
+        assert name == "kms"
+        assert region_name == "ap-south-1"
+        return self.kms
+
+
+def _write_proof(
+    tmp_path: Path, *, completed_at: datetime
+) -> tuple[Path, Path]:
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    public_key_pem = private_key.public_key().public_bytes(
+        serialization.Encoding.PEM,
+        serialization.PublicFormat.SubjectPublicKeyInfo,
+    ).decode("ascii")
+    signers = tmp_path / "signers.json"
+    signers.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "signers": [
+                    {
+                        "account_id": "123456789012",
+                        "signing_key_arn": (
+                            "arn:aws:kms:ap-south-1:123456789012:key/test-key"
+                        ),
+                        "public_key_pem": public_key_pem,
+                    }
+                ],
+            }
+        )
+    )
+    proof = tmp_path / "proof.json"
+    template = Path("deploy/database-secret-refresh-rehearsal.yaml")
+    write_rehearsal_proof(
+        proof,
+        session=_SigningSession(private_key),
+        signing_key_id="alias/database-refresh-rehearsal-proof",
+        account_id="123456789012",
+        region="ap-south-1",
+        run_id="a" * 16,
+        template_path=template,
+        completed_at=completed_at,
+    )
+    return proof, signers
+
+
+def test_accepts_recent_matching_database_rehearsal_proof(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    now = datetime.now(timezone.utc)
+    proof, signers = _write_proof(tmp_path, completed_at=now)
+    monkeypatch.setattr(
+        "deploy.safe_restart_smoke.REHEARSAL_TEMPLATE",
+        Path("deploy/database-secret-refresh-rehearsal.yaml"),
+    )
+    monkeypatch.setattr(
+        "deploy.safe_restart_smoke.REHEARSAL_SIGNERS", signers
+    )
+    validate_database_rehearsal_requirement(
+        proof,
+        expected_account_id="123456789012",
+        max_age_hours=24,
+    )
+
+
+def test_rejects_stale_or_wrong_account_database_rehearsal_proof(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    proof, signers = _write_proof(
+        tmp_path,
+        completed_at=datetime.now(timezone.utc) - timedelta(hours=25),
+    )
+    monkeypatch.setattr(
+        "deploy.safe_restart_smoke.REHEARSAL_TEMPLATE",
+        Path("deploy/database-secret-refresh-rehearsal.yaml"),
+    )
+    monkeypatch.setattr("deploy.safe_restart_smoke.REHEARSAL_SIGNERS", signers)
+    with pytest.raises(SmokeFailure, match="stale"):
+        validate_database_rehearsal_requirement(
+            proof,
+            expected_account_id="123456789012",
+            max_age_hours=24,
+        )
+    with pytest.raises(SmokeFailure, match="account or template"):
+        validate_database_rehearsal_requirement(
+            proof,
+            expected_account_id="210987654321",
+            max_age_hours=24,
+        )
+
+
+def test_requires_database_rehearsal_account_before_maintenance(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(SmokeFailure, match="ACCOUNT_ID"):
+        validate_database_rehearsal_requirement(
+            tmp_path / "missing.json",
+            expected_account_id=None,
+            max_age_hours=24,
+        )
+
+
+def test_rejects_modified_or_production_attested_proof(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    proof, signers = _write_proof(
+        tmp_path, completed_at=datetime.now(timezone.utc)
+    )
+    payload = json.loads(proof.read_text(encoding="utf-8"))
+    payload["region"] = "us-east-1"
+    proof.write_text(json.dumps(payload), encoding="utf-8")
+    monkeypatch.setattr(
+        "deploy.safe_restart_smoke.REHEARSAL_TEMPLATE",
+        Path("deploy/database-secret-refresh-rehearsal.yaml"),
+    )
+    monkeypatch.setattr("deploy.safe_restart_smoke.REHEARSAL_SIGNERS", signers)
+    with pytest.raises(SmokeFailure, match="signature"):
+        validate_database_rehearsal_requirement(
+            proof,
+            expected_account_id="123456789012",
+            max_age_hours=24,
+        )
+
+
+def test_signed_proof_contains_no_aws_credentials_or_signed_url(
+    tmp_path: Path,
+) -> None:
+    proof, _signers = _write_proof(
+        tmp_path, completed_at=datetime.now(timezone.utc)
+    )
+    serialized = proof.read_text(encoding="utf-8")
+    assert "X-Amz-Security-Token" not in serialized
+    assert "X-Amz-Credential" not in serialized
+    assert "test-session-token" not in serialized
+    assert "test-signing-secret" not in serialized
+    assert "aws_identity_attestation_url" not in serialized
+    assert base64.b64decode(json.loads(serialized)["signature_base64"], validate=True)
+    with pytest.raises(SmokeFailure, match="production"):
+        validate_database_rehearsal_requirement(
+            proof,
+            expected_account_id="905043442097",
+            max_age_hours=24,
         )

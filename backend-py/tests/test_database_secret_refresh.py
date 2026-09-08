@@ -55,6 +55,7 @@ REHEARSAL_SPEC.loader.exec_module(rehearsal)
 def test_disposable_rehearsal_is_explicitly_guarded_and_uses_isolated_fixture() -> None:
     fixture = (DEPLOY_DIR / "database-secret-refresh-rehearsal.yaml").read_text()
     source = (DEPLOY_DIR / "rehearse_database_secret_refresh.py").read_text()
+    readme = (DEPLOY_DIR / "README.md").read_text()
     assert "ManageMasterUserPassword: true" in fixture
     assert "PubliclyAccessible: false" in fixture
     assert "Type: AWS::Scheduler::ScheduleGroup" in fixture
@@ -88,6 +89,21 @@ def test_disposable_rehearsal_is_explicitly_guarded_and_uses_isolated_fixture() 
     assert "describe_secret" in source
     assert ".get_secret_value(" in source
     assert "print(value)" not in source
+    assert "DISPOSABLE_AWS_ACCESS_KEY_ID" in source
+    assert "DISPOSABLE_AWS_SECRET_ACCESS_KEY" in source
+    assert "AWS_SSM_ACCESS_KEY_ID" not in source
+    for required_argument in (
+        "--proof-output",
+        "--proof-signing-key-id",
+        "--expected-account-id",
+        "--production-account-id",
+        "--vpc-id",
+        "--private-subnet-id",
+        "--second-private-subnet-id",
+        "--i-understand-this-creates-disposable-aws-resources",
+    ):
+        assert required_argument in source
+        assert required_argument in readme
 
 
 def test_rehearsal_runner_logical_resource_lookups_exist_in_fixture() -> None:
@@ -113,6 +129,17 @@ def test_rehearsal_refuses_without_opt_in_before_any_aws_call() -> None:
             stack_name="test",
             opt_in=False,
         )
+
+
+def test_rehearsal_never_falls_back_to_production_aws_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("DISPOSABLE_AWS_ACCESS_KEY_ID", raising=False)
+    monkeypatch.delenv("DISPOSABLE_AWS_SECRET_ACCESS_KEY", raising=False)
+    monkeypatch.setenv("AWS_SSM_ACCESS_KEY_ID", "production-must-not-be-used")
+    monkeypatch.setenv("AWS_SSM_SECRET_ACCESS_KEY", "production-must-not-be-used")
+    with pytest.raises(RuntimeError, match="dedicated DISPOSABLE"):
+        rehearsal._session()
 
 
 class _RehearsalSts:

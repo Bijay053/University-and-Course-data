@@ -15,12 +15,31 @@ import sys
 import time
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
-from install_openai_fallback_via_ssm import _session
+import boto3
+
+from database_refresh_rehearsal_proof import write_rehearsal_proof
 
 TAG_KEY = "university-portal:disposable-rehearsal"
 PRODUCTION_ACCOUNT_IDS = frozenset({"905043442097"})
 SUCCESS_OUTPUT = "database-credentials-refreshed-and-db-verified"
+
+
+def _session() -> boto3.Session:
+    access_key = os.environ.get("DISPOSABLE_AWS_ACCESS_KEY_ID")
+    secret_key = os.environ.get("DISPOSABLE_AWS_SECRET_ACCESS_KEY")
+    session_token = os.environ.get("DISPOSABLE_AWS_SESSION_TOKEN") or None
+    if not access_key or not secret_key:
+        raise RuntimeError(
+            "dedicated DISPOSABLE_AWS_ACCESS_KEY_ID and "
+            "DISPOSABLE_AWS_SECRET_ACCESS_KEY are required"
+        )
+    return boto3.Session(
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
+        aws_session_token=session_token,
+    )
 
 
 def _tags(tags: list[dict[str, str]]) -> dict[str, str]:
@@ -88,13 +107,16 @@ def _wait_command(ssm, instance_id: str, document: str, expected: str) -> None:
 
 def rehearse(*, expected_account: str, production_account: str, region: str, vpc_id: str,
              private_subnet_id: str, second_private_subnet_id: str, stack_name: str,
-             opt_in: bool) -> None:
+             opt_in: bool, proof_output: Path | None = None,
+             proof_signing_key_id: str | None = None) -> None:
     if not opt_in:
         raise RuntimeError("pass --i-understand-this-creates-disposable-aws-resources")
     if os.environ.get("RUN_DISPOSABLE_AWS_DATABASE_REFRESH_REHEARSAL") != "1":
         raise RuntimeError(
             "set RUN_DISPOSABLE_AWS_DATABASE_REFRESH_REHEARSAL=1 explicitly"
         )
+    if proof_output is not None and not proof_signing_key_id:
+        raise RuntimeError("a dedicated disposable KMS proof-signing key is required")
     session = _session()
     # Account identity is checked before CloudFormation, Scheduler, SSM, RDS, and SQS mutations.
     if (not production_account or expected_account == production_account
@@ -266,7 +288,6 @@ def rehearse(*, expected_account: str, production_account: str, region: str, vpc
             time.sleep(5)
         if invocation["Status"] != "Success" or invocation.get("StandardOutputContent", "").strip() != SUCCESS_OUTPUT:
             raise RuntimeError("rehearsal refresh/restart/TLS assertion failed")
-        print("disposable-database-secret-refresh-rehearsal-passed")
     except BaseException as error:
         primary_error = error
         raise
@@ -349,6 +370,17 @@ def rehearse(*, expected_account: str, production_account: str, region: str, vpc
                 primary_error.add_note(message)
             else:
                 raise RuntimeError(message)
+    if proof_output is not None:
+        write_rehearsal_proof(
+            proof_output,
+            session=session,
+            signing_key_id=proof_signing_key_id,
+            account_id=expected_account,
+            region=region,
+            run_id=rehearsal_id,
+            template_path=Path(template_url[7:]),
+        )
+    print("disposable-database-secret-refresh-rehearsal-passed")
 
 
 def _require_account(session, region: str, expected: str, production: str) -> None:
@@ -365,13 +397,17 @@ def main() -> None:
     parser.add_argument("--private-subnet-id", required=True)
     parser.add_argument("--second-private-subnet-id", required=True)
     parser.add_argument("--region", default="ap-south-1")
+    parser.add_argument("--proof-output", type=Path, required=True)
+    parser.add_argument("--proof-signing-key-id", required=True)
     parser.add_argument("--i-understand-this-creates-disposable-aws-resources", action="store_true")
     args = parser.parse_args()
     run_id = uuid.uuid4().hex[:16]
     rehearse(expected_account=args.expected_account_id, production_account=args.production_account_id,
              region=args.region, vpc_id=args.vpc_id,
-             private_subnet_id=args.private_subnet_id, second_private_subnet_id=args.second_private_subnet_id, stack_name=f"up-db-refresh-rehearsal-{run_id}",
-             opt_in=args.i_understand_this_creates_disposable_aws_resources)
+              private_subnet_id=args.private_subnet_id, second_private_subnet_id=args.second_private_subnet_id, stack_name=f"up-db-refresh-rehearsal-{run_id}",
+              opt_in=args.i_understand_this_creates_disposable_aws_resources,
+              proof_output=args.proof_output,
+              proof_signing_key_id=args.proof_signing_key_id)
 
 
 if __name__ == "__main__":

@@ -19,10 +19,11 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def test_disposable_database_secret_refresh_rehearsal() -> None:
+def test_disposable_database_secret_refresh_rehearsal(tmp_path: Path) -> None:
     required = (
         "DISPOSABLE_AWS_ACCOUNT_ID", "PRODUCTION_AWS_ACCOUNT_ID", "TEST_VPC_ID",
         "TEST_PRIVATE_SUBNET_A", "TEST_PRIVATE_SUBNET_B",
+        "DISPOSABLE_AWS_PROOF_SIGNING_KEY_ID",
     )
     missing = [key for key in required if not os.environ.get(key)]
     assert not missing, f"missing explicit disposable integration settings: {', '.join(missing)}"
@@ -34,7 +35,10 @@ def test_disposable_database_secret_refresh_rehearsal() -> None:
          "--vpc-id", os.environ["TEST_VPC_ID"],
          "--private-subnet-id", os.environ["TEST_PRIVATE_SUBNET_A"],
          "--second-private-subnet-id", os.environ["TEST_PRIVATE_SUBNET_B"],
+          "--proof-output", str(tmp_path / "database-refresh-proof.json"),
+          "--proof-signing-key-id", os.environ["DISPOSABLE_AWS_PROOF_SIGNING_KEY_ID"],
          "--i-understand-this-creates-disposable-aws-resources"],
         check=True,
         timeout=2700,
     )
+    assert (tmp_path / "database-refresh-proof.json").is_file()

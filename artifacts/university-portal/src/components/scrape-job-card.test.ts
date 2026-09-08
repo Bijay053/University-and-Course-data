@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   countSuspiciousSkipped,
+  hasReviewableCourses,
   isCategoryPageWarningStale,
   runtimeProgressFromStatus,
 } from "./scrape-job-card";
@@ -59,5 +60,19 @@ describe("countSuspiciousSkipped", () => {
 
   it("never returns a negative count when reason totals drift", () => {
     expect(countSuspiciousSkipped(5, { online_only: 7 })).toBe(0);
+  });
+});
+
+describe("hasReviewableCourses", () => {
+  it("keeps review visible when a zero-stage continuation inherits parent rows", () => {
+    expect(hasReviewableCourses({ imported: 0 }, 101)).toBe(true);
+  });
+
+  it("uses the cumulative status count while the pending count loads", () => {
+    expect(hasReviewableCourses({ imported: 101 }, null)).toBe(true);
+  });
+
+  it("hides review only after the chain has no pending rows", () => {
+    expect(hasReviewableCourses({ imported: 101 }, 0)).toBe(false);
   });
 });

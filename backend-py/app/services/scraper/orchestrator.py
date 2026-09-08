@@ -1034,27 +1034,17 @@ async def _clear_stale_dedup(
     ``'pending'`` and the scraper never auto-rejects), so narrowing to
     ``pending`` cures the symptom without trampling reviewer history.
 
-    Fresh full scrapes replace old pending rows, including rows from completed
-    jobs, so dedup cannot reduce the new scrape to zero. Reviewer-rejected rows,
-    the current job's checkpoints, running jobs, and recent resumable jobs are
-    preserved. The live message must say ``pending`` only; rejected rows are
-    never eligible for this DELETE.
+    Fresh staging replaces only the same canonical course URL (see
+    ``stage_course`` cross-job alias dedup). Pending rows attached to any known
+    runtime job remain reviewable history until an operator decides them; age
+    alone must never erase that work. This cleanup now removes only true orphan
+    pending rows left without a runtime-job record.
     """
     from sqlalchemy import text as _text
-    from app.config import settings as _settings
 
-    # Clear pending rows from all non-running jobs (including completed jobs).
-    # This ensures that when a new scrape starts it replaces stale pending rows
-    # from previous runs so reviewers always see fresh data.
-    #
-    # Only currently RUNNING jobs are protected — their rows are mid-flight and
-    # must not be wiped from under the active scrape worker.
-    #
-    # Previous versions also excluded 'completed' jobs from deletion to avoid
-    # the PR-1.5 regression (history showing 0 rows after a subsequent scrape).
-    # That protection caused the opposite problem: new scrapes found all courses
-    # blocked by existing pending rows and staged 0 new courses. Users now
-    # prefer fresh replacement over stale history preservation.
+    # Only orphan pending rows are eligible. A known completed/failed/stopped
+    # job can still own unresolved operator review, and a fresh scrape already
+    # replaces matching canonical URLs individually during staging.
     #
     # RESUME CHECKPOINT preservation (large-scrape reliability):
     #   1. NEVER wipe the current job's OWN rows.  A re-dispatched / re-claimed
@@ -1076,18 +1066,6 @@ async def _clear_stale_dedup(
         _preserve_current = "AND sc.scrape_job_id <> :cur_job"
         params["cur_job"] = current_job_id
 
-    _preserve_resumable = ""
-    if _settings.scrape_resume_enabled:
-        _preserve_resumable = (
-            "AND NOT EXISTS ("
-            "    SELECT 1 FROM scrape_runtime_jobs j2"
-            "    WHERE j2.runtime_job_id = sc.scrape_job_id"
-            "      AND j2.status IN ('queued', 'failed', 'stopped', 'failed_degraded', 'failed_provider')"
-            "      AND j2.updated_at > NOW() - (:rw || ' minutes')::interval"
-            ")"
-        )
-        params["rw"] = str(_settings.scrape_resume_window_minutes)
-
     res = await db.execute(
         _text(
             f"""
@@ -1096,11 +1074,9 @@ async def _clear_stale_dedup(
               AND sc.status = 'pending'
               AND sc.created_at < NOW() - (:m || ' minutes')::interval
               {_preserve_current}
-              {_preserve_resumable}
               AND NOT EXISTS (
                   SELECT 1 FROM scrape_runtime_jobs j
                   WHERE j.runtime_job_id = sc.scrape_job_id
-                    AND j.status = 'running'
               )
             """
         ),
@@ -1516,7 +1492,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             )
             await emit(
                 "status",
-                f"Cleared {cleared} stale pending scraped_courses rows "
+                f"Cleared {cleared} orphan pending scraped_courses rows "
                 f"(>{_STALE_DEDUP_MINUTES}m old) for university {job.university_id}",
                 phase="cleanup",
                 cleared=cleared,

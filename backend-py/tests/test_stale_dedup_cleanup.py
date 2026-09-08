@@ -195,20 +195,10 @@ async def _delete_runtime_job(runtime_job_id: str) -> None:
 
 
 @pytest.mark.asyncio
-async def test_clear_stale_dedup_clears_non_resumable_rows_for_fresh_replacement(
+async def test_clear_stale_dedup_preserves_known_review_rows_and_clears_orphans(
     isolated_universities,
 ):
-    """Completed/orphan rows are cleared while recent failed progress survives.
-
-    Context: the original PR-1.5 fix protected completed-job rows from cleanup
-    to prevent job_440a0e26c6df's counter-vs-rows mismatch. That protection
-    caused a worse regression: new scrapes found all courses blocked by existing
-    pending rows from the completed run and staged 0 new courses.
-
-    Current behaviour also protects recent failed jobs while resume is enabled,
-    because their rows are checkpoints for the next run. Completed and orphaned
-    pending rows are still cleared so a fresh scrape can replace them.
-    """
+    """Age never deletes review owned by a known job; only orphans are stale."""
     uni_a, _ = isolated_universities
     prefix = f"test_completed_{uuid.uuid4().hex[:8]}_"
     completed_job = prefix + "completed_job"
@@ -227,9 +217,9 @@ async def test_clear_stale_dedup_clears_non_resumable_rows_for_fresh_replacement
         async with AsyncSessionLocal() as db:
             cleared = await _clear_stale_dedup(db, uni_a, minutes=10)
 
-        assert cleared == 2, f"expected 2 deletions (completed + orphan), got {cleared}"
-        assert not await _exists(from_completed), (
-            "completed-job pending row should be cleared so a re-scrape can stage fresh data"
+        assert cleared == 1, f"expected only the orphan deletion, got {cleared}"
+        assert await _exists(from_completed), (
+            "completed-job pending review must survive until an operator decides it"
         )
         assert await _exists(from_failed), "recent failed-job row is a resumable checkpoint"
         assert not await _exists(from_orphan), "orphan-job pending row should be cleared"

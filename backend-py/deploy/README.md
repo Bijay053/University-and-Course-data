@@ -44,13 +44,43 @@ certificate-verifying `SELECT 1`, proves queued work survived, and deletes the
 stack in `finally`.
 
 ```bash
+export RUN_DISPOSABLE_AWS_DATABASE_REFRESH_REHEARSAL=1
 python backend-py/deploy/rehearse_database_secret_refresh.py \
   --expected-account-id "$DISPOSABLE_AWS_ACCOUNT_ID" \
   --production-account-id "$PRODUCTION_AWS_ACCOUNT_ID" --vpc-id "$TEST_VPC_ID" \
   --private-subnet-id "$TEST_PRIVATE_SUBNET_A" \
   --second-private-subnet-id "$TEST_PRIVATE_SUBNET_B" \
+  --proof-output runtime-proofs/database-refresh-rehearsal.json \
+  --proof-signing-key-id "$DISPOSABLE_AWS_PROOF_SIGNING_KEY_ID" \
   --i-understand-this-creates-disposable-aws-resources
 ```
+
+The runner reads only `DISPOSABLE_AWS_ACCESS_KEY_ID`,
+`DISPOSABLE_AWS_SECRET_ACCESS_KEY`, and optional
+`DISPOSABLE_AWS_SESSION_TOKEN`. It never falls back to the production
+`AWS_SSM_*` identity or the default AWS credential chain. The non-secret proof
+is written atomically only after Scheduler is disabled, the stack is deleted,
+the exact run-tag residue search is empty, and the RDS-managed secret is gone.
+
+Provision one persistent asymmetric KMS key in the disposable account with
+`KeyUsage=SIGN_VERIFY` and an RSA key spec. Restrict the rehearsal principal to
+`kms:DescribeKey` and `kms:Sign` on that exact key. Export only its public key:
+
+```bash
+aws kms get-public-key \
+  --key-id "$DISPOSABLE_AWS_PROOF_SIGNING_KEY_ID" \
+  --query PublicKey --output text |
+  base64 --decode |
+  openssl pkey -pubin -inform DER -outform PEM \
+    -out /tmp/database-refresh-rehearsal-public.pem
+```
+
+Verify `aws kms describe-key` reports the expected disposable account, region,
+key ARN, `SIGN_VERIFY`, RSA key spec, and enabled state. Then add exactly one
+entry containing that account ID, full key ARN, and public PEM to
+`deploy/database-refresh-rehearsal-signers.json`. Public-key material is not a
+secret. Review this pin as a production trust change; never populate it from a
+proof file or caller-supplied account.
 
 Do not use a production account ID, production VPC, or production subnets. The
 known production account `905043442097` is rejected immutably as well as by the
@@ -385,9 +415,35 @@ is supported as long as its deployment pipeline supplies `RELEASE_REVISION`.
 Before a planned production restart, run the checked-in smoke command:
 
 ```bash
+install -m 0600 /trusted/handoff/database-refresh-rehearsal.json \
+  /etc/university-portal/database-refresh-rehearsal-proof.json
 cd /opt/university-portal/backend-py
-PYTHONPATH=. python deploy/safe_restart_smoke.py
+PYTHONPATH=. python deploy/safe_restart_smoke.py \
+  --expected-rehearsal-account-id "$DISPOSABLE_AWS_ACCOUNT_ID"
 ```
+
+The smoke command checks the rehearsal proof before its first database query.
+It fails closed unless the proof reports successful teardown, is no more than
+24 hours old, names the expected disposable account, and matches the SHA-256
+digest of the exact checked-in rehearsal template. The path can be changed with
+`--database-rehearsal-proof`; the age bound can be tightened with
+`--max-rehearsal-age-hours` (1–24). `DATABASE_REFRESH_REHEARSAL_ACCOUNT_ID`,
+`DATABASE_REFRESH_REHEARSAL_PROOF`, and
+`DATABASE_REFRESH_REHEARSAL_MAX_AGE_HOURS` provide equivalent environment
+configuration for the production service/deployment environment.
+
+The receipt is not trusted as plain JSON. After teardown, the runner asks a
+dedicated asymmetric AWS KMS `SIGN_VERIFY` key in the disposable account to
+sign the exact canonical proof payload with `RSASSA_PSS_SHA_256`. The receipt
+contains only the KMS key ARN and signature, never an access key, secret key,
+session token, presigned URL, or reusable credential. Production verifies the
+signature offline with the public key pinned in
+`deploy/database-refresh-rehearsal-signers.json`, requires its account and key
+ARN to match the configured disposable signer, and rejects the known
+production account. The disposable principal needs `kms:DescribeKey` and
+`kms:Sign` for only that key. Until the dedicated account and key are
+provisioned and their public identity is deliberately added to the signer
+registry, production maintenance remains blocked.
 
 The default sample is Torrens' known online-only Bachelor of Applied Business
 Marketing (Ducere partnership) page. The command resolves its university by

@@ -101,6 +101,15 @@ export function countSuspiciousSkipped(
   return Math.max(0, totalSkipped - expectedPolicySkips);
 }
 
+export function hasReviewableCourses(
+  summary: { imported: number } | null,
+  pendingReviewCount: number | null,
+): boolean {
+  return pendingReviewCount !== 0 && (
+    (pendingReviewCount ?? 0) > 0 || (summary?.imported ?? 0) > 0
+  );
+}
+
 type QualityAction = {
   action_type: string;
   target_fields: string[];
@@ -1464,8 +1473,10 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
             .catch(() => {
               // Keep the label generic if the count request is interrupted.
             });
+          const hasCumulativeReview = (data.reviewableCount ?? 0) > 0;
           setPhase(
             ["completed", "completed_with_errors", "completed_with_warnings"].includes(data.status ?? "")
+              || hasCumulativeReview
               ? "done"
               : "error",
           );
@@ -3971,7 +3982,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                     : `Continue ${resultSummary.errors} unresolved`}
                 </Button>
               )}
-              {completedJobId && resultSummary && resultSummary.imported > 0 && pendingReviewCount !== 0 && (
+              {completedJobId && hasReviewableCourses(resultSummary, pendingReviewCount) && (
                 <Button
                   onClick={() => completedJobId && onReviewReady(completedJobId, uniName, true)}
                   className="flex-1 bg-green-600 hover:bg-green-700 h-9"
