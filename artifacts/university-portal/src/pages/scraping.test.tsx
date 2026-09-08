@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from "react";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -132,6 +132,8 @@ describe("Scraping repair reviewer", () => {
       universityId: number;
       sourceJobId: string;
       targetFields: string[];
+      forceFields: string[];
+      forceReasons: Record<string, string>;
     }> = [];
     let analyzeCalls = 0;
 
@@ -242,6 +244,82 @@ describe("Scraping repair reviewer", () => {
       universityId: 7,
       sourceJobId: "repair-job",
       targetFields: ["international_fee"],
+      forceFields: [],
+      forceReasons: {},
+    });
+  }, 10_000);
+
+  it("requires reasons for forced fields and sends them with the union of detected targets", async () => {
+    const review = initialReview();
+    const fixBodies: Array<{
+      targetFields: string[];
+      forceFields: string[];
+      forceReasons: Record<string, string>;
+    }> = [];
+
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
+      if (url === "/api/scrape/staged/repair-job") return jsonResponse(review.courses);
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      if (url === "/api/scrape/staged/analyze") {
+        const body = JSON.parse(String(init?.body));
+        return jsonResponse({
+          total: body.ids.length,
+          courses_with_url: body.ids.length,
+          issues: [{ field: "ielts_overall", label: "Missing IELTS", missing: body.ids.length, total: body.ids.length, current_pct: 0, expected_fill_pct: 80 }],
+        });
+      }
+      if (url === "/api/scrape/staged/fix-jobs") {
+        fixBodies.push(JSON.parse(String(init?.body)));
+        return jsonResponse({
+          jobId: "forced-fix",
+          sourceJobId: "repair-job",
+          status: "queued",
+          total: 51,
+          queued: 51,
+          running: 0,
+          completed: 0,
+          noProgress: 0,
+          failed: 0,
+          processed: 0,
+          results: [],
+          errorMessage: null,
+        });
+      }
+      return jsonResponse({});
+    }));
+
+    const user = userEvent.setup();
+    render(<ScrapingForTest initialReviewState={review} />);
+    const selectAll = screen.getAllByRole("checkbox")[0];
+    await user.click(selectAll);
+    await user.click(selectAll);
+    await user.click(screen.getByRole("button", { name: "Fix (51)" }));
+
+    const previewDialog = await screen.findByRole("dialog", { name: "Review Before Fixing" });
+    expect(within(previewDialog).getByText(/Existing values will be overwritten/)).toBeTruthy();
+    await user.click(within(previewDialog).getByLabelText("Force International Fee"));
+    await user.click(within(previewDialog).getByLabelText("Force Course Location"));
+
+    const confirmButton = within(previewDialog).getByRole("button", { name: "Confirm Fix (51)" });
+    expect((confirmButton as HTMLButtonElement).disabled).toBe(true);
+    const reasonInputs = within(previewDialog).getAllByLabelText(/Correction reason/);
+    fireEvent.change(reasonInputs[0], { target: { value: "Published fee is outdated" } });
+    fireEvent.change(reasonInputs[1], { target: { value: "Campus list is incomplete" } });
+    expect((confirmButton as HTMLButtonElement).disabled).toBe(false);
+    await user.click(confirmButton);
+
+    await waitFor(() => expect(fixBodies).toHaveLength(1));
+    expect(fixBodies[0]).toMatchObject({
+      targetFields: ["ielts_overall", "international_fee", "course_location"],
+      forceFields: ["international_fee", "course_location"],
+      forceReasons: {
+        international_fee: "Published fee is outdated",
+        course_location: "Campus list is incomplete",
+      },
     });
   }, 10_000);
 });

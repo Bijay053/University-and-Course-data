@@ -194,6 +194,17 @@ async def _async_bulk_fix(runtime_job_id: str) -> None:
             for value in payload.get("targetFields") or []
             if isinstance(value, str) and value
         }
+        force_fields = {
+            str(value)
+            for value in payload.get("forceFields") or []
+            if isinstance(value, str) and value
+        }
+        force_reasons = {
+            str(field): str(reason)
+            for field, reason in (payload.get("forceReasons") or {}).items()
+            if field in force_fields and isinstance(reason, str)
+        }
+        target_fields.update(force_fields)
         university_id = int(job.university_id or 0)
         persisted_summary = job.approval_summary or {}
         results: list[dict] = list(persisted_summary.get("results") or [])
@@ -225,6 +236,8 @@ async def _async_bulk_fix(runtime_job_id: str) -> None:
                         ids=chunk,
                         universityId=university_id,
                         targetFields=sorted(target_fields),
+                        forceFields=sorted(force_fields),
+                        forceReasons=force_reasons,
                     ),
                     db,
                 )

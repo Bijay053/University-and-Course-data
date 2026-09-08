@@ -132,6 +132,67 @@ def test_bulk_fix_active_job_equivalence_includes_targets_and_source_job():
     )
 
 
+def test_bulk_fix_active_job_equivalence_includes_forced_fields_and_reasons():
+    from app.routers.scrape import _bulk_fix_request_matches
+
+    job = SimpleNamespace(
+        request_payload={
+            "courseIds": [11],
+            "targetFields": [],
+            "forceFields": ["course_location"],
+            "forceReasons": {"course_location": "Campus list is known stale"},
+            "sourceJobId": None,
+        }
+    )
+
+    assert _bulk_fix_request_matches(
+        job,
+        course_ids=[11],
+        target_fields=[],
+        force_fields=["course_location"],
+        force_reasons={"course_location": "Campus list is known stale"},
+        source_job_id=None,
+    )
+    assert not _bulk_fix_request_matches(
+        job,
+        course_ids=[11],
+        target_fields=[],
+        force_fields=["course_location"],
+        force_reasons={"course_location": "Different rationale"},
+        source_job_id=None,
+    )
+
+
+def test_force_fields_are_limited_and_require_nonblank_reasons():
+    from pydantic import ValidationError
+
+    from app.routers.scrape import ReExtractBody, StartBulkFixBody
+
+    valid = ReExtractBody(
+        ids=[1],
+        universityId=7,
+        forceFields=["international_fee"],
+        forceReasons={"international_fee": "Fee was copied from an old page"},
+    )
+    assert valid.force_reasons == {
+        "international_fee": "Fee was copied from an old page"
+    }
+    with pytest.raises(ValidationError):
+        StartBulkFixBody(
+            ids=[1],
+            universityId=7,
+            forceFields=["duration"],
+            forceReasons={"duration": "Required"},
+        )
+    with pytest.raises(ValidationError):
+        ReExtractBody(
+            ids=[1],
+            universityId=7,
+            forceFields=["course_location"],
+            forceReasons={"course_location": "   "},
+        )
+
+
 def test_fee_target_does_not_allow_unrelated_reextract_fields():
     from app.routers.scrape import _targeted_reextract_fields
 
@@ -223,6 +284,55 @@ async def test_bulk_fix_ignores_unrelated_updates_when_target_gap_remains(monkey
     ]
     assert job.approval_summary["counts"]["completed"] == 0
     assert job.approval_summary["counts"]["noProgress"] == 1
+
+
+@pytest.mark.asyncio
+async def test_bulk_fix_forwards_forced_fields_and_reasons_to_each_batch(monkeypatch):
+    from app.routers import scrape as scrape_router
+    from app.services.scraper import job_claim
+    from app.tasks import scrape_tasks
+
+    job = SimpleNamespace(
+        request_payload={
+            "courseIds": [11, 12, 13, 14, 15, 16],
+            "forceFields": ["course_location"],
+            "forceReasons": {"course_location": "Campus locations were stale"},
+        },
+        approval_summary={"counts": {"queued": 6}, "results": []},
+        university_id=7,
+        current=0,
+        imported=0,
+        skipped=0,
+        errors=0,
+        heartbeat_at=None,
+        status="queued",
+        completed_at=None,
+    )
+    session = _Session(job)
+    monkeypatch.setattr(scrape_tasks, "AsyncSessionLocal", lambda: session)
+
+    async def claim(_db, _job_id):
+        job.status = "running"
+        return True
+
+    calls = []
+
+    async def extract(body, _db):
+        calls.append(body)
+        return {"results": [{"id": course_id, "ok": True} for course_id in body.ids]}
+
+    monkeypatch.setattr(job_claim, "claim_runtime_job", claim)
+    monkeypatch.setattr(scrape_router, "re_extract_staged", extract)
+
+    await scrape_tasks._async_bulk_fix("fix-forced")
+
+    assert [call.ids for call in calls] == [[11, 12, 13, 14, 15], [16]]
+    assert all(call.force_fields == ["course_location"] for call in calls)
+    assert all(
+        call.force_reasons == {"course_location": "Campus locations were stale"}
+        for call in calls
+    )
+    assert all(call.target_fields == ["course_location"] for call in calls)
 
 
 @pytest.mark.asyncio

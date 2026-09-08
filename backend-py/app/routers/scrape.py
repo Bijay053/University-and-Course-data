@@ -14,7 +14,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy import and_, case, desc, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -2001,6 +2001,8 @@ class ReExtractBody(BaseModel):
     ids: list[int] = Field(..., description="scraped_course IDs to re-extract (max 50)")
     university_id: int = Field(alias="universityId")
     target_fields: list[str] = Field(default_factory=list, alias="targetFields")
+    force_fields: list[str] = Field(default_factory=list, alias="forceFields")
+    force_reasons: dict[str, str] = Field(default_factory=dict, alias="forceReasons")
 
     model_config = {"populate_by_name": True}
 
@@ -2010,6 +2012,33 @@ class ReExtractBody(BaseModel):
         if len(v) > 50:
             raise ValueError("Maximum 50 courses per re-extract call")
         return v
+
+    @field_validator("force_fields")
+    @classmethod
+    def _validate_force_fields(cls, value: list[str]) -> list[str]:
+        allowed = {"course_location", "international_fee"}
+        if invalid := set(value) - allowed:
+            raise ValueError(f"Only {sorted(allowed)} may be forceFields; got {sorted(invalid)}")
+        if len(value) != len(set(value)):
+            raise ValueError("forceFields must not contain duplicates")
+        return value
+
+    @model_validator(mode="after")
+    def _validate_force_reasons(self):
+        force_fields = set(self.force_fields)
+        reasons = self.force_reasons
+        if set(reasons) - force_fields:
+            raise ValueError("forceReasons may only contain requested forceFields")
+        missing = [
+            field for field in force_fields
+            if not isinstance(reasons.get(field), str) or not reasons[field].strip()
+        ]
+        if missing:
+            raise ValueError(f"A nonblank forceReasons entry is required for {sorted(missing)}")
+        self.force_reasons = {
+            field: reason.strip() for field, reason in reasons.items() if field in force_fields
+        }
+        return self
 
 
 @router.post("/staged/re-extract")
@@ -2031,7 +2060,7 @@ async def re_extract_staged(
     import math as _math
     import time as _time
 
-    from app.models import ScrapedCourse, University
+    from app.models import ScrapeFeedback, ScrapedCourse, University
     from app.services.auto_publish import should_auto_publish
     from app.services.scraper.completeness import compute_completeness, decide_eligibility
     from app.services.scraper.config.context import set_uni_config
@@ -2106,7 +2135,12 @@ async def re_extract_staged(
         "course_location",
         "duration",
     )
-    targeted_fields = _targeted_reextract_fields(body.target_fields)
+    force_fields = set(body.force_fields)
+    # A forced field is necessarily a persisted target, even if the caller did
+    # not also send it in targetFields.
+    targeted_fields = _targeted_reextract_fields([
+        *body.target_fields, *body.force_fields,
+    ])
     operation_deadline = _time.monotonic() + 240.0
 
     for sc_id in body.ids:
@@ -2124,6 +2158,38 @@ async def re_extract_staged(
             results.append({"id": sc_id, "ok": False, "error": "not found"})
             errors += 1
             continue
+
+        # Record the operator's explicit correction instruction once.  A job may
+        # be replayed after a worker recovery, so an identical active entry is
+        # reused instead of creating duplicate feedback for a five-course batch.
+        feedback_added = False
+        for field_key in force_fields:
+            reason = body.force_reasons[field_key]
+            existing_feedback = await db.scalar(
+                select(ScrapeFeedback.id).where(
+                    ScrapeFeedback.scraped_course_id == row.id,
+                    ScrapeFeedback.field_key == field_key,
+                    ScrapeFeedback.issue_type == "forced_fix",
+                    ScrapeFeedback.reason == reason,
+                    ScrapeFeedback.status == "active",
+                ).limit(1)
+            )
+            if existing_feedback is None:
+                db.add(ScrapeFeedback(
+                    university_id=row.university_id,
+                    scraped_course_id=row.id,
+                    course_name=row.course_name,
+                    field_key=field_key,
+                    issue_type="forced_fix",
+                    reason=reason,
+                    status="active",
+                ))
+                feedback_added = True
+        # A forced Fix is feedback even when extraction cannot proceed (for
+        # example, an old staged row has no URL), so do not leave it pending a
+        # later course's transaction.
+        if feedback_added:
+            await db.commit()
 
         url = row.course_website
         if not url:
@@ -2214,7 +2280,7 @@ async def re_extract_staged(
                 field_key
                 for field_key in _ONE_GO_RETRY_FIELDS
                 if targeted_fields is None or field_key in targeted_fields
-                if not getattr(row, field_key, None)
+                if (field_key in force_fields or not getattr(row, field_key, None))
                 and not payload.get(field_key)
             ]
             if not unresolved:
@@ -2311,7 +2377,9 @@ async def re_extract_staged(
         # field; showing no evidence is safer than showing evidence for old data.
         # Equal normalized values also refresh when their selected source details
         # changed, so canonical newer-year pages replace stale provenance.
-        evidence_refreshed_fields = set(changed_fields) | provenance_changed_fields
+        evidence_refreshed_fields = (
+            set(changed_fields) | provenance_changed_fields | force_fields
+        )
         await refresh_evidence_for_fields(
             db,
             scraped_course_id=row.id,
@@ -2375,7 +2443,38 @@ class StartBulkFixBody(BaseModel):
         alias="targetFields",
         max_length=20,
     )
+    force_fields: list[str] = Field(default_factory=list, alias="forceFields")
+    force_reasons: dict[str, str] = Field(default_factory=dict, alias="forceReasons")
     model_config = {"populate_by_name": True}
+
+    @field_validator("force_fields")
+    @classmethod
+    def _validate_force_fields(cls, value: list[str]) -> list[str]:
+        allowed = {"course_location", "international_fee"}
+        if invalid := set(value) - allowed:
+            raise ValueError(f"Only {sorted(allowed)} may be forceFields; got {sorted(invalid)}")
+        if len(value) != len(set(value)):
+            raise ValueError("forceFields must not contain duplicates")
+        return value
+
+    @model_validator(mode="after")
+    def _validate_force_reasons(self):
+        force_fields = set(self.force_fields)
+        if set(self.force_reasons) - force_fields:
+            raise ValueError("forceReasons may only contain requested forceFields")
+        missing = [
+            field for field in force_fields
+            if not isinstance(self.force_reasons.get(field), str)
+            or not self.force_reasons[field].strip()
+        ]
+        if missing:
+            raise ValueError(f"A nonblank forceReasons entry is required for {sorted(missing)}")
+        self.force_reasons = {
+            field: reason.strip()
+            for field, reason in self.force_reasons.items()
+            if field in force_fields
+        }
+        return self
 
 
 def _bulk_fix_job_dict(job: ScrapeRuntimeJob) -> dict:
@@ -2385,6 +2484,8 @@ def _bulk_fix_job_dict(job: ScrapeRuntimeJob) -> dict:
         "jobId": job.runtime_job_id,
         "sourceJobId": (job.request_payload or {}).get("sourceJobId"),
         "targetFields": (job.request_payload or {}).get("targetFields") or [],
+        "forceFields": (job.request_payload or {}).get("forceFields") or [],
+        "forceReasons": (job.request_payload or {}).get("forceReasons") or {},
         "status": job.status,
         "total": job.total_found,
         "queued": counts.get("queued", max(0, job.total_found - job.current)),
@@ -2406,11 +2507,15 @@ def _bulk_fix_request_matches(
     course_ids: list[int],
     target_fields: list[str],
     source_job_id: str | None,
+    force_fields: list[str] | None = None,
+    force_reasons: dict[str, str] | None = None,
 ) -> bool:
     payload = job.request_payload or {}
     return (
         set(payload.get("courseIds") or []) == set(course_ids)
         and set(payload.get("targetFields") or []) == set(target_fields)
+        and set(payload.get("forceFields") or []) == set(force_fields or [])
+        and (payload.get("forceReasons") or {}) == (force_reasons or {})
         and payload.get("sourceJobId") == source_job_id
     )
 
@@ -2421,6 +2526,8 @@ def _matching_bulk_fix_job(
     course_ids: list[int],
     target_fields: list[str],
     source_job_id: str | None,
+    force_fields: list[str] | None = None,
+    force_reasons: dict[str, str] | None = None,
 ) -> ScrapeRuntimeJob | None:
     return next(
         (
@@ -2430,6 +2537,8 @@ def _matching_bulk_fix_job(
                 job,
                 course_ids=course_ids,
                 target_fields=target_fields,
+                force_fields=force_fields,
+                force_reasons=force_reasons,
                 source_job_id=source_job_id,
             )
         ),
@@ -2483,6 +2592,8 @@ async def start_bulk_fix_job(
         active_jobs,
         course_ids=found_ids,
         target_fields=body.target_fields,
+        force_fields=body.force_fields,
+        force_reasons=body.force_reasons,
         source_job_id=body.source_job_id,
     )
     if active:
@@ -2500,6 +2611,8 @@ async def start_bulk_fix_job(
             "courseIds": found_ids,
             "sourceJobId": body.source_job_id,
             "targetFields": body.target_fields,
+            "forceFields": body.force_fields,
+            "forceReasons": body.force_reasons,
             "aiProvider": "openai",
             "maxPasses": 2,
         },

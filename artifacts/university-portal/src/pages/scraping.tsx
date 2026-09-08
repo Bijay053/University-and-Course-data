@@ -346,6 +346,11 @@ interface BulkFixJob {
   errorMessage: string | null;
 }
 
+const FORCEABLE_FIX_FIELDS = [
+  { field: "international_fee", label: "International Fee" },
+  { field: "course_location", label: "Course Location" },
+] as const;
+
 export function getFixResultHeading(result: {
   total: number;
   updated: number;
@@ -2122,7 +2127,14 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   const [fixAnalysis, setFixAnalysis] = useState<FixAnalysis | null>(null);
   const [fixResults, setFixResults] = useState<FixResults | null>(null);
   const [bulkFixJob, setBulkFixJob] = useState<BulkFixJob | null>(null);
+  const [forceFields, setForceFields] = useState<string[]>([]);
+  const [forceReasons, setForceReasons] = useState<Record<string, string>>({});
   const [cleaningNames, setCleaningNames] = useState(false);
+
+  const resetForcedFixFields = () => {
+    setForceFields([]);
+    setForceReasons({});
+  };
 
   const handleBulkRejectAll = async () => {
     if (!selectedUni || selectedUni === ALL) return;
@@ -2269,6 +2281,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       return;
     }
     const ids = Array.from(selectedIds);
+    resetForcedFixFields();
     setAnalyzingFix(true);
     toast({
       title: `Checking ${ids.length} selected course${ids.length === 1 ? "" : "s"}…`,
@@ -2290,6 +2303,15 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
 
   const handleConfirmFix = async () => {
     if (!fixAnalysis) return;
+    const missingForceReason = forceFields.some((field) => !forceReasons[field]?.trim());
+    if (missingForceReason) {
+      toast({
+        title: "Correction reason required",
+        description: "Add a correction reason for every field you choose to overwrite.",
+        variant: "destructive",
+      });
+      return;
+    }
     const uniId = reviewUniversityId();
     if (uniId == null) {
       toast({ title: "Fix unavailable", description: "Refresh the review and try again.", variant: "destructive" });
@@ -2307,7 +2329,14 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
           ids,
           universityId: uniId,
           sourceJobId: reviewJobId,
-          targetFields: fixAnalysis.issues.map((issue) => issue.field),
+          targetFields: Array.from(new Set([
+            ...fixAnalysis.issues.map((issue) => issue.field),
+            ...forceFields,
+          ])),
+          forceFields,
+          forceReasons: Object.fromEntries(
+            forceFields.map((field) => [field, forceReasons[field].trim()]),
+          ),
         }),
       });
       if (!res.ok) throw new Error(await getFetchErrorMessage(res));
@@ -2412,6 +2441,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
           setFixingSelected(false);
           setFixProgress(null);
           setShowFixPreviewDialog(false);
+          resetForcedFixFields();
           setShowFixResultsDialog(true);
           if (reviewJobId) void loadStagedCourses(reviewJobId);
         }
@@ -3669,7 +3699,12 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       </Dialog>
 
       {/* ── Fix Selected: Preview Dialog ───────────────────────────────────── */}
-      <Dialog open={showFixPreviewDialog} onOpenChange={(o) => { if (!o && !fixingSelected) setShowFixPreviewDialog(false); }}>
+      <Dialog open={showFixPreviewDialog} onOpenChange={(o) => {
+        if (!o && !fixingSelected) {
+          setShowFixPreviewDialog(false);
+          resetForcedFixFields();
+        }
+      }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -3711,6 +3746,58 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                 <strong>Action:</strong> Re-extract {fixAnalysis.courses_with_url} of {fixAnalysis.total} courses using current recipe rules. OpenAI will attempt to fill missing fields and retry unresolved fee, location, or duration once.
               </div>
 
+              <div className="border-t pt-3 space-y-3">
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Force corrections</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Select a field only when its existing value is incorrect. Existing values will be overwritten.
+                  </p>
+                </div>
+                {FORCEABLE_FIX_FIELDS.map(({ field, label }) => {
+                  const isForced = forceFields.includes(field);
+                  return (
+                    <div key={field} className="rounded-md border p-3 space-y-2">
+                      <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isForced}
+                          onChange={(event) => {
+                            if (event.target.checked) {
+                              setForceFields((current) => [...current, field]);
+                            } else {
+                              setForceFields((current) => current.filter((currentField) => currentField !== field));
+                              setForceReasons((current) => {
+                                const { [field]: _removed, ...remaining } = current;
+                                return remaining;
+                              });
+                            }
+                          }}
+                        />
+                        Force {label}
+                      </label>
+                      {isForced && (
+                        <div>
+                          <label htmlFor={`force-reason-${field}`} className="text-xs font-medium">
+                            Correction reason <span className="text-red-600">*</span>
+                          </label>
+                          <Textarea
+                            id={`force-reason-${field}`}
+                            rows={2}
+                            className="mt-1"
+                            value={forceReasons[field] ?? ""}
+                            onChange={(event) => setForceReasons((current) => ({
+                              ...current,
+                              [field]: event.target.value,
+                            }))}
+                            placeholder={`Why should the existing ${label.toLowerCase()} be overwritten?`}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
               {fixingSelected && fixProgress && (
                 <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
                   <div>Background Fix progress: <strong>{fixProgress.completed} of {fixProgress.total}</strong> processed.</div>
@@ -3746,10 +3833,17 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             </div>
           )}
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setShowFixPreviewDialog(false)}>
+            <Button variant="outline" onClick={() => {
+              setShowFixPreviewDialog(false);
+              resetForcedFixFields();
+            }}>
               {fixingSelected ? "Close" : "Cancel"}
             </Button>
-            <Button onClick={handleConfirmFix} disabled={fixingSelected} className="bg-blue-600 hover:bg-blue-700 text-white">
+            <Button
+              onClick={handleConfirmFix}
+              disabled={fixingSelected || forceFields.some((field) => !forceReasons[field]?.trim())}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
               {fixingSelected ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
               {fixingSelected && fixProgress
                 ? `Fixing ${fixProgress.completed}/${fixProgress.total}`
