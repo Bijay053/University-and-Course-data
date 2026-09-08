@@ -55,6 +55,45 @@ async def test_location_text_block_picks_known_city() -> None:
     assert "Townsville" in val
 
 
+@pytest.mark.asyncio
+async def test_uow_location_collects_all_campus_options_once() -> None:
+    html = """
+    <html><body>
+      <strong>Location</strong><span>Wollongong</span>
+      <select id="campus" name="campus">
+        <option value="" disabled>Please select</option>
+        <option value="wollongong" selected>Wollongong</option>
+        <option value="liverpool">Liverpool</option>
+      </select>
+      <select id="campus" name="campus">
+        <option value="wollongong">Wollongong</option>
+        <option value="liverpool">Liverpool</option>
+      </select>
+    </body></html>
+    """
+    out = await location.extract(
+        html,
+        "https://www.uow.edu.au/study/courses/master-of-social-work-qualifying/"
+        "?students=international&year=2026",
+    )
+    assert out and out[0].value == "Wollongong, Liverpool"
+    assert out[0].method == "location.uow_campus_select"
+
+
+@pytest.mark.asyncio
+async def test_uow_location_selector_does_not_change_other_hosts() -> None:
+    html = """
+    <select id="campus" name="campus">
+      <option selected>Wollongong</option>
+      <option>Liverpool</option>
+    </select>
+    <dl><dt>Campus</dt><dd>Sydney</dd></dl>
+    """
+    out = await location.extract(html, "https://example.edu/course")
+    assert out and out[0].value == "Sydney"
+    assert out[0].method == "location.dl"
+
+
 # ─── eligibility ─────────────────────────────────────────────────────────
 
 

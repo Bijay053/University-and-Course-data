@@ -1603,6 +1603,26 @@ def _from_swinburne_international_hero(soup: BeautifulSoup) -> str | None:
     return _classify_location_value(raw)
 
 
+def _from_uow_campus_select(soup: BeautifulSoup) -> str | None:
+    """Collect every campus in UOW's authoritative course selector."""
+    campuses: list[str] = []
+    seen: set[str] = set()
+    for select in soup.select('select#campus, select[name="campus"]'):
+        for option in select.find_all("option"):
+            value = option.get_text(" ", strip=True)
+            normalized = value.casefold()
+            if (
+                not value
+                or option.has_attr("disabled")
+                or normalized in {"please select", "select", "choose a campus"}
+                or normalized in seen
+            ):
+                continue
+            seen.add(normalized)
+            campuses.append(value)
+    return ", ".join(campuses) if campuses else None
+
+
 async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG001
     if not html:
         return []
@@ -1828,6 +1848,18 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
         cascade_list = [
             ("uwl_jsonld", _from_uwl_jsonld(soup), 0.98),
             ("aria_input", _from_aria_input_value(soup), 0.93),
+        ]
+    elif _parsed_host == "uow.edu.au" or _parsed_host.endswith(".uow.edu.au"):
+        # The selected campus is only one offering.  All valid alternatives
+        # for the active international/year state are present as options.
+        cascade_list = [
+            ("uow_campus_select", _from_uow_campus_select(soup), 0.98),
+            ("strong", _from_strong_dom_walk(soup), 0.9),
+            ("dl", _from_dl(soup), 0.9),
+            ("div_panel", _from_panel_divs(soup), 0.88),
+            ("table", _from_tables(soup), 0.85),
+            ("heading", _from_headings(soup), 0.7),
+            ("delivery_inperson", _from_delivery_mode_inperson(soup), 0.85),
         ]
     else:
         cascade_list = [
