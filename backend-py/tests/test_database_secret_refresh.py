@@ -43,6 +43,124 @@ assert DELIVERY_PROOF_SPEC and DELIVERY_PROOF_SPEC.loader
 delivery_proof = importlib.util.module_from_spec(DELIVERY_PROOF_SPEC)
 DELIVERY_PROOF_SPEC.loader.exec_module(delivery_proof)
 
+REHEARSAL_SPEC = importlib.util.spec_from_file_location(
+    "database_refresh_rehearsal",
+    DEPLOY_DIR / "rehearse_database_secret_refresh.py",
+)
+assert REHEARSAL_SPEC and REHEARSAL_SPEC.loader
+rehearsal = importlib.util.module_from_spec(REHEARSAL_SPEC)
+REHEARSAL_SPEC.loader.exec_module(rehearsal)
+
+
+def test_disposable_rehearsal_is_explicitly_guarded_and_uses_isolated_fixture() -> None:
+    fixture = (DEPLOY_DIR / "database-secret-refresh-rehearsal.yaml").read_text()
+    source = (DEPLOY_DIR / "rehearse_database_secret_refresh.py").read_text()
+    assert "ManageMasterUserPassword: true" in fixture
+    assert "PubliclyAccessible: false" in fixture
+    assert "Type: AWS::Scheduler::ScheduleGroup" in fixture
+    assert "ScheduleExpression: rate(5 minutes)" in fixture
+    assert "arn:aws:scheduler:::aws-sdk:ssm:sendCommand" in fixture
+    assert 'sslmode="verify-full"' in fixture
+    assert 'connection.execute("SELECT 1")' in fixture
+    assert "university-portal:disposable-rehearsal" in fixture
+    assert "scheduler-origin disposable database refresh rehearsal" in fixture
+    assert "RotateMasterUserPassword=True" in source
+    assert "VersionIdsToStages" in source
+    assert '@celery_app.task(name="scrape.university")' in fixture
+    assert "executions.sqlite3" in fixture
+    assert "redis-cli llen scrape" in fixture
+    assert "cancel_consumer scrape" in fixture
+    assert "control.inspect(timeout=10).active()" in fixture
+    assert "up-db-refresh-${RehearsalId}/up-db-refresh-${RehearsalId}" in fixture
+    assert "905043442097" in source
+    assert "PaginationToken" in source
+    assert "Type: AWS::SQS::Queue" not in fixture
+    assert "redis://127.0.0.1:6379/0" in fixture
+    assert "cloud-init status --wait" in fixture
+    assert "describe_instance_information" in source
+    assert "NatGatewayId" in source
+    assert "RDS managed secret remains after teardown" in source
+    assert source.index("scheduler.update_schedule(") < source.index(
+        "cf.delete_stack("
+    )
+    assert "--i-understand-this-creates-disposable-aws-resources" in source
+    assert "get_caller_identity" in source
+    assert "describe_secret" in source
+    assert ".get_secret_value(" in source
+    assert "print(value)" not in source
+
+
+def test_rehearsal_runner_logical_resource_lookups_exist_in_fixture() -> None:
+    fixture = (DEPLOY_DIR / "database-secret-refresh-rehearsal.yaml").read_text()
+    source = (DEPLOY_DIR / "rehearse_database_secret_refresh.py").read_text()
+    logical_ids = set(
+        re.findall(r"^  ([A-Za-z][A-Za-z0-9]+):\n    Type: AWS::", fixture, re.MULTILINE)
+    )
+    lookups = set(re.findall(r'tagged\["([^"]+)"\]', source))
+    assert lookups
+    assert lookups <= logical_ids
+
+
+def test_rehearsal_refuses_without_opt_in_before_any_aws_call() -> None:
+    with pytest.raises(RuntimeError, match="i-understand"):
+        rehearsal.rehearse(
+            expected_account="123456789012",
+            production_account="210987654321",
+            region="ap-south-1",
+            vpc_id="vpc-test",
+            private_subnet_id="subnet-a",
+            second_private_subnet_id="subnet-b",
+            stack_name="test",
+            opt_in=False,
+        )
+
+
+class _RehearsalSts:
+    def get_caller_identity(self):
+        return {"Account": "123456789012"}
+
+
+class _RehearsalSession:
+    def client(self, name, region_name):
+        assert name == "sts"
+        return _RehearsalSts()
+
+
+def test_rehearsal_requires_the_exact_run_tag_not_merely_tag_presence() -> None:
+    session = _RehearsalSession()
+    with pytest.raises(RuntimeError, match="this run"):
+        rehearsal._require_disposable(
+            session, "ap-south-1", "123456789012", "run-a",
+            [{"Key": rehearsal.TAG_KEY, "Value": "run-b"}],
+        )
+    rehearsal._require_disposable(
+        session, "ap-south-1", "123456789012", "run-a",
+        [{"Key": rehearsal.TAG_KEY, "Value": "run-a"}],
+    )
+
+
+class _SafeSecret:
+    def describe_secret(self, **_kwargs):
+        return {
+            "ARN": "arn:aws:secretsmanager:ap-south-1:123456789012:secret:fixture",
+            "OwningService": "rds",
+            "VersionIdsToStages": {"version": ["AWSCURRENT"]},
+        }
+
+    def get_secret_value(self, **_kwargs):
+        return {"SecretString": json.dumps({"username": "u", "password": "p"})}
+
+
+def test_rehearsal_accepts_managed_secret_without_endpoint_fields() -> None:
+    assert rehearsal._managed_secret_shape(_SafeSecret(), "fixture")["ARN"]
+
+
+def test_known_production_account_is_immutably_rejected() -> None:
+    with pytest.raises(RuntimeError, match="production"):
+        rehearsal._require_account(
+            _RehearsalSession(), "ap-south-1", "905043442097", "000000000000"
+        )
+
 
 def _notifier_source() -> str:
     template = (DEPLOY_DIR / "database-secret-rotation-iam.yaml").read_text()

@@ -16,10 +16,53 @@ in `../README.md`.
 | `snapshot-parameter-store-iam.yaml` | One-time least-privilege snapshot IAM, KMS, and fixed SSM document setup |
 | `refresh_database_credentials_via_secrets_manager.py` | Requests the fixed host-side refresh of the RDS-managed database credential |
 | `database-secret-rotation-iam.yaml` | One-time least-privilege fixed-secret and SSM-document IAM setup |
+| `database-secret-refresh-rehearsal.yaml` | Isolated, tagged disposable RDS/SSM/Scheduler refresh fixture |
+| `rehearse_database_secret_refresh.py` | Explicitly opt-in disposable refresh rehearsal orchestrator |
 | `prove_database_refresh_alert.py` | Publishes one disposable sanitized database-refresh failure alert and proves repeat suppression |
 | `prove_database_refresh_alert_delivery.py` | Temporarily triggers and restores the fixed delivery-failure alarm |
 
 ## Refresh the RDS-managed database credential
+
+### Disposable AWS refresh rehearsal
+
+Before changing the production refresh transaction, rehearse it only in a
+separate non-production account with two private subnets in different AZs. This
+creates a uniquely tagged private PostgreSQL instance whose master secret is
+RDS-managed, an SSM-only test host, a dedicated five-minute Scheduler group,
+and a local Redis/Celery durable-work probe. A preparation SSM document waits
+for cloud-init and SSM readiness, verifies the isolated services, cancels the
+`scrape` consumer, and enqueues exactly one rehearsal-only
+`scrape.university` task. The scheduled refresh applies the production-like
+Celery active-task fence, then resumes consumption after both isolated
+`uni-api-py` and real `uni-celery` units restart. Success requires exactly one
+durable SQLite execution record and an empty Redis queue. It validates STS
+identity and every
+mutation target's disposable ownership tag; it refuses configured production
+accounts and never prints a secret. It rotates the fixture, requires
+Scheduler-origin SSM evidence, verifies the restart and RDS-CA
+certificate-verifying `SELECT 1`, proves queued work survived, and deletes the
+stack in `finally`.
+
+```bash
+python backend-py/deploy/rehearse_database_secret_refresh.py \
+  --expected-account-id "$DISPOSABLE_AWS_ACCOUNT_ID" \
+  --production-account-id "$PRODUCTION_AWS_ACCOUNT_ID" --vpc-id "$TEST_VPC_ID" \
+  --private-subnet-id "$TEST_PRIVATE_SUBNET_A" \
+  --second-private-subnet-id "$TEST_PRIVATE_SUBNET_B" \
+  --i-understand-this-creates-disposable-aws-resources
+```
+
+Do not use a production account ID, production VPC, or production subnets. The
+known production account `905043442097` is rejected immutably as well as by the
+required CLI production-account guard. The VPC must be non-default and it and
+both private, distinct-AZ subnets must carry
+`university-portal:disposable-network=<disposable-account-id>`; each subnet
+must have an active NAT gateway default route for package and RDS-CA downloads.
+Teardown disables Scheduler first, still attempts stack deletion if that fails,
+paginates an exact run-tag residue search, and proves the RDS-managed secret is
+gone while retaining both primary and cleanup errors. The
+script is deliberately not a normal deployment command and performs no work
+without its long opt-in flag.
 
 `DATABASE_URL` is not a deployment input on production. `.env` holds
 non-secret, general application defaults and `.release.env` holds only immutable
