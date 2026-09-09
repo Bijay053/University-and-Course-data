@@ -201,6 +201,59 @@ def test_murdoch_category_accordion_parses_each_course_table() -> None:
     ]
 
 
+def test_murdoch_bare_program_heading_does_not_reuse_previous_codes() -> None:
+    html = """
+    <div class="accordion-item">
+      <div class="accordion-body">
+        <h5>Education</h5>
+        <p>
+          <strong>Graduate Certificate in Education</strong> (C1153)<br>
+          <strong>Master of Education</strong> (M1313, M1367)
+        </p>
+        <table><tr><th>IELTS Academic</th><td>6.5 Overall</td></tr></table>
+        <h5>Teaching</h5>
+        <strong>Master of Teaching (Primary and Secondary)</strong> (M1390, M1391)
+        <table><tr><th>IELTS Academic</th><td>7.5 Overall</td></tr></table>
+      </div>
+    </div>
+    """
+
+    profiles = _parse_program_keyed_english_tables(html)
+
+    assert profiles[0]["course_codes"] == ["C1153", "M1313", "M1367"]
+    assert profiles[0]["program_aliases"] == [
+        "Graduate Certificate in Education",
+        "Master of Education",
+    ]
+    assert profiles[1]["course_codes"] == ["M1390", "M1391"]
+    assert profiles[1]["program_aliases"] == [
+        "Master of Teaching (Primary and Secondary)"
+    ]
+
+
+def test_murdoch_later_dated_profile_wins_for_same_course_code() -> None:
+    profiles = [
+        {
+            "program_names": "Bachelor of Nursing",
+            "program_aliases": ["Bachelor of Nursing"],
+            "course_codes": ["B1417"],
+            "values": {"ielts_overall": 7.0, "pte_overall": 66.0},
+        },
+        {
+            "program_names": "Bachelor of Nursing",
+            "program_aliases": ["Bachelor of Nursing"],
+            "course_codes": ["B1417"],
+            "values": {"ielts_overall": 7.0, "pte_overall": 63.0},
+        },
+    ]
+
+    assert _select_central_english_program(
+        profiles,
+        "Bachelor of Nursing",
+        "https://www.murdoch.edu.au/course/undergraduate/b1417",
+    ) == {"ielts_overall": 7.0, "pte_overall": 63.0}
+
+
 def test_bare_numeric_full_time_duration_uses_label_semantics() -> None:
     html = """
     <dl>

@@ -1095,11 +1095,48 @@ def _parse_program_keyed_english_tables(html: str) -> list[dict[str, Any]]:
         # the program name blank and silently discarded the whole profile.
         for table in body.find_all("table"):
             program_names = ""
+            program_aliases: list[str] = []
             course_codes: list[str] = []
-            for node in table.find_all_previous(["p", "h5", "h6"], limit=12):
-                if body not in node.parents:
+            for strong in table.find_all_previous("strong"):
+                if body not in strong.parents or strong.find_parent("table") is not None:
                     continue
-                node_text = " ".join(node.get_text(" ", strip=True).split())
+                strong_text = " ".join(strong.get_text(" ", strip=True).split())
+                if not strong_text:
+                    continue
+
+                container = strong.find_parent(["p", "h5", "h6"])
+                if container is not None and body in container.parents:
+                    node_text = " ".join(
+                        container.get_text(" ", strip=True).split()
+                    )
+                    aliases = [
+                        " ".join(item.get_text(" ", strip=True).split())
+                        for item in container.find_all("strong")
+                    ]
+                    aliases = [alias for alias in aliases if alias]
+                else:
+                    # Murdoch sometimes writes the program name as a bare
+                    # <strong> followed by a text-node code list immediately
+                    # before the table (for example Master of Teaching).
+                    # Capture only siblings before this table; crossing another
+                    # table would attach the preceding program's identity.
+                    pieces: list[str] = []
+                    reached_table = False
+                    for sibling in strong.next_siblings:
+                        if sibling is table:
+                            reached_table = True
+                            break
+                        if getattr(sibling, "name", None) == "table":
+                            break
+                        if hasattr(sibling, "get_text"):
+                            pieces.append(sibling.get_text(" ", strip=True))
+                        else:
+                            pieces.append(str(sibling))
+                    if not reached_table:
+                        continue
+                    node_text = " ".join(" ".join(pieces).split())
+                    aliases = [strong_text]
+
                 node_codes = sorted(
                     {
                         code.upper()
@@ -1112,19 +1149,8 @@ def _parse_program_keyed_english_tables(html: str) -> list[dict[str, Any]]:
                 )
                 if not node_codes:
                     continue
-                named_node = next(
-                    (
-                        strong
-                        for strong in node.find_all("strong")
-                        if " ".join(strong.get_text(" ", strip=True).split())
-                    ),
-                    None,
-                )
-                if named_node is None:
-                    continue
-                program_names = " ".join(
-                    named_node.get_text(" ", strip=True).split()
-                )
+                program_aliases = aliases
+                program_names = " / ".join(aliases)
                 course_codes = node_codes
                 break
 
@@ -1133,7 +1159,7 @@ def _parse_program_keyed_english_tables(html: str) -> list[dict[str, Any]]:
                 profiles.append(
                     {
                         "program_names": program_names,
-                        "program_aliases": [program_names],
+                        "program_aliases": program_aliases,
                         "course_codes": course_codes,
                         "values": values,
                     }
@@ -1311,7 +1337,7 @@ async def _fetch_with_browser_fallback(url: str) -> str | None:
 #                             english_by_level + english_by_program
 
 _CACHE_TTL_DAYS = 30
-_ENGLISH_CACHE_SCHEMA_VERSION = 6
+_ENGLISH_CACHE_SCHEMA_VERSION = 7
 
 
 def _is_non_tuition_central_fee_pdf(

@@ -1204,7 +1204,11 @@ def _select_central_english_program(
     course_code = (str(course_url or "").split("?", 1)[0].rstrip("/").rsplit("/", 1)[-1]).upper()
     if not target and not course_code:
         return {}
-    for profile in profiles:
+    # Later exact-code profiles take precedence. Some central pages publish
+    # dated revisions for the same course code in chronological DOM order
+    # (Murdoch Nursing B1417: tests taken on/before vs on/after a cutoff).
+    # The later table is the current rule and must replace the historical one.
+    for profile in reversed(profiles):
         if not isinstance(profile, dict):
             continue
         values = profile.get("values")
