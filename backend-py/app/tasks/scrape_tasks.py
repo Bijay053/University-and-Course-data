@@ -71,6 +71,20 @@ def _sync_dispose() -> None:
     except Exception as exc:  # noqa: BLE001
         log.warning("_sync_dispose: could not invalidate engine pool: %s", exc)
 
+
+def _run_db_coro(coro):  # noqa: ANN001, ANN202
+    """Run one database coroutine on a fresh loop with a fresh connection pool.
+
+    Callers that perform multiple ``asyncio.run()`` operations in one Celery
+    task must cross this boundary for *every* operation. Invalidating only once
+    at task entry leaves connections returned by the first operation bound to
+    its now-closed loop, and the second operation can then fail with
+    ``Future attached to a different loop``.
+    """
+    _sync_dispose()
+    return asyncio.run(coro)
+
+
 # Alias for internal use within this module.
 _STALE_QUEUED_MINUTES = STALE_QUEUED_MINUTES
 
@@ -680,9 +694,8 @@ def requeue_stale_queued(self) -> dict:  # noqa: ANN001
        automatically, allowing re-dispatch if the worker never picks it up.
     """
     log.info("requeue_stale_queued: checking for stuck queued jobs")
-    _sync_dispose()
     try:
-        recovered = asyncio.run(_async_requeue_abandoned_bulk_fixes())
+        recovered = _run_db_coro(_async_requeue_abandoned_bulk_fixes())
         if recovered:
             log.warning(
                 "requeue_stale_queued: lease-recovered %d abandoned bulk Fix job(s)",
@@ -691,9 +704,8 @@ def requeue_stale_queued(self) -> dict:  # noqa: ANN001
     except Exception as exc:  # noqa: BLE001
         recovered = []
         log.warning("requeue_stale_queued: bulk Fix lease recovery failed: %s", exc)
-        _sync_dispose()
     try:
-        stale = asyncio.run(_async_find_stale())
+        stale = _run_db_coro(_async_find_stale())
     except Exception as exc:
         log.exception("requeue_stale_queued DB query failed: %s", exc)
         return {"ok": False, "error": str(exc)}
@@ -720,8 +732,7 @@ def requeue_stale_queued(self) -> dict:  # noqa: ANN001
                 _MAX_REQUEUES,
             )
             try:
-                _sync_dispose()
-                asyncio.run(_async_mark_failed_max_requeue(jid))
+                _run_db_coro(_async_mark_failed_max_requeue(jid))
             except Exception as exc:
                 log.exception(
                     "requeue_stale_queued: could not mark job %s failed: %s", jid, exc
@@ -753,8 +764,7 @@ def requeue_stale_queued(self) -> dict:  # noqa: ANN001
 
         # Increment the persistent counter so operators can track bouncing jobs.
         try:
-            _sync_dispose()
-            asyncio.run(_async_increment_requeue(jid))
+            _run_db_coro(_async_increment_requeue(jid))
         except Exception as exc:
             log.warning(
                 "requeue_stale_queued: could not increment requeue_count for %s: %s",

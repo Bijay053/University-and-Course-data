@@ -1,6 +1,6 @@
 """Tests for the stale-job requeue logic in ``app/tasks/scrape_tasks.py``.
 
-Six behaviours exercised:
+Seven behaviours exercised:
 
 1. Jobs younger than 5 minutes are NOT returned by ``_async_find_stale``
    (i.e. they are NOT re-dispatched).
@@ -16,6 +16,8 @@ Six behaviours exercised:
 6. **Concurrent beat ticks against real Redis**: two invocations fired
    simultaneously must produce exactly one dispatch — the NX lock is the
    sole serialisation point and must survive a genuine thread race.
+7. Every database coroutine gets a fresh pool immediately before its new event
+   loop, including consecutive checks in one long-lived worker process.
 """
 from __future__ import annotations
 
@@ -129,6 +131,48 @@ def _call_requeue_stale(task_module: Any) -> dict:
     what Celery does when it dispatches via ``.delay()`` or ``.apply()``.
     """
     return task_module.requeue_stale_queued.run()
+
+
+def test_repeated_stale_checks_invalidate_pool_before_every_database_loop():
+    """A successful lease-recovery query must not donate its pooled asyncpg
+    connection to the stale-query loop that immediately follows it.
+
+    Invoke the complete task twice, as a long-lived Celery worker does. The
+    regression is the exact ordering: every ``asyncio.run`` must be preceded by
+    a synchronous pool invalidation, including the second run inside each task.
+    """
+    from app.tasks import scrape_tasks as st
+
+    events: list[str] = []
+
+    def fake_dispose() -> None:
+        events.append("dispose")
+
+    def fake_run(coro: Any) -> list:
+        name = _coro_name(coro)
+        try:
+            coro.close()
+        except AttributeError:
+            pass
+        events.append(f"run:{name}")
+        return []
+
+    with (
+        patch.object(st, "_sync_dispose", side_effect=fake_dispose),
+        patch.object(st.asyncio, "run", side_effect=fake_run),
+    ):
+        first = _call_requeue_stale(st)
+        second = _call_requeue_stale(st)
+
+    assert first == {"ok": True, "requeued": []}
+    assert second == {"ok": True, "requeued": []}
+    one_check = [
+        "dispose",
+        "run:_async_requeue_abandoned_bulk_fixes",
+        "dispose",
+        "run:_async_find_stale",
+    ]
+    assert events == one_check + one_check
 
 
 # ─── Case 1: young jobs are NOT re-dispatched ─────────────────────────────────
