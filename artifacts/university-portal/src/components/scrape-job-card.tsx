@@ -110,6 +110,13 @@ export function hasReviewableCourses(
   );
 }
 
+export function shouldShowAutomaticUrlRepair(
+  completedJobId: string | null,
+  warningKind: "high_drop_rate" | "category_pages" | null,
+): boolean {
+  return Boolean(completedJobId && warningKind === "high_drop_rate");
+}
+
 type QualityAction = {
   action_type: string;
   target_fields: string[];
@@ -2221,12 +2228,6 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                         </div>
                       </div>
                     )}
-                    {selectedUni && !isNaN(parseInt(selectedUni)) && (
-                      <a href={`/universities/${selectedUni}/recipe`} className="inline-flex items-center gap-1 text-[10px] text-blue-600 hover:underline font-semibold">
-                        Fix in Recipe Editor →
-                      </a>
-                    )}
-
                     {/* ── OpenAI autonomous repair panel ── */}
                     {repairLoading && (
                       <div className="flex items-center gap-1.5 text-[10px] text-gray-500 pt-1">
@@ -2234,10 +2235,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                         Preparing URL evidence…
                       </div>
                     )}
-                    {(() => {
-                      const smart = (repairCandidates || []).find(c => c.id === "smart_replace_patterns" && c.proposed_yaml);
-                      if (!smart && !aiRepairSession) return null;
-                      return (
+                    {shouldShowAutomaticUrlRepair(completedJobId, urlFilterWarning.kind) && (
                         <div className="space-y-2 pt-1.5 border-t border-amber-200 mt-1.5">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-[9px] font-bold px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded-full border border-violet-200 shrink-0">Automatic repair</span>
@@ -2261,7 +2259,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                               ? "Check and repair again"
                               : aiRepairSession?.status === "failed"
                               ? "Try automatic repair again"
-                              : "Fix automatically and retry"
+                              : "Auto-fix URL filter"
                             }
                           </button>
                           {aiRepairSession?.status === "completed" && aiRepairSession.final_verdict && (() => {
@@ -2298,8 +2296,12 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                             </div>
                           ))}
                         </div>
-                      );
-                    })()}
+                    )}
+                    {selectedUni && !isNaN(parseInt(selectedUni)) && (
+                      <a href={`/universities/${selectedUni}/recipe`} className="inline-flex items-center gap-1 text-[10px] text-blue-600 hover:underline font-semibold">
+                        Manual option: open Recipe Editor →
+                      </a>
+                    )}
                   </>
                 )}
                 {/* URL filter test tool */}

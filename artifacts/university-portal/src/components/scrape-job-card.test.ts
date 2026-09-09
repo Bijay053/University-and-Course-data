@@ -5,6 +5,7 @@ import {
   hasReviewableCourses,
   isCategoryPageWarningStale,
   runtimeProgressFromStatus,
+  shouldShowAutomaticUrlRepair,
 } from "./scrape-job-card";
 
 describe("runtimeProgressFromStatus", () => {
@@ -74,5 +75,16 @@ describe("hasReviewableCourses", () => {
 
   it("hides review only after the chain has no pending rows", () => {
     expect(hasReviewableCourses({ imported: 101 }, 0)).toBe(false);
+  });
+});
+
+describe("shouldShowAutomaticUrlRepair", () => {
+  it("shows one-click repair for a completed high-drop job without requiring preloaded candidates", () => {
+    expect(shouldShowAutomaticUrlRepair("job_123", "high_drop_rate")).toBe(true);
+  });
+
+  it("does not offer URL-filter repair without a completed job or for category-page diagnosis", () => {
+    expect(shouldShowAutomaticUrlRepair(null, "high_drop_rate")).toBe(false);
+    expect(shouldShowAutomaticUrlRepair("job_123", "category_pages")).toBe(false);
   });
 });
