@@ -262,13 +262,8 @@ def filter_non_degree_candidates(
     return kept, dropped
 
 
-def _visible_course_detail_evidence(raw_html: str) -> tuple[str, str]:
-    """Return visible ``(H1, structured evidence)`` from main/article.
-
-    This parses a private copy of the static document.  Inert and explicitly
-    hidden elements are removed before selecting either signal, so embedded
-    component templates and shared hidden dialogs cannot decide a rejection.
-    """
+def _sanitized_visible_document(raw_html: str) -> BeautifulSoup:
+    """Parse HTML and remove inert or explicitly hidden content."""
     soup = BeautifulSoup(raw_html or "", "html.parser")
     for node in soup.find_all(["script", "style", "noscript", "template"]):
         node.decompose()
@@ -284,6 +279,17 @@ def _visible_course_detail_evidence(raw_html: str) -> tuple[str, str]:
             or "visibility:hidden" in style
         ):
             node.decompose()
+    return soup
+
+
+def _visible_course_detail_evidence(raw_html: str) -> tuple[str, str]:
+    """Return visible ``(H1, structured evidence)`` from main/article.
+
+    This parses a private copy of the static document.  Inert and explicitly
+    hidden elements are removed before selecting either signal, so embedded
+    component templates and shared hidden dialogs cannot decide a rejection.
+    """
+    soup = _sanitized_visible_document(raw_html)
 
     region = soup.find("main") or soup.find("article")
     if region is None:
@@ -827,6 +833,146 @@ _CATEGORY_URL_SUFFIXES: tuple[str, ...] = (
     "/two-specialisations",
     "/two-specializations",
 )
+
+
+def is_confirmed_host_online_only_page(
+    html: str,
+    source_url: str | None,
+) -> bool:
+    """Detect audited online-only templates whose mode can be overwritten.
+
+    These rules are intentionally host- and template-scoped.  A parent path
+    containing ``online`` or ``distance`` is not sufficient by itself: each
+    rule also requires a course-owned heading or labelled delivery/location
+    value from the page.  This avoids rejecting mixed-delivery courses that
+    require campus attendance, and subject names that merely contain words
+    such as "online harms" or "external wall".
+    """
+    if not html or not source_url:
+        return False
+
+    parsed = urlparse(source_url)
+    host = (parsed.hostname or "").casefold()
+    path = parsed.path.rstrip("/").casefold()
+    try:
+        soup = _sanitized_visible_document(html)
+        selectors: tuple[str, ...]
+        if host == "westminster.ac.uk" or host.endswith(".westminster.ac.uk"):
+            selectors = (".course-overview", "main", "#main-content")
+        elif host == "tees.ac.uk" or host.endswith(".tees.ac.uk"):
+            selectors = ("#coursepage", "main", "#main-content")
+        elif host == "manchester.ac.uk" or host.endswith(".manchester.ac.uk"):
+            selectors = ("#content", "main", "#main-content", ".mainContentContainer")
+        else:
+            selectors = ("main", "#main-content", "#content", "article")
+        region = next(
+            (soup.select_one(selector) for selector in selectors if soup.select_one(selector)),
+            None,
+        )
+        if region is None:
+            return False
+        h1_node = region.find("h1") or soup.find("h1")
+        h1 = (
+            _NORMALIZE_WS.sub(" ", h1_node.get_text(" ", strip=True)).casefold()
+            if h1_node is not None
+            else ""
+        )
+        page_text = _NORMALIZE_WS.sub(
+            " ", region.get_text(" ", strip=True)
+        ).casefold()
+    except Exception:
+        return False
+
+    mandatory_in_person = bool(
+        re.search(
+            r"\b(?:must|will|need(?:ed)?\s+to|required\s+to|"
+            r"you(?:'ll| will| are)?\s+required\s+to)\b"
+            r".{0,60}\battend\b",
+            page_text,
+        )
+        or re.search(
+            r"\brequires?\b.{0,60}\b(?:on-?campus|in[ -]person|"
+            r"face[ -]to[ -]face|residential)\b",
+            page_text,
+        )
+        or re.search(
+            r"\b(?:on-?campus|in[ -]person|face[ -]to[ -]face|residential)"
+            r"\b.{0,50}\brequirements?\b",
+            page_text,
+        )
+    )
+    if mandatory_in_person:
+        return False
+
+    if host == "herts.ac.uk" or host.endswith(".herts.ac.uk"):
+        return bool(
+            path.startswith("/courses/")
+            and path.rsplit("/", 1)[-1].endswith("-online")
+            and re.search(r"\bonline\b", h1)
+            and re.search(
+                r"\b(?:100%\s+online|online distance learning|online degrees?|"
+                r"studying fully online|delivered entirely online)\b",
+                page_text,
+            )
+        )
+
+    if host == "westminster.ac.uk" or host.endswith(".westminster.ac.uk"):
+        return bool(
+            re.search(
+                r"/open-distance-learning-(?:full|part)-time/",
+                f"{path}/",
+            )
+            and re.search(
+                r"\battendance\s+open\s*/?\s*distance learning\b",
+                page_text,
+            )
+            and re.search(
+                r"\bcampus\s+distance learning online\b",
+                page_text,
+            )
+        )
+
+    if host == "tees.ac.uk" or host.endswith(".tees.ac.uk"):
+        return bool(
+            re.search(r"_\(online\)\.cfm$", path)
+            and re.search(r"\(online\)", h1)
+            and re.search(
+                r"\b(?:100%\s+online|no requirement to attend classes)\b",
+                page_text,
+            )
+        )
+
+    if host == "manchester.ac.uk" or host.endswith(".manchester.ac.uk"):
+        return bool(
+            (
+                path.startswith("/study/masters/courses/list/")
+                or path.startswith("/study/online-blended-learning/courses/")
+            )
+            and path.rsplit("/", 1)[-1].endswith("-online")
+            and re.search(
+                r"\bdelivery\s*:?\s*(?:100%\s+)?online(?:\s+learning)?\b",
+                page_text,
+            )
+        )
+
+    if host == "qmul.ac.uk" or host.endswith(".qmul.ac.uk"):
+        return bool(
+            re.search(r"-online-pg(?:cert|dip)$", path)
+            and re.search(r"\blocation\s+distance learning\b", page_text)
+        )
+
+    if host == "kingston.ac.uk" or host.endswith(".kingston.ac.uk"):
+        return bool(
+            path.startswith("/study/postgraduate/")
+            and path.rsplit("/", 1)[-1].endswith("-online")
+            and re.search(r"\bonline\b", h1)
+            and re.search(
+                r"\b(?:studying fully online|delivered entirely online)\b",
+                page_text,
+            )
+        )
+
+    return False
 
 
 def should_stage_course(

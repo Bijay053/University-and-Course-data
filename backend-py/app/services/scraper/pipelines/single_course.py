@@ -25,6 +25,7 @@ from app.services.scraper.config.context import get_uni_config
 from app.services.scraper.guards import (
     OBVIOUS_NON_DEGREE,
     classify_static_course_page,
+    is_confirmed_host_online_only_page,
     should_trust_generic_university_fee_fallback,
 )
 from app.services.scraper.extractors import (
@@ -2928,6 +2929,24 @@ async def extract_course(
             await emit(
                 "status",
                 f"[ONLINE ONLY] {url} — Adelaide route or course metadata is all-online; skipping",
+                phase="extract",
+                kind="online_only_skip",
+                url=url,
+            )
+        return {"url": url, "payload": payload, "evidence": evidence}
+
+    # A bounded pending-review audit confirmed six additional host templates
+    # where course-owned online/distance signals were overwritten by generic
+    # campus chrome.  The shared helper requires both the exact host/URL shape
+    # and labelled course evidence; it deliberately excludes mixed-delivery
+    # distance courses with mandatory campus attendance.
+    if is_confirmed_host_online_only_page(html, url):
+        payload["online_only"] = True
+        payload["online_only_audited_host"] = True
+        if emit:
+            await emit(
+                "status",
+                f"[ONLINE ONLY] {url} — audited host template confirms all-online delivery; skipping",
                 phase="extract",
                 kind="online_only_skip",
                 url=url,

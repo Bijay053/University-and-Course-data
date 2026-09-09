@@ -5,7 +5,10 @@ import pytest
 
 from app.services.scraper.config.context import current_uni_config
 from app.services.scraper.config.schema import UniConfig
-from app.services.scraper.guards import should_stage_course
+from app.services.scraper.guards import (
+    is_confirmed_host_online_only_page,
+    should_stage_course,
+)
 from app.services.scraper.pipelines.single_course import (
     _domestic_only_filter_enabled,
     _duration_labeled_values,
@@ -279,6 +282,382 @@ def test_adelaide_shared_online_navigation_does_not_reject_campus_degree() -> No
         html,
         "https://adelaide.edu.au/study/degrees/bachelor-of-arts/",
     )
+
+
+@pytest.mark.parametrize(
+    ("url", "html"),
+    [
+        (
+            "https://www.herts.ac.uk/courses/undergraduate/"
+            "bsc-hons-information-technology-online",
+            """
+            <main>
+              <h1>BSc (Hons) Information Technology (Online)</h1>
+              <p>Our online degrees let you study when and where you want.</p>
+            </main>
+            """,
+        ),
+        (
+            "https://www.westminster.ac.uk/health-psychology-courses/2026-27/"
+            "september/open-distance-learning-full-time/"
+            "digital-health-and-cyberpsychology-msc",
+            """
+            <main>
+              <h1>Digital Health and Cyberpsychology MSc</h1>
+              <dl>
+                <dt>Attendance</dt><dd>Open/Distance Learning</dd>
+                <dt>Campus</dt><dd>Distance Learning Online</dd>
+              </dl>
+            </main>
+            """,
+        ),
+        (
+            "https://www.tees.ac.uk/postgraduate_courses/"
+            "english_&_creative_writing/ma_creative_writing_(online).cfm",
+            """
+            <main>
+              <h1>Creative Writing (Online) MA</h1>
+              <div>100% online</div>
+              <p>There is no requirement to attend classes.</p>
+            </main>
+            """,
+        ),
+        (
+            "https://www.manchester.ac.uk/study/masters/courses/list/21020/"
+            "msc-pollution-and-environmental-control-online/",
+            """
+            <main>
+              <h1>Pollution and Environmental Control (online)</h1>
+              <dl><dt>Delivery</dt><dd>100% online learning</dd></dl>
+            </main>
+            """,
+        ),
+        (
+            "https://www.qmul.ac.uk/postgraduate/taught/coursefinder/courses/"
+            "technology-media-and-telecommunications-law-online-pgdip/",
+            """
+            <main>
+              <h1>Technology, Media and Telecommunications Law Online PGDip</h1>
+              <dl>
+                <dt>Location</dt><dd>Distance Learning</dd>
+                <dt>Fees</dt><dd>Home/Overseas: £11,150</dd>
+              </dl>
+            </main>
+            """,
+        ),
+        (
+            "https://www.kingston.ac.uk/study/postgraduate/"
+            "psychology-msc-conversion-online",
+            """
+            <main>
+              <h1>Psychology MSc (Conversion) Online</h1>
+              <p>Study psychology while studying fully online.</p>
+              <p>Teaching is delivered entirely online.</p>
+            </main>
+            """,
+        ),
+    ],
+)
+def test_audited_host_templates_reject_online_only_courses(
+    url: str,
+    html: str,
+) -> None:
+    assert is_confirmed_host_online_only_page(html, url)
+
+
+@pytest.mark.parametrize(
+    ("url", "html"),
+    [
+        (
+            "https://courses.uwe.ac.uk/KN2B6/"
+            "real-estate-finance-and-investment-distance-learning",
+            """
+            <main>
+              <h1>MSc Real Estate Finance and Investment (Distance learning)</h1>
+              <p>You are mainly taught online.</p>
+              <p>You must attend a one-week block at Frenchay Campus.</p>
+            </main>
+            """,
+        ),
+        (
+            "https://www.flinders.edu.au/study/courses/"
+            "bachelor-social-work-external",
+            """
+            <main>
+              <h1>Bachelor of Social Work</h1>
+              <dl><dt>Delivery mode</dt><dd>In person and Online</dd></dl>
+              <p>Students attend 20 days at Bedford Park in intensive blocks.</p>
+            </main>
+            """,
+        ),
+        (
+            "https://www.sruc.ac.uk/course-catalogue/"
+            "wildlife-and-conservation-management/"
+            "postgraduate-certificate-wildlife-and-conservation-management-"
+            "distance-learning/",
+            """
+            <main>
+              <h1>Postgraduate Certificate Wildlife and Conservation Management</h1>
+              <p>Study mode: Distance Learning.</p>
+              <p>This programme requires two in-person study weekends.</p>
+            </main>
+            """,
+        ),
+        (
+            "https://www.uel.ac.uk/postgraduate/courses/"
+            "mphil-phd-health-wellbeing-online-harms",
+            """
+            <main>
+              <h1>Health, Wellbeing and Online Harms MPhil PhD</h1>
+              <p>Study on campus in London.</p>
+            </main>
+            """,
+        ),
+        (
+            "https://www.unitec.ac.nz/current-students/on-campus/"
+            "external-support-services/",
+            """
+            <main>
+              <h1>External Support Services</h1>
+              <p>Support information for students studying on campus.</p>
+            </main>
+            """,
+        ),
+    ],
+)
+def test_audited_online_parent_rules_keep_mixed_and_false_positive_pages(
+    url: str,
+    html: str,
+) -> None:
+    assert not is_confirmed_host_online_only_page(html, url)
+
+
+def test_audited_host_rule_requires_course_owned_delivery_evidence() -> None:
+    html = """
+    <main>
+      <h1>Digital Health and Cyberpsychology MSc</h1>
+      <p>Attendance: On campus</p>
+    </main>
+    <nav><a href="/study/online/">Explore online study</a></nav>
+    """
+    assert not is_confirmed_host_online_only_page(
+        html,
+        "https://www.westminster.ac.uk/health-psychology-courses/2026-27/"
+        "september/open-distance-learning-full-time/"
+        "digital-health-and-cyberpsychology-msc",
+    )
+
+
+def test_optional_campus_event_does_not_override_online_only_delivery() -> None:
+    html = """
+    <main>
+      <h1>Digital Health and Cyberpsychology MSc</h1>
+      <dl>
+        <dt>Attendance</dt><dd>Open/Distance Learning</dd>
+        <dt>Campus</dt><dd>Distance Learning Online</dd>
+      </dl>
+      <p>Online students may attend an optional graduation event on campus.</p>
+    </main>
+    """
+    assert is_confirmed_host_online_only_page(
+        html,
+        "https://www.westminster.ac.uk/health-psychology-courses/2026-27/"
+        "september/open-distance-learning-full-time/"
+        "digital-health-and-cyberpsychology-msc",
+    )
+
+
+@pytest.mark.parametrize(
+    ("url", "html"),
+    [
+        (
+            "https://www.herts.ac.uk/courses/undergraduate/"
+            "mixed-computing-online",
+            """
+            <main>
+              <h1>Mixed Computing (Online)</h1>
+              <p>Students must attend weekly classes at Hatfield Campus.</p>
+              <template><p>Our online degrees can be studied anywhere.</p></template>
+            </main>
+            """,
+        ),
+        (
+            "https://www.westminster.ac.uk/health-psychology-courses/2026-27/"
+            "september/open-distance-learning-full-time/mixed-health-msc",
+            """
+            <main>
+              <h1>Mixed Health MSc</h1>
+              <p>Attendance: On campus</p>
+            </main>
+            <footer>
+              <p>Attendance Open/Distance Learning</p>
+              <p>Campus Distance Learning Online</p>
+            </footer>
+            """,
+        ),
+        (
+            "https://www.tees.ac.uk/postgraduate_courses/business/"
+            "msc_mixed_business_(online).cfm",
+            """
+            <div id="coursepage">
+              <h1>Mixed Business (Online) MSc</h1>
+              <p>Students must attend classes on campus.</p>
+              <div hidden>100% online</div>
+            </div>
+            """,
+        ),
+        (
+            "https://www.manchester.ac.uk/study/masters/courses/list/99999/"
+            "msc-mixed-science-online/",
+            """
+            <main id="content">
+              <h1>Mixed Science (online)</h1>
+              <p>Students must attend practical classes in Manchester.</p>
+              <div aria-hidden="true">Delivery: 100% online learning</div>
+            </main>
+            """,
+        ),
+        (
+            "https://www.qmul.ac.uk/postgraduate/taught/coursefinder/courses/"
+            "mixed-law-online-pgdip/",
+            """
+            <main>
+              <h1>Mixed Law Online PGDip</h1>
+              <dl><dt>Location</dt><dd>Lincoln's Inn Fields</dd></dl>
+            </main>
+            <footer><p>Location Distance Learning</p></footer>
+            """,
+        ),
+        (
+            "https://www.kingston.ac.uk/study/postgraduate/"
+            "mixed-psychology-online",
+            """
+            <main>
+              <h1>Mixed Psychology Online</h1>
+              <p>Students must attend practical sessions on campus.</p>
+              <template><p>Teaching is delivered entirely online.</p></template>
+            </main>
+            """,
+        ),
+    ],
+)
+def test_audited_host_templates_ignore_hidden_chrome_and_keep_mixed_courses(
+    url: str,
+    html: str,
+) -> None:
+    assert not is_confirmed_host_online_only_page(html, url)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("url", "course_name", "html"),
+    [
+        (
+            "https://www.herts.ac.uk/courses/undergraduate/"
+            "bsc-hons-information-technology-online",
+            "BSc (Hons) Information Technology (Online)",
+            """
+            <main>
+              <h1>BSc (Hons) Information Technology (Online)</h1>
+              <p>Our online degrees let you study when and where you want.</p>
+            </main>
+            """,
+        ),
+        (
+            "https://www.westminster.ac.uk/health-psychology-courses/2026-27/"
+            "september/open-distance-learning-full-time/"
+            "digital-health-and-cyberpsychology-msc",
+            "Digital Health and Cyberpsychology MSc",
+            """
+            <main>
+              <h1>Digital Health and Cyberpsychology MSc</h1>
+              <dl>
+                <dt>Attendance</dt><dd>Open/Distance Learning</dd>
+                <dt>Campus</dt><dd>Distance Learning Online</dd>
+              </dl>
+            </main>
+            """,
+        ),
+        (
+            "https://www.tees.ac.uk/postgraduate_courses/"
+            "english_&_creative_writing/ma_creative_writing_(online).cfm",
+            "Creative Writing (Online) MA",
+            """
+            <main>
+              <h1>Creative Writing (Online) MA</h1>
+              <p>Attendance: 100% online</p>
+            </main>
+            """,
+        ),
+        (
+            "https://www.manchester.ac.uk/study/masters/courses/list/21020/"
+            "msc-pollution-and-environmental-control-online/",
+            "Pollution and Environmental Control (online) MSc",
+            """
+            <main>
+              <h1>Pollution and Environmental Control (online)</h1>
+              <dl><dt>Delivery</dt><dd>100% online learning</dd></dl>
+            </main>
+            """,
+        ),
+        (
+            "https://www.qmul.ac.uk/postgraduate/taught/coursefinder/courses/"
+            "technology-media-and-telecommunications-law-online-pgdip/",
+            "Technology, Media and Telecommunications Law Online PGDip",
+            """
+            <main>
+              <h1>Technology, Media and Telecommunications Law Online PGDip</h1>
+              <dl><dt>Location</dt><dd>Distance Learning</dd></dl>
+            </main>
+            """,
+        ),
+        (
+            "https://www.kingston.ac.uk/study/postgraduate/"
+            "psychology-msc-conversion-online",
+            "Psychology MSc (Conversion) Online",
+            """
+            <main>
+              <h1>Psychology MSc (Conversion) Online</h1>
+              <p>Teaching is delivered entirely online.</p>
+            </main>
+            """,
+        ),
+    ],
+)
+async def test_audited_host_pipeline_exits_as_online_only(
+    url: str,
+    course_name: str,
+    html: str,
+) -> None:
+    config = UniConfig.model_validate(
+        {
+            "slug": "audited-online-template",
+            "name": "Audited Online Template",
+            "base_url": f"https://{url.split('/')[2]}",
+            "scrape_url": f"https://{url.split('/')[2]}/",
+        }
+    )
+    token = current_uni_config.set(config)
+    try:
+        from app.services.scraper.pipelines.single_course import extract_course
+
+        result = await extract_course(
+            url,
+            html=html,
+            use_ai_fallback=False,
+        )
+    finally:
+        current_uni_config.reset(token)
+
+    assert result["payload"]["online_only"] is True
+    assert result["payload"]["online_only_audited_host"] is True
+    accepted, reason = should_stage_course(
+        course_name,
+        result["payload"],
+        source_url=result["url"],
+    )
+    assert accepted is False
+    assert reason == "online_only"
 
 
 @pytest.mark.asyncio
