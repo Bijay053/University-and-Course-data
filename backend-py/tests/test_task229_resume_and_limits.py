@@ -118,7 +118,7 @@ def test_resume_provenance_records_only_checkpoint_rows_used_by_current_links():
 
 # ── _clear_stale_dedup SQL shaping (reviewer-rejection + resume preservation) ─
 
-def test_clear_stale_dedup_preserves_current_and_resumable(monkeypatch):
+def test_clear_stale_dedup_preserves_current_and_all_runtime_owned_rows(monkeypatch):
     """The DELETE must (a) exclude the current job's own rows and (b) exclude
     recently-interrupted resumable jobs when resume is enabled, while never
     touching rejected rows (status='pending' only)."""
@@ -144,15 +144,14 @@ def test_clear_stale_dedup_preserves_current_and_resumable(monkeypatch):
     sql = captured["sql"]
     assert "sc.status = 'pending'" in sql          # rejected rows untouched
     assert "sc.scrape_job_id <> :cur_job" in sql   # current job preserved
-    assert "'queued', 'failed', 'stopped'" in sql  # resumable jobs preserved
+    assert "AND NOT EXISTS" in sql
+    assert "j.runtime_job_id = sc.scrape_job_id" in sql
     assert captured["params"]["cur_job"] == "job_abc"
     assert captured["params"]["uid"] == 42
 
 
-def test_clear_stale_dedup_preserves_manually_stopped_jobs(monkeypatch):
-    """Manual-stop checkpoints must survive: a deliberately STOPPED run's pending
-    rows must be preserved (within the resume window) so a re-trigger resumes
-    instead of restarting from course 0.  Regression for the manual-stop gap."""
+def test_clear_stale_dedup_preserves_rows_owned_by_any_known_job(monkeypatch):
+    """Known jobs own review history regardless of their terminal status."""
     captured: dict = {}
 
     class _FakeResult:
@@ -172,12 +171,11 @@ def test_clear_stale_dedup_preserves_manually_stopped_jobs(monkeypatch):
     monkeypatch.setattr(settings, "scrape_resume_enabled", True, raising=False)
     _run(orch._clear_stale_dedup(_FakeDB(), 99))
     sql = captured["sql"]
-    # All three interrupted statuses (timeout=failed, restart=queued,
-    # manual=stopped) must be in the preservation clause.
-    assert "'queued', 'failed', 'stopped'" in sql
-    # The window bound must be applied so genuinely-old leftovers are still wiped.
-    assert "updated_at > NOW() - (:rw || ' minutes')::interval" in sql
-    assert captured["params"]["rw"] == str(settings.scrape_resume_window_minutes)
+    assert "AND NOT EXISTS" in sql
+    assert "FROM scrape_runtime_jobs j" in sql
+    assert "j.runtime_job_id = sc.scrape_job_id" in sql
+    # Age still applies to orphan cleanup; known runtime-owned rows are excluded.
+    assert "sc.created_at < NOW() - (:m || ' minutes')::interval" in sql
 
 
 def test_clear_stale_dedup_skips_resumable_clause_when_disabled(monkeypatch):
