@@ -28,6 +28,7 @@ def test_start_scrape_body_accepts_targeted_course_urls() -> None:
 
     assert body.course_urls == ["https://example.edu/course/a"]
     assert body.retry_source_job_id == "job_source"
+    assert body.browser_rescue_attempted is False
 
 
 def test_targeted_urls_are_http_only_deduplicated_and_bounded() -> None:
@@ -322,3 +323,4 @@ def test_continue_endpoint_can_enable_browser_rescue_after_proven_skip(monkeypat
     assert university.scrape_config["admin_config"]["extraction"]["skip_browser_rescue"] is False
     assert university.scrape_config["admin_config"]["extraction"]["skip_per_course_browser"] is False
     assert captured["body"].course_urls == ["https://example.edu/course/a"]
+    assert captured["body"].browser_rescue_attempted is True

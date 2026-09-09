@@ -26,6 +26,10 @@ class StartScrapeBody(BaseModel):
     # non-empty, but still uses the ordinary extraction and staging pipeline.
     course_urls: list[str] = Field(default_factory=list, alias="courseUrls")
     retry_source_job_id: str | None = Field(default=None, alias="retrySourceJobId")
+    browser_rescue_attempted: bool = Field(
+        default=False,
+        alias="browserRescueAttempted",
+    )
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
 

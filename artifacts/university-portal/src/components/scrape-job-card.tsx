@@ -479,6 +479,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
   const [pendingReviewCount, setPendingReviewCount] = useState<number | null>(null);
   const pendingReviewCountJobRef = useRef<string | null>(null);
   const [continuingUnresolved, setContinuingUnresolved] = useState(false);
+  const [browserRescueAttempted, setBrowserRescueAttempted] = useState(false);
   const [recoveringSkipped, setRecoveringSkipped] = useState(false);
 
   // Snapshot badge state — loaded after job completes
@@ -747,6 +748,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
     setPendingReviewCount(null);
     setPerformanceSavings(null);
     setCompletedJobId(null);
+    setBrowserRescueAttempted(false);
     setSnapshotSummary(null);
     setSnapshotSummaryLoading(false);
     setQualityData(null);
@@ -1352,6 +1354,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
           logs?: ScrapeLog[]; logIndex?: number;
           status?: string; imported?: number; skipped?: number; errors?: number;
           reviewableCount?: number;
+          browserRescueAttempted?: boolean;
           current?: number; total?: number; totalFound?: number;
         }>(res);
         if (!data) { schedule(POLL_BASE); return; }
@@ -1362,6 +1365,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
         if (data.universityName) setUniName(data.universityName);
         if (data.universityId != null) setSelectedUni(String(data.universityId));
         if (data.url) setScrapeUrl(data.url);
+        setBrowserRescueAttempted(Boolean(data.browserRescueAttempted));
         if (typeof data.fastMode === "boolean") setFastMode(data.fastMode);
         if (data.feePageUrl) {
           setFeePageUrl(data.feePageUrl);
@@ -1697,6 +1701,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
       const t0 = Date.now();
       setActiveJobId(data.jobId);
       setCompletedJobId(null);
+      setBrowserRescueAttempted(enableBrowserRescue);
       // Keep the completed parent's staged count visible until the child
       // status poll returns its cumulative reviewableCount. Clearing this made
       // a continuation appear to have lost all data and briefly show zero.
@@ -3981,6 +3986,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
             </div>
 
             {completedJobId && resultSummary && resultSummary.errors > 0 &&
+              !browserRescueAttempted &&
               logs.some(log => {
                 const message = log.message || "";
                 return message.includes("skip_browser_rescue=true") ||
@@ -4012,8 +4018,24 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                 </div>
               )}
 
+            {completedJobId && resultSummary && resultSummary.errors > 0 &&
+              browserRescueAttempted && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-blue-600" />
+                    <div className="text-xs text-blue-900">
+                      <p className="font-semibold">Browser recovery finished</p>
+                      <p className="mt-0.5 text-blue-800">
+                        The remaining pages still could not be fetched. The recovered and previously staged courses are ready for review; another identical retry will not help.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
             <div className="flex gap-2">
               {completedJobId && resultSummary && resultSummary.errors > 0 &&
+                !browserRescueAttempted &&
                 !logs.some(log => {
                   const message = log.message || "";
                   return message.includes("skip_browser_rescue=true") ||

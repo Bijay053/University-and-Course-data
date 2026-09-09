@@ -539,6 +539,7 @@ async def start_scrape(
             "courseUrls": body.course_urls,
             "course_urls": body.course_urls,
             "retrySourceJobId": body.retry_source_job_id,
+            "browserRescueAttempted": body.browser_rescue_attempted,
         },
     )
     db.add(job)
@@ -868,6 +869,9 @@ async def get_status(
         "fastMode": bool(job.fast_mode),
         "feePageUrl": request_payload.get("feePage"),
         "requirementsPageUrl": request_payload.get("requirementsPage"),
+        "browserRescueAttempted": bool(
+            request_payload.get("browserRescueAttempted")
+        ),
         "startedAt": job.started_at.isoformat() if job.started_at else None,
         "completedAt": job.completed_at.isoformat() if job.completed_at else None,
         "errorMessage": job.error_message,
@@ -1665,6 +1669,7 @@ async def continue_unresolved_history_urls(
             universityId=job.university_id,
             courseUrls=selected_urls,
             retrySourceJobId=job_id,
+            browserRescueAttempted=enable_browser_rescue,
         ),
         db,
     )
