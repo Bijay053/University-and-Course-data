@@ -1694,7 +1694,6 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
       const data = await readResponseJson<{ jobId: string }>(response);
       if (!data?.jobId) throw new Error("Server did not return a job ID.");
 
-      const unresolvedCount = resultSummary?.errors ?? 0;
       const t0 = Date.now();
       setActiveJobId(data.jobId);
       setCompletedJobId(null);
@@ -1718,7 +1717,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
           event: "status",
           message:
             `══ ${enableBrowserRescue ? "BROWSER RESCUE ENABLED — " : ""}CONTINUING ` +
-            `${unresolvedCount} UNRESOLVED COURSE${unresolvedCount === 1 ? "" : "S"} ` +
+            "UNRESOLVED COURSES " +
             `FROM ${completedJobId} AS ${data.jobId} ══`,
         },
       ].slice(-MAX_LOGS));
@@ -1736,7 +1735,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
     } finally {
       setContinuingUnresolved(false);
     }
-  }, [completedJobId, continuingUnresolved, pollJobStatus, resultSummary?.errors, slotKey, startTimeKey, toast]);
+  }, [completedJobId, continuingUnresolved, pollJobStatus, slotKey, startTimeKey, toast]);
 
   const handleRecoverSkipped = useCallback(async () => {
     if (!completedJobId || recoveringSkipped) return;
@@ -3982,14 +3981,18 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
             </div>
 
             {completedJobId && resultSummary && resultSummary.errors > 0 &&
-              logs.some(log => (log.message || "").includes("skip_browser_rescue=true")) && (
+              logs.some(log => {
+                const message = log.message || "";
+                return message.includes("skip_browser_rescue=true") ||
+                  message.includes("skip_per_course_browser=true");
+              }) && (
                 <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 space-y-2">
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-600" />
                     <div className="text-xs text-amber-900">
                       <p className="font-semibold">Browser rescue was disabled</p>
                       <p className="mt-0.5 text-amber-800">
-                        A normal Continue will repeat these fetch failures. Enable browser rescue and retry only the unresolved course URLs.
+                        A normal Continue would repeat these fetch failures. Enable all browser recovery paths and retry only the unresolved course URLs.
                       </p>
                     </div>
                   </div>
@@ -4004,13 +4007,18 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                       : <RefreshCw className="w-3.5 h-3.5 mr-1.5" />}
                     {continuingUnresolved
                       ? "Enabling browser rescue…"
-                      : `Enable browser rescue & retry ${resultSummary.errors}`}
+                      : "Enable browser rescue & retry unresolved"}
                   </Button>
                 </div>
               )}
 
             <div className="flex gap-2">
-              {completedJobId && resultSummary && resultSummary.errors > 0 && (
+              {completedJobId && resultSummary && resultSummary.errors > 0 &&
+                !logs.some(log => {
+                  const message = log.message || "";
+                  return message.includes("skip_browser_rescue=true") ||
+                    message.includes("skip_per_course_browser=true");
+                }) && (
                 <Button
                   onClick={() => handleContinueUnresolved(false)}
                   disabled={continuingUnresolved}
@@ -4023,7 +4031,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                     : <Play className="w-3.5 h-3.5 mr-1.5" />}
                   {continuingUnresolved
                     ? "Continuing…"
-                    : `Continue ${resultSummary.errors} unresolved`}
+                    : "Continue unresolved"}
                 </Button>
               )}
               {completedJobId && hasReviewableCourses(resultSummary, pendingReviewCount) && (

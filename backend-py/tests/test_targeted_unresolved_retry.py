@@ -265,7 +265,10 @@ def test_continue_endpoint_can_enable_browser_rescue_after_proven_skip(monkeypat
     university = SimpleNamespace(
         scrape_config={
             "admin_config": {
-                "extraction": {"skip_browser_rescue": True},
+                "extraction": {
+                    "skip_browser_rescue": True,
+                    "skip_per_course_browser": True,
+                },
             },
         },
     )
@@ -279,7 +282,10 @@ def test_continue_endpoint_can_enable_browser_rescue_after_proven_skip(monkeypat
                         "url": "https://example.edu/course/a",
                         "reason": "fetch_failed",
                         "retryable": True,
-                        "message": "[BROWSER↑ SKIPPED] skip_browser_rescue=true",
+                        "message": (
+                            "[BROWSER↑ SKIPPED] "
+                            "skip_per_course_browser=true"
+                        ),
                     },
                     None,
                 ),
@@ -314,4 +320,5 @@ def test_continue_endpoint_can_enable_browser_rescue_after_proven_skip(monkeypat
     assert result.job_id == "job_browser"
     assert db.committed is True
     assert university.scrape_config["admin_config"]["extraction"]["skip_browser_rescue"] is False
+    assert university.scrape_config["admin_config"]["extraction"]["skip_per_course_browser"] is False
     assert captured["body"].course_urls == ["https://example.edu/course/a"]

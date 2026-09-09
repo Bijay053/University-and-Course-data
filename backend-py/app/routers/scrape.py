@@ -1591,8 +1591,8 @@ async def continue_unresolved_history_urls(
     """Queue a focused continuation for all retryable URLs left unresolved.
 
     Operators may explicitly enable browser rescue when this run's own logs
-    prove that ``skip_browser_rescue`` prevented every browser attempt.  The
-    override is persisted in the university's admin config so subsequent UI
+    prove that either browser-suppression flag prevented an attempt.  Both
+    overrides are persisted in the university's admin config so subsequent UI
     retries do not silently repeat the same deterministic failure.
     """
     job = await db.get(ScrapeRuntimeJob, job_id)
@@ -1622,13 +1622,22 @@ async def continue_unresolved_history_urls(
 
     if enable_browser_rescue:
         rescue_was_blocked = any(
-            "skip_browser_rescue=true" in json.dumps(payload or {}).casefold()
+            any(
+                flag in json.dumps(payload or {}).casefold()
+                for flag in (
+                    "skip_browser_rescue=true",
+                    "skip_per_course_browser=true",
+                )
+            )
             for payload, _created_at in rows
         )
         if not rescue_was_blocked:
             raise HTTPException(
                 status_code=409,
-                detail="Browser rescue can only be enabled when this run was blocked by skip_browser_rescue=true",
+                detail=(
+                    "Browser rescue can only be enabled when this run was "
+                    "blocked by a browser-suppression flag"
+                ),
             )
 
         university = await db.get(University, job.university_id)
@@ -1638,12 +1647,14 @@ async def continue_unresolved_history_urls(
         admin_config = dict(config.get("admin_config") or {})
         extraction = dict(admin_config.get("extraction") or {})
         extraction["skip_browser_rescue"] = False
+        extraction["skip_per_course_browser"] = False
         admin_config["extraction"] = extraction
         config["admin_config"] = admin_config
         university.scrape_config = config
         await db.commit()
         log.info(
-            "Browser rescue enabled from failed scrape UI: source_job=%s university_id=%s",
+            "Browser rescue fully enabled from failed scrape UI: "
+            "source_job=%s university_id=%s",
             job_id,
             job.university_id,
         )
