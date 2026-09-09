@@ -319,6 +319,10 @@ interface FixResults {
     id: number;
     reason?: string;
   }>;
+  failedResults: Array<{
+    id: number;
+    error?: string;
+  }>;
   valueUpdatedFields: string[];
   provenanceOnlyFields: string[];
   beforeIssues: FixIssue[];
@@ -351,6 +355,9 @@ interface BulkFixJob {
   }>;
   errorMessage: string | null;
 }
+
+const isCompletedFixStatus = (status: string) =>
+  status === "completed" || status === "completed_with_errors";
 
 const FORCEABLE_FIX_FIELDS = [
   { field: "international_fee", label: "International Fee" },
@@ -2423,6 +2430,50 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     }
   };
 
+  const openCompletedFixResults = async (
+    job: BulkFixJob,
+    beforeIssues: FixIssue[] = [],
+  ) => {
+    const valueUpdatedFields = new Set<string>();
+    const provenanceOnlyFields = new Set<string>();
+    mergeReextractFieldResults({ valueUpdatedFields, provenanceOnlyFields }, job.results);
+    const resultIds = job.results
+      .map((result) => Number(result.id))
+      .filter((id) => Number.isInteger(id));
+    const uniId = reviewUniversityId();
+    let afterIssues: FixIssue[] = [];
+    let afterAnalysisComplete = false;
+    if (resultIds.length > 0 && uniId != null) {
+      try {
+        afterIssues = (await loadFixAnalysis(resultIds, uniId)).issues;
+        afterAnalysisComplete = true;
+      } catch {
+        // Do not claim target-field success without a fresh comparison.
+      }
+    }
+    setFixResults({
+      total: job.total,
+      updated: job.completed,
+      skipped: job.noProgress,
+      errors: job.failed,
+      noProgressResults: job.results
+        .filter((result) => result.outcome === "no_progress")
+        .map((result) => ({ id: result.id, reason: result.reason })),
+      failedResults: job.results
+        .filter((result) => result.outcome === "failed")
+        .map((result) => ({ id: result.id, error: result.error ?? result.reason })),
+      valueUpdatedFields: Array.from(valueUpdatedFields).sort(),
+      provenanceOnlyFields: Array.from(provenanceOnlyFields).sort(),
+      beforeIssues,
+      afterIssues,
+      afterAnalysisComplete,
+      requestedFields: job.targetFields?.length
+        ? job.targetFields
+        : beforeIssues.map((issue) => issue.field),
+    });
+    setShowFixResultsDialog(true);
+  };
+
   useEffect(() => {
     const savedJobId = localStorage.getItem("activeBulkFixJob");
     if (!savedJobId) return;
@@ -2478,45 +2529,11 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         setFixProgress({ completed: job.processed, total: job.total });
         if (!["queued", "running"].includes(job.status)) {
           window.clearInterval(timer);
-          const valueUpdatedFields = new Set<string>();
-          const provenanceOnlyFields = new Set<string>();
-          mergeReextractFieldResults({ valueUpdatedFields, provenanceOnlyFields }, job.results);
-          const resultIds = job.results
-            .map((result) => Number(result.id))
-            .filter((id) => Number.isInteger(id));
-          const uniId = reviewUniversityId();
-          let afterIssues: FixIssue[] = [];
-          let afterAnalysisComplete = false;
-          if (resultIds.length > 0 && uniId != null) {
-            try {
-              afterIssues = (await loadFixAnalysis(resultIds, uniId)).issues;
-              afterAnalysisComplete = true;
-            } catch {
-              // Do not claim target-field success without a fresh comparison.
-            }
-          }
-          setFixResults({
-            total: job.total,
-            updated: job.completed,
-            skipped: job.noProgress,
-            errors: job.failed,
-            noProgressResults: job.results
-              .filter((result) => result.outcome === "no_progress")
-              .map((result) => ({ id: result.id, reason: result.reason })),
-            valueUpdatedFields: Array.from(valueUpdatedFields).sort(),
-            provenanceOnlyFields: Array.from(provenanceOnlyFields).sort(),
-            beforeIssues: fixAnalysis?.issues ?? [],
-            afterIssues,
-            afterAnalysisComplete,
-            requestedFields: job.targetFields?.length
-              ? job.targetFields
-              : (fixAnalysis?.issues ?? []).map((issue) => issue.field),
-          });
+          await openCompletedFixResults(job, fixAnalysis?.issues ?? []);
           setFixingSelected(false);
           setFixProgress(null);
           setShowFixPreviewDialog(false);
           resetForcedFixFields();
-          setShowFixResultsDialog(true);
           if (reviewJobId) void loadStagedCourses(reviewJobId);
         }
       } catch {
@@ -3024,6 +3041,17 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             <p className="mt-2 text-xs text-muted-foreground">
               This status was restored from the durable repair job. Open the related course review to inspect repaired fields.
             </p>
+            {isCompletedFixStatus(bulkFixJob.status) && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => void openCompletedFixResults(bulkFixJob)}
+              >
+                View Fix results
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}
@@ -3245,6 +3273,17 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                 )}
                 {["queued", "running"].includes(bulkFixJob.status) && (
                   <p className="mt-2 text-xs text-blue-700">This job continues if you close or reload the page.</p>
+                )}
+                {isCompletedFixStatus(bulkFixJob.status) && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => void openCompletedFixResults(bulkFixJob)}
+                  >
+                    View Fix results
+                  </Button>
                 )}
               </div>
             )}
@@ -3969,6 +4008,20 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                       <p key={result.id}>
                         Course {result.id}
                         {result.reason ? ` — ${result.reason}` : ""}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {fixResults.failedResults.length > 0 && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-red-800">Failed</p>
+                  <div className="mt-2 space-y-1 text-sm text-red-800">
+                    {fixResults.failedResults.map((result) => (
+                      <p key={result.id}>
+                        Course {result.id}
+                        {result.error ? ` — ${result.error}` : ""}
                       </p>
                     ))}
                   </div>

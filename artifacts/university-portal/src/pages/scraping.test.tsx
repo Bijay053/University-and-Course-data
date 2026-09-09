@@ -302,6 +302,82 @@ describe("Scraping repair reviewer", () => {
     });
   }, 10_000);
 
+  it("restores a completed background Fix with errors and opens its detailed results", async () => {
+    const review = initialReview();
+    localStorage.setItem("activeBulkFixJob", "restored-fix");
+
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
+      if (url === "/api/scrape/staged/repair-job") return jsonResponse(review.courses);
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      if (url === "/api/scrape/staged/analyze") {
+        return jsonResponse({ total: 3, courses_with_url: 3, issues: [] });
+      }
+      if (url === "/api/scrape/staged/fix-jobs/restored-fix") {
+        return jsonResponse({
+          jobId: "restored-fix",
+          sourceJobId: "repair-job",
+          targetFields: ["international_fee"],
+          status: "completed_with_errors",
+          total: 3,
+          queued: 0,
+          running: 0,
+          completed: 1,
+          noProgress: 1,
+          failed: 1,
+          processed: 3,
+          results: [
+            {
+              id: 1,
+              ok: true,
+              outcome: "completed",
+              updated_fields: ["international_fee"],
+              refreshed_evidence_fields: ["duration"],
+            },
+            {
+              id: 2,
+              ok: true,
+              outcome: "no_progress",
+              updated_fields: [],
+              refreshed_evidence_fields: [],
+              reason: "International fee remained unavailable",
+            },
+            {
+              id: 3,
+              ok: false,
+              outcome: "failed",
+              error: "Course page timed out",
+            },
+          ],
+          errorMessage: null,
+        });
+      }
+      return jsonResponse({});
+    }));
+
+    const user = userEvent.setup();
+    render(<ScrapingForTest initialReviewState={review} />);
+
+    const viewResults = await screen.findByRole("button", { name: "View Fix results" });
+    expect(screen.queryByRole("dialog", { name: "Fix Results" })).toBeNull();
+    await user.click(viewResults);
+
+    const dialog = await screen.findByRole("dialog", { name: "Fix Results" });
+    expect(within(dialog).getByText("Processed 2 of 3")).toBeTruthy();
+    expect(within(dialog).getByText("· 1 failed")).toBeTruthy();
+    expect(within(dialog).getByText("Requested values updated")).toBeTruthy();
+    expect(within(dialog).getByText("International Fee")).toBeTruthy();
+    expect(within(dialog).getByText("Sources refreshed — values unchanged")).toBeTruthy();
+    expect(within(dialog).getByText("Duration")).toBeTruthy();
+    expect(within(dialog).getByText(
+      "Course 2 — International fee remained unavailable",
+    )).toBeTruthy();
+    expect(within(dialog).getByText("Course 3 — Course page timed out")).toBeTruthy();
+  });
+
   it("requires reasons for forced fields and sends them with the union of detected targets", async () => {
     const review = initialReview();
     const fixBodies: Array<{
