@@ -12,9 +12,13 @@ import pytest
 
 from app.services.scraper.config.loader import load_uni_config
 from app.services.scraper.bond_static_extract import (
+    _enrich_from_central_ielts,
     _enrich_from_details_api,
+    _enrich_from_fees_api,
+    _extract_program_ids,
     apply_bond_extraction,
     is_bond_program_url,
+    suppress_authoritative_fee_omission,
 )
 
 
@@ -76,6 +80,241 @@ def test_details_api_preserves_duration_value_and_unit(
     assert (result["duration"], result["duration_term"]) == expected
 
 
+def test_details_api_exposes_valid_program_code_fallback(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.services.scraper.bond_static_extract._get_json",
+        lambda _url: {"programs": [{"id": "CC-60005", "duration": "2 years"}]},
+    )
+    assert _enrich_from_details_api("5622")["_program_code"] == "CC-60005"
+
+
+def test_program_ids_accept_spacing_absolute_urls_and_lowercase_codes() -> None:
+    html = (
+        'data-program-detail-url = "https://www.bond.edu.au/api/program-details/5622" '
+        'data-program-code = "cc-60005"'
+    )
+    assert _extract_program_ids(html) == ("5622", "cc-60005")
+
+
+@pytest.mark.parametrize(
+    ("international", "expected"),
+    [
+        ({"annual": 43700, "total": 174800}, (43700.0, "Annual")),
+        ({"semester": 25040, "total": 150240}, (75120.0, "Annual")),
+        ({"total": 21200}, (21200.0, "Full Course")),
+    ],
+)
+def test_fee_api_preserves_authoritative_period(
+    monkeypatch, international: dict, expected: tuple[float, str]
+) -> None:
+    monkeypatch.setattr(
+        "app.services.scraper.bond_static_extract._get_json",
+        lambda _url: {
+            "fees": [
+                {"year": "2025", "international": {"total": 9999}},
+                {"year": "2027", "international": international},
+            ]
+        },
+    )
+    result = _enrich_from_fees_api("123", "AA-100")
+    assert (result["international_fee"], result["fee_term"]) == expected
+    assert result["fee_year"] == 2027
+    assert result["currency"] == "AUD"
+
+
+def test_empty_fee_api_is_an_authoritative_omission(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.services.scraper.bond_static_extract._get_json",
+        lambda _url: {"fees": []},
+    )
+    assert _enrich_from_fees_api("123", "AA-100") == {
+        "_authoritative_fee_omission": True
+    }
+
+
+def test_central_ielts_is_limited_to_exact_authoritative_groups(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.services.scraper.bond_static_extract._get_html",
+        lambda _url: (
+            "<table><tr><td>Master of Occupational Therapy</td>"
+            "<td>Overall 7.0 with no sub-score less than 6.5</td></tr></table>"
+            "<table><tr><td>All higher degree by research (HDR) programs</td>"
+            "<td>Overall 7.0 with no sub-score less than 6.5</td></tr></table>"
+        ),
+    )
+    expected = {
+        "ielts_overall": 7.0,
+        "ielts_writing": 6.5,
+        "ielts_reading": 6.5,
+        "ielts_listening": 6.5,
+        "ielts_speaking": 6.5,
+    }
+    assert _enrich_from_central_ielts(
+        "https://bond.edu.au/program/master-of-philosophy"
+    ) == expected
+    assert _enrich_from_central_ielts(
+        "https://bond.edu.au/program/bachelor-of-health-sciences-master-of-occupational-therapy"
+    ) == expected
+    assert _enrich_from_central_ielts(
+        "https://bond.edu.au/program/master-of-accounting"
+    ) == {}
+    assert _enrich_from_central_ielts(
+        "https://bond.edu.au/program/unrelated-research"
+    ) == {}
+
+
+def test_central_ielts_does_not_borrow_neighboring_row_score(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.services.scraper.bond_static_extract._get_html",
+        lambda _url: (
+            "<table>"
+            "<tr><td>Master of Occupational Therapy</td><td>No numeric score published</td></tr>"
+            "<tr><td>Unrelated program</td><td>Overall 6.0 with no sub-score less than 5.5</td></tr>"
+            "</table>"
+        ),
+    )
+    assert _enrich_from_central_ielts(
+        "https://bond.edu.au/program/master-of-occupational-therapy"
+    ) == {}
+
+
+def test_central_ielts_honors_rowspan_group(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.services.scraper.bond_static_extract._get_html",
+        lambda _url: (
+            "<table>"
+            "<tr><td>Doctor of Physiotherapy</td>"
+            "<td rowspan='2'>Overall 7.0 with no sub-score less than 6.5</td></tr>"
+            "<tr><td>Master of Occupational Therapy</td></tr>"
+            "</table>"
+        ),
+    )
+    assert _enrich_from_central_ielts(
+        "https://bond.edu.au/program/master-of-occupational-therapy"
+    )["ielts_overall"] == 7.0
+
+
+def test_course_english_wins_and_central_only_fills_missing_slots(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.services.scraper.bond_static_extract._extract_program_ids",
+        lambda _html: (None, None),
+    )
+    monkeypatch.setattr(
+        "app.services.scraper.bond_static_extract._enrich_from_entry_requirements",
+        lambda _url: {"ielts_overall": 7.5},
+    )
+    monkeypatch.setattr(
+        "app.services.scraper.bond_static_extract._enrich_from_central_ielts",
+        lambda _url: {
+            "ielts_overall": 7.0,
+            "ielts_writing": 6.5,
+            "ielts_reading": 6.5,
+        },
+    )
+    result = apply_bond_extraction(
+        "https://bond.edu.au/program/master-of-philosophy", ""
+    )
+    assert result["ielts_overall"] == 7.5
+    assert result["ielts_writing"] == 6.5
+    assert result["_source_urls"]["ielts_overall"].endswith("/entry_requirements")
+    assert result["_source_urls"]["ielts_writing"].endswith(
+        "/english-language-requirements/ielts"
+    )
+
+
+def test_explicit_html_program_code_wins_over_details_fallback(monkeypatch) -> None:
+    called: list[str] = []
+    monkeypatch.setattr(
+        "app.services.scraper.bond_static_extract._enrich_from_details_api",
+        lambda _id: {"_program_code": "FALLBACK-999"},
+    )
+    monkeypatch.setattr(
+        "app.services.scraper.bond_static_extract._enrich_from_fees_api",
+        lambda _id, code: called.append(code) or {},
+    )
+    monkeypatch.setattr(
+        "app.services.scraper.bond_static_extract._enrich_from_entry_requirements",
+        lambda _url: {},
+    )
+    monkeypatch.setattr(
+        "app.services.scraper.bond_static_extract._enrich_from_central_ielts",
+        lambda _url: {},
+    )
+    apply_bond_extraction(
+        "https://bond.edu.au/program/example",
+        'data-program-detail-url="/api/program-details/123" '
+        'data-program-code="EXPLICIT-123"',
+    )
+    assert called == ["EXPLICIT-123"]
+
+
+def test_authoritative_empty_fee_blocks_static_fallback(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.services.scraper.bond_static_extract._enrich_from_details_api",
+        lambda _id: {"_program_code": "AA-100"},
+    )
+    monkeypatch.setattr(
+        "app.services.scraper.bond_static_extract._enrich_from_fees_api",
+        lambda _id, _code: {"_authoritative_fee_omission": True},
+    )
+    monkeypatch.setattr(
+        "app.services.scraper.bond_static_extract._enrich_from_entry_requirements",
+        lambda _url: {},
+    )
+    monkeypatch.setattr(
+        "app.services.scraper.bond_static_extract._enrich_from_central_ielts",
+        lambda _url: {},
+    )
+    result = apply_bond_extraction(
+        "https://bond.edu.au/program/example",
+        'data-program-detail-url="/api/program-details/123" '
+        "International students: A$99,999",
+    )
+    assert "international_fee" not in result
+    assert result["_authoritative_fee_omission"] is True
+    assert "bond_fee_source_empty" in result["scrape_warnings"]
+
+
+def test_authoritative_empty_fee_removes_all_downstream_guesses() -> None:
+    payload = {
+        "international_fee": 99999,
+        "currency": "AUD",
+        "fee_term": "Annual",
+        "fee_year": 2026,
+        "course_name": "Keep me",
+    }
+    evidence = [
+        {"field_key": "international_fee", "method": "ai_fallback"},
+        {"field_key": "fee_term", "method": "page_regex"},
+        {"field_key": "course_name", "method": "page_regex"},
+    ]
+    suppress_authoritative_fee_omission(payload, evidence)
+    assert all(
+        payload[key] is None
+        for key in ("international_fee", "domestic_fee", "currency", "fee_term", "fee_year")
+    )
+    assert evidence == [{"field_key": "course_name", "method": "page_regex"}]
+    assert payload["course_name"] == "Keep me"
+
+
+def test_enrichment_script_never_writes_internal_metadata() -> None:
+    from scripts.bond_enrich import _build_update
+
+    sql, params = _build_update(
+        {
+            "id": 123,
+            "_authoritative_fee_omission": True,
+            "_source_urls": {"international_fee": "https://example.test"},
+            "scrape_warnings": ["bond_fee_source_empty"],
+            "course_location": "Gold Coast, Queensland",
+        }
+    )
+    assert "_authoritative_fee_omission" not in sql
+    assert "_source_urls" not in sql
+    assert "scrape_warnings" not in sql
+    assert params["course_location"] == "Gold Coast, Queensland"
+
+
 def test_bond_config_excludes_microcredentials_from_degree_discovery() -> None:
     config = load_uni_config(
         slug="bond",
@@ -92,6 +331,8 @@ def test_bond_config_excludes_microcredentials_from_degree_discovery() -> None:
         "microcredential" in pattern
         for pattern in config.discovery.block_url_patterns
     )
+    assert config.extraction.english.course_english_priority is True
+    assert config.extraction.english.central_page is None
 
 
 # ─────────────────────────────────────────────────────────────────────────────

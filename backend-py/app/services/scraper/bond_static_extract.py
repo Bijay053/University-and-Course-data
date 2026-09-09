@@ -60,6 +60,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from typing import Any
 from urllib.parse import urlparse
 
@@ -94,31 +95,41 @@ _HEADERS = {
     "Accept": "application/json, text/html, */*",
 }
 _API_TIMEOUT = 10  # seconds per request
+_API_ATTEMPTS = 3
 
 
 def _get_json(url: str) -> dict | list | None:
     """GET *url* and return parsed JSON, or None on any error."""
-    try:
-        import requests  # lazy import — keeps module usable in test contexts
-        r = requests.get(url, headers=_HEADERS, timeout=_API_TIMEOUT)
-        r.raise_for_status()
-        return r.json()
-    except Exception as exc:
-        log.debug("[BOND] JSON fetch failed for %s: %s", url, exc)
-        return None
+    import requests  # lazy import — keeps module usable in test contexts
+    for attempt in range(_API_ATTEMPTS):
+        try:
+            r = requests.get(url, headers=_HEADERS, timeout=_API_TIMEOUT)
+            r.raise_for_status()
+            return r.json()
+        except Exception as exc:
+            log.debug("[BOND] JSON fetch attempt %d failed for %s: %s", attempt + 1, url, exc)
+            if attempt + 1 < _API_ATTEMPTS:
+                time.sleep(0.25 * (attempt + 1))
+    return None
 
 
 def _get_html(url: str) -> str | None:
     """GET *url* and return response text, or None on any error."""
-    try:
-        import requests
-        r = requests.get(url, headers={**_HEADERS, "Accept": "text/html,*/*"},
-                         timeout=_API_TIMEOUT)
-        r.raise_for_status()
-        return r.text
-    except Exception as exc:
-        log.debug("[BOND] HTML fetch failed for %s: %s", url, exc)
-        return None
+    import requests
+    for attempt in range(_API_ATTEMPTS):
+        try:
+            r = requests.get(
+                url,
+                headers={**_HEADERS, "Accept": "text/html,*/*"},
+                timeout=_API_TIMEOUT,
+            )
+            r.raise_for_status()
+            return r.text
+        except Exception as exc:
+            log.debug("[BOND] HTML fetch attempt %d failed for %s: %s", attempt + 1, url, exc)
+            if attempt + 1 < _API_ATTEMPTS:
+                time.sleep(0.25 * (attempt + 1))
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -151,6 +162,26 @@ _FEE_TERM_MAP: list[tuple[re.Pattern[str], str]] = [
 
 _FEE_MIN = 1_000
 _FEE_MAX = 200_000
+_FEE_SLOT_KEYS = frozenset(
+    {"international_fee", "domestic_fee", "currency", "fee_term", "fee_year"}
+)
+
+
+def suppress_authoritative_fee_omission(
+    payload: dict[str, Any],
+    evidence: list[dict[str, Any]],
+) -> None:
+    """Remove all downstream fee guesses after Bond returns ``fees: []``."""
+    for key in _FEE_SLOT_KEYS:
+        payload[key] = None
+    evidence[:] = [
+        ev for ev in evidence
+        if not isinstance(ev, dict) or ev.get("field_key") not in _FEE_SLOT_KEYS
+    ]
+    warnings = list(payload.get("scrape_warnings") or [])
+    if "bond_fee_source_empty" not in warnings:
+        warnings.append("bond_fee_source_empty")
+    payload["scrape_warnings"] = warnings
 
 # ---------------------------------------------------------------------------
 # Static HTML: intake month extraction (fallback when API ids are absent)
@@ -227,9 +258,15 @@ def _extract_fee_from_static_html(plain_text: str) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 _DETAIL_URL_RE = re.compile(
-    r'data-program-detail-url=["\']\/api\/program-details\/(\d+)["\']'
+    r'data-program-detail-url\s*=\s*["\']'
+    r'(?:https?://(?:www\.)?bond\.edu\.au)?/api/program-details/(\d+)["\']',
+    re.IGNORECASE,
 )
-_PROG_CODE_RE = re.compile(r'data-program-code=["\']([A-Z0-9\-]+)["\']')
+_PROG_CODE_RE = re.compile(
+    r'data-program-code\s*=\s*["\']([A-Z0-9\-]+)["\']',
+    re.IGNORECASE,
+)
+_SAFE_PROGRAM_CODE_RE = re.compile(r"^[A-Z0-9]+(?:-[A-Z0-9]+)+$", re.IGNORECASE)
 
 
 def _extract_program_ids(html: str) -> tuple[str | None, str | None]:
@@ -331,6 +368,9 @@ def _enrich_from_details_api(numeric_id: str) -> dict[str, Any]:
     prog = programs[0]
 
     result: dict[str, Any] = {}
+    details_code = prog.get("id")
+    if isinstance(details_code, str) and _SAFE_PROGRAM_CODE_RE.fullmatch(details_code.strip()):
+        result["_program_code"] = details_code.strip()
 
     # Duration
     dur_str = prog.get("duration", "")
@@ -370,36 +410,77 @@ _BOND_SEMESTERS_PER_YEAR = 3
 _PREFERRED_FEE_YEAR = "2026"
 
 
+def _select_fee_entry(fees_list: list[dict[str, Any]]) -> dict[str, Any] | None:
+    valid = [entry for entry in fees_list if isinstance(entry, dict)]
+    if not valid:
+        return None
+    preferred = next(
+        (entry for entry in valid if str(entry.get("year", "")) == _PREFERRED_FEE_YEAR),
+        None,
+    )
+    if preferred is not None:
+        return preferred
+    numeric = [
+        (int(str(entry.get("year"))), entry)
+        for entry in valid
+        if str(entry.get("year", "")).isdigit()
+    ]
+    return max(numeric, key=lambda pair: pair[0])[1] if numeric else valid[0]
+
+
+def _positive_amount(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+        return None
+    return float(value)
+
+
 def _enrich_from_fees_api(numeric_id: str, program_code: str) -> dict[str, Any]:
-    """Call /api/program-fees/{id}/{code} and return international_fee (annual)."""
+    """Return Bond's best authoritative international fee and its real period."""
     url = f"https://bond.edu.au/api/program-fees/{numeric_id}/{program_code}"
     data = _get_json(url)
     if not data or not isinstance(data, dict):
         return {}
     fees_list = data.get("fees", [])
     if not fees_list:
-        return {}
+        # This is an authoritative 200 response saying Bond publishes no fee
+        # for this program. Keep it distinct from transport/identifier failure
+        # so downstream HTML/AI fallbacks cannot invent a tuition amount.
+        return {"_authoritative_fee_omission": True}
 
-    # Prefer the target year; fall back to first entry.
-    fee_entry = next(
-        (f for f in fees_list if str(f.get("year", "")) == _PREFERRED_FEE_YEAR),
-        fees_list[0],
-    )
-    intl = fee_entry.get("international", {})
-    semester_fee = intl.get("semester")
-    if not semester_fee or not isinstance(semester_fee, (int, float)):
+    fee_entry = _select_fee_entry(fees_list)
+    if fee_entry is None:
         return {}
-
-    annual_fee = float(semester_fee) * _BOND_SEMESTERS_PER_YEAR
+    intl = fee_entry.get("international")
+    if not isinstance(intl, dict):
+        return {}
+    annual_fee = _positive_amount(intl.get("annual"))
+    semester_fee = _positive_amount(intl.get("semester"))
+    total_fee = _positive_amount(intl.get("total"))
+    fee_year = int(fee_entry["year"]) if str(fee_entry.get("year", "")).isdigit() else None
+    if annual_fee is not None:
+        amount, term, origin = annual_fee, "Annual", "annual"
+    elif semester_fee is not None:
+        amount, term, origin = (
+            semester_fee * _BOND_SEMESTERS_PER_YEAR,
+            "Annual",
+            "semester_x_3",
+        )
+    elif total_fee is not None:
+        amount, term, origin = total_fee, "Full Course", "total"
+    else:
+        return {}
     log.info(
-        "[BOND] fees API → semester=%s × %d = annual %.0f (year=%s)",
-        semester_fee, _BOND_SEMESTERS_PER_YEAR, annual_fee,
-        fee_entry.get("year"),
+        "[BOND] fees API → %s %.0f term=%s (year=%s)",
+        origin, amount, term, fee_entry.get("year"),
     )
-    return {
-        "international_fee": annual_fee,
-        "fee_term": "year",
+    result: dict[str, Any] = {
+        "international_fee": amount,
+        "currency": "AUD",
+        "fee_term": term,
     }
+    if fee_year is not None:
+        result["fee_year"] = fee_year
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -457,6 +538,83 @@ def _enrich_from_entry_requirements(course_url: str) -> dict[str, Any]:
     return result
 
 
+_CENTRAL_IELTS_URL = (
+    "https://bond.edu.au/entry-to-bond/entry-requirements/"
+    "international-entry-requirements/english-language-requirements/ielts"
+)
+
+
+def _enrich_from_central_ielts(course_url: str) -> dict[str, Any]:
+    """Fill only exact Bond program gaps from the official program-keyed table."""
+    slug = urlparse(course_url).path.rstrip("/").split("/")[-1].lower()
+    if slug in {
+        "master-of-occupational-therapy",
+        "bachelor-of-health-sciences-master-of-occupational-therapy",
+    }:
+        marker = "Master of Occupational Therapy"
+    elif slug in {
+        "master-of-philosophy",
+        "doctor-of-philosophy",
+        "doctor-of-legal-science-research",
+        "master-of-laws-by-research",
+    }:
+        marker = "All higher degree by research (HDR) programs"
+    else:
+        return {}
+    html = _get_html(_CENTRAL_IELTS_URL)
+    try:
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html or "", "html.parser")
+    except Exception:
+        return {}
+    requirement_text = ""
+    for table in soup.find_all("table"):
+        active_requirement = ""
+        active_rows = 0
+        for row in table.find_all("tr"):
+            cells = row.find_all(["th", "td"], recursive=False)
+            if not cells:
+                continue
+            if len(cells) >= 2:
+                requirement_cell = cells[1]
+                active_requirement = " ".join(
+                    requirement_cell.get_text(" ", strip=True).split()
+                )
+                try:
+                    active_rows = max(1, int(requirement_cell.get("rowspan", 1)))
+                except (TypeError, ValueError):
+                    active_rows = 1
+            first_cell = " ".join(cells[0].get_text(" ", strip=True).split())
+            current_requirement = active_requirement if active_rows > 0 else ""
+            if first_cell.casefold() == marker.casefold():
+                requirement_text = current_requirement
+                break
+            if active_rows > 0:
+                active_rows -= 1
+                if active_rows == 0:
+                    active_requirement = ""
+        if requirement_text:
+            break
+    requirement = re.search(
+        r"Overall\s+(\d(?:\.\d+)?)\s+with\s+no\s+sub-?score\s+less\s+than\s+"
+        r"(\d(?:\.\d+)?)",
+        requirement_text,
+        re.IGNORECASE,
+    )
+    if not requirement:
+        return {}
+    overall, floor = map(float, requirement.groups())
+    if not (4.0 <= floor <= overall <= 9.0):
+        return {}
+    return {
+        "ielts_overall": overall,
+        "ielts_writing": floor,
+        "ielts_reading": floor,
+        "ielts_listening": floor,
+        "ielts_speaking": floor,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Public entry-point
 # ---------------------------------------------------------------------------
@@ -485,6 +643,8 @@ def apply_bond_extraction(url: str, html: str) -> dict[str, Any]:
     pair and must be applied together by the caller.
     """
     result: dict[str, Any] = {}
+    source_urls: dict[str, str] = {}
+    authoritative_fee_omission = False
 
     # ── Always-set (hard block on extractor mis-fires) ─────────────────────
     result["has_central_fee_page"] = True
@@ -502,24 +662,42 @@ def apply_bond_extraction(url: str, html: str) -> dict[str, Any]:
 
     if numeric_id:
         details = _enrich_from_details_api(numeric_id)
+        details_program_code = details.pop("_program_code", None)
         # Use setdefault for everything from the API so generic extractors
         # can still win if they found values first.
         for k, v in details.items():
             result.setdefault(k, v)
+            source_urls.setdefault(k, f"https://bond.edu.au/api/program-details/{numeric_id}")
 
-        if program_code:
-            fees = _enrich_from_fees_api(numeric_id, program_code)
+        resolved_program_code = program_code or details_program_code
+        if resolved_program_code:
+            fees_url = f"https://bond.edu.au/api/program-fees/{numeric_id}/{resolved_program_code}"
+            fees = _enrich_from_fees_api(numeric_id, resolved_program_code)
+            authoritative_fee_omission = bool(
+                fees.pop("_authoritative_fee_omission", False)
+            )
             for k, v in fees.items():
                 result.setdefault(k, v)
+                source_urls.setdefault(k, fees_url)
         else:
             log.warning("[BOND] %s — program_code not found in HTML, skipping fees API", url)
     else:
         log.warning("[BOND] %s — numeric_id not found in HTML, API enrichment skipped", url)
 
     # ── IELTS from entry_requirements subpage ───────────────────────────────
-    ielts = _enrich_from_entry_requirements(url)
+    entry_ielts = _enrich_from_entry_requirements(url)
+    central_ielts = _enrich_from_central_ielts(url)
+    ielts = dict(entry_ielts)
+    for k, v in central_ielts.items():
+        ielts.setdefault(k, v)
     for k, v in ielts.items():
         result.setdefault(k, v)
+        source_urls.setdefault(
+            k,
+            f"{url.rstrip('/')}/entry_requirements"
+            if k in entry_ielts
+            else _CENTRAL_IELTS_URL,
+        )
 
     # ── Static HTML intake fallback (when API ids absent or API returned no months) ─
     if "intake_months" not in result:
@@ -529,7 +707,7 @@ def apply_bond_extraction(url: str, html: str) -> dict[str, Any]:
             log.info("[BOND] %s — intake_months extracted from static HTML: %s", url, static_months)
 
     # ── Static HTML fee fallback (when API ids absent or API returned no fee) ─
-    if "international_fee" not in result:
+    if "international_fee" not in result and not authoritative_fee_omission:
         static_fee = _extract_fee_from_static_html(plain_text)
         for k, v in static_fee.items():
             result.setdefault(k, v)
@@ -538,7 +716,13 @@ def apply_bond_extraction(url: str, html: str) -> dict[str, Any]:
 
     # ── Fee warning when still missing ─────────────────────────────────────
     if "international_fee" not in result:
-        result["scrape_warnings"] = ["bond_fee_js_rendered"]
+        result["scrape_warnings"] = [
+            "bond_fee_source_empty"
+            if authoritative_fee_omission
+            else "bond_fee_js_rendered"
+        ]
+        if authoritative_fee_omission:
+            result["_authoritative_fee_omission"] = True
         log.info(
             "[BOND] %s — fee not resolved from API; "
             "staging with has_central_fee_page=True for human review", url,
@@ -549,4 +733,5 @@ def apply_bond_extraction(url: str, html: str) -> dict[str, Any]:
             url, result["international_fee"], result.get("ielts_overall"),
         )
 
+    result["_source_urls"] = source_urls
     return result

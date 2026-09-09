@@ -25,6 +25,7 @@ from urllib.parse import urlparse
 
 import requests as _requests
 from sqlalchemy import create_engine, text
+from app.services.scraper.bond_static_extract import apply_bond_extraction
 
 # ── logging ──────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -106,96 +107,10 @@ def enrich_one(row: dict) -> dict:
         log.warning("[%d] %s — HTML fetch failed", sc_id, url)
         return result
 
-    m_id = _DETAIL_URL_RE.search(html)
-    m_code = _PROG_CODE_RE.search(html)
-    if not m_id:
-        log.warning("[%d] %s — no data-program-detail-url found", sc_id, url)
-        return result
-
-    numeric_id = m_id.group(1)
-    program_code = m_code.group(1) if m_code else None
-
-    # ── 2. Program details API → duration, intakes, category ─────────────
-    details = _get(f"https://bond.edu.au/api/program-details/{numeric_id}", as_json=True)
-    if details and isinstance(details, dict):
-        programs = details.get("programs", [])
-        if programs:
-            prog = programs[0]
-
-            dur_str = prog.get("duration", "")
-            if dur_str:
-                years = _YEAR_RE.search(dur_str)
-                months = _MONTH_DURATION_RE.search(dur_str)
-                if years and months:
-                    result["duration"] = (
-                        float(years.group(1)) * 12 + float(months.group(1))
-                    )
-                    result["duration_term"] = "Month"
-                elif years:
-                    result["duration"] = float(years.group(1))
-                    result["duration_term"] = "Year"
-                elif months:
-                    result["duration"] = float(months.group(1))
-                    result["duration_term"] = "Month"
-
-            offerings = prog.get("offerings", [])
-            if offerings:
-                months, seen = [], set()
-                for o in offerings:
-                    key = o.get("semester", "")[:3].lower()
-                    name = _OFFERING_MONTH_MAP.get(key)
-                    if name and name not in seen:
-                        months.append(name)
-                        seen.add(name)
-                if months:
-                    result["intake_months"] = months
-
-            study_areas = prog.get("studyAreas", [])
-            if study_areas and study_areas[0].get("label"):
-                result["category"] = study_areas[0]["label"]
-
-    # ── 3. Fee API → annual international fee ─────────────────────────────
-    if program_code:
-        fees_data = _get(
-            f"https://bond.edu.au/api/program-fees/{numeric_id}/{program_code}",
-            as_json=True,
-        )
-        if fees_data and isinstance(fees_data, dict):
-            fees_list = fees_data.get("fees", [])
-            if fees_list:
-                fee_entry = next(
-                    (f for f in fees_list if str(f.get("year", "")) == PREFERRED_FEE_YEAR),
-                    fees_list[0],
-                )
-                intl = fee_entry.get("international", {})
-                sem_fee = intl.get("semester")
-                if sem_fee and isinstance(sem_fee, (int, float)):
-                    result["international_fee"] = float(sem_fee) * SEMESTERS_PER_YEAR
-                    result["fee_term"] = "year"
-
-    # ── 4. Entry requirements → IELTS ─────────────────────────────────────
-    base = url.rstrip("/")
-    er_html = _get(f"{base}/entry_requirements")
-    if er_html:
-        text = re.sub(r"<[^>]+>", " ", er_html)
-        text = re.sub(r"\s+", " ", text)
-
-        m_ov = _IELTS_OVERALL_RE.search(text)
-        if m_ov:
-            try:
-                result["ielts_overall"] = float(m_ov.group(1))
-            except ValueError:
-                pass
-
-        m_sub = _IELTS_SUB_RE.search(text)
-        if m_sub:
-            try:
-                sub = float(m_sub.group(1))
-                for band in ("ielts_writing", "ielts_reading",
-                             "ielts_listening", "ielts_speaking"):
-                    result[band] = sub
-            except ValueError:
-                pass
+    runtime_result = apply_bond_extraction(url, html)
+    runtime_result.pop("_source_urls", None)
+    runtime_result.pop("_authoritative_fee_omission", None)
+    result.update(runtime_result)
 
     log.info(
         "[%d] done: fee=%s ielts=%s duration=%s intakes=%s",
@@ -212,8 +127,12 @@ def enrich_one(row: dict) -> dict:
 
 def _build_update(fields: dict) -> tuple[str, dict] | None:
     """Build a parameterised UPDATE for the enriched fields."""
-    skip = {"id"}
-    params = {k: v for k, v in fields.items() if k not in skip}
+    skip = {"id", "scrape_warnings"}
+    params = {
+        k: v
+        for k, v in fields.items()
+        if k not in skip and not k.startswith("_")
+    }
     if not params:
         return None
 

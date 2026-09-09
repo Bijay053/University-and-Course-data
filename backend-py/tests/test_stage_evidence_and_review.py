@@ -56,6 +56,63 @@ async def _cleanup(prefix: str) -> None:
         await db.commit()
 
 
+@pytest.mark.asyncio
+async def test_bond_source_empty_fee_is_not_inherited_from_approved_row():
+    uni_id = await _pick_university()
+    prefix = f"test_bond_empty_{uuid.uuid4().hex[:10]}"
+    name = f"Master of Source Omission {uuid.uuid4().hex[:8]}"
+    try:
+        async with AsyncSessionLocal() as db:
+            approved = ScrapedCourse(
+                scrape_job_id=f"{prefix}_old",
+                university_id=uni_id,
+                course_name=name,
+                course_website="https://bond.edu.au/program/old-version",
+                status="approved",
+                international_fee=75000,
+                fee_term="Annual",
+            )
+            db.add(approved)
+            await db.commit()
+
+        async with AsyncSessionLocal() as db:
+            staged = await stage_course(
+                db,
+                scrape_job_id=f"{prefix}_new",
+                university_id=uni_id,
+                course_name=name,
+                payload={
+                    "course_name": name,
+                    "course_website": "https://bond.edu.au/program/current-version",
+                    "international_fee": None,
+                    "fee_term": None,
+                    "has_central_fee_page": True,
+                    "course_location": "Gold Coast, Queensland",
+                    "scrape_warnings": ["bond_fee_source_empty"],
+                },
+                evidence=[],
+                source_url="https://bond.edu.au/program/current-version",
+            )
+            assert staged.saved
+            fresh = await db.get(ScrapedCourse, staged.scraped_course_id)
+            assert fresh.international_fee is None
+            assert fresh.fee_term is None
+            inherited = (
+                await db.execute(
+                    select(ScrapedFieldEvidence).where(
+                        ScrapedFieldEvidence.scraped_course_id == fresh.id,
+                        ScrapedFieldEvidence.extraction_method == "approved_row:inherited",
+                        ScrapedFieldEvidence.field_key.in_(
+                            ["international_fee", "domestic_fee", "fee_term"]
+                        ),
+                    )
+                )
+            ).scalars().all()
+            assert inherited == []
+    finally:
+        await _cleanup(prefix)
+
+
 def test_reextract_warning_cleanup_is_condition_specific():
     warnings = _filter_resolved_reextract_warnings(
         [

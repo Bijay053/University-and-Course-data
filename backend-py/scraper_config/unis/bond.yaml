@@ -92,7 +92,10 @@ discovery:
 
 extraction:
   english:
-    central_page: "https://bond.edu.au/international-students/english-language-requirements"
+    # The official IELTS page is program-keyed, not a university-wide default.
+    # bond_static_extract consumes its exact Occupational Therapy/HDR rows.
+    central_page: null
+    course_english_priority: true
 
   filters:
     domestic_only:

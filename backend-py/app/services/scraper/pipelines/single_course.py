@@ -3594,6 +3594,8 @@ async def extract_course(
     # Unlike CSU, we do NOT disable use_ai_fallback — Gemini can still help
     # with course_name, duration, description, and English scores.
     _is_bond_page: bool = False
+    _bond_authoritative_empty_fee: bool = False
+    _bond_source_urls: dict[str, str] = {}
     try:
         from app.services.scraper.bond_static_extract import (
             apply_bond_extraction as _bond_apply,
@@ -3601,6 +3603,10 @@ async def extract_course(
         )
         if _is_bond(url):
             _bond_pre = _bond_apply(url, html)
+            _bond_source_urls = dict(_bond_pre.pop("_source_urls", {}) or {})
+            _bond_authoritative_empty_fee = bool(
+                _bond_pre.pop("_authoritative_fee_omission", False)
+            )
             # Direct-write keys must block generic extractor mis-fires.
             # Only the keys explicitly listed here use direct write; all
             # other keys (e.g. international_fee when found in static HTML)
@@ -3633,7 +3639,7 @@ async def extract_course(
                             "value": _v,
                             "confidence": 0.85,
                             "method": "bond_static",
-                            "source_url": url,
+                            "source_url": _bond_source_urls.get(_k, url),
                             "snippet": f"Bond pre-seed: {_k}={_v}",
                         }
                     )
@@ -3800,6 +3806,16 @@ async def extract_course(
                     # and has confidence ≥ 0.90 — should always win.
                     # _stage0_covered tracks exactly which fields Stage-0 wrote.
                     if r.method.startswith("fee.audience_structural"):
+                        payload[k] = v
+                    elif (
+                        _is_bond_page
+                        and k.startswith("ielts_")
+                        and _bond_source_urls.get(k, "").endswith(
+                            "/english-language-requirements/ielts"
+                        )
+                    ):
+                        # Main program-page evidence outranks Bond's narrow
+                        # central-table recovery, which exists only to fill gaps.
                         payload[k] = v
                     elif r.method.startswith("location.") and k in _stage0_covered:
                         payload[k] = v  # structural extractor overrides Stage-0 guess
@@ -8777,6 +8793,14 @@ async def extract_course(
                     )
     except Exception as exc:  # noqa: BLE001
         log.warning("fee degree_level_defaults fallback errored on %s: %s", url, exc)
+
+    # A successful Bond fee API response with fees:[] is authoritative source
+    # evidence of an omission, not permission for regex/AI/default guesses.
+    if _bond_authoritative_empty_fee:
+        from app.services.scraper.bond_static_extract import (
+            suppress_authoritative_fee_omission as _suppress_bond_fee,
+        )
+        _suppress_bond_fee(payload, evidence)
 
     # Rule-based category classifier — runs after every other slot is
     # populated so we can use the (possibly AI-filled) course_name. The

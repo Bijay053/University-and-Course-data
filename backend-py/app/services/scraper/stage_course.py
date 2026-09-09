@@ -520,6 +520,10 @@ async def stage_course(
         "intake_months",
         "study_mode", "course_location",
     )
+    _authoritative_fee_omission = "bond_fee_source_empty" in set(
+        payload.get("scrape_warnings") or []
+    )
+    _fee_preserve_fields = {"international_fee", "domestic_fee", "fee_term"}
     try:
         _exist_q = await db.execute(
             select(ScrapedCourse)
@@ -535,6 +539,8 @@ async def stage_course(
         if _exist:
             preserved: list[str] = []
             for _fld in _PRESERVE_FIELDS:
+                if _authoritative_fee_omission and _fld in _fee_preserve_fields:
+                    continue
                 if payload.get(_fld) is None and getattr(_exist, _fld, None) is not None:
                     _val = getattr(_exist, _fld)
                     payload[_fld] = _val
