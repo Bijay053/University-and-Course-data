@@ -775,6 +775,67 @@ def _is_domestic_only_page(html: str, url: str | None = None) -> bool:
     return False
 
 
+def _is_adelaide_online_only_page(html: str, url: str | None = None) -> bool:
+    """Return True for Adelaide degrees with authoritative all-online delivery.
+
+    Adelaide's online catalogue uses ``/study/degrees/online/`` as an
+    institution-owned route and publishes paired course metadata such as
+    ``courseMode=100% online`` and ``location=Online``. Generic page-wide mode
+    extraction is unsafe because the shared navigation lists both online study
+    and physical campuses on every degree page.
+    """
+    if not url:
+        return False
+    parsed = urlparse(url)
+    if (parsed.hostname or "").lower() not in {
+        "adelaide.edu.au",
+        "www.adelaide.edu.au",
+    }:
+        return False
+
+    path = parsed.path.rstrip("/").casefold()
+    if path == "/study/degrees/online" or path.startswith(
+        "/study/degrees/online/"
+    ):
+        return True
+    if not html:
+        return False
+
+    try:
+        from bs4 import BeautifulSoup as _BS4_adelaide_online
+
+        soup = _BS4_adelaide_online(html, "html.parser")
+
+        def _meta_property(name: str) -> str:
+            meta = soup.find(
+                "meta",
+                attrs={
+                    "property": lambda value: bool(value)
+                    and str(value).casefold() == name.casefold()
+                },
+            )
+            return (
+                " ".join(str(meta.get("content") or "").split()).casefold()
+                if meta is not None
+                else ""
+            )
+
+        course_mode = _meta_property("courseMode")
+        course_location = _meta_property("location")
+        return course_mode in {"online", "online only", "100% online"} and (
+            course_location in {
+                "online",
+                "online only",
+                "virtual",
+                "remote",
+                "distance",
+                "distance learning",
+            }
+        )
+    except Exception:
+        return False
+
+
 def _is_deakin_online_only_page(html: str, url: str | None = None) -> bool:
     """Return True when Deakin's international location signal is all-virtual.
 
@@ -2853,6 +2914,22 @@ async def extract_course(
                 f"[DOMESTIC ONLY] {url} — course page states domestic-students-only; skipping",
                 phase="extract",
                 kind="domestic_only_skip",
+                url=url,
+            )
+        return {"url": url, "payload": payload, "evidence": evidence}
+
+    # Adelaide's online catalogue is explicit in both its route and its
+    # course-owned mode/location metadata. Reject before shared navigation and
+    # synthetic campus defaults can overwrite "100% online" as "Blended".
+    if _is_adelaide_online_only_page(html, url):
+        payload["online_only"] = True
+        payload["online_only_adelaide"] = True
+        if emit:
+            await emit(
+                "status",
+                f"[ONLINE ONLY] {url} — Adelaide route or course metadata is all-online; skipping",
+                phase="extract",
+                kind="online_only_skip",
                 url=url,
             )
         return {"url": url, "payload": payload, "evidence": evidence}

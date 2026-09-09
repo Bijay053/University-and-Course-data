@@ -10,6 +10,7 @@ from app.services.scraper.pipelines.single_course import (
     _domestic_only_filter_enabled,
     _duration_labeled_values,
     _infer_study_load_from_text,
+    _is_adelaide_online_only_page,
     _is_domestic_only_page,
     _is_parttime_only_page,
     _parttime_only_filter_enabled,
@@ -236,6 +237,105 @@ def test_adelaide_international_only_exclusive_switch_remains_eligible() -> None
         "https://adelaide.edu.au/study/degrees/"
         "international-master-of-business-administration/",
     )
+
+
+def test_adelaide_online_catalogue_route_is_authoritative() -> None:
+    html = """
+    <nav>
+      <a href="/study/online/">100% online study</a>
+      <a href="/life-at-adelaide/campuses/">Campuses</a>
+    </nav>
+    """
+    assert _is_adelaide_online_only_page(
+        html,
+        "https://adelaide.edu.au/study/degrees/online/"
+        "bachelor-of-business-economics-finance-and-trade/"
+        "#section-entry-requirements",
+    )
+
+
+def test_adelaide_paired_online_metadata_rejects_noncanonical_alias() -> None:
+    html = """
+    <meta property="courseMode" content="100% online"/>
+    <meta property="location" content="Online"/>
+    """
+    assert _is_adelaide_online_only_page(
+        html,
+        "https://adelaide.edu.au/study/degrees/"
+        "bachelor-of-business-economics-finance-and-trade/",
+    )
+
+
+def test_adelaide_shared_online_navigation_does_not_reject_campus_degree() -> None:
+    html = """
+    <meta property="courseMode" content="On campus"/>
+    <meta property="location" content="Adelaide City Campus"/>
+    <nav>
+      <a href="/study/online/">100% online study</a>
+      <a href="/life-at-adelaide/campuses/">Campuses</a>
+    </nav>
+    """
+    assert not _is_adelaide_online_only_page(
+        html,
+        "https://adelaide.edu.au/study/degrees/bachelor-of-arts/",
+    )
+
+
+@pytest.mark.asyncio
+async def test_adelaide_online_degree_pipeline_exits_before_mode_overwrite() -> None:
+    config = UniConfig.model_validate(
+        {
+            "slug": "adelaide",
+            "name": "Adelaide University",
+            "base_url": "https://adelaide.edu.au",
+            "scrape_url": "https://adelaide.edu.au/study/degrees/",
+            "extraction": {
+                "filters": {
+                    "online_only": {"enabled": False},
+                }
+            },
+        }
+    )
+    html = """
+    <html>
+      <head>
+        <meta property="studentType" content="Domestic|International"/>
+        <meta property="courseMode" content="100% online"/>
+        <meta property="location" content="Online"/>
+      </head>
+      <body>
+        <h1>Bachelor of Business (Economics, Finance and Trade)</h1>
+        <span class="cmp-herobanner__pretitle">100% online</span>
+        <nav>
+          <a href="/life-at-adelaide/campuses/adelaide-city-campus/">
+            Adelaide City Campus
+          </a>
+        </nav>
+      </body>
+    </html>
+    """
+    token = current_uni_config.set(config)
+    try:
+        from app.services.scraper.pipelines.single_course import extract_course
+
+        result = await extract_course(
+            "https://adelaide.edu.au/study/degrees/online/"
+            "bachelor-of-business-economics-finance-and-trade/",
+            html=html,
+            use_ai_fallback=False,
+        )
+    finally:
+        current_uni_config.reset(token)
+
+    assert result["payload"]["online_only"] is True
+    assert result["payload"]["online_only_adelaide"] is True
+    accepted, reason = should_stage_course(
+        "Bachelor of Business (Economics, Finance and Trade)",
+        result["payload"],
+        source_url=result["url"],
+    )
+    assert accepted is False
+    assert reason == "online_only"
 
 
 def test_adelaide_domestic_student_type_metadata_rejects_course() -> None:
