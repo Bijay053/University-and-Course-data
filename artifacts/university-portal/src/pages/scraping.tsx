@@ -3718,13 +3718,13 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       </Dialog>
 
       {/* ── Fix Selected: Preview Dialog ───────────────────────────────────── */}
-      <Dialog open={showFixPreviewDialog} onOpenChange={(o) => {
-        if (!o && !fixingSelected) {
-          setShowFixPreviewDialog(false);
+      <Dialog open={showFixPreviewDialog} onOpenChange={(open) => {
+        setShowFixPreviewDialog(open);
+        if (!open) {
           resetForcedFixFields();
         }
       }}>
-        <DialogContent className="flex max-h-[calc(100dvh-2rem)] max-w-lg flex-col overflow-hidden">
+        <DialogContent className="flex h-[calc(100dvh-2rem)] max-h-[calc(100dvh-2rem)] max-w-lg flex-col overflow-hidden sm:h-auto">
           <DialogHeader className="shrink-0 pr-6">
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-blue-600" />
