@@ -5,6 +5,10 @@
 # Note: UNSW historically uses heavy JS rendering on the find-a-degree filter UI.
 discovery:
   always_sitemap_supplement: true
+  # UNSW's professional-development catalogue contains domestic online
+  # products and short courses, not international on-campus degrees.
+  block_url_patterns:
+    - '/study/professional-development(?:/|$)'
 extraction:
   filters:
     domestic_only:
