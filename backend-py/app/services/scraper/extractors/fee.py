@@ -138,6 +138,64 @@ def _has_domestic_only_fee_meta(html: str) -> bool:
         return False
 
 
+_QUT_NO_CURRENT_COURSE_INTL_FEE = object()
+
+
+def _from_qut_current_course_json(
+    html: str,
+    url: str,
+) -> "tuple[int, str] | object | None":
+    """Read QUT's exact current-course international fee.
+
+    QUT's static course response embeds one authoritative ``var courseJson``
+    object plus many related-course objects. The visible fee tabs mix domestic
+    CSP and international amounts, so broad text scoring can either return no
+    value or select the wrong audience. Parse only ``courseJson.fee.int`` and
+    require its canonical course URL to match the requested page.
+    """
+    import json
+    from urllib.parse import urlparse
+
+    parsed_url = urlparse(url if "://" in (url or "") else f"https://{url}")
+    host = (parsed_url.hostname or "").lower()
+    if host != "qut.edu.au" and not host.endswith(".qut.edu.au"):
+        return None
+
+    marker = re.search(r"\bvar\s+courseJson\s*=\s*", html or "")
+    if marker is None:
+        return None
+
+    try:
+        course, _ = json.JSONDecoder().raw_decode(html, marker.end())
+    except (TypeError, ValueError):
+        return _QUT_NO_CURRENT_COURSE_INTL_FEE
+    if not isinstance(course, dict):
+        return _QUT_NO_CURRENT_COURSE_INTL_FEE
+
+    requested_path = parsed_url.path.rstrip("/").lower()
+    course_urls = course.get("url")
+    if not isinstance(course_urls, dict):
+        return _QUT_NO_CURRENT_COURSE_INTL_FEE
+    published_paths = set()
+    for candidate in course_urls.values():
+        candidate_url = urlparse(str(candidate or "").replace("&amp;", "&"))
+        candidate_host = (candidate_url.hostname or "").lower()
+        if candidate_host == "qut.edu.au" or candidate_host.endswith(".qut.edu.au"):
+            published_paths.add(candidate_url.path.rstrip("/").lower())
+    if not requested_path or requested_path not in published_paths:
+        return _QUT_NO_CURRENT_COURSE_INTL_FEE
+
+    fees = course.get("fee")
+    fee_text = str(fees.get("int") or "").strip() if isinstance(fees, dict) else ""
+    match = _AMOUNT_RE.search(fee_text)
+    if match is None:
+        return _QUT_NO_CURRENT_COURSE_INTL_FEE
+    amount = _parse_amount(match.group(2) or match.group(3) or "")
+    if amount is None or not 5_000 <= amount <= 500_000:
+        return _QUT_NO_CURRENT_COURSE_INTL_FEE
+    return amount, fee_text
+
+
 _SALARY_CTX = re.compile(
     r"\b(salary|salaries|earn|earning|earnings|wage|wages|income|"
     r"starting\s+pay|graduate\s+(?:salary|outcomes?|income))\b",
@@ -2353,6 +2411,29 @@ async def extract(
     except Exception:  # noqa: BLE001 — defensive; keep extractor working
         prefer_yr1 = False
         require_explicit_intl_context = False
+
+    qut_fee = _from_qut_current_course_json(html, url)
+    if qut_fee is _QUT_NO_CURRENT_COURSE_INTL_FEE:
+        return []
+    if isinstance(qut_fee, tuple):
+        amount, ctx = qut_fee
+        return [
+            ExtractionResult(
+                field_key="international_fee",
+                value=amount,
+                normalized={
+                    "international_fee": amount,
+                    "currency": "AUD",
+                    "fee_term": _normalize_fee_term(
+                        ctx, prefer_year_one=prefer_yr1
+                    ),
+                    "fee_year": _extract_year(ctx),
+                },
+                confidence=0.99,
+                snippet=ctx[:240],
+                method="fee.qut_current_course_json",
+            )
+        ]
 
     metadata_fee = _extract_explicit_international_fee_meta(html)
     if metadata_fee is not None:

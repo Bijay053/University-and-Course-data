@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   annualFeeEquivalentForDisplay,
   getFixResultHeading,
+  isRequestedFixField,
   ScrapingForTest,
   type ScrapingInitialReviewState,
 } from "./scraping";
@@ -102,6 +103,34 @@ describe("Scraping repair reviewer", () => {
       afterIssues: [issue],
       afterAnalysisComplete: true,
     })).toBe("No progress");
+  });
+
+  it("reports a remaining requested gap as partial after the preview state is lost", () => {
+    const remainingFee = {
+      field: "international_fee",
+      label: "International Fee",
+      missing: 1,
+      total: 4,
+      current_pct: 75,
+      expected_fill_pct: 90,
+    };
+    expect(getFixResultHeading({
+      total: 4,
+      updated: 4,
+      skipped: 0,
+      errors: 0,
+      beforeIssues: [],
+      afterIssues: [remainingFee],
+      afterAnalysisComplete: true,
+      requestedFields: ["international_fee", "study_mode"],
+      valueUpdatedFields: ["international_fee", "study_mode"],
+    })).toBe("Partially successful");
+  });
+
+  it("maps component updates to their requested Fix field groups", () => {
+    expect(isRequestedFixField("pte_overall", ["english_requirements"])).toBe(true);
+    expect(isRequestedFixField("fee_term", ["international_fee"])).toBe(true);
+    expect(isRequestedFixField("duration", ["international_fee"])).toBe(false);
   });
 
   it("forces a fresh authenticated staged-course request when Refresh is clicked", async () => {

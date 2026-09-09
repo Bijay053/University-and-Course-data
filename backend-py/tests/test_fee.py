@@ -55,6 +55,70 @@ def test_explicit_international_fee_meta_beats_domestic_csp_body_amounts():
     assert out[0].confidence == 0.99
 
 
+def test_qut_current_course_json_supplies_exact_international_fee():
+    html = """
+    <p>2026: CSP $4,700 per year full-time</p>
+    <script>
+    var courseJson = {
+      "full-name": "Master of Teaching (Early Childhood)",
+      "url": {
+        "domestic": "https://www.qut.edu.au/courses/master-of-teaching-early-childhood",
+        "international": "https://www.qut.edu.au/courses/master-of-teaching-early-childhood"
+      },
+      "fee": {
+        "dom": "2027: Fee available from October",
+        "int": "2027: $39,500 per year full-time (96 credit points)"
+      }
+    };
+    </script>
+    <script>
+    var relatedCourse = {"fee": {"int": "2027: $53,700 per year"}};
+    </script>
+    """
+
+    out = _run(
+        fee.extract(
+            html,
+            "qut.edu.au/courses/master-of-teaching-early-childhood",
+            country="Australia",
+        )
+    )
+
+    assert len(out) == 1
+    assert out[0].normalized == {
+        "international_fee": 39500,
+        "currency": "AUD",
+        "fee_term": "Annual",
+        "fee_year": 2027,
+    }
+    assert out[0].method == "fee.qut_current_course_json"
+    assert out[0].confidence == 0.99
+
+
+def test_qut_current_course_json_never_leaks_fee_to_another_course():
+    html = """
+    <script>
+    var courseJson = {
+      "url": {
+        "international": "https://www.qut.edu.au/courses/course-a"
+      },
+      "fee": {"int": "2027: $39,500 per year"}
+    };
+    </script>
+    <p>Related international course fee: $53,700 per year.</p>
+    """
+
+    out = _run(
+        fee.extract(
+            html,
+            "https://www.qut.edu.au/courses/course-b",
+            country="Australia",
+        )
+    )
+
+    assert out == []
+
+
 def test_domestic_or_ambiguous_fee_meta_does_not_trigger_international_prepass():
     html = """
     <head>

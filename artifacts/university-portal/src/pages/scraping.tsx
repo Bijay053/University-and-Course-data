@@ -324,6 +324,7 @@ interface FixResults {
   beforeIssues: FixIssue[];
   afterIssues: FixIssue[];
   afterAnalysisComplete: boolean;
+  requestedFields: string[];
 }
 interface BulkFixJob {
   jobId: string;
@@ -380,6 +381,8 @@ export function getFixResultHeading(result: {
   beforeIssues?: FixIssue[];
   afterIssues?: FixIssue[];
   afterAnalysisComplete?: boolean;
+  requestedFields?: string[];
+  valueUpdatedFields?: string[];
 }): string {
   if (result.afterAnalysisComplete && result.beforeIssues?.length) {
     const beforeMissing = result.beforeIssues.reduce((sum, issue) => sum + issue.missing, 0);
@@ -389,6 +392,22 @@ export function getFixResultHeading(result: {
     );
     if (afterMissing >= beforeMissing) return "No progress";
     if (afterMissing === 0 && result.errors === 0) return "Successful";
+    return "Partially successful";
+  }
+  if (result.afterAnalysisComplete && result.requestedFields?.length) {
+    const remainingRequested = (result.afterIssues ?? []).reduce(
+      (sum, issue) => sum + (
+        result.requestedFields?.includes(issue.field) ? issue.missing : 0
+      ),
+      0,
+    );
+    if (remainingRequested > 0) {
+      const requestedValueChanged = (result.valueUpdatedFields ?? []).some(
+        (field) => isRequestedFixField(field, result.requestedFields ?? []),
+      );
+      return requestedValueChanged ? "Partially successful" : "No progress";
+    }
+    if (result.errors === 0) return "Successful";
     return "Partially successful";
   }
   if (result.errors === 0 && result.updated === result.total && result.skipped === 0) {
@@ -414,6 +433,34 @@ const FIX_FIELD_LABELS: Record<string, string> = {
   other_requirement: "Entry Requirements",
   course_name: "University Name in Title",
 };
+
+const FIX_FIELD_GROUPS: Record<string, string> = {
+  currency: "international_fee",
+  fee_term: "international_fee",
+  fee_year: "international_fee",
+  ielts_overall: "english_requirements",
+  ielts_reading: "english_requirements",
+  ielts_writing: "english_requirements",
+  ielts_speaking: "english_requirements",
+  ielts_listening: "english_requirements",
+  pte_overall: "english_requirements",
+  pte_reading: "english_requirements",
+  pte_writing: "english_requirements",
+  pte_speaking: "english_requirements",
+  pte_listening: "english_requirements",
+  toefl_overall: "english_requirements",
+  toefl_reading: "english_requirements",
+  toefl_writing: "english_requirements",
+  toefl_speaking: "english_requirements",
+  toefl_listening: "english_requirements",
+  cambridge_overall: "english_requirements",
+  duolingo_overall: "english_requirements",
+};
+
+export function isRequestedFixField(field: string, requestedFields: string[]): boolean {
+  return requestedFields.includes(field)
+    || requestedFields.includes(FIX_FIELD_GROUPS[field]);
+}
 
 function UniversityCombobox({
   value,
@@ -2461,6 +2508,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             beforeIssues: fixAnalysis?.issues ?? [],
             afterIssues,
             afterAnalysisComplete,
+            requestedFields: job.targetFields?.length
+              ? job.targetFields
+              : (fixAnalysis?.issues ?? []).map((issue) => issue.field),
           });
           setFixingSelected(false);
           setFixProgress(null);
@@ -3930,7 +3980,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                   {fixResults.valueUpdatedFields.length > 0 && (
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                       <p className="text-xs font-semibold uppercase tracking-wide text-slate-700">
-                        {fixResults.valueUpdatedFields.some((field) => fixResults.beforeIssues.some((issue) => issue.field === field))
+                        {fixResults.valueUpdatedFields.some((field) => isRequestedFixField(field, fixResults.requestedFields))
                           ? "Requested values updated"
                           : "Other metadata updated — requested fields unchanged"}
                       </p>
