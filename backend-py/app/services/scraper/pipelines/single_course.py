@@ -620,12 +620,16 @@ def _is_domestic_only_page(html: str, url: str | None = None) -> bool:
         return False
     if _utas_has_advisory_only_international_panel(html, url):
         return True
-    # Adelaide University publishes the eligible audiences as authoritative
-    # page metadata. The reusable domestic-exclusivity dialog is embedded on
-    # every degree page, so its text alone is deliberately ignored below.
-    # `studentType=Domestic` means the International audience URL redirects
-    # back to the domestic page; eligible degrees publish
-    # `studentType=Domestic|International`.
+    # Adelaide University usually publishes the eligible audiences as
+    # authoritative page metadata. The reusable domestic-exclusivity dialog is
+    # embedded on every degree page, so its text alone is deliberately ignored.
+    #
+    # A small set of domestic-only degrees incorrectly publish
+    # `studentType=Domestic|International`. Those pages use the site's exclusive
+    # audience-switcher component; selecting International activates the
+    # Australian-students-only dialog. Require the metadata and component
+    # signals together so international-only degrees that reuse the exclusive
+    # component remain eligible.
     if url and (urlparse(url).hostname or "").lower() in {
         "adelaide.edu.au",
         "www.adelaide.edu.au",
@@ -655,6 +659,16 @@ def _is_domestic_only_page(html: str, url: str | None = None) -> bool:
             }
             if "domestic" in _student_types and "international" not in _student_types:
                 return True
+            if {"domestic", "international"}.issubset(_student_types):
+                _exclusive_audience = _adelaide_soup.select_one(
+                    "#audience-switcher-exclusively-dom-int-content, "
+                    "select#dom-modal-exclusive"
+                )
+                _open_domestic_dialog = _adelaide_soup.select_one(
+                    'dialog[data-modal-opener="dom-modal-exclusive"][open]'
+                )
+                if _exclusive_audience is not None or _open_domestic_dialog is not None:
+                    return True
         except Exception:
             pass  # malformed metadata must not create a false rejection
     # SCU always emits an empty International snapshot shell, even for courses

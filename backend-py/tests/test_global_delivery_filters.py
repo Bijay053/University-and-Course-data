@@ -1,6 +1,8 @@
 """Global enforcement tests for domestic-only and online-only courses."""
 from __future__ import annotations
 
+import pytest
+
 from app.services.scraper.config.context import current_uni_config
 from app.services.scraper.config.schema import UniConfig
 from app.services.scraper.guards import should_stage_course
@@ -105,6 +107,12 @@ def test_scu_visible_audience_selector_keeps_international_course() -> None:
 def test_adelaide_dormant_domestic_modal_does_not_reject_international_degree() -> None:
     html = """
     <meta property="studentType" content="Domestic|International"/>
+    <div id="audience-switcher-dom-int-content">
+      <select id="int-modal">
+        <option value="Domestic">Australian student</option>
+        <option value="International">International student</option>
+      </select>
+    </div>
     <dialog data-modal-opener="dom-modal-exclusive" role="dialog">
       <h2>This degree is only available to Australian students</h2>
     </dialog>
@@ -117,6 +125,116 @@ def test_adelaide_dormant_domestic_modal_does_not_reject_international_degree() 
     assert not _is_domestic_only_page(
         html,
         "https://adelaide.edu.au/study/degrees/bachelor-of-arts/",
+    )
+
+
+def test_adelaide_exclusive_audience_switch_rejects_metadata_inconsistent_degree() -> None:
+    html = """
+    <meta property="studentType" content="Domestic|International"/>
+    <div id="audience-switcher-exclusively-dom-int-content">
+      <select id="int-modal-exclusive">
+        <option value="Domestic">Australian student</option>
+        <option value="International">International student</option>
+      </select>
+    </div>
+    <dialog data-modal-opener="dom-modal-exclusive" role="dialog">
+      <h2>This degree is only available to Australian students</h2>
+    </dialog>
+    """
+    assert _is_domestic_only_page(
+        html,
+        "https://adelaide.edu.au/study/degrees/diploma-in-building-studies/",
+    )
+
+
+def test_adelaide_open_domestic_dialog_rejects_rendered_recovery_page() -> None:
+    html = """
+    <meta property="studentType" content="Domestic|International"/>
+    <dialog
+      open=""
+      data-modal-opener="dom-modal-exclusive"
+      role="dialog"
+      aria-modal="true"
+    >
+      <h2>This degree is only available to Australian students</h2>
+    </dialog>
+    """
+    assert _is_domestic_only_page(
+        html,
+        "https://adelaide.edu.au/study/degrees/diploma-in-building-studies/",
+    )
+
+
+@pytest.mark.asyncio
+async def test_adelaide_diploma_pipeline_exits_as_domestic_only() -> None:
+    config = UniConfig.model_validate(
+        {
+            "slug": "adelaide",
+            "name": "Adelaide University",
+            "base_url": "https://adelaide.edu.au",
+            "scrape_url": "https://adelaide.edu.au/study/degrees/",
+            "extraction": {
+                "filters": {
+                    "domestic_only": {"enabled": False},
+                }
+            },
+        }
+    )
+    html = """
+    <html>
+      <head>
+        <meta property="studentType" content="Domestic|International"/>
+      </head>
+      <body>
+        <h1>Diploma in Building Studies</h1>
+        <div id="audience-switcher-exclusively-dom-int-content">
+          <select id="int-modal-exclusive">
+            <option value="Domestic">Australian student</option>
+            <option value="International">International student</option>
+          </select>
+        </div>
+        <dialog data-modal-opener="dom-modal-exclusive" role="dialog">
+          <h2>This degree is only available to Australian students</h2>
+        </dialog>
+      </body>
+    </html>
+    """
+    token = current_uni_config.set(config)
+    try:
+        from app.services.scraper.pipelines.single_course import extract_course
+
+        result = await extract_course(
+            "https://adelaide.edu.au/study/degrees/diploma-in-building-studies/",
+            html=html,
+            use_ai_fallback=False,
+        )
+    finally:
+        current_uni_config.reset(token)
+
+    assert result["payload"]["domestic_only"] is True
+
+
+def test_adelaide_international_only_exclusive_switch_remains_eligible() -> None:
+    html = """
+    <meta property="studentType" content="International"/>
+    <div id="audience-switcher-exclusively-dom-int-content">
+      <select id="int-modal-exclusive">
+        <option value="Domestic">Australian student</option>
+        <option value="International">International student</option>
+      </select>
+    </div>
+    <dialog
+      open=""
+      data-modal-opener="dom-modal-exclusive"
+      role="dialog"
+    >
+      <h2>This degree is only available to Australian students</h2>
+    </dialog>
+    """
+    assert not _is_domestic_only_page(
+        html,
+        "https://adelaide.edu.au/study/degrees/"
+        "international-master-of-business-administration/",
     )
 
 
