@@ -38,3 +38,9 @@ Reserve `retrySourceJobId` for true targeted/resume continuations. A full fresh 
 **Why:** Review loading follows every explicit retry-source link. Linking a replacement full scrape to the failed run merges stale parent rows into the new review and can show duplicate or obsolete courses.
 
 **How to apply:** Full recovery requests should force fresh discovery without a retry-source link. If the start endpoint reuses an already-active job, report that reuse explicitly and do not present it as a newly created recovery.
+
+Continuation exhaustion is URL-level across an entire university, not only within one explicit parent chain. A fresh full scrape must not make previously targeted failures look new again; ordinary Continue retries only unresolved URLs that no earlier continuation submitted. Persist and show the fresh/exhausted split. A proven browser-rescue escalation is a distinct recovery mode and may retry previously targeted URLs once.
+
+**Why:** A fresh ACU scrape had 79 unresolved URLs after several continuation children had already exhausted 71 of them. Looking only at the current root job's `retrySourceJobId` re-offered all 79 and recreated the retry loop.
+
+**How to apply:** Derive eligibility server-side from persisted continuation payloads for the same university, enforce the same filter in the continuation endpoint, and hydrate the status result after reload. Never use the raw error count as continuation eligibility.

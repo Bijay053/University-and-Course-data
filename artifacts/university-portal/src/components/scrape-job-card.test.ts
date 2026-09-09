@@ -6,6 +6,7 @@ import {
   hasReviewableCourses,
   isCategoryPageWarningStale,
   runtimeProgressFromStatus,
+  shouldOfferIdenticalContinuation,
   shouldShowAutomaticUrlRepair,
 } from "./scrape-job-card";
 
@@ -76,6 +77,35 @@ describe("hasReviewableCourses", () => {
 
   it("hides review only after the chain has no pending rows", () => {
     expect(hasReviewableCourses({ imported: 101 }, 0)).toBe(false);
+  });
+});
+
+describe("shouldOfferIdenticalContinuation", () => {
+  const base = {
+    completedJobId: "job_child",
+    errors: 79,
+    unresolvedCount: 79,
+    isContinuation: false,
+    browserRescueAttempted: false,
+    browserRescueWasBlocked: false,
+  };
+
+  it("offers one bounded continuation for a completed original run", () => {
+    expect(shouldOfferIdenticalContinuation(base)).toBe(true);
+  });
+
+  it("does not offer the same continuation again for a child run after reload", () => {
+    expect(shouldOfferIdenticalContinuation({
+      ...base,
+      isContinuation: true,
+    })).toBe(false);
+  });
+
+  it("does not use raw errors as retry eligibility when no URLs remain retryable", () => {
+    expect(shouldOfferIdenticalContinuation({
+      ...base,
+      unresolvedCount: 0,
+    })).toBe(false);
   });
 });
 

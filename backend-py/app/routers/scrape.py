@@ -99,6 +99,43 @@ def _unresolved_history_entries(logs: list[dict]) -> list[dict]:
     return list(by_url.values())
 
 
+async def _previous_continuation_urls(
+    db: AsyncSession,
+    *,
+    university_id: int,
+    current_job_id: str,
+) -> set[str]:
+    """Return URLs already submitted by earlier continuations for a university."""
+    rows = (await db.execute(
+        text(
+            "SELECT request_payload FROM scrape_runtime_jobs "
+            "WHERE university_id = :university_id "
+            "AND runtime_job_id <> :current_job_id"
+        ),
+        {
+            "university_id": university_id,
+            "current_job_id": current_job_id,
+        },
+    )).all()
+    attempted: set[str] = set()
+    for row in rows:
+        try:
+            payload = row[0]
+        except (KeyError, IndexError, TypeError):
+            payload = row
+        if not isinstance(payload, dict) or not payload.get("retrySourceJobId"):
+            continue
+        course_urls = payload.get("courseUrls") or payload.get("course_urls") or []
+        if not isinstance(course_urls, list):
+            continue
+        attempted.update(
+            url.strip()
+            for url in course_urls
+            if isinstance(url, str) and url.strip()
+        )
+    return attempted
+
+
 def _staged_row_to_dict(r) -> dict:
     """Build complete UI-friendly dict from a ScrapedCourse row.
 
@@ -810,8 +847,40 @@ async def get_status(
         logs.append(entry)
 
     request_payload = job.request_payload if isinstance(job.request_payload, dict) else {}
+    is_continuation = bool(request_payload.get("retrySourceJobId"))
+    unresolved_count: int | None = None
+    continuable_unresolved_count: int | None = None
+    exhausted_unresolved_count: int | None = None
+    if job.status not in {"queued", "running", "awaiting_approval"}:
+        all_log_rows = (await db.execute(
+            _text(
+                "SELECT payload, created_at FROM scrape_runtime_logs "
+                "WHERE runtime_job_id = :job_id ORDER BY sequence"
+            ),
+            {"job_id": job_id},
+        )).all()
+        unresolved_entries = _unresolved_history_entries([
+            {
+                "payload": payload,
+                "createdAt": created_at.isoformat() if created_at else None,
+            }
+            for payload, created_at in all_log_rows
+        ])
+        unresolved_count = len(unresolved_entries)
+        attempted_urls = await _previous_continuation_urls(
+            db,
+            university_id=job.university_id,
+            current_job_id=job_id,
+        )
+        continuable_unresolved_count = sum(
+            1 for entry in unresolved_entries
+            if entry["url"] not in attempted_urls
+        )
+        exhausted_unresolved_count = (
+            unresolved_count - continuable_unresolved_count
+        )
     reviewable_count: int | None = None
-    if request_payload.get("retrySourceJobId"):
+    if is_continuation:
         from app.models import ScrapedCourse
         from app.services.scraper.replay_extraction import continuation_review_scope
 
@@ -875,6 +944,17 @@ async def get_status(
         "requirementsPageUrl": request_payload.get("requirementsPage"),
         "browserRescueAttempted": bool(
             request_payload.get("browserRescueAttempted")
+        ),
+        # Durable continuation eligibility. Raw error counts include terminal
+        # source omissions and cannot decide whether another identical retry
+        # would help. A continuation child is one bounded retry, not an
+        # indefinitely chainable action.
+        "isContinuation": is_continuation,
+        "unresolvedCount": unresolved_count,
+        "continuableUnresolvedCount": continuable_unresolved_count,
+        "exhaustedUnresolvedCount": exhausted_unresolved_count,
+        "canContinueUnresolved": (
+            bool(continuable_unresolved_count) and not is_continuation
         ),
         "startedAt": job.started_at.isoformat() if job.started_at else None,
         "completedAt": job.completed_at.isoformat() if job.completed_at else None,
@@ -1544,7 +1624,6 @@ async def retry_unresolved_history_urls(
     job = await db.get(ScrapeRuntimeJob, job_id)
     if not job or not job.university_id:
         raise HTTPException(status_code=404, detail="Scrape job not found")
-
     rows = (await db.execute(
         text(
             "SELECT payload, created_at FROM scrape_runtime_logs "
@@ -1606,6 +1685,26 @@ async def continue_unresolved_history_urls(
     job = await db.get(ScrapeRuntimeJob, job_id)
     if not job or not job.university_id:
         raise HTTPException(status_code=404, detail="Scrape job not found")
+    request_payload = (
+        job.request_payload if isinstance(getattr(job, "request_payload", None), dict)
+        else {}
+    )
+    if request_payload.get("retrySourceJobId") and not enable_browser_rescue:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "This run already retried unresolved URLs. Review the remaining "
+                "courses; another identical continuation will not help."
+            ),
+        )
+    if enable_browser_rescue and request_payload.get("browserRescueAttempted"):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Browser rescue has already been attempted for this continuation "
+                "chain. Review the remaining source omissions."
+            ),
+        )
 
     rows = (await db.execute(
         text(
@@ -1621,11 +1720,26 @@ async def continue_unresolved_history_urls(
         }
         for payload, created_at in rows
     ])
-    selected_urls = [entry["url"] for entry in unresolved[:200]]
+    attempted_urls = (
+        set()
+        if enable_browser_rescue
+        else await _previous_continuation_urls(
+            db,
+            university_id=job.university_id,
+            current_job_id=job_id,
+        )
+    )
+    selected_urls = [
+        entry["url"] for entry in unresolved
+        if entry["url"] not in attempted_urls
+    ][:200]
     if not selected_urls:
         raise HTTPException(
             status_code=409,
-            detail="This scrape run has no retryable unresolved course URLs",
+            detail=(
+                "Recovery is exhausted: every unresolved URL has already been "
+                "submitted by an earlier continuation."
+            ),
         )
 
     if enable_browser_rescue:

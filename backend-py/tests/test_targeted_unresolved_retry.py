@@ -9,6 +9,8 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 
+import pytest
+
 from app.routers import scrape
 from app.schemas.scrape import ScrapeStartResponse, StartScrapeBody
 from app.services.scraper.orchestrator import (
@@ -255,6 +257,124 @@ def test_continue_endpoint_retries_every_unresolved_url(monkeypatch) -> None:
     assert result.job_id == "job_continued"
     assert captured["body"].course_urls == ["https://example.edu/course/b"]
     assert captured["body"].retry_source_job_id == "job_source"
+
+
+def test_continue_endpoint_excludes_urls_targeted_by_an_earlier_chain(
+    monkeypatch,
+) -> None:
+    captured: dict = {}
+
+    class _Result:
+        def __init__(self, rows):
+            self._rows = rows
+
+        def all(self):
+            return self._rows
+
+    class _Db:
+        execute_count = 0
+
+        async def get(self, _model, _job_id):
+            return SimpleNamespace(
+                university_id=12,
+                url="https://example.edu/courses",
+                request_payload={},
+            )
+
+        async def execute(self, _statement, _params):
+            self.execute_count += 1
+            if self.execute_count == 1:
+                return _Result([
+                    (
+                        {
+                            "kind": "extract_error",
+                            "url": "https://example.edu/course/already-tried",
+                            "reason": "per_course_timeout",
+                            "retryable": True,
+                        },
+                        None,
+                    ),
+                    (
+                        {
+                            "kind": "extract_error",
+                            "url": "https://example.edu/course/new",
+                            "reason": "per_course_timeout",
+                            "retryable": True,
+                        },
+                        None,
+                    ),
+                ])
+            return _Result([
+                (
+                    {
+                        "retrySourceJobId": "job_older",
+                        "courseUrls": [
+                            "https://example.edu/course/already-tried",
+                        ],
+                    },
+                ),
+            ])
+
+    async def _fake_start(body, db):
+        captured["body"] = body
+        return ScrapeStartResponse(
+            job_id="job_fresh_only",
+            runtime_job_id="job_fresh_only",
+        )
+
+    monkeypatch.setattr(scrape, "start_scrape", _fake_start)
+
+    result = asyncio.run(scrape.continue_unresolved_history_urls(
+        "job_new_full_scrape",
+        _Db(),
+        enable_browser_rescue=False,
+    ))
+
+    assert result.job_id == "job_fresh_only"
+    assert captured["body"].course_urls == ["https://example.edu/course/new"]
+
+
+def test_continue_endpoint_rejects_an_identical_second_continuation() -> None:
+    class _Db:
+        async def get(self, _model, _job_id):
+            return SimpleNamespace(
+                university_id=12,
+                url="https://example.edu/courses",
+                request_payload={"retrySourceJobId": "job_parent"},
+            )
+
+    with pytest.raises(scrape.HTTPException) as exc:
+        asyncio.run(scrape.continue_unresolved_history_urls(
+            "job_continuation",
+            _Db(),
+            enable_browser_rescue=False,
+        ))
+
+    assert exc.value.status_code == 409
+    assert "already retried unresolved URLs" in exc.value.detail
+
+
+def test_continue_endpoint_rejects_repeated_browser_rescue() -> None:
+    class _Db:
+        async def get(self, _model, _job_id):
+            return SimpleNamespace(
+                university_id=12,
+                url="https://example.edu/courses",
+                request_payload={
+                    "retrySourceJobId": "job_parent",
+                    "browserRescueAttempted": True,
+                },
+            )
+
+    with pytest.raises(scrape.HTTPException) as exc:
+        asyncio.run(scrape.continue_unresolved_history_urls(
+            "job_browser_continuation",
+            _Db(),
+            enable_browser_rescue=True,
+        ))
+
+    assert exc.value.status_code == 409
+    assert "already been attempted" in exc.value.detail
 
 
 def test_continue_endpoint_can_enable_browser_rescue_after_proven_skip(monkeypatch) -> None:

@@ -110,6 +110,31 @@ export function hasReviewableCourses(
   );
 }
 
+export function shouldOfferIdenticalContinuation({
+  completedJobId,
+  errors,
+  unresolvedCount,
+  isContinuation,
+  browserRescueAttempted,
+  browserRescueWasBlocked,
+}: {
+  completedJobId: string | null;
+  errors: number;
+  unresolvedCount: number | null;
+  isContinuation: boolean;
+  browserRescueAttempted: boolean;
+  browserRescueWasBlocked: boolean;
+}): boolean {
+  return Boolean(
+    completedJobId
+    && errors > 0
+    && (unresolvedCount ?? 0) > 0
+    && !isContinuation
+    && !browserRescueAttempted
+    && !browserRescueWasBlocked
+  );
+}
+
 export function shouldShowAutomaticUrlRepair(
   completedJobId: string | null,
   warningKind: "high_drop_rate" | "category_pages" | null,
@@ -480,6 +505,10 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
   const pendingReviewCountJobRef = useRef<string | null>(null);
   const [continuingUnresolved, setContinuingUnresolved] = useState(false);
   const [browserRescueAttempted, setBrowserRescueAttempted] = useState(false);
+  const [isContinuationJob, setIsContinuationJob] = useState(false);
+  const [unresolvedCount, setUnresolvedCount] = useState<number | null>(null);
+  const [continuableUnresolvedCount, setContinuableUnresolvedCount] = useState<number | null>(null);
+  const [exhaustedUnresolvedCount, setExhaustedUnresolvedCount] = useState<number | null>(null);
   const [recoveringSkipped, setRecoveringSkipped] = useState(false);
 
   // Snapshot badge state — loaded after job completes
@@ -749,6 +778,10 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
     setPerformanceSavings(null);
     setCompletedJobId(null);
     setBrowserRescueAttempted(false);
+    setIsContinuationJob(false);
+    setUnresolvedCount(null);
+    setContinuableUnresolvedCount(null);
+    setExhaustedUnresolvedCount(null);
     setSnapshotSummary(null);
     setSnapshotSummaryLoading(false);
     setQualityData(null);
@@ -1355,6 +1388,11 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
           status?: string; imported?: number; skipped?: number; errors?: number;
           reviewableCount?: number;
           browserRescueAttempted?: boolean;
+          isContinuation?: boolean;
+          unresolvedCount?: number | null;
+          continuableUnresolvedCount?: number | null;
+          exhaustedUnresolvedCount?: number | null;
+          canContinueUnresolved?: boolean;
           current?: number; total?: number; totalFound?: number;
         }>(res);
         if (!data) { schedule(POLL_BASE); return; }
@@ -1366,6 +1404,20 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
         if (data.universityId != null) setSelectedUni(String(data.universityId));
         if (data.url) setScrapeUrl(data.url);
         setBrowserRescueAttempted(Boolean(data.browserRescueAttempted));
+        setIsContinuationJob(Boolean(data.isContinuation));
+        setUnresolvedCount(
+          typeof data.unresolvedCount === "number" ? data.unresolvedCount : null
+        );
+        setContinuableUnresolvedCount(
+          typeof data.continuableUnresolvedCount === "number"
+            ? data.continuableUnresolvedCount
+            : null
+        );
+        setExhaustedUnresolvedCount(
+          typeof data.exhaustedUnresolvedCount === "number"
+            ? data.exhaustedUnresolvedCount
+            : null
+        );
         if (typeof data.fastMode === "boolean") setFastMode(data.fastMode);
         if (data.feePageUrl) {
           setFeePageUrl(data.feePageUrl);
@@ -1595,6 +1647,11 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
     setProgress(null);
     setResultSummary(null);
     setCompletedSkipReasons(undefined);
+    setBrowserRescueAttempted(false);
+    setIsContinuationJob(false);
+    setUnresolvedCount(null);
+    setContinuableUnresolvedCount(null);
+    setExhaustedUnresolvedCount(null);
     setUrlFilterWarning(null);
     setRepairCandidates(null);
     setRepairFixApplied(false);
@@ -1702,6 +1759,10 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
       setActiveJobId(data.jobId);
       setCompletedJobId(null);
       setBrowserRescueAttempted(enableBrowserRescue);
+      setIsContinuationJob(true);
+      setUnresolvedCount(null);
+      setContinuableUnresolvedCount(null);
+      setExhaustedUnresolvedCount(null);
       // Keep the completed parent's staged count visible until the child
       // status poll returns its cumulative reviewableCount. Clearing this made
       // a continuation appear to have lost all data and briefly show zero.
@@ -3986,6 +4047,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
             </div>
 
             {completedJobId && resultSummary && resultSummary.errors > 0 &&
+              (unresolvedCount ?? 0) > 0 &&
               !browserRescueAttempted &&
               logs.some(log => {
                 const message = log.message || "";
@@ -4019,12 +4081,28 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
               )}
 
             {completedJobId && resultSummary && resultSummary.errors > 0 &&
-              browserRescueAttempted && (
+              (browserRescueAttempted || (
+                isContinuationJob &&
+                !logs.some(log => {
+                  const message = log.message || "";
+                  return message.includes("skip_browser_rescue=true") ||
+                    message.includes("skip_per_course_browser=true");
+                })
+              ) || (
+                (unresolvedCount ?? 0) > 0 &&
+                continuableUnresolvedCount === 0
+              )) && (
                 <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
                   <div className="flex items-start gap-2">
                     <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-blue-600" />
                     <div className="text-xs text-blue-900">
-                      <p className="font-semibold">Browser recovery finished</p>
+                      <p className="font-semibold">
+                        {browserRescueAttempted
+                          ? "Browser recovery finished"
+                          : isContinuationJob
+                            ? "Continuation finished"
+                            : "Recovery exhausted"}
+                      </p>
                       <p className="mt-0.5 text-blue-800">
                         The remaining pages still could not be fetched. The recovered and previously staged courses are ready for review; another identical retry will not help.
                       </p>
@@ -4034,13 +4112,24 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
               )}
 
             <div className="flex gap-2">
-              {completedJobId && resultSummary && resultSummary.errors > 0 &&
-                !browserRescueAttempted &&
-                !logs.some(log => {
+              {(exhaustedUnresolvedCount ?? 0) > 0 &&
+                (continuableUnresolvedCount ?? 0) > 0 && (
+                  <p className="self-center text-xs text-slate-600">
+                    {exhaustedUnresolvedCount} previously attempted URL{exhaustedUnresolvedCount === 1 ? "" : "s"} excluded.
+                  </p>
+                )}
+              {shouldOfferIdenticalContinuation({
+                completedJobId,
+                errors: resultSummary?.errors ?? 0,
+                unresolvedCount: continuableUnresolvedCount,
+                isContinuation: isContinuationJob,
+                browserRescueAttempted,
+                browserRescueWasBlocked: logs.some(log => {
                   const message = log.message || "";
                   return message.includes("skip_browser_rescue=true") ||
                     message.includes("skip_per_course_browser=true");
-                }) && (
+                }),
+              }) && (
                 <Button
                   onClick={() => handleContinueUnresolved(false)}
                   disabled={continuingUnresolved}
@@ -4053,7 +4142,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                     : <Play className="w-3.5 h-3.5 mr-1.5" />}
                   {continuingUnresolved
                     ? "Continuing…"
-                    : "Continue unresolved"}
+                    : `Continue ${continuableUnresolvedCount ?? ""} new unresolved`}
                 </Button>
               )}
               {completedJobId && hasReviewableCourses(resultSummary, pendingReviewCount) && (
