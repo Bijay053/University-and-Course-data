@@ -241,7 +241,7 @@ type AIRepairAttempt = {
 type AIRepairSession = {
   session_id:      string;
   job_id:          string;
-  status:          "queued" | "running" | "completed" | "failed" | "not_started";
+  status:          "queued" | "starting" | "running" | "completed" | "failed" | "not_started";
   current_attempt: number;
   attempts:        AIRepairAttempt[];
   final_verdict:   string | null;
@@ -267,6 +267,26 @@ type AIRepairSession = {
   };
   runs?: AIRepairSession[];
 };
+
+type ActiveRepairReference = {
+  jobId: string;
+  sessionId: string;
+  status: string;
+};
+
+export function activeRepairFromStartConflict(payload: unknown): ActiveRepairReference | null {
+  if (!payload || typeof payload !== "object") return null;
+  const active = (payload as { active_repair?: unknown }).active_repair;
+  if (!active || typeof active !== "object") return null;
+  const record = active as Record<string, unknown>;
+  if (typeof record.job_id !== "string" || !record.job_id.trim()) return null;
+  if (typeof record.session_id !== "string" || !record.session_id.trim()) return null;
+  return {
+    jobId: record.job_id,
+    sessionId: record.session_id,
+    status: typeof record.status === "string" ? record.status : "running",
+  };
+}
 
 // ── AI Diagnostic types ───────────────────────────────────────────────────────
 type DiagnoseRootCause = { issue: string; explanation: string; severity: "high" | "medium" | "low" };
@@ -623,6 +643,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
   const [selectedAiRepairRunId, setSelectedAiRepairRunId] = useState<string | null>(null);
   const [aiRepairLoading, setAiRepairLoading] = useState(false);
   const [aiRepairPolling, setAiRepairPolling] = useState(false);
+  const [aiRepairJobId, setAiRepairJobId] = useState<string | null>(null);
   const [showAiRepairLog, setShowAiRepairLog] = useState(false);
   const aiRepairRequestRef = useRef(0);
   const aiRepairAutoRetryArmedRef = useRef(false);
@@ -961,11 +982,12 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
 
   // Poll AI repair session status every 2.5 s while the loop is running
   useEffect(() => {
-    if (!aiRepairPolling || !completedJobId) return;
+    const statusJobId = aiRepairJobId ?? completedJobId;
+    if (!aiRepairPolling || !statusJobId) return;
     const poll = async () => {
       const requestId = ++aiRepairRequestRef.current;
       try {
-        const res = await fetch(`/api/scrape/jobs/${completedJobId}/ai-repair-status`, {
+        const res = await fetch(`/api/scrape/jobs/${statusJobId}/ai-repair-status`, {
           credentials: "include",
           cache: "no-store",
         });
@@ -987,7 +1009,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
     poll(); // immediate first fetch
     const id = setInterval(poll, 2500);
     return () => clearInterval(id);
-  }, [aiRepairPolling, completedJobId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [aiRepairPolling, aiRepairJobId, completedJobId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Hydrate completed repair evidence when an older scrape-history card opens.
   useEffect(() => {
@@ -1006,7 +1028,11 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
           setSelectedAiRepairRunId(current =>
             current && runs.some(run => run.session_id === current) ? current : data.session_id
           );
+          setAiRepairJobId(data.job_id || completedJobId);
           setShowAiRepairLog(true);
+          if (data.status === "queued" || data.status === "starting" || data.status === "running") {
+            setAiRepairPolling(true);
+          }
         }
       })
       .catch(() => {});
@@ -1127,13 +1153,29 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
         cache: "no-store",
       });
       if (!res.ok) {
-        const msg = await getFetchErrorMessage(res);
-        toast({ title: "AI Repair failed to start", description: msg || `Error ${res.status}`, variant: "destructive" });
+        const errorData = await readResponseJson<{
+          detail?: string;
+          active_repair?: { job_id?: string; session_id?: string; status?: string };
+        }>(res);
+        const activeRepair = res.status === 409 ? activeRepairFromStartConflict(errorData) : null;
+        if (activeRepair) {
+          setAiRepairJobId(activeRepair.jobId);
+          setSelectedAiRepairRunId(activeRepair.sessionId);
+          setAiRepairPolling(true);
+          toast({
+            title: "Automatic repair already running",
+            description: "Showing the existing repair’s live progress.",
+          });
+          return;
+        }
+        const msg = typeof errorData?.detail === "string" ? errorData.detail : `Error ${res.status}`;
+        toast({ title: "Automatic repair failed to start", description: msg, variant: "destructive" });
         return;
       }
       const data = await readResponseJson<{ session_id: string; status: string; job_id: string }>(res);
       if (data) {
         aiRepairAutoRetryArmedRef.current = true;
+        setAiRepairJobId(completedJobId);
         const queuedSession: AIRepairSession = {
           session_id:      data.session_id,
           job_id:          completedJobId,

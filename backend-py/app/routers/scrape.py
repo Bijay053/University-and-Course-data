@@ -7089,6 +7089,7 @@ async def start_ai_repair(
     from app.services.scraper.ai_repair_agent import (
         _write_session,
         acquire_repair_lease,
+        load_active_repair_audit,
         persist_repair_audit,
         release_repair_lease,
         validate_ai_repair_target,
@@ -7149,9 +7150,26 @@ async def start_ai_repair(
 
     session_id = str(uuid.uuid4())[:8]
     if not acquire_repair_lease(university_id, session_id):
+        active_repair = await load_active_repair_audit(university_id, db)
+        active_job_id = str(active_repair.get("job_id") or "").strip()
+        active_session_id = str(active_repair.get("session_id") or "").strip()
+        if active_job_id and active_session_id:
+            from fastapi.responses import JSONResponse
+
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "detail": "An automatic repair is already queued or running for this university.",
+                    "active_repair": {
+                        "job_id": active_job_id,
+                        "session_id": active_session_id,
+                        "status": str(active_repair.get("status") or "running"),
+                    },
+                },
+            )
         raise HTTPException(
             status_code=409,
-            detail="An OpenAI repair is already queued or running for this university.",
+            detail="An automatic repair is already queued or running for this university.",
         )
 
     queued_at = datetime.now(timezone.utc).isoformat()

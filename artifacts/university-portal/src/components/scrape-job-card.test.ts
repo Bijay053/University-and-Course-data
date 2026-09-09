@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  activeRepairFromStartConflict,
   countSuspiciousSkipped,
   hasReviewableCourses,
   isCategoryPageWarningStale,
@@ -86,5 +87,29 @@ describe("shouldShowAutomaticUrlRepair", () => {
   it("does not offer URL-filter repair without a completed job or for category-page diagnosis", () => {
     expect(shouldShowAutomaticUrlRepair(null, "high_drop_rate")).toBe(false);
     expect(shouldShowAutomaticUrlRepair("job_123", "category_pages")).toBe(false);
+  });
+});
+
+describe("activeRepairFromStartConflict", () => {
+  it("returns the existing repair owner so polling can attach to it", () => {
+    expect(activeRepairFromStartConflict({
+      detail: "already running",
+      active_repair: {
+        job_id: "job_owner",
+        session_id: "repair_123",
+        status: "running",
+      },
+    })).toEqual({
+      jobId: "job_owner",
+      sessionId: "repair_123",
+      status: "running",
+    });
+  });
+
+  it("rejects conflicts that do not identify an attachable session", () => {
+    expect(activeRepairFromStartConflict({ detail: "already running" })).toBeNull();
+    expect(activeRepairFromStartConflict({
+      active_repair: { job_id: "job_owner", session_id: "" },
+    })).toBeNull();
   });
 });

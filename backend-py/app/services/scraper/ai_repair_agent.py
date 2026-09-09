@@ -182,6 +182,22 @@ async def load_repair_audits(job_id: str, db) -> list[dict]:
     return [dict(row) for row in rows if row]
 
 
+async def load_active_repair_audit(university_id: int, db) -> dict:
+    """Load the newest non-terminal repair audit for a university."""
+    from sqlalchemy import text
+
+    row = (await db.execute(
+        text(
+            "SELECT evidence FROM ai_repair_audits "
+            "WHERE university_id = :university_id "
+            "AND status IN ('queued', 'starting', 'running') "
+            "ORDER BY updated_at DESC LIMIT 1"
+        ),
+        {"university_id": university_id},
+    )).scalar_one_or_none()
+    return dict(row or {})
+
+
 async def attach_repair_snapshot_availability(
     runs: list[dict],
     db,

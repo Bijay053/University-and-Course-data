@@ -8,6 +8,7 @@ from app.services.scraper.ai_repair_agent import (
     _audit_urls,
     attach_repair_snapshot_availability,
     fail_repair_audit,
+    load_active_repair_audit,
     load_repair_audit,
     load_repair_audits,
     persist_repair_audit,
@@ -116,6 +117,23 @@ async def test_load_repair_audits_returns_every_run_in_time_order():
     statement, params = db.calls[0]
     assert "ORDER BY created_at ASC, session_id ASC" in statement
     assert params == {"job_id": "job-1"}
+
+
+@pytest.mark.asyncio
+async def test_load_active_repair_audit_returns_attachable_owner():
+    evidence = {
+        "session_id": "repair-active",
+        "job_id": "job-owner",
+        "university_id": 7,
+        "status": "running",
+    }
+    db = _DB([_Result(scalar=evidence)])
+
+    assert await load_active_repair_audit(7, db) == evidence
+    statement, params = db.calls[0]
+    assert "status IN ('queued', 'starting', 'running')" in statement
+    assert "ORDER BY updated_at DESC LIMIT 1" in statement
+    assert params == {"university_id": 7}
 
 
 @pytest.mark.asyncio
