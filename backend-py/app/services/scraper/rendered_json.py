@@ -21,6 +21,11 @@ _CHROMIUM_JSON_DOCUMENT_RE = re.compile(
       )?
       <body\b[^>]*>\s*
         <pre\b[^>]*>(?P<payload>.*?)</pre>\s*
+        (?:
+          <div\b
+            (?=[^>]*\bclass\s*=\s*["'][^"']*\bjson-formatter-container\b[^"']*["'])
+            [^>]*>\s*</div>\s*
+        )?
       </body>\s*
     </html>\s*\Z
     """,

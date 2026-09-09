@@ -27,8 +27,10 @@ Every part of `www.mq.edu.au` and both Funnelback endpoints are behind Cloudflar
 - Total: ~368 courses (fullyMatching=368 per resultsSummary)
 
 **Chrome wraps JSON in `<pre>` tag:** When scrape.do render=true opens a JSON URL,
-Chrome displays it as `<html><body><pre>{json}</pre></body></html>`.
-Rendered JSON fetches must unwrap this before parsing.
+Chrome displays it as `<html><body><pre>{json}</pre></body></html>` and may append
+an empty `json-formatter-container` sibling after the `<pre>`. Rendered JSON
+fetches must accept that exact browser-owned wrapper while rejecting arbitrary
+HTML around otherwise valid JSON.
 
 **Reference Python spider** (`macquarie_university_au_1786509801112.py`) uses `websearch.mq.edu.au`
 and works from non-datacenter IPs (local machines). From Replit servers that endpoint is also CF-blocked.

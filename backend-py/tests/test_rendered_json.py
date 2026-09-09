@@ -32,6 +32,18 @@ def test_pre_attributes_are_supported():
     assert parse_rendered_json(wrapped) == payload
 
 
+def test_chromium_json_formatter_container_after_pre_is_supported():
+    payload = {"response": {"resultPacket": {"results": [{"title": "Law"}]}}}
+    wrapped = (
+        '<html><head><meta name="color-scheme" content="light dark">'
+        '<meta charset="utf-8"></head><body><pre>'
+        f"{html.escape(json.dumps(payload))}</pre>"
+        '<div class="json-formatter-container"></div></body></html>'
+    )
+
+    assert parse_rendered_json(wrapped) == payload
+
+
 @pytest.mark.parametrize(
     "raw",
     [
@@ -69,6 +81,11 @@ def test_challenge_page_is_an_explicit_failure():
         (
             "<html><head><title>API response</title></head><body>"
             '<pre>{"accepted": true}</pre></body></html>'
+        ),
+        (
+            "<html><head></head><body>"
+            '<pre>{"accepted": true}</pre>'
+            '<div class="unrelated-container"></div></body></html>'
         ),
     ],
 )
