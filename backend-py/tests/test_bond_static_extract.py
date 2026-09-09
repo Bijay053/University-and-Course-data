@@ -315,6 +315,53 @@ def test_enrichment_script_never_writes_internal_metadata() -> None:
     assert params["course_location"] == "Gold Coast, Queensland"
 
 
+def test_enrichment_script_clears_existing_fee_after_authoritative_empty(
+    monkeypatch,
+) -> None:
+    from scripts import bond_enrich
+
+    monkeypatch.setattr(bond_enrich, "_get", lambda _url: "<html>Bond program</html>")
+    monkeypatch.setattr(
+        bond_enrich,
+        "apply_bond_extraction",
+        lambda _url, _html: {
+            "_authoritative_fee_omission": True,
+            "_source_urls": {
+                "international_fee": "https://bond.edu.au/api/program-fees/1/ABC"
+            },
+            "scrape_warnings": ["bond_fee_source_empty"],
+        },
+    )
+
+    fields = bond_enrich.enrich_one(
+        {
+            "id": 123,
+            "source_url": "https://bond.edu.au/program/example",
+            # Represents stale values already present in the database.  The
+            # generated UPDATE must explicitly clear every associated slot.
+            "international_fee": 99999,
+            "domestic_fee": 88888,
+            "currency": "AUD",
+            "fee_term": "Annual",
+            "fee_year": 2025,
+        }
+    )
+    sql, params = bond_enrich._build_update(fields)
+
+    for key in (
+        "international_fee",
+        "domestic_fee",
+        "currency",
+        "fee_term",
+        "fee_year",
+    ):
+        assert f"{key} = :{key}" in sql
+        assert key in params
+        assert params[key] is None
+    assert "_authoritative_fee_omission" not in sql
+    assert "scrape_warnings" not in sql
+
+
 def test_bond_config_excludes_microcredentials_from_degree_discovery() -> None:
     config = load_uni_config(
         slug="bond",

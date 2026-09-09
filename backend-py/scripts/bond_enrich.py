@@ -109,7 +109,19 @@ def enrich_one(row: dict) -> dict:
 
     runtime_result = apply_bond_extraction(url, html)
     runtime_result.pop("_source_urls", None)
-    runtime_result.pop("_authoritative_fee_omission", None)
+    if runtime_result.pop("_authoritative_fee_omission", False):
+        # A successful official ``fees: []`` response is authoritative.  The
+        # standalone updater must emit explicit NULL assignments so stale or
+        # guessed fee data cannot survive merely because there is no new value.
+        runtime_result.update(
+            {
+                "international_fee": None,
+                "domestic_fee": None,
+                "currency": None,
+                "fee_term": None,
+                "fee_year": None,
+            }
+        )
     result.update(runtime_result)
 
     log.info(
