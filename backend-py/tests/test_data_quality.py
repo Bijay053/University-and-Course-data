@@ -150,6 +150,23 @@ class TestFeeValidation:
         payload = _good_payload(international_fee=250_000.0)
         assert "fee_too_high" not in _codes(_run_check(payload))
 
+    def test_per_university_warning_ceiling_keeps_valid_high_fee(self):
+        payload = _good_payload(
+            degree_level="Bachelor's",
+            international_fee=75_120.0,
+            fee_term="Annual",
+            currency="AUD",
+        )
+        assert "annual_fee_too_high_warning" in _codes(_check_course(
+            payload,
+            "https://bond.edu.au/program/bachelor-of-film-and-television",
+        ))
+        assert "annual_fee_too_high_warning" not in _codes(_check_course(
+            payload,
+            "https://bond.edu.au/program/bachelor-of-film-and-television",
+            warn_max_aud_override=90_000,
+        ))
+
     def test_non_numeric_fee_is_warning(self):
         payload = _good_payload(international_fee="contact us")
         assert "non_numeric_fee" in _codes(_run_check(payload))

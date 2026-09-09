@@ -325,6 +325,7 @@ def _check_course(
     default_currency: str = "AUD",
     require_international_fee: bool = True,
     crit_min_aud_override: float | None = None,
+    warn_max_aud_override: float | None = None,
 ) -> list[QualityIssue]:
     """Return a list of quality issues for one staged course payload.
 
@@ -542,6 +543,8 @@ def _check_course(
                     # AU-tuned default).  Set via YAML extraction.fees.fee_crit_min_aud.
                     if crit_min_aud_override is not None:
                         _crit_min = float(crit_min_aud_override)
+                    if warn_max_aud_override is not None:
+                        _warn_max = float(warn_max_aud_override)
                     # Normalise fee to AUD so GBP/USD/EUR fees are not falsely
                     # flagged against AUD thresholds.  fee_val remains in
                     # original currency for display; _fee_aud is used for logic.
@@ -910,6 +913,7 @@ async def run_quality_checks(
     _default_currency: str = "AUD"
     _require_intl_fee: bool = True  # default: missing fee is CRITICAL
     _crit_min_aud_override: float | None = None
+    _warn_max_aud_override: float | None = None
     if uni_config is not None:
         try:
             campus_allowlist = uni_config.extraction.campus_allowlist or []
@@ -934,6 +938,12 @@ async def run_quality_checks(
             _crit_min_aud_override = uni_config.extraction.fees.fee_crit_min_aud
         except AttributeError:
             pass
+        try:
+            _warn_max_aud_override = (
+                uni_config.extraction.fees.annual_fee_warning_max_aud
+            )
+        except AttributeError:
+            pass
 
     for r in staged_results:
         if not isinstance(r, dict):
@@ -954,6 +964,7 @@ async def run_quality_checks(
             default_currency=_default_currency,
             require_international_fee=_require_intl_fee,
             crit_min_aud_override=_crit_min_aud_override,
+            warn_max_aud_override=_warn_max_aud_override,
         )
         all_issues.extend(course_issues)
 

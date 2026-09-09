@@ -52,9 +52,9 @@ This module provides:
 Design note
 -----------
 Called as a *pre-seed* inside ``single_course.extract_course`` before the
-``_EXTRACTORS`` loop.  Uses direct assignment for location, study_mode, and
-has_central_fee_page.  All other keys use ``setdefault`` so the generic
-extractors can still win when they find real values first.
+``_EXTRACTORS`` loop.  Only ``has_central_fee_page`` is a direct assignment.
+Location and study mode remain owned by the ordinary course-page extractors;
+page-wide Bond defaults caused every program to inherit the same values.
 """
 from __future__ import annotations
 
@@ -263,7 +263,7 @@ _DETAIL_URL_RE = re.compile(
     re.IGNORECASE,
 )
 _PROG_CODE_RE = re.compile(
-    r'data-program-code\s*=\s*["\']([A-Z0-9\-]+)["\']',
+    r'data-program(?:-code)?\s*=\s*["\']([A-Z0-9\-]+)["\']',
     re.IGNORECASE,
 )
 _SAFE_PROGRAM_CODE_RE = re.compile(r"^[A-Z0-9]+(?:-[A-Z0-9]+)+$", re.IGNORECASE)
@@ -277,38 +277,33 @@ def _extract_program_ids(html: str) -> tuple[str | None, str | None]:
         data-program-detail-url="/api/program-details/432"
         data-program-code="HS-20003"
     """
-    m_id = _DETAIL_URL_RE.search(html)
-    m_code = _PROG_CODE_RE.search(html)
-    numeric_id = m_id.group(1) if m_id else None
-    prog_code = m_code.group(1) if m_code else None
-    return numeric_id, prog_code
+    tags = re.findall(r"<[^>]*data-program-detail-url[^>]*>", html, re.I | re.S)
+    candidates: list[tuple[str, str | None, bool]] = []
+    for tag in tags:
+        m_id = _DETAIL_URL_RE.search(tag)
+        if not m_id:
+            continue
+        m_code = _PROG_CODE_RE.search(tag)
+        is_main = bool(re.search(
+            r'class\s*=\s*["\'][^"\']*\bprogram-detail\b',
+            tag,
+            re.IGNORECASE,
+        ))
+        candidates.append((
+            m_id.group(1),
+            m_code.group(1) if m_code else None,
+            is_main,
+        ))
 
-
-# ---------------------------------------------------------------------------
-# Location / mode
-# ---------------------------------------------------------------------------
-
-_BOND_LOCATION: str = "Gold Coast, Queensland"
-
-_ONLINE_MODE_RE = re.compile(
-    r"\b(online(?:\s+delivery)?|fully\s+online|distance\s+learning|"
-    r"external\s+study|study\s+online)\b",
-    re.IGNORECASE,
-)
-_CAMPUS_MENTION_RE = re.compile(
-    r"\b(gold\s+coast|robina|on.campus|on\s+campus|residential)\b",
-    re.IGNORECASE,
-)
-
-
-def _derive_study_mode(plain_text: str) -> str | None:
-    has_online = bool(_ONLINE_MODE_RE.search(plain_text))
-    has_campus = bool(_CAMPUS_MENTION_RE.search(plain_text))
-    if has_online and has_campus:
-        return "Blended"
-    if has_online:
-        return "Online"
-    return None
+    main = [(numeric_id, code) for numeric_id, code, is_main in candidates if is_main]
+    if len(main) == 1:
+        return main[0]
+    if len(candidates) == 1:
+        numeric_id, code, _is_main = candidates[0]
+        return numeric_id, code
+    # Multiple unscoped components cannot safely prove which identifier pair
+    # belongs to the current course. Fail closed instead of borrowing a card.
+    return None, None
 
 
 # ---------------------------------------------------------------------------
@@ -633,10 +628,10 @@ def apply_bond_extraction(url: str, html: str) -> dict[str, Any]:
     Review UI surfaces the incomplete row for human follow-up.
 
     Hard-set keys (direct assignment, cannot be overwritten by generic
-    extractors): ``has_central_fee_page``, ``course_location``.
+    extractors): ``has_central_fee_page``.
 
     Soft-set keys (``setdefault`` semantics, extractors may win):
-    ``study_mode``, ``intake_months``, ``category``,
+    ``intake_months``, ``category``,
     ``international_fee``, ``fee_term``, ``ielts_*``.
 
     The details API's ``duration`` and ``duration_term`` form one authoritative
@@ -648,14 +643,8 @@ def apply_bond_extraction(url: str, html: str) -> dict[str, Any]:
 
     # ── Always-set (hard block on extractor mis-fires) ─────────────────────
     result["has_central_fee_page"] = True
-    result["course_location"] = _BOND_LOCATION
-
-    # Study mode from static HTML keywords
     plain_text = re.sub(r"<[^>]+>", " ", html or "")
     plain_text = re.sub(r"\s+", " ", plain_text)
-    _mode = _derive_study_mode(plain_text)
-    if _mode is not None:
-        result["study_mode"] = _mode
 
     # ── API enrichment ──────────────────────────────────────────────────────
     numeric_id, program_code = _extract_program_ids(html or "")
@@ -669,7 +658,21 @@ def apply_bond_extraction(url: str, html: str) -> dict[str, Any]:
             result.setdefault(k, v)
             source_urls.setdefault(k, f"https://bond.edu.au/api/program-details/{numeric_id}")
 
-        resolved_program_code = program_code or details_program_code
+        if (
+            program_code
+            and details_program_code
+            and program_code.casefold() != details_program_code.casefold()
+        ):
+            log.warning(
+                "[BOND] %s — HTML program code %s disagrees with details API "
+                "code %s; skipping fees API",
+                url,
+                program_code,
+                details_program_code,
+            )
+            resolved_program_code = None
+        else:
+            resolved_program_code = program_code or details_program_code
         if resolved_program_code:
             fees_url = f"https://bond.edu.au/api/program-fees/{numeric_id}/{resolved_program_code}"
             fees = _enrich_from_fees_api(numeric_id, resolved_program_code)

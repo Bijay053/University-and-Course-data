@@ -2210,6 +2210,14 @@ class FeesConfig(BaseModel):
             "as warnings rather than data_quality_failure blocks."
         ),
     )
+    annual_fee_warning_max_aud: Optional[float] = Field(
+        default=None,
+        description=(
+            "Per-university override for the annual-fee warning ceiling in AUD. "
+            "This changes only the review warning threshold; it does not discard "
+            "fees or relax the degree-level critical upper limit."
+        ),
+    )
 
 
 class BandSpec(BaseModel):

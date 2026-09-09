@@ -91,6 +91,11 @@ discovery:
   expected_min_courses: 150
 
 extraction:
+  fees:
+    # Bond's official 2026 API publishes annual international fees up to
+    # AUD 81,600. Keep the global critical ceiling, but avoid false warnings.
+    annual_fee_warning_max_aud: 90000
+
   english:
     # The official IELTS page is program-keyed, not a university-wide default.
     # bond_static_extract consumes its exact Occupational Therapy/HDR rows.

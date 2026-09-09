@@ -90,10 +90,32 @@ def test_details_api_exposes_valid_program_code_fallback(monkeypatch) -> None:
 
 def test_program_ids_accept_spacing_absolute_urls_and_lowercase_codes() -> None:
     html = (
+        '<div class="program-detail" '
         'data-program-detail-url = "https://www.bond.edu.au/api/program-details/5622" '
-        'data-program-code = "cc-60005"'
+        'data-program = "cc-60005"></div>'
     )
     assert _extract_program_ids(html) == ("5622", "cc-60005")
+
+
+def test_program_ids_choose_paired_main_program_over_related_card() -> None:
+    html = (
+        '<article data-program-detail-url="/api/program-details/999" '
+        'data-program="WRONG-999"></article>'
+        '<div class="program-detail notranslate" '
+        'data-program-detail-url="/api/program-details/351" '
+        'data-program="HS-20021"></div>'
+    )
+    assert _extract_program_ids(html) == ("351", "HS-20021")
+
+
+def test_program_ids_reject_multiple_unscoped_components() -> None:
+    html = (
+        '<article data-program-detail-url="/api/program-details/1" '
+        'data-program="AA-100"></article>'
+        '<article data-program-detail-url="/api/program-details/2" '
+        'data-program="BB-200"></article>'
+    )
+    assert _extract_program_ids(html) == (None, None)
 
 
 @pytest.mark.parametrize(
@@ -222,7 +244,7 @@ def test_course_english_wins_and_central_only_fills_missing_slots(monkeypatch) -
     )
 
 
-def test_explicit_html_program_code_wins_over_details_fallback(monkeypatch) -> None:
+def test_disagreeing_html_and_details_codes_skip_fee_lookup(monkeypatch) -> None:
     called: list[str] = []
     monkeypatch.setattr(
         "app.services.scraper.bond_static_extract._enrich_from_details_api",
@@ -242,8 +264,36 @@ def test_explicit_html_program_code_wins_over_details_fallback(monkeypatch) -> N
     )
     apply_bond_extraction(
         "https://bond.edu.au/program/example",
+        '<div class="program-detail" '
         'data-program-detail-url="/api/program-details/123" '
-        'data-program-code="EXPLICIT-123"',
+        'data-program="EXPLICIT-123"></div>',
+    )
+    assert called == []
+
+
+def test_matching_html_and_details_codes_use_paired_fee_lookup(monkeypatch) -> None:
+    called: list[str] = []
+    monkeypatch.setattr(
+        "app.services.scraper.bond_static_extract._enrich_from_details_api",
+        lambda _id: {"_program_code": "EXPLICIT-123"},
+    )
+    monkeypatch.setattr(
+        "app.services.scraper.bond_static_extract._enrich_from_fees_api",
+        lambda _id, code: called.append(code) or {},
+    )
+    monkeypatch.setattr(
+        "app.services.scraper.bond_static_extract._enrich_from_entry_requirements",
+        lambda _url: {},
+    )
+    monkeypatch.setattr(
+        "app.services.scraper.bond_static_extract._enrich_from_central_ielts",
+        lambda _url: {},
+    )
+    apply_bond_extraction(
+        "https://bond.edu.au/program/example",
+        '<div class="program-detail" '
+        'data-program-detail-url="/api/program-details/123" '
+        'data-program="EXPLICIT-123"></div>',
     )
     assert called == ["EXPLICIT-123"]
 
@@ -267,8 +317,9 @@ def test_authoritative_empty_fee_blocks_static_fallback(monkeypatch) -> None:
     )
     result = apply_bond_extraction(
         "https://bond.edu.au/program/example",
-        'data-program-detail-url="/api/program-details/123" '
-        "International students: A$99,999",
+        '<div class="program-detail" '
+        'data-program-detail-url="/api/program-details/123"></div>'
+        "<p>International students: A$99,999</p>",
     )
     assert "international_fee" not in result
     assert result["_authoritative_fee_omission"] is True
@@ -373,6 +424,7 @@ def test_bond_config_excludes_microcredentials_from_degree_discovery() -> None:
     api = config.discovery.generic_search_api
 
     assert api is not None
+    assert config.extraction.fees.annual_fee_warning_max_aud == 90_000
     assert all("microcredential" not in pattern for pattern in api.allow_url_patterns)
     assert any(
         "microcredential" in pattern
@@ -398,9 +450,9 @@ class TestApplyBondExtractionAlwaysPresent:
     def test_has_central_fee_page_always_true(self) -> None:
         assert self._run()["has_central_fee_page"] is True
 
-    def test_course_location_is_gold_coast(self) -> None:
+    def test_course_location_is_not_fabricated(self) -> None:
         result = self._run()
-        assert result["course_location"] == "Gold Coast, Queensland"
+        assert "course_location" not in result
 
     def test_study_mode_not_set_when_no_delivery_keywords(self) -> None:
         """When page has no delivery keywords, study_mode must NOT be set.
@@ -445,27 +497,25 @@ class TestApplyBondExtractionStudyMode:
         """
         html = "<h1>MBA</h1><p>Study at Gold Coast campus.</p>"
         result = apply_bond_extraction(self._URL, html)
-        # "campus" is a location keyword, not a delivery-mode keyword.
-        # Bond's _derive_study_mode only sets mode when ONLINE keywords are found.
         assert "study_mode" not in result
 
-    def test_blended_when_online_and_campus_both_mentioned(self) -> None:
+    def test_page_wide_delivery_keywords_do_not_preseed_mode(self) -> None:
         html = (
             "<h1>MBA</h1>"
             "<p>Available via online delivery or on campus at Gold Coast.</p>"
         )
         result = apply_bond_extraction(self._URL, html)
-        assert result.get("study_mode") == "Blended"
+        assert "study_mode" not in result
 
-    def test_online_when_only_online_keyword_and_no_campus(self) -> None:
+    def test_online_keyword_does_not_override_structured_extractor(self) -> None:
         html = "<h1>MBA Online</h1><p>Fully online delivery.</p>"
         result = apply_bond_extraction(self._URL, html)
-        assert result.get("study_mode") == "Online"
+        assert "study_mode" not in result
 
-    def test_study_online_keyword_triggers_online_detection(self) -> None:
+    def test_footer_style_study_online_copy_does_not_set_mode(self) -> None:
         html = "<p>Study online from anywhere in Australia.</p>"
         result = apply_bond_extraction(self._URL, html)
-        assert result.get("study_mode") in ("Online", "Blended")
+        assert "study_mode" not in result
 
 
 # ─────────────────────────────────────────────────────────────────────────────
