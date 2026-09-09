@@ -101,6 +101,7 @@ def test_unresolved_history_entries_keep_latest_reason_per_url() -> None:
 
     assert entries == [{
         "url": "https://example.edu/a",
+        "kind": "sweep_unresolved",
         "courseName": None,
         "reason": "scrape_do_circuit_open",
         "detail": "Provider unavailable",
@@ -332,6 +333,59 @@ def test_continue_endpoint_excludes_urls_targeted_by_an_earlier_chain(
 
     assert result.job_id == "job_fresh_only"
     assert captured["body"].course_urls == ["https://example.edu/course/new"]
+
+
+def test_continue_endpoint_rejects_urls_already_attempted_by_current_sweep() -> None:
+    class _Result:
+        def __init__(self, rows):
+            self._rows = rows
+
+        def all(self):
+            return self._rows
+
+    class _Db:
+        execute_count = 0
+
+        async def get(self, _model, _job_id):
+            return SimpleNamespace(
+                university_id=12,
+                url="https://example.edu/courses",
+                request_payload={},
+            )
+
+        async def execute(self, _statement, _params):
+            self.execute_count += 1
+            if self.execute_count == 1:
+                return _Result([
+                    (
+                        {
+                            "kind": "extract_error",
+                            "url": "https://example.edu/course/exhausted",
+                            "reason": "per_course_timeout",
+                            "retryable": True,
+                        },
+                        None,
+                    ),
+                    (
+                        {
+                            "kind": "sweep_unresolved",
+                            "url": "https://example.edu/course/exhausted",
+                            "reason": "per_course_timeout",
+                        },
+                        None,
+                    ),
+                ])
+            return _Result([])
+
+    with pytest.raises(scrape.HTTPException) as exc:
+        asyncio.run(scrape.continue_unresolved_history_urls(
+            "job_sweep_exhausted",
+            _Db(),
+            enable_browser_rescue=False,
+        ))
+
+    assert exc.value.status_code == 409
+    assert "Recovery is exhausted" in exc.value.detail
 
 
 def test_continue_endpoint_rejects_an_identical_second_continuation() -> None:

@@ -89,6 +89,7 @@ def _unresolved_history_entries(logs: list[dict]) -> list[dict]:
 
         by_url[url] = {
             "url": url,
+            "kind": kind,
             "courseName": payload.get("course_name") or entry.get("course_name"),
             "reason": payload.get("reason") or payload.get("error") or entry.get("reason") or "unresolved",
             "detail": payload.get("detail") or entry.get("detail"),
@@ -874,7 +875,8 @@ async def get_status(
         )
         continuable_unresolved_count = sum(
             1 for entry in unresolved_entries
-            if entry["url"] not in attempted_urls
+            if entry["kind"] == "extract_error"
+            and entry["url"] not in attempted_urls
         )
         exhausted_unresolved_count = (
             unresolved_count - continuable_unresolved_count
@@ -1731,7 +1733,13 @@ async def continue_unresolved_history_urls(
     )
     selected_urls = [
         entry["url"] for entry in unresolved
-        if entry["url"] not in attempted_urls
+        if (
+            enable_browser_rescue
+            or (
+                entry["kind"] == "extract_error"
+                and entry["url"] not in attempted_urls
+            )
+        )
     ][:200]
     if not selected_urls:
         raise HTTPException(

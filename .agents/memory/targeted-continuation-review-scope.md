@@ -44,3 +44,9 @@ Continuation exhaustion is URL-level across an entire university, not only withi
 **Why:** A fresh ACU scrape had 79 unresolved URLs after several continuation children had already exhausted 71 of them. Looking only at the current root job's `retrySourceJobId` re-offered all 79 and recreated the retry loop.
 
 **How to apply:** Derive eligibility server-side from persisted continuation payloads for the same university, enforce the same filter in the continuation endpoint, and hydrate the status result after reload. Never use the raw error count as continuation eligibility.
+
+An unresolved URL that the current run's bounded recovery sweep actually attempted is already exhausted for normal continuation purposes. Only extraction failures the sweep never reached remain eligible; a proven browser-rescue escalation is still a distinct mode.
+
+**Why:** Bond and Adelaide completion cards offered every remaining sweep failure again immediately after logs confirmed the sweep had attempted them, making the normal Continue action inherently repetitive across all universities.
+
+**How to apply:** Preserve whether each unresolved record came from `extract_error` or `sweep_unresolved`. Count and queue only untouched `extract_error` records for ordinary continuation, while retaining all unresolved records for review diagnostics.
