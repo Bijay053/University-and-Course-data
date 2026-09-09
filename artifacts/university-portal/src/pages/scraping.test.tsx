@@ -198,8 +198,8 @@ describe("Scraping repair reviewer", () => {
           total: 51,
           queued: 0,
           running: 0,
-          completed: 51,
-          noProgress: 0,
+          completed: 50,
+          noProgress: 1,
           failed: 0,
           processed: 51,
           results: [
@@ -216,6 +216,14 @@ describe("Scraping repair reviewer", () => {
               outcome: "completed",
               updated_fields: ["ielts_overall"],
               refreshed_evidence_fields: ["study_mode", "international_fee"],
+            },
+            {
+              id: 2,
+              ok: true,
+              outcome: "no_progress",
+              updated_fields: [],
+              refreshed_evidence_fields: [],
+              reason: "Requested target fields and selected evidence were unchanged",
             },
           ],
           errorMessage: null,
@@ -250,6 +258,9 @@ describe("Scraping repair reviewer", () => {
     expect(sourceSummary?.textContent).toContain("Duration, Study Mode");
     expect(sourceSummary?.textContent).not.toContain("IELTS");
     expect(sourceSummary?.textContent).not.toContain("International Fee");
+    expect(within(dialog).getByText(
+      "Course 2 — Requested target fields and selected evidence were unchanged",
+    )).toBeTruthy();
 
     expect(fixBodies).toHaveLength(1);
     expect(fixBodies[0]).toEqual({

@@ -315,6 +315,10 @@ interface FixResults {
   updated: number;
   skipped: number;
   errors: number;
+  noProgressResults: Array<{
+    id: number;
+    reason?: string;
+  }>;
   valueUpdatedFields: string[];
   provenanceOnlyFields: string[];
   beforeIssues: FixIssue[];
@@ -341,6 +345,7 @@ interface BulkFixJob {
     refreshed_evidence_fields?: string[];
     extraction_passes?: number;
     ai_provider?: string;
+    reason?: string;
     error?: string;
   }>;
   errorMessage: string | null;
@@ -2448,6 +2453,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             updated: job.completed,
             skipped: job.noProgress,
             errors: job.failed,
+            noProgressResults: job.results
+              .filter((result) => result.outcome === "no_progress")
+              .map((result) => ({ id: result.id, reason: result.reason })),
             valueUpdatedFields: Array.from(valueUpdatedFields).sort(),
             provenanceOnlyFields: Array.from(provenanceOnlyFields).sort(),
             beforeIssues: fixAnalysis?.issues ?? [],
@@ -3900,6 +3908,20 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
               {getFixResultHeading(fixResults) === "No progress" && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                   The requested fields are still missing. Other metadata or source changes did not fix the selected issues.
+                </div>
+              )}
+
+              {fixResults.noProgressResults.length > 0 && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">No progress</p>
+                  <div className="mt-2 space-y-1 text-sm text-amber-800">
+                    {fixResults.noProgressResults.map((result) => (
+                      <p key={result.id}>
+                        Course {result.id}
+                        {result.reason ? ` — ${result.reason}` : ""}
+                      </p>
+                    ))}
+                  </div>
                 </div>
               )}
 
