@@ -317,10 +317,12 @@ interface FixResults {
   errors: number;
   noProgressResults: Array<{
     id: number;
+    courseName?: string | null;
     reason?: string;
   }>;
   failedResults: Array<{
     id: number;
+    courseName?: string | null;
     error?: string;
   }>;
   valueUpdatedFields: string[];
@@ -344,6 +346,7 @@ interface BulkFixJob {
   processed: number;
   results: Array<{
     id: number;
+    course_name?: string | null;
     ok: boolean;
     outcome: "completed" | "no_progress" | "failed";
     updated_fields?: string[];
@@ -2458,10 +2461,18 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       errors: job.failed,
       noProgressResults: job.results
         .filter((result) => result.outcome === "no_progress")
-        .map((result) => ({ id: result.id, reason: result.reason })),
+        .map((result) => ({
+          id: result.id,
+          courseName: result.course_name,
+          reason: result.reason,
+        })),
       failedResults: job.results
         .filter((result) => result.outcome === "failed")
-        .map((result) => ({ id: result.id, error: result.error ?? result.reason })),
+        .map((result) => ({
+          id: result.id,
+          courseName: result.course_name,
+          error: result.error ?? result.reason,
+        })),
       valueUpdatedFields: Array.from(valueUpdatedFields).sort(),
       provenanceOnlyFields: Array.from(provenanceOnlyFields).sort(),
       beforeIssues,
@@ -4006,7 +4017,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                   <div className="mt-2 space-y-1 text-sm text-amber-800">
                     {fixResults.noProgressResults.map((result) => (
                       <p key={result.id}>
-                        Course {result.id}
+                        {result.courseName
+                          ? `${result.courseName} (Course ${result.id})`
+                          : `Course ${result.id}`}
                         {result.reason ? ` — ${result.reason}` : ""}
                       </p>
                     ))}

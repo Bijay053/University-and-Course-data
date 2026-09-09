@@ -191,7 +191,7 @@ async def _async_repair(runtime_job_id: str) -> None:
 
 async def _async_bulk_fix(runtime_job_id: str) -> None:
     """Run selected staged-course fixes in durable five-course batches."""
-    from app.models import ScrapeRuntimeJob
+    from app.models import ScrapedCourse, ScrapeRuntimeJob
     from app.routers.scrape import ReExtractBody, re_extract_staged
     from app.services.scraper.job_claim import claim_runtime_job
 
@@ -203,6 +203,16 @@ async def _async_bulk_fix(runtime_job_id: str) -> None:
             return
         payload = job.request_payload or {}
         ids = [int(value) for value in payload.get("courseIds") or []]
+        course_name_rows = await db.execute(
+            select(ScrapedCourse.id, ScrapedCourse.course_name).where(
+                ScrapedCourse.id.in_(ids)
+            )
+        )
+        course_names = {
+            int(course_id): str(course_name).strip()
+            for course_id, course_name in course_name_rows.all()
+            if course_name and str(course_name).strip()
+        }
         target_fields = {
             str(value)
             for value in payload.get("targetFields") or []
@@ -272,6 +282,11 @@ async def _async_bulk_fix(runtime_job_id: str) -> None:
             for result in part.get("results") or []:
                 item = {
                     **result,
+                    "course_name": (
+                        str(result.get("course_name") or "").strip()
+                        or course_names.get(int(result.get("id") or 0))
+                        or None
+                    ),
                     "ai_provider": result.get("ai_provider") or "openai",
                     "extraction_passes": result.get("extraction_passes", 0),
                 }

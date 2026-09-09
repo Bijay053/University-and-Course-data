@@ -248,6 +248,7 @@ describe("Scraping repair reviewer", () => {
             },
             {
               id: 2,
+              course_name: "Master of Applied Science",
               ok: true,
               outcome: "no_progress",
               updated_fields: [],
@@ -288,7 +289,7 @@ describe("Scraping repair reviewer", () => {
     expect(sourceSummary?.textContent).not.toContain("IELTS");
     expect(sourceSummary?.textContent).not.toContain("International Fee");
     expect(within(dialog).getByText(
-      "Course 2 — Requested target fields and selected evidence were unchanged",
+      "Master of Applied Science (Course 2) — Requested target fields and selected evidence were unchanged",
     )).toBeTruthy();
 
     expect(fixBodies).toHaveLength(1);

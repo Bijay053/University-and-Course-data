@@ -8,8 +8,9 @@ import pytest
 
 
 class _Session:
-    def __init__(self, job):
+    def __init__(self, job, course_names=None):
         self.job = job
+        self.course_names = course_names or {}
         self.snapshots = []
 
     async def __aenter__(self):
@@ -20,6 +21,10 @@ class _Session:
 
     async def get(self, _model, _job_id):
         return self.job
+
+    async def execute(self, _statement):
+        rows = list(self.course_names.items())
+        return SimpleNamespace(all=lambda: rows)
 
     async def commit(self):
         self.snapshots.append(copy.deepcopy(self.job.approval_summary))
@@ -50,7 +55,7 @@ async def test_bulk_fix_persists_post_batch_counts_and_audit_metadata(monkeypatc
         status="queued",
         completed_at=None,
     )
-    session = _Session(job)
+    session = _Session(job, {11: "Master of Applied Science"})
     monkeypatch.setattr(scrape_tasks, "AsyncSessionLocal", lambda: session)
 
     async def claim(_db, _job_id):
@@ -97,7 +102,9 @@ async def test_bulk_fix_persists_post_batch_counts_and_audit_metadata(monkeypatc
         "failed": 0,
     }
     assert post_batch["results"][0]["ai_provider"] == "openai"
+    assert post_batch["results"][0]["course_name"] == "Master of Applied Science"
     assert post_batch["results"][0]["extraction_passes"] == 2
+    assert post_batch["results"][1]["course_name"] is None
     assert post_batch["results"][1]["outcome"] == "no_progress"
     assert post_batch["results"][1]["reason"] == (
         "Requested target fields and selected evidence were unchanged"
