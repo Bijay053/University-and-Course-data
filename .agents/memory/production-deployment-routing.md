@@ -168,6 +168,18 @@ appeared unfixed.
 **How to apply:** After frontend changes, run the portal production build and
 verify the asset hash in Nginx's live HTML matches the newly built `index.html`.
 
+Do not assume the production virtual environment includes pytest or that the
+application owner can write Python bytecode caches during release verification.
+
+**Why:** A guarded release correctly stopped before restart when pytest was
+absent, then a fallback `compileall` check failed because an existing
+`__pycache__` directory was root-owned even though the source was valid.
+
+**How to apply:** Run the full focused tests before deployment. On-host, use the
+project `.venv/bin/python` with `PYTHONDONTWRITEBYTECODE=1` and `-B` for a
+bounded import/syntax smoke; do not use `compileall` as the application owner
+unless cache-directory ownership has been verified.
+
 **Why:** An idle-check failed on both stale Python paths, and a successful
 release twice stopped on verification-only assumptions: exact short-hash width
 and treating the frontend's HTTP→HTTPS redirect as unhealthy.
