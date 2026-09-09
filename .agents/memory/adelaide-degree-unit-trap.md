@@ -1,6 +1,6 @@
 ---
-name: Adelaide University degree vs unit URL trap
-description: Adelaide has two URL spaces that look similar; /study/degrees/ are programs; /study/courses/ are individual units — must be blocked.
+name: Adelaide University degree-page traps
+description: Adelaide's degree/unit URL boundary and conjunctive domestic-only eligibility signals.
 ---
 
 ## The rule
@@ -38,4 +38,20 @@ Every Adelaide degree page embeds a reusable `dom-modal-exclusive` dialog whose 
 
 **Why:** Treating that hidden dialog as a hard course-level signal rejected 534 of 560 discovered pages in one run, including Bachelor of Arts, Bachelor of Nursing, and international IT degrees.
 
-**How to apply:** Remove only Adelaide's `dialog[data-modal-opener="dom-modal-exclusive"]` subtree before both static and rendered hard-marker checks. Continue honoring explicit domestic-only statements elsewhere on the page. Use the page-level `studentType` metadata as the authoritative availability signal: `Domestic` alone is ineligible, while `Domestic|International` is eligible. This also prevents a domestic page fee from being promoted to `international_fee` when the International URL redirects back to `/dom/`.
+**How to apply:** Remove only Adelaide's dormant shared dialog subtree before broad hard-marker checks. Continue honoring explicit domestic-only statements elsewhere on the page.
+
+## Conjunctive Adelaide eligibility rule
+
+`studentType=Domestic` without `International` is ineligible. Dual-audience metadata is not conclusive: reject `Domestic|International` only when paired with Adelaide's exclusive audience component, its hydrated exclusive selector, or an open domestic-exclusion dialog. Do not reject an exclusive component paired with `studentType=International` alone.
+
+**Why:** A live catalogue inventory found three metadata-inconsistent domestic-only programmes with dual-audience metadata plus the exclusive state, while seven legitimate international-only programmes reuse the exclusive component. Browser checks confirmed the three inconsistent pages activate the Australian-only dialog after selecting International.
+
+**How to apply:** Require the metadata/state conjunction in both static and rendered HTML. Keep the shared dormant dialog suppressed, and do not force generic per-course browser rendering because the static exclusive-state signal catches these pages before browser or AI recovery.
+
+## Online catalogue authority
+
+Adelaide's `/study/degrees/online/` route is an institution-owned online-only signal. A non-online alias is also online-only when the course-owned metadata pairs `courseMode` of `Online`, `Online only`, or `100% online` with an all-virtual `location`.
+
+**Why:** Adelaide degree pages share navigation links for both online study and physical campuses. Generic page-wide extraction misread that chrome as mixed delivery, converting true `100% online` degrees to `Blended` with a synthetic Adelaide location.
+
+**How to apply:** Reject these routes and paired metadata before generic mode/location extraction, browser recovery, or AI. Do not match bare page text or shared navigation; ordinary campus degree pages also mention online study.

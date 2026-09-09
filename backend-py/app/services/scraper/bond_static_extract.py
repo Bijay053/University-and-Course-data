@@ -280,6 +280,7 @@ def _derive_study_mode(plain_text: str) -> str | None:
 
 _YEAR_RE = re.compile(r"(\d+(?:\.\d+)?)\s+years?", re.IGNORECASE)
 _MONTH_RE = re.compile(r"(\d+)\s+months?", re.IGNORECASE)
+_SEMESTER_RE = re.compile(r"(\d+(?:\.\d+)?)\s+semesters?", re.IGNORECASE)
 
 _OFFERING_MONTH_MAP: dict[str, str] = {
     "jan": "January", "feb": "February", "mar": "March",
@@ -289,14 +290,19 @@ _OFFERING_MONTH_MAP: dict[str, str] = {
 }
 
 
-def _parse_duration_years(duration_str: str) -> float | None:
-    """Convert 'N years (M semesters)' or 'N months' to a year float."""
-    m = _YEAR_RE.search(duration_str)
-    if m:
-        return float(m.group(1))
-    m = _MONTH_RE.search(duration_str)
-    if m:
-        return round(int(m.group(1)) / 12, 2)
+def _parse_duration(duration_str: str) -> tuple[float, str] | None:
+    """Return Bond's authoritative duration as an atomic value/unit pair."""
+    years = _YEAR_RE.search(duration_str)
+    months = _MONTH_RE.search(duration_str)
+    if years and months:
+        return float(years.group(1)) * 12 + float(months.group(1)), "Month"
+    if years:
+        return float(years.group(1)), "Year"
+    if months:
+        return float(months.group(1)), "Month"
+    semesters = _SEMESTER_RE.search(duration_str)
+    if semesters:
+        return float(semesters.group(1)), "Semester"
     return None
 
 
@@ -329,9 +335,9 @@ def _enrich_from_details_api(numeric_id: str) -> dict[str, Any]:
     # Duration
     dur_str = prog.get("duration", "")
     if dur_str:
-        dur_years = _parse_duration_years(dur_str)
-        if dur_years is not None:
-            result["duration"] = dur_years
+        duration = _parse_duration(dur_str)
+        if duration is not None:
+            result["duration"], result["duration_term"] = duration
 
     # Intake months from offerings
     offerings = prog.get("offerings", [])
@@ -346,8 +352,9 @@ def _enrich_from_details_api(numeric_id: str) -> dict[str, Any]:
         result["category"] = study_areas[0]["label"]
 
     log.info(
-        "[BOND] program-details API → duration=%s intake_months=%s category=%s",
-        result.get("duration"), result.get("intake_months"), result.get("category"),
+        "[BOND] program-details API → duration=%s %s intake_months=%s category=%s",
+        result.get("duration"), result.get("duration_term"),
+        result.get("intake_months"), result.get("category"),
     )
     return result
 
@@ -471,8 +478,11 @@ def apply_bond_extraction(url: str, html: str) -> dict[str, Any]:
     extractors): ``has_central_fee_page``, ``course_location``.
 
     Soft-set keys (``setdefault`` semantics, extractors may win):
-    ``study_mode``, ``duration``, ``intake_months``, ``category``,
+    ``study_mode``, ``intake_months``, ``category``,
     ``international_fee``, ``fee_term``, ``ielts_*``.
+
+    The details API's ``duration`` and ``duration_term`` form one authoritative
+    pair and must be applied together by the caller.
     """
     result: dict[str, Any] = {}
 

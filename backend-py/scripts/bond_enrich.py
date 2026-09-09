@@ -124,13 +124,19 @@ def enrich_one(row: dict) -> dict:
 
             dur_str = prog.get("duration", "")
             if dur_str:
-                m = _YEAR_RE.search(dur_str)
-                if m:
-                    result["duration"] = float(m.group(1))
-                else:
-                    m = _MONTH_DURATION_RE.search(dur_str)
-                    if m:
-                        result["duration"] = round(int(m.group(1)) / 12, 2)
+                years = _YEAR_RE.search(dur_str)
+                months = _MONTH_DURATION_RE.search(dur_str)
+                if years and months:
+                    result["duration"] = (
+                        float(years.group(1)) * 12 + float(months.group(1))
+                    )
+                    result["duration_term"] = "Month"
+                elif years:
+                    result["duration"] = float(years.group(1))
+                    result["duration_term"] = "Year"
+                elif months:
+                    result["duration"] = float(months.group(1))
+                    result["duration_term"] = "Month"
 
             offerings = prog.get("offerings", [])
             if offerings:

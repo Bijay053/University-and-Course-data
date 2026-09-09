@@ -3,8 +3,9 @@
 #
 # Discovery strategy: Bond's internal Elasticsearch index (open, no auth)
 #   POST https://bond.edu.au/api/v1/elasticsearch/bond_prod_default/_search
-#   with student_type filter → 221 international courses (168 /program/ + 52
-#   /microcredential/) in a single request.  No scraping or BFS needed.
+#   with student_type filter. Only /program/ records are degree candidates;
+#   /microcredential/ records are professional learning products and are
+#   excluded before extraction.
 #
 # Why not sitemap: bond.edu.au/sitemap.xml?page=N returns HTTP 403 from
 #   datacenter IPs (Cloudflare IP-block on sitemap children).  The index
@@ -54,11 +55,10 @@ discovery:
     base_url: "https://bond.edu.au"
     normalize_relative_urls: true
 
-    # Keep only course overview pages; filter out the 1 stray
-    # /translational-simulation URL and any depth-3+ sub-pages.
+    # Keep only degree/program overview pages; microcredentials are not
+    # international degree records.
     allow_url_patterns:
       - '^https://bond\.edu\.au/program/[^/]+/?$'
-      - '^https://bond\.edu\.au/microcredential/[^/]+/?$'
 
   # ── BFS fallback (if ES index changes / returns 0) ────────────────────────
   # The orchestrator falls through to BFS when generic_search_api returns 0.
@@ -78,18 +78,17 @@ discovery:
 
   force_candidate_url_patterns:
     - '^https://bond\.edu\.au/program/[^/]+/?$'
-    - '^https://bond\.edu\.au/microcredential/[^/]+/?$'
 
   block_url_patterns:
     - '/program/[^/]+/[^/]+'
-    - '/microcredential/[^/]+/[^/]+'
+    - '^https://bond\.edu\.au/microcredential(?:/|$)'
 
   # Sitemap child pages return 403 from datacenter IPs — disable supplement.
   # (sitemap.xml index resolves; sitemap.xml?page=N all 403.)
   sitemap_url: "https://bond.edu.au/sitemap.xml"
   always_sitemap_supplement: false
 
-  expected_min_courses: 200
+  expected_min_courses: 150
 
 extraction:
   english:

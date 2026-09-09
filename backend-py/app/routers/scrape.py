@@ -832,6 +832,10 @@ async def get_status(
                 select(func.count(ScrapedCourse.id)).where(
                     review_scope,
                     ScrapedCourse.status == "pending",
+                    or_(
+                        ScrapedCourse.auto_publish_status.is_(None),
+                        ScrapedCourse.auto_publish_status != "data_quality_failure",
+                    ),
                 )
             )
             or 0
@@ -3010,7 +3014,17 @@ async def staged_one(
             select(ScrapedCourse).where(where_clause, ScrapedCourse.status == "pending")
             .order_by(ScrapedCourse.created_at.desc())
         )).scalars().all()
-        courses = [_staged_row_to_dict(s) for s in rows]
+        quality_blocked_count = sum(
+            1
+            for row in rows
+            if getattr(row, "auto_publish_status", None) == "data_quality_failure"
+        )
+        review_rows = [
+            row
+            for row in rows
+            if getattr(row, "auto_publish_status", None) != "data_quality_failure"
+        ]
+        courses = [_staged_row_to_dict(s) for s in review_rows]
         await _attach_evidence_bulk(db, courses)
         await _attach_recovery_counts_bulk(db, courses)
         last_scrape = None
@@ -3029,8 +3043,13 @@ async def staged_one(
                 "staged": job.imported or 0,
                 "skipped": job.skipped or 0,
                 "errors": job.errors or 0,
+                "qualityBlocked": quality_blocked_count,
             }
-        return {"courses": courses, "lastScrape": last_scrape}
+        return {
+            "courses": courses,
+            "lastScrape": last_scrape,
+            "qualityBlocked": quality_blocked_count,
+        }
     
     # Otherwise treat as integer sc_id
     try:

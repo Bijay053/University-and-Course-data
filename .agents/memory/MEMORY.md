@@ -86,7 +86,7 @@
 - [UniSC sitemap + config identity](unisc-sitemap-discovery.md) — XMLsitemap supplies courses; production ID-specific YAML can shadow the verified recipe, so shared name cleanup must not depend on its aliases.
 - [Bond University sitemap discovery](bond-sitemap-discovery.md) — generic_search_api gated by `if not links`; BFS fills it first; sitemap.xml index (5 child pages, 240 URLs) is the correct approach.
 - [SCU HTML-comment hidden URLs](scu-html-comment-hidden.md) — base course URLs inside an HTML comment; _LinkExtractor finds 0; force_candidate_url_patterns is useless here; fix = allow year-versioned URLs through (remove /2027/ block, prefer 2027).
-- [Adelaide degree-page traps](adelaide-degree-unit-trap.md) — sitemap supplies /study/degrees/ programs; block /study/courses/ units; ignore the dormant domestic-only modal embedded on every degree page.
+- [Adelaide degree-page traps](adelaide-degree-unit-trap.md) — dual-audience needs exclusive state to reject; `/degrees/online/` and paired mode/location metadata mean online-only.
 - [UNE Wayback CDX discovery](une-wayback-discovery.md) — listing page is React SPA (0 links even with Scrape.do render); no sitemap; Wayback CDX with /study/courses/* prefix is the only discovery mechanism.
 - [MQ Scrape.do render false fix](mq-scrape-do-render-lesson.md) — scrape_do_render+skip_fallbacks caused 41/127 timeouts; stealth browser is correct for MQ; degree_level_defaults fills fees.
 - [CSU discovery fix](csu-discovery-fix.md) — CF Enterprise; 3 YAML knobs (skip_browser_discovery+sitemap_url+use_wayback) skip 160s of dead probes; CDX→329 course URLs.
@@ -102,6 +102,7 @@
 - [Flinders AEM page compaction](flinders-aem-compaction.md) — course pages are mostly AEM chrome; retain metadata, title shell and fast facts before generic extraction.
 - [Safe cross-site HTML compaction](safe-html-compaction.md) — preserve chrome text/order, never flatten structured descendants, and require per-university full-payload parity before opt-in.
 - [Required browser state validation](required-browser-actions-timeout.md) — pooled sessions and timeout DOM require idempotent audience-state checks before extraction.
+- [Browser rescue override parity](browser-rescue-override-parity.md) — enabling rescue must clear both browser-suppression controls; never offer a retry known to repeat the same block.
 - [Audience-scoped fee boundaries](audience-scoped-fee-boundaries.md) — audience attributes are authoritative only when exclusive, nearest-owned, and paired with explicit tuition semantics.
 - [Location table-header contamination](location-table-header-contamination.md) — “Location” table headers must not turn adjacent column labels into campuses or override authoritative Online delivery.
 - [Non-tuition PDF fee safety](non-tuition-pdf-fee-safety.md) — incidental, ancillary, SSAF, application, deposit, materials, and equipment PDFs must never populate international tuition.

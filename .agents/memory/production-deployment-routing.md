@@ -199,3 +199,17 @@ then tried root-level health paths.
 **How to apply:** Smoke the backend with
 `http://127.0.0.1:8000/api/health`, then independently verify the public portal
 and its generated hashed JavaScript asset return HTTP 200.
+
+The cryptographic restart-proof gate must obtain its expected disposable account
+from independently configured deployment/service state. Never derive that
+expected account from the proof being validated.
+
+**Why:** A planned release found neither the documented root application
+environment file nor `DATABASE_REFRESH_REHEARSAL_ACCOUNT_ID` in the running
+Celery process. The checked-in gate correctly failed closed before Git pull or
+service restart.
+
+**How to apply:** Validate the proof before changing the release. If the
+independent expected-account setting is absent, leave production on the current
+revision; if the scrape consumer was paused to drain work, restore and verify it
+before ending the attempt.

@@ -3588,10 +3588,9 @@ async def extract_course(
     #   2. Sets course_location="Gold Coast, Queensland" directly → prevents
     #      the footer-derived garbage location (e.g. "University Club (Building
     #      6), Bond University") from winning via setdefault.
-    #   3. Sets study_mode="On Campus" (default; switches to Blended/Online
-    #      when the static HTML has explicit online-delivery keywords).
-    #   4. Injects Bond's tri-semester intake calendar (January/May/September)
-    #      as the fallback when no real intake months are found.
+    #   3. Sets study_mode only when the page has explicit delivery evidence.
+    #   4. Uses the details API for real intake months and an atomic
+    #      duration/duration_term pair.
     # Unlike CSU, we do NOT disable use_ai_fallback — Gemini can still help
     # with course_name, duration, description, and English scores.
     _is_bond_page: bool = False
@@ -3607,7 +3606,13 @@ async def extract_course(
             # other keys (e.g. international_fee when found in static HTML)
             # use setdefault so the standard extractors can override when
             # they actually find a value on the page.
-            _BOND_DIRECT_KEYS = {"has_central_fee_page", "course_location", "study_mode"}
+            _BOND_DIRECT_KEYS = {
+                "has_central_fee_page",
+                "course_location",
+                "study_mode",
+                "duration",
+                "duration_term",
+            }
             for _k, _v in _bond_pre.items():
                 if _k == "scrape_warnings":
                     # Merge into any existing warnings already set.

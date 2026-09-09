@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import pytest
 
+from app.services.scraper.config.loader import load_uni_config
 from app.services.scraper.bond_static_extract import (
+    _enrich_from_details_api,
     apply_bond_extraction,
     is_bond_program_url,
 )
@@ -42,6 +44,7 @@ class TestIsBondProgramUrl:
             "https://bond.edu.au/sport/swimming",
             "https://bond.edu.au/important-information",
             "https://bond.edu.au/study/program-finder",
+            "https://bond.edu.au/microcredential/mastering-negotiations-behavioural-science",
             # Different host
             "https://www.acu.edu.au/program/master-of-business",
             "https://www.csu.edu.au/program/bachelor",
@@ -49,6 +52,46 @@ class TestIsBondProgramUrl:
     )
     def test_false_for_non_program_or_other_hosts(self, url: str) -> None:
         assert is_bond_program_url(url) is False
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ("2 years (6 semesters)", (2.0, "Year")),
+        ("1 year 4 months (4 semesters)", (16.0, "Month")),
+        ("16 months", (16.0, "Month")),
+        ("5 semesters", (5.0, "Semester")),
+    ],
+)
+def test_details_api_preserves_duration_value_and_unit(
+    monkeypatch, source: str, expected: tuple[float, str]
+) -> None:
+    monkeypatch.setattr(
+        "app.services.scraper.bond_static_extract._get_json",
+        lambda _url: {"programs": [{"duration": source}]},
+    )
+
+    result = _enrich_from_details_api("123")
+
+    assert (result["duration"], result["duration_term"]) == expected
+
+
+def test_bond_config_excludes_microcredentials_from_degree_discovery() -> None:
+    config = load_uni_config(
+        slug="bond",
+        name="Bond University",
+        scrape_url="https://bond.edu.au",
+        university_id=29,
+        db_scrape_config=None,
+    )
+    api = config.discovery.generic_search_api
+
+    assert api is not None
+    assert all("microcredential" not in pattern for pattern in api.allow_url_patterns)
+    assert any(
+        "microcredential" in pattern
+        for pattern in config.discovery.block_url_patterns
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

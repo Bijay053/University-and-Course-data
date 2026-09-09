@@ -9,7 +9,18 @@ class _Rows:
         return self
 
     def all(self):
-        return [SimpleNamespace(id=101, course_name="Fresh course")]
+        return [
+            SimpleNamespace(
+                id=101,
+                course_name="Fresh course",
+                auto_publish_status="review",
+            ),
+            SimpleNamespace(
+                id=102,
+                course_name="Blocked course",
+                auto_publish_status="data_quality_failure",
+            ),
+        ]
 
 
 class _FakeDb:
@@ -55,6 +66,8 @@ def test_job_review_does_not_include_older_pending_rows(monkeypatch):
     assert "scraped_courses.scrape_job_id" in where_clause
     assert "scraped_courses.university_id" not in where_clause
     assert response["courses"] == [{"id": 101, "courseName": "Fresh course"}]
+    assert response["qualityBlocked"] == 1
+    assert response["lastScrape"]["qualityBlocked"] == 1
 
 
 def test_job_review_includes_explicit_unresolved_continuation_chain(monkeypatch):
