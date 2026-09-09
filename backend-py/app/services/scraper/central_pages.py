@@ -1087,42 +1087,57 @@ def _parse_program_keyed_english_tables(html: str) -> list[dict[str, Any]]:
     # B1368, B1404, B1405 and B1406.  Preserve those codes so application can
     # match the exact course URL rather than guessing from title substrings.
     for body in soup.select(".accordion-item .accordion-body"):
-        table = body.find("table")
-        if table is None:
-            continue
-        preceding_nodes = [
-            node
-            for node in table.find_all_previous(["p", "h5", "h6"], limit=6)
-            if body in node.parents
-        ]
-        intro_text = " ".join(
-            " ".join(node.get_text(" ", strip=True).split())
-            for node in reversed(preceding_nodes)
-        )
-        course_codes = sorted(
-            {
-                code.upper()
-                for code in _re.findall(r"\b[A-Z]{1,3}\d{3,4}\b", intro_text, _re.I)
-            }
-        )
-        if not course_codes:
-            continue
-        program_node = table.find_previous("strong")
-        program_names = (
-            " ".join(program_node.get_text(" ", strip=True).split())
-            if program_node is not None and body in program_node.parents
-            else ""
-        )
-        values = _table_values(table)
-        if program_names and values:
-            profiles.append(
-                {
-                    "program_names": program_names,
-                    "program_aliases": [program_names],
-                    "course_codes": course_codes,
-                    "values": values,
-                }
-            )
+        # One category accordion may contain several independently named course
+        # tables. Bind each table to the nearest preceding paragraph/heading
+        # that carries course codes. Do not use table.find_previous("strong"):
+        # Murdoch inserts empty formatting-only <strong>&nbsp;</strong> nodes
+        # between a course heading and its table (B1422), which previously made
+        # the program name blank and silently discarded the whole profile.
+        for table in body.find_all("table"):
+            program_names = ""
+            course_codes: list[str] = []
+            for node in table.find_all_previous(["p", "h5", "h6"], limit=12):
+                if body not in node.parents:
+                    continue
+                node_text = " ".join(node.get_text(" ", strip=True).split())
+                node_codes = sorted(
+                    {
+                        code.upper()
+                        for code in _re.findall(
+                            r"\b[A-Z]{1,3}\d{3,4}\b",
+                            node_text,
+                            _re.I,
+                        )
+                    }
+                )
+                if not node_codes:
+                    continue
+                named_node = next(
+                    (
+                        strong
+                        for strong in node.find_all("strong")
+                        if " ".join(strong.get_text(" ", strip=True).split())
+                    ),
+                    None,
+                )
+                if named_node is None:
+                    continue
+                program_names = " ".join(
+                    named_node.get_text(" ", strip=True).split()
+                )
+                course_codes = node_codes
+                break
+
+            values = _table_values(table)
+            if program_names and course_codes and values:
+                profiles.append(
+                    {
+                        "program_names": program_names,
+                        "program_aliases": [program_names],
+                        "course_codes": course_codes,
+                        "values": values,
+                    }
+                )
     return profiles
 
 
@@ -1296,7 +1311,7 @@ async def _fetch_with_browser_fallback(url: str) -> str | None:
 #                             english_by_level + english_by_program
 
 _CACHE_TTL_DAYS = 30
-_ENGLISH_CACHE_SCHEMA_VERSION = 5
+_ENGLISH_CACHE_SCHEMA_VERSION = 6
 
 
 def _is_non_tuition_central_fee_pdf(

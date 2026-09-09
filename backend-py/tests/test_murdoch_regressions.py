@@ -132,6 +132,75 @@ def test_murdoch_higher_education_profile_matches_exact_course_codes() -> None:
     ) == {}
 
 
+def test_murdoch_profile_ignores_blank_strong_before_b1422_table() -> None:
+    html = """
+    <div class="accordion-item">
+      <div class="accordion-body">
+        <p><strong>Bachelor of Health Science / Master of Clinical Chiropractic</strong>
+           (B1422)</p>
+        <p><strong>&nbsp;</strong></p>
+        <table>
+          <tr>
+            <th>International English Language Testing System (IELTS) Academic</th>
+            <td><strong>6.5 Overall</strong> 6.5 Reading 6.5 Writing
+                6.5 Speaking 6.5 Listening</td>
+          </tr>
+          <tr><th>Cambridge Advanced English (CAE)</th><td><strong>176 Overall</strong></td></tr>
+          <tr><th>Pearson Test of English (PTE)</th><td><strong>58 Overall</strong></td></tr>
+          <tr><th>TOEFL IBT</th><td><strong>79 Overall</strong></td></tr>
+          <tr><th>Duolingo English Test (DET)</th><td><strong>120 Overall</strong></td></tr>
+        </table>
+      </div>
+    </div>
+    """
+
+    profiles = _parse_program_keyed_english_tables(html)
+
+    assert _select_central_english_program(
+        profiles,
+        "Bachelor of Health Science / Master of Clinical Chiropractic",
+        "https://www.murdoch.edu.au/course/undergraduate/b1422",
+    ) == {
+        "ielts_overall": 6.5,
+        "ielts_reading": 6.5,
+        "ielts_writing": 6.5,
+        "ielts_speaking": 6.5,
+        "ielts_listening": 6.5,
+        "cambridge_overall": 176.0,
+        "pte_overall": 58.0,
+        "toefl_overall": 79.0,
+        "duolingo_overall": 120.0,
+    }
+
+
+def test_murdoch_category_accordion_parses_each_course_table() -> None:
+    html = """
+    <div class="accordion-item">
+      <div class="accordion-body">
+        <p><strong>First Allied Health Course</strong> (B1001)</p>
+        <table>
+          <tr><th>IELTS Academic</th><td>6.5 Overall</td></tr>
+        </table>
+        <p><strong>Second Allied Health Course</strong> (M1002)</p>
+        <table>
+          <tr><th>IELTS Academic</th><td>7.0 Overall</td></tr>
+        </table>
+      </div>
+    </div>
+    """
+
+    profiles = _parse_program_keyed_english_tables(html)
+
+    assert [profile["course_codes"] for profile in profiles] == [
+        ["B1001"],
+        ["M1002"],
+    ]
+    assert [profile["values"]["ielts_overall"] for profile in profiles] == [
+        6.5,
+        7.0,
+    ]
+
+
 def test_bare_numeric_full_time_duration_uses_label_semantics() -> None:
     html = """
     <dl>
