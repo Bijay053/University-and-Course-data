@@ -158,6 +158,16 @@ The live backend uses its project-local `.venv/bin/python`; neither system
 smokes may return the expected HTTPS redirect, and abbreviated Git hashes can
 be eight characters rather than seven.
 
+Frontend source changes are not deployed by pulling Git or restarting the API
+and Celery services. Nginx serves the built Vite output directly.
+
+**Why:** A Fix-dialog close correction existed in production source while
+Nginx continued serving an older JavaScript bundle, so the reported UI bug
+appeared unfixed.
+
+**How to apply:** After frontend changes, run the portal production build and
+verify the asset hash in Nginx's live HTML matches the newly built `index.html`.
+
 **Why:** An idle-check failed on both stale Python paths, and a successful
 release twice stopped on verification-only assumptions: exact short-hash width
 and treating the frontend's HTTP→HTTPS redirect as unhealthy.
