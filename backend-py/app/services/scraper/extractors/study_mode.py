@@ -149,7 +149,12 @@ def has_authoritative_online_location_evidence(
     study_mode_value: object,
     evidence: list[dict],
 ) -> bool:
-    """Return True only for UTAS's scoped international Location=Online signal."""
+    """Return True for a scoped/structured course delivery value of Online.
+
+    These methods read a course-owned label or machine-readable attribute.  A
+    synthetic university location must not turn their Online value into an
+    on-campus offering.
+    """
     if str(study_mode_value or "").strip().casefold() != "online":
         return False
     for item in evidence:
@@ -162,7 +167,13 @@ def has_authoritative_online_location_evidence(
         value = normalized_value or item.get("value")
         if str(value or "").strip().casefold() != "online":
             continue
-        if item.get("method") == "study_mode:utas_international_location":
+        if item.get("method") in {
+            "study_mode:utas_international_location",
+            "study_mode:span_id_delivery",
+            "study_mode:data_attribute",
+            "study_mode:strong_label",
+            "study_mode:label",
+        }:
             return True
     return False
 
@@ -665,6 +676,56 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
             pass
     if _suppress_rule:
         return []
+
+    # Preserve structural provenance instead of flattening every deterministic
+    # result into ``study_mode:rule``. Downstream location correction is
+    # intentionally allowed to replace noisy keyword-only Online matches, but
+    # must never replace a course-owned labelled value (Monash: ``Study mode
+    # Online``) with a synthetic/default campus.
+    _structured_candidates = (
+        ("study_mode:span_id_delivery", _extract_span_id_delivery(html), 0.9),
+        ("study_mode:data_attribute", _extract_data_attribute_mode(html), 0.9),
+        ("study_mode:strong_label", _extract_strong_label_value(html), 0.7),
+    )
+    for _method, (_mode, _snippet), _confidence in _structured_candidates:
+        if _mode:
+            return [
+                ExtractionResult(
+                    field_key=field_key,
+                    value=_mode,
+                    normalized={"study_mode": _mode},
+                    confidence=_confidence,
+                    method=_method,
+                    snippet=_snippet,
+                )
+            ]
+
+    _plain = _RECENTLY_VIEWED_SM_RE.sub("", _strip_tags(html))
+    _label_match = _LABEL_RE.search(_plain)
+    _nocolon_match = _STUDY_MODES_NOCOLON_RE.search(_plain)
+    _chosen = None
+    if _nocolon_match and (
+        not _label_match or _nocolon_match.start() < _label_match.start()
+    ):
+        _chosen = _nocolon_match
+    elif _label_match:
+        _chosen = _label_match
+    if _chosen:
+        _label_mode = _classify_label_value(_chosen.group(1))
+        if _label_mode:
+            return [
+                ExtractionResult(
+                    field_key=field_key,
+                    value=_label_mode,
+                    normalized={"study_mode": _label_mode},
+                    confidence=0.7,
+                    method="study_mode:label",
+                    snippet=_plain[
+                        max(0, _chosen.start() - 20) : _chosen.end() + 20
+                    ].strip(),
+                )
+            ]
+
     mode, snippet, confidence = classify_study_mode(html)
     if not mode:
         return []

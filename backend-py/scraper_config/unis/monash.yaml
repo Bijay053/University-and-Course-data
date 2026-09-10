@@ -1,10 +1,84 @@
-# Monash University — stub created for Week 4 scale-up.
-# Hostname: www.monash.edu  (course catalogue under /study/courses)
+# Monash University
+# Hostname: www.monash.edu
 #
-# Bug history: none yet — fill in after first scrape.
-# Likely platform: Adobe Experience Manager.
-discovery: {}
+# A bounded September 2026 production render verified that Find a course exposes
+# the broad catalogue in one DOM. Audience/tab query parameters produced the
+# same 565-link DOM and must not be treated as discovery filters.
+hostname_guard: www.monash.edu
+locked_config_paths:
+  - discovery.seed_urls
+  - discovery.allow_url_patterns
+  - discovery.block_url_patterns
+  - discovery.always_browser_discover
+  - discovery.expected_min_courses
+  - discovery.non_degree_classifier.force_url_patterns
+  - discovery.non_degree_classifier.force_title_patterns
+  - extraction.url_rewrites
+  - extraction.filters.domestic_only
+  - extraction.filters.online_only
+  - extraction.filters.reject_parttime_only
+  - extraction.staging.require_international_fee
+  - extraction.staging.stage_on_parser_error
+
+discovery:
+  # Monash's broad catalogue is rendered. One seed is sufficient; eligibility
+  # is decided from each course's international detail view, not listing facets.
+  always_browser_discover: true
+  seed_urls:
+    - "https://www.monash.edu/study/courses/find-a-course"
+  allow_url_patterns:
+    # Degree pages end in a course code. PDM/PDD are Monash professional-
+    # development category codes, not award-bearing degrees.
+    - "^https://www\\.monash\\.edu/study/courses/find-a-course/[a-z0-9-]+-(?!pdm[0-9]{4}/?$|pdd[0-9]{4}/?$)[a-z][a-z0-9]*[0-9]{4}/?$"
+  block_url_patterns:
+    - "-pdm[0-9]{4}/?$"
+    - "-pdd[0-9]{4}/?$"
+    - "/professional-certificate-"
+    - "/certificate-of-completion-"
+    - "/monash-certificate-"
+    - "/monash-mango/"
+  non_degree_classifier:
+    # Monash uses certificate-shaped course codes for non-degree professional
+    # offerings. Keep this exclusion local: other institutions can legitimately
+    # award qualifications named Professional Certificate.
+    force_url_patterns:
+      - "/professional-certificate-"
+      - "/certificate-of-completion-"
+      - "/monash-certificate-"
+    force_title_patterns:
+      - "\\bProfessional Certificate\\b"
+      - "\\bCertificate of Completion\\b"
+      - "\\bMonash Certificate\\b"
+  max_candidates: 500
+  # One bounded production render yielded 453 URLs after URL filtering and 444
+  # after the Monash title classifier. Use a measured conservative cache floor.
+  expected_min_courses: 400
+  browser_early_stop_courses: 400
+  browser_time_budget_s: 120
+
 extraction:
+  # A live B2029 render verified that this view exposes international entry
+  # metadata plus authoritative location/load. Some pages link to fees rather
+  # than publishing an amount; missing fees remain blank for human review.
+  url_rewrites:
+    - host: www.monash.edu
+      path_contains: /study/courses/find-a-course/
+      append_query: international=true
   filters:
     domestic_only:
-      enabled: false
+      enabled: true
+      require_international_evidence: true
+      international_markers:
+        - "International entry requirements"
+        - "International students are eligible"
+        - "International student fee"
+    online_only:
+      enabled: true
+      reject_if_mode_is_exactly:
+        - Online
+        - Distance learning
+      keep_if_location_present: true
+    reject_parttime_only: true
+  staging:
+    require_international_fee: false
+    stage_on_parser_error: true

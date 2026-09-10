@@ -151,3 +151,4 @@
 - [Bond fee, location, and IELTS authority](bond-fee-ielts-authority.md) — pair course IDs/codes, preserve fee periods, avoid campus/mode defaults, and use exact program-keyed IELTS rows.
 - [Celery loop resource cleanup](celery-loop-resource-cleanup.md) — close loop-owned HTTP and database resources before each asyncio.run loop ends or worker descriptors accumulate.
 - [Pre-claim failure ownership fence](preclaim-failure-ownership.md) — emergency worker failure writes bypass the shared pool and may transition only queued jobs.
+- [Monash rendered catalogue](monash-rendered-catalogue.md) — listing query facets do not constrain discovered links; filter short-course codes and use detail-page audience evidence.
