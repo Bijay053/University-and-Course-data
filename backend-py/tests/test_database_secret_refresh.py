@@ -68,6 +68,7 @@ def test_disposable_rehearsal_is_explicitly_guarded_and_uses_isolated_fixture() 
     assert "PubliclyAccessible: false" in fixture
     assert "Type: AWS::Scheduler::ScheduleGroup" in fixture
     assert "ScheduleExpression: rate(5 minutes)" in fixture
+    assert "State: DISABLED" in fixture
     assert "arn:aws:scheduler:::aws-sdk:ssm:sendCommand" in fixture
     assert 'sslmode="verify-full"' in fixture
     assert 'connection.execute("SELECT 1")' in fixture
@@ -77,15 +78,30 @@ def test_disposable_rehearsal_is_explicitly_guarded_and_uses_isolated_fixture() 
     assert "VersionIdsToStages" in source
     assert '@celery_app.task(name="scrape.university")' in fixture
     assert "executions.sqlite3" in fixture
-    assert "redis-cli llen scrape" in fixture
-    assert "cancel_consumer scrape" in fixture
-    assert "control.inspect(timeout=10).active()" in fixture
-    assert "up-db-refresh-${RehearsalId}/up-db-refresh-${RehearsalId}" in fixture
+    assert "redis6-cli llen scrape" in fixture
+    assert "redis-cli llen scrape" not in fixture
+    assert fixture.count("cancel_consumer scrape --timeout=20") == 2
+    assert fixture.count("control.inspect(timeout=20).active()") == 2
+    assert (
+        'aws:SourceArn: !Sub "arn:${AWS::Partition}:scheduler:${AWS::Region}:'
+        '${AWS::AccountId}:schedule-group/up-db-refresh-${RehearsalId}"'
+    ) in fixture
     assert "905043442097" in source
     assert "PaginationToken" in source
     assert "Type: AWS::SQS::Queue" not in fixture
     assert "redis://127.0.0.1:6379/0" in fixture
-    assert "cloud-init status --wait" in fixture
+    assert "cloud-init status --wait >/dev/null" in fixture
+    assert "touch /var/lib/up-rehearsal/bootstrap.complete" in fixture
+    assert "inspect ping --timeout=5" in fixture
+    assert fixture.count(
+        "until test -f /var/lib/up-rehearsal/bootstrap.complete"
+    ) == 2
+    assert (
+        "/opt/up-rehearsal/.venv/bin/python - "
+        "'${Database.MasterUserSecret.SecretArn}'" in fixture
+    )
+    assert "deadline=time.monotonic()+120" in fixture
+    assert 'State="ENABLED"' in source
     assert "describe_instance_information" in source
     assert "NatGatewayId" in source
     assert "RDS managed secret remains after teardown" in source
@@ -169,6 +185,52 @@ def test_rehearsal_cleanup_failure_is_raised_without_primary_failure() -> None:
             ["stack deletion failed: timeout"],
             None,
         )
+
+
+class _ResidueEc2:
+    def describe_instances(self, *, InstanceIds):
+        assert InstanceIds == ["i-0123456789abcdef0", "i-0fedcba9876543210"]
+        return {
+            "Reservations": [
+                {
+                    "Instances": [
+                        {
+                            "InstanceId": "i-0fedcba9876543210",
+                            "State": {"Name": "terminated"},
+                        },
+                        {
+                            "InstanceId": "i-0123456789abcdef0",
+                            "State": {"Name": "running"},
+                        },
+                    ]
+                }
+            ]
+        }
+
+
+def test_rehearsal_ignores_only_proven_terminated_ec2_tag_index_ghosts() -> None:
+    residues = [
+        {
+            "ResourceARN": (
+                "arn:aws:ec2:ap-south-1:123456789012:"
+                "instance/i-0fedcba9876543210"
+            )
+        },
+        {
+            "ResourceARN": (
+                "arn:aws:ec2:ap-south-1:123456789012:"
+                "instance/i-0123456789abcdef0"
+            )
+        },
+        {
+            "ResourceARN": (
+                "arn:aws:rds:ap-south-1:123456789012:db:still-present"
+            )
+        },
+    ]
+    assert rehearsal._exclude_terminated_instance_residues(
+        _ResidueEc2(), residues
+    ) == residues[1:]
 
 
 def test_rehearsal_never_falls_back_to_production_aws_credentials(

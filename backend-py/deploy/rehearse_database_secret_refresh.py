@@ -49,6 +49,43 @@ def _tags(tags: list[dict[str, str]]) -> dict[str, str]:
     return {tag["Key"]: tag["Value"] for tag in tags}
 
 
+def _exclude_terminated_instance_residues(
+    ec2, residues: list[dict[str, object]]
+) -> list[dict[str, object]]:
+    """Ignore only EC2 tag-index ghosts proven terminated by EC2 itself."""
+    instance_ids: set[str] = set()
+    instance_id_by_arn: dict[str, str] = {}
+    for residue in residues:
+        arn = residue.get("ResourceARN")
+        if not isinstance(arn, str):
+            continue
+        match = re.fullmatch(
+            r"arn:[^:]+:ec2:[^:]+:[0-9]{12}:instance/(i-[0-9a-f]+)",
+            arn,
+        )
+        if match:
+            instance_id = match.group(1)
+            instance_ids.add(instance_id)
+            instance_id_by_arn[arn] = instance_id
+    if not instance_ids:
+        return residues
+    try:
+        response = ec2.describe_instances(InstanceIds=sorted(instance_ids))
+    except Exception:
+        return residues
+    states = {
+        instance["InstanceId"]: instance.get("State", {}).get("Name")
+        for reservation in response.get("Reservations", [])
+        for instance in reservation.get("Instances", [])
+    }
+    return [
+        residue
+        for residue in residues
+        if states.get(instance_id_by_arn.get(str(residue.get("ResourceARN"))))
+        != "terminated"
+    ]
+
+
 def _account(session, region: str) -> str:
     return session.client("sts", region_name=region).get_caller_identity()["Account"]
 
@@ -88,7 +125,7 @@ def _wait_command(ssm, instance_id: str, document: str, expected: str) -> None:
         Comment="prepare disposable database refresh rehearsal",
     )
     command_id = response["Command"]["CommandId"]
-    deadline = time.monotonic() + 300
+    deadline = time.monotonic() + 720
     while time.monotonic() < deadline:
         try:
             result = ssm.get_command_invocation(
@@ -294,6 +331,31 @@ def rehearse(*, expected_account: str, production_account: str, region: str, vpc
         else:
             raise TimeoutError("managed-secret rotation did not expose a new version")
         _inject_failure(fail_at, "after-password-rotation")
+        scheduler = session.client("scheduler", region_name=region)
+        schedule_group = scheduler.get_schedule_group(
+            Name=outputs["ScheduleGroup"]
+        )
+        _require_disposable(
+            session,
+            region,
+            expected_account,
+            rehearsal_id,
+            scheduler.list_tags_for_resource(
+                ResourceArn=schedule_group["Arn"]
+            )["Tags"],
+        )
+        schedule = scheduler.get_schedule(
+            Name=outputs["ScheduleName"],
+            GroupName=outputs["ScheduleGroup"],
+        )
+        scheduler.update_schedule(
+            Name=outputs["ScheduleName"],
+            GroupName=outputs["ScheduleGroup"],
+            State="ENABLED",
+            ScheduleExpression=schedule["ScheduleExpression"],
+            FlexibleTimeWindow=schedule["FlexibleTimeWindow"],
+            Target=schedule["Target"],
+        )
         # Scheduler is the execution path: require a command requested after
         # rotation began, with the fixed document and scheduler-only comment.
         command = None
@@ -337,7 +399,9 @@ def rehearse(*, expected_account: str, production_account: str, region: str, vpc
         if created:
             if outputs.get("ScheduleName") and outputs.get("ScheduleGroup"):
                 try:
-                    scheduler = session.client("scheduler", region_name=region)
+                    scheduler = session.client(
+                        "scheduler", region_name=region
+                    )
                     schedule = scheduler.get_schedule(
                         Name=outputs["ScheduleName"],
                         GroupName=outputs["ScheduleGroup"],
@@ -383,6 +447,9 @@ def rehearse(*, expected_account: str, production_account: str, region: str, vpc
                         token = page.get("PaginationToken", "")
                         if not token:
                             break
+                    residues = _exclude_terminated_instance_residues(
+                        ec2, residues
+                    )
                     if not residues or time.monotonic() >= residue_deadline:
                         break
                     time.sleep(5)

@@ -1,4 +1,10 @@
 {
   "schema_version": 1,
-  "signers": []
+  "signers": [
+    {
+      "account_id": "151955775532",
+      "signing_key_arn": "arn:aws:kms:ap-south-1:151955775532:key/996356dc-5c4a-4e0d-8415-78ff1866678e",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA8Dpkl/jG0BB7pBW/9zao\naL6OxhUzJiG0j1dbsp+SrfonxVkF5+PK/RJJeVh6ExC3efF0mdlC+Lof6C92zAQ+\nHGPq00fmMXsH/lvWgz9MilAV9+wS6QmvkqwoB5uEjewgfUCVlezBYHJAbbNcaQR2\nE3yx1DviWb6QUeAuk7w38ILzHV6d9ihzFVi9bOEUxvxtij+wpdxDOFkpMZCLaJJx\n30ULYnD/B+ni8YHeVBSyI/H5ZiNIqDm0eBFLqvSjnk3oCFrse/n0M5L7UCsxY/mK\n0XaXJIi/2b7mIpzOZ5+l9msuQycVLeeQQwXW4xsSins3FEgW/lJwyIgExI0KZzHp\nLwIDAQAB\n-----END PUBLIC KEY-----\n"
+    }
+  ]
 }
