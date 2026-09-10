@@ -46,4 +46,6 @@ reference, and increments are synchronous in one event loop.
    short cap during later enrichment, converting successful fetches into false
    `per_course_timeout` errors.
    **How to apply:** keep transport-specific limits inside transport calls and
-   retain enough outer budget for all bounded downstream stages.
+   retain enough outer budget for all bounded downstream stages. Cooldown sleeps
+   outside the extraction semaphore must still share this deadline; otherwise a
+   long retry sentinel bypasses the course cap.

@@ -787,8 +787,10 @@ async def _settle_course_with_retries(
     *,
     sleep=asyncio.sleep,
     max_retries: int = 2,
+    max_elapsed_seconds: float | None = None,
 ):
-    """Run cooldown retries and advance progress once after the result settles."""
+    """Run bounded cooldown retries and advance progress once after settlement."""
+    started_at = time.monotonic()
     retry_delay = 0.0
     retry_count = 0
     while True:
@@ -805,6 +807,13 @@ async def _settle_course_with_retries(
             and retry_count < max_retries
         ):
             retry_delay = float(result["_retry_after"])
+            if (
+                max_elapsed_seconds is not None
+                and time.monotonic() - started_at + retry_delay
+                >= max(0.0, float(max_elapsed_seconds))
+            ):
+                await record_complete(link)
+                return result
             retry_count += 1
             continue
         await record_complete(link)
@@ -4938,6 +4947,8 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             # BEFORE sleeping N seconds, so other courses can proceed in the
             # meantime.  Previously the sleep happened inside the sem block,
             # freezing every concurrent slot simultaneously on a 429 storm.
+            _dispatch_index: list[int | None] = [None]
+
             async def _attempt():
                 async with sem:
                     # Stop check INSIDE the semaphore so all queued coroutines
@@ -4961,8 +4972,11 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                             "error": "extract: Scrape.do auth/credits error HTTP 401 — check SCRAPE_DO_TOKEN and account balance",
                         }
                         return result
-                    dispatched[0] += 1
-                    idx = dispatched[0]
+                    _first_attempt = _dispatch_index[0] is None
+                    if _first_attempt:
+                        dispatched[0] += 1
+                        _dispatch_index[0] = dispatched[0]
+                    idx = _dispatch_index[0]
                     nm = (link.get("name") or "").strip() or link.get("url", "?")
                     # Throttle textual [EXTRACT] status messages for large runs.
                     # For universities with >200 courses, emitting every single
@@ -4970,7 +4984,9 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     # every _emit_tick-th course so the live log always shows
                     # ~50 progress lines regardless of total course count.
                     _emit_tick = max(1, total // 50) if total > 200 else 1
-                    if idx % _emit_tick == 0 or idx == 1 or idx == total:
+                    if _first_attempt and (
+                        idx % _emit_tick == 0 or idx == 1 or idx == total
+                    ):
                         await emit(
                             "status",
                             f"[EXTRACT] {idx}/{total}: {nm}",
@@ -5051,6 +5067,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 _attempt,
                 _record_extraction_complete,
                 sleep=_cooldown_sleep,
+                max_elapsed_seconds=_effective_course_timeout,
             )
 
         # ── Apply final hard cap so merged link sets (BFS + sitemap supplement

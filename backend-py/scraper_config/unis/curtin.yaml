@@ -368,6 +368,12 @@ discovery:
       - "https://www.curtin.edu.au/study/offering/course-ug-public-health-honours-major-bsc-health-hons--mjrh-phlth/"
 
 extraction:
+  # Current offering pages are complete static HTML and include international
+  # year-1 fees in course-owned JSON-LD. Browser rescue only triggers Curtin's
+  # Cloudflare 429s and previously caused repeated 600-second cooldowns.
+  skip_browser_rescue: true
+  skip_per_course_browser: true
+
   filters:
     domestic_only:
       # 2026-05-12 fix: Curtin DOES publish domestic-only courses on the

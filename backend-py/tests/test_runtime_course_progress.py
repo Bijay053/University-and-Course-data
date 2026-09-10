@@ -114,3 +114,35 @@ async def test_resumed_mixed_outcomes_advance_once_after_settlement():
     assert attempts.count("Cooldown") == 2
     assert len(emitted) == len(links)
     assert isinstance(results[3], RuntimeError)
+
+
+@pytest.mark.asyncio
+async def test_retry_after_cannot_outlive_per_course_budget():
+    link = {"name": "Rate limited", "url": "https://example.test/rate-limited"}
+    attempts = 0
+    sleeps: list[float] = []
+    completions: list[str] = []
+
+    async def attempt():
+        nonlocal attempts
+        attempts += 1
+        return {"_retry_after": 600, "error": "browser_rate_limit_retry"}
+
+    async def record_complete(course):
+        completions.append(course["name"])
+
+    async def sleep(delay):
+        sleeps.append(delay)
+
+    result = await orchestrator._settle_course_with_retries(
+        link,
+        attempt,
+        record_complete,
+        sleep=sleep,
+        max_elapsed_seconds=90,
+    )
+
+    assert result["error"] == "browser_rate_limit_retry"
+    assert attempts == 1
+    assert sleeps == []
+    assert completions == ["Rate limited"]
