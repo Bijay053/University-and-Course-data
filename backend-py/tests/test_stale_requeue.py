@@ -156,6 +156,48 @@ def test_scrape_claim_failure_uses_direct_queued_only_fallback():
     normal_mark.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    ("task_name", "async_coro_name"),
+    [
+        ("repair_university", "_async_repair"),
+        ("bulk_fix_staged_courses", "_async_bulk_fix"),
+    ],
+)
+def test_secondary_worker_claim_failure_uses_direct_queued_only_fallback(
+    task_name: str,
+    async_coro_name: str,
+):
+    """Repair and bulk Fix preserve their payload and completion-hook contract."""
+    from app.tasks import scrape_tasks as st
+
+    job_id = f"test_preclaim_{uuid.uuid4().hex[:8]}"
+    claim_error = RuntimeJobClaimError("pool unavailable")
+
+    def fake_fresh_loop(coro: Any) -> None:
+        assert _coro_name(coro) == "fail_queued_runtime_job_direct"
+        coro.close()
+
+    def fail_claim(coro: Any) -> None:
+        assert _coro_name(coro) == async_coro_name
+        coro.close()
+        raise claim_error
+
+    task = getattr(st, task_name)
+    with (
+        patch.object(st, "_sync_dispose"),
+        patch.object(st.asyncio, "run", side_effect=fail_claim),
+        patch.object(st, "_run_in_fresh_loop", side_effect=fake_fresh_loop) as fallback,
+        patch.object(st, "_immediate_requeue_hook") as completion_hook,
+        patch.object(st, "_mark_failed") as normal_mark,
+    ):
+        result = task.run(job_id)
+
+    assert result == {"ok": False, "id": job_id, "error": "pool unavailable"}
+    fallback.assert_called_once()
+    normal_mark.assert_not_called()
+    completion_hook.assert_called_once_with()
+
+
 @pytest.mark.asyncio
 async def test_direct_preclaim_failure_transitions_queued_job_to_failed():
     """The pool-independent fallback durably terminates an unclaimed job."""
