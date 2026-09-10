@@ -152,3 +152,4 @@
 - [Celery loop resource cleanup](celery-loop-resource-cleanup.md) — close loop-owned HTTP and database resources before each asyncio.run loop ends or worker descriptors accumulate.
 - [Pre-claim failure ownership fence](preclaim-failure-ownership.md) — emergency worker failure writes bypass the shared pool and may transition only queued jobs.
 - [Monash rendered catalogue](monash-rendered-catalogue.md) — listing query facets do not constrain discovered links; filter short-course codes and use detail-page audience evidence.
+- [UWA campus and fee authority](uwa-campus-fee-authority.md) — use the current course’s labelled campus card and exact course-code lookup against UWA’s international fee calculator.

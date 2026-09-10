@@ -1402,6 +1402,7 @@ METHOD_AUTHORITY: dict[str, float] = {
     "cdu_static": _AUTHORITY_PRE_SEED,
     "bond_pre_seed": _AUTHORITY_PRE_SEED,
     "ecu_pre_seed": _AUTHORITY_PRE_SEED,
+    "uwa_static": _AUTHORITY_PRE_SEED,
 }
 
 # ── Structural course-page method protection ──────────────────────────────────
@@ -3552,6 +3553,48 @@ async def extract_course(
                     payload[_guard_k] = None
     except Exception as _csu_exc:  # noqa: BLE001
         log.warning("csu_static_extract pre-seed failed on %s: %s", url, _csu_exc)
+
+    # UWA's labelled course card is the authority for campus.  Generic
+    # extraction sees Perth/Sydney in related-course and navigation content.
+    try:
+        from app.services.scraper.uwa_static_extract import (
+            apply_uwa_static_extraction as _uwa_apply,
+            is_uwa_url as _is_uwa,
+        )
+        if _is_uwa(url):
+            _uwa_pre = await asyncio.to_thread(
+                _uwa_apply, url, html, str(payload.get("course_name") or "")
+            )
+            for _k, _v in _uwa_pre.items():
+                if _k == "scrape_warnings":
+                    _existing_uwa_w = list(payload.get("scrape_warnings") or [])
+                    for _warning in _v or []:
+                        if _warning not in _existing_uwa_w:
+                            _existing_uwa_w.append(_warning)
+                    payload["scrape_warnings"] = _existing_uwa_w
+                    continue
+                payload[_k] = _v
+                if _v not in (None, "", 0, []):
+                    evidence.append({
+                        "field_key": _k,
+                        "value": _v,
+                        "confidence": 0.98,
+                        "method": "uwa_static",
+                        "source_url": (
+                            _uwa_pre.get("uwa_fee_source_url")
+                            if _k in {
+                                "international_fee", "fee_currency",
+                                "fee_term", "fee_year",
+                            }
+                            else url
+                        ),
+                        "snippet": f"UWA labelled course card: {_k}={_v}",
+                    })
+            # Keep a missing labelled campus explicit; never synthesize Perth.
+            payload["course_location"] = _uwa_pre.get("course_location")
+            payload["location_text"] = _uwa_pre.get("location_text")
+    except Exception as _uwa_exc:  # noqa: BLE001
+        log.warning("uwa_static_extract pre-seed failed on %s: %s", url, _uwa_exc)
 
     # ── CDU pre-seed: current-course international DOM blocks ───────────────
     # CDU serves domestic and international values in the same HTML, followed
