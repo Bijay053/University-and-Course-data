@@ -290,6 +290,20 @@ def _get_shared_client() -> httpx.AsyncClient:
         _LOOP_CLIENTS[loop] = client
     return client
 
+
+async def close_shared_client_for_current_loop() -> None:
+    """Close and forget the shared HTTP client owned by the current loop.
+
+    Celery runs each scrape task in a fresh ``asyncio.run()`` loop. Relying on
+    garbage collection after loop shutdown leaves keep-alive sockets open in
+    the long-lived worker process. Close the client while its owning loop is
+    still running so every transport descriptor is released deterministically.
+    """
+    loop = asyncio.get_running_loop()
+    client = _LOOP_CLIENTS.pop(loop, None)
+    if client is not None and not client.is_closed:
+        await client.aclose()
+
 # ---------------------------------------------------------------------------
 # Scrape.do render gate — extraction-only ContextVar
 # ---------------------------------------------------------------------------

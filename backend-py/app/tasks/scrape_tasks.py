@@ -131,6 +131,7 @@ def set_initial_dispatch_lock(job_id: str) -> None:
 
 async def _async_scrape(runtime_job_id: str) -> None:
     from app.services.scraper.browser_pool import pool as _browser_pool
+    from app.services.scraper.http_fetcher import close_shared_client_for_current_loop
 
     # Suppress "RuntimeError: Event loop is closed" noise emitted by the
     # google-genai SDK's GeminiApiClient.aclose() cleanup task.  The SDK
@@ -170,6 +171,20 @@ async def _async_scrape(runtime_job_id: str) -> None:
             await _browser_pool.close()
         except Exception:  # noqa: BLE001 — best-effort cleanup
             pass
+        # The shared httpx client is scoped to this asyncio.run() loop. Close
+        # it before loop shutdown; otherwise its keep-alive sockets accumulate
+        # across tasks in the long-lived Celery child process.
+        try:
+            await close_shared_client_for_current_loop()
+        except Exception as exc:  # noqa: BLE001 — preserve the scrape result
+            log.warning("Could not close scrape HTTP client: %s", exc)
+        # AsyncSession has exited, so every connection returned by this scrape
+        # belongs to the still-running current loop and can be closed safely.
+        # The entry-time close=False invalidation cannot release those sockets.
+        try:
+            await engine.dispose()
+        except Exception as exc:  # noqa: BLE001 — preserve the scrape result
+            log.warning("Could not dispose scrape DB connections: %s", exc)
         # Cancel and drain any remaining asyncio tasks (e.g. stray Gemini
         # httpx cleanup futures) before asyncio.run() closes the loop.
         # Without this, Python logs "Task exception was never retrieved" for
