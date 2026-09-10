@@ -8,10 +8,52 @@ host.
 """
 from __future__ import annotations
 
+import html
+import json
 import os
 import pytest
 
 from app.services.scraper import mq_browser_discover as mq
+
+
+class TestRenderedPageData:
+    def _body(self) -> tuple[dict, str]:
+        program = {
+            "course_name": "Bachelor of International Studies",
+            "fees": [{"student_type": "International", "amount": 42000}],
+            "offering": [{"location": "North Ryde"}],
+        }
+        outer = {
+            "result": {
+                "data": {
+                    "current": {
+                        "fields": {
+                            "json": json.dumps(program),
+                        }
+                    }
+                }
+            }
+        }
+        return program, json.dumps(outer)
+
+    def test_extracts_plain_page_data_json(self):
+        program, body = self._body()
+        assert mq._extract_program_from_page_data(body) == program
+
+    def test_extracts_chromium_wrapped_page_data_json(self):
+        program, body = self._body()
+        wrapped = (
+            '<html><head><meta name="color-scheme" content="light dark">'
+            '<meta charset="utf-8"></head><body><pre>'
+            f"{html.escape(body)}</pre>"
+            '<div class="json-formatter-container"></div></body></html>'
+        )
+        assert mq._extract_program_from_page_data(wrapped) == program
+
+    def test_rejects_arbitrary_html_around_page_data(self):
+        _program, body = self._body()
+        wrapped = f"<html><body><div>untrusted</div><pre>{html.escape(body)}</pre></body></html>"
+        assert mq._extract_program_from_page_data(wrapped) == {}
 
 
 class TestCoursehandbookRegexContract:

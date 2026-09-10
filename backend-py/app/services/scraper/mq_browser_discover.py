@@ -356,7 +356,12 @@ def _extract_program_from_page_data(body: str | None) -> dict:
     if not body:
         return {}
     try:
-        outer = json.loads(body)
+        # Scrape.do's rendered Chrome transport displays JSON documents inside
+        # its browser-owned <pre> wrapper (and may append the JSON formatter
+        # container).  The same wrapper used by Funnelback is also returned for
+        # page-data.json, so plain json.loads would discard every rendered
+        # fallback response.
+        outer = parse_rendered_json(body)
         program_json = (
             outer.get("result", {})
                  .get("data", {})
@@ -833,7 +838,7 @@ async def _discover_from_funnelback_api(
             from app.services.scraper.http_fetcher import fetch_html_scrape_do
             scrape_do_ok = 0
             # Sequential to avoid burning Scrape.do credits in a parallel burst.
-            for url in missing_urls:
+            for retry_index, url in enumerate(missing_urls, start=1):
                 pd_url = _page_data_url(url)
                 try:
                     body = await fetch_html_scrape_do(
@@ -846,7 +851,13 @@ async def _discover_from_funnelback_api(
                             scrape_do_ok += 1
                 except Exception:  # noqa: BLE001
                     pass
-            if scrape_do_ok:
+                if retry_index % 25 == 0 or retry_index == len(missing_urls):
+                    await emit_fn(
+                        "[DISCOVER] MQ: Tier 0 — rendered page-data.json retry "
+                        f"progress: {retry_index}/{len(missing_urls)} attempted, "
+                        f"{scrape_do_ok} recovered"
+                    )
+            if missing_urls:
                 await emit_fn(
                     f"[DISCOVER] MQ: Tier 0 — page-data.json via scrape.do retry: "
                     f"+{scrape_do_ok} (total now {len(programs)}/{len(course_triples)})"
