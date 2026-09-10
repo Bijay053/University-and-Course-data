@@ -23,6 +23,7 @@ from app.services.scraper.orchestrator import run_scrape
 from app.services.scraper.repair import run_repair
 from app.services.scraper.job_claim import (
     RuntimeJobClaimError,
+    emit_preclaim_failure_alert,
     fail_queued_runtime_job_direct,
 )
 from app.tasks.celery_app import celery_app
@@ -87,6 +88,30 @@ def _run_db_coro(coro):  # noqa: ANN001, ANN202
     """
     _sync_dispose()
     return asyncio.run(coro)
+
+
+def _handle_preclaim_failure(runtime_job_id: str, claim_error: RuntimeJobClaimError) -> None:
+    """Fail a queued job directly, alerting externally if the DB is unreachable."""
+    try:
+        _run_in_fresh_loop(
+            fail_queued_runtime_job_direct(runtime_job_id, str(claim_error))
+        )
+    except Exception as fallback_exc:
+        log.exception(
+            "Direct pre-claim failure update failed id=%s: %s",
+            runtime_job_id,
+            fallback_exc,
+        )
+        try:
+            emit_preclaim_failure_alert(runtime_job_id, fallback_exc)
+        except Exception as alert_exc:
+            log.critical(
+                "PRE-CLAIM DATABASE FAILURE ALERT COULD NOT BE PERSISTED "
+                "id=%s db_error=%s alert_error=%s",
+                runtime_job_id,
+                str(fallback_exc)[:200],
+                str(alert_exc)[:200],
+            )
 
 
 # Alias for internal use within this module.
@@ -456,16 +481,7 @@ def scrape_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
         return {"ok": True, "id": runtime_job_id}
     except RuntimeJobClaimError as exc:
         log.exception("Task failed before claim id=%s: %s", runtime_job_id, exc)
-        try:
-            _run_in_fresh_loop(
-                fail_queued_runtime_job_direct(runtime_job_id, str(exc))
-            )
-        except Exception as fallback_exc:
-            log.exception(
-                "Direct pre-claim failure update failed id=%s: %s",
-                runtime_job_id,
-                fallback_exc,
-            )
+        _handle_preclaim_failure(runtime_job_id, exc)
         return {"ok": False, "id": runtime_job_id, "error": str(exc)}
     except SoftTimeLimitExceeded:
         # 45-min ceiling hit. Mark the job failed so the UI shows a real
@@ -533,16 +549,7 @@ def repair_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
         return {"ok": True, "id": runtime_job_id}
     except RuntimeJobClaimError as exc:
         log.exception("Repair task failed before claim id=%s: %s", runtime_job_id, exc)
-        try:
-            _run_in_fresh_loop(
-                fail_queued_runtime_job_direct(runtime_job_id, str(exc))
-            )
-        except Exception as fallback_exc:
-            log.exception(
-                "Direct pre-claim repair failure update failed id=%s: %s",
-                runtime_job_id,
-                fallback_exc,
-            )
+        _handle_preclaim_failure(runtime_job_id, exc)
         return {"ok": False, "id": runtime_job_id, "error": str(exc)}
     except Exception as exc:
         log.exception("Repair task failed id=%s: %s", runtime_job_id, exc)
@@ -575,16 +582,7 @@ def bulk_fix_staged_courses(self, runtime_job_id: str) -> dict:  # noqa: ANN001
         return {"ok": True, "id": runtime_job_id}
     except RuntimeJobClaimError as exc:
         log.exception("Bulk Fix task failed before claim id=%s: %s", runtime_job_id, exc)
-        try:
-            _run_in_fresh_loop(
-                fail_queued_runtime_job_direct(runtime_job_id, str(exc))
-            )
-        except Exception as fallback_exc:
-            log.exception(
-                "Direct pre-claim bulk Fix failure update failed id=%s: %s",
-                runtime_job_id,
-                fallback_exc,
-            )
+        _handle_preclaim_failure(runtime_job_id, exc)
         return {"ok": False, "id": runtime_job_id, "error": str(exc)}
     except Exception as exc:
         log.exception("Bulk Fix task failed id=%s: %s", runtime_job_id, exc)

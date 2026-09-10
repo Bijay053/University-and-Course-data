@@ -23,6 +23,9 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import json
+import sys
+import types
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -35,6 +38,7 @@ from app.database import AsyncSessionLocal, engine
 from app.models.scrape_runtime import ScrapeRuntimeJob
 from app.services.scraper.job_claim import (
     RuntimeJobClaimError,
+    emit_preclaim_failure_alert,
     fail_queued_runtime_job_direct,
 )
 from app.tasks.scrape_tasks import (
@@ -154,6 +158,118 @@ def test_scrape_claim_failure_uses_direct_queued_only_fallback():
     assert result == {"ok": False, "id": job_id, "error": "pool unavailable"}
     fallback.assert_called_once()
     normal_mark.assert_not_called()
+
+
+def test_failed_direct_preclaim_update_emits_external_alert():
+    from app.tasks import scrape_tasks as st
+
+    job_id = f"test_preclaim_{uuid.uuid4().hex[:8]}"
+    claim_error = RuntimeJobClaimError("pool unavailable")
+    fallback_error = OSError("database host unreachable")
+
+    def fail_scrape(coro: Any) -> None:
+        coro.close()
+        raise claim_error
+
+    def fail_fallback(coro: Any) -> None:
+        coro.close()
+        raise fallback_error
+
+    with (
+        patch.object(st, "_sync_dispose"),
+        patch.object(st.asyncio, "run", side_effect=fail_scrape),
+        patch.object(st, "_run_in_fresh_loop", side_effect=fail_fallback),
+        patch.object(st, "emit_preclaim_failure_alert") as alert,
+        patch.object(st, "_immediate_requeue_hook"),
+    ):
+        st.scrape_university.run(job_id)
+
+    alert.assert_called_once_with(job_id, fallback_error)
+
+
+def test_alert_storage_failure_preserves_task_result_and_completion_hook():
+    from app.tasks import scrape_tasks as st
+
+    job_id = f"test_preclaim_{uuid.uuid4().hex[:8]}"
+    claim_error = RuntimeJobClaimError("pool unavailable")
+
+    def fail_scrape(coro: Any) -> None:
+        coro.close()
+        raise claim_error
+
+    def fail_fallback(coro: Any) -> None:
+        coro.close()
+        raise OSError("database host unreachable")
+
+    with (
+        patch.object(st, "_sync_dispose"),
+        patch.object(st.asyncio, "run", side_effect=fail_scrape),
+        patch.object(st, "_run_in_fresh_loop", side_effect=fail_fallback),
+        patch.object(
+            st,
+            "emit_preclaim_failure_alert",
+            side_effect=OSError("S3 unavailable"),
+        ),
+        patch.object(st, "_immediate_requeue_hook") as completion_hook,
+    ):
+        result = st.scrape_university.run(job_id)
+
+    assert result == {"ok": False, "id": job_id, "error": "pool unavailable"}
+    completion_hook.assert_called_once_with()
+
+
+def test_preclaim_alert_is_bounded_and_uses_conditional_create(monkeypatch):
+    client = MagicMock()
+    fake_boto3 = types.SimpleNamespace(client=MagicMock(return_value=client))
+    monkeypatch.setitem(sys.modules, "boto3", fake_boto3)
+    monkeypatch.setenv("AWS_S3_BUCKET_NAME", "alerts-bucket")
+    monkeypatch.setenv("AWS_S3_REGION", "ap-southeast-2")
+    job_id = "runtime-job-123"
+
+    assert emit_preclaim_failure_alert(job_id, "failure\n" + ("x" * 900)) is True
+
+    call_kwargs = client.put_object.call_args.kwargs
+    body = json.loads(call_kwargs["Body"])
+    assert body["runtimeJobId"] == job_id
+    assert len(body["error"]) == 500
+    assert "\n" not in body["error"]
+    assert call_kwargs["IfNoneMatch"] == "*"
+    assert call_kwargs["Key"].startswith(
+        "_operational_alerts/preclaim-db-failure/"
+    )
+
+
+def test_preclaim_alert_suppresses_duplicate(monkeypatch):
+    duplicate = RuntimeError("already exists")
+    duplicate.response = {
+        "Error": {"Code": "PreconditionFailed"},
+        "ResponseMetadata": {"HTTPStatusCode": 412},
+    }
+    client = MagicMock()
+    client.put_object.side_effect = duplicate
+    fake_boto3 = types.SimpleNamespace(client=MagicMock(return_value=client))
+    monkeypatch.setitem(sys.modules, "boto3", fake_boto3)
+    monkeypatch.setenv("AWS_S3_BUCKET_NAME", "alerts-bucket")
+    monkeypatch.setenv("AWS_S3_REGION", "ap-southeast-2")
+
+    assert emit_preclaim_failure_alert("same-job", "database unavailable") is False
+
+
+def test_preclaim_alert_retries_conditional_conflict(monkeypatch):
+    conflict = RuntimeError("conditional operation conflicts")
+    conflict.response = {
+        "Error": {"Code": "ConditionalRequestConflict"},
+        "ResponseMetadata": {"HTTPStatusCode": 409},
+    }
+    client = MagicMock()
+    client.put_object.side_effect = [conflict, {"ETag": "created"}]
+    fake_boto3 = types.SimpleNamespace(client=MagicMock(return_value=client))
+    monkeypatch.setitem(sys.modules, "boto3", fake_boto3)
+    monkeypatch.setenv("AWS_S3_BUCKET_NAME", "alerts-bucket")
+    monkeypatch.setenv("AWS_S3_REGION", "ap-southeast-2")
+
+    assert emit_preclaim_failure_alert("conflicted-job", "database unavailable") is True
+    assert client.put_object.call_count == 2
 
 
 @pytest.mark.parametrize(

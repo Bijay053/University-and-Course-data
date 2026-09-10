@@ -1,6 +1,10 @@
 """Atomic scrape-runtime job claiming with worker release audit history."""
 from __future__ import annotations
 
+import hashlib
+import json
+import logging
+import os
 from datetime import datetime, timezone
 
 from sqlalchemy import text
@@ -8,9 +12,84 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.release_info import get_release_revision
 
+log = logging.getLogger(__name__)
+
+_PRECLAIM_ALERT_PREFIX = "_operational_alerts/preclaim-db-failure"
+_MAX_ALERT_ERROR_CHARS = 500
+
 
 class RuntimeJobClaimError(RuntimeError):
     """The worker could not determine or persist ownership of a queued job."""
+
+
+def _bounded_error_summary(error: BaseException | str) -> str:
+    """Return a single-line, bounded error summary safe for an operator alert."""
+    summary = " ".join(str(error).split())
+    return (summary or error.__class__.__name__)[:_MAX_ALERT_ERROR_CHARS]
+
+
+def emit_preclaim_failure_alert(
+    runtime_job_id: str,
+    error: BaseException | str,
+) -> bool:
+    """Persist a database-independent alert, once per runtime job.
+
+    A deterministic object key and S3's conditional create provide deduplication
+    across Celery deliveries and worker processes. This path intentionally does
+    not import the application database or snapshot metadata code.
+    """
+    import boto3
+
+    bucket = os.environ.get("AWS_S3_BUCKET_NAME", "")
+    region = os.environ.get("AWS_S3_REGION", "")
+    if not bucket or not region:
+        raise RuntimeError("operational alert storage is not configured")
+
+    job_hash = hashlib.sha256(runtime_job_id.encode("utf-8")).hexdigest()
+    key = f"{_PRECLAIM_ALERT_PREFIX}/{job_hash}.json"
+    payload = json.dumps(
+        {
+            "alertType": "preclaim_database_failure",
+            "runtimeJobId": runtime_job_id,
+            "error": _bounded_error_summary(error),
+            "createdAt": datetime.now(timezone.utc).isoformat(),
+        },
+        separators=(",", ":"),
+    ).encode("utf-8")
+    client_kwargs = {
+        "region_name": region,
+        "aws_access_key_id": os.environ.get("AWS_ACCESS_KEY_ID"),
+        "aws_secret_access_key": os.environ.get("AWS_SECRET_ACCESS_KEY"),
+    }
+    if endpoint := os.environ.get("AWS_S3_ENDPOINT_URL"):
+        client_kwargs["endpoint_url"] = endpoint
+    client = boto3.client("s3", **client_kwargs)
+    for attempt in range(2):
+        try:
+            client.put_object(
+                Bucket=bucket,
+                Key=key,
+                Body=payload,
+                ContentType="application/json",
+                IfNoneMatch="*",
+            )
+            return True
+        except Exception as exc:
+            response = getattr(exc, "response", {}) or {}
+            code = str((response.get("Error") or {}).get("Code") or "")
+            status = (response.get("ResponseMetadata") or {}).get("HTTPStatusCode")
+            if code == "PreconditionFailed" or status == 412:
+                log.info(
+                    "Pre-claim operational alert already exists for job %s",
+                    runtime_job_id,
+                )
+                return False
+            if (
+                code == "ConditionalRequestConflict" or status == 409
+            ) and attempt == 0:
+                continue
+            raise
+    return False  # pragma: no cover - loop always returns or raises
 
 
 async def claim_runtime_job(db: AsyncSession, runtime_job_id: str) -> bool:
