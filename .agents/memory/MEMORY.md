@@ -149,3 +149,4 @@
 - [Central profiles in staged re-extraction](central-profiles-staged-reextract.md) — Review → Fix must prefetch central pages; semantic parser changes must bump the English cache schema.
 - [UQ start-semester intake authority](uq-start-semester-intake.md) — UQ intake comes only from the selected program’s Drupal start_semester fact; page-wide date scanning is unsafe.
 - [Bond fee, location, and IELTS authority](bond-fee-ielts-authority.md) — pair course IDs/codes, preserve fee periods, avoid campus/mode defaults, and use exact program-keyed IELTS rows.
+- [Celery loop resource cleanup](celery-loop-resource-cleanup.md) — close loop-owned HTTP and database resources before each asyncio.run loop ends or worker descriptors accumulate.
