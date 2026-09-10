@@ -1403,6 +1403,7 @@ METHOD_AUTHORITY: dict[str, float] = {
     "bond_pre_seed": _AUTHORITY_PRE_SEED,
     "ecu_pre_seed": _AUTHORITY_PRE_SEED,
     "uwa_static": _AUTHORITY_PRE_SEED,
+    "curtin_static": _AUTHORITY_PRE_SEED,
 }
 
 # ── Structural course-page method protection ──────────────────────────────────
@@ -3458,6 +3459,45 @@ async def extract_course(
                 )
         except Exception as _s0_exc:
             log.debug("[STAGE0] Rule application failed (non-fatal): %s", _s0_exc)
+
+    # ── Curtin pre-seed: current offering fact blocks ───────────────────────
+    # Curtin pages repeat related majors and recommendation cards.  Run the
+    # provider before generic regex so credit counts cannot become durations
+    # and the generic Perth fallback cannot become course-owned location.
+    try:
+        from app.services.scraper.curtin_static_extract import (
+            apply_curtin_static_extraction as _curtin_apply,
+            is_curtin_url as _is_curtin,
+        )
+        if _is_curtin(url):
+            _curtin_pre = _curtin_apply(url, html)
+            for _k, _v in _curtin_pre.items():
+                if _k == "scrape_warnings":
+                    payload.setdefault("scrape_warnings", [])
+                    for _warning in _v or []:
+                        if _warning not in payload["scrape_warnings"]:
+                            payload["scrape_warnings"].append(_warning)
+                    continue
+                payload[_k] = _v
+                if _v not in (None, "", 0, []):
+                    evidence.append({
+                        "field_key": _k,
+                        "value": _v,
+                        "confidence": 0.98,
+                        "method": "curtin_static",
+                        "source_url": url,
+                        "snippet": f"Curtin current offering: {_k}={_v}",
+                    })
+            # Protect course-owned delivery, duration and fee fields from
+            # page-wide defaults. English and admission fields are not
+            # protected here because Curtin's configured central English page
+            # remains an authoritative fallback when the course page omits them.
+            for _k in ("course_location", "location_text", "study_mode",
+                       "duration", "duration_term", "international_fee",
+                        "fee_term", "fee_currency", "fee_year"):
+                payload.setdefault(_k, None)
+    except Exception as _curtin_exc:  # noqa: BLE001
+        log.warning("curtin_static_extract failed on %s: %s", url, _curtin_exc)
 
     # ── CSU pre-seed: runs BEFORE _EXTRACTORS ────────────────────────────────
     # CSU pages embed all course data as inline JS (fees, ocb_metadata,
