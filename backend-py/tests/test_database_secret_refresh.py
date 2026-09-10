@@ -65,6 +65,8 @@ def test_disposable_rehearsal_is_explicitly_guarded_and_uses_isolated_fixture() 
     source = (DEPLOY_DIR / "rehearse_database_secret_refresh.py").read_text()
     readme = (DEPLOY_DIR / "README.md").read_text()
     assert "ManageMasterUserPassword: true" in fixture
+    assert "DBInstanceClass: db.t3.micro" in fixture
+    assert "DBInstanceClass: db.t4g.micro" not in fixture
     assert "PubliclyAccessible: false" in fixture
     assert "Type: AWS::Scheduler::ScheduleGroup" in fixture
     assert "ScheduleExpression: rate(5 minutes)" in fixture
@@ -82,6 +84,7 @@ def test_disposable_rehearsal_is_explicitly_guarded_and_uses_isolated_fixture() 
     assert "redis-cli llen scrape" not in fixture
     assert fixture.count("cancel_consumer scrape --timeout=20") == 2
     assert fixture.count("control.inspect(timeout=20).active()") == 2
+    assert fixture.count("add_consumer scrape --timeout=20") == 1
     assert (
         'aws:SourceArn: !Sub "arn:${AWS::Partition}:scheduler:${AWS::Region}:'
         '${AWS::AccountId}:schedule-group/up-db-refresh-${RehearsalId}"'
