@@ -33,6 +33,10 @@ from sqlalchemy import text
 
 from app.database import AsyncSessionLocal, engine
 from app.models.scrape_runtime import ScrapeRuntimeJob
+from app.services.scraper.job_claim import (
+    RuntimeJobClaimError,
+    fail_queued_runtime_job_direct,
+)
 from app.tasks.scrape_tasks import (
     _STALE_QUEUED_MINUTES,
     _async_find_stale,
@@ -121,6 +125,91 @@ def _make_sync_redis(*, nx_result: Any = True) -> MagicMock:
     r.set = MagicMock(return_value=nx_result)
     r.delete = MagicMock(return_value=1)
     return r
+
+
+def test_scrape_claim_failure_uses_direct_queued_only_fallback():
+    """A failure at the ownership boundary must bypass the normal async pool."""
+    from app.tasks import scrape_tasks as st
+
+    job_id = f"test_preclaim_{uuid.uuid4().hex[:8]}"
+    claim_error = RuntimeJobClaimError("pool unavailable")
+
+    def fake_fresh_loop(coro: Any) -> None:
+        assert _coro_name(coro) == "fail_queued_runtime_job_direct"
+        coro.close()
+
+    def fail_scrape(coro: Any) -> None:
+        coro.close()
+        raise claim_error
+
+    with (
+        patch.object(st, "_sync_dispose"),
+        patch.object(st.asyncio, "run", side_effect=fail_scrape),
+        patch.object(st, "_run_in_fresh_loop", side_effect=fake_fresh_loop) as fallback,
+        patch.object(st, "_immediate_requeue_hook"),
+        patch.object(st, "_mark_failed") as normal_mark,
+    ):
+        result = st.scrape_university.run(job_id)
+
+    assert result == {"ok": False, "id": job_id, "error": "pool unavailable"}
+    fallback.assert_called_once()
+    normal_mark.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_direct_preclaim_failure_transitions_queued_job_to_failed():
+    """The pool-independent fallback durably terminates an unclaimed job."""
+    job_id = await _seed_job(age_minutes=0)
+    try:
+        changed = await fail_queued_runtime_job_direct(job_id, "startup failed")
+
+        async with AsyncSessionLocal() as db:
+            row = (
+                await db.execute(
+                    text(
+                        "SELECT status, error_message, completed_at "
+                        "FROM scrape_runtime_jobs WHERE runtime_job_id = :jid"
+                    ),
+                    {"jid": job_id},
+                )
+            ).one()
+        assert changed is True
+        assert row.status == "failed"
+        assert "startup failed" in row.error_message
+        assert row.completed_at is not None
+    finally:
+        await _delete_job(job_id)
+
+
+@pytest.mark.asyncio
+async def test_direct_preclaim_failure_does_not_overwrite_racing_claim():
+    """A worker that claimed first keeps ownership when the fallback arrives."""
+    job_id = await _seed_job(age_minutes=0)
+    try:
+        async with AsyncSessionLocal() as db:
+            await db.execute(
+                text(
+                    "UPDATE scrape_runtime_jobs SET status = 'running' "
+                    "WHERE runtime_job_id = :jid AND status = 'queued'"
+                ),
+                {"jid": job_id},
+            )
+            await db.commit()
+
+        changed = await fail_queued_runtime_job_direct(job_id, "startup failed")
+
+        async with AsyncSessionLocal() as db:
+            status = await db.scalar(
+                text(
+                    "SELECT status FROM scrape_runtime_jobs "
+                    "WHERE runtime_job_id = :jid"
+                ),
+                {"jid": job_id},
+            )
+        assert changed is False
+        assert status == "running"
+    finally:
+        await _delete_job(job_id)
 
 
 def _call_requeue_stale(task_module: Any) -> dict:

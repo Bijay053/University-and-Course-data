@@ -9,12 +9,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.release_info import get_release_revision
 
 
+class RuntimeJobClaimError(RuntimeError):
+    """The worker could not determine or persist ownership of a queued job."""
+
+
 async def claim_runtime_job(db: AsyncSession, runtime_job_id: str) -> bool:
     """Claim a queued job and append the claiming worker's release identity."""
     now = datetime.now(timezone.utc)
     release_revision = get_release_revision()
-    claimed = await db.execute(
-        text(
+    try:
+        claimed = await db.execute(
+            text(
             "WITH claimed AS ("
             "    UPDATE scrape_runtime_jobs "
             "    SET status = 'running', claimed_at = :now, heartbeat_at = :now, "
@@ -64,18 +69,57 @@ async def claim_runtime_job(db: AsyncSession, runtime_job_id: str) -> bool:
             "    )"
             ") "
             "SELECT runtime_job_id FROM claimed"
-        ),
-        {
-            "jid": runtime_job_id,
-            "now": now,
-            "release_revision": release_revision,
-        },
-    )
-    was_claimed = claimed.first() is not None
-    await db.commit()
+            ),
+            {
+                "jid": runtime_job_id,
+                "now": now,
+                "release_revision": release_revision,
+            },
+        )
+        was_claimed = claimed.first() is not None
+        await db.commit()
+    except Exception as exc:
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+        raise RuntimeJobClaimError(
+            f"Could not claim runtime job {runtime_job_id}"
+        ) from exc
     # The claim is issued as textual SQL, so SQLAlchemy cannot synchronize
     # already-loaded ScrapeRuntimeJob instances in this session. Expire them
     # after commit so a later requeue/resume observes the persisted "running"
     # state before applying another status transition.
     db.expire_all()
     return was_claimed
+
+
+async def fail_queued_runtime_job_direct(runtime_job_id: str, error: str) -> bool:
+    """Fail an unclaimed job using a connection outside the shared async pool.
+
+    The status predicate is the ownership fence: if another worker committed a
+    successful claim while this worker was failing, its running job is left
+    untouched.
+    """
+    import asyncpg
+
+    from app.config import settings
+    from app.database import postgres_tls_connect_args
+
+    dsn = settings.database_url.replace(
+        "postgresql+asyncpg://", "postgresql://", 1
+    )
+    ssl_context = postgres_tls_connect_args().get("ssl")
+    connection = await asyncpg.connect(dsn=dsn, ssl=ssl_context)
+    try:
+        result = await connection.execute(
+            "UPDATE scrape_runtime_jobs "
+            "SET status = 'failed', completed_at = NOW(), "
+            "    error_message = $2, updated_at = NOW() "
+            "WHERE runtime_job_id = $1 AND status = 'queued'",
+            runtime_job_id,
+            f"Scraping failed before worker claim: {error[:200]}",
+        )
+        return result == "UPDATE 1"
+    finally:
+        await connection.close()

@@ -21,6 +21,10 @@ from app.config import STALE_QUEUED_MINUTES
 from app.database import AsyncSessionLocal, engine
 from app.services.scraper.orchestrator import run_scrape
 from app.services.scraper.repair import run_repair
+from app.services.scraper.job_claim import (
+    RuntimeJobClaimError,
+    fail_queued_runtime_job_direct,
+)
 from app.tasks.celery_app import celery_app
 
 log = logging.getLogger(__name__)
@@ -450,6 +454,19 @@ def scrape_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
     try:
         asyncio.run(_async_scrape(runtime_job_id))
         return {"ok": True, "id": runtime_job_id}
+    except RuntimeJobClaimError as exc:
+        log.exception("Task failed before claim id=%s: %s", runtime_job_id, exc)
+        try:
+            _run_in_fresh_loop(
+                fail_queued_runtime_job_direct(runtime_job_id, str(exc))
+            )
+        except Exception as fallback_exc:
+            log.exception(
+                "Direct pre-claim failure update failed id=%s: %s",
+                runtime_job_id,
+                fallback_exc,
+            )
+        return {"ok": False, "id": runtime_job_id, "error": str(exc)}
     except SoftTimeLimitExceeded:
         # 45-min ceiling hit. Mark the job failed so the UI shows a real
         # error instead of spinning forever, then let Celery clean up.
@@ -514,6 +531,19 @@ def repair_university(self, runtime_job_id: str) -> dict:  # noqa: ANN001
     try:
         asyncio.run(_async_repair(runtime_job_id))
         return {"ok": True, "id": runtime_job_id}
+    except RuntimeJobClaimError as exc:
+        log.exception("Repair task failed before claim id=%s: %s", runtime_job_id, exc)
+        try:
+            _run_in_fresh_loop(
+                fail_queued_runtime_job_direct(runtime_job_id, str(exc))
+            )
+        except Exception as fallback_exc:
+            log.exception(
+                "Direct pre-claim repair failure update failed id=%s: %s",
+                runtime_job_id,
+                fallback_exc,
+            )
+        return {"ok": False, "id": runtime_job_id, "error": str(exc)}
     except Exception as exc:
         log.exception("Repair task failed id=%s: %s", runtime_job_id, exc)
         try:
@@ -543,6 +573,19 @@ def bulk_fix_staged_courses(self, runtime_job_id: str) -> dict:  # noqa: ANN001
     try:
         asyncio.run(_async_bulk_fix(runtime_job_id))
         return {"ok": True, "id": runtime_job_id}
+    except RuntimeJobClaimError as exc:
+        log.exception("Bulk Fix task failed before claim id=%s: %s", runtime_job_id, exc)
+        try:
+            _run_in_fresh_loop(
+                fail_queued_runtime_job_direct(runtime_job_id, str(exc))
+            )
+        except Exception as fallback_exc:
+            log.exception(
+                "Direct pre-claim bulk Fix failure update failed id=%s: %s",
+                runtime_job_id,
+                fallback_exc,
+            )
+        return {"ok": False, "id": runtime_job_id, "error": str(exc)}
     except Exception as exc:
         log.exception("Bulk Fix task failed id=%s: %s", runtime_job_id, exc)
         try:
