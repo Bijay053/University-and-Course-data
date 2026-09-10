@@ -1,0 +1,24 @@
+{
+  "programs": [
+    {
+      "id": "CC-60025",
+      "duration": "2 years (6 semesters)",
+      "name": "Bachelor of Exercise and Sports Science - CC-60025",
+      "studyAreas": [{"label": "Health, Biomedical, and Sport Sciences"}],
+      "offerings": []
+    },
+    {
+      "id": "CC-63034",
+      "duration": "2 years (6 semesters)",
+      "name": "Doctor of Physiotherapy - CC-63034",
+      "studyAreas": [{"label": "Health, Biomedical, and Sport Sciences"}],
+      "offerings": [
+        {
+          "semester": "May 2027",
+          "deliveryMode": "On-Campus",
+          "location": "Gold Coast Campus"
+        }
+      ]
+    }
+  ]
+}

@@ -61,6 +61,7 @@ from __future__ import annotations
 import logging
 import re
 import time
+from html import unescape
 from typing import Any
 from urllib.parse import urlparse
 
@@ -181,6 +182,24 @@ def suppress_authoritative_fee_omission(
     warnings = list(payload.get("scrape_warnings") or [])
     if "bond_fee_source_empty" not in warnings:
         warnings.append("bond_fee_source_empty")
+    payload["scrape_warnings"] = warnings
+
+
+def suppress_authoritative_delivery_omission(
+    payload: dict[str, Any],
+    evidence: list[dict[str, Any]],
+) -> None:
+    """Clear page-wide location/mode guesses when Bond has no current offering."""
+    for key in ("course_location", "study_mode"):
+        payload[key] = None
+    evidence[:] = [
+        ev for ev in evidence
+        if not isinstance(ev, dict)
+        or ev.get("field_key") not in {"course_location", "study_mode"}
+    ]
+    warnings = list(payload.get("scrape_warnings") or [])
+    if "bond_no_current_offerings" not in warnings:
+        warnings.append("bond_no_current_offerings")
     payload["scrape_warnings"] = warnings
 
 # ---------------------------------------------------------------------------
@@ -306,6 +325,35 @@ def _extract_program_ids(html: str) -> tuple[str | None, str | None]:
     return None, None
 
 
+def _extract_program_keys(html: str) -> tuple[str | None, list[str]]:
+    """Return the shared details id and every course-owned program code.
+
+    Packaged Bond programs intentionally render multiple ``program-detail``
+    elements with one details id (one element per component).  Treating that
+    as ambiguous discarded the package duration and every component fee.
+    """
+    tags = re.findall(r"<[^>]*data-program-detail-url[^>]*>", html, re.I | re.S)
+    pairs: list[tuple[str, str]] = []
+    for tag in tags:
+        if not re.search(
+            r'class\s*=\s*["\'][^"\']*\bprogram-detail\b', tag, re.IGNORECASE
+        ):
+            continue
+        id_match = _DETAIL_URL_RE.search(tag)
+        code_match = _PROG_CODE_RE.search(tag)
+        if id_match and code_match:
+            pair = (id_match.group(1), code_match.group(1))
+            if pair not in pairs:
+                pairs.append(pair)
+    if not pairs:
+        numeric_id, code = _extract_program_ids(html)
+        return numeric_id, [code] if code else []
+    ids = {numeric_id for numeric_id, _code in pairs}
+    if len(ids) != 1:
+        return None, []
+    return pairs[0][0], [code for _numeric_id, code in pairs]
+
+
 # ---------------------------------------------------------------------------
 # /api/program-details/{id}  — duration, intakes, category, degree type
 # ---------------------------------------------------------------------------
@@ -360,29 +408,71 @@ def _enrich_from_details_api(numeric_id: str) -> dict[str, Any]:
     programs = data.get("programs", [])
     if not programs:
         return {}
-    prog = programs[0]
-
     result: dict[str, Any] = {}
-    details_code = prog.get("id")
-    if isinstance(details_code, str) and _SAFE_PROGRAM_CODE_RE.fullmatch(details_code.strip()):
-        result["_program_code"] = details_code.strip()
+    valid_programs = [prog for prog in programs if isinstance(prog, dict)]
+    detail_codes = [
+        code.strip()
+        for prog in valid_programs
+        if isinstance((code := prog.get("id")), str)
+        and _SAFE_PROGRAM_CODE_RE.fullmatch(code.strip())
+    ]
+    if detail_codes:
+        result["_program_codes"] = detail_codes
+        if len(detail_codes) == 1:
+            result["_program_code"] = detail_codes[0]
 
-    # Duration
-    dur_str = prog.get("duration", "")
-    if dur_str:
-        duration = _parse_duration(dur_str)
-        if duration is not None:
-            result["duration"], result["duration_term"] = duration
+    # A packaged program's standard duration is the sum of its consecutive
+    # component programs. Normalise to months only when the units differ.
+    durations = [
+        parsed
+        for prog in valid_programs
+        if (parsed := _parse_duration(str(prog.get("duration") or ""))) is not None
+    ]
+    if len(durations) == 1:
+        result["duration"], result["duration_term"] = durations[0]
+    elif durations:
+        months = sum(
+            value * (12 if unit == "Year" else 4 if unit == "Semester" else 1)
+            for value, unit in durations
+        )
+        if months % 12 == 0:
+            result["duration"], result["duration_term"] = months / 12, "Year"
+        else:
+            result["duration"], result["duration_term"] = months, "Month"
 
     # Intake months from offerings
-    offerings = prog.get("offerings", [])
+    offerings = [
+        offering
+        for prog in valid_programs
+        for offering in (prog.get("offerings") or [])
+        if isinstance(offering, dict)
+    ]
     if offerings:
         months = _parse_offerings_intakes(offerings)
         if months:
             result["intake_months"] = months
+        locations = list(dict.fromkeys(
+            str(o.get("location")).strip()
+            for o in offerings if o.get("location")
+        ))
+        modes = list(dict.fromkeys(
+            str(o.get("deliveryMode")).strip()
+            for o in offerings if o.get("deliveryMode")
+        ))
+        if locations:
+            result["course_location"] = ", ".join(locations)
+        if modes:
+            normalised = {
+                "on-campus": "On Campus",
+                "online": "Online",
+            }
+            mapped = list(dict.fromkeys(normalised.get(m.casefold(), m) for m in modes))
+            result["study_mode"] = mapped[0] if len(mapped) == 1 else "Blended"
+    else:
+        result["_authoritative_delivery_omission"] = True
 
     # Category from first study area
-    study_areas = prog.get("studyAreas", [])
+    study_areas = valid_programs[0].get("studyAreas", []) if valid_programs else []
     if study_areas and study_areas[0].get("label"):
         result["category"] = study_areas[0]["label"]
 
@@ -478,6 +568,44 @@ def _enrich_from_fees_api(numeric_id: str, program_code: str) -> dict[str, Any]:
     return result
 
 
+def _enrich_from_packaged_fees_api(
+    numeric_id: str,
+    program_codes: list[str],
+) -> dict[str, Any]:
+    """Return the exact combined full-course fee for a packaged program."""
+    if len(program_codes) == 1:
+        return _enrich_from_fees_api(numeric_id, program_codes[0])
+    totals: list[float] = []
+    years: list[int] = []
+    for code in program_codes:
+        data = _get_json(f"https://bond.edu.au/api/program-fees/{numeric_id}/{code}")
+        if not isinstance(data, dict):
+            return {}
+        fees_list = data.get("fees") or []
+        if not fees_list:
+            return {"_authoritative_fee_omission": True}
+        entry = _select_fee_entry(fees_list)
+        international = entry.get("international") if entry else None
+        total = _positive_amount(
+            international.get("total") if isinstance(international, dict) else None
+        )
+        if total is None:
+            # Different component semester prices cannot safely be presented as
+            # one annual figure. Fail closed unless every full-course total exists.
+            return {}
+        totals.append(total)
+        if str(entry.get("year", "")).isdigit():
+            years.append(int(entry["year"]))
+    result: dict[str, Any] = {
+        "international_fee": sum(totals),
+        "currency": "AUD",
+        "fee_term": "Full Course",
+    }
+    if years and len(set(years)) == 1:
+        result["fee_year"] = years[0]
+    return result
+
+
 # ---------------------------------------------------------------------------
 # /program/{slug}/entry_requirements — IELTS from static HTML
 # ---------------------------------------------------------------------------
@@ -493,6 +621,54 @@ _IELTS_SUB_RE = re.compile(
     r"(\d+(?:\.\d+)?)",
     re.IGNORECASE,
 )
+_PTE_RE = re.compile(
+    r"Pearson Test of English \(PTE\) Academic.*?Overall score\s+(\d+)"
+    r"(?:\s+with no Communicative Scores below\s+(\d+))?",
+    re.IGNORECASE,
+)
+_TOEFL_RE = re.compile(
+    r"TOEFL iBT\).*?Overall score\s+(\d+)",
+    re.IGNORECASE,
+)
+
+
+def _extract_admission_text(text: str) -> str | None:
+    section = re.search(
+        r"Admission criteria\s+(.*?)\s+(?:Find your qualification|"
+        r"English language proficiency requirements|Alternative entry options)",
+        text,
+        re.IGNORECASE,
+    )
+    source = section.group(1).strip() if section else ""
+    degree = re.search(
+        r"(Successful completion of a recognised Bachelor degree "
+        r"\(or equivalent qualification\) in any field(?:\s*\([^)]{1,220}\))?\.?)",
+        source,
+        re.IGNORECASE,
+    )
+    if degree:
+        return " ".join(degree.group(1).split())[:300]
+    atar = re.search(
+        r"ATAR\s*-\s*Australian Tertiary Admissions Rank\s*(\d+).*?"
+        r"IB\s*-\s*International Baccalaureate Diploma\s*(\d+)",
+        source,
+        re.IGNORECASE,
+    )
+    parts: list[str] = []
+    if atar:
+        parts.append(
+            f"ATAR {atar.group(1)} (Australian Year 12 qualification or "
+            f"equivalent Selection Rank); IB Diploma {atar.group(2)}"
+        )
+    prerequisite = re.search(
+        r"Program prerequisites\s+(Successfully complete .*?)"
+        r"(?:See the equivalent|Some programs have|$)",
+        text,
+        re.IGNORECASE,
+    )
+    if prerequisite:
+        parts.append("Prerequisites: " + " ".join(prerequisite.group(1).split()))
+    return "; ".join(parts)[:300] or None
 
 
 def _enrich_from_entry_requirements(course_url: str) -> dict[str, Any]:
@@ -506,7 +682,7 @@ def _enrich_from_entry_requirements(course_url: str) -> dict[str, Any]:
         return {}
 
     # Strip tags and normalise whitespace for regex matching
-    text = re.sub(r"<[^>]+>", " ", html)
+    text = unescape(re.sub(r"<[^>]+>", " ", html))
     text = re.sub(r"\s+", " ", text)
 
     result: dict[str, Any] = {}
@@ -527,6 +703,19 @@ def _enrich_from_entry_requirements(course_url: str) -> dict[str, Any]:
                 result[band] = sub
         except ValueError:
             pass
+
+    pte = _PTE_RE.search(text)
+    if pte:
+        result["pte_overall"] = float(pte.group(1))
+        if pte.group(2):
+            for skill in ("writing", "reading", "listening", "speaking"):
+                result[f"pte_{skill}"] = float(pte.group(2))
+    toefl = _TOEFL_RE.search(text)
+    if toefl:
+        result["toefl_overall"] = float(toefl.group(1))
+    admission = _extract_admission_text(text)
+    if admission:
+        result["other_requirement"] = admission
 
     if result:
         log.info("[BOND] entry_requirements → %s", result)
@@ -647,11 +836,19 @@ def apply_bond_extraction(url: str, html: str) -> dict[str, Any]:
     plain_text = re.sub(r"\s+", " ", plain_text)
 
     # ── API enrichment ──────────────────────────────────────────────────────
-    numeric_id, program_code = _extract_program_ids(html or "")
+    numeric_id, program_codes = _extract_program_keys(html or "")
 
     if numeric_id:
         details = _enrich_from_details_api(numeric_id)
         details_program_code = details.pop("_program_code", None)
+        details_program_codes = details.pop("_program_codes", [])
+        if not details_program_codes and details_program_code:
+            details_program_codes = [details_program_code]
+        authoritative_delivery_omission = bool(
+            details.pop("_authoritative_delivery_omission", False)
+        )
+        if authoritative_delivery_omission:
+            result["_authoritative_delivery_omission"] = True
         # Use setdefault for everything from the API so generic extractors
         # can still win if they found values first.
         for k, v in details.items():
@@ -659,23 +856,34 @@ def apply_bond_extraction(url: str, html: str) -> dict[str, Any]:
             source_urls.setdefault(k, f"https://bond.edu.au/api/program-details/{numeric_id}")
 
         if (
-            program_code
-            and details_program_code
-            and program_code.casefold() != details_program_code.casefold()
+            program_codes
+            and details_program_codes
+            and {code.casefold() for code in program_codes}
+            != {code.casefold() for code in details_program_codes}
         ):
             log.warning(
                 "[BOND] %s — HTML program code %s disagrees with details API "
                 "code %s; skipping fees API",
                 url,
-                program_code,
-                details_program_code,
+                program_codes,
+                details_program_codes,
             )
-            resolved_program_code = None
+            resolved_program_codes = []
         else:
-            resolved_program_code = program_code or details_program_code
-        if resolved_program_code:
-            fees_url = f"https://bond.edu.au/api/program-fees/{numeric_id}/{resolved_program_code}"
-            fees = _enrich_from_fees_api(numeric_id, resolved_program_code)
+            resolved_program_codes = (
+                program_codes or details_program_codes
+                or ([details_program_code] if details_program_code else [])
+            )
+        if resolved_program_codes:
+            fees_url = (
+                f"{url.rstrip('/')}/fees"
+                if len(resolved_program_codes) > 1
+                else f"https://bond.edu.au/api/program-fees/"
+                f"{numeric_id}/{resolved_program_codes[0]}"
+            )
+            fees = _enrich_from_packaged_fees_api(
+                numeric_id, resolved_program_codes
+            )
             authoritative_fee_omission = bool(
                 fees.pop("_authoritative_fee_omission", False)
             )

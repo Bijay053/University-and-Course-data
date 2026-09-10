@@ -9,6 +9,8 @@ Covers:
 from __future__ import annotations
 
 import pytest
+import json
+from pathlib import Path
 
 from app.services.scraper.config.loader import load_uni_config
 from app.services.scraper.bond_static_extract import (
@@ -16,10 +18,14 @@ from app.services.scraper.bond_static_extract import (
     _enrich_from_details_api,
     _enrich_from_fees_api,
     _extract_program_ids,
+    _extract_program_keys,
     apply_bond_extraction,
     is_bond_program_url,
     suppress_authoritative_fee_omission,
+    suppress_authoritative_delivery_omission,
 )
+
+_FIXTURES = Path(__file__).parent / "fixtures"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -116,6 +122,65 @@ def test_program_ids_reject_multiple_unscoped_components() -> None:
         'data-program="BB-200"></article>'
     )
     assert _extract_program_ids(html) == (None, None)
+
+
+def test_packaged_program_keys_preserve_all_exact_component_codes() -> None:
+    html = (
+        '<div class="program-detail notranslate" data-program="CC-60025" '
+        'data-program-detail-url="/api/program-details/5626"></div>'
+        '<div class="program-detail notranslate" data-program="CC-63034" '
+        'data-program-detail-url="/api/program-details/5626"></div>'
+    )
+    assert _extract_program_keys(html) == (
+        "5626", ["CC-60025", "CC-63034"]
+    )
+
+
+def test_packaged_details_sum_duration_and_use_current_offering(monkeypatch) -> None:
+    fixture = json.loads(
+        (_FIXTURES / "bond_packaged_program_details.json").read_text()
+    )
+    monkeypatch.setattr(
+        "app.services.scraper.bond_static_extract._get_json", lambda _url: fixture
+    )
+    result = _enrich_from_details_api("5626")
+    assert (result["duration"], result["duration_term"]) == (4.0, "Year")
+    assert result["course_location"] == "Gold Coast Campus"
+    assert result["study_mode"] == "On Campus"
+    assert result["intake_months"] == ["May"]
+
+
+def test_current_entry_profile_fills_admission_pte_and_toefl(monkeypatch) -> None:
+    html = (_FIXTURES / "bond_entry_requirements.html").read_text()
+    monkeypatch.setattr(
+        "app.services.scraper.bond_static_extract._get_html", lambda _url: html
+    )
+    from app.services.scraper.bond_static_extract import (
+        _enrich_from_entry_requirements,
+    )
+    result = _enrich_from_entry_requirements(
+        "https://bond.edu.au/program/master-of-project-management"
+    )
+    assert result["other_requirement"].startswith(
+        "Successful completion of a recognised Bachelor degree"
+    )
+    assert result["ielts_overall"] == 6.5
+    assert result["pte_overall"] == 58
+    assert result["pte_writing"] == 50
+    assert result["toefl_overall"] == 79
+
+
+def test_empty_current_offerings_clear_page_wide_guesses() -> None:
+    payload = {"course_location": "Gold Coast", "study_mode": "On Campus"}
+    evidence = [
+        {"field_key": "course_location", "method": "location_derived"},
+        {"field_key": "study_mode", "method": "rule"},
+    ]
+    suppress_authoritative_delivery_omission(payload, evidence)
+    assert payload["course_location"] is None
+    assert payload["study_mode"] is None
+    assert evidence == []
+    assert "bond_no_current_offerings" in payload["scrape_warnings"]
 
 
 @pytest.mark.parametrize(

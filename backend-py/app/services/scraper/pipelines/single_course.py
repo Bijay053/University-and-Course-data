@@ -3614,6 +3614,7 @@ async def extract_course(
     # with course_name, duration, description, and English scores.
     _is_bond_page: bool = False
     _bond_authoritative_empty_fee: bool = False
+    _bond_authoritative_empty_delivery: bool = False
     _bond_source_urls: dict[str, str] = {}
     try:
         from app.services.scraper.bond_static_extract import (
@@ -3626,6 +3627,9 @@ async def extract_course(
             _bond_authoritative_empty_fee = bool(
                 _bond_pre.pop("_authoritative_fee_omission", False)
             )
+            _bond_authoritative_empty_delivery = bool(
+                _bond_pre.pop("_authoritative_delivery_omission", False)
+            )
             # Direct-write keys must block generic extractor mis-fires.
             # Only the keys explicitly listed here use direct write; all
             # other keys (e.g. international_fee when found in static HTML)
@@ -3637,6 +3641,23 @@ async def extract_course(
                 "study_mode",
                 "duration",
                 "duration_term",
+                "intake_months",
+                "international_fee",
+                "currency",
+                "fee_term",
+                "fee_year",
+                "ielts_overall",
+                "ielts_writing",
+                "ielts_reading",
+                "ielts_listening",
+                "ielts_speaking",
+                "pte_overall",
+                "pte_writing",
+                "pte_reading",
+                "pte_listening",
+                "pte_speaking",
+                "toefl_overall",
+                "other_requirement",
             }
             for _k, _v in _bond_pre.items():
                 if _k == "scrape_warnings":
@@ -8820,6 +8841,11 @@ async def extract_course(
             suppress_authoritative_fee_omission as _suppress_bond_fee,
         )
         _suppress_bond_fee(payload, evidence)
+    if _bond_authoritative_empty_delivery:
+        from app.services.scraper.bond_static_extract import (
+            suppress_authoritative_delivery_omission as _suppress_bond_delivery,
+        )
+        _suppress_bond_delivery(payload, evidence)
 
     # Rule-based category classifier — runs after every other slot is
     # populated so we can use the (possibly AI-filled) course_name. The

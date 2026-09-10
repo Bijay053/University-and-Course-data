@@ -13,10 +13,20 @@ Bond location and study mode must come from course-owned structured page evidenc
 
 **Why:** Bond pages repeat general online and Gold Coast marketing copy. Treating that chrome as course evidence made unrelated programs all appear “Blended” at one fabricated location and created conflicts with their structured delivery facts.
 
-**How to apply:** Leave location and mode unset in the Bond API pre-seed. Let the standard structured extractors determine them per course and preserve genuine conflicts for review.
+**How to apply:** Use current course-keyed API offerings for location and mode. A successful empty offerings response must clear generic defaults; transport failure is not an authoritative empty response. Preserve genuine source conflicts for review.
 
 Bond’s current IELTS source is program-keyed and uses HTML rowspans. Course-specific entry-requirements pages remain authoritative; central values may fill only missing slots for an exact named program/group, parsed from that row’s own requirement cell.
 
 **Why:** Flattening the central page can borrow a neighboring program’s score or turn one exception into a university-wide default.
 
 **How to apply:** Resolve table rowspans, require exact program/group identity, parse the numeric requirement from the matched row, and let any course-page evidence override central-origin values.
+
+Packaged Bond pages contain one main `program-detail` element per component,
+all sharing the same details API id but carrying different program codes. Query
+every paired code: sum the component durations for the standard package
+duration and, only when every component publishes a total, sum those totals
+and preserve the result as `Full Course`. Do not combine differing semester
+fees into a synthetic annual amount. Offerings are the course-owned authority
+for current campus and delivery mode; a successful details response with no
+offerings must clear page-wide location/mode guesses rather than inheriting
+Bond footer or marketing copy.
