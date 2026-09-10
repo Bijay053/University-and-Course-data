@@ -146,6 +146,92 @@ def test_rehearsal_runner_logical_resource_lookups_exist_in_fixture() -> None:
     assert lookups <= logical_ids
 
 
+def _rehearsal_execution_wait_source() -> str:
+    fixture = (DEPLOY_DIR / "database-secret-refresh-rehearsal.yaml").read_text()
+    marker = ".venv/bin/python - '${RehearsalId}' <<'PY'\n"
+    assert fixture.count(marker) == 1
+    source = fixture.split(marker, 1)[1].split("\n                    PY", 1)[0]
+    return textwrap.dedent(source)
+
+
+@pytest.mark.parametrize(
+    ("execution_count", "expected_returncode", "expected_error"),
+    [
+        (None, 1, "queued probe did not execute"),
+        (1, 0, ""),
+        (2, 1, "queued probe executed more than once"),
+    ],
+)
+def test_rehearsal_execution_wait_runs_against_sqlite(
+    tmp_path: Path,
+    execution_count: int | None,
+    expected_returncode: int,
+    expected_error: str,
+) -> None:
+    """Execute the template's real exactly-once check, not a rewritten analogue."""
+    run_id = "0123456789abcdef"
+    database = tmp_path / "executions.sqlite3"
+    if execution_count is not None:
+        import sqlite3
+
+        with sqlite3.connect(database) as connection:
+            connection.execute(
+                "CREATE TABLE executions(run_id text primary key,count integer not null)"
+            )
+            connection.execute(
+                "INSERT INTO executions(run_id,count) VALUES(?,?)",
+                (run_id, execution_count),
+            )
+
+    source = _rehearsal_execution_wait_source().replace(
+        '"/var/lib/up-rehearsal/executions.sqlite3"',
+        repr(str(database)),
+    )
+    # Keep failure coverage fast while preserving the extracted control flow.
+    source = source.replace(
+        "deadline = time.monotonic() + 60",
+        "deadline = time.monotonic() + 0.01",
+    )
+    result = subprocess.run(
+        [sys.executable, "-", run_id],
+        input=source,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=5,
+    )
+    assert result.returncode == expected_returncode
+    assert expected_error in result.stderr
+
+
+def test_rehearsal_embedded_shell_and_python_are_syntactically_executable() -> None:
+    fixture = (DEPLOY_DIR / "database-secret-refresh-rehearsal.yaml").read_text()
+    shell_blocks = re.findall(
+        r"                - !Sub \|\n(.*?)(?=\n  [A-Za-z]|\nOutputs:)",
+        fixture,
+        re.DOTALL,
+    )
+    assert len(shell_blocks) == 2
+    for index, block in enumerate(shell_blocks):
+        script = textwrap.dedent(block)
+        syntax = subprocess.run(
+            ["bash", "-n"],
+            input=script,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        assert syntax.returncode == 0, f"shell block {index}: {syntax.stderr}"
+        heredocs = re.findall(r"<<'PY'\n(.*?)\n\s*PY", script, re.DOTALL)
+        assert heredocs
+        for heredoc_index, source in enumerate(heredocs):
+            compile(
+                textwrap.dedent(source),
+                f"<rehearsal-{index}-{heredoc_index}>",
+                "exec",
+            )
+
+
 def test_rehearsal_refuses_without_opt_in_before_any_aws_call() -> None:
     with pytest.raises(RuntimeError, match="i-understand"):
         rehearsal.rehearse(
