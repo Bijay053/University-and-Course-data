@@ -1,8 +1,12 @@
 """Regression tests for the production release-identity deployment contract."""
 
 from pathlib import Path
+from argparse import Namespace
+import asyncio
 
 import pytest
+
+from deploy.safe_restart_smoke import _main
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -52,3 +56,30 @@ def test_release_identity_smoke_check_covers_fastapi_and_celery() -> None:
     assert '--journal-since "$smoke_since"' in smoke_check
     assert "--release-identity-timeout-seconds 15" in smoke_check
     assert "exact full `RELEASE_REVISION`" in smoke_check
+
+
+def test_release_identity_success_reports_only_sanitized_match_timings(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    release = "a" * 40
+    monkeypatch.setattr(
+        "deploy.safe_restart_smoke._verify_release_and_services",
+        lambda **_kwargs: (
+            release,
+            {"uni-api-py": 0.125, "uni-celery": 1.75},
+        ),
+    )
+    args = Namespace(
+        release_identity_only=True,
+        journal_since="2026-09-11T00:00:00+00:00",
+        release_identity_timeout_seconds=15,
+    )
+
+    asyncio.run(_main(args))
+
+    assert capsys.readouterr().out == (
+        f"release identity passed: release={release} "
+        "uni-api-py_match_elapsed_s=0.125 "
+        "uni-celery_match_elapsed_s=1.750\n"
+    )

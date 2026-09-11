@@ -156,18 +156,51 @@ def test_release_identity_retries_until_delayed_exact_journal_line(
         "deploy.safe_restart_smoke._read_process_environment",
         lambda _pid: [b"RELEASE_REVISION=" + b"a" * 40],
     )
-    monkeypatch.setattr("deploy.safe_restart_smoke.time.monotonic", lambda: 0.0)
+    times = iter([10.0, 11.0, 12.25])
+    monkeypatch.setattr(
+        "deploy.safe_restart_smoke.time.monotonic", lambda: next(times)
+    )
     monkeypatch.setattr(
         "deploy.safe_restart_smoke.time.sleep", lambda seconds: sleeps.append(seconds)
     )
 
-    verify_service_release_identity(
+    elapsed = verify_service_release_identity(
         "uni-api-py",
         "a" * 40,
         journal_since="2026-09-11T00:00:00+00:00",
         timeout_seconds=15,
     )
     assert sleeps == [1.0]
+    assert elapsed == 2.25
+
+
+def test_release_identity_reports_immediate_match_elapsed_time(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_run(command: list[str], **_kwargs) -> str:
+        if command[:2] == ["systemctl", "show"]:
+            return "123"
+        if command[0] == "journalctl":
+            return "Python backend starting up (release_revision=" + "a" * 40 + ")"
+        return ""
+
+    times = iter([20.0, 20.125])
+    monkeypatch.setattr("deploy.safe_restart_smoke._run", fake_run)
+    monkeypatch.setattr(
+        "deploy.safe_restart_smoke._read_process_environment",
+        lambda _pid: [b"RELEASE_REVISION=" + b"a" * 40],
+    )
+    monkeypatch.setattr(
+        "deploy.safe_restart_smoke.time.monotonic", lambda: next(times)
+    )
+
+    elapsed = verify_service_release_identity(
+        "uni-api-py",
+        "a" * 40,
+        journal_since="2026-09-11T00:00:00+00:00",
+    )
+
+    assert elapsed == 0.125
 
 
 def test_release_identity_rejects_process_environment_mismatch(

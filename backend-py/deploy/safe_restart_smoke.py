@@ -195,33 +195,35 @@ def verify_service_release_identity(
     journal_since: str,
     timeout_seconds: float = DEFAULT_RELEASE_IDENTITY_TIMEOUT_SECONDS,
     retry_seconds: float = DEFAULT_RELEASE_IDENTITY_RETRY_SECONDS,
-) -> None:
+) -> float:
     """Require exact process and bounded journal evidence for one service."""
+    started_at = time.monotonic()
     verify_service_process_release_identity(unit, release)
     expected_log = f"release_revision={release}"
     expected_log_pattern = re.compile(
         rf"(?:^|[\s,(]){re.escape(expected_log)}\)(?:$|\s)"
     )
-    deadline = time.monotonic() + max(0.0, timeout_seconds)
+    deadline = started_at + max(0.0, timeout_seconds)
     while True:
         journal = _run(
             ["journalctl", "-u", unit, "--since", journal_since, "--no-pager"]
         )
+        observed_at = time.monotonic()
         if any(expected_log_pattern.search(line) for line in journal.splitlines()):
-            return
-        if time.monotonic() >= deadline:
+            return max(0.0, observed_at - started_at)
+        if observed_at >= deadline:
             raise SmokeFailure(
                 f"{unit} did not report exact {expected_log} "
                 f"within {timeout_seconds:g}s"
             )
-        time.sleep(min(retry_seconds, max(0.0, deadline - time.monotonic())))
+        time.sleep(min(retry_seconds, max(0.0, deadline - observed_at)))
 
 
 def _verify_release_and_services(
     *,
     journal_since: str | None = None,
     identity_timeout_seconds: float = DEFAULT_RELEASE_IDENTITY_TIMEOUT_SECONDS,
-) -> str:
+) -> tuple[str, dict[str, float]]:
     release = resolve_expected_release()
     if release == UNKNOWN_RELEASE:
         raise SmokeFailure("deployed release revision is unavailable")
@@ -234,17 +236,18 @@ def _verify_release_and_services(
         or release.lower().startswith(head.lower())
     ):
         raise SmokeFailure(f"release revision {release!r} does not match Git HEAD {head}")
+    match_elapsed_seconds: dict[str, float] = {}
     for unit in ("uni-api-py", "uni-celery"):
         if journal_since is None:
             verify_service_process_release_identity(unit, release)
         else:
-            verify_service_release_identity(
+            match_elapsed_seconds[unit] = verify_service_release_identity(
                 unit,
                 release,
                 journal_since=journal_since,
                 timeout_seconds=identity_timeout_seconds,
             )
-    return release
+    return release, match_elapsed_seconds
 
 
 def _fetch_json(url: str, timeout: float = 10) -> Mapping[str, Any]:
@@ -415,11 +418,16 @@ async def _wait_for_done(
 
 async def _main(args: argparse.Namespace) -> None:
     if args.release_identity_only:
-        release = _verify_release_and_services(
+        release, match_elapsed_seconds = _verify_release_and_services(
             journal_since=args.journal_since,
             identity_timeout_seconds=args.release_identity_timeout_seconds,
         )
-        print(f"release identity passed: release={release}")
+        print(
+            "release identity passed: "
+            f"release={release} "
+            f"uni-api-py_match_elapsed_s={match_elapsed_seconds['uni-api-py']:.3f} "
+            f"uni-celery_match_elapsed_s={match_elapsed_seconds['uni-celery']:.3f}"
+        )
         return
     validate_database_rehearsal_requirement(
         args.database_rehearsal_proof,
@@ -428,7 +436,7 @@ async def _main(args: argparse.Namespace) -> None:
     )
     counts = await _active_counts()
     validate_idle_counts(counts)
-    release = _verify_release_and_services()
+    release, _ = _verify_release_and_services()
     _verify_api_and_celery(args.api_health_url)
     _verify_ordinary_html(args.course_url)
 

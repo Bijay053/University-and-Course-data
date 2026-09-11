@@ -483,6 +483,12 @@ identity. Do not complete the deployment if this check fails. A package without
 `.git` is supported as long as its deployment pipeline supplies
 `RELEASE_REVISION`.
 
+On success, the command reports sanitized
+`uni-api-py_match_elapsed_s=<seconds>` and
+`uni-celery_match_elapsed_s=<seconds>` values. These are measured from the
+start of each service's identity check until its exact startup line is found;
+the command never prints process environments or unrelated journal lines.
+
 ## Safe restart smoke command
 
 Before a planned production restart, run the checked-in smoke command:
