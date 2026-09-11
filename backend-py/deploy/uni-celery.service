@@ -15,6 +15,11 @@ LimitNOFILE=65536
 ExecStart=/opt/university-portal/backend-py/.venv/bin/celery \
     -A app.tasks.celery_app worker --concurrency=8 --max-tasks-per-child=10 \
     --loglevel=info -Q scrape
+ExecStop=/opt/university-portal/backend-py/.venv/bin/python \
+    /opt/university-portal/backend-py/deploy/celery_stop.py \
+    --main-pid $MAINPID \
+    --celery-bin /opt/university-portal/backend-py/.venv/bin/celery
+TimeoutStopSec=90
 Restart=always
 RestartSec=5
 StandardOutput=journal
