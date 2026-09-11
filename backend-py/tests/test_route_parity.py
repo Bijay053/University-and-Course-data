@@ -37,9 +37,9 @@ from typing import Any
 
 import httpx
 import pytest
-from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 from sqlalchemy import text
+from starlette.routing import compile_path
 
 from app.database import AsyncSessionLocal
 from app.main import app
@@ -281,10 +281,15 @@ def test_every_route_is_in_the_app_route_table() -> None:
     """Pure routing check — does every (method, path) pair we plan to
     request actually map to a registered handler? No DB needed."""
     matchers: list[tuple[set[str], "re.Pattern[str]"]] = []
-    for r in app.routes:
-        if not isinstance(r, APIRoute):
-            continue
-        matchers.append((set(r.methods or set()), r.path_regex))
+    for path, operations in app.openapi()["paths"].items():
+        path_regex, _, _ = compile_path(path)
+        methods = {
+            method.upper()
+            for method in operations
+            if method.lower()
+            in {"get", "post", "put", "patch", "delete", "options", "head"}
+        }
+        matchers.append((methods, path_regex))
 
     fake_ids = {
         "uni_id": 1,

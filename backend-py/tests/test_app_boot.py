@@ -11,7 +11,7 @@ def test_app_imports():
 
 
 def test_health_route_registered():
-    paths = {r.path for r in app.routes}
+    paths = set(app.openapi()["paths"])
     assert "/api/health" in paths
     assert "/api/auth/login" in paths
     assert "/api/universities" in paths
