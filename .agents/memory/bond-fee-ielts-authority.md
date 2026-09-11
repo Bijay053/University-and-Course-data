@@ -3,11 +3,11 @@ name: Bond fee and IELTS authority
 description: Safe authority and fallback rules for Bond program fees and English requirements.
 ---
 
-Bond identifiers must be paired from the current course’s main program element. The details API code is a valid fallback when HTML omits it; if both exist they must agree before querying fees. Fee precedence is explicit annual amount, then per-semester amount times Bond’s three semesters, then total preserved as `Full Course`. A successful `fees: []` response is an authoritative omission: clear downstream fee guesses and do not inherit an older approved fee.
+Bond identifiers must be paired from the current course’s main program element. The details API code is a valid fallback when HTML omits it; if both exist they must agree before querying fees. Fee precedence is explicit annual amount, then per-semester amount times Bond’s three semesters, then total preserved as `Full Course`. A successful `fees: []` response blocks generic/AI guesses and older approved fees, but Bond’s course-owned `/fees` tab may override it when the international audience block publishes an exact total program fee.
 
-**Why:** Bond’s live pages vary in identifier markup, and its fee API has three legitimate shapes plus explicit empty results. Treating totals as annual or empty results as permission to guess produced misleading review data.
+**Why:** Bond’s live pages vary in identifier markup, and its legacy fee API may return `fees: []` for a current program whose official Fees tab publishes the current international total. Treating totals as annual, borrowing the domestic audience block, or letting generic guesses fill an empty result produced misleading review data.
 
-**How to apply:** Keep amount, term, year, currency, and source evidence atomic. Select 2026 when present, otherwise the newest numeric year. Never let static, AI, defaults, or approved-row preservation refill an authoritative empty response. Bond’s legitimate annual fees can exceed generic warning ceilings, so adjust only its warning threshold; retain global critical limits.
+**How to apply:** Keep amount, term, year, currency, and source evidence atomic. Select 2026 when present, otherwise the newest numeric year. Scope Fees-tab parsing to the current course’s `Program fees` section and its international audience block; preserve “total program fee” as `Full Course`. Never let generic static parsing, AI, defaults, or approved-row preservation refill an authoritative empty response. Bond’s legitimate totals can exceed generic warning ceilings, so allow them only under this exact audience-scoped wording.
 
 Bond location and study mode must come from course-owned structured page evidence, not university-wide campus defaults or page-wide keyword scans.
 

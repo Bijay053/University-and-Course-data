@@ -149,7 +149,7 @@
 - [QUT static extraction and delivery gates](qut-static-extraction.md) — prefer the usable static payload; browser rescue is blocked, and bare “online” text is not delivery authority.
 - [Central profiles in staged re-extraction](central-profiles-staged-reextract.md) — Review → Fix must prefetch central pages; semantic parser changes must bump the English cache schema.
 - [UQ start-semester intake authority](uq-start-semester-intake.md) — UQ intake comes only from the selected program’s Drupal start_semester fact; page-wide date scanning is unsafe.
-- [Bond fee, location, and IELTS authority](bond-fee-ielts-authority.md) — pair course IDs/codes, preserve fee periods, avoid campus/mode defaults, and use exact program-keyed IELTS rows.
+- [Bond fee, location, and IELTS authority](bond-fee-ielts-authority.md) — pair IDs/codes; official international Fees tabs can override empty legacy API results; keep delivery and IELTS course-owned.
 - [Celery loop resource cleanup](celery-loop-resource-cleanup.md) — close loop-owned HTTP and database resources before each asyncio.run loop ends or worker descriptors accumulate.
 - [Pre-claim failure ownership fence](preclaim-failure-ownership.md) — emergency worker failure writes bypass the shared pool and may transition only queued jobs.
 - [Monash rendered catalogue](monash-rendered-catalogue.md) — listing query facets do not constrain discovered links; filter short-course codes and use detail-page audience evidence.
