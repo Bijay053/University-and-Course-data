@@ -448,13 +448,16 @@ after `.env`, so the value tied to this deployment is authoritative.
 
 ## Install and restart
 
-`uni-celery.service` uses an idle-aware stop helper. It checks Celery's active
-task list before sending the normal warm-shutdown signal. If no task is active,
-it allows 10 seconds for a clean exit and then removes only processes captured
-from that worker tree, preventing leaked pool/thread processes from consuming
-the full stop timeout. If inspection fails or any task is active, it fails safe:
+`uni-celery.service` uses an idle-aware stop helper. It first stops the named
+worker from consuming `scrape`, then checks its reserved, scheduled, and active
+tasks in transition-safe order before sending the normal warm-shutdown signal.
+If all three are empty, it allows 10 seconds for a clean exit and then removes
+only process identities (PID plus kernel start time) captured from that worker
+tree, preventing leaked pool/thread processes from consuming the full stop
+timeout. If quiescing or inspection fails, or any task exists, it fails safe:
 no early cleanup occurs and systemd retains the full 90-second graceful-stop
-window. The API uses its normal prompt Gunicorn shutdown.
+window. Restarting the unit restores consumption. The API uses its normal
+prompt Gunicorn shutdown.
 
 To diagnose stop latency without combining both units into one timing, first
 pause the `scrape` consumer and verify `celery inspect active` reports

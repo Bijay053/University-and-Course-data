@@ -137,13 +137,13 @@ Celery shutdown must distinguish confirmed idle workers from active or
 uninspectable workers; API and Celery stop latency must be measured separately.
 
 **Why:** A combined restart hid that API stopped promptly while an idle Celery
-prefork tree survived until systemd's 90-second timeout. A fail-safe
-idle-aware stop reduced the controlled combined restart to 13.833 seconds.
+prefork tree survived until systemd's stop timeout. An idle check before
+quiescing is unsafe because work can start between inspection and shutdown.
 
-**How to apply:** Confirm idle before allowing bounded early cleanup of the
-captured Celery process tree. Treat failed inspection as active, preserve the
-full 90-second graceful window for active work, keep outer restart bounds above
-that window, and verify release identity and both services after restart.
+**How to apply:** Stop the exact worker's consumption first, then check reserved,
+scheduled, and active work before bounded cleanup. Treat failed inspection as
+active, preserve the full graceful window for work, verify process start
+identity before delayed signals, and check both services after restart.
 
 The production Nginx virtual host is hostname-scoped, so a bare
 `http://127.0.0.1/` frontend smoke request can return 404 even when the public
