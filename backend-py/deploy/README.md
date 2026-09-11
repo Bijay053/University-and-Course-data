@@ -503,7 +503,21 @@ On success, the command reports sanitized
 `uni-api-py_match_elapsed_s=<seconds>` and
 `uni-celery_match_elapsed_s=<seconds>` values. These are measured from the
 start of each service's identity check until its exact startup line is found;
-the command never prints process environments or unrelated journal lines.
+the command never prints process environments or unrelated journal lines. The
+same successful check appends a mode-`0600` JSONL record to
+`/var/lib/university-portal/deployment-evidence.jsonl`. Each record contains
+only the revision, UTC timestamp, API match time, and Celery match time. Failed
+or mismatched checks append nothing.
+
+Retrieve the newest successful activation records through the same command:
+
+```bash
+PYTHONPATH=. python deploy/safe_restart_smoke.py \
+  --recent-deployment-evidence 10
+```
+
+Use `--deployment-evidence-path` only for a deliberately different protected
+history location or isolated testing.
 
 ## Safe restart smoke command
 

@@ -6,7 +6,11 @@ import asyncio
 
 import pytest
 
-from deploy.safe_restart_smoke import _main
+from deploy.safe_restart_smoke import (
+    SmokeFailure,
+    _main,
+    persist_deployment_timing_evidence,
+)
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -61,6 +65,7 @@ def test_release_identity_smoke_check_covers_fastapi_and_celery() -> None:
 def test_release_identity_success_reports_only_sanitized_match_timings(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
 ) -> None:
     release = "a" * 40
     monkeypatch.setattr(
@@ -74,6 +79,8 @@ def test_release_identity_success_reports_only_sanitized_match_timings(
         release_identity_only=True,
         journal_since="2026-09-11T00:00:00+00:00",
         release_identity_timeout_seconds=15,
+        deployment_evidence_path=tmp_path / "deployments.jsonl",
+        recent_deployment_evidence=None,
     )
 
     asyncio.run(_main(args))
@@ -83,3 +90,121 @@ def test_release_identity_success_reports_only_sanitized_match_timings(
         "uni-api-py_match_elapsed_s=0.125 "
         "uni-celery_match_elapsed_s=1.750\n"
     )
+    record = __import__("json").loads(
+        (tmp_path / "deployments.jsonl").read_text(encoding="utf-8")
+    )
+    assert record["revision"] == release
+    assert record["api_match_elapsed_seconds"] == 0.125
+    assert record["celery_match_elapsed_seconds"] == 1.75
+    assert set(record) == {
+        "revision",
+        "timestamp",
+        "api_match_elapsed_seconds",
+        "celery_match_elapsed_seconds",
+    }
+
+
+def test_successful_identity_persists_only_sanitized_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from datetime import UTC, datetime
+    import json
+
+    release = "b" * 40
+    evidence_path = tmp_path / "deployments.jsonl"
+    monkeypatch.setattr(
+        "deploy.safe_restart_smoke._verify_release_and_services",
+        lambda **_kwargs: (
+            release,
+            {"uni-api-py": 0.25, "uni-celery": 2.5},
+        ),
+    )
+    monkeypatch.setattr(
+        "deploy.safe_restart_smoke.persist_deployment_timing_evidence",
+        lambda path, **kwargs: persist_deployment_timing_evidence(
+            path,
+            **kwargs,
+            recorded_at=datetime(2026, 9, 11, 12, 30, tzinfo=UTC),
+        ),
+    )
+
+    asyncio.run(
+        _main(
+            Namespace(
+                release_identity_only=True,
+                journal_since="2026-09-11T12:29:00+00:00",
+                release_identity_timeout_seconds=15,
+                deployment_evidence_path=evidence_path,
+                recent_deployment_evidence=None,
+            )
+        )
+    )
+
+    assert json.loads(evidence_path.read_text(encoding="utf-8")) == {
+        "revision": release,
+        "timestamp": "2026-09-11T12:30:00Z",
+        "api_match_elapsed_seconds": 0.25,
+        "celery_match_elapsed_seconds": 2.5,
+    }
+
+
+def test_failed_identity_does_not_persist_success_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    evidence_path = tmp_path / "deployments.jsonl"
+
+    def fail_identity(**_kwargs: object) -> object:
+        raise SmokeFailure("release mismatch")
+
+    monkeypatch.setattr(
+        "deploy.safe_restart_smoke._verify_release_and_services", fail_identity
+    )
+
+    with pytest.raises(SmokeFailure, match="release mismatch"):
+        asyncio.run(
+            _main(
+                Namespace(
+                    release_identity_only=True,
+                    journal_since="2026-09-11T12:29:00+00:00",
+                    release_identity_timeout_seconds=15,
+                    deployment_evidence_path=evidence_path,
+                    recent_deployment_evidence=None,
+                )
+            )
+        )
+
+    assert not evidence_path.exists()
+
+
+def test_recent_deployment_evidence_returns_newest_records(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    from datetime import UTC, datetime
+    import json
+
+    evidence_path = tmp_path / "deployments.jsonl"
+    for hour in range(3):
+        persist_deployment_timing_evidence(
+            evidence_path,
+            release=str(hour) * 40,
+            api_match_elapsed_seconds=hour + 0.1,
+            celery_match_elapsed_seconds=hour + 0.2,
+            recorded_at=datetime(2026, 9, 11, hour, tzinfo=UTC),
+        )
+
+    asyncio.run(
+        _main(
+            Namespace(
+                recent_deployment_evidence=2,
+                deployment_evidence_path=evidence_path,
+            )
+        )
+    )
+
+    records = [
+        json.loads(line) for line in capsys.readouterr().out.splitlines()
+    ]
+    assert [record["revision"] for record in records] == ["2" * 40, "1" * 40]

@@ -18,7 +18,7 @@ import time
 import urllib.request
 import uuid
 from collections.abc import Mapping
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -78,10 +78,71 @@ REHEARSAL_SIGNERS = Path(__file__).with_name(
 )
 DEFAULT_RELEASE_IDENTITY_TIMEOUT_SECONDS = 15.0
 DEFAULT_RELEASE_IDENTITY_RETRY_SECONDS = 1.0
+DEFAULT_DEPLOYMENT_EVIDENCE_PATH = Path(
+    "/var/lib/university-portal/deployment-evidence.jsonl"
+)
 
 
 class SmokeFailure(RuntimeError):
     """A safe-restart precondition or proof failed."""
+
+
+def persist_deployment_timing_evidence(
+    path: Path,
+    *,
+    release: str,
+    api_match_elapsed_seconds: float,
+    celery_match_elapsed_seconds: float,
+    recorded_at: datetime | None = None,
+) -> dict[str, str | float]:
+    """Append one sanitized successful activation record."""
+    timestamp = recorded_at or datetime.now(UTC)
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=UTC)
+    record: dict[str, str | float] = {
+        "revision": release,
+        "timestamp": timestamp.astimezone(UTC).isoformat().replace("+00:00", "Z"),
+        "api_match_elapsed_seconds": round(max(0.0, api_match_elapsed_seconds), 3),
+        "celery_match_elapsed_seconds": round(
+            max(0.0, celery_match_elapsed_seconds), 3
+        ),
+    }
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    descriptor = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+    try:
+        os.fchmod(descriptor, 0o600)
+        payload = (
+            json.dumps(record, separators=(",", ":"), sort_keys=True) + "\n"
+        ).encode()
+        if os.write(descriptor, payload) != len(payload):
+            raise OSError("incomplete deployment evidence write")
+    finally:
+        os.close(descriptor)
+    return record
+
+
+def recent_deployment_timing_evidence(
+    path: Path, *, limit: int
+) -> list[Mapping[str, Any]]:
+    """Read the newest sanitized activation records from deployment evidence."""
+    if limit < 1:
+        raise SmokeFailure("recent deployment evidence limit must be positive")
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except FileNotFoundError:
+        return []
+    records: list[Mapping[str, Any]] = []
+    for line in reversed(lines):
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise SmokeFailure("deployment evidence contains invalid JSON") from exc
+        if not isinstance(record, Mapping):
+            raise SmokeFailure("deployment evidence contains a non-object record")
+        records.append(record)
+        if len(records) == limit:
+            break
+    return records
 
 
 def validate_database_rehearsal_requirement(
@@ -417,10 +478,26 @@ async def _wait_for_done(
 
 
 async def _main(args: argparse.Namespace) -> None:
+    recent_limit = getattr(args, "recent_deployment_evidence", None)
+    evidence_path = getattr(
+        args, "deployment_evidence_path", DEFAULT_DEPLOYMENT_EVIDENCE_PATH
+    )
+    if recent_limit is not None:
+        for record in recent_deployment_timing_evidence(
+            evidence_path, limit=recent_limit
+        ):
+            print(json.dumps(record, separators=(",", ":"), sort_keys=True))
+        return
     if args.release_identity_only:
         release, match_elapsed_seconds = _verify_release_and_services(
             journal_since=args.journal_since,
             identity_timeout_seconds=args.release_identity_timeout_seconds,
+        )
+        persist_deployment_timing_evidence(
+            evidence_path,
+            release=release,
+            api_match_elapsed_seconds=match_elapsed_seconds["uni-api-py"],
+            celery_match_elapsed_seconds=match_elapsed_seconds["uni-celery"],
         )
         print(
             "release identity passed: "
@@ -471,6 +548,18 @@ def main() -> int:
         "--release-identity-timeout-seconds",
         type=float,
         default=DEFAULT_RELEASE_IDENTITY_TIMEOUT_SECONDS,
+    )
+    parser.add_argument(
+        "--deployment-evidence-path",
+        type=Path,
+        default=DEFAULT_DEPLOYMENT_EVIDENCE_PATH,
+        help="append-only sanitized successful activation history",
+    )
+    parser.add_argument(
+        "--recent-deployment-evidence",
+        type=int,
+        metavar="COUNT",
+        help="print the newest successful activation records and exit",
     )
     parser.add_argument(
         "--database-rehearsal-proof",
