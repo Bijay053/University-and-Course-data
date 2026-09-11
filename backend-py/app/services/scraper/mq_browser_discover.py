@@ -384,6 +384,17 @@ def _mq_international_intake_months(offerings: object) -> list[str]:
     ]
 
 
+def _canonical_mq_admissions_url(url: str) -> str:
+    """Use MQ's current-course route instead of a stale year snapshot."""
+    return re.sub(
+        r"(/study/find-a-course/courses/)20\d{2}/",
+        r"\1",
+        (url or "").strip().rstrip("/") + "/",
+        count=1,
+        flags=re.IGNORECASE,
+    ).rstrip("/")
+
+
 def _extract_program_from_page_data(body: str | None) -> dict:
     """Extract ``program`` dict from a Gatsby page-data.json response body.
 
@@ -864,7 +875,7 @@ async def _discover_from_funnelback_api(
     # Build the (url, name, metaData) triples.
     course_triples: list[tuple[str, str, dict]] = []
     for r in results:
-        live_url = (r.get("liveUrl") or "").strip().rstrip("/")
+        live_url = _canonical_mq_admissions_url(r.get("liveUrl") or "")
         title = (r.get("title") or "").strip()
         meta = r.get("metaData") or {}
         if not live_url or not title:

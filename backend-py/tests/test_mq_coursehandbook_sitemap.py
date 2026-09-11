@@ -161,6 +161,26 @@ class TestRenderedPageData:
         assert mq._extract_program_from_page_data(wrapped) == {}
 
 
+class TestCurrentAdmissionsUrl:
+    def test_year_stamped_url_uses_current_course_route(self):
+        assert mq._canonical_mq_admissions_url(
+            "https://www.mq.edu.au/study/find-a-course/courses/2026/"
+            "bachelor-of-psychology/"
+        ) == (
+            "https://www.mq.edu.au/study/find-a-course/courses/"
+            "bachelor-of-psychology"
+        )
+
+    def test_current_url_is_unchanged(self):
+        assert mq._canonical_mq_admissions_url(
+            "https://www.mq.edu.au/study/find-a-course/courses/"
+            "bachelor-of-psychology/"
+        ) == (
+            "https://www.mq.edu.au/study/find-a-course/courses/"
+            "bachelor-of-psychology"
+        )
+
+
 class TestCoursehandbookRegexContract:
     """The /YYYY/courses/CXXXXXX shape is the ONLY thing we want to
     harvest from the handbook sitemap.  Units, areas-of-study, and
