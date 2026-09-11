@@ -74,6 +74,78 @@ def test_postgraduate_visible_international_fee_cards_supply_newest_year_one_fee
     assert result["fee_year"] == 2027
 
 
+def test_research_template_supplies_current_offering_facts_and_fee():
+    html = """
+      <ul class="course-essentials__list">
+        <li>
+          <dt>Duration
+            <dialog><h2>Duration</h2><p>One to two years.</p></dialog>
+          </dt>
+          <dd class="details-duration">2 years full-time, part-time</dd>
+        </li>
+        <li>
+          <dt>Location
+            <dialog><h2>Location</h2><p>Course teaching locations.</p></dialog>
+          </dt>
+          <dd><span>Curtin Perth</span></dd>
+        </li>
+      </ul>
+      <div class="course-locations">
+        <div class="locations__period">
+          <h6>Research Term 1</h6><p>On campus</p>
+        </div>
+        <div class="locations__period">
+          <h6>Research Term 2</h6><p>Online</p>
+        </div>
+      </div>
+      <section class="fees-and-charges">
+        <div class="fees-charges__box purple">
+          <div class="fees-charges__item fees-charges__item--int">
+            <h4 class="fees-charges__fee-title">
+              Indicative year 1 fee (2026)
+            </h4>
+            <p class="fees-charges__fee h3">$38,220*</p>
+          </div>
+          <div class="fees-charges__item fees-charges__item--int">
+            <h4 class="fees-charges__fee-title">
+              Total indicative course fee (2027)
+            </h4>
+            <p class="fees-charges__fee h3">$80,262*</p>
+          </div>
+          <div class="fees-charges__item fees-charges__item--int">
+            <h4 class="fees-charges__fee-title">
+              Indicative year 1 fee (2027)
+            </h4>
+            <p class="fees-charges__fee h3">$40,131*</p>
+          </div>
+        </div>
+        <div class="fees-charges__box">
+          <div class="fees-charges__item">
+            <h4 class="fees-charges__fee-title">
+              Indicative year 1 fee (2028)
+            </h4>
+            <p class="fees-charges__fee h3">$12,000*</p>
+          </div>
+        </div>
+      </section>
+    """
+
+    result = apply_curtin_static_extraction(
+        "https://www.curtin.edu.au/study/offering/"
+        "course-research-master-of-philosophy-information-systems--mr-isys/",
+        html,
+    )
+
+    assert result["international_fee"] == 40131.0
+    assert result["fee_currency"] == "AUD"
+    assert result["fee_term"] == "Annual"
+    assert result["fee_year"] == 2027
+    assert result["duration"] == 2.0
+    assert result["duration_term"] == "Year"
+    assert result["course_location"] == "Curtin Perth"
+    assert result["study_mode"] == "Blended"
+
+
 def test_missing_location_is_not_defaulted_and_major_is_scoped():
     html = "<h1>Mining major</h1><div>Perth Online</div>"
     result = apply_curtin_static_extraction(

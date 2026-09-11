@@ -42,6 +42,26 @@ def _information_value(soup: BeautifulSoup, label: str) -> str | None:
     return None
 
 
+def _course_essential_value(soup: BeautifulSoup, label: str) -> str | None:
+    """Read one research-template course-essential definition."""
+    wanted = label.casefold()
+    for term in soup.select(".course-essentials__list dt"):
+        direct_label = next(
+            (
+                str(child).strip()
+                for child in term.children
+                if isinstance(child, str) and str(child).strip()
+            ),
+            "",
+        )
+        if direct_label.casefold() != wanted:
+            continue
+        value = term.find_next_sibling("dd")
+        if value:
+            return _text(str(value)) or None
+    return None
+
+
 def _international_annual_offer(soup: BeautifulSoup) -> dict[str, Any]:
     """Return the newest exact international year-1 structured offer."""
     matches: list[tuple[int, dict[str, Any]]] = []
@@ -105,6 +125,51 @@ def _international_annual_offer(soup: BeautifulSoup) -> dict[str, Any]:
                 },
             )
         )
+
+    # Curtin research offerings use a third markup contract: exact fee titles
+    # inside the purple international box, without JSON-LD or data attributes.
+    # Keep the same year-one-only rule so full-course totals cannot win.
+    for block in soup.select(
+        ".fees-and-charges .fees-charges__box.purple "
+        ".fees-charges__item--int"
+    ):
+        title = block.select_one(".fees-charges__fee-title")
+        fee = block.select_one(".fees-charges__fee")
+        title_text = _text(str(title)) if title else ""
+        if not re.fullmatch(
+            r"Indicative\s+year\s*1\s+fee\s*\(20\d{2}\)",
+            title_text,
+            re.I,
+        ):
+            continue
+        year_match = re.search(r"\b(20\d{2})\b", title_text)
+        price_match = re.search(
+            r"\$\s*([\d,]+(?:\.\d{1,2})?)",
+            _text(str(fee)) if fee else "",
+        )
+        if not year_match or not price_match:
+            continue
+        try:
+            price = float(price_match.group(1).replace(",", ""))
+        except ValueError:
+            continue
+        if price < 1000:
+            continue
+        year = int(year_match.group(1))
+        matches.append(
+            (
+                year,
+                {
+                    "@type": "Offer",
+                    "name": (
+                        f"{year} - International - "
+                        f"Indicative year 1 fee ({year})"
+                    ),
+                    "price": price,
+                    "priceCurrency": "AUD",
+                },
+            )
+        )
     return max(matches, key=lambda pair: pair[0])[1] if matches else {}
 
 
@@ -141,7 +206,10 @@ def apply_curtin_static_extraction(url: str, html: str) -> dict[str, Any]:
         result["scrape_warnings"] = ["curtin_non_award_major"]
         return result
 
-    duration_value = _information_value(soup, "Duration")
+    duration_value = (
+        _information_value(soup, "Duration")
+        or _course_essential_value(soup, "Duration")
+    )
     # Never treat credit points/units as time.  The old loose matcher turned
     # "66 credit points" into 66 years/months on combined degrees.
     if duration_value:
@@ -172,7 +240,10 @@ def apply_curtin_static_extraction(url: str, html: str) -> dict[str, Any]:
         if year_match:
             result["fee_year"] = int(year_match.group(1))
 
-    location = _information_value(soup, "Location")
+    location = (
+        _information_value(soup, "Location")
+        or _course_essential_value(soup, "Location")
+    )
     if location:
         location = re.split(r"\b(?:Duration|Study mode|International|English)\b", location, flags=re.I)[0].strip(" :-|")
         if location and len(location) < 100 and not re.search(r"start dates|academic calendar", location, re.I):
@@ -184,6 +255,20 @@ def apply_curtin_static_extraction(url: str, html: str) -> dict[str, Any]:
         m = re.search(r"\b(On\s+campus|Online|Blended|External|Part[- ]?time|Full[- ]?time)\b", mode, re.I)
         if m:
             result["study_mode"] = m.group(1).title().replace("  ", " ")
+    if not result["study_mode"]:
+        delivery_values = {
+            _text(str(node)).casefold()
+            for node in soup.select(".course-locations .locations__period p")
+            if _text(str(node))
+        }
+        has_on_campus = any("on campus" in value for value in delivery_values)
+        has_online = any("online" in value for value in delivery_values)
+        if has_on_campus and has_online:
+            result["study_mode"] = "Blended"
+        elif has_online:
+            result["study_mode"] = "Online"
+        elif has_on_campus:
+            result["study_mode"] = "On Campus"
 
     english_match = re.search(
         r"(?is)English\s+(?:language\s+)?requirements?.{0,800}?"
