@@ -3396,6 +3396,39 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 uni_name,
             )
 
+        if (
+            not _targeted_retry
+            and getattr(
+                _uni_cfg.discovery,
+                "segi_wordpress_supplement",
+                False,
+            )
+        ):
+            try:
+                from app.services.scraper.segi_wordpress_discover import (
+                    discover_segi_wordpress_courses,
+                )
+
+                _segi_links = await discover_segi_wordpress_courses(emit=emit)
+                _known = {str(item.get("url") or "") for item in links}
+                _added = 0
+                for _item in _segi_links:
+                    if _item["url"] not in _known:
+                        links.append(_item)
+                        _known.add(_item["url"])
+                        _added += 1
+                log.info(
+                    "[DISCOVER] SEGi Colleges supplement added %d/%d pages",
+                    _added,
+                    len(_segi_links),
+                )
+            except Exception as _segi_exc:  # noqa: BLE001
+                log.error(
+                    "SEGi Colleges WordPress supplement failed: %s",
+                    _segi_exc,
+                    exc_info=True,
+                )
+
         # ── Rendered listing pages: Scrape.do render for Angular/React SPA catalogues ──
         # When discovery.render_listing_pages is set the orchestrator renders each URL
         # via Scrape.do headless Chrome and harvests course links from the live DOM.

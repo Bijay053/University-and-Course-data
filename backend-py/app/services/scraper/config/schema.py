@@ -1437,6 +1437,14 @@ class DiscoveryConfig(BaseModel):
             "Do NOT add a foreign university's domain here — that is a misconfiguration."
         ),
     )
+    segi_wordpress_supplement: bool = Field(
+        default=False,
+        description=(
+            "Add current campus-specific SEGi Colleges pages from the protected "
+            "www.segi.edu.my WordPress search API. This is a narrow SEGi-only "
+            "supplement and does not replace the university.segi.edu.my catalogue."
+        ),
+    )
     always_sitemap_supplement: bool = Field(
         default=False,
         description=(
@@ -3386,6 +3394,14 @@ class ExtractionConfig(BaseModel):
             "when Cloudflare blocks all free options.  Requires SCRAPE_DO_TOKEN "
             "env var.  Use for Cloudflare-Enterprise sites whose httpx/cffi "
             "responses are empty SPA shells (Canterbury, Sunderland, etc.)."
+        ),
+    )
+    scrape_do_render_hostnames: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Exact course-page hostnames that opt into rendered Scrape.do "
+            "extraction while other hosts in the same university keep their "
+            "normal transport."
         ),
     )
     scrape_do_skip_fallbacks: bool = Field(

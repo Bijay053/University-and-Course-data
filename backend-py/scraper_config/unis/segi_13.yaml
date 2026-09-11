@@ -18,6 +18,8 @@ discovery:
     - "https://university.segi.edu.my/site-map/"
   allowed_extra_hostnames:
     - "university.segi.edu.my"
+    - "www.segi.edu.my"
+  segi_wordpress_supplement: true
 
   # The official host presents an incomplete TLS chain. Production probes
   # confirm direct verify=False fetches are fast and stable; scope the exception
@@ -26,11 +28,13 @@ discovery:
     - "university.segi.edu.my"
 
   expected_min_courses: 80
-  max_candidates: 150
+  max_candidates: 450
   allow_url_patterns:
     - "^https?://university\\.segi\\.edu\\.my/course/[^/?#]+/?$"
+    - "^https://www\\.segi\\.edu\\.my/[^/?#]+/$"
   course_detail_url_patterns:
     - "^https?://university\\.segi\\.edu\\.my/course/[^/?#]+/?$"
+    - "^https://www\\.segi\\.edu\\.my/[^/?#]+/$"
   block_url_patterns:
     - "^https?://university\\.segi\\.edu\\.my/course-search(?:/|$)"
 
@@ -38,6 +42,8 @@ extraction:
   skip_browser_rescue: true
   skip_per_course_browser: true
   max_parallel_fetch: 4
+  scrape_do_render_hostnames:
+    - "www.segi.edu.my"
 
   fees:
     default_currency: MYR

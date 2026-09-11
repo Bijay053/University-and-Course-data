@@ -1702,6 +1702,36 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
         _parsed_host == "swinburne.edu.au"
         or _parsed_host.endswith(".swinburne.edu.au")
     )
+    _is_segi_college_host = _parsed_host == "www.segi.edu.my"
+
+    def _from_segi_college_page() -> str | None:
+        if not _is_segi_college_host:
+            return None
+        for meta in soup.select(
+            "meta[property='og:description'], meta[name='description']"
+        ):
+            content = str(meta.get("content") or "")
+            match = re.search(
+                r"\bCampus\s*:\s*(.+?)(?=\s*Levels?\s+of\s+Study\s*:|$)",
+                content,
+                re.I,
+            )
+            if match:
+                campus = re.sub(r"\s+", " ", match.group(1)).strip(" .,:;|-")
+                if campus and len(campus) <= 120:
+                    return campus
+        for text_node in soup.find_all(string=re.compile(r"\bCampus\s*:", re.I)):
+            text = re.sub(r"\s+", " ", str(text_node)).strip()
+            match = re.search(
+                r"\bCampus\s*:\s*(.+?)(?=\s*Levels?\s+of\s+Study\s*:|$)",
+                text,
+                re.I,
+            )
+            if match:
+                campus = match.group(1).strip(" .,:;|-")
+                if campus and len(campus) <= 120:
+                    return campus
+        return None
 
     # IMPORTANT — the UTAS-panel branch MUST be gated on the UTAS host.
     # Without the host guard, the `tab.?international` regex (where `.` is
@@ -1713,7 +1743,11 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
     # pages, and `course_location` stages blank fleet-wide.  Verified
     # 2026-05-17 on Master of Nursing, Master of Leadership and Management
     # in Education, and Master of Health Management and Policy (Global).
-    if _is_swinburne_host:
+    if _is_segi_college_host:
+        cascade_list = [
+            ("segi_course_campus", _from_segi_college_page(), 0.98),
+        ]
+    elif _is_swinburne_host:
         cascade_list = [
             ("swinburne_international_hero", _from_swinburne_international_hero(soup), 0.98),
         ]

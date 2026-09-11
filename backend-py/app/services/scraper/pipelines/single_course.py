@@ -1968,6 +1968,23 @@ async def extract_course(
     _use_scrape_do_render: bool = bool(
         getattr(getattr(_uc, "extraction", None), "scrape_do_render", False)
     )
+    _render_hostnames = {
+        str(host).strip().lower()
+        for host in (
+            getattr(
+                getattr(_uc, "extraction", None),
+                "scrape_do_render_hostnames",
+                [],
+            )
+            or []
+        )
+        if str(host).strip()
+    }
+    _host_scoped_render = (
+        (urlparse(url).hostname or "").lower() in _render_hostnames
+    )
+    if _host_scoped_render:
+        _use_scrape_do_render = True
     # Extraction-phase render wait time (ms). Increase for React/Next.js SPAs
     # that hydrate slowly (e.g. La Trobe's Adobe Target prehide needs >3 s).
     _extr_wait_ms: int = int(
@@ -1985,6 +2002,8 @@ async def extract_course(
             False,
         )
     )
+    if _host_scoped_render:
+        _skip_render_hydration_retry = True
     # Hash-routed SPA tab navigation (e.g. La Trobe). The primary fragment
     # makes scrape.do render the fee/duration tab; the secondary fragment
     # fetches the entry-requirements (IELTS) tab in a separate render call.
@@ -2240,7 +2259,28 @@ async def extract_course(
                 )
         else:
             _http_attempted = True
-            if _use_scrape_do_render:
+            if _host_scoped_render:
+                html = await fetch_html_scrape_do(
+                    url,
+                    render=True,
+                    wait_for_ms=_extr_wait_ms,
+                    geo_code=(
+                        getattr(
+                            getattr(_uc, "extraction", None),
+                            "scrape_do_geo",
+                            "",
+                        )
+                        or None
+                    ),
+                    max_retries=0,
+                    local_concurrency_limit=_scrape_do_local_concurrency,
+                    request_timeout_seconds=getattr(
+                        getattr(_uc, "extraction", None),
+                        "scrape_do_request_timeout_seconds",
+                        None,
+                    ),
+                )
+            elif _use_scrape_do_render:
                 with scrape_do_render_scope():
                     from app.services.scraper.extractors import (
                         latrobe_json as _latrobe_fetch,

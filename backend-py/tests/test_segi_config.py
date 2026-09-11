@@ -37,15 +37,18 @@ def test_segi_production_config_uses_current_official_catalogue() -> None:
         "https://university.segi.edu.my/site-map/"
     ]
     assert config.discovery.allowed_extra_hostnames == [
-        "university.segi.edu.my"
+        "university.segi.edu.my",
+        "www.segi.edu.my",
     ]
+    assert config.discovery.segi_wordpress_supplement is True
     assert config.discovery.scrape_do_skip_fallbacks is False
     assert config.discovery.scrape_do_render is False
     assert config.discovery.insecure_tls_direct_hostnames == [
         "university.segi.edu.my"
     ]
     assert config.discovery.allow_url_patterns == [
-        r"^https?://university\.segi\.edu\.my/course/[^/?#]+/?$"
+        r"^https?://university\.segi\.edu\.my/course/[^/?#]+/?$",
+        r"^https://www\.segi\.edu\.my/[^/?#]+/$",
     ]
     assert re.search(
         config.discovery.allow_url_patterns[0],
@@ -55,11 +58,14 @@ def test_segi_production_config_uses_current_official_catalogue() -> None:
         config.discovery.allow_url_patterns[0],
         "https://university.segi.edu.my/course-search/",
     )
-    assert not re.search(
-        config.discovery.allow_url_patterns[0],
-        "https://www.segi.edu.my/course/master-of-accountancy/",
+    assert re.search(
+        config.discovery.allow_url_patterns[1],
+        "https://www.segi.edu.my/diploma-in-nursing-pg/",
     )
     assert config.extraction.scrape_do_render is False
+    assert config.extraction.scrape_do_render_hostnames == [
+        "www.segi.edu.my",
+    ]
     assert config.extraction.scrape_do_skip_fallbacks is False
     assert config.extraction.staging.require_international_fee is False
     assert config.extraction.staging.stage_on_parser_error is True
@@ -318,6 +324,40 @@ async def test_segi_online_mode_title_overrides_campus_derived_mode() -> None:
         and evidence.get("value") == "Online"
         for evidence in result["evidence"]
     )
+
+
+@pytest.mark.asyncio
+async def test_segi_college_page_uses_course_owned_metadata_campus() -> None:
+    from app.services.scraper.config import set_uni_config
+    from app.services.scraper.extractors import location
+
+    config = load_uni_config(
+        slug="segi",
+        scrape_url="https://www.segi.edu.my/",
+        university_id=13,
+        name="SEGi University & Colleges",
+    )
+    set_uni_config(config)
+    html = """
+    <html><head>
+      <meta property="og:description"
+            content="Programme ID : (R2/1022/4/0033)(06/28) (FA1779)
+                     Campus: SEGi College Kuala Lumpur
+                     Levels of Study: Diploma">
+    </head><body>
+      <footer>Visit our campuses in Kota Damansara, Penang and Sarawak.</footer>
+    </body></html>
+    """
+
+    results = await location.extract(
+        html,
+        "https://www.segi.edu.my/"
+        "diploma-in-occupational-safety-and-health-kl/",
+    )
+
+    assert len(results) == 1
+    assert results[0].value == "SEGi College Kuala Lumpur"
+    assert results[0].method == "location.segi_course_campus"
 
 
 @pytest.mark.asyncio
