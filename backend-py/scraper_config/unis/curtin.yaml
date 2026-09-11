@@ -49,6 +49,38 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 discovery:
+  generic_search_api:
+    enabled: true
+    method: GET
+    url: "https://search.curtin.edu.au/api/trpc/search"
+    params:
+      batch: "1"
+    fetch_via_scrape_do: true
+    scrape_do_render: false
+    body:
+      "0":
+        region: "international"
+        searchTerms: ""
+        facet: "courses"
+        page: 1
+        availability:
+          year: 2027
+    query_json_param: "input"
+    page_size: 10
+    body_pagination:
+      current_path: "0.page"
+    max_pages: 40
+    root_path: "0.result.data.results"
+    url_fields:
+      - "courseDetails.url"
+    title_fields:
+      - "courseDetails.title"
+    allow_url_patterns:
+      - '^https://www\.curtin\.edu\.au/study/offering/course-'
+
+  # Retain the manually harvested catalogue only if the live API is unavailable.
+  # Never merge it into a fresh response: annual rotations leave retired 404 URLs.
+  extra_course_urls_fallback_only: true
   # Default budget is enough — previous run hit 137 candidates within budget.
   # Not raising.
 
@@ -373,6 +405,11 @@ extraction:
   # Cloudflare 429s and previously caused repeated 600-second cooldowns.
   skip_browser_rescue: true
   skip_per_course_browser: true
+  # Direct static HTML normally works, but concurrent requests can be throttled.
+  # Retry only failures through the cheap residential static proxy; do not invoke
+  # Playwright, which causes Curtin's long 429 cooldown behavior.
+  scrape_do_static_on_failure: true
+  scrape_do_geo: "AU"
 
   filters:
     domestic_only:

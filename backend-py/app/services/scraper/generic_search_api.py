@@ -1132,6 +1132,13 @@ async def fetch_yaml_api_links(cfg: Any, emit: Callable[..., Any] | None = None)
                     else:
                         req_params[cfg.offset_param] = str(offset)
 
+                _query_json_param = getattr(cfg, "query_json_param", None)
+                if _query_json_param and req_body is not None:
+                    req_params[_query_json_param] = json.dumps(
+                        req_body,
+                        separators=(",", ":"),
+                    )
+
                 # ── Make the HTTP request ────────────────────────────────────────
                 # When fetch_via_scrape_do=True, route through scrape.do as a
                 # residential proxy to bypass Cloudflare on the API endpoint itself.

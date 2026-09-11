@@ -545,6 +545,15 @@ class GenericSearchApiConfig(BaseModel):
             "E.g. {'q': '*', 'rows': '250', 'model': 'coursefinder-ug'}."
         ),
     )
+    query_json_param: Optional[str] = Field(
+        default=None,
+        description=(
+            "For GET APIs that encode a nested JSON request inside one query "
+            "parameter, serialize body as compact JSON and assign it to this "
+            "parameter after applying body_pagination updates. Example: tRPC "
+            "endpoints commonly use query_json_param: input."
+        ),
+    )
     root_path: Optional[str] = Field(
         default=None,
         description=(
@@ -1765,6 +1774,15 @@ class DiscoveryConfig(BaseModel):
             "surgical fallback for known-CRICOS courses that all discovery "
             "tiers consistently miss (e.g. a single URL that lives behind "
             "Cloudflare and is not reachable by any crawler)."
+        ),
+    )
+    extra_course_urls_fallback_only: bool = Field(
+        default=False,
+        description=(
+            "When True, inject extra_course_urls only if the configured YAML "
+            "generic_search_api did not return links. Use for legacy static "
+            "catalogue snapshots that should remain an emergency fallback but "
+            "must not contaminate a fresh API result with retired URLs."
         ),
     )
     use_stealth_browser: bool = Field(
@@ -3395,6 +3413,16 @@ class ExtractionConfig(BaseModel):
             "returns 'We welcome applications from the United States of America' "
             "with 'Our Use of Cookies' as the extracted course name.  Does NOT "
             "execute JavaScript — use scrape_do_render for JS-rendered pages."
+        ),
+    )
+    scrape_do_static_on_failure: bool = Field(
+        default=False,
+        description=(
+            "When True, a direct fetch that returns no usable HTML gets one "
+            "Scrape.do static residential-proxy retry before browser rescue or "
+            "fetch_failed. Unlike scrape_do_static, successful direct requests "
+            "remain free. Use for SSR sites that usually allow direct traffic "
+            "but intermittently throttle concurrent datacenter requests."
         ),
     )
     scrape_do_geo: str = Field(

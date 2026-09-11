@@ -3360,7 +3360,15 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # sitemap / browser / Wayback entirely.  Only use for known-CRICOS
         # courses that every discovery tier consistently misses.
         _extra_urls = getattr(_uni_cfg.discovery, "extra_course_urls", [])
-        if _extra_urls:
+        _extras_fallback_only = bool(
+            getattr(
+                _uni_cfg.discovery,
+                "extra_course_urls_fallback_only",
+                False,
+            )
+        )
+        _yaml_api_succeeded = bool(locals().get("_yaml_api_links"))
+        if _extra_urls and not (_extras_fallback_only and _yaml_api_succeeded):
             # Insert / move extra URLs to the 1/3 mark of the discovered list.
             # Position 0 (front) is too early: the browser discovery session
             # just finished and Cloudflare's rate-limit counter hasn't cleared
@@ -3380,6 +3388,13 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     "to position %d/%d for %s",
                     _injected, _moved, _insert_pos, len(links), uni_name,
                 )
+        elif _extra_urls and _extras_fallback_only and _yaml_api_succeeded:
+            log.info(
+                "extra_course_urls: skipped %d fallback-only URL(s) because "
+                "generic_search_api returned a fresh catalogue for %s",
+                len(_extra_urls),
+                uni_name,
+            )
 
         # ── Rendered listing pages: Scrape.do render for Angular/React SPA catalogues ──
         # When discovery.render_listing_pages is set the orchestrator renders each URL

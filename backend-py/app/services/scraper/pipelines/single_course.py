@@ -44,6 +44,7 @@ from app.services.scraper.extractors import (
 from app.services.scraper.extractors.base import ExtractionResult
 from app.services.scraper.http_fetcher import (
     fetch_html,
+    fetch_html_scrape_do,
     get_last_fetch_failure,
     scrape_do_render_scope,
     scrape_do_static_scope,
@@ -2326,7 +2327,29 @@ async def extract_course(
                 with scrape_do_static_scope():
                     html = await fetch_html(url)
             else:
-                html = await fetch_html(url)
+                try:
+                    html = await fetch_html(url)
+                except Exception as _direct_fetch_exc:  # noqa: BLE001
+                    # A configured static-proxy rescue must also handle direct
+                    # transports that raise instead of returning None. Without
+                    # this, the exception escapes before the rescue block below.
+                    if (
+                        _uc_http is not None
+                        and getattr(
+                            _uc_http.extraction,
+                            "scrape_do_static_on_failure",
+                            False,
+                        )
+                    ):
+                        log.warning(
+                            "direct fetch raised for %s; static proxy rescue "
+                            "remains available: %s",
+                            url,
+                            _direct_fetch_exc,
+                        )
+                        html = None
+                    else:
+                        raise
     # ── 404 + query-string domestic-skip ────────────────────────────────────
     # When a URL rewrite (e.g. ?audience=INTERNATIONAL) appends a query param
     # and the fetch returns nothing (includes HTTP 404), retry the bare URL
@@ -2444,6 +2467,53 @@ async def extract_course(
                     kind="cqu_shell_bare_missing",
                     url=url,
                 )
+    if not html:
+        _static_retry_cfg = get_uni_config()
+        if bool(
+            _static_retry_cfg is not None
+            and
+            getattr(
+                _static_retry_cfg.extraction,
+                "scrape_do_static_on_failure",
+                False,
+            )
+        ):
+            try:
+                _static_retry_html = await fetch_html_scrape_do(
+                    url,
+                    render=False,
+                    geo_code=(
+                        getattr(
+                            _static_retry_cfg.extraction,
+                            "scrape_do_geo",
+                            "",
+                        )
+                        or None
+                    ),
+                    max_retries=1,
+                    request_timeout_seconds=30.0,
+                )
+                if _static_retry_html:
+                    html = _static_retry_html
+                    log.info(
+                        "[STATIC PROXY RESCUE] recovered %s after direct fetch failed",
+                        url,
+                    )
+                    if emit:
+                        await emit(
+                            "status",
+                            f"[STATIC PROXY RESCUE] recovered {url[:70]}",
+                            phase="extract",
+                            kind="static_proxy_http_fallback",
+                            url=url,
+                        )
+            except Exception as _static_retry_exc:  # noqa: BLE001
+                log.warning(
+                    "static proxy fallback failed for %s: %s",
+                    url,
+                    _static_retry_exc,
+                )
+
     if not html:
         # HTTP fetch failed (Cloudflare, bot-protection, JS-gate, etc.).
         # Try a real Playwright browser before giving up — this handles any
