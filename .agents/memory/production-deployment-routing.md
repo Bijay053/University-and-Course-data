@@ -137,10 +137,14 @@ Bounded credential restarts must exceed systemd's configured orderly stop
 window while remaining inside the five-minute SSM transaction.
 
 **Why:** Production units permit 90-second graceful stops; a 60-second outer
-timeout expired during a healthy sequential API/Celery transition.
+timeout expired during a healthy sequential API/Celery transition. A controlled
+restart on 2026-09-11 took 90.255 seconds in `systemctl restart`; after it
+returned, exact process and journal release identity verification completed in
+2.629 seconds against the 15-second bound.
 
 **How to apply:** Keep the refresh document's restart bound above the unit stop
-timeout plus startup margin, and retain the outer 300-second SSM deadline.
+timeout plus startup margin, retain the outer 300-second SSM deadline, and time
+the restart separately from the bounded post-restart identity poll.
 
 The production Nginx virtual host is hostname-scoped, so a bare
 `http://127.0.0.1/` frontend smoke request can return 404 even when the public
