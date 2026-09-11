@@ -42,6 +42,7 @@ from app.services.scraper.extractors import (
     study_mode,
 )
 from app.services.scraper.extractors.base import ExtractionResult
+from app.services.scraper.extractors.curtin_session import cookies_for_url
 from app.services.scraper.http_fetcher import (
     fetch_html,
     fetch_html_scrape_do,
@@ -2479,6 +2480,17 @@ async def extract_course(
             )
         ):
             try:
+                _target_cookies = cookies_for_url(url)
+                _target_headers = (
+                    {
+                        "Cookie": "; ".join(
+                            f"{name}={value}"
+                            for name, value in _target_cookies.items()
+                        )
+                    }
+                    if _target_cookies
+                    else None
+                )
                 _static_retry_html = await fetch_html_scrape_do(
                     url,
                     render=False,
@@ -2492,6 +2504,7 @@ async def extract_course(
                     ),
                     max_retries=1,
                     request_timeout_seconds=30.0,
+                    target_headers=_target_headers,
                 )
                 if _static_retry_html:
                     html = _static_retry_html

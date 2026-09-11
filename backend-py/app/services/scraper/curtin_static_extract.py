@@ -43,7 +43,7 @@ def _information_value(soup: BeautifulSoup, label: str) -> str | None:
 
 
 def _international_annual_offer(soup: BeautifulSoup) -> dict[str, Any]:
-    """Return the newest exact international year-1 offer from JSON-LD."""
+    """Return the newest exact international year-1 structured offer."""
     matches: list[tuple[int, dict[str, Any]]] = []
     for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
         try:
@@ -70,6 +70,41 @@ def _international_annual_offer(soup: BeautifulSoup) -> dict[str, Any]:
                 price = item.get("price")
                 if year_match and isinstance(price, (int, float)) and price >= 1000:
                     matches.append((int(year_match.group(1)), item))
+
+    # Some Curtin postgraduate pages publish the same structured fee data only
+    # in international fee cards, with no Offers in JSON-LD. Restrict this to
+    # the international container and the exact year-1 fee key; total-course
+    # and domestic cards must never be substituted.
+    for block in soup.select(
+        ".fees__international "
+        "div.fee[data-segment='int'][data-fee-key='YR1_IND_INT'][data-fee-year]"
+    ):
+        year_text = str(block.get("data-fee-year") or "")
+        if not re.fullmatch(r"20\d{2}", year_text):
+            continue
+        price_match = re.search(r"\$\s*([\d,]+(?:\.\d{1,2})?)", _text(str(block)))
+        if not price_match:
+            continue
+        try:
+            price = float(price_match.group(1).replace(",", ""))
+        except ValueError:
+            continue
+        if price < 1000:
+            continue
+        matches.append(
+            (
+                int(year_text),
+                {
+                    "@type": "Offer",
+                    "name": (
+                        f"{year_text} - International - "
+                        f"Indicative year 1 fee ({year_text})"
+                    ),
+                    "price": price,
+                    "priceCurrency": "AUD",
+                },
+            )
+        )
     return max(matches, key=lambda pair: pair[0])[1] if matches else {}
 
 

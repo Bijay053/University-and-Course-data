@@ -665,6 +665,7 @@ async def fetch_html_scrape_do(
     unescape_json_html: bool = True,
     local_concurrency_limit: int | None = None,
     request_timeout_seconds: float | None = None,
+    target_headers: dict[str, str] | None = None,
 ) -> str | None:
     """Fetch via Scrape.do residential proxy — paid tier-4/5 Cloudflare bypass.
 
@@ -739,6 +740,11 @@ async def fetch_html_scrape_do(
         )
     if geo_code:
         params["geoCode"] = geo_code.upper()
+    if target_headers:
+        # Scrape.do forwards request headers to the target only when this flag
+        # is enabled. This is required for audience-state cookies such as
+        # Curtin's user_region=int international fee view.
+        params["customHeaders"] = "true"
     # T03: Exponential-backoff retry for transient Scrape.do failures.
     # JCU root cause: account concurrency/rate-limit rejection returned non-200
     # with zero retry — 96/103 courses silently returned None.
@@ -812,9 +818,12 @@ async def fetch_html_scrape_do(
                             timeout=_inner_timeout or 90.0,
                             follow_redirects=True,
                         ) as c:
+                            request_kwargs: dict[str, object] = {"params": params}
+                            if target_headers:
+                                request_kwargs["headers"] = target_headers
                             _get = c.get(
                                 "https://api.scrape.do",
-                                params=params,
+                                **request_kwargs,
                             )
                             if _inner_timeout is None:
                                 return await _get

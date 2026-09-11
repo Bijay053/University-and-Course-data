@@ -40,6 +40,40 @@ def test_combined_degree_uses_course_duration_not_credit_count():
     assert result["ielts_overall"] == 6.0
 
 
+def test_postgraduate_visible_international_fee_cards_supply_newest_year_one_fee():
+    html = """
+      <div class="fees__domestic">
+        <div class="fee" data-fee-key="YR1_IND_DOM" data-fee-year="2027"
+             data-segment="dom"><p>$12,000</p></div>
+      </div>
+      <div class="fees__international">
+        <div class="fees__international--year">
+          <h3>2026 International indicative fees</h3>
+          <div class="fee" data-fee-key="YR1_IND_INT" data-fee-year="2026"
+               data-segment="int"><h4>Indicative year 1 fee</h4><p>$39,328*</p></div>
+          <div class="fee" data-fee-key="TOTAL_IND_INT" data-fee-year="2026"
+               data-segment="int"><h4>Total indicative course fee</h4><p>$78,656*</p></div>
+          <h3>2027 International indicative fees</h3>
+          <div class="fee" data-fee-key="YR1_IND_INT" data-fee-year="2027"
+               data-segment="int"><h4>Indicative year 1 fee</h4><p>$43,260*</p></div>
+          <div class="fee" data-fee-key="TOTAL_IND_INT" data-fee-year="2027"
+               data-segment="int"><h4>Total indicative course fee</h4><p>$86,520*</p></div>
+        </div>
+      </div>
+    """
+
+    result = apply_curtin_static_extraction(
+        "https://www.curtin.edu.au/study/offering/"
+        "course-pg-graduate-diploma-in-project-management--gd-projm/",
+        html,
+    )
+
+    assert result["international_fee"] == 43260.0
+    assert result["fee_currency"] == "AUD"
+    assert result["fee_term"] == "Annual"
+    assert result["fee_year"] == 2027
+
+
 def test_missing_location_is_not_defaulted_and_major_is_scoped():
     html = "<h1>Mining major</h1><div>Perth Online</div>"
     result = apply_curtin_static_extraction(
