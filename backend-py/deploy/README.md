@@ -489,6 +489,9 @@ PYTHONPATH=. python deploy/safe_restart_smoke.py \
   --release-identity-only \
   --journal-since "$smoke_since" \
   --release-identity-warning-seconds 5 \
+  --release-identity-regression-multiplier 2 \
+  --release-identity-regression-min-samples 3 \
+  --release-identity-regression-history-records 10 \
   --release-identity-timeout-seconds 15
 ```
 
@@ -505,6 +508,18 @@ The default warning threshold is 5 seconds and can be changed with
 threshold emits one sanitized warning containing only the service name and
 elapsed seconds. The match still succeeds unless it exceeds the independent
 `--release-identity-timeout-seconds` hard limit.
+
+Each service is also compared only with its own timings from the newest
+successful deployment records. Once at least three usable samples exist, the
+default relative rule warns when the current match time exceeds twice that
+service's recent median. Configure the rule with
+`--release-identity-regression-multiplier`,
+`--release-identity-regression-min-samples`, and
+`--release-identity-regression-history-records`. Missing, malformed, or
+insufficient history disables only the relative comparison; the fixed warning
+threshold and hard timeout remain in force. Malformed history emits a generic
+sanitized warning without exposing file contents. Relative warnings report only
+the service, current elapsed time, sanitized median, and calculated threshold.
 
 On success, the command reports sanitized
 `uni-api-py_match_elapsed_s=<seconds>` and

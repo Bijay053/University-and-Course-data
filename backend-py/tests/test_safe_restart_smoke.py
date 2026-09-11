@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 import json
+from argparse import Namespace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from deploy.safe_restart_smoke import (
     DEFAULT_EXPECTED_SKIP_REASON,
     DEFAULT_UNIVERSITY_ID,
     SmokeFailure,
+    _main,
     resolve_expected_release,
     verify_service_release_identity,
     warn_slow_release_identity_matches,
@@ -225,6 +227,125 @@ def test_release_identity_slow_exact_match_warns_but_remains_successful(
     assert capsys.readouterr().err == (
         "release identity warning: uni-api-py 5.001s\n"
     )
+
+
+def test_release_identity_stable_service_history_emits_no_warning(capsys) -> None:
+    history = [
+        {
+            "api_match_elapsed_seconds": value,
+            "celery_match_elapsed_seconds": 4.0,
+        }
+        for value in (1.0, 1.1, 1.2, 1.3, 1.4)
+    ]
+
+    warn_slow_release_identity_matches(
+        {"uni-api-py": 1.5, "uni-celery": 4.5},
+        warning_seconds=5,
+        recent_evidence=history,
+        regression_multiplier=2,
+        regression_min_samples=3,
+    )
+
+    assert capsys.readouterr().err == ""
+
+
+def test_release_identity_relative_regression_uses_service_own_history(capsys) -> None:
+    history = [
+        {
+            "api_match_elapsed_seconds": value,
+            "celery_match_elapsed_seconds": 4.0,
+        }
+        for value in (1.0, 1.1, 1.2)
+    ]
+
+    warn_slow_release_identity_matches(
+        {"uni-api-py": 2.5, "uni-celery": 4.5},
+        warning_seconds=5,
+        recent_evidence=history,
+        regression_multiplier=2,
+        regression_min_samples=3,
+    )
+
+    assert capsys.readouterr().err == (
+        "release identity warning: uni-api-py 2.500s "
+        "(recent median 1.100s, regression threshold 2.200s)\n"
+    )
+
+
+def test_release_identity_insufficient_history_falls_back_to_fixed_threshold(
+    capsys,
+) -> None:
+    history = [
+        {"api_match_elapsed_seconds": 1.0, "celery_match_elapsed_seconds": 8.0},
+        {"api_match_elapsed_seconds": 1.1, "celery_match_elapsed_seconds": 8.0},
+    ]
+
+    warn_slow_release_identity_matches(
+        {"uni-api-py": 2.5, "uni-celery": 5.001},
+        warning_seconds=5,
+        recent_evidence=history,
+        regression_multiplier=2,
+        regression_min_samples=3,
+    )
+
+    assert capsys.readouterr().err == (
+        "release identity warning: uni-celery 5.001s\n"
+    )
+
+
+@pytest.mark.asyncio
+async def test_release_identity_malformed_history_falls_back_without_aborting(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    evidence_path = tmp_path / "deployment-evidence.jsonl"
+    evidence_path.write_text("{not-json}\n", encoding="utf-8")
+    verification_calls: list[tuple[str, float]] = []
+    persisted: list[dict] = []
+
+    def fake_verify(*, journal_since: str, identity_timeout_seconds: float):
+        verification_calls.append((journal_since, identity_timeout_seconds))
+        return "release-1", {"uni-api-py": 6.0, "uni-celery": 2.0}
+
+    monkeypatch.setattr(
+        "deploy.safe_restart_smoke._verify_release_and_services", fake_verify
+    )
+    monkeypatch.setattr(
+        "deploy.safe_restart_smoke.persist_deployment_timing_evidence",
+        lambda _path, **kwargs: persisted.append(kwargs),
+    )
+
+    await _main(
+        Namespace(
+            recent_deployment_evidence=None,
+            deployment_evidence_path=evidence_path,
+            release_identity_only=True,
+            journal_since="2026-09-11T00:00:00+00:00",
+            release_identity_timeout_seconds=15,
+            release_identity_warning_seconds=5,
+            release_identity_regression_multiplier=2,
+            release_identity_regression_min_samples=3,
+            release_identity_regression_history_records=10,
+        )
+    )
+
+    captured = capsys.readouterr()
+    assert verification_calls == [("2026-09-11T00:00:00+00:00", 15)]
+    assert persisted[0]["release"] == "release-1"
+    assert "relative comparison unavailable" in captured.err
+    assert "release identity warning: uni-api-py 6.000s" in captured.err
+    assert "release identity passed: release=release-1" in captured.out
+
+
+@pytest.mark.parametrize("multiplier", [float("nan"), float("inf"), float("-inf")])
+def test_release_identity_rejects_non_finite_regression_multiplier(
+    multiplier: float,
+) -> None:
+    with pytest.raises(SmokeFailure, match="multiplier"):
+        warn_slow_release_identity_matches(
+            {"uni-api-py": 1.0},
+            warning_seconds=5,
+            regression_multiplier=multiplier,
+        )
 
 
 def test_release_identity_rejects_process_environment_mismatch(

@@ -10,9 +10,11 @@ import argparse
 import asyncio
 import fcntl
 import json
+import math
 import os
 import re
 import shlex
+import statistics
 import subprocess
 import sys
 import tempfile
@@ -85,6 +87,14 @@ DEFAULT_DEPLOYMENT_EVIDENCE_PATH = Path(
     "/var/lib/university-portal/deployment-evidence.jsonl"
 )
 DEFAULT_DEPLOYMENT_EVIDENCE_MAX_RECORDS = 1_000
+DEFAULT_RELEASE_IDENTITY_REGRESSION_MULTIPLIER = 2.0
+DEFAULT_RELEASE_IDENTITY_REGRESSION_MIN_SAMPLES = 3
+DEFAULT_RELEASE_IDENTITY_REGRESSION_HISTORY_RECORDS = 10
+
+_SERVICE_EVIDENCE_FIELDS = {
+    "uni-api-py": "api_match_elapsed_seconds",
+    "uni-celery": "celery_match_elapsed_seconds",
+}
 
 
 class SmokeFailure(RuntimeError):
@@ -185,6 +195,22 @@ def recent_deployment_timing_evidence(
         if len(records) == limit:
             break
     return records
+
+
+def optional_recent_deployment_timing_evidence(
+    path: Path, *, limit: int
+) -> list[Mapping[str, Any]]:
+    """Load an optional regression baseline without blocking identity checks."""
+    if limit < 1:
+        raise SmokeFailure("recent deployment evidence limit must be positive")
+    try:
+        return recent_deployment_timing_evidence(path, limit=limit)
+    except SmokeFailure:
+        print(
+            "deployment evidence warning: relative comparison unavailable",
+            file=sys.stderr,
+        )
+        return []
 
 
 def validate_database_rehearsal_requirement(
@@ -326,14 +352,45 @@ def warn_slow_release_identity_matches(
     match_elapsed_seconds: Mapping[str, float],
     *,
     warning_seconds: float,
+    recent_evidence: list[Mapping[str, Any]] | None = None,
+    regression_multiplier: float = DEFAULT_RELEASE_IDENTITY_REGRESSION_MULTIPLIER,
+    regression_min_samples: int = DEFAULT_RELEASE_IDENTITY_REGRESSION_MIN_SAMPLES,
 ) -> None:
     """Emit sanitized warnings without changing successful identity matches."""
     if warning_seconds < 0:
         raise SmokeFailure("release identity warning threshold must be non-negative")
+    if not math.isfinite(regression_multiplier) or regression_multiplier <= 1:
+        raise SmokeFailure("release identity regression multiplier must be greater than 1")
+    if regression_min_samples < 1:
+        raise SmokeFailure("release identity regression minimum samples must be positive")
+    evidence = recent_evidence or []
     for unit, elapsed_seconds in match_elapsed_seconds.items():
-        if elapsed_seconds > warning_seconds:
+        samples: list[float] = []
+        evidence_field = _SERVICE_EVIDENCE_FIELDS.get(unit)
+        if evidence_field:
+            for record in evidence:
+                value = record.get(evidence_field)
+                if (
+                    isinstance(value, (int, float))
+                    and not isinstance(value, bool)
+                    and math.isfinite(value)
+                    and value >= 0
+                ):
+                    samples.append(float(value))
+        relative_threshold: float | None = None
+        if len(samples) >= regression_min_samples:
+            relative_threshold = statistics.median(samples) * regression_multiplier
+        if elapsed_seconds > warning_seconds or (
+            relative_threshold is not None and elapsed_seconds > relative_threshold
+        ):
+            detail = ""
+            if relative_threshold is not None and elapsed_seconds > relative_threshold:
+                detail = (
+                    f" (recent median {statistics.median(samples):.3f}s, "
+                    f"regression threshold {relative_threshold:.3f}s)"
+                )
             print(
-                f"release identity warning: {unit} {elapsed_seconds:.3f}s",
+                f"release identity warning: {unit} {elapsed_seconds:.3f}s{detail}",
                 file=sys.stderr,
             )
 
@@ -547,6 +604,14 @@ async def _main(args: argparse.Namespace) -> None:
             print(json.dumps(record, separators=(",", ":"), sort_keys=True))
         return
     if args.release_identity_only:
+        regression_history_records = getattr(
+            args,
+            "release_identity_regression_history_records",
+            DEFAULT_RELEASE_IDENTITY_REGRESSION_HISTORY_RECORDS,
+        )
+        recent_evidence = optional_recent_deployment_timing_evidence(
+            evidence_path, limit=regression_history_records
+        )
         release, match_elapsed_seconds = _verify_release_and_services(
             journal_since=args.journal_since,
             identity_timeout_seconds=args.release_identity_timeout_seconds,
@@ -557,6 +622,17 @@ async def _main(args: argparse.Namespace) -> None:
                 args,
                 "release_identity_warning_seconds",
                 DEFAULT_RELEASE_IDENTITY_WARNING_SECONDS,
+            ),
+            recent_evidence=recent_evidence,
+            regression_multiplier=getattr(
+                args,
+                "release_identity_regression_multiplier",
+                DEFAULT_RELEASE_IDENTITY_REGRESSION_MULTIPLIER,
+            ),
+            regression_min_samples=getattr(
+                args,
+                "release_identity_regression_min_samples",
+                DEFAULT_RELEASE_IDENTITY_REGRESSION_MIN_SAMPLES,
             ),
         )
         persist_deployment_timing_evidence(
@@ -620,6 +696,24 @@ def main() -> int:
         type=float,
         default=DEFAULT_RELEASE_IDENTITY_WARNING_SECONDS,
         help="warn when a service takes longer than this to report its release",
+    )
+    parser.add_argument(
+        "--release-identity-regression-multiplier",
+        type=float,
+        default=DEFAULT_RELEASE_IDENTITY_REGRESSION_MULTIPLIER,
+        help="warn when startup exceeds this multiple of its service median",
+    )
+    parser.add_argument(
+        "--release-identity-regression-min-samples",
+        type=int,
+        default=DEFAULT_RELEASE_IDENTITY_REGRESSION_MIN_SAMPLES,
+        help="successful service timings required before relative warnings",
+    )
+    parser.add_argument(
+        "--release-identity-regression-history-records",
+        type=int,
+        default=DEFAULT_RELEASE_IDENTITY_REGRESSION_HISTORY_RECORDS,
+        help="newest successful deployments used for each service baseline",
     )
     parser.add_argument(
         "--deployment-evidence-path",
