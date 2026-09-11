@@ -191,6 +191,7 @@ _MULTI_LABEL_EDUCATION_SUFFIXES = {
 _HOSTNAME_OFFICIAL_NAMES = {
     "csu.edu.au": "Charles Sturt University",
     "jcu.edu.au": "James Cook University",
+    "lincoln.edu.my": "Lincoln University College",
     "segi.edu.my": "SEGi University & Colleges",
     "unsw.edu.au": "UNSW Sydney",
 }
@@ -582,6 +583,12 @@ def _normalise_institution_name(value: str) -> str:
         None,
     )
     if institution_segment:
+        if re.match(
+            r"^(?:top|best|leading|premier|award[- ]winning)\b",
+            institution_segment,
+            re.I,
+        ):
+            return ""
         cleaned = re.sub(
             r"^(?:study|learn)\s+at\s+|^(?:welcome\s+to|discover|explore)\s+",
             "",

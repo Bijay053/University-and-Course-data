@@ -198,6 +198,7 @@ def test_normalises_institution_name_from_any_metadata_source(
 def test_rejects_generic_only_institution_name_metadata() -> None:
     assert _normalise_institution_name("Home | Welcome") == ""
     assert _normalise_institution_name("UNSW Sites") == ""
+    assert _normalise_institution_name("Top Private University Degree College") == ""
 
 
 def test_known_jcu_domain_has_authoritative_official_name() -> None:
@@ -206,6 +207,13 @@ def test_known_jcu_domain_has_authoritative_official_name() -> None:
 
 def test_known_unsw_domain_has_authoritative_official_name() -> None:
     assert _HOSTNAME_OFFICIAL_NAMES["unsw.edu.au"] == "UNSW Sydney"
+
+
+def test_known_lincoln_malaysia_domain_has_authoritative_official_name() -> None:
+    assert (
+        _HOSTNAME_OFFICIAL_NAMES["lincoln.edu.my"]
+        == "Lincoln University College"
+    )
 
 
 def test_monash_dot_edu_is_authoritatively_australian() -> None:
