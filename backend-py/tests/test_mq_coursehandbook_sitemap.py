@@ -8,6 +8,7 @@ host.
 """
 from __future__ import annotations
 
+import asyncio
 import html
 import json
 import os
@@ -451,8 +452,11 @@ class TestFunnelbackRichProvider:
             },
         })
         calls = []
+        active_rendered = 0
+        peak_rendered = 0
 
         async def fake_scrape_do(url, **kwargs):
+            nonlocal active_rendered, peak_rendered
             calls.append((url, kwargs))
             if "s/search.json" in url:
                 return (
@@ -461,7 +465,13 @@ class TestFunnelbackRichProvider:
                     f"{html.escape(funnelback_body)}"
                     "</pre></body></html>"
                 )
-            return page_data_body
+            active_rendered += 1
+            peak_rendered = max(peak_rendered, active_rendered)
+            try:
+                await asyncio.sleep(0)
+                return page_data_body
+            finally:
+                active_rendered -= 1
 
         class FakeResponse:
             status_code = 403
@@ -494,7 +504,11 @@ class TestFunnelbackRichProvider:
         )
 
         assert len(links) == 48
+        assert 1 < peak_rendered <= mq._PAGE_DATA_RENDER_PARALLEL == 4
         assert all(call[1]["render"] is True for call in calls)
+        page_data_calls = [call for call in calls if "s/search.json" not in call[0]]
+        assert all(call[1]["rate_limit"] is True for call in page_data_calls)
+        assert all(call[1]["max_retries"] == 0 for call in page_data_calls)
         assert all(
             "/major/" not in link["url"]
             and "/specialisation/" not in link["url"]
@@ -647,6 +661,77 @@ class TestFunnelbackRichProvider:
         monkeypatch.setattr(mq, "_RICH_COURSE_MIN_RESULTS", 1)
 
         with pytest.raises(mq.MqEnrichmentCoverageError, match="page-data coverage"):
+            await mq._discover_from_funnelback_api(emit, max_courses=100)
+
+    @pytest.mark.asyncio
+    async def test_fails_closed_when_international_fee_coverage_is_low(
+        self, monkeypatch,
+    ):
+        import httpx
+        import app.services.scraper.http_fetcher as http_fetcher
+
+        rows = [
+            {
+                "title": f"Bachelor of Test {i}",
+                "liveUrl": (
+                    "https://www.mq.edu.au/study/find-a-course/"
+                    f"courses/course-{i}"
+                ),
+                "metaData": {},
+            }
+            for i in range(50)
+        ]
+        page_data_without_fee = json.dumps({
+            "result": {
+                "data": {
+                    "current": {
+                        "fields": {
+                            "json": json.dumps({
+                                "study_level": "Undergraduate",
+                            }),
+                        },
+                    },
+                },
+            },
+        })
+
+        async def fake_scrape_do(url, **kwargs):
+            if "s/search.json" in url:
+                return json.dumps({
+                    "response": {"resultPacket": {"results": rows}},
+                })
+            return page_data_without_fee
+
+        class FakeResponse:
+            status_code = 403
+            text = ""
+
+        class FakeClient:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def get(self, *args, **kwargs):
+                return FakeResponse()
+
+        async def emit(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(
+            http_fetcher, "fetch_html_scrape_do", fake_scrape_do,
+        )
+        monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
+        monkeypatch.setattr(mq, "_RICH_COURSE_MIN_RESULTS", 1)
+
+        with pytest.raises(
+            mq.MqEnrichmentCoverageError,
+            match="international-fee coverage",
+        ):
             await mq._discover_from_funnelback_api(emit, max_courses=100)
 
     @pytest.mark.asyncio

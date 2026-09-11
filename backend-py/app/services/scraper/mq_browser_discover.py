@@ -290,6 +290,7 @@ _INTERNATIONAL_FEE_MIN_COVERAGE = 0.70
 # Concurrent page-data.json fetches — 20 parallel keeps a 338-course
 # fetch under ~30s at ~200ms/request.
 _PAGE_DATA_PARALLEL = 20
+_PAGE_DATA_RENDER_PARALLEL = 4
 _PAGE_DATA_TIMEOUT_S = 20.0
 
 # Scrape.do fetch UA — same as used by the resolver pass.
@@ -941,24 +942,38 @@ async def _discover_from_funnelback_api(
         try:
             from app.services.scraper.http_fetcher import fetch_html_scrape_do
             scrape_do_ok = 0
-            # Sequential to avoid burning Scrape.do credits in a parallel burst.
-            for retry_index, url in enumerate(missing_urls, start=1):
+            retry_count = 0
+            render_sem = asyncio.Semaphore(_PAGE_DATA_RENDER_PARALLEL)
+
+            async def _retry_rendered_page_data(
+                url: str,
+            ) -> tuple[str, dict | None]:
                 pd_url = _page_data_url(url)
                 try:
-                    body = await fetch_html_scrape_do(
-                        pd_url, render=True, rate_limit=False, max_retries=1,
-                    )
+                    async with render_sem:
+                        body = await fetch_html_scrape_do(
+                            pd_url, render=True, rate_limit=True, max_retries=0,
+                        )
                     if body:
-                        prog = _extract_program_from_page_data(body)
-                        if prog:
-                            programs[url] = prog
-                            scrape_do_ok += 1
+                        return url, _extract_program_from_page_data(body)
                 except Exception:  # noqa: BLE001
                     pass
-                if retry_index % 25 == 0 or retry_index == len(missing_urls):
+                return url, None
+
+            retry_tasks = [
+                asyncio.create_task(_retry_rendered_page_data(url))
+                for url in missing_urls
+            ]
+            for completed in asyncio.as_completed(retry_tasks):
+                url, prog = await completed
+                retry_count += 1
+                if prog:
+                    programs[url] = prog
+                    scrape_do_ok += 1
+                if retry_count % 25 == 0 or retry_count == len(missing_urls):
                     await emit_fn(
                         "[DISCOVER] MQ: Tier 0 — rendered page-data.json retry "
-                        f"progress: {retry_index}/{len(missing_urls)} attempted, "
+                        f"progress: {retry_count}/{len(missing_urls)} attempted, "
                         f"{scrape_do_ok} recovered"
                     )
             if missing_urls:

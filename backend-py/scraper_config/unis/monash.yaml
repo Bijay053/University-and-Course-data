@@ -13,6 +13,7 @@ locked_config_paths:
   - discovery.expected_min_courses
   - discovery.non_degree_classifier.force_url_patterns
   - discovery.non_degree_classifier.force_title_patterns
+  - extraction.max_parallel_fetch
   - extraction.url_rewrites
   - extraction.filters.domestic_only
   - extraction.filters.online_only
@@ -57,6 +58,9 @@ discovery:
   browser_time_budget_s: 120
 
 extraction:
+  # Keep Monash within the orchestrator's hard per-university ceiling while
+  # reducing wall time for its 400+ independent course pages.
+  max_parallel_fetch: 16
   # A live B2029 render verified that this view exposes international entry
   # metadata plus authoritative location/load. Some pages link to fees rather
   # than publishing an amount; missing fees remain blank for human review.

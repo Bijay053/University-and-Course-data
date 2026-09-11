@@ -39,7 +39,10 @@ def test_monash_funnelback_recipe_beats_stale_admin_category_rules():
                     "force_title_patterns": [],
                 },
             },
-            "extraction": {"url_rewrites": []},
+            "extraction": {
+                "max_parallel_fetch": 1,
+                "url_rewrites": [],
+            },
         }
     })
 
@@ -59,6 +62,7 @@ def test_monash_funnelback_recipe_beats_stale_admin_category_rules():
     assert r"\bProfessional Certificate\b" in (
         cfg.discovery.non_degree_classifier.force_title_patterns
     )
+    assert cfg.extraction.max_parallel_fetch == 16
     assert cfg.extraction.url_rewrites[0].append_query == "international=true"
     assert cfg.extraction.filters.domestic_only.require_international_evidence is True
     assert cfg.extraction.filters.reject_parttime_only is True
