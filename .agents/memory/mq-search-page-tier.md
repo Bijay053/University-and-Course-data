@@ -11,6 +11,17 @@ Use the international Funnelback catalogue only through the rich MQ provider tha
 
 **How to apply:** Give the rich provider precedence over caches and generated API recipes. Reject majors and specialisations. Fail the scrape rather than supplementing with domestic HTML when pagination, structured-page coverage, or fee coverage is materially incomplete.
 
+Rich provider links short-circuit ordinary per-course extraction, so every
+authoritative page-data field must be copied into the provider payload itself.
+
+**Why:** rendered page-data recovered almost the full catalogue, but omitting
+`study_level` and `course_duration_in_years.label` from the provider handoff
+staged an apparently successful run with duration missing on every row.
+
+**How to apply:** regression-test the final rich-link payload, not only JSON
+parsing or recovery counts. Funnelback values retain priority when present;
+page-data fills fields Funnelback omits.
+
 ## Transport
 
 Every part of `www.mq.edu.au` and both Funnelback endpoints are behind Cloudflare Enterprise.

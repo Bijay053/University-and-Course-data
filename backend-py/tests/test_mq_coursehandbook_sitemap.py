@@ -36,6 +36,46 @@ class TestRenderedPageData:
         }
         return program, json.dumps(outer)
 
+    def test_rich_result_uses_page_data_study_level_and_duration(self):
+        result = mq._build_scrapy_result(
+            "Bachelor of Arts",
+            "https://www.mq.edu.au/study/find-a-course/courses/bachelor-of-arts",
+            {},
+            {
+                "study_level": "Undergraduate",
+                "course_duration_in_years": {"label": "Full time: 3 years"},
+            },
+        )
+
+        assert result["payload"]["degree_level"] == "Undergraduate"
+        assert result["payload"]["academic_level"] == "Undergraduate"
+        assert result["payload"]["duration"] == 3.0
+        assert result["payload"]["duration_term"] == "year"
+        methods = {item["method"] for item in result["evidence"]}
+        assert "page_data:study_level" in methods
+        assert "page_data:course_duration_in_years" in methods
+
+    def test_funnelback_study_level_and_duration_keep_priority(self):
+        result = mq._build_scrapy_result(
+            "Master of Test",
+            "https://www.mq.edu.au/study/find-a-course/courses/master-of-test",
+            {
+                "studyLevel": "Postgraduate",
+                "courseDuration": "2 years",
+            },
+            {
+                "study_level": "Undergraduate",
+                "course_duration_in_years": {"label": "Full time: 3 years"},
+            },
+        )
+
+        assert result["payload"]["degree_level"] == "Postgraduate"
+        assert result["payload"]["duration"] == 2.0
+        assert result["payload"]["duration_term"] == "year"
+        methods = {item["method"] for item in result["evidence"]}
+        assert "page_data:study_level" not in methods
+        assert "page_data:course_duration_in_years" not in methods
+
     def test_extracts_plain_page_data_json(self):
         program, body = self._body()
         assert mq._extract_program_from_page_data(body) == program
@@ -310,6 +350,10 @@ class TestFunnelbackRichProvider:
                     "current": {
                         "fields": {
                             "json": json.dumps({
+                                "study_level": "Undergraduate",
+                                "course_duration_in_years": {
+                                    "label": "Full time: 3 years",
+                                },
                                 "fees": [{
                                     "fee_type": {"label": "International"},
                                     "estimated_annual_fee": "43200",
@@ -374,6 +418,9 @@ class TestFunnelbackRichProvider:
         payload = links[0]["scrapy_result"]["payload"]
         assert payload["international_fee"] == 43200.0
         assert payload["ielts_overall"] == 6.5
+        assert payload["degree_level"] == "Undergraduate"
+        assert payload["duration"] == 3.0
+        assert payload["duration_term"] == "year"
 
     @pytest.mark.asyncio
     async def test_paginates_past_funnelback_two_hundred_result_cap(

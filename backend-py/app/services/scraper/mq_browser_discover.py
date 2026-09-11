@@ -447,6 +447,54 @@ def _build_scrapy_result(
     if not program:
         return {"name": name, "url": url, "payload": payload, "evidence": evidence}
 
+    # Funnelback's live result currently omits these fields for most courses,
+    # while the rendered Gatsby payload exposes them as ``study_level`` and
+    # ``course_duration_in_years.label``.  Rich MQ links short-circuit the
+    # ordinary per-course extractor, so map both here or they are lost.
+    if not payload.get("degree_level"):
+        page_study_level = program.get("study_level")
+        if isinstance(page_study_level, dict):
+            page_study_level = (
+                page_study_level.get("label")
+                or page_study_level.get("value")
+            )
+        parsed_study_level = _parse_study_level(
+            page_study_level if isinstance(page_study_level, str) else ""
+        )
+        if parsed_study_level:
+            payload["degree_level"] = parsed_study_level
+            payload["academic_level"] = parsed_study_level
+            evidence.append(_ev(
+                "degree_level", parsed_study_level, "page_data:study_level",
+                page_data_url_str, "course",
+                f"page-data.json study_level: {page_study_level}", 0.90,
+            ))
+
+    if payload.get("duration") is None:
+        page_duration = program.get("course_duration_in_years")
+        if isinstance(page_duration, dict):
+            page_duration = (
+                page_duration.get("label")
+                or page_duration.get("value")
+            )
+        if not page_duration:
+            page_duration = (
+                program.get("course_duration")
+                or program.get("duration_text")
+                or program.get("duration")
+            )
+        dur_val, dur_term = _parse_duration_funnelback(
+            str(page_duration or "")
+        )
+        if dur_val is not None:
+            payload["duration"] = dur_val
+            payload["duration_term"] = dur_term
+            evidence.append(_ev(
+                "duration", dur_val, "page_data:course_duration_in_years",
+                page_data_url_str, "course",
+                f"page-data.json course duration: {page_duration}", 0.90,
+            ))
+
     # International fee
     fees = program.get("fees") or []
     for fee_item in fees:
