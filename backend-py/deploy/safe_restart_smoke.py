@@ -10,9 +10,11 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
+import time
 import urllib.request
 import uuid
 from collections.abc import Mapping
@@ -74,6 +76,8 @@ REHEARSAL_TEMPLATE = Path(__file__).with_name(
 REHEARSAL_SIGNERS = Path(__file__).with_name(
     "database-refresh-rehearsal-signers.json"
 )
+DEFAULT_RELEASE_IDENTITY_TIMEOUT_SECONDS = 15.0
+DEFAULT_RELEASE_IDENTITY_RETRY_SECONDS = 1.0
 
 
 class SmokeFailure(RuntimeError):
@@ -161,7 +165,63 @@ def resolve_expected_release(
     return fallback if fallback is not None else get_release_revision()
 
 
-def _verify_release_and_services() -> str:
+def _read_process_environment(pid: str) -> list[bytes]:
+    return Path(f"/proc/{pid}/environ").read_bytes().split(b"\0")
+
+
+def verify_service_process_release_identity(unit: str, release: str) -> None:
+    """Require one live service process to carry the exact release revision."""
+    _run(["systemctl", "is-active", "--quiet", unit])
+    pid = _run(
+        ["systemctl", "show", unit, "--property=MainPID", "--value"]
+    ).strip()
+    if not pid.isdigit() or int(pid) <= 0:
+        raise SmokeFailure(f"{unit} has no live MainPID")
+    try:
+        process_env = _read_process_environment(pid)
+    except OSError as exc:
+        raise SmokeFailure(f"cannot inspect {unit} process environment") from exc
+    expected_env = f"RELEASE_REVISION={release}".encode()
+    if expected_env not in process_env:
+        raise SmokeFailure(
+            f"{unit} running process does not have RELEASE_REVISION={release}"
+        )
+
+
+def verify_service_release_identity(
+    unit: str,
+    release: str,
+    *,
+    journal_since: str,
+    timeout_seconds: float = DEFAULT_RELEASE_IDENTITY_TIMEOUT_SECONDS,
+    retry_seconds: float = DEFAULT_RELEASE_IDENTITY_RETRY_SECONDS,
+) -> None:
+    """Require exact process and bounded journal evidence for one service."""
+    verify_service_process_release_identity(unit, release)
+    expected_log = f"release_revision={release}"
+    expected_log_pattern = re.compile(
+        rf"(?:^|[\s,(]){re.escape(expected_log)}\)(?:$|\s)"
+    )
+    deadline = time.monotonic() + max(0.0, timeout_seconds)
+    while True:
+        journal = _run(
+            ["journalctl", "-u", unit, "--since", journal_since, "--no-pager"]
+        )
+        if any(expected_log_pattern.search(line) for line in journal.splitlines()):
+            return
+        if time.monotonic() >= deadline:
+            raise SmokeFailure(
+                f"{unit} did not report exact {expected_log} "
+                f"within {timeout_seconds:g}s"
+            )
+        time.sleep(min(retry_seconds, max(0.0, deadline - time.monotonic())))
+
+
+def _verify_release_and_services(
+    *,
+    journal_since: str | None = None,
+    identity_timeout_seconds: float = DEFAULT_RELEASE_IDENTITY_TIMEOUT_SECONDS,
+) -> str:
     release = resolve_expected_release()
     if release == UNKNOWN_RELEASE:
         raise SmokeFailure("deployed release revision is unavailable")
@@ -175,20 +235,14 @@ def _verify_release_and_services() -> str:
     ):
         raise SmokeFailure(f"release revision {release!r} does not match Git HEAD {head}")
     for unit in ("uni-api-py", "uni-celery"):
-        _run(["systemctl", "is-active", "--quiet", unit])
-        pid = _run(
-            ["systemctl", "show", unit, "--property=MainPID", "--value"]
-        ).strip()
-        if not pid.isdigit() or int(pid) <= 0:
-            raise SmokeFailure(f"{unit} has no live MainPID")
-        try:
-            process_env = Path(f"/proc/{pid}/environ").read_bytes().split(b"\0")
-        except OSError as exc:
-            raise SmokeFailure(f"cannot inspect {unit} process environment") from exc
-        expected = f"RELEASE_REVISION={release}".encode()
-        if expected not in process_env:
-            raise SmokeFailure(
-                f"{unit} running process does not have RELEASE_REVISION={release}"
+        if journal_since is None:
+            verify_service_process_release_identity(unit, release)
+        else:
+            verify_service_release_identity(
+                unit,
+                release,
+                journal_since=journal_since,
+                timeout_seconds=identity_timeout_seconds,
             )
     return release
 
@@ -360,6 +414,13 @@ async def _wait_for_done(
 
 
 async def _main(args: argparse.Namespace) -> None:
+    if args.release_identity_only:
+        release = _verify_release_and_services(
+            journal_since=args.journal_since,
+            identity_timeout_seconds=args.release_identity_timeout_seconds,
+        )
+        print(f"release identity passed: release={release}")
+        return
     validate_database_rehearsal_requirement(
         args.database_rehearsal_proof,
         expected_account_id=args.expected_rehearsal_account_id,
@@ -388,6 +449,21 @@ def main() -> int:
         "--api-health-url", default="http://127.0.0.1:8000/api/health"
     )
     parser.add_argument("--timeout-seconds", type=int, default=300)
+    parser.add_argument(
+        "--release-identity-only",
+        action="store_true",
+        help="verify exact process and journal release identity, then exit",
+    )
+    parser.add_argument(
+        "--journal-since",
+        default="10 minutes ago",
+        help="journalctl --since value for release identity evidence",
+    )
+    parser.add_argument(
+        "--release-identity-timeout-seconds",
+        type=float,
+        default=DEFAULT_RELEASE_IDENTITY_TIMEOUT_SECONDS,
+    )
     parser.add_argument(
         "--database-rehearsal-proof",
         type=Path,

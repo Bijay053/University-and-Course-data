@@ -16,6 +16,7 @@ from deploy.safe_restart_smoke import (
     DEFAULT_UNIVERSITY_ID,
     SmokeFailure,
     resolve_expected_release,
+    verify_service_release_identity,
     validate_database_rehearsal_requirement,
     validate_done_payload,
     validate_idle_counts,
@@ -132,6 +133,127 @@ def test_metadata_only_package_uses_release_file_without_git(tmp_path) -> None:
     assert (
         resolve_expected_release(release_file, fallback="unknown")
         == "build-2026-09-07"
+    )
+
+
+def test_release_identity_retries_until_delayed_exact_journal_line(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    journals = iter(
+        ["worker booting", "Celery worker starting (release_revision=" + "a" * 40 + ")"]
+    )
+    sleeps: list[float] = []
+
+    def fake_run(command: list[str], **_kwargs) -> str:
+        if command[:2] == ["systemctl", "show"]:
+            return "123"
+        if command[0] == "journalctl":
+            return next(journals)
+        return ""
+
+    monkeypatch.setattr("deploy.safe_restart_smoke._run", fake_run)
+    monkeypatch.setattr(
+        "deploy.safe_restart_smoke._read_process_environment",
+        lambda _pid: [b"RELEASE_REVISION=" + b"a" * 40],
+    )
+    monkeypatch.setattr("deploy.safe_restart_smoke.time.monotonic", lambda: 0.0)
+    monkeypatch.setattr(
+        "deploy.safe_restart_smoke.time.sleep", lambda seconds: sleeps.append(seconds)
+    )
+
+    verify_service_release_identity(
+        "uni-api-py",
+        "a" * 40,
+        journal_since="2026-09-11T00:00:00+00:00",
+        timeout_seconds=15,
+    )
+    assert sleeps == [1.0]
+
+
+def test_release_identity_rejects_process_environment_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "deploy.safe_restart_smoke._run",
+        lambda command, **_kwargs: "123" if command[:2] == ["systemctl", "show"] else "",
+    )
+    monkeypatch.setattr(
+        "deploy.safe_restart_smoke._read_process_environment",
+        lambda _pid: [b"RELEASE_REVISION=" + b"b" * 40],
+    )
+
+    with pytest.raises(SmokeFailure, match="does not have RELEASE_REVISION"):
+        verify_service_release_identity(
+            "uni-api-py",
+            "a" * 40,
+            journal_since="2026-09-11T00:00:00+00:00",
+        )
+
+
+@pytest.mark.parametrize(
+    "journal",
+    [
+        "",
+        "Celery worker starting (release_revision=" + "b" * 40 + ")",
+        "Python backend starting up (debug=False, release_revision=" + "a" * 40 + "0)",
+    ],
+)
+def test_release_identity_rejects_missing_or_mismatched_journal_line(
+    journal: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fake_run(command: list[str], **_kwargs) -> str:
+        if command[:2] == ["systemctl", "show"]:
+            return "123"
+        if command[0] == "journalctl":
+            return journal
+        return ""
+
+    times = iter([0.0, 1.0])
+    monkeypatch.setattr("deploy.safe_restart_smoke._run", fake_run)
+    monkeypatch.setattr(
+        "deploy.safe_restart_smoke._read_process_environment",
+        lambda _pid: [b"RELEASE_REVISION=" + b"a" * 40],
+    )
+    monkeypatch.setattr(
+        "deploy.safe_restart_smoke.time.monotonic", lambda: next(times)
+    )
+
+    with pytest.raises(SmokeFailure, match="did not report exact"):
+        verify_service_release_identity(
+            "uni-api-py",
+            "a" * 40,
+            journal_since="2026-09-11T00:00:00+00:00",
+            timeout_seconds=0,
+        )
+
+
+@pytest.mark.parametrize(
+    "journal",
+    [
+        "Python backend starting up (debug=False, release_revision=" + "a" * 40 + ")",
+        "Celery worker starting (release_revision=" + "a" * 40 + ")",
+    ],
+)
+def test_release_identity_accepts_real_startup_message_forms(
+    journal: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fake_run(command: list[str], **_kwargs) -> str:
+        if command[:2] == ["systemctl", "show"]:
+            return "123"
+        if command[0] == "journalctl":
+            return journal
+        return ""
+
+    monkeypatch.setattr("deploy.safe_restart_smoke._run", fake_run)
+    monkeypatch.setattr(
+        "deploy.safe_restart_smoke._read_process_environment",
+        lambda _pid: [b"RELEASE_REVISION=" + b"a" * 40],
+    )
+    verify_service_release_identity(
+        "uni-api-py",
+        "a" * 40,
+        journal_since="2026-09-11T00:00:00+00:00",
+        timeout_seconds=0,
     )
 
 

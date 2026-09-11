@@ -48,7 +48,7 @@ def test_release_identity_smoke_check_covers_fastapi_and_celery() -> None:
     readme = (DEPLOY_DIR / "README.md").read_text(encoding="utf-8")
 
     smoke_check = readme.split("## Release-identity smoke check", maxsplit=1)[1]
-    assert "for unit in uni-api-py uni-celery" in smoke_check
-    assert 'journalctl -u "$unit"' in smoke_check
-    assert 'grep -Fq "$expected"' in smoke_check
-    assert "FastAPI and Celery reported" in smoke_check
+    assert "--release-identity-only" in smoke_check
+    assert '--journal-since "$smoke_since"' in smoke_check
+    assert "--release-identity-timeout-seconds 15" in smoke_check
+    assert "exact full `RELEASE_REVISION`" in smoke_check

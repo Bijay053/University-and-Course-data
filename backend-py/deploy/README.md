@@ -468,20 +468,20 @@ nginx -t && systemctl reload nginx
 Confirm both processes started with the exact revision written above:
 
 ```bash
-expected="release_revision=$deployed_revision"
-
-for unit in uni-api-py uni-celery; do
-  systemctl is-active --quiet "$unit"
-  journalctl -u "$unit" --since "$smoke_since" --no-pager |
-    grep -Fq "$expected" ||
-    { echo "$unit did not report $expected" >&2; exit 1; }
-done
-
-echo "FastAPI and Celery reported $deployed_revision"
+cd /opt/university-portal/backend-py
+PYTHONPATH=. python deploy/safe_restart_smoke.py \
+  --release-identity-only \
+  --journal-since "$smoke_since" \
+  --release-identity-timeout-seconds 15
 ```
 
-Do not complete the deployment if this check fails. A package without `.git`
-is supported as long as its deployment pipeline supplies `RELEASE_REVISION`.
+The command first requires each live service process environment to contain the
+exact full `RELEASE_REVISION`. It then retries each service's exact
+`release_revision=<revision>` startup line for up to 15 seconds, allowing normal
+Gunicorn/Celery startup delay without accepting a missing or mismatched
+identity. Do not complete the deployment if this check fails. A package without
+`.git` is supported as long as its deployment pipeline supplies
+`RELEASE_REVISION`.
 
 ## Safe restart smoke command
 
