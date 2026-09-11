@@ -129,6 +129,88 @@ def canonical_course_url_key(url: str | None) -> str:
         return raw.lower().rstrip("/")
 
 
+def canonicalize_uwa_sitecore_course_urls(
+    items: list[dict],
+) -> tuple[list[dict], int, int]:
+    """Rewrite UWA Sitecore course copies to public URLs and deduplicate them.
+
+    UWA's study sitemap exposes internal Sitecore paths that redirect to the
+    corresponding public course page.  Discovery can also find that public page
+    directly, so prefer its item regardless of discovery order.
+    """
+    sitecore_prefix = "/sitecore/content/uwafs/home/courses/"
+    public_prefix = "/study/courses/"
+    transformed: list[tuple[dict, bool, str]] = []
+    rewritten = 0
+
+    def _alias_key(url: str) -> str:
+        """Normalize transport details while retaining every query parameter."""
+        try:
+            parts = urlsplit(url)
+            host = (parts.hostname or "").lower().rstrip(".")
+            if host.startswith("www."):
+                host = host[4:]
+            port = parts.port
+            host_port = (
+                f"{host}:{port}"
+                if port and port not in (80, 443)
+                else host
+            )
+            path = parts.path.rstrip("/") if parts.path != "/" else parts.path
+            return repr((host_port, path, sorted(parse_qsl(parts.query, keep_blank_values=True))))
+        except (TypeError, ValueError):
+            return url
+
+    for item in items:
+        old_url = item.get("url") or ""
+        output_item = item
+        was_sitecore = False
+        try:
+            parts = urlsplit(old_url)
+            host = (parts.hostname or "").lower().rstrip(".")
+            if host.startswith("www."):
+                host = host[4:]
+            path_lower = parts.path.lower()
+            if host == "uwa.edu.au" and path_lower.startswith(sitecore_prefix):
+                suffix = parts.path[len(sitecore_prefix):]
+                new_path = f"{public_prefix}{suffix}"
+                new_url = urlunsplit(
+                    (parts.scheme, parts.netloc, new_path, parts.query, parts.fragment)
+                )
+                output_item = dict(item)
+                output_item["url"] = new_url
+                rewritten += 1
+                was_sitecore = True
+        except (TypeError, ValueError):
+            pass
+
+        transformed.append(
+            (output_item, was_sitecore, _alias_key(output_item.get("url") or ""))
+        )
+
+    # Only keys produced by an actual Sitecore rewrite are candidates for
+    # collapse. Untouched links, including exact non-UWA duplicates, pass
+    # through unchanged.
+    rewritten_keys = {key for _, was_sitecore, key in transformed if was_sitecore}
+    winner_indexes: dict[str, int] = {}
+    for index, (_, was_sitecore, key) in enumerate(transformed):
+        if key not in rewritten_keys:
+            continue
+        current = winner_indexes.get(key)
+        if current is None:
+            winner_indexes[key] = index
+        elif transformed[current][1] and not was_sitecore:
+            winner_indexes[key] = index
+
+    kept = [
+        item
+        for index, (item, _, key) in enumerate(transformed)
+        if key not in rewritten_keys or winner_indexes[key] == index
+    ]
+    duplicates = len(items) - len(kept)
+    return kept, rewritten, duplicates
+
+
 def strip_and_deduplicate_course_query_parameters(
     items: list[dict],
     parameter_names: list[str] | tuple[str, ...] | set[str] | frozenset[str],

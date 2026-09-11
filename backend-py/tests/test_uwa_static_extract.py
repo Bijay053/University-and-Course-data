@@ -1,4 +1,5 @@
 from app.services.scraper import uwa_static_extract as uwa
+from app.services.scraper.url_identity import canonicalize_uwa_sitecore_course_urls
 from app.services.scraper.uwa_static_extract import apply_uwa_static_extraction
 
 
@@ -10,6 +11,121 @@ def _page(location: str) -> str:
     <div class="card-details-label">Course Code</div>
     <div class="card-details-value"><ul><li>BP026</li></ul></div>
     """
+
+
+def test_sitecore_course_copy_is_deduplicated_in_favour_of_public_url():
+    sitecore = {
+        "url": (
+            "https://www.uwa.edu.au/sitecore/content/uwafs/home/courses/"
+            "bachelor-of-commerce"
+        ),
+        "source": "sitemap",
+    }
+    public = {
+        "url": "https://www.uwa.edu.au/study/courses/bachelor-of-commerce",
+        "source": "listing",
+    }
+
+    result, rewritten, duplicates = canonicalize_uwa_sitecore_course_urls(
+        [sitecore, public]
+    )
+
+    assert result == [public]
+    assert rewritten == 1
+    assert duplicates == 1
+
+
+def test_public_course_wins_when_discovered_before_sitecore_copy():
+    public = {
+        "url": "https://www.uwa.edu.au/study/courses/bachelor-of-commerce",
+        "source": "listing",
+    }
+    sitecore = {
+        "url": (
+            "https://www.uwa.edu.au/sitecore/content/uwafs/home/courses/"
+            "bachelor-of-commerce"
+        ),
+        "source": "sitemap",
+    }
+
+    result, rewritten, duplicates = canonicalize_uwa_sitecore_course_urls(
+        [public, sitecore]
+    )
+
+    assert result == [public]
+    assert rewritten == 1
+    assert duplicates == 1
+
+
+def test_sitecore_alias_dedup_preserves_uwa_audience_query_variants():
+    sitecore_international = {
+        "url": (
+            "https://www.uwa.edu.au/sitecore/content/uwafs/home/courses/"
+            "bachelor-of-commerce?studenttype=international"
+        ),
+    }
+    public_domestic = {
+        "url": (
+            "https://www.uwa.edu.au/study/courses/"
+            "bachelor-of-commerce?studenttype=domestic"
+        ),
+    }
+
+    result, rewritten, duplicates = canonicalize_uwa_sitecore_course_urls(
+        [sitecore_international, public_domestic]
+    )
+
+    assert [item["url"] for item in result] == [
+        (
+            "https://www.uwa.edu.au/study/courses/"
+            "bachelor-of-commerce?studenttype=international"
+        ),
+        public_domestic["url"],
+    ]
+    assert rewritten == 1
+    assert duplicates == 0
+
+
+def test_non_uwa_links_are_never_deduplicated():
+    international = {
+        "url": "https://example.edu/course/x?studenttype=international",
+    }
+    domestic = {
+        "url": "https://example.edu/course/x?studenttype=domestic",
+    }
+    repeated = {"url": international["url"]}
+
+    result, rewritten, duplicates = canonicalize_uwa_sitecore_course_urls(
+        [international, domestic, repeated]
+    )
+
+    assert result == [international, domestic, repeated]
+    assert rewritten == 0
+    assert duplicates == 0
+
+
+def test_sitecore_only_course_is_rewritten_to_public_url_before_extraction():
+    sitecore = {
+        "url": (
+            "https://www.uwa.edu.au/sitecore/content/uwafs/home/courses/"
+            "master-of-data-science?year=2027"
+        ),
+        "source": "sitemap",
+    }
+
+    result, rewritten, duplicates = canonicalize_uwa_sitecore_course_urls([sitecore])
+
+    assert result == [
+        {
+            "url": (
+                "https://www.uwa.edu.au/study/courses/"
+                "master-of-data-science?year=2027"
+            ),
+            "source": "sitemap",
+        }
+    ]
+    assert rewritten == 1
+    assert duplicates == 0
 
 
 def test_uses_current_course_campus_card_not_navigation_text(monkeypatch):

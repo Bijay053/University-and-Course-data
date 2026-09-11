@@ -35,6 +35,7 @@ from app.services.scraper.pipelines.university_pdfs import load_university_pdf_d
 from app.services.scraper.stage_course import stage_course
 from app.services.scraper.url_identity import (
     canonical_course_url_key,
+    canonicalize_uwa_sitecore_course_urls,
     deduplicate_latest_course_year_queries,
     strip_and_deduplicate_course_query_parameters,
 )
@@ -4372,7 +4373,36 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         dropped_sample=[d.get("url", "") for d in _cdp_dropped[:5]],
                     )
 
-        # Phase A.5c — Configured query cleanup before year dedup/extraction ──────
+        # Phase A.5c — Known canonical course-path aliases before extraction ─────
+        # UWA's sitemap exposes internal Sitecore copies of public study pages.
+        # Rewrite those copies even when no public link was discovered, and when
+        # both forms exist retain the public discovery item regardless of order.
+        if links and _discovery_hostname in {"uwa.edu.au", "www.uwa.edu.au"}:
+            links, _uwa_rewritten, _uwa_duplicates = (
+                canonicalize_uwa_sitecore_course_urls(links)
+            )
+            if _uwa_rewritten or _uwa_duplicates:
+                log.info(
+                    "[EXTRACT] UWA Sitecore canonicalization: rewrote %d URLs; "
+                    "dropped %d duplicates",
+                    _uwa_rewritten,
+                    _uwa_duplicates,
+                )
+                await emit(
+                    "status",
+                    (
+                        f"[EXTRACT] UWA Sitecore canonicalization: rewrote "
+                        f"{_uwa_rewritten} internal URL(s) and dropped "
+                        f"{_uwa_duplicates} duplicate(s)"
+                    ),
+                    phase="extract",
+                    kind="uwa_sitecore_url_canonicalization",
+                    rewritten=_uwa_rewritten,
+                    dropped=_uwa_duplicates,
+                    kept=len(links),
+                )
+
+        # Phase A.5c.1 — Configured query cleanup before year dedup/extraction ───
         # Some catalogues publish stale query-selected variants while the
         # yearless canonical page tracks the currently published entry year.
         # This must rewrite the URL actually fetched (not merely its identity key)
@@ -4412,7 +4442,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     parameters=_strip_query_params,
                 )
 
-        # Phase A.5c.1 — Global latest-year query deduplication ─────────────────
+        # Phase A.5c.2 — Global latest-year query deduplication ─────────────────
         # Prefer a yearless canonical candidate when discovery found one;
         # otherwise retain the highest ?year=20xx variant. Other semantic query
         # parameters remain in the group key and are never collapsed.
