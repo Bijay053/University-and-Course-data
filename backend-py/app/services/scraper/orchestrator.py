@@ -472,6 +472,44 @@ def _resolve_stage_course_name(result: dict, payload: dict) -> str:
     )
 
 
+def _catalogue_floor_guard(
+    *,
+    raw_discovered: int,
+    extractable: int,
+    staged: int,
+    expected_min_courses: int | None,
+    targeted_retry: bool = False,
+) -> dict[str, Any] | None:
+    """Classify a full scrape that finishes below its configured catalogue floor."""
+    expected = int(expected_min_courses or 0)
+    if targeted_retry or expected <= 0:
+        return None
+
+    collapsed = extractable == 0 or staged == 0
+    if not collapsed and extractable >= expected:
+        return None
+    return {
+        "status": "failed_degraded" if collapsed else "completed_with_warnings",
+        "kind": "discovery_filter_collapse" if collapsed else "catalogue_below_expected_min",
+        "level": "error" if collapsed else "warning",
+        "message": (
+            f"Catalogue coverage below configured minimum: {raw_discovered} raw candidates "
+            f"became {extractable} extractable URLs and {staged} staged courses; "
+            f"expected at least {expected}. "
+            + (
+                "Discovery/filter collapse detected; existing published and Review rows "
+                "were left unchanged."
+                if collapsed
+                else "The run cannot be reported as an ordinary successful completion."
+            )
+        ),
+        "raw_discovered": raw_discovered,
+        "extractable": extractable,
+        "staged": staged,
+        "expected_min_courses": expected,
+    }
+
+
 async def _apply_render_listing_pages(
     *,
     links: list[dict],
@@ -6850,13 +6888,30 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             summary,
             _resume_already_staged,
         )
+        _catalogue_guard = _catalogue_floor_guard(
+            raw_discovered=int(summary.get("discovered_raw", summary.get("discovered", 0)) or 0),
+            extractable=int(summary.get("discovered", 0) or 0),
+            staged=_total_imported,
+            expected_min_courses=getattr(
+                getattr(_uni_cfg, "discovery", None),
+                "expected_min_courses",
+                None,
+            ),
+            targeted_retry=bool(_targeted_retry),
+        )
         _done_msg = (
-            f"══ DONE ══ Found:{summary.get('discovered', 0)} | "
+            f"══ {'FAILED' if _catalogue_guard and _catalogue_guard['status'] == 'failed_degraded' else 'DONE'} ══ "
+            f"Found:{summary.get('discovered', 0)} | "
             f"Staged:{_total_imported} | "
             f"Skipped:{summary.get('skipped', 0)}{_skip_detail} | "
             f"FetchFailed:{_fetch_failed_n} | "
             f"Errors:{summary.get('errors', 0)}"
         )
+        if _catalogue_guard:
+            _done_msg += (
+                f" | CatalogueFloor:{_catalogue_guard['expected_min_courses']} "
+                f"| Raw:{_catalogue_guard['raw_discovered']}"
+            )
         if _ss_filter_stats.get("searchstax_title_excluded", 0):
             _done_msg += (
                 f" | SearchStax title-filter excluded:{_ss_filter_stats['searchstax_title_excluded']}"
@@ -6897,23 +6952,6 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # the new ones staged this run.  Without this, a resume-checkpoint run
         # (e.g. 25 new + 105 already-pending = 130 total) shows "Review 25 Courses"
         # but the review panel loads 130.
-        await emit(
-            "done",
-            _done_msg,
-            phase="complete",
-            totalFound=summary.get("discovered", 0),
-            imported=_total_imported,
-            skipped=summary.get("skipped", 0),
-            errors=summary.get("errors", 0),
-            fetchFailed=_fetch_failed_n,
-            skip_reasons=skip_reasons,
-            skip_reason_samples=skip_reason_samples,
-            searchstax_filter=_ss_filter_stats or None,
-            performance_savings=_perf_savings,
-            html_compaction=_html_compaction_stats or None,
-            phase_timings=_phase_timings,
-            level="success",
-        )
         # PR-1.5: post-run sanity check on the imported counter.
         # Prod regression on job_440a0e26c6df reported imported=9 against a
         # DB COUNT(*)=0. Root cause was the over-aggressive _clear_stale_dedup
@@ -6962,6 +7000,60 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 level="warn",
             )
             summary["staged"] = actual_staged
+        _reconciled_total_imported = _cumulative_imported(
+            summary,
+            _resume_already_staged,
+        )
+        if _reconciled_total_imported != _total_imported:
+            _done_msg = _done_msg.replace(
+                f"Staged:{_total_imported}",
+                f"Staged:{_reconciled_total_imported}",
+                1,
+            )
+            _total_imported = _reconciled_total_imported
+        _reconciled_catalogue_guard = _catalogue_floor_guard(
+            raw_discovered=int(summary.get("discovered_raw", summary.get("discovered", 0)) or 0),
+            extractable=int(summary.get("discovered", 0) or 0),
+            staged=_total_imported,
+            expected_min_courses=getattr(
+                getattr(_uni_cfg, "discovery", None),
+                "expected_min_courses",
+                None,
+            ),
+            targeted_retry=bool(_targeted_retry),
+        )
+        if _reconciled_catalogue_guard and not _catalogue_guard:
+            _done_msg += (
+                f" | CatalogueFloor:{_reconciled_catalogue_guard['expected_min_courses']} "
+                f"| Raw:{_reconciled_catalogue_guard['raw_discovered']}"
+            )
+        if (
+            _reconciled_catalogue_guard
+            and _reconciled_catalogue_guard["status"] == "failed_degraded"
+        ):
+            _done_msg = _done_msg.replace("══ DONE ══", "══ FAILED ══", 1)
+        _catalogue_guard = _reconciled_catalogue_guard
+        # Emit the terminal row only after the database count is authoritative.
+        # Otherwise an in-memory staged count can produce a false success event
+        # immediately before reconciliation proves that zero rows exist.
+        await emit(
+            "done",
+            _done_msg,
+            phase="complete",
+            totalFound=summary.get("discovered", 0),
+            imported=_total_imported,
+            skipped=summary.get("skipped", 0),
+            errors=summary.get("errors", 0),
+            fetchFailed=_fetch_failed_n,
+            skip_reasons=skip_reasons,
+            skip_reason_samples=skip_reason_samples,
+            searchstax_filter=_ss_filter_stats or None,
+            performance_savings=_perf_savings,
+            html_compaction=_html_compaction_stats or None,
+            phase_timings=_phase_timings,
+            catalogue_guard=_catalogue_guard,
+            level="success" if not _catalogue_guard else _catalogue_guard["level"],
+        )
         await emit(
             "status",
             f"Staged {_total_imported} courses, {summary['skipped']} skipped, "
@@ -7026,6 +7118,36 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 fetch_failed=_fetch_fail_n, discovered=_discovered_n,
                 rate=round(_fetch_failure_rate, 3),
                 level="warn",
+            )
+        _catalogue_guard = _catalogue_floor_guard(
+            raw_discovered=int(summary.get("discovered_raw", _discovered_n) or 0),
+            extractable=int(_discovered_n or 0),
+            staged=_cumulative_imported(summary, _resume_already_staged),
+            expected_min_courses=getattr(
+                getattr(_uni_cfg, "discovery", None),
+                "expected_min_courses",
+                None,
+            ),
+            targeted_retry=bool(_targeted_retry),
+        )
+        if _catalogue_guard:
+            # A full discovery/filter collapse is more severe than a warning
+            # selected by another guard. A partial catalogue remains reviewable
+            # but must not be labelled as an ordinary successful completion.
+            if (
+                _catalogue_guard["status"] == "failed_degraded"
+                or _forced_status is None
+            ):
+                _forced_status = _catalogue_guard["status"]
+            log.error(
+                "[CATALOGUE FLOOR] %s",
+                _catalogue_guard["message"],
+            )
+            await emit(
+                "status",
+                f"[CATALOGUE FLOOR] {_catalogue_guard['message']}",
+                phase="complete",
+                **_catalogue_guard,
             )
         finished_cleanly = summary["errors"] == 0 or (
             summary["staged"] + summary["skipped"] > 0
@@ -7148,7 +7270,9 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             except Exception:  # noqa: BLE001
                 pass
             log.warning("[CONF_TREND] failed for run %s: %s", runtime_job_id, _conf_exc)
-        if finished_cleanly:
+        if _catalogue_guard:
+            job.error_message = _catalogue_guard["message"][:1000]
+        elif finished_cleanly:
             job.error_message = None  # clear any stale message
         else:
             job.error_message = (
