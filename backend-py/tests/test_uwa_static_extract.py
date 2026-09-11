@@ -34,6 +34,52 @@ def test_uses_current_course_campus_card_not_navigation_text(monkeypatch):
     assert result["fee_year"] == 2026
 
 
+def test_uses_plural_locations_card_for_mba_template(monkeypatch):
+    page = """
+    <nav>Sydney Perth Albany</nav>
+    <div class="card-details-label">Locations</div>
+    <div class="card-details-value">
+      <ul class="default-list"><li>Perth (Crawley campus)</li></ul>
+    </div>
+    <div class="card-details-label">Course Code</div>
+    <div class="card-details-value"><ul><li>42520</li></ul></div>
+    """
+    monkeypatch.setattr(uwa, "_fee_for_code", lambda *_args: {})
+
+    result = apply_uwa_static_extraction(
+        "https://www.uwa.edu.au/study/courses/"
+        "master-of-business-administration-flexible-mba",
+        page,
+        "Master of Business Administration (MBA) Flexible",
+    )
+
+    assert result["course_location"] == "Perth (Crawley campus)"
+    assert result["location_text"] == "Perth (Crawley campus)"
+
+
+def test_campus_location_label_keeps_pharmacy_campus(monkeypatch):
+    page = """
+    <nav>Sydney Perth Albany</nav>
+    <div class="card-details-label">CAMPUS LOCATION</div>
+    <div class="card-details-value">
+      <ul class="default-list"><li>Perth (Crawley campus)</li></ul>
+    </div>
+    <div class="card-details-label">Course Code</div>
+    <div class="card-details-value"><ul><li>CM039</li></ul></div>
+    """
+    monkeypatch.setattr(uwa, "_fee_for_code", lambda *_args: {})
+
+    result = apply_uwa_static_extraction(
+        "https://www.uwa.edu.au/study/courses/"
+        "bachelor-of-human-sciences-pharmaceutical-health-and-doctor-of-pharmacy",
+        page,
+        "Bachelor of Human Sciences (Pharmaceutical Health) and Doctor of Pharmacy",
+    )
+
+    assert result["course_location"] == "Perth (Crawley campus)"
+    assert result["location_text"] == "Perth (Crawley campus)"
+
+
 def test_representative_2026_fee_values(monkeypatch):
     values = {
         "BP006": "$51,400", "BH011": "$53,700", "BH008": "$52,000",

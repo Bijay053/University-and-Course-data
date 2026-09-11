@@ -46,6 +46,15 @@ def _card_value(page: str, label: str) -> str | None:
     return ", ".join(dict.fromkeys(values)) or None
 
 
+def _location_card_value(page: str) -> str | None:
+    """Read UWA's current-course campus card across its template labels."""
+    for label in ("Campus location", "Locations", "Course location", "Location"):
+        value = _card_value(page, label)
+        if value:
+            return value
+    return None
+
+
 @lru_cache(maxsize=512)
 def _fee_for_code(code: str, category: str) -> dict[str, Any]:
     """Read one exact course amount from UWA's official calculator.
@@ -86,7 +95,7 @@ def apply_uwa_static_extraction(
     """Extract only values proven by the current UWA course card."""
     if not is_uwa_url(url):
         return {}
-    location = _card_value(page, "Campus location")
+    location = _location_card_value(page)
     code = _card_value(page, "Course Code")
     result: dict[str, Any] = {
         # Always write location, including None, so noisy regex fallback cannot
