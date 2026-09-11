@@ -348,6 +348,42 @@ def _parse_duration_funnelback(raw: str) -> tuple[float | None, str]:
     return val, unit
 
 
+_MQ_SESSION_MONTHS = {
+    "session 1": "February",
+    "session 2": "July",
+    "session 3": "December",
+}
+
+
+def _mq_international_intake_months(offerings: object) -> list[str]:
+    """Map MQ's international offering sessions to their start months."""
+    if not isinstance(offerings, list):
+        return []
+
+    months: set[str] = set()
+    for offering in offerings:
+        if not isinstance(offering, dict):
+            continue
+        student_types = offering.get("student_types") or []
+        if isinstance(student_types, str):
+            student_types = [student_types]
+        if not any(
+            "international" in str(student_type).lower()
+            for student_type in student_types
+        ):
+            continue
+        session = str(offering.get("admission_calendar") or "").strip().lower()
+        month = _MQ_SESSION_MONTHS.get(session)
+        if month:
+            months.add(month)
+
+    return [
+        month
+        for month in ("February", "July", "December")
+        if month in months
+    ]
+
+
 def _extract_program_from_page_data(body: str | None) -> dict:
     """Extract ``program`` dict from a Gatsby page-data.json response body.
 
@@ -576,6 +612,15 @@ def _build_scrapy_result(
     # Study mode + location from offering[]
     try:
         offerings = program.get("offering") or []
+        intake_months = _mq_international_intake_months(offerings)
+        if intake_months:
+            payload["intake_months"] = intake_months
+            evidence.append(_ev(
+                "intake_months", intake_months,
+                "page_data:offering.admission_calendar",
+                page_data_url_str, "course",
+                f"International offering sessions: {intake_months}", 0.90,
+            ))
         locations: set[str] = set()
         for of in offerings:
             loc = (of.get("location") or "").strip()

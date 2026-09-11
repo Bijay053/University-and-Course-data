@@ -76,6 +76,71 @@ class TestRenderedPageData:
         assert "page_data:study_level" not in methods
         assert "page_data:course_duration_in_years" not in methods
 
+    def test_rich_result_maps_only_international_offering_sessions_to_intakes(self):
+        result = mq._build_scrapy_result(
+            "Bachelor of Arts",
+            "https://www.mq.edu.au/study/find-a-course/courses/bachelor-of-arts",
+            {},
+            {
+                "offering": [
+                    {
+                        "student_types": ["Domestic students"],
+                        "admission_calendar": "Session 3",
+                        "location": "Off-campus",
+                    },
+                    {
+                        "student_types": [
+                            "International students studying within Australia on a visa",
+                            "Domestic students",
+                        ],
+                        "admission_calendar": "Session 2",
+                        "location": "North Ryde",
+                    },
+                    {
+                        "student_types": [
+                            "International students studying within Australia on a visa",
+                        ],
+                        "admission_calendar": "Session 1",
+                        "location": "North Ryde",
+                    },
+                    {
+                        "student_types": ["International students"],
+                        "admission_calendar": "Session 2",
+                        "location": "North Ryde",
+                    },
+                ]
+            },
+        )
+
+        assert result["payload"]["intake_months"] == ["February", "July"]
+        intake_evidence = [
+            item for item in result["evidence"]
+            if item["field_key"] == "intake_months"
+        ]
+        assert len(intake_evidence) == 1
+        assert (
+            intake_evidence[0]["method"]
+            == "page_data:offering.admission_calendar"
+        )
+
+    def test_rich_result_leaves_intakes_blank_without_international_offering(self):
+        result = mq._build_scrapy_result(
+            "Domestic Test Course",
+            "https://www.mq.edu.au/study/find-a-course/courses/domestic-test",
+            {},
+            {
+                "offering": [
+                    {
+                        "student_types": ["Domestic students"],
+                        "admission_calendar": "Session 1",
+                        "location": "North Ryde",
+                    }
+                ]
+            },
+        )
+
+        assert "intake_months" not in result["payload"]
+
     def test_extracts_plain_page_data_json(self):
         program, body = self._body()
         assert mq._extract_program_from_page_data(body) == program
