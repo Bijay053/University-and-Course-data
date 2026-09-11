@@ -8,12 +8,14 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import fcntl
 import json
 import os
 import re
 import shlex
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 import uuid
@@ -82,6 +84,7 @@ DEFAULT_RELEASE_IDENTITY_RETRY_SECONDS = 1.0
 DEFAULT_DEPLOYMENT_EVIDENCE_PATH = Path(
     "/var/lib/university-portal/deployment-evidence.jsonl"
 )
+DEFAULT_DEPLOYMENT_EVIDENCE_MAX_RECORDS = 1_000
 
 
 class SmokeFailure(RuntimeError):
@@ -95,8 +98,11 @@ def persist_deployment_timing_evidence(
     api_match_elapsed_seconds: float,
     celery_match_elapsed_seconds: float,
     recorded_at: datetime | None = None,
+    max_records: int = DEFAULT_DEPLOYMENT_EVIDENCE_MAX_RECORDS,
 ) -> dict[str, str | float]:
-    """Append one sanitized successful activation record."""
+    """Append one sanitized record, retaining the newest complete records."""
+    if max_records < 1:
+        raise SmokeFailure("deployment evidence retention must be positive")
     timestamp = recorded_at or datetime.now(UTC)
     if timestamp.tzinfo is None:
         timestamp = timestamp.replace(tzinfo=UTC)
@@ -109,16 +115,43 @@ def persist_deployment_timing_evidence(
         ),
     }
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    descriptor = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+    lock_path = path.with_name(f".{path.name}.lock")
+    lock_descriptor = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
     try:
-        os.fchmod(descriptor, 0o600)
-        payload = (
-            json.dumps(record, separators=(",", ":"), sort_keys=True) + "\n"
-        ).encode()
-        if os.write(descriptor, payload) != len(payload):
-            raise OSError("incomplete deployment evidence write")
+        os.fchmod(lock_descriptor, 0o600)
+        fcntl.flock(lock_descriptor, fcntl.LOCK_EX)
+        try:
+            existing_lines = path.read_text(encoding="utf-8").splitlines()
+        except FileNotFoundError:
+            existing_lines = []
+        retained_lines = (
+            existing_lines[-(max_records - 1) :] if max_records > 1 else []
+        )
+        retained_lines.append(
+            json.dumps(record, separators=(",", ":"), sort_keys=True)
+        )
+        temp_descriptor, temp_name = tempfile.mkstemp(
+            prefix=f".{path.name}.", dir=path.parent
+        )
+        try:
+            os.fchmod(temp_descriptor, 0o600)
+            payload = ("\n".join(retained_lines) + "\n").encode()
+            with os.fdopen(temp_descriptor, "wb", closefd=True) as stream:
+                temp_descriptor = -1
+                stream.write(payload)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temp_name, path)
+            os.chmod(path, 0o600)
+        finally:
+            if temp_descriptor >= 0:
+                os.close(temp_descriptor)
+            try:
+                os.unlink(temp_name)
+            except FileNotFoundError:
+                pass
     finally:
-        os.close(descriptor)
+        os.close(lock_descriptor)
     return record
 
 
@@ -128,10 +161,18 @@ def recent_deployment_timing_evidence(
     """Read the newest sanitized activation records from deployment evidence."""
     if limit < 1:
         raise SmokeFailure("recent deployment evidence limit must be positive")
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    lock_path = path.with_name(f".{path.name}.lock")
+    lock_descriptor = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
     try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except FileNotFoundError:
-        return []
+        os.fchmod(lock_descriptor, 0o600)
+        fcntl.flock(lock_descriptor, fcntl.LOCK_SH)
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except FileNotFoundError:
+            return []
+    finally:
+        os.close(lock_descriptor)
     records: list[Mapping[str, Any]] = []
     for line in reversed(lines):
         try:

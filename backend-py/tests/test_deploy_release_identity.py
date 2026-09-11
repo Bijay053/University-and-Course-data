@@ -3,6 +3,9 @@
 from pathlib import Path
 from argparse import Namespace
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
+import json
+import stat
 
 import pytest
 
@@ -10,6 +13,7 @@ from deploy.safe_restart_smoke import (
     SmokeFailure,
     _main,
     persist_deployment_timing_evidence,
+    recent_deployment_timing_evidence,
 )
 
 
@@ -244,3 +248,57 @@ def test_recent_deployment_evidence_returns_newest_records(
         json.loads(line) for line in capsys.readouterr().out.splitlines()
     ]
     assert [record["revision"] for record in records] == ["2" * 40, "1" * 40]
+
+
+def test_deployment_evidence_rotates_only_after_retention_boundary(
+    tmp_path: Path,
+) -> None:
+    evidence_path = tmp_path / "deployments.jsonl"
+
+    for index in range(4):
+        persist_deployment_timing_evidence(
+            evidence_path,
+            release=str(index) * 40,
+            api_match_elapsed_seconds=index,
+            celery_match_elapsed_seconds=index,
+            max_records=3,
+        )
+        records = [
+            json.loads(line)
+            for line in evidence_path.read_text(encoding="utf-8").splitlines()
+        ]
+        assert len(records) == min(index + 1, 3)
+        assert [record["revision"] for record in records] == [
+            str(value) * 40 for value in range(max(0, index - 2), index + 1)
+        ]
+        assert stat.S_IMODE(evidence_path.stat().st_mode) == 0o600
+
+    recent = recent_deployment_timing_evidence(evidence_path, limit=2)
+    assert [record["revision"] for record in recent] == ["3" * 40, "2" * 40]
+
+
+def test_concurrent_deployment_evidence_appends_are_complete_and_retained(
+    tmp_path: Path,
+) -> None:
+    evidence_path = tmp_path / "deployments.jsonl"
+    releases = [f"{index:040d}" for index in range(40)]
+
+    def append(release: str) -> None:
+        persist_deployment_timing_evidence(
+            evidence_path,
+            release=release,
+            api_match_elapsed_seconds=0.1,
+            celery_match_elapsed_seconds=0.2,
+            max_records=len(releases),
+        )
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        list(executor.map(append, releases))
+
+    records = [
+        json.loads(line)
+        for line in evidence_path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert len(records) == len(releases)
+    assert {record["revision"] for record in records} == set(releases)
+    assert stat.S_IMODE(evidence_path.stat().st_mode) == 0o600

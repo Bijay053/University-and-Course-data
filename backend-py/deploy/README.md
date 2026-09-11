@@ -514,7 +514,12 @@ the command never prints process environments or unrelated journal lines. The
 same successful check appends a mode-`0600` JSONL record to
 `/var/lib/university-portal/deployment-evidence.jsonl`. Each record contains
 only the revision, UTC timestamp, API match time, and Celery match time. Failed
-or mismatched checks append nothing.
+or mismatched checks append nothing. The history retains the newest 1,000
+successful activations. Each append takes an exclusive lock and atomically
+replaces the history with complete JSONL records only; the history and lock
+files remain mode `0600`. Readers take a shared lock, so recent-history
+retrieval sees one complete retained version while an append or rotation is in
+progress.
 
 Retrieve the newest successful activation records through the same command:
 
