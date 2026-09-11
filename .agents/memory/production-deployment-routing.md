@@ -153,10 +153,21 @@ because the verification request omitted the portal hostname.
 the configured Host header to localhost. Read the generated index to discover
 the current hashed asset path rather than assuming its prefix format.
 
-The live backend uses its project-local `.venv/bin/python`; neither system
-`python` nor the older `venv/bin/python3` path is available. Local Nginx HTTP
-smokes may return the expected HTTPS redirect, and abbreviated Git hashes can
-be eight characters rather than seven.
+The live backend uses `backend-py/.venv/bin/python`; neither a repository-root
+`.venv/bin/python`, system Python, nor the older `venv/bin/python3` path is
+available. Local Nginx HTTP smokes may return the expected HTTPS redirect, and
+abbreviated Git hashes can be eight characters rather than seven.
+
+Release-identity journal checks must retry for the bounded service startup
+window after `systemctl restart`.
+
+**Why:** Gunicorn became active before its workers emitted their startup
+identity lines, so an immediate one-shot journal assertion reported failure
+even though both process environments already contained the exact revision.
+
+**How to apply:** Verify the process environment immediately, then poll the
+unit journal for the exact full revision for a short bounded interval before
+classifying the restart as failed.
 
 Frontend source changes are not deployed by pulling Git or restarting the API
 and Celery services. Nginx serves the built Vite output directly.
