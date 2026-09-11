@@ -3,6 +3,7 @@
 import inspect
 
 from app.services.scraper.orchestrator import _catalogue_floor_guard
+from app.services.scraper.alerts import _repeated_below_floor_counts
 
 
 def test_unsw_style_filter_collapse_cannot_report_success():
@@ -77,3 +78,25 @@ def test_targeted_retry_is_not_compared_with_full_catalogue_floor():
         expected_min_courses=200,
         targeted_retry=True,
     ) is None
+
+
+def test_three_consecutive_nonzero_below_floor_runs_prompt_review():
+    assert _repeated_below_floor_counts(141, [145, 149], 200) == [141, 145, 149]
+
+
+def test_floor_review_does_not_treat_zero_collapse_as_stale_config():
+    assert _repeated_below_floor_counts(0, [145, 149], 200) == []
+
+
+def test_floor_review_requires_consecutive_below_floor_history():
+    assert _repeated_below_floor_counts(141, [205, 149], 200) == []
+    assert _repeated_below_floor_counts(141, [145], 200) == []
+
+
+def test_orchestrator_passes_floor_context_to_alert_evaluator():
+    from app.services.scraper.orchestrator import run_scrape
+
+    source = inspect.getsource(run_scrape)
+    assert "expected_min_courses=getattr(" in source
+    assert 'current_extractable=int(summary.get("discovered", 0) or 0)' in source
+    assert "targeted_retry=bool(_targeted_retry)" in source

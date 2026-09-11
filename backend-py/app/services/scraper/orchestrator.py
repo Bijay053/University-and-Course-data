@@ -7339,7 +7339,18 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             try:
                 from app.services.scraper.alerts import evaluate_run_alerts
                 from app.services.scraper.alert_delivery import deliver_alerts
-                _alerts = await evaluate_run_alerts(db, runtime_job_id, uni_id)
+                _alerts = await evaluate_run_alerts(
+                    db,
+                    runtime_job_id,
+                    uni_id,
+                    expected_min_courses=getattr(
+                        getattr(_uni_cfg, "discovery", None),
+                        "expected_min_courses",
+                        None,
+                    ),
+                    current_extractable=int(summary.get("discovered", 0) or 0),
+                    targeted_retry=bool(_targeted_retry),
+                )
                 await deliver_alerts(_alerts)
             except Exception as _alert_exc:  # noqa: BLE001
                 log.warning("[ALERTS] failed for run %s: %s", runtime_job_id, _alert_exc)

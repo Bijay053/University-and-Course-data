@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.scrape_run_metrics import ScrapeRunMetrics
 from app.models.scrape_run_alert import ScrapeRunAlert
+from app.models.scrape_run_summary import ScrapeRunSummary
 from app.models.university_field_baseline import UniversityFieldBaseline
 from app.models.scrape_runtime import ScrapeRuntimeJob
 
@@ -112,6 +113,46 @@ _TREND_DROP_THRESHOLD = 0.15  # 15 percentage-point drop vs trailing mean fires 
 _COMPACTION_MIN_SAMPLE = 10
 _COMPACTION_MIN_USEFUL_REDUCTION = 0.10
 _COMPACTION_MIN_QUALITY_SAMPLE = 10
+_CATALOGUE_FLOOR_REVIEW_RUNS = 3
+
+
+def _repeated_below_floor_counts(
+    current_extractable: int,
+    recent_extractable: list[int],
+    expected_min_courses: int | None,
+) -> list[int]:
+    """Return the consecutive below-floor counts that justify config review."""
+    expected = int(expected_min_courses or 0)
+    counts = [int(current_extractable), *map(int, recent_extractable)]
+    window = counts[:_CATALOGUE_FLOOR_REVIEW_RUNS]
+    if (
+        expected <= 0
+        or len(window) < _CATALOGUE_FLOOR_REVIEW_RUNS
+        or any(count <= 0 or count >= expected for count in window)
+    ):
+        return []
+    return window
+
+
+async def _recent_extractable_counts(
+    db: AsyncSession,
+    university_id: int,
+    exclude_run: str,
+    n: int,
+) -> list[int]:
+    result = await db.execute(
+        select(ScrapeRunSummary.candidates_discovered)
+        .join(
+            ScrapeRuntimeJob,
+            ScrapeRuntimeJob.runtime_job_id == ScrapeRunSummary.scrape_run_id,
+        )
+        .where(ScrapeRunSummary.university_id == university_id)
+        .where(ScrapeRunSummary.scrape_run_id != exclude_run)
+        .where(ScrapeRuntimeJob.status == "completed_with_warnings")
+        .order_by(ScrapeRunSummary.run_finished_at.desc())
+        .limit(n)
+    )
+    return [int(row[0]) for row in result.all()]
 
 
 def _compaction_lost_useful_speedup(compaction: dict) -> bool:
@@ -239,6 +280,10 @@ async def evaluate_run_alerts(
     db: AsyncSession,
     scrape_run_id: str,
     university_id: int | None = None,
+    *,
+    expected_min_courses: int | None = None,
+    current_extractable: int | None = None,
+    targeted_retry: bool = False,
 ) -> list[ScrapeRunAlert]:
     """Check a completed scrape run against baselines + quality rules.
 
@@ -277,6 +322,40 @@ async def evaluate_run_alerts(
     accepted = int(compaction.get("accepted") or 0)
     acceptance_rate = float(compaction.get("acceptance_rate") or 0.0)
     reduction_rate = float(compaction.get("reduction_rate") or 0.0)
+    if (
+        not targeted_retry
+        and uni_id is not None
+        and current_extractable is not None
+        and int(current_extractable) > 0
+    ):
+        recent_counts = await _recent_extractable_counts(
+            db,
+            uni_id,
+            scrape_run_id,
+            _CATALOGUE_FLOOR_REVIEW_RUNS - 1,
+        )
+        review_counts = _repeated_below_floor_counts(
+            int(current_extractable),
+            recent_counts,
+            expected_min_courses,
+        )
+        if review_counts:
+            expected = int(expected_min_courses or 0)
+            alerts.append(ScrapeRunAlert(
+                scrape_run_id=scrape_run_id,
+                rule_id="catalogue_floor_review_required",
+                severity="warning",
+                message=(
+                    f"Catalogue produced {review_counts} extractable courses "
+                    f"across {_CATALOGUE_FLOOR_REVIEW_RUNS} consecutive runs, "
+                    f"all below discovery.expected_min_courses={expected}. "
+                    "Review the university's current catalogue and update the "
+                    "configured floor explicitly if the smaller catalogue is legitimate; "
+                    "the floor was not changed automatically."
+                ),
+                expected=float(expected),
+                actual=float(review_counts[0]),
+            ))
     if _compaction_lost_useful_speedup(compaction):
         alerts.append(ScrapeRunAlert(
             scrape_run_id=scrape_run_id,
