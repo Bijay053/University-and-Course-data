@@ -19,6 +19,8 @@ from app.services.scraper.bond_static_extract import (
     _enrich_from_fees_api,
     _extract_program_ids,
     _extract_program_keys,
+    _extract_international_fee_page,
+    _fee_page_url,
     apply_bond_extraction,
     is_bond_program_url,
     suppress_authoritative_fee_omission,
@@ -134,6 +136,114 @@ def test_packaged_program_keys_preserve_all_exact_component_codes() -> None:
     assert _extract_program_keys(html) == (
         "5626", ["CC-60025", "CC-63034"]
     )
+
+
+def test_international_fee_tab_ignores_domestic_total_and_accepts_large_package() -> None:
+    html = """
+      <section>
+        <h2>Program fees</h2>
+        <div data-student-type="domestic">
+          <strong>The 2026 total program fee is $202,400</strong>
+        </div>
+        <div data-student-type="international">
+          <strong>The 2026 total program fee is $275,440</strong>
+        </div>
+      </section>
+      <section>
+        <h2>Related program</h2>
+        <div data-student-type="international">
+          <strong>The 2026 total program fee is $99,999</strong>
+        </div>
+      </section>
+    """
+    assert _extract_international_fee_page(html) == {
+        "international_fee": 275440.0,
+        "currency": "AUD",
+        "fee_term": "Full Course",
+        "fee_year": 2026,
+    }
+
+
+def test_fee_page_url_does_not_append_fees_twice() -> None:
+    base = (
+        "https://bond.edu.au/program/"
+        "bachelor-of-enterprise-artificial-intelligencebachelor-of-laws"
+    )
+    assert _fee_page_url(base) == f"{base}/fees"
+    assert _fee_page_url(f"{base}/fees") == f"{base}/fees"
+    assert _fee_page_url(f"{base}?audience=international#fees") == f"{base}/fees"
+    assert _fee_page_url(f"{base}/fees?audience=international") == f"{base}/fees"
+
+
+def test_international_fee_tab_prefers_2026_when_multiple_years_are_published() -> None:
+    html = """
+      <section>
+        <h2>Program fees</h2>
+        <div data-student-type="international">
+          <p>The 2026 total program fee is $275,440</p>
+          <p>The 2027 total program fee is $282,000</p>
+        </div>
+      </section>
+    """
+    assert _extract_international_fee_page(html)["international_fee"] == 275440.0
+
+
+def test_official_fee_tab_overrides_empty_legacy_fee_api(monkeypatch) -> None:
+    base = (
+        "https://bond.edu.au/program/"
+        "bachelor-of-enterprise-artificial-intelligencebachelor-of-laws"
+    )
+    program_html = (
+        '<div class="program-detail" '
+        'data-program-detail-url="/api/program-details/11055" '
+        'data-program-code="BL-11088"></div>'
+    )
+    fee_html = """
+      <section>
+        <h2>Program fees</h2>
+        <div data-student-type="domestic">
+          <strong>The 2026 total program fee is $202,400</strong>
+        </div>
+        <div data-student-type="international">
+          <strong>The 2026 total program fee is $275,440</strong>
+        </div>
+      </section>
+    """
+
+    def fake_json(url: str):
+        if "/api/program-details/" in url:
+            return {
+                "programs": [
+                    {
+                        "id": "BL-11088",
+                        "duration": "44 months",
+                        "offerings": [],
+                    }
+                ]
+            }
+        if "/api/program-fees/" in url:
+            return {"fees": []}
+        return None
+
+    def fake_html(url: str):
+        return fee_html if url == f"{base}/fees" else ""
+
+    monkeypatch.setattr(
+        "app.services.scraper.bond_static_extract._get_json",
+        fake_json,
+    )
+    monkeypatch.setattr(
+        "app.services.scraper.bond_static_extract._get_html",
+        fake_html,
+    )
+
+    result = apply_bond_extraction(base, program_html)
+
+    assert result["international_fee"] == 275440.0
+    assert result["fee_term"] == "Full Course"
+    assert result["fee_year"] == 2026
+    assert result["_source_urls"]["international_fee"] == f"{base}/fees"
+    assert "scrape_warnings" not in result
 
 
 def test_packaged_details_sum_duration_and_use_current_offering(monkeypatch) -> None:

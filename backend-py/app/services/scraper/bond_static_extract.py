@@ -272,6 +272,104 @@ def _extract_fee_from_static_html(plain_text: str) -> dict[str, Any]:
     return {}
 
 
+_TOTAL_PROGRAM_FEE_RE = re.compile(
+    r"\b(20\d{2})\s+total\s+program\s+fee\s+is\s+"
+    r"(?:A\$|\$)\s*([\d,]+(?:\.\d{1,2})?)",
+    re.IGNORECASE,
+)
+
+
+def _extract_international_fee_page(html: str) -> dict[str, Any]:
+    """Extract Bond's course-owned international total from its Fees tab.
+
+    Current Bond pages render separate domestic and international content
+    blocks in the same HTML. Only ``data-student-type="international"`` is
+    authoritative for this pipeline. The exact "total program fee" wording
+    makes large packaged-degree totals safe even when they exceed the generic
+    annual-fee ceiling.
+    """
+    if not html:
+        return {}
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "html.parser")
+        fee_sections = []
+        for section in soup.find_all("section"):
+            heading = section.find(["h1", "h2", "h3", "h4"])
+            heading_text = (
+                " ".join(heading.get_text(" ", strip=True).split()).casefold()
+                if heading
+                else ""
+            )
+            if heading_text == "program fees":
+                fee_sections.append(section)
+        if len(fee_sections) != 1:
+            return {}
+
+        amounts: list[tuple[int, float]] = []
+        for block in fee_sections[0].select('[data-student-type="international"]'):
+            text = " ".join(block.get_text(" ", strip=True).split())
+            for match in _TOTAL_PROGRAM_FEE_RE.finditer(text):
+                try:
+                    year = int(match.group(1))
+                    amount = float(match.group(2).replace(",", ""))
+                except (TypeError, ValueError):
+                    continue
+                if amount >= _FEE_MIN:
+                    pair = (year, amount)
+                    if pair not in amounts:
+                        amounts.append(pair)
+        if not amounts:
+            return {}
+        preferred = [
+            pair for pair in amounts if str(pair[0]) == _PREFERRED_FEE_YEAR
+        ]
+        selected = preferred or [
+            pair for pair in amounts if pair[0] == max(year for year, _ in amounts)
+        ]
+        if len(selected) != 1:
+            if len(selected) > 1:
+                log.warning(
+                    "[BOND] international Fees tab has conflicting totals: %s",
+                    selected,
+                )
+            return {}
+        year, amount = selected[0]
+        return {
+            "international_fee": amount,
+            "currency": "AUD",
+            "fee_term": "Full Course",
+            "fee_year": year,
+        }
+    except Exception as exc:  # noqa: BLE001
+        log.debug("[BOND] international Fees tab parse failed: %s", exc)
+        return {}
+
+
+def _fee_page_url(url: str) -> str:
+    from urllib.parse import urlsplit, urlunsplit
+
+    parsed = urlsplit(url)
+    path = parsed.path.rstrip("/")
+    if path.casefold().endswith("/fees"):
+        path = path[:-5].rstrip("/")
+    return urlunsplit((parsed.scheme, parsed.netloc, f"{path}/fees", "", ""))
+
+
+def _enrich_from_fee_page(url: str) -> dict[str, Any]:
+    fee_url = _fee_page_url(url)
+    html = _get_html(fee_url)
+    result = _extract_international_fee_page(html or "")
+    if result:
+        log.info(
+            "[BOND] Fees tab → total %.0f AUD (year=%s)",
+            result["international_fee"],
+            result.get("fee_year"),
+        )
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Static HTML: data-* attribute parsing
 # ---------------------------------------------------------------------------
@@ -917,7 +1015,22 @@ def apply_bond_extraction(url: str, html: str) -> dict[str, Any]:
             result["intake_months"] = static_months
             log.info("[BOND] %s — intake_months extracted from static HTML: %s", url, static_months)
 
-    # ── Static HTML fee fallback (when API ids absent or API returned no fee) ─
+    # ── Official Fees-tab fallback ──────────────────────────────────────────
+    # Bond's current CMS can publish the fee on /fees while its older
+    # /api/program-fees endpoint returns fees:[]. The audience-scoped official
+    # page is newer course-owned authority and must win over that stale API
+    # omission. This also handles new page templates that no longer expose the
+    # numeric program-details id.
+    if "international_fee" not in result:
+        fee_page = _enrich_from_fee_page(url)
+        if fee_page:
+            authoritative_fee_omission = False
+            fee_url = _fee_page_url(url)
+            for k, v in fee_page.items():
+                result.setdefault(k, v)
+                source_urls.setdefault(k, fee_url)
+
+    # ── Static HTML fee fallback (when authoritative sources had no answer) ─
     if "international_fee" not in result and not authoritative_fee_omission:
         static_fee = _extract_fee_from_static_html(plain_text)
         for k, v in static_fee.items():
