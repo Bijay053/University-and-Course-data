@@ -7646,10 +7646,21 @@ async def extract_course(
         "distance learning",
         "distance education",
     )
-    if any(sig in _cn_for_online for sig in _ONLINE_TITLE_SIGNALS):
+    _title_says_odl = bool(
+        _re.search(
+            r"(?:\[\s*odl\s*\]|\(\s*odl\s*\)|\bopen\s+distance\s+learning\b)",
+            _cn_for_online,
+        )
+    )
+    if any(sig in _cn_for_online for sig in _ONLINE_TITLE_SIGNALS) or _title_says_odl:
         _prev_mode = payload.get("study_mode")
-        if _prev_mode != "Online":
-            payload["study_mode"] = "Online"
+        payload["study_mode"] = "Online"
+        if not any(
+            item.get("field_key") == "study_mode"
+            and item.get("method") == "study_mode:title_keyword"
+            and item.get("value") == "Online"
+            for item in evidence
+        ):
             evidence.append({
                 "field_key": "study_mode",
                 "value": "Online",
@@ -7660,6 +7671,7 @@ async def extract_course(
                     f"{_prev_mode!r}: {(payload.get('course_name') or '')[:80]}"
                 ),
             })
+        if _prev_mode != "Online":
             log.info(
                 "[STUDY_MODE TITLE] course=%r — title keyword → 'Online' "
                 "(was %r) for %s",

@@ -40,6 +40,25 @@ def test_returns_none_when_no_signal():
     assert _classify("Apply now for the next intake") is None
 
 
+def test_online_test_format_is_not_course_delivery():
+    html = """
+    <main>
+      <h1>Bachelor of Business Administration (Honours)</h1>
+      <section>
+        <strong>International Student English Entry Requirement</strong>
+        <div>IELTS: 5.5</div>
+        <div>TOEFL Essentials (Online): 8</div>
+        <div>TOEFL iBT: 46</div>
+      </section>
+    </main>
+    """
+    assert _classify(html) is None
+
+
+def test_course_title_parenthesized_online_still_counts():
+    assert _classify("<h1>Master of Education (Online)</h1>") == "Online"
+
+
 def test_extract_returns_extraction_result():
     out = asyncio.run(study_mode.extract("<p>On-campus delivery</p>", "https://e/x"))
     assert len(out) == 1

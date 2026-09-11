@@ -90,6 +90,14 @@ _NOISE_BLOCK_RE = re.compile(
     r"<(select|form|nav|footer|aside)\b[^>]*>.*?</\1\s*>",
     re.IGNORECASE | re.DOTALL,
 )
+# Test providers use ``(Online)`` to describe the exam format, not the
+# university course's delivery mode.  Keep the test name/score visible to the
+# English extractor while removing only the misleading delivery token before
+# the whole-page study-mode fallback runs.
+_ONLINE_TEST_FORMAT_RE = re.compile(
+    r"\b(TOEFL\s+Essentials)\s*\(\s*Online\s*\)",
+    re.IGNORECASE,
+)
 
 
 def _utas_international_location_mode(html: str) -> tuple[str | None, str | None]:
@@ -173,6 +181,7 @@ def has_authoritative_online_location_evidence(
             "study_mode:data_attribute",
             "study_mode:strong_label",
             "study_mode:label",
+            "study_mode:title_keyword",
         }:
             return True
     return False
@@ -536,6 +545,7 @@ def classify_study_mode(
         return strong_label, strong_snippet, 0.7
 
     plain = _strip_tags(page_text)
+    plain = _ONLINE_TEST_FORMAT_RE.sub(r"\1", plain)
 
     # Strip "Recently viewed" sidebar from the keyword-fallback text so
     # campus names / mode keywords from unrelated courses in the widget

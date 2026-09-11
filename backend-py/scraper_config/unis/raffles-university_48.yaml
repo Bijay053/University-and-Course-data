@@ -1,0 +1,42 @@
+# Raffles University (production university id 48)
+hostname_guard: "raffles-university.edu.my"
+
+discovery:
+  # The English programme index is static and contains the complete current
+  # catalogue. Do not traverse course pages, staff/news pages, or the mirrored
+  # Chinese catalogue.
+  seed_urls:
+    - "https://raffles-university.edu.my/programme/"
+  bfs_page_budget: 1
+  skip_sitemap_fallback: true
+  max_candidates: 100
+  expected_min_courses: 35
+  allow_url_patterns:
+    - "^https?://raffles-university\\.edu\\.my/programme/[^/?#]+/?$"
+  course_detail_url_patterns:
+    - "^https?://raffles-university\\.edu\\.my/programme/[^/?#]+/?$"
+  block_url_patterns:
+    - "/programme/english-language-programme/"
+
+extraction:
+  # Course pages are complete static WordPress HTML. Browser rescue adds no
+  # fields and previously consumed the per-course deadline on non-course URLs.
+  skip_browser_rescue: true
+  skip_per_course_browser: true
+  max_parallel_fetch: 8
+
+  # Raffles teaches its campus catalogue at Medini. This fallback applies only
+  # when the course page has no location and no authoritative Online evidence.
+  default_course_location: "Raffles University Medini Campus, Iskandar Puteri, Johor"
+
+  study_mode:
+    # TOEFL Essentials (Online) describes the English test format. It is not
+    # evidence that the university course is delivered online.
+    online_only_requires_strong_evidence: true
+
+  fees:
+    default_currency: MYR
+    currency_override: MYR
+    # Malaysian tuition legitimately converts below AU-market degree ranges.
+    # Keep those amounts in review as warnings instead of critical failures.
+    fee_crit_min_aud: 2000

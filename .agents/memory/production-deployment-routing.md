@@ -227,3 +227,24 @@ service restart.
 independent expected-account setting is absent, leave production on the current
 revision; if the scrape consumer was paused to drain work, restore and verify it
 before ending the attempt.
+
+The production checkout intentionally contains untracked runtime release files,
+generated scraper recipes, and operator backups. A deployment must preserve
+them rather than requiring an entirely empty `git status`.
+
+**Why:** A valid guarded release was initially blocked by expected untracked
+operational files even though the tracked tree and index were clean.
+
+**How to apply:** Require `git diff --quiet` and `git diff --cached --quiet`,
+then compare every untracked path with the target commit and abort on a
+tracked-path collision. Never clean or reset the untracked files automatically.
+
+When discovering the public portal hostname from Nginx output, match the
+`server_name` directive exactly.
+
+**Why:** A loose substring match selected `server_names_hash_bucket_size` as a
+hostname after the release itself had already passed.
+
+**How to apply:** Parse only records whose first token is exactly
+`server_name`, then exclude `_` and localhost before running public HTML and
+asset checks.
