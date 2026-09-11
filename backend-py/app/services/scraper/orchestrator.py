@@ -7222,6 +7222,9 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         job.scrape_do_render_calls = _sd_job_ctrs["render"]
         job.scrape_do_static_calls = _sd_job_ctrs["static"]
         job.gate_skip_counts = _gate_skips if _nonzero_skips else None
+        if _catalogue_guard:
+            job.gate_skip_counts = dict(job.gate_skip_counts or {})
+            job.gate_skip_counts["catalogue_guard"] = _catalogue_guard
         if _run_event_metrics:
             job.gate_skip_counts = dict(job.gate_skip_counts or {})
             job.gate_skip_counts.update(_run_event_metrics)

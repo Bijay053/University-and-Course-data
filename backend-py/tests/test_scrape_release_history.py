@@ -230,6 +230,49 @@ async def test_release_job_endpoints_require_view_permission() -> None:
             assert matching["releaseRevision"] is None
             assert matching["releaseHistory"] == []
             assert matching["releaseWarnings"] == []
+            assert matching["catalogueGuard"] is None
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+        async with AsyncSessionLocal() as cleanup:
+            await cleanup.execute(
+                text("DELETE FROM scrape_runtime_jobs WHERE runtime_job_id = :jid"),
+                {"jid": job_id},
+            )
+            await cleanup.commit()
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_history_exposes_persisted_catalogue_guard() -> None:
+    job_id = f"test_catalogue_guard_{uuid.uuid4().hex[:12]}"
+    guard = {
+        "kind": "discovery_filter_collapse",
+        "status": "failed_degraded",
+        "level": "error",
+        "message": "Catalogue discovery/filter collapse",
+        "raw_discovered": 236,
+        "extractable": 0,
+        "staged": 0,
+        "expected_min_courses": 200,
+    }
+    transport = httpx.ASGITransport(app=app)
+    async with AsyncSessionLocal() as db:
+        db.add(_job(runtime_job_id=job_id, gate_skip_counts={"catalogue_guard": guard}))
+        await db.commit()
+
+    async def view_user() -> dict:
+        return {"permissions": ["scraping.view"]}
+
+    try:
+        app.dependency_overrides[get_current_user] = view_user
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/api/scrape/history")
+        assert response.status_code == 200
+        matching = next(
+            run for run in response.json()["runs"]
+            if run["runtimeJobId"] == job_id
+        )
+        assert matching["catalogueGuard"] == guard
     finally:
         app.dependency_overrides.pop(get_current_user, None)
         async with AsyncSessionLocal() as cleanup:

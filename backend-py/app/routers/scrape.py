@@ -1231,6 +1231,7 @@ async def history_list(
             "htmlCompaction": (r.gate_skip_counts or {}).get("html_compaction"),
             "htmlCompactionAlerts": compaction_alerts_by_run.get(r.runtime_job_id, []),
             "antiBotChallenges": (r.gate_skip_counts or {}).get("anti_bot_challenges"),
+            "catalogueGuard": (r.gate_skip_counts or {}).get("catalogue_guard"),
         })
     return {"runs": runs, "total": int(total), "limit": limit, "offset": offset}
 

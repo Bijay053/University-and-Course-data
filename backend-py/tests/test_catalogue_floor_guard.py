@@ -68,6 +68,7 @@ def test_authoritative_zero_row_reconciliation_drives_terminal_status():
 
     assert reconciled < final_guard < forced_status
     assert '_catalogue_guard["status"] == "failed_degraded"' in source
+    assert 'job.gate_skip_counts["catalogue_guard"] = _catalogue_guard' in source
 
 
 def test_targeted_retry_is_not_compared_with_full_catalogue_floor():

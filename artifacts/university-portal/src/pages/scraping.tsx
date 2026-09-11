@@ -923,6 +923,16 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       rejection_total: number;
       unresolved_total: number;
     } | null;
+    catalogueGuard: {
+      kind: "discovery_filter_collapse" | "catalogue_below_expected_min";
+      status: "failed_degraded" | "completed_with_warnings";
+      level: "error" | "warning";
+      message: string;
+      raw_discovered: number;
+      extractable: number;
+      staged: number;
+      expected_min_courses: number;
+    } | null;
   };
   type HistoryLogEntry = { sequence: number; event: string; createdAt: string; message?: string; phase?: string; [k: string]: unknown };
   // History staged course is now the full StagedCourse + evidence array
@@ -4732,6 +4742,26 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                           after all fallbacks. Affected transport
                           {unresolvedChallengeTransports.length === 1 ? "" : "s"}:{" "}
                           {unresolvedChallengeTransports.join(", ")}.
+                        </div>
+                      ) : null}
+                      {run.catalogueGuard ? (
+                        <div
+                          role="alert"
+                          className={`w-full rounded-md border px-3 py-2 text-xs ${
+                            run.catalogueGuard.kind === "discovery_filter_collapse"
+                              ? "border-red-300 bg-red-50 text-red-900"
+                              : "border-amber-300 bg-amber-50 text-amber-900"
+                          }`}
+                        >
+                          <strong>
+                            {run.catalogueGuard.kind === "discovery_filter_collapse"
+                              ? "Discovery/filter collapse."
+                              : "Catalogue below configured floor."}
+                          </strong>{" "}
+                          Raw candidates: <strong>{run.catalogueGuard.raw_discovered}</strong>
+                          {" · "}Extractable URLs: <strong>{run.catalogueGuard.extractable}</strong>
+                          {" · "}Staged courses: <strong>{run.catalogueGuard.staged}</strong>
+                          {" · "}Configured floor: <strong>{run.catalogueGuard.expected_min_courses}</strong>
                         </div>
                       ) : null}
                       {compactionLostSpeedup ? (
