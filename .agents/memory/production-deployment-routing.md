@@ -133,18 +133,17 @@ production TLS requirement.
 validate it as a CA file, combine it with the system bundle, and set
 `SSL_CERT_FILE` for both services. Never disable hostname or certificate checks.
 
-Bounded credential restarts must exceed systemd's configured orderly stop
-window while remaining inside the five-minute SSM transaction.
+Celery shutdown must distinguish confirmed idle workers from active or
+uninspectable workers; API and Celery stop latency must be measured separately.
 
-**Why:** Production units permit 90-second graceful stops; a 60-second outer
-timeout expired during a healthy sequential API/Celery transition. A controlled
-restart on 2026-09-11 took 90.255 seconds in `systemctl restart`; after it
-returned, exact process and journal release identity verification completed in
-2.629 seconds against the 15-second bound.
+**Why:** A combined restart hid that API stopped promptly while an idle Celery
+prefork tree survived until systemd's stop timeout. An idle check before
+quiescing is unsafe because work can start between inspection and shutdown.
 
-**How to apply:** Keep the refresh document's restart bound above the unit stop
-timeout plus startup margin, retain the outer 300-second SSM deadline, and time
-the restart separately from the bounded post-restart identity poll.
+**How to apply:** Stop the exact worker's consumption first, then check reserved,
+scheduled, and active work before bounded cleanup. Treat failed inspection as
+active, preserve the full graceful window for work, verify process start
+identity before delayed signals, and check both services after restart.
 
 The production Nginx virtual host is hostname-scoped, so a bare
 `http://127.0.0.1/` frontend smoke request can return 404 even when the public
