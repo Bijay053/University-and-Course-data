@@ -3,8 +3,15 @@
 #
 # Bug history: none yet — fill in after first scrape.
 # Note: UNSW historically uses heavy JS rendering on the find-a-degree filter UI.
+locked_config_paths:
+  - discovery.allow_url_patterns
+  - discovery.course_detail_url_patterns
 discovery:
   always_sitemap_supplement: true
+  allow_url_patterns:
+    - '^https?://www\.unsw\.edu\.au/study/(?:undergraduate|postgraduate)/[^/?#]+/?(?:\?[^#]*)?(?:#.*)?$'
+  course_detail_url_patterns:
+    - '^https?://www\.unsw\.edu\.au/study/(?:undergraduate|postgraduate)/[^/?#]+/?(?:\?[^#]*)?(?:#.*)?$'
   # UNSW's professional-development catalogue contains domestic online
   # products and short courses, not international on-campus degrees.
   block_url_patterns:
