@@ -162,6 +162,7 @@ async def test_curtin_direct_failure_uses_static_proxy_before_browser_skip() -> 
     assert len(proxy_calls) == 1
     assert proxy_calls[0]["render"] is False
     assert proxy_calls[0]["geo_code"] == "AU"
+    assert proxy_calls[0]["target_headers"] == {"Cookie": "user_region=int"}
     assert browser_calls == []
     assert result.get("error") != "fetch_failed"
     assert result["payload"]["international_fee"] == 42000.0
@@ -210,4 +211,5 @@ async def test_curtin_direct_exception_still_uses_static_proxy() -> None:
 
     assert len(proxy_kwargs) == 1
     assert proxy_kwargs[0]["request_timeout_seconds"] == 30.0
+    assert proxy_kwargs[0]["target_headers"] == {"Cookie": "user_region=int"}
     assert result.get("error") != "fetch_failed"

@@ -9,8 +9,18 @@ Curtin course duration, attendance mode, and location must come from the current
 
 **How to apply:** Scope each value to its own information block. Preserve an explicit blank when a course-owned block is absent so page-wide text cannot refill it.
 
-Curtin international annual tuition comes from the newest “International – Indicative year 1 fee” Offer in the current page’s JSON-LD, not the visible domestic fee panel.
+Curtin international annual tuition comes from the newest exact international
+year-one fee in the current offering. Prefer JSON-LD Offers; postgraduate
+pages may instead expose equivalent structured
+`.fees__international .fee[data-segment=int][data-fee-key=YR1_IND_INT]`
+cards.
 
-**Why:** The international query can still render domestic fee UI while the structured course data carries both domestic and international offers.
+**Why:** The international query can still render domestic fee UI. Direct
+responses often carry both audiences in JSON-LD, but static-proxy recovery
+returns postgraduate international fee cards only when Curtin’s
+`user_region=int` cookie is forwarded.
 
-**How to apply:** Select only AUD international year-1 offers, retain the stated fee year, and keep the amount, currency, Annual period, and evidence atomic. Ignore total-course and domestic offers.
+**How to apply:** Forward the audience cookie through every transport. Select
+only AUD international year-one Offers or exact `YR1_IND_INT` cards, retain the
+stated fee year, and keep amount, currency, Annual period, and evidence atomic.
+Ignore total-course and domestic values.
