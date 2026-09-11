@@ -15,6 +15,17 @@ certificate/professional title rules removed another 9 while retaining degree
 codes such as B2029 and B6038, leaving 444 candidates. Do not add
 `professional certificate` to the fleet-wide non-degree regex.
 
+In browser discovery, an explicit per-university course allow-pattern must run
+before the generic course/category classifier.
+
+**Why:** The generic classifier treated valid Monash degree URLs as navigation,
+so 400+ links visible in the rendered catalogue never reached the correct
+Monash allowlist and discovery collapsed to zero.
+
+**How to apply:** Apply block rules first, then accept exact allow-pattern
+matches as course candidates. Use the generic classifier only when no explicit
+allowlist exists.
+
 Appending `international=true` to B2029 preserved the parameter and exposed
 international entry requirements plus `On-campus at Caulfield: Full time`, but
 only linked to generic fee information. Treat the detail view as authority for

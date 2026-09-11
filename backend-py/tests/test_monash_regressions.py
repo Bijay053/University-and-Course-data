@@ -5,6 +5,9 @@ import re
 
 import pytest
 
+from app.services.scraper.browser_discover_generic import (
+    _is_configured_course_candidate,
+)
 from app.services.scraper.config.context import set_uni_config
 from app.services.scraper.config.loader import load_uni_config
 from app.services.scraper.discovery_cache_scope import discovery_cache_scope_key
@@ -111,6 +114,34 @@ def test_monash_course_code_filter_excludes_live_professional_development_urls()
     }
 
     assert {url: bool(allow.search(url)) for url in observed} == observed
+
+
+def test_browser_discovery_applies_configured_allow_before_generic_classifier():
+    cfg = _config()
+    allow = [re.compile(pattern, re.IGNORECASE) for pattern in cfg.discovery.allow_url_patterns]
+    block = [re.compile(pattern, re.IGNORECASE) for pattern in cfg.discovery.block_url_patterns]
+    degree = (
+        "https://www.monash.edu/study/courses/find-a-course/"
+        "business-administration-b4001"
+    )
+    professional = (
+        "https://www.monash.edu/study/courses/find-a-course/"
+        "implementing-improvement-in-healthcare-program-pdm1153"
+    )
+
+    assert _is_configured_course_candidate(
+        degree, "", allow, block, lambda _url, _name: False
+    )
+    assert not _is_configured_course_candidate(
+        professional, "", allow, block, lambda _url, _name: True
+    )
+    assert not _is_configured_course_candidate(
+        "https://www.monash.edu/study/courses/english-language-programs",
+        "",
+        allow,
+        block,
+        lambda _url, _name: True,
+    )
 
 
 def test_monash_non_degree_results_are_removed_before_extraction():

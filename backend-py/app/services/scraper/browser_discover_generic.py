@@ -92,6 +92,21 @@ _LOW_VALUE_WORDS: tuple[str, ...] = (
     "accommodation", "student-life", "studentlife",
     "apprenticeship", "privacy", "terms", "cookie",
 )
+
+
+def _is_configured_course_candidate(
+    url: str,
+    name: str,
+    allow_patterns: list[re.Pattern],
+    block_patterns: list[re.Pattern],
+    looks_like_course,
+) -> bool:
+    """Classify a browser link with explicit university URL rules first."""
+    if block_patterns and any(pattern.search(url) for pattern in block_patterns):
+        return False
+    if allow_patterns:
+        return any(pattern.search(url) for pattern in allow_patterns)
+    return looks_like_course(url, name)
 # URL path patterns that strongly indicate a course-listing page.
 _HIGH_VALUE_PATH_RE: re.Pattern[str] = re.compile(
     r"/(courses?|programs?|undergraduate|postgraduate|study|degrees?|"
@@ -804,20 +819,21 @@ async def browser_discover_generic(
 
             seen.add(url)
 
-            if _looks_like_course(url, name):
-                # Honour YAML allow_url_patterns / block_url_patterns for
-                # browser-mode discovery (same semantics as static BFS).
-                if _browser_allow_pats and not any(p.search(url) for p in _browser_allow_pats):
-                    log.debug(
-                        "browser_discover_generic: allow_url_patterns rejected %s", url
-                    )
-                    continue
-                if _browser_block_pats and any(p.search(url) for p in _browser_block_pats):
-                    log.debug(
-                        "browser_discover_generic: block_url_patterns rejected %s", url
-                    )
-                    continue
+            if _is_configured_course_candidate(
+                url,
+                name,
+                _browser_allow_pats,
+                _browser_block_pats,
+                _looks_like_course,
+            ):
                 results.append({"url": url, "name": name})
+            elif _looks_like_course(url, name) and (
+                _browser_allow_pats or _browser_block_pats
+            ):
+                log.debug(
+                    "browser_discover_generic: configured URL patterns rejected %s",
+                    url,
+                )
             elif _is_nav_url(url) and not _is_known_non_course_url(url):
                 # Score the URL before deciding whether to queue it.
                 nav_score = _score_nav_url(url, name)
