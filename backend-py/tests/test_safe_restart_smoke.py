@@ -17,6 +17,7 @@ from deploy.safe_restart_smoke import (
     SmokeFailure,
     resolve_expected_release,
     verify_service_release_identity,
+    warn_slow_release_identity_matches,
     validate_database_rehearsal_requirement,
     validate_done_payload,
     validate_idle_counts,
@@ -201,6 +202,29 @@ def test_release_identity_reports_immediate_match_elapsed_time(
     )
 
     assert elapsed == 0.125
+
+
+def test_release_identity_normal_elapsed_time_emits_no_warning(capsys) -> None:
+    warn_slow_release_identity_matches(
+        {"uni-api-py": 1.25, "uni-celery": 4.999},
+        warning_seconds=5,
+    )
+
+    assert capsys.readouterr().err == ""
+
+
+def test_release_identity_slow_exact_match_warns_but_remains_successful(
+    capsys,
+) -> None:
+    result = warn_slow_release_identity_matches(
+        {"uni-api-py": 5.001, "uni-celery": 2.0},
+        warning_seconds=5,
+    )
+
+    assert result is None
+    assert capsys.readouterr().err == (
+        "release identity warning: uni-api-py 5.001s\n"
+    )
 
 
 def test_release_identity_rejects_process_environment_mismatch(

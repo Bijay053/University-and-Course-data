@@ -85,7 +85,9 @@ def test_release_identity_success_reports_only_sanitized_match_timings(
 
     asyncio.run(_main(args))
 
-    assert capsys.readouterr().out == (
+    output = capsys.readouterr()
+    assert output.err == ""
+    assert output.out == (
         f"release identity passed: release={release} "
         "uni-api-py_match_elapsed_s=0.125 "
         "uni-celery_match_elapsed_s=1.750\n"
@@ -102,6 +104,40 @@ def test_release_identity_success_reports_only_sanitized_match_timings(
         "api_match_elapsed_seconds",
         "celery_match_elapsed_seconds",
     }
+
+
+def test_slow_release_identity_warns_and_still_persists_success(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    release = "c" * 40
+    evidence_path = tmp_path / "deployments.jsonl"
+    monkeypatch.setattr(
+        "deploy.safe_restart_smoke._verify_release_and_services",
+        lambda **_kwargs: (
+            release,
+            {"uni-api-py": 6.125, "uni-celery": 2.0},
+        ),
+    )
+
+    asyncio.run(
+        _main(
+            Namespace(
+                release_identity_only=True,
+                journal_since="2026-09-11T12:29:00+00:00",
+                release_identity_timeout_seconds=15,
+                release_identity_warning_seconds=5,
+                deployment_evidence_path=evidence_path,
+                recent_deployment_evidence=None,
+            )
+        )
+    )
+
+    output = capsys.readouterr()
+    assert output.err == "release identity warning: uni-api-py 6.125s\n"
+    assert output.out.startswith("release identity passed:")
+    assert evidence_path.exists()
 
 
 def test_successful_identity_persists_only_sanitized_evidence(

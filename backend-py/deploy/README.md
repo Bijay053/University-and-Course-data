@@ -488,6 +488,7 @@ cd /opt/university-portal/backend-py
 PYTHONPATH=. python deploy/safe_restart_smoke.py \
   --release-identity-only \
   --journal-since "$smoke_since" \
+  --release-identity-warning-seconds 5 \
   --release-identity-timeout-seconds 15
 ```
 
@@ -498,6 +499,12 @@ Gunicorn/Celery startup delay without accepting a missing or mismatched
 identity. Do not complete the deployment if this check fails. A package without
 `.git` is supported as long as its deployment pipeline supplies
 `RELEASE_REVISION`.
+
+The default warning threshold is 5 seconds and can be changed with
+`--release-identity-warning-seconds`. A matching startup line found after that
+threshold emits one sanitized warning containing only the service name and
+elapsed seconds. The match still succeeds unless it exceeds the independent
+`--release-identity-timeout-seconds` hard limit.
 
 On success, the command reports sanitized
 `uni-api-py_match_elapsed_s=<seconds>` and

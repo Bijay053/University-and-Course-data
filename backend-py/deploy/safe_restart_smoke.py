@@ -77,6 +77,7 @@ REHEARSAL_SIGNERS = Path(__file__).with_name(
     "database-refresh-rehearsal-signers.json"
 )
 DEFAULT_RELEASE_IDENTITY_TIMEOUT_SECONDS = 15.0
+DEFAULT_RELEASE_IDENTITY_WARNING_SECONDS = 5.0
 DEFAULT_RELEASE_IDENTITY_RETRY_SECONDS = 1.0
 DEFAULT_DEPLOYMENT_EVIDENCE_PATH = Path(
     "/var/lib/university-portal/deployment-evidence.jsonl"
@@ -278,6 +279,22 @@ def verify_service_release_identity(
                 f"within {timeout_seconds:g}s"
             )
         time.sleep(min(retry_seconds, max(0.0, deadline - observed_at)))
+
+
+def warn_slow_release_identity_matches(
+    match_elapsed_seconds: Mapping[str, float],
+    *,
+    warning_seconds: float,
+) -> None:
+    """Emit sanitized warnings without changing successful identity matches."""
+    if warning_seconds < 0:
+        raise SmokeFailure("release identity warning threshold must be non-negative")
+    for unit, elapsed_seconds in match_elapsed_seconds.items():
+        if elapsed_seconds > warning_seconds:
+            print(
+                f"release identity warning: {unit} {elapsed_seconds:.3f}s",
+                file=sys.stderr,
+            )
 
 
 def _verify_release_and_services(
@@ -493,6 +510,14 @@ async def _main(args: argparse.Namespace) -> None:
             journal_since=args.journal_since,
             identity_timeout_seconds=args.release_identity_timeout_seconds,
         )
+        warn_slow_release_identity_matches(
+            match_elapsed_seconds,
+            warning_seconds=getattr(
+                args,
+                "release_identity_warning_seconds",
+                DEFAULT_RELEASE_IDENTITY_WARNING_SECONDS,
+            ),
+        )
         persist_deployment_timing_evidence(
             evidence_path,
             release=release,
@@ -548,6 +573,12 @@ def main() -> int:
         "--release-identity-timeout-seconds",
         type=float,
         default=DEFAULT_RELEASE_IDENTITY_TIMEOUT_SECONDS,
+    )
+    parser.add_argument(
+        "--release-identity-warning-seconds",
+        type=float,
+        default=DEFAULT_RELEASE_IDENTITY_WARNING_SECONDS,
+        help="warn when a service takes longer than this to report its release",
     )
     parser.add_argument(
         "--deployment-evidence-path",
