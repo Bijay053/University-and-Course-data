@@ -41,10 +41,11 @@ discovery:
 extraction:
   skip_browser_rescue: true
   skip_per_course_browser: true
-  # The Colleges supplement contains 225 rendered WordPress pages. Keep the
-  # provider calls bounded and use enough slots to avoid a long apparent stall
-  # when extraction transitions from the fast University host.
-  max_parallel_fetch: 8
+  # Rendered Colleges pages are ~600 KB and the generic extractor is
+  # synchronous. More than one page per worker blocks the event loop long
+  # enough to stale the heartbeat at the University→Colleges boundary.
+  # Serial extraction remains within the two-hour job budget.
+  max_parallel_fetch: 1
   per_course_timeout_seconds: 60
   html_compaction_enabled: true
   scrape_do_render_hostnames:
