@@ -7225,7 +7225,11 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 "status",
                 f"[CATALOGUE FLOOR] {_catalogue_guard['message']}",
                 phase="complete",
-                **_catalogue_guard,
+                **{
+                    key: value
+                    for key, value in _catalogue_guard.items()
+                    if key != "message"
+                },
             )
         finished_cleanly = summary["errors"] == 0 or (
             summary["staged"] + summary["skipped"] > 0

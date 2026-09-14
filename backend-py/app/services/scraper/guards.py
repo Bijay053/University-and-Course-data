@@ -1030,13 +1030,19 @@ def should_stage_course(
             return (False, "category_landing_page_url_suffix")
 
         # URL-slug online detection: if the last path segment is exactly
-        # "online" or ends with "-online", the university explicitly published
-        # this as an online-only course. Both URL shapes are common:
+        # "online"/"odl" or ends with "-online"/"-odl", the university
+        # explicitly published this as an online/distance-learning course.
+        # These URL shapes are common:
         #   /course/graduate-certificate-business-online
         #   /course/graduate-certificate-business/online/
+        #   /programme/master-of-education-odl/
         # Uses the same global policy as the study-mode check below.
         _slug = _url_path.rstrip("/").rsplit("/", 1)[-1]
-        if _slug == "online" or _slug.endswith("-online"):
+        if (
+            _slug in {"online", "odl"}
+            or _slug.endswith("-online")
+            or _slug.endswith("-odl")
+        ):
             log.info(
                 "[REJECT CHECK] course=%r url_slug=%r "
                 "decision=reject (url_slug_online) global_policy=true",
@@ -1045,14 +1051,20 @@ def should_stage_course(
             )
             return (False, "online_only")
 
-    # A course name ending in "Online" is also an explicit institution-owned
-    # signal. This catches provider/API records even if an upstream transform
-    # strips the /online/ URL segment or a noisy location fallback later
-    # overwrites study_mode from Online to On Campus.
+    # A course name ending in "Online" or containing the institution-owned ODL
+    # label is also explicit delivery evidence. This catches provider/API
+    # records even if an upstream transform strips the URL marker or a noisy
+    # location fallback later overwrites study_mode from Online to On Campus.
+    # Only the course name is checked, so test-format text such as
+    # "TOEFL Essentials (Online)" elsewhere in the payload cannot trigger it.
     _name_for_online_check = str(
         payload.get("course_name") or course_name or ""
     ).strip().lower()
-    if re.search(r"\bonline(?:\s+degree)?$", _name_for_online_check):
+    if (
+        re.search(r"\bonline(?:\s+degree)?$", _name_for_online_check)
+        or re.search(r"\bodl\b", _name_for_online_check)
+        or "open distance learning" in _name_for_online_check
+    ):
         log.info(
             "[REJECT CHECK] course=%r decision=reject "
             "(course_name_online) global_policy=true",

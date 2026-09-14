@@ -7,6 +7,7 @@ from app.services.scraper.config.loader import load_uni_config
 from app.services.scraper.extractors.study_mode import (
     has_authoritative_online_location_evidence,
 )
+from app.services.scraper.guards import should_stage_course
 from app.services.scraper.pipelines.single_course import extract_course
 
 
@@ -26,7 +27,7 @@ def test_raffles_recipe_uses_bounded_english_catalogue() -> None:
         "https://raffles-university.edu.my/programme/"
     ]
     assert config.discovery.bfs_page_budget == 1
-    assert config.discovery.expected_min_courses == 35
+    assert config.discovery.expected_min_courses == 30
     assert config.discovery.allow_url_patterns == [
         r"^https?://raffles-university\.edu\.my/programme/[^/?#]+/?$"
     ]
@@ -56,6 +57,41 @@ def test_title_owned_online_mode_blocks_default_campus() -> None:
     ]
 
     assert has_authoritative_online_location_evidence("Online", evidence)
+
+
+@pytest.mark.parametrize(
+    ("course_name", "source_url"),
+    [
+        (
+            "Doctor of Philosophy in Business Administration (Odl)",
+            "https://raffles-university.edu.my/programme/"
+            "doctor-of-philosophy-in-business-administration-odl/",
+        ),
+        (
+            "Master of Education (ODL)",
+            "https://raffles-university.edu.my/programme/master-of-education/",
+        ),
+    ],
+)
+def test_raffles_odl_is_rejected_even_if_metadata_says_blended(
+    course_name: str,
+    source_url: str,
+) -> None:
+    accepted, reason = should_stage_course(
+        course_name,
+        {
+            "course_name": course_name,
+            "study_mode": "Blended",
+            "course_location": (
+                "Raffles University Medini Campus, Iskandar Puteri, Johor"
+            ),
+            "international_fee": 25_000,
+        },
+        source_url=source_url,
+    )
+
+    assert accepted is False
+    assert reason == "online_only"
 
 
 @pytest.mark.asyncio

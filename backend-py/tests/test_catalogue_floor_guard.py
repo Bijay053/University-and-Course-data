@@ -101,3 +101,11 @@ def test_orchestrator_passes_floor_context_to_alert_evaluator():
     assert "expected_min_courses=getattr(" in source
     assert 'current_extractable=int(summary.get("discovered", 0) or 0)' in source
     assert "targeted_retry=bool(_targeted_retry)" in source
+
+
+def test_catalogue_floor_emit_does_not_pass_message_twice():
+    from app.services.scraper.orchestrator import run_scrape
+
+    source = inspect.getsource(run_scrape)
+
+    assert 'if key != "message"' in source
