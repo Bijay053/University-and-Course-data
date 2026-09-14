@@ -3616,7 +3616,7 @@ async def extract_course(
             # protected here because Curtin's configured central English page
             # remains an authoritative fallback when the course page omits them.
             for _k in ("course_location", "location_text", "study_mode",
-                       "duration", "duration_term", "international_fee",
+                       "duration", "duration_term", "intake_months", "international_fee",
                         "fee_term", "fee_currency", "fee_year"):
                 payload.setdefault(_k, None)
     except Exception as _curtin_exc:  # noqa: BLE001

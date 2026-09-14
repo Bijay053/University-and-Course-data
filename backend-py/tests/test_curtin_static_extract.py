@@ -174,3 +174,34 @@ def test_attendance_is_scoped_and_ignores_on_campus_tooltip():
     result = apply_curtin_static_extraction(URL, html)
     assert result["study_mode"] == "Online"
     assert result["course_location"] is None
+
+
+def test_course_owned_semesters_override_unrelated_page_months():
+    html = """
+      <aside>Applications may close in May. Information session: September.</aside>
+      <script type="application/ld+json">
+      {"@type":"Course","hasCourseInstance":[
+        {"@type":"CourseInstance","name":"Engineering - Bentley - 2027 - Semester 1 - On Campus"},
+        {"@type":"CourseInstance","name":"Engineering - Bentley - 2027 - Semester 2 - On Campus"},
+        {"@type":"CourseInstance","name":"Engineering - Bentley - 2027 - Extended Delivery Period 1 - On Campus"}
+      ]}
+      </script>
+    """
+
+    result = apply_curtin_static_extraction(URL, html)
+
+    assert result["intake_months"] == ["February", "July"]
+
+
+def test_unavailable_semester_and_research_terms_are_not_intakes():
+    html = """
+      <div class="course-locations">
+        <div class="locations__period"><h6>Semester 1</h6><p>On campus</p></div>
+        <div class="locations__period"><h6>Semester 2</h6><p>Not offered</p></div>
+        <div class="locations__period"><h6>Research Term 1</h6><p>On campus</p></div>
+      </div>
+    """
+
+    result = apply_curtin_static_extraction(URL, html)
+
+    assert result["intake_months"] == ["February"]

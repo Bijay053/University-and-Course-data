@@ -173,6 +173,38 @@ def _international_annual_offer(soup: BeautifulSoup) -> dict[str, Any]:
     return max(matches, key=lambda pair: pair[0])[1] if matches else {}
 
 
+def _course_instance_intake_months(soup: BeautifulSoup) -> list[str]:
+    """Read Curtin Semester 1/2 availability from current-course JSON-LD."""
+    semester_numbers: set[str] = set()
+    for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
+        try:
+            root = json.loads(script.string or script.get_text() or "")
+        except (json.JSONDecodeError, TypeError):
+            continue
+        stack = root if isinstance(root, list) else [root]
+        while stack:
+            item = stack.pop()
+            if isinstance(item, list):
+                stack.extend(item)
+                continue
+            if not isinstance(item, dict):
+                continue
+            stack.extend(v for v in item.values() if isinstance(v, (dict, list)))
+            if item.get("@type") != "CourseInstance":
+                continue
+            name = str(item.get("name") or "")
+            match = re.search(r"\s-\sSemester\s+([12])\s-\s", name, re.I)
+            if match:
+                semester_numbers.add(match.group(1))
+
+    month_by_semester = {"1": "February", "2": "July"}
+    return [
+        month_by_semester[number]
+        for number in ("1", "2")
+        if number in semester_numbers
+    ]
+
+
 def _number(value: str | None, pattern: str) -> float | None:
     if not value:
         return None
@@ -194,6 +226,7 @@ def apply_curtin_static_extraction(url: str, html: str) -> dict[str, Any]:
         "study_mode": None,
         "duration": None,
         "duration_term": None,
+        "intake_months": None,
     }
     if not is_curtin_url(url) or not html:
         return result
@@ -269,6 +302,38 @@ def apply_curtin_static_extraction(url: str, html: str) -> dict[str, Any]:
             result["study_mode"] = "Online"
         elif has_on_campus:
             result["study_mode"] = "On Campus"
+
+    # Curtin publishes coursework availability as exact Semester 1 /
+    # Semester 2 headings in the current offering's course-locations block.
+    # Generic page-text extraction otherwise picks unrelated event/deadline
+    # months such as September or May. Curtin Semester 1 starts in February
+    # and Semester 2 starts in July. Do not match research-term headings:
+    # research offerings use continuous/rolling enrolment instead.
+    semester_months = {
+        "1": "February",
+        "2": "July",
+    }
+    result["intake_months"] = _course_instance_intake_months(soup) or None
+    if not result["intake_months"]:
+        available_months: set[str] = set()
+        for period in soup.select(".course-locations .locations__period"):
+            heading = period.select_one("h1, h2, h3, h4, h5, h6")
+            heading_text = _text(str(heading)) if heading else ""
+            semester_match = re.fullmatch(r"Semester\s+([12])", heading_text, re.I)
+            if not semester_match:
+                continue
+            period_text = _text(str(period))
+            if re.search(
+                r"\b(?:not\s+available|unavailable|not\s+offered)\b",
+                period_text,
+                re.I,
+            ):
+                continue
+            available_months.add(semester_months[semester_match.group(1)])
+        if available_months:
+            result["intake_months"] = [
+                month for month in ("February", "July") if month in available_months
+            ]
 
     english_match = re.search(
         r"(?is)English\s+(?:language\s+)?requirements?.{0,800}?"
