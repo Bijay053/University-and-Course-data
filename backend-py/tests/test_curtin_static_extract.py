@@ -193,6 +193,24 @@ def test_course_owned_semesters_override_unrelated_page_months():
     assert result["intake_months"] == ["February", "July"]
 
 
+def test_labelled_postgraduate_intake_overrides_unrelated_page_months():
+    html = """
+      <aside>Applications close in May. Information session: September.</aside>
+      <div class="information">
+        <div class="information__title"><h3>Intake</h3></div>
+        <div class="information__content"><p>Semester 1, Semester 2</p></div>
+      </div>
+    """
+
+    result = apply_curtin_static_extraction(
+        "https://www.curtin.edu.au/study/offering/"
+        "course-pg-master-of-computing--mc-comp/?region=int",
+        html,
+    )
+
+    assert result["intake_months"] == ["February", "July"]
+
+
 def test_unavailable_semester_and_research_terms_are_not_intakes():
     html = """
       <div class="course-locations">
@@ -205,3 +223,23 @@ def test_unavailable_semester_and_research_terms_are_not_intakes():
     result = apply_curtin_static_extraction(URL, html)
 
     assert result["intake_months"] == ["February"]
+
+
+def test_research_terms_use_rolling_instead_of_page_months():
+    html = """
+      <aside>Applications close in May. Information session: September.</aside>
+      <div class="information">
+        <div class="information__title"><h3>Intake</h3></div>
+        <div class="information__content">
+          <p>Research Term 1, Research Term 2</p>
+        </div>
+      </div>
+    """
+
+    result = apply_curtin_static_extraction(
+        "https://www.curtin.edu.au/study/offering/"
+        "course-research-doctor-of-philosophy---physics--dr-phys/?region=int",
+        html,
+    )
+
+    assert result["intake_months"] == ["Rolling"]

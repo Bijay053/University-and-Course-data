@@ -11,8 +11,9 @@
 #    candidates. Removing whitelist altogether let the discoverer find 130
 #    courses on the next run; 83 staged successfully.
 #
-# 2. The international-fee toggle on Curtin pages is the query string
-#    ?regionToggle=1. With that param, the page renders International fees
+# 2. The international-fee view on Curtin pages is selected by
+#    ?region=int. The older ?regionToggle=1 query no longer selects it.
+#    With region=int, the page renders International fees
 #    (e.g. Bachelor of Biomedical Sciences Honours: $42,834/yr 2026 intake).
 #    Without it, the page renders domestic CSP fees, which is why almost
 #    every staged course shows a fee that is far below the true international
@@ -36,7 +37,7 @@
 #
 # Outstanding limitations after this YAML:
 # - Fees will only become international-correct IF the backend honors the
-#   regionToggle=1 query in fetched URLs. This file relies on
+#   region=int query in fetched URLs. This file relies on
 #   extraction.url_rewrites, which IS NOT documented in defaults.yaml. If
 #   the backend doesn't read that key, this section is a no-op and fees
 #   will remain domestic-CSP values. Verification step is in the
@@ -491,7 +492,7 @@ extraction:
   # ── url_rewrites: speculative — verify before relying on ──────────────────
   # Not documented in defaults.yaml. Including in case the backend reads
   # this key; harmless if it doesn't (just ignored). The intent is to
-  # append ?regionToggle=1 to every fetched Curtin URL so each course
+  # append ?region=int to every fetched Curtin URL so each course
   # renders the international view server-side.
   #
   # If on next run fees are STILL domestic-CSP values (e.g. Nursing $7,200),
@@ -499,7 +500,7 @@ extraction:
   # Python code (intercept the URL request and append the query before fetch).
   url_rewrites:
     - host: "www.curtin.edu.au"
-      append_query: "regionToggle=1"
+      append_query: "region=int"
 
 # ── Expected next-run outcome ────────────────────────────────────────────────
 #

@@ -205,6 +205,43 @@ def _course_instance_intake_months(soup: BeautifulSoup) -> list[str]:
     ]
 
 
+def _labelled_intake_months(soup: BeautifulSoup) -> list[str]:
+    """Map only the current course's labelled Curtin semester intake."""
+    intake = _information_value(soup, "Intake") or ""
+    semester_numbers = {
+        match.group(1)
+        for match in re.finditer(r"\bSemester\s+([12])\b", intake, re.I)
+    }
+    month_by_semester = {"1": "February", "2": "July"}
+    return [
+        month_by_semester[number]
+        for number in ("1", "2")
+        if number in semester_numbers
+    ]
+
+
+def _has_research_term_intake(soup: BeautifulSoup) -> bool:
+    """Return whether the current course explicitly offers Research Terms."""
+    intake = _information_value(soup, "Intake") or ""
+    if re.search(r"\bResearch\s+Term\s+[12]\b", intake, re.I):
+        return True
+    return any(
+        re.fullmatch(
+            r"Research\s+Term\s+[12]",
+            _text(str(heading)),
+            re.I,
+        )
+        for heading in soup.select(
+            ".course-locations .locations__period h1, "
+            ".course-locations .locations__period h2, "
+            ".course-locations .locations__period h3, "
+            ".course-locations .locations__period h4, "
+            ".course-locations .locations__period h5, "
+            ".course-locations .locations__period h6"
+        )
+    )
+
+
 def _number(value: str | None, pattern: str) -> float | None:
     if not value:
         return None
@@ -313,7 +350,17 @@ def apply_curtin_static_extraction(url: str, html: str) -> dict[str, Any]:
         "1": "February",
         "2": "July",
     }
-    result["intake_months"] = _course_instance_intake_months(soup) or None
+    result["intake_months"] = (
+        _course_instance_intake_months(soup)
+        or _labelled_intake_months(soup)
+        or None
+    )
+    if (
+        not result["intake_months"]
+        and re.search(r"/course-(?:research|rs|rd)-", url, re.I)
+        and _has_research_term_intake(soup)
+    ):
+        result["intake_months"] = ["Rolling"]
     if not result["intake_months"]:
         available_months: set[str] = set()
         for period in soup.select(".course-locations .locations__period"):

@@ -3609,6 +3609,8 @@ async def extract_course(
     # Curtin pages repeat related majors and recommendation cards.  Run the
     # provider before generic regex so credit counts cannot become durations
     # and the generic Perth fallback cannot become course-owned location.
+    _curtin_intake_authoritative = False
+    _curtin_structured_intake = None
     try:
         from app.services.scraper.curtin_static_extract import (
             apply_curtin_static_extraction as _curtin_apply,
@@ -3616,6 +3618,8 @@ async def extract_course(
         )
         if _is_curtin(url):
             _curtin_pre = _curtin_apply(url, html)
+            _curtin_intake_authoritative = True
+            _curtin_structured_intake = _curtin_pre.get("intake_months")
             for _k, _v in _curtin_pre.items():
                 if _k == "scrape_warnings":
                     payload.setdefault("scrape_warnings", [])
@@ -4091,6 +4095,19 @@ async def extract_course(
                         # First-write-wins so the highest-confidence result (which
                         # the extractor returned first) is preserved.
                         payload.setdefault(k, v)
+
+    # Curtin's current-course provider is the only intake authority on its
+    # offering pages. If it found no Semester 1/2 value, remove page-wide month
+    # guesses (typically May/September from deadlines and events). Research
+    # courses remain empty here so the rolling-enrolment fallback can run.
+    if _curtin_intake_authoritative:
+        payload["intake_months"] = _curtin_structured_intake
+        evidence = [
+            item
+            for item in evidence
+            if item.get("field_key") != "intake_months"
+            or str(item.get("method") or "").startswith("curtin_static")
+        ]
 
     # ── Field-level extraction summary log ───────────────────────────────────
     # After all static extractors have run, emit a structured per-field summary
