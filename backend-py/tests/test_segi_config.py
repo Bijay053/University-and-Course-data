@@ -69,6 +69,9 @@ def test_segi_production_config_uses_current_official_catalogue() -> None:
     assert config.extraction.max_parallel_fetch == 1
     assert config.extraction.per_course_timeout_seconds == 60
     assert config.extraction.html_compaction_enabled is True
+    assert config.extraction.scrape_do_wait_for_ms == 500
+    assert config.extraction.scrape_do_request_timeout_seconds == 20
+    assert config.extraction.scrape_do_render_max_retries == 1
     assert config.extraction.scrape_do_skip_fallbacks is False
     assert config.extraction.staging.require_international_fee is False
     assert config.extraction.staging.stage_on_parser_error is True

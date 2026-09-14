@@ -992,13 +992,23 @@ async def fetch_html_scrape_do(
             raise  # always propagate — orchestrator must abort the job
         except asyncio.TimeoutError:
             log.warning(
-                "[COURSE DEADLINE] Scrape.do request exceeded remaining %.3fs for %s",
+                "[FETCH TIMEOUT] Scrape.do request exceeded %.3fs for %s",
                 _effective_request_timeout[0] or 0.0,
                 url,
             )
+            if _sd_attempt < len(_SD_BACKOFFS):
+                log.warning(
+                    "[FETCH RETRY] scrape.do %s render=%s → timeout attempt %d/%d "
+                    "— scheduling retry with backoff",
+                    url,
+                    render,
+                    _sd_attempt + 1,
+                    len(_SD_BACKOFFS) + 1,
+                )
+                continue
             _record_fetch_failure(
                 kind="scrape_do_timeout",
-                reason="Scrape.do did not finish within the shared course deadline.",
+                reason="Scrape.do did not finish within the configured request timeout.",
                 retryable=True,
                 transport="scrape_do_render" if render else "scrape_do_static",
             )

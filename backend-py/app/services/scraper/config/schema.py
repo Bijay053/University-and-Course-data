@@ -3474,6 +3474,17 @@ class ExtractionConfig(BaseModel):
             "occasionally hang long enough to consume the entire course budget."
         ),
     )
+    scrape_do_render_max_retries: int = Field(
+        default=0,
+        ge=0,
+        le=3,
+        description=(
+            "Number of retries after the first extraction-phase rendered "
+            "Scrape.do attempt fails. Keep zero for fail-fast hosts; opt in "
+            "when a fresh provider route reliably recovers transient rotation "
+            "failures within the shared per-course deadline."
+        ),
+    )
     scrape_do_wayback_after_first_failure: bool = Field(
         default=False,
         description=(

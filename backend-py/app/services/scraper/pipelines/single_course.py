@@ -2273,7 +2273,11 @@ async def extract_course(
                         )
                         or None
                     ),
-                    max_retries=0,
+                    max_retries=getattr(
+                        getattr(_uc, "extraction", None),
+                        "scrape_do_render_max_retries",
+                        0,
+                    ),
                     local_concurrency_limit=_scrape_do_local_concurrency,
                     request_timeout_seconds=getattr(
                         getattr(_uc, "extraction", None),

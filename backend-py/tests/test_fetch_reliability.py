@@ -187,6 +187,48 @@ class TestFetchHtmlScrapeDoRetry:
         assert all(params.get("render") == "true" for params in seen_params)
         assert all(params.get("super") == "true" for params in seen_params)
 
+    def test_request_timeout_retries_on_fresh_provider_route(self):
+        """A per-attempt timeout must not bypass an explicitly enabled retry."""
+        import app.services.scraper.http_fetcher as m
+
+        call_count = 0
+        good_html = "<html><body>" + ("real course content " * 50) + "</body></html>"
+
+        async def _mock_enter(self_):
+            return self_
+
+        async def _mock_exit(self_, *a):
+            return False
+
+        async def _mock_get(url, params=None):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise asyncio.TimeoutError
+            return _make_response(200, good_html)
+
+        mock_client = MagicMock()
+        mock_client.__aenter__ = _mock_enter
+        mock_client.__aexit__ = _mock_exit
+        mock_client.get = _mock_get
+
+        with patch.object(m, "_unescape_json_html", side_effect=lambda x: x), \
+             patch("app.services.scraper.snapshot_context.stage_snapshot", lambda *a, **kw: None), \
+             patch("httpx.AsyncClient", return_value=mock_client), \
+             patch("asyncio.sleep", new_callable=AsyncMock):
+            result = asyncio.run(
+                m.fetch_html_scrape_do(
+                    "https://example.com/course",
+                    render=True,
+                    rate_limit=False,
+                    max_retries=1,
+                    request_timeout_seconds=20,
+                )
+            )
+
+        assert result == good_html
+        assert call_count == 2
+
 
 class TestDirectChallengeFallback:
     """HTTP-200 challenge shells must continue through the direct fetch ladder."""

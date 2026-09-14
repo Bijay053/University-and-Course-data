@@ -48,6 +48,11 @@ extraction:
   max_parallel_fetch: 1
   per_course_timeout_seconds: 60
   html_compaction_enabled: true
+  # Healthy renders return in ~19s, while bad provider rotations can wait
+  # indefinitely. Bound each attempt and retry once on a fresh route.
+  scrape_do_wait_for_ms: 500
+  scrape_do_request_timeout_seconds: 20
+  scrape_do_render_max_retries: 1
   scrape_do_render_hostnames:
     - "www.segi.edu.my"
 
