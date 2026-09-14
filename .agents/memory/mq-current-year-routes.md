@@ -7,4 +7,4 @@ Macquarie Funnelback can keep returning an explicit year-stamped admissions URL 
 
 **Why:** A live full scrape used a 2026 Funnelback URL and therefore retained the older fee, while the same course's unversioned public route had advanced to 2027.
 
-**How to apply:** For MQ admissions URLs under `find-a-course/courses`, remove a single `20xx` path segment before page-data enrichment. Keep explicit handbook-year URLs separate because they serve historical discovery.
+**How to apply:** For MQ admissions URLs under `find-a-course/courses`, remove a single `20xx` path segment before page-data enrichment, then deduplicate again because distinct Funnelback results can collapse to one current route. Keep explicit handbook-year URLs separate because they serve historical discovery.

@@ -875,6 +875,7 @@ async def _discover_from_funnelback_api(
 
     # Build the (url, name, metaData) triples.
     course_triples: list[tuple[str, str, dict]] = []
+    seen_course_urls: set[str] = set()
     for r in results:
         live_url = _canonical_mq_admissions_url(r.get("liveUrl") or "")
         title = (r.get("title") or "").strip()
@@ -885,6 +886,12 @@ async def _discover_from_funnelback_api(
         # specialisations, which have no standalone fee or qualification.
         if not _is_mq_course_url(live_url):
             continue
+        # Funnelback can return both a stale year-stamped route and the current
+        # unversioned route for the same degree.  They become identical only
+        # after canonicalisation, so deduplicate here as well as at ingestion.
+        if live_url in seen_course_urls:
+            continue
+        seen_course_urls.add(live_url)
         course_triples.append((live_url, title, meta))
 
     await emit_fn(
@@ -991,8 +998,8 @@ async def _discover_from_funnelback_api(
         message = (
             "Macquarie structured page-data coverage is too low "
             f"({len(programs)}/{len(course_triples)}, "
-            f"{page_data_coverage:.0%}; required "
-            f"{_PAGE_DATA_MIN_COVERAGE:.0%}). Refusing to stage "
+            f"{page_data_coverage:.1%}; required "
+            f"{_PAGE_DATA_MIN_COVERAGE:.1%}). Refusing to stage "
             "domestic-default course data."
         )
         await emit_fn(f"[DISCOVER] MQ: ERROR — {message}")
@@ -1018,8 +1025,8 @@ async def _discover_from_funnelback_api(
     if fee_coverage < _INTERNATIONAL_FEE_MIN_COVERAGE:
         message = (
             "Macquarie international-fee coverage is too low "
-            f"({fee_count}/{len(links)}, {fee_coverage:.0%}; required "
-            f"{_INTERNATIONAL_FEE_MIN_COVERAGE:.0%}). Refusing to stage "
+            f"({fee_count}/{len(links)}, {fee_coverage:.1%}; required "
+            f"{_INTERNATIONAL_FEE_MIN_COVERAGE:.1%}). Refusing to stage "
             "a misleading low-fee catalogue."
         )
         await emit_fn(f"[DISCOVER] MQ: ERROR — {message}")

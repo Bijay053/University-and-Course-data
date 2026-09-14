@@ -735,6 +735,98 @@ class TestFunnelbackRichProvider:
             await mq._discover_from_funnelback_api(emit, max_courses=100)
 
     @pytest.mark.asyncio
+    async def test_deduplicates_year_routes_after_canonicalisation(
+        self, monkeypatch,
+    ):
+        import httpx
+        import app.services.scraper.http_fetcher as http_fetcher
+
+        rows = []
+        for i in range(50):
+            slug = f"course-{i}"
+            rows.extend([
+                {
+                    "title": f"Bachelor of Test {i}",
+                    "liveUrl": (
+                        "https://www.mq.edu.au/study/find-a-course/"
+                        f"courses/2026/{slug}"
+                    ),
+                    "metaData": {"course_fees_international": "$40,000"},
+                },
+                {
+                    "title": f"Bachelor of Test {i}",
+                    "liveUrl": (
+                        "https://www.mq.edu.au/study/find-a-course/"
+                        f"courses/{slug}"
+                    ),
+                    "metaData": {"course_fees_international": "$40,000"},
+                },
+            ])
+
+        page_data = json.dumps({
+            "result": {
+                "data": {
+                    "current": {
+                        "fields": {
+                            "json": json.dumps({
+                                "study_level": "Undergraduate",
+                                "fees": [{
+                                    "fee_type": {
+                                        "label": "International",
+                                    },
+                                    "estimated_annual_fee": 40_000,
+                                }],
+                            }),
+                        },
+                    },
+                },
+            },
+        })
+        requested_page_data: list[str] = []
+
+        async def fake_scrape_do(url, **kwargs):
+            if "s/search.json" in url:
+                return json.dumps({
+                    "response": {"resultPacket": {"results": rows}},
+                })
+            return None
+
+        class FakeResponse:
+            status_code = 200
+            text = page_data
+
+        class FakeClient:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def get(self, url, *args, **kwargs):
+                requested_page_data.append(url)
+                return FakeResponse()
+
+        async def emit(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(
+            http_fetcher, "fetch_html_scrape_do", fake_scrape_do,
+        )
+        monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
+        monkeypatch.setattr(mq, "_FUNNELBACK_MIN_RESULTS", 1)
+        monkeypatch.setattr(mq, "_RICH_COURSE_MIN_RESULTS", 1)
+
+        links = await mq._discover_from_funnelback_api(emit, max_courses=100)
+
+        assert len(links) == 50
+        assert len(requested_page_data) == 50
+        assert len({link["url"] for link in links}) == 50
+        assert all("/courses/2026/" not in link["url"] for link in links)
+
+    @pytest.mark.asyncio
     async def test_fails_closed_when_second_funnelback_page_is_unreachable(
         self, monkeypatch,
     ):

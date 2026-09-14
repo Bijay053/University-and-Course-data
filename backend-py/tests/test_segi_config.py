@@ -327,6 +327,89 @@ async def test_segi_online_mode_title_overrides_campus_derived_mode() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("slug", "score"),
+    [
+        (
+            "master-of-science-in-environmental-sustainability-with-artificial-intelligence",
+            5.0,
+        ),
+        ("master-of-science-pharmaceutical-sciences", 6.0),
+    ],
+)
+async def test_segi_verified_postgraduate_brochure_rules_fill_missing_ielts(
+    slug: str,
+    score: float,
+) -> None:
+    """Only explicitly mapped SEGi programmes may use the official brochure.
+
+    These current official pages expose programme entry prose but no numeric
+    IELTS value in their HTML.  The linked SEGi Postgraduate Studies brochure
+    gives the score for each named programme.  This is intentionally not a
+    university-wide default.
+    """
+    from app.services.scraper.config import set_uni_config
+    from app.services.scraper.extractors import english_test
+
+    config = load_uni_config(
+        slug="segi",
+        scrape_url="https://www.segi.edu.my/",
+        university_id=13,
+        name="SEGi University & Colleges",
+    )
+    set_uni_config(config)
+    html = """
+    <html><body>
+      <h1>Postgraduate programme</h1>
+      <h2>English Requirements</h2>
+      <p>MUET Band 4 or equivalent to CEFR Mid B2.</p>
+    </body></html>
+    """
+
+    results = await english_test.extract(
+        html,
+        f"https://university.segi.edu.my/course/{slug}/",
+    )
+
+    assert [(r.value, r.method) for r in results if r.field_key == "ielts_overall"] == [
+        (score, "segi_programme_rule")
+    ]
+
+
+@pytest.mark.asyncio
+async def test_segi_brochure_rule_does_not_become_universal_or_rescue_odl() -> None:
+    from app.services.scraper.config import set_uni_config
+    from app.services.scraper.extractors import english_test
+
+    config = load_uni_config(
+        slug="segi",
+        scrape_url="https://www.segi.edu.my/",
+        university_id=13,
+        name="SEGi University & Colleges",
+    )
+    set_uni_config(config)
+    html = "<html><body><p>MUET Band 4 or equivalent to CEFR Mid B2.</p></body></html>"
+
+    # A different university must never inherit SEGi's programme map.
+    other_host = await english_test.extract(
+        html,
+        "https://other.example/course/master-of-accountancy/",
+    )
+    assert not any(r.field_key == "ielts_overall" for r in other_host)
+
+    # ODL has its own online-only exclusion.  The conventional programme's
+    # brochure score must not fill an ODL URL as a side effect.
+    odl = await english_test.extract(
+        html,
+        "https://university.segi.edu.my/course/master-of-accountancy-odl/",
+    )
+    assert not any(
+        r.field_key == "ielts_overall" and r.method == "segi_programme_rule"
+        for r in odl
+    )
+
+
+@pytest.mark.asyncio
 async def test_segi_college_page_uses_course_owned_metadata_campus() -> None:
     from app.services.scraper.config import set_uni_config
     from app.services.scraper.extractors import location

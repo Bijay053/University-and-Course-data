@@ -1314,6 +1314,42 @@ _NO_PTE_HOSTS: frozenset[str] = frozenset({
     "uow.edu.au",
 })
 
+# SEGi's current course pages are not uniform: a number of postgraduate pages
+# publish only MUET/CEFR wording, while the university's official
+# ``Postgraduate Studies`` brochure gives an IELTS score for the programme.
+# Keep these as exact programme rules rather than a university-wide default.
+# The brochure is an official SEGi document linked from the course pages:
+# https://university.segi.edu.my/brochures/Postgraduate%20Studies.pdf
+#
+# ODL slugs are deliberately absent.  They remain subject to the normal
+# Online Mode exclusion and must not be rescued merely because their
+# conventional counterpart has a brochure score.
+_SEGI_PROGRAMME_IELTS: dict[str, float] = {
+    # Doctoral / research programmes (brochure pp. 10-17).
+    "doctor-of-philosophy-in-management": 6.0,
+    "doctor-of-business-administration": 6.0,
+    "phd-engineering-by-research": 5.0,
+    "msc-ngineering-by-research": 5.0,  # official catalogue's historical slug
+    # Postgraduate coursework / taught programmes.
+    "master-of-science-in-management": 6.0,
+    "master-of-accountancy": 5.5,
+    "master-of-business-administration": 6.0,
+    "master-of-business-administration-general-management": 6.0,
+    "master-of-business-administration-general-management-2": 6.0,
+    "master-of-business-administration-general-management-3": 6.0,
+    "master-of-business-administration-global-business": 6.0,
+    "master-of-business-administration-human-resource-management": 6.0,
+    "master-of-business-administration-marketing": 6.0,
+    "master-of-environmental-sustainability-with-artificial-intelligence": 5.0,
+    "master-of-science-in-environmental-sustainability-with-artificial-intelligence": 5.0,
+    "master-of-education": 5.0,
+    "master-of-science-pharmaceutical-science": 6.0,
+    "master-of-science-pharmaceutical-sciences": 6.0,
+    "master-of-arts-in-corporate-communications": 6.0,
+    "master-of-creative-design-management": 5.0,
+    "master-of-medical-science-by-research": 5.5,
+}
+
 
 async def extract(html: str, url: str) -> list[ExtractionResult]:
     from urllib.parse import urlparse as _up
@@ -1344,6 +1380,33 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
         *_emit("cambridge", _cambridge(text), snippet),
         *_emit("duolingo", _duolingo(text), snippet),
     ]
+    # Apply a verified SEGi programme rule only when the course page itself
+    # yielded no IELTS result.  This preserves an explicit course-page score
+    # if the catalogue changes while recovering pages that currently expose
+    # only MUET/CEFR prose.  Exact slugs and an exact official host guard keep
+    # this from becoming a universal institutional default.
+    if not any(r.field_key == "ielts_overall" for r in results):
+        _path_slug = (_up(url).path.rstrip("/").rsplit("/", 1)[-1]).lower()
+        _host = (_up(url).netloc or "").lower()
+        _segi_score = (
+            _SEGI_PROGRAMME_IELTS.get(_path_slug)
+            if _host in {"university.segi.edu.my", "www.segi.edu.my"}
+            else None
+        )
+        if _segi_score is not None:
+            results.append(
+                ExtractionResult(
+                    field_key="ielts_overall",
+                    value=_segi_score,
+                    normalized={"ielts_overall": _segi_score},
+                    confidence=0.92,
+                    snippet=(
+                        "SEGi official Postgraduate Studies brochure programme "
+                        f"mapping: IELTS {_segi_score:.1f}"
+                    ),
+                    method="segi_programme_rule",
+                )
+            )
     # Explicit per-skill tables are more authoritative than flattened prose.
     # In particular, UOW places the header row before the IELTS data row, so
     # the prose parser sees the overall but cannot associate the four scores

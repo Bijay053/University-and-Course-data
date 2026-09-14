@@ -1,0 +1,44 @@
+# MILA University (production university id 49)
+#
+# The English programme index is a complete static catalogue.  Keep discovery
+# bounded to its one-segment English detail URLs: the site also publishes a
+# mirrored Chinese catalogue, WordPress listings, and unrelated site sections.
+hostname_guard: "mila.edu.my"
+
+discovery:
+  seed_urls:
+    - "https://mila.edu.my/programmes/"
+  bfs_page_budget: 1
+  skip_sitemap_fallback: true
+  max_candidates: 100
+  expected_min_courses: 35
+  allow_url_patterns:
+    - "^https?://mila\\.edu\\.my/programme/[a-z0-9]+(?:-[a-z0-9]+)*/?$"
+  course_detail_url_patterns:
+    - "^https?://mila\\.edu\\.my/programme/[a-z0-9]+(?:-[a-z0-9]+)*/?$"
+  block_url_patterns:
+    - "^https?://mila\\.edu\\.my/zh/"
+    - "^https?://mila\\.edu\\.my/(?:wp-|research|school-|news|conference|online)"
+
+extraction:
+  # Programme pages contain the title, overview, entry requirements, duration,
+  # tuition, and English requirements in static HTML.  Browser fetches add no
+  # useful fields and can re-introduce site-wide navigation noise.
+  skip_browser_rescue: true
+  skip_per_course_browser: true
+  max_parallel_fetch: 8
+
+  # Conventional programmes are taught at MILA's Nilai campus.  This fallback
+  # is bypassed for authoritative ODL/online-only pages.
+  default_course_location: "MILA University, Nilai, Negeri Sembilan, Malaysia"
+
+  study_mode:
+    # "TOEFL Essentials (Online)" is an English-test format, not course
+    # delivery evidence.  Require structured/high-specificity online evidence.
+    online_only_requires_strong_evidence: true
+
+  fees:
+    default_currency: MYR
+    currency_override: MYR
+    # Malaysian tuition may be below the generic AUD-market critical threshold.
+    fee_crit_min_aud: 2000
