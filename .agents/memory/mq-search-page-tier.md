@@ -5,6 +5,19 @@ description: Macquarie requires rendered Funnelback discovery plus structured pa
 
 ## Source authority
 
+Funnelback can include postgraduate/undergraduate specialisation subpaths and
+retired degree links. Classify exact subpath segments and confirm both public
+detail and page-data origin-not-found before excluding stale links.
+
+**Why:** A fee-coverage failure repeated unchanged after retries because
+non-degree specialisations inflated the denominator and dead endpoints
+returned 404, not transient failures. International annual fee strings also
+use thousands separators, so numeric conversion must accept valid grouping.
+
+**How to apply:** Preserve the coverage thresholds, retain blocked/unknown
+courses in their denominator, and never use discovery exclusions to delete
+existing live catalogue records.
+
 Use the international Funnelback catalogue only through the rich MQ provider that retains structured page-data fees, English scores, duration, and evidence. A generic provider that returns only URLs is unsafe because downstream detail pages render the domestic audience by default.
 
 **Why:** A bare-link production run found the full catalogue but staged almost every degree without international fees, while also admitting majors and specialisations as courses. Link-count completeness did not imply data completeness.

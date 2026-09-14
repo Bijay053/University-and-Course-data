@@ -18,6 +18,40 @@ from app.services.scraper import mq_browser_discover as mq
 
 
 class TestRenderedPageData:
+    @pytest.mark.parametrize("amount,expected", [
+        ("48,800.00", 48800.0), ("43,700.00", 43700.0),
+        ("47,100.00", 47100.0), ("48800.00", 48800.0),
+        ("48,80.00", None), ("40000-50000", None),
+        ("NaN", None), ("Infinity", None), ("0", None),
+    ])
+    def test_international_fee_numeric_format(self, amount, expected):
+        result = mq._build_scrapy_result(
+            "Bachelor of Business",
+            "https://www.mq.edu.au/study/find-a-course/courses/bachelor-of-business",
+            {},
+            {"fees": [
+                {"fee_type": {"label": "Domestic Fee-paying"},
+                 "estimated_annual_fee": "30000"},
+                {"fee_type": {"label": "International Fee-paying"},
+                 "estimated_annual_fee": amount},
+            ]},
+        )
+        assert result["payload"].get("international_fee") == expected
+
+    def test_empty_international_fee_does_not_mask_later_valid_fee(self):
+        result = mq._build_scrapy_result(
+            "Bachelor of Business",
+            "https://www.mq.edu.au/study/find-a-course/courses/bachelor-of-business",
+            {},
+            {"fees": [
+                {"fee_type": {"label": "International Fee-paying"},
+                 "estimated_annual_fee": ""},
+                {"fee_type": {"label": "International Fee-paying"},
+                 "estimated_annual_fee": "48,800.00"},
+            ]},
+        )
+        assert result["payload"]["international_fee"] == 48800.0
+
     def _body(self) -> tuple[dict, str]:
         program = {
             "course_name": "Bachelor of International Studies",
@@ -386,6 +420,38 @@ class TestEarlyReturnFloor:
 
 
 class TestFunnelbackRichProvider:
+    @pytest.mark.parametrize(
+        "subtype",
+        (
+            "major",
+            "specialisation",
+            "postgraduate-specialisation",
+            "undergraduate-specialisation",
+        ),
+    )
+    def test_rejects_exact_subdegree_path_segments(self, subtype):
+        assert not mq._is_mq_course_url(
+            "https://www.mq.edu.au/study/find-a-course/"
+            f"courses/{subtype}/fintech"
+        )
+
+    @pytest.mark.parametrize(
+        "slug",
+        (
+            "bachelor-of-specialisation",
+            "master-of-postgraduate-specialisation",
+            "bachelor-of-undergraduate-specialisation",
+        ),
+    )
+    def test_keeps_degree_slug_containing_subdegree_word(self, slug):
+        assert mq._is_mq_course_url(
+            "https://www.mq.edu.au/study/find-a-course/courses/" + slug
+        )
+
+    def test_rich_provider_coverage_gates_are_unchanged(self):
+        assert mq._PAGE_DATA_MIN_COVERAGE == 0.80
+        assert mq._INTERNATIONAL_FEE_MIN_COVERAGE == 0.70
+
     @pytest.mark.asyncio
     async def test_uses_rendered_transport_maps_fee_and_filters_subdegrees(
         self, monkeypatch,
@@ -520,6 +586,314 @@ class TestFunnelbackRichProvider:
         assert payload["degree_level"] == "Undergraduate"
         assert payload["duration"] == 3.0
         assert payload["duration_term"] == "year"
+
+    @pytest.mark.asyncio
+    async def test_public_probe_keeps_survivor_and_excludes_confirmed_missing(
+        self, monkeypatch,
+    ):
+        import contextvars
+        import httpx
+        import app.services.scraper.http_fetcher as http_fetcher
+
+        rows = [
+            {
+                "title": f"Bachelor of Test {i}",
+                "liveUrl": (
+                    "https://www.mq.edu.au/study/find-a-course/"
+                    f"courses/course-{i}"
+                ),
+                "metaData": {},
+            }
+            for i in range(10)
+        ]
+        funnelback_body = json.dumps({
+            "response": {"resultPacket": {"results": rows}},
+        })
+        page_data = json.dumps({
+            "result": {
+                "data": {
+                    "current": {
+                        "fields": {
+                            "json": json.dumps({
+                                "study_level": "Undergraduate",
+                                "fees": [{
+                                    "fee_type": {"label": "International"},
+                                    "estimated_annual_fee": "40000",
+                                }],
+                            }),
+                        },
+                    },
+                },
+            },
+        })
+        failure_state: contextvars.ContextVar[dict | None] = (
+            contextvars.ContextVar("mq_test_failure", default=None)
+        )
+        page_data_calls: dict[str, int] = {}
+        public_calls: list[str] = []
+
+        def set_failure(value):
+            failure_state.set(value)
+
+        async def fake_scrape_do(url, **kwargs):
+            if "s/search.json" in url:
+                return funnelback_body
+            if "/page-data/" in url:
+                slug = url.split("/courses/")[-1].split("/page-data")[0]
+                page_data_calls[slug] = page_data_calls.get(slug, 0) + 1
+                if slug == "course-8":
+                    set_failure({
+                        "kind": "origin_not_found",
+                        "status_code": 404,
+                    })
+                    return None
+                if slug == "course-9":
+                    set_failure({
+                        "kind": "origin_not_found",
+                        "status_code": 404,
+                    })
+                    return None
+                set_failure(None)
+                return page_data
+
+            public_calls.append(url)
+            if url.endswith("/course-8"):
+                set_failure({
+                    "kind": "origin_not_found",
+                    "status_code": 404,
+                })
+                return None
+            set_failure(None)
+            return "<html>public detail survives</html>"
+
+        class FakeResponse:
+            status_code = 403
+            text = ""
+
+        class FakeClient:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def get(self, *args, **kwargs):
+                return FakeResponse()
+
+        async def emit(*args, **kwargs):
+            emits.append(str(args[0] if args else ""))
+
+        emits: list[str] = []
+        monkeypatch.setattr(
+            http_fetcher, "fetch_html_scrape_do", fake_scrape_do,
+        )
+        monkeypatch.setattr(
+            http_fetcher, "get_last_fetch_failure",
+            lambda: failure_state.get(),
+        )
+        monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
+        monkeypatch.setattr(mq, "_FUNNELBACK_MIN_RESULTS", 1)
+        monkeypatch.setattr(mq, "_RICH_COURSE_MIN_RESULTS", 1)
+
+        links = await mq._discover_from_funnelback_api(emit, max_courses=100)
+
+        urls = {link["url"] for link in links}
+        assert len(links) == 9
+        assert not any(url.endswith("/course-8") for url in urls)
+        assert any(url.endswith("/course-9") for url in urls)
+        assert set(public_calls) == {
+            "https://www.mq.edu.au/study/find-a-course/courses/course-8",
+            "https://www.mq.edu.au/study/find-a-course/courses/course-9",
+        }
+        assert page_data_calls["course-8"] == 1
+        assert page_data_calls["course-9"] == 2
+        assert any("course-8" in message for message in emits)
+        assert any(
+            "public_origin_not_found_404×1" in message
+            and "public_success×1" in message
+            for message in emits
+        )
+
+    @pytest.mark.asyncio
+    async def test_keeps_challenge_timeout_and_parser_failures_in_denominator(
+        self, monkeypatch,
+    ):
+        import contextvars
+        import httpx
+        import app.services.scraper.http_fetcher as http_fetcher
+
+        rows = [
+            {
+                "title": f"Bachelor of Test {i}",
+                "liveUrl": (
+                    "https://www.mq.edu.au/study/find-a-course/"
+                    f"courses/course-{i}"
+                ),
+                "metaData": {},
+            }
+            for i in range(15)
+        ]
+        funnelback_body = json.dumps({
+            "response": {"resultPacket": {"results": rows}},
+        })
+        page_data = json.dumps({
+            "result": {
+                "data": {
+                    "current": {
+                        "fields": {
+                            "json": json.dumps({
+                                "fees": [{
+                                    "fee_type": {"label": "International"},
+                                    "estimated_annual_fee": "40000",
+                                }],
+                            }),
+                        },
+                    },
+                },
+            },
+        })
+        failure_state: contextvars.ContextVar[dict | None] = (
+            contextvars.ContextVar("mq_test_failure_denominator", default=None)
+        )
+
+        async def fake_scrape_do(url, **kwargs):
+            if "s/search.json" in url:
+                return funnelback_body
+            if any(f"/course-{i}/page-data.json" in url for i in (12, 13, 14)):
+                kinds = {
+                    12: "challenge_page",
+                    13: "scrape_do_timeout",
+                    14: "parser_failure",
+                }
+                index = next(i for i in kinds if f"/course-{i}/" in url)
+                failure_state.set({"kind": kinds[index]})
+                # A non-JSON body exercises the parser-failure path for the
+                # third URL; the other two represent transport failures.
+                return "<not-json>" if index == 14 else None
+            failure_state.set(None)
+            return page_data
+
+        class FakeResponse:
+            status_code = 403
+            text = ""
+
+        class FakeClient:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def get(self, *args, **kwargs):
+                return FakeResponse()
+
+        public_calls: list[str] = []
+
+        async def emit(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(
+            http_fetcher, "fetch_html_scrape_do", fake_scrape_do,
+        )
+        monkeypatch.setattr(
+            http_fetcher, "get_last_fetch_failure",
+            lambda: failure_state.get(),
+        )
+        monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
+        monkeypatch.setattr(mq, "_FUNNELBACK_MIN_RESULTS", 1)
+        monkeypatch.setattr(mq, "_RICH_COURSE_MIN_RESULTS", 1)
+
+        # No public-detail probe is allowed for non-origin-not-found failures.
+        original_fetch = http_fetcher.fetch_html_scrape_do
+
+        async def track_public(url, **kwargs):
+            if "/courses/" in url and "/page-data/" not in url:
+                public_calls.append(url)
+            return await original_fetch(url, **kwargs)
+
+        monkeypatch.setattr(http_fetcher, "fetch_html_scrape_do", track_public)
+        links = await mq._discover_from_funnelback_api(emit, max_courses=100)
+
+        assert len(links) == 15
+        assert public_calls == []
+        assert sum(
+            "international_fee" in link["scrapy_result"]["payload"]
+            for link in links
+        ) == 12
+
+    @pytest.mark.asyncio
+    async def test_fails_closed_when_all_candidates_confirmed_missing(
+        self, monkeypatch,
+    ):
+        import contextvars
+        import httpx
+        import app.services.scraper.http_fetcher as http_fetcher
+
+        row = {
+            "title": "Bachelor of Gone",
+            "liveUrl": (
+                "https://www.mq.edu.au/study/find-a-course/"
+                "courses/course-gone"
+            ),
+            "metaData": {},
+        }
+        failure_state: contextvars.ContextVar[dict | None] = (
+            contextvars.ContextVar("mq_test_failure_empty", default=None)
+        )
+
+        async def fake_scrape_do(url, **kwargs):
+            if "s/search.json" in url:
+                return json.dumps({
+                    "response": {"resultPacket": {"results": [row]}},
+                })
+            failure_state.set({
+                "kind": "origin_not_found",
+                "status_code": 410,
+            })
+            return None
+
+        class FakeResponse:
+            status_code = 403
+            text = ""
+
+        class FakeClient:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def get(self, *args, **kwargs):
+                return FakeResponse()
+
+        async def emit(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(
+            http_fetcher, "fetch_html_scrape_do", fake_scrape_do,
+        )
+        monkeypatch.setattr(
+            http_fetcher, "get_last_fetch_failure",
+            lambda: failure_state.get(),
+        )
+        monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
+        monkeypatch.setattr(mq, "_FUNNELBACK_MIN_RESULTS", 1)
+        monkeypatch.setattr(mq, "_RICH_COURSE_MIN_RESULTS", 1)
+
+        with pytest.raises(
+            mq.MqEnrichmentCoverageError,
+            match="no candidates remaining",
+        ):
+            await mq._discover_from_funnelback_api(emit, max_courses=100)
 
     @pytest.mark.asyncio
     async def test_paginates_past_funnelback_two_hundred_result_cap(
@@ -1017,6 +1391,181 @@ class TestFunnelbackRichProvider:
         assert "Refusing to supplement with domestic-default HTML" in message
         assert "SECRET_TOKEN" not in message
         assert "search.json?" not in message
+
+
+class TestMqBatchCleanupAndFatalProviderErrors:
+    @staticmethod
+    def _rows(count: int) -> list[dict]:
+        return [
+            {
+                "title": f"Bachelor of Batch Test {i}",
+                "liveUrl": (
+                    "https://www.mq.edu.au/study/find-a-course/"
+                    f"courses/batch-course-{i}"
+                ),
+                "metaData": {},
+            }
+            for i in range(count)
+        ]
+
+    @staticmethod
+    def _httpx_403():
+        class FakeResponse:
+            status_code = 403
+            text = ""
+
+        class FakeClient:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def get(self, *args, **kwargs):
+                return FakeResponse()
+
+        return FakeClient
+
+    @pytest.mark.asyncio
+    async def test_account_error_cancels_and_gathers_rendered_siblings(
+        self, monkeypatch,
+    ):
+        import httpx
+        import app.services.scraper.http_fetcher as http_fetcher
+
+        rows = self._rows(3)
+        funnelback_body = json.dumps({
+            "response": {"resultPacket": {"results": rows}},
+        })
+        cancelled: list[str] = []
+        all_siblings_started = asyncio.Event()
+        never = asyncio.Event()
+        sibling_count = 0
+
+        async def fake_scrape_do(url, **kwargs):
+            nonlocal sibling_count
+            if "s/search.json" in url:
+                return funnelback_body
+            slug = url.rsplit("/courses/", 1)[-1].split("/page-data", 1)[0]
+            if slug == "batch-course-0":
+                await all_siblings_started.wait()
+                raise http_fetcher.ScrapedoAccountError("account exhausted")
+            sibling_count += 1
+            if sibling_count == len(rows) - 1:
+                all_siblings_started.set()
+            try:
+                await never.wait()
+            except asyncio.CancelledError:
+                cancelled.append(slug)
+                raise
+            return None
+
+        async def emit(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(
+            http_fetcher, "fetch_html_scrape_do", fake_scrape_do,
+        )
+        monkeypatch.setattr(
+            httpx, "AsyncClient", self._httpx_403(),
+        )
+        monkeypatch.setattr(mq, "_FUNNELBACK_MIN_RESULTS", 1)
+        monkeypatch.setattr(mq, "_RICH_COURSE_MIN_RESULTS", 1)
+
+        with pytest.raises(http_fetcher.ScrapedoAccountError):
+            await mq._discover_from_funnelback_api(emit, max_courses=100)
+
+        assert set(cancelled) == {
+            "batch-course-1",
+            "batch-course-2",
+        }
+
+    @pytest.mark.asyncio
+    async def test_parent_cancellation_cancels_and_gathers_rendered_siblings(
+        self, monkeypatch,
+    ):
+        import httpx
+        import app.services.scraper.http_fetcher as http_fetcher
+
+        rows = self._rows(4)
+        funnelback_body = json.dumps({
+            "response": {"resultPacket": {"results": rows}},
+        })
+        all_started = asyncio.Event()
+        never = asyncio.Event()
+        children: list[asyncio.Task] = []
+        started_count = 0
+
+        async def fake_scrape_do(url, **kwargs):
+            nonlocal started_count
+            if "s/search.json" in url:
+                return funnelback_body
+            children.append(asyncio.current_task())
+            started_count += 1
+            if started_count == len(rows):
+                all_started.set()
+            await all_started.wait()
+            try:
+                await never.wait()
+            except asyncio.CancelledError:
+                raise
+            return None
+
+        async def emit(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(
+            http_fetcher, "fetch_html_scrape_do", fake_scrape_do,
+        )
+        monkeypatch.setattr(
+            httpx, "AsyncClient", self._httpx_403(),
+        )
+        monkeypatch.setattr(mq, "_FUNNELBACK_MIN_RESULTS", 1)
+        monkeypatch.setattr(mq, "_RICH_COURSE_MIN_RESULTS", 1)
+
+        worker = asyncio.create_task(
+            mq._discover_from_funnelback_api(emit, max_courses=100)
+        )
+        await all_started.wait()
+        worker.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await worker
+
+        assert len(children) == len(rows)
+        assert all(child.done() for child in children)
+        assert all(child.cancelled() for child in children)
+
+    @pytest.mark.asyncio
+    async def test_funnelback_account_error_does_not_fall_back_to_other_tiers(
+        self, monkeypatch,
+    ):
+        import app.services.scraper.http_fetcher as http_fetcher
+
+        calls: list[str] = []
+
+        async def fake_funnelback(*args, **kwargs):
+            raise http_fetcher.ScrapedoAccountError("account exhausted")
+
+        async def forbidden_fallback(*args, **kwargs):
+            calls.append("fallback")
+            raise AssertionError("fallback tier must not run after account error")
+
+        async def emit(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(mq, "_discover_from_funnelback_api", fake_funnelback)
+        monkeypatch.setattr(
+            mq, "_discover_from_coursehandbook_sitemap", forbidden_fallback,
+        )
+        monkeypatch.setattr(mq, "_discover_from_search_page", forbidden_fallback)
+
+        with pytest.raises(http_fetcher.ScrapedoAccountError):
+            await mq.browser_discover_mq(emit, max_courses=100)
+
+        assert calls == []
 
 
 @pytest.mark.skipif(

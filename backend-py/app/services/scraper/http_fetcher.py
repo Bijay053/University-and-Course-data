@@ -690,6 +690,11 @@ async def fetch_html_scrape_do(
     Returns None if the token is absent, the request fails, or the
     response is suspiciously short (likely an error page from scrape.do).
     """
+    # Failure metadata is task-local, but a caller may issue several bounded
+    # probes in the same task.  Clear the previous result before every fetch
+    # so an early return (missing token/budget or limiter timeout) cannot make
+    # the caller misclassify this request using a stale origin_not_found.
+    _last_fetch_failure.set(None)
     token = os.environ.get("SCRAPE_DO_TOKEN")
     if not token:
         log.debug("fetch_html_scrape_do: SCRAPE_DO_TOKEN not set — skipping")

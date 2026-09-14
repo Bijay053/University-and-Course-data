@@ -64,6 +64,7 @@ import re
 from urllib.parse import urlparse
 
 from app.services.scraper.challenge_shell import is_challenge_shell
+from app.services.scraper.http_fetcher import ScrapedoAccountError
 from app.services.scraper.rendered_json import parse_rendered_json
 
 log = logging.getLogger(__name__)
@@ -90,6 +91,15 @@ def _safe_render_failure_summary(failure: dict[str, object] | None) -> str:
     if status is not None:
         return f"rendered Scrape.do transport returned HTTP {status}"
     return "rendered Scrape.do transport was unavailable"
+
+
+async def _cancel_and_gather_tasks(tasks: list[asyncio.Task]) -> None:
+    """Cancel a failed/cancelled explicit task batch and consume siblings."""
+    for task in tasks:
+        if not task.done():
+            task.cancel()
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 
 def _direct_fallback_failure(body: str, status_code: int) -> str | None:
@@ -181,6 +191,12 @@ _BLOCKED_PATH_SUBSTRINGS: tuple[str, ...] = (
     "/find-a-course/courses/major/",
     "/find-a-course/courses/specialisation/",
     "/find-a-course/courses/specialization/",
+    # Funnelback also publishes postgraduate/undergraduate specialisation
+    # records under these explicit path segments.  They are not degree pages
+    # and have no standalone international fee, but a degree slug containing
+    # the word "specialisation" must remain valid.
+    "/find-a-course/courses/postgraduate-specialisation/",
+    "/find-a-course/courses/undergraduate-specialisation/",
 )
 
 # Selector that waits for the catalogue/faculty page to hydrate.  Faculty
@@ -552,7 +568,16 @@ def _build_scrapy_result(
         if "international" in fee_type_label:
             raw_fee = fee_item.get("estimated_annual_fee")
             try:
-                fee_val = float(raw_fee)
+                # The same authoritative field uses both "48800.00" and
+                # "48,800.00". Accept numeric amounts, not ranges/prose.
+                fee_text = str(raw_fee).strip()
+                if not re.fullmatch(
+                    r"(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?", fee_text
+                ):
+                    continue
+                fee_val = float(fee_text.replace(",", ""))
+                if not 0 < fee_val < float("inf"):
+                    continue
                 payload["international_fee"] = fee_val
                 payload["fee_term"] = "Year"
                 payload["currency"] = "AUD"
@@ -945,16 +970,22 @@ async def _discover_from_funnelback_api(
     missing_urls = [
         url for url, _, _ in course_triples if url not in programs
     ]
+    confirmed_missing_urls: set[str] = set()
     if missing_urls:
         try:
-            from app.services.scraper.http_fetcher import fetch_html_scrape_do
+            from app.services.scraper.http_fetcher import (
+                ScrapedoAccountError,
+                fetch_html_scrape_do,
+                get_last_fetch_failure,
+            )
             scrape_do_ok = 0
-            retry_count = 0
             render_sem = asyncio.Semaphore(_PAGE_DATA_RENDER_PARALLEL)
+            public_checked_urls: set[str] = set()
+            public_reason_counts: dict[str, int] = {}
 
             async def _retry_rendered_page_data(
                 url: str,
-            ) -> tuple[str, dict | None]:
+            ) -> tuple[str, dict | None, dict | None]:
                 pd_url = _page_data_url(url)
                 try:
                     async with render_sem:
@@ -962,10 +993,79 @@ async def _discover_from_funnelback_api(
                             pd_url, render=True, rate_limit=True, max_retries=0,
                         )
                     if body:
-                        return url, _extract_program_from_page_data(body)
+                        program = _extract_program_from_page_data(body)
+                        if program:
+                            return url, program, None
+                        return url, None, {"kind": "parser_failure"}
+                except ScrapedoAccountError:
+                    # Account/auth failures are a job-level contract: never
+                    # turn one into a silent metadata-only course.
+                    raise
                 except Exception:  # noqa: BLE001
                     pass
-                return url, None
+                failure = get_last_fetch_failure()
+                return url, None, dict(failure) if failure else None
+
+            def _is_origin_not_found(failure: dict | None) -> bool:
+                if not failure or failure.get("kind") != "origin_not_found":
+                    return False
+                try:
+                    return int(failure.get("status_code")) in (404, 410)
+                except (TypeError, ValueError):
+                    return False
+
+            def _failure_reason(
+                failure: dict | None,
+                *,
+                prefix: str = "",
+            ) -> str:
+                if not failure:
+                    return f"{prefix}unknown_failure"
+                kind = str(failure.get("kind") or "unknown_failure")
+                status = failure.get("status_code")
+                suffix = f"_{status}" if status is not None else ""
+                return f"{prefix}{kind}{suffix}"
+
+            async def _validate_public_detail(
+                url: str,
+            ) -> tuple[str, bool, str]:
+                """Confirm a rendered page-data 404/410 on the public page.
+
+                A missing Gatsby document is only removable from this
+                enrichment candidate set when the corresponding public detail
+                page is also definitively gone.  The probe deliberately uses
+                the existing rendered fetch helper with one provider attempt;
+                challenge pages, timeouts, parser/transport failures, and
+                successful public pages remain candidates.
+                """
+                try:
+                    async with render_sem:
+                        body = await fetch_html_scrape_do(
+                            url,
+                            render=True,
+                            rate_limit=True,
+                            max_retries=0,
+                            request_timeout_seconds=_PAGE_DATA_TIMEOUT_S,
+                        )
+                    if body:
+                        return url, False, "public_success"
+                except ScrapedoAccountError:
+                    raise
+                except Exception:  # noqa: BLE001
+                    pass
+
+                failure = get_last_fetch_failure()
+                if _is_origin_not_found(failure):
+                    status = failure.get("status_code")
+                    return (
+                        url,
+                        True,
+                        f"public_origin_not_found_{status}",
+                    )
+                return url, False, _failure_reason(
+                    failure,
+                    prefix="public_",
+                )
 
             # The rendering proxy can transiently fail a small minority of a
             # large concurrent sweep. Retry only those misses once more rather
@@ -974,7 +1074,9 @@ async def _discover_from_funnelback_api(
             # no request for a URL already recovered by the first pass.
             for sweep in (1, 2):
                 sweep_urls = [
-                    url for url in missing_urls if url not in programs
+                    url
+                    for url in missing_urls
+                    if url not in programs and url not in confirmed_missing_urls
                 ]
                 if not sweep_urls:
                     break
@@ -983,34 +1085,99 @@ async def _discover_from_funnelback_api(
                     asyncio.create_task(_retry_rendered_page_data(url))
                     for url in sweep_urls
                 ]
-                for completed in asyncio.as_completed(retry_tasks):
-                    url, prog = await completed
-                    retry_count += 1
-                    if prog:
-                        programs[url] = prog
-                        scrape_do_ok += 1
-                    if retry_count % 25 == 0 or retry_count == len(sweep_urls):
-                        await emit_fn(
-                            "[DISCOVER] MQ: Tier 0 — rendered page-data.json "
-                            f"sweep {sweep} progress: "
-                            f"{retry_count}/{len(sweep_urls)} attempted, "
-                            f"{scrape_do_ok} recovered total"
+                try:
+                    for completed in asyncio.as_completed(retry_tasks):
+                        url, prog, failure = await completed
+                        retry_count += 1
+                        if prog:
+                            programs[url] = prog
+                            scrape_do_ok += 1
+                        elif sweep == 1 and _is_origin_not_found(failure):
+                            # Public validation is intentionally restricted to
+                            # rendered page-data origin 404/410s.  A URL is not
+                            # excluded merely because the provider returned a
+                            # challenge, timeout, parser failure, or other error.
+                            public_checked_urls.add(url)
+                        if retry_count % 25 == 0 or retry_count == len(sweep_urls):
+                            await emit_fn(
+                                "[DISCOVER] MQ: Tier 0 — rendered page-data.json "
+                                f"sweep {sweep} progress: "
+                                f"{retry_count}/{len(sweep_urls)} attempted, "
+                                f"{scrape_do_ok} recovered total"
+                            )
+                finally:
+                    await _cancel_and_gather_tasks(retry_tasks)
+
+                if sweep == 1 and public_checked_urls:
+                    public_tasks = [
+                        asyncio.create_task(_validate_public_detail(url))
+                        for url in sorted(public_checked_urls)
+                    ]
+                    try:
+                        for completed in asyncio.as_completed(public_tasks):
+                            url, confirmed, reason = await completed
+                            public_reason_counts[reason] = (
+                                public_reason_counts.get(reason, 0) + 1
+                            )
+                            if confirmed:
+                                confirmed_missing_urls.add(url)
+                                await emit_fn(
+                                    "[DISCOVER] MQ: confirmed missing public detail "
+                                    f"{url} — page-data and public detail both "
+                                    f"origin_not_found HTTP {reason.rsplit('_', 1)[-1]}; "
+                                    "excluding from enrichment candidates"
+                                )
+                        reason_summary = ", ".join(
+                            f"{reason}×{count}"
+                            for reason, count in sorted(
+                                public_reason_counts.items()
+                            )
                         )
+                        await emit_fn(
+                            "[DISCOVER] MQ: public-detail validation complete — "
+                            f"{len(public_checked_urls)} rendered page-data "
+                            f"origin_not_found candidate(s); reasons: "
+                            f"{reason_summary or 'none'}"
+                        )
+                    finally:
+                        await _cancel_and_gather_tasks(public_tasks)
             if missing_urls:
                 await emit_fn(
                     f"[DISCOVER] MQ: Tier 0 — page-data.json via scrape.do retry: "
-                    f"+{scrape_do_ok} (total now {len(programs)}/{len(course_triples)})"
+                    f"+{scrape_do_ok} (total now {len(programs)}/"
+                    f"{len(course_triples) - len(confirmed_missing_urls)}; "
+                    f"{len(confirmed_missing_urls)} confirmed missing excluded)"
                 )
+        except ScrapedoAccountError:
+            raise
         except Exception as _exc:  # noqa: BLE001
             log.debug("mq funnelback: scrape.do page-data retry unavailable: %s", _exc)
 
+    # A page-data 404/410 is removable only when the public detail route also
+    # returned the same definitive origin-not-found result.  Every other
+    # failure remains in this candidate set and therefore in both coverage
+    # denominators.
+    candidate_triples = [
+        triple
+        for triple in course_triples
+        if triple[0] not in confirmed_missing_urls
+    ]
+    if not candidate_triples:
+        message = (
+            "Macquarie structured enrichment has no candidates remaining "
+            "after confirmed public origin-not-found checks. Refusing to "
+            "stage an empty catalogue."
+        )
+        await emit_fn(f"[DISCOVER] MQ: ERROR — {message}")
+        raise MqEnrichmentCoverageError(message)
+
     page_data_coverage = (
-        len(programs) / len(course_triples) if course_triples else 0.0
+        len(programs) / len(candidate_triples) if candidate_triples else 0.0
     )
     if page_data_coverage < _PAGE_DATA_MIN_COVERAGE:
         message = (
             "Macquarie structured page-data coverage is too low "
-            f"({len(programs)}/{len(course_triples)}, "
+            f"({len(programs)}/{len(candidate_triples)}, "
             f"{page_data_coverage:.1%}; required "
             f"{_PAGE_DATA_MIN_COVERAGE:.1%}). Refusing to stage "
             "domestic-default course data."
@@ -1020,7 +1187,7 @@ async def _discover_from_funnelback_api(
 
     # ── Step 4: Build scrapy_result links ───────────────────────────────
     links: list[dict] = []
-    for url, name, meta in course_triples[:max_courses]:
+    for url, name, meta in candidate_triples[:max_courses]:
         program = programs.get(url, {})
         scrapy_result = _build_scrapy_result(name, url, meta, program)
         links.append({
@@ -1486,7 +1653,10 @@ async def _resolve_to_study_urls(
                 asyncio.create_task(_resolve_one(client, url))
                 for url in handbook_urls
             ]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+            try:
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+            finally:
+                await _cancel_and_gather_tasks(tasks)
 
         for result in results:
             if isinstance(result, Exception):
@@ -2020,6 +2190,10 @@ async def browser_discover_mq(
             _emit, max_courses=max_courses,
         )
     except MqEnrichmentCoverageError:
+        raise
+    except ScrapedoAccountError:
+        # Scrape.do auth/credits failures are job-fatal.  Do not hide one by
+        # falling through to lower-quality discovery tiers.
         raise
     except Exception as _fb_exc:  # noqa: BLE001
         log.warning(
