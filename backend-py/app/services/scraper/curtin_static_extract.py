@@ -355,12 +355,8 @@ def apply_curtin_static_extraction(url: str, html: str) -> dict[str, Any]:
         or _labelled_intake_months(soup)
         or None
     )
-    if (
-        not result["intake_months"]
-        and re.search(r"/course-(?:research|rs|rd)-", url, re.I)
-        and _has_research_term_intake(soup)
-    ):
-        result["intake_months"] = ["Rolling"]
+    # Research Term labels do not establish calendar intake months.
+    # Leave unknown months empty rather than inventing a Rolling intake.
     if not result["intake_months"]:
         available_months: set[str] = set()
         for period in soup.select(".course-locations .locations__period"):

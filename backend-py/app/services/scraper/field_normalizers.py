@@ -144,6 +144,26 @@ def normalize_score(raw: Any) -> str | None:
 # Intake month
 # ---------------------------------------------------------------------------
 
+# ``normalize_intake`` is intentionally kept as a comparison normalizer.  It
+# knows about semantic labels such as "Semester 1" so conflict detection can
+# compare those labels with an equivalent month.  Those labels must *not* be
+# written to ``scraped_courses.intake_months`` though: that column is a
+# calendar-month field, not a general intake-period field.
+_CALENDAR_MONTH_NAMES: tuple[str, ...] = (
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+)
+_CALENDAR_MONTH_MAP: dict[str, str] = {
+    name.lower(): name for name in _CALENDAR_MONTH_NAMES
+}
+_CALENDAR_MONTH_MAP.update(
+    {
+        name[:3].lower(): name
+        for name in _CALENDAR_MONTH_NAMES
+    }
+)
+_CALENDAR_MONTH_MAP["sept"] = "September"
+
 _INTAKE_MAP: dict[str, str] = {
     # Full month names
     "january": "1", "february": "2", "march": "3", "april": "4",
@@ -187,6 +207,95 @@ def normalize_intake(raw: Any) -> str | None:
     except ValueError:
         pass
     return _INTAKE_MAP.get(val)
+
+
+def normalize_intake_months(raw: Any) -> list[str] | None:
+    """Return only explicit calendar months for persistence.
+
+    ``intake_months`` is displayed and queried as a list of calendar month
+    names.  Period labels such as ``Rolling``, ``ROI``, ``Research Term 1``,
+    ``Semester 1`` and ``Trimester 2`` therefore have no valid representation
+    in this field and are dropped rather than being translated to an
+    arbitrary month (or to all twelve months).
+
+    The function accepts the list-shaped values used by extractors as well as
+    a scalar/comma-separated value from older providers.  Month abbreviations
+    and numeric month values are canonicalised to full month names.  When a
+    mixed value contains both a period label and real months, only the real
+    months are returned.  An invalid/period-only value returns ``None`` so a
+    staging or re-extraction caller can leave the field empty without
+    persisting the label.
+    """
+    if raw is None or raw == "":
+        return None
+
+    if isinstance(raw, (list, tuple, set)):
+        values: list[Any] = list(raw)
+    else:
+        values = [raw]
+
+    months: list[str] = []
+    for value in values:
+        if isinstance(value, bool):
+            # bool is an int subclass, but True/False are not month numbers.
+            continue
+        if isinstance(value, (int, float)):
+            if isinstance(value, float) and not value.is_integer():
+                continue
+            month_number = int(value)
+            if 1 <= month_number <= 12:
+                month = _CALENDAR_MONTH_NAMES[month_number - 1]
+                if month not in months:
+                    months.append(month)
+            continue
+        if not isinstance(value, str):
+            continue
+
+        text = value.strip()
+        if not text:
+            continue
+
+        # A provider occasionally returns "February, July" as one scalar.
+        # Split only on list-like separators; do not search inside arbitrary
+        # prose, since extracting a month from "Research Term 1 (February)"
+        # would turn an unverified period into a misleading intake.
+        pieces = re.split(r"\s*[,;|/]\s*", text)
+        for piece in pieces:
+            candidate = piece.strip()
+            if not candidate:
+                continue
+            month = _CALENDAR_MONTH_MAP.get(candidate.casefold())
+            if month is None:
+                try:
+                    month_number = int(candidate)
+                except ValueError:
+                    continue
+                if 1 <= month_number <= 12:
+                    month = _CALENDAR_MONTH_NAMES[month_number - 1]
+            if month is not None and month not in months:
+                months.append(month)
+
+    return months or None
+
+
+def sanitize_intake_months_payload(
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    """Copy ``payload`` while enforcing the persisted intake-month contract.
+
+    Keeping this at the shared normalisation boundary means both normal scrape
+    staging and in-place re-extraction apply exactly the same rule.  A key
+    supplied by an extractor is retained with ``None`` when no calendar month
+    survives; this lets callers distinguish an intentional empty extraction
+    from a missing field while ensuring no invalid label reaches JSONB.
+    """
+    if "intake_months" not in payload:
+        return payload
+    cleaned = dict(payload)
+    cleaned["intake_months"] = normalize_intake_months(
+        payload.get("intake_months")
+    )
+    return cleaned
 
 
 # ---------------------------------------------------------------------------

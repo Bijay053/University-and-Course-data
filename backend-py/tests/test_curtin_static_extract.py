@@ -225,7 +225,7 @@ def test_unavailable_semester_and_research_terms_are_not_intakes():
     assert result["intake_months"] == ["February"]
 
 
-def test_research_terms_use_rolling_instead_of_page_months():
+def test_research_terms_without_calendar_months_leave_intake_empty():
     html = """
       <aside>Applications close in May. Information session: September.</aside>
       <div class="information">
@@ -242,4 +242,4 @@ def test_research_terms_use_rolling_instead_of_page_months():
         html,
     )
 
-    assert result["intake_months"] == ["Rolling"]
+    assert result["intake_months"] is None

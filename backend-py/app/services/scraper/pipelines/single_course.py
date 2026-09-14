@@ -51,6 +51,7 @@ from app.services.scraper.http_fetcher import (
     scrape_do_static_scope,
 )
 from app.services.scraper.provenance import build_course_page_provenance_footer
+from app.services.scraper.field_normalizers import sanitize_intake_months_payload
 from app.services.scraper.course_deadline import (
     clamp_timeout,
     has_budget,
@@ -4103,7 +4104,7 @@ async def extract_course(
     # Curtin's current-course provider is the only intake authority on its
     # offering pages. If it found no Semester 1/2 value, remove page-wide month
     # guesses (typically May/September from deadlines and events). Research
-    # courses remain empty here so the rolling-enrolment fallback can run.
+    # courses remain empty unless course-owned calendar months are known.
     if _curtin_intake_authoritative:
         payload["intake_months"] = _curtin_structured_intake
         evidence = [
@@ -9348,6 +9349,12 @@ async def extract_course(
     # missing/suspicious-field warnings.
     _apply_configured_field_overrides(payload, url)
 
+    # ``intake_months`` is a calendar-month field at every persistence
+    # boundary.  Normalize it before the quality audit and before the payload
+    # is returned to staging so period labels (Rolling / ROI / Research Term)
+    # cannot be counted as a filled intake.
+    payload = sanitize_intake_months_payload(payload)
+
     # ── Scrape-quality warning detection ─────────────────────────────────────
     # After ALL extractors have settled, audit the final payload for cases
     # where the course page clearly contained a data section but the pipeline
@@ -9638,62 +9645,18 @@ async def extract_course(
     except Exception as exc:  # noqa: BLE001 — never abort extraction
         log.warning("duration degree_level_defaults fallback errored on %s: %s", url, exc)
 
-    # ── Normalise any abbreviated intake months to full names ────────────────
-    # Belt-and-suspenders: ai_extractor_run month_list transform, federation_json,
-    # and any other extractor that slips through should already emit full names
-    # after the 2026-07 fix, but normalise here as a fleet-wide safety net so
-    # abbreviated months ("Mar","Jul","Nov") never reach the scraped_courses table
-    # and trigger data_quality `invalid_intake_months` warnings on every re-scrape.
-    _raw_im = payload.get("intake_months")
-    if _raw_im:
-        try:
-            from app.services.scraper.extractors.intake import (
-                _normalise_month as _nm_sc,
-            )
-            if isinstance(_raw_im, str):
-                # Comma-separated string that wasn't converted to a list upstream
-                import re as _re_sc
-                _raw_im = [p.strip() for p in _re_sc.split(r"[,;/\n]", _raw_im) if p.strip()]
-            _normed = [_nm_sc(m) for m in _raw_im if m]
-            _normed = [m for m in _normed if m]
-            if _normed:
-                payload["intake_months"] = _normed
-        except Exception:
-            pass
-
     # ── No intake months ────────────────────────────────────────────────────
     _intake_months = payload.get("intake_months") or []
-    if not _intake_months:
-        # Per-uni rolling-enrollment fallback (research degrees).
-        # When the page describes continuous / rolling enrolment AND the
-        # uni opted in via YAML, surface that in the catalogue instead
-        # of leaving the column blank. Curtin PhD / MPhil pages are the
-        # canonical case ("Enrolment shall be continuous").
-        _rolling_label: Optional[str] = None
-        _rolling_markers: list[str] = []
-        try:
-            _ic = get_uni_config()
-            if _ic is not None:
-                _rolling_label = _ic.extraction.intake.rolling_enrollment_label
-                _rolling_markers = list(
-                    _ic.extraction.intake.rolling_enrollment_markers or []
-                )
-        except Exception:
-            _rolling_label = None
-            _rolling_markers = []
-        if _rolling_label and _rolling_markers and any(
-            m.lower() in _check_lower for m in _rolling_markers
-        ):
-            payload["intake_months"] = [_rolling_label]
-            _intake_months = payload["intake_months"]
 
     # ── YAML default_by_level intake fallback ────────────────────────────────
-    # When intake_months is still empty after all extractors (including the
-    # rolling-enrollment fallback above), apply the YAML-configured default
+    # When intake_months is still empty after all extractors, apply the
+    # YAML-configured default
     # month(s) for the course's degree level.  The synthetic evidence row is
     # marked with the configured default_source_note so reviewers can see the
-    # intake was not extracted from the course page.
-    if not _intake_months:
+    # intake was not extracted from the course page. Curtin's current-course
+    # provider is authoritative even when it returns no calendar month, so
+    # never replace that explicit empty result with a configured guess.
+    if not _intake_months and not _curtin_intake_authoritative:
         try:
             _uc_intk = get_uni_config()
             _intk_cfg = _uc_intk.extraction.intake if _uc_intk else None
@@ -9736,11 +9699,15 @@ async def extract_course(
                 )
                 else ""
             )
-            _default_months: list[str] = (
-                list(_dl_map.get(_dl_tier) or [])
-                if _dl_tier else
-                list(_dl_map.get("undergraduate") or [])  # safe global fallback
-            )
+            _default_months = sanitize_intake_months_payload(
+                {
+                    "intake_months": (
+                        list(_dl_map.get(_dl_tier) or [])
+                        if _dl_tier else
+                        list(_dl_map.get("undergraduate") or [])  # safe global fallback
+                    )
+                }
+            ).get("intake_months") or []
             if _default_months:
                 payload["intake_months"] = _default_months
                 _intake_months = _default_months
@@ -9764,6 +9731,12 @@ async def extract_course(
                     _dl_tier,
                     _src_note,
                 )
+
+    # YAML defaults are another producer of this field. Re-apply the shared
+    # guard after all fallback logic and before warning generation so a bad
+    # configuration cannot make an invalid period look like a filled intake.
+    payload = sanitize_intake_months_payload(payload)
+    _intake_months = payload.get("intake_months") or []
 
     if not _intake_months:
         # Only warn if page had explicit intake-related text (avoid false

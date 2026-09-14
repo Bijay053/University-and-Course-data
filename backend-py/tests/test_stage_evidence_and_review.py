@@ -236,6 +236,43 @@ async def test_targeted_fee_fix_does_not_persist_unrelated_extraction(monkeypatc
 
 
 @pytest.mark.asyncio
+async def test_stage_course_persists_only_calendar_intake_months():
+    uni_id = await _pick_university()
+    job_id = f"test_intake_guard_{uuid.uuid4().hex[:10]}"
+    url = "https://example.edu/courses/master-of-computing"
+    try:
+        async with AsyncSessionLocal() as db:
+            result = await stage_course(
+                db,
+                scrape_job_id=job_id,
+                university_id=uni_id,
+                course_name="Master of Computing",
+                payload={
+                    "course_name": "Master of Computing",
+                    "degree_level": "Master's",
+                    "course_website": url,
+                    "international_fee": 42000,
+                    "intake_months": [
+                        "Rolling",
+                        "February",
+                        "Research Term 1",
+                        "July",
+                    ],
+                },
+                evidence=[],
+                source_url=url,
+            )
+            assert result.saved, result.reason
+
+        async with AsyncSessionLocal() as db:
+            staged = await db.get(ScrapedCourse, result.scraped_course_id)
+            assert staged is not None
+            assert staged.intake_months == ["February", "July"]
+    finally:
+        await _cleanup(job_id)
+
+
+@pytest.mark.asyncio
 async def test_stage_course_persists_completeness_and_evidence():
     uni_id = await _pick_university()
     job_id = f"test_bugcd_{uuid.uuid4().hex[:10]}"
@@ -657,6 +694,97 @@ async def test_re_extract_staged_refreshes_changed_fee_evidence(monkeypatch):
         )
         assert by_field["fee_year"].candidate_value == "2026"
         assert by_field["fee_year"].snippet == "Fees shown are for 2026"
+    finally:
+        await _cleanup(job_id)
+
+
+@pytest.mark.asyncio
+async def test_re_extract_clears_legacy_rolling_intake_without_touching_other_fields(
+    monkeypatch,
+):
+    uni_id = await _pick_university()
+    job_id = f"test_reextract_intake_{uuid.uuid4().hex[:10]}"
+    url = "https://example.edu/courses/master-of-computing"
+    try:
+        async with AsyncSessionLocal() as db:
+            row = ScrapedCourse(
+                scrape_job_id=job_id,
+                university_id=uni_id,
+                course_name="Master of Computing",
+                course_website=url,
+                status="pending",
+                category="Computer Science & IT",
+                intake_months=["Rolling"],
+                international_fee=42000,
+            )
+            db.add(row)
+            await db.flush()
+            sc_id = row.id
+            await db.commit()
+
+        async def _fake_extract_only(*_args, **_kwargs):
+            return {
+                "url": url,
+                "payload": {
+                    "intake_months": ["Research Term 1"],
+                    "category": "Computing",
+                },
+                "evidence": [
+                    {
+                        "field_key": "intake_months",
+                        "value": ["Research Term 1"],
+                        "method": "test:research-term",
+                        "source_url": url,
+                        "snippet": "Research Term 1",
+                        "decision_status": "selected",
+                    },
+                    {
+                        "field_key": "category",
+                        "value": "Computing",
+                        "method": "test:category",
+                        "source_url": url,
+                        "snippet": "Computing",
+                        "decision_status": "selected",
+                    },
+                ],
+            }
+
+        async def _fake_prefetch_central_pages(*_args, **_kwargs):
+            return None
+
+        monkeypatch.setattr(
+            "app.services.scraper.orchestrator._extract_only",
+            _fake_extract_only,
+        )
+        monkeypatch.setattr(
+            "app.services.scraper.central_pages.prefetch_central_pages",
+            _fake_prefetch_central_pages,
+        )
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post(
+                "/api/scrape/staged/re-extract",
+                json={"ids": [sc_id], "universityId": uni_id},
+            )
+        assert response.status_code == 200, response.text
+        assert response.json()["updated"] == 1
+
+        async with AsyncSessionLocal() as db:
+            refreshed = await db.get(ScrapedCourse, sc_id)
+            assert refreshed is not None
+            assert refreshed.intake_months is None
+            assert refreshed.category == "Computing"
+            assert refreshed.international_fee == 42000
+            evidence = (
+                await db.execute(
+                    select(ScrapedFieldEvidence).where(
+                        ScrapedFieldEvidence.scraped_course_id == sc_id,
+                    )
+                )
+            ).scalars().all()
+            assert {item.field_key for item in evidence} == {"category"}
     finally:
         await _cleanup(job_id)
 

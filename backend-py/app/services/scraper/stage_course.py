@@ -43,6 +43,7 @@ from app.services.scraper.guards import (
     is_generic_course_category_name,
     should_stage_course,
 )
+from app.services.scraper.field_normalizers import sanitize_intake_months_payload
 from app.services.scraper.url_identity import canonical_course_url_key
 
 log = logging.getLogger(__name__)
@@ -359,6 +360,12 @@ async def stage_course(
     # in the review modal.
     if is_generic_course_category_name(name):
         return StageResult(False, "rejected: generic category page")
+
+    # ``intake_months`` is a calendar-month column.  Apply the shared
+    # persistence guard before any staging gate or approved-row preservation so
+    # period labels (Rolling / ROI / Research Term) cannot reach JSONB, while
+    # real months in a mixed extractor result remain available.
+    payload = sanitize_intake_months_payload(payload)
 
     # Phase A defence-in-depth: refuse to stage a course whose source URL
     # is on the page blocklist (apply / fees / news / faculty / etc.).
@@ -945,6 +952,11 @@ async def stage_course(
                             )
                     except re.error:
                         log.warning("field_overrides: invalid regex skipped: %s", _fo.url_regex)
+
+    # Approved-row preservation above can reintroduce a legacy period label
+    # after the initial guard.  Re-run the guard immediately before model
+    # construction so the actual JSONB write is always month-only.
+    payload = sanitize_intake_months_payload(payload)
 
     sc = ScrapedCourse(
         scrape_job_id=scrape_job_id,

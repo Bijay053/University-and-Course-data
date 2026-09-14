@@ -7,6 +7,7 @@ from app.services.scraper.field_normalizers import (
     normalize_duration,
     normalize_fee,
     normalize_intake,
+    normalize_intake_months,
     normalize_score,
     normalize_for_conflict,
 )
@@ -200,6 +201,36 @@ class TestNormalizeIntake:
 
     def test_december(self):
         assert normalize_intake("december") == "12"
+
+
+class TestNormalizePersistedIntakeMonths:
+    """The JSONB intake_months field stores calendar months only."""
+
+    def test_calendar_months_are_canonicalized(self):
+        assert normalize_intake_months(["Feb", "July", 9]) == [
+            "February",
+            "July",
+            "September",
+        ]
+
+    def test_period_labels_are_not_mapped_to_months(self):
+        for value in ("Rolling", "ROI", "Research Term 1", "Semester 1"):
+            assert normalize_intake_months([value]) is None
+
+    def test_mixed_period_labels_keep_real_months(self):
+        assert normalize_intake_months(
+            ["Rolling", "February", "Research Term 2", "July"]
+        ) == ["February", "July"]
+
+    def test_scalar_month_list_is_supported_without_inference(self):
+        assert normalize_intake_months("February, Rolling, September") == [
+            "February",
+            "September",
+        ]
+
+    def test_empty_and_invalid_values_are_empty(self):
+        assert normalize_intake_months(None) is None
+        assert normalize_intake_months(["Research Term 1", "ROI"]) is None
 
 
 # ---------------------------------------------------------------------------

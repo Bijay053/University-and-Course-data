@@ -2268,6 +2268,10 @@ async def re_extract_staged(
         evidence_fields_with_changed_provenance,
         refresh_evidence_for_fields,
     )
+    from app.services.scraper.field_normalizers import (
+        normalize_intake_months,
+        sanitize_intake_months_payload,
+    )
 
     if len(body.ids) > 5:
         raise HTTPException(
@@ -2443,6 +2447,7 @@ async def re_extract_staged(
         payload: dict = {}
         selected_evidence_by_field: dict[str, dict] = {}
         other_evidence: dict[tuple, dict] = {}
+        intake_clear_requested = False
         extraction_passes = 0
         last_error = "extractor returned empty payload"
         retry_merge_fields: set[str] | None = None
@@ -2472,7 +2477,18 @@ async def re_extract_staged(
                     continue
                 break
 
-            pass_payload = pass_out.get("payload") or {}
+            raw_pass_payload = pass_out.get("payload") or {}
+            if (
+                isinstance(raw_pass_payload, dict)
+                and "intake_months" in raw_pass_payload
+                and normalize_intake_months(raw_pass_payload.get("intake_months")) is None
+            ):
+                # Keep this bit separate from the cleaned payload.  A
+                # ``None`` value can otherwise be mistaken for a missing
+                # extraction and leave an existing legacy ["Rolling"] value
+                # untouched during a targeted Fix.
+                intake_clear_requested = True
+            pass_payload = sanitize_intake_months_payload(raw_pass_payload)
             if not pass_payload:
                 if pass_number == 1:
                     continue
@@ -2558,6 +2574,35 @@ async def re_extract_staged(
                 if str(evidence.get("field_key") or "") in targeted_fields
             }
 
+        # Re-apply the guard after combining extraction passes and narrowing a
+        # targeted request.  This is the last boundary before values are
+        # assigned to the existing JSONB row.
+        payload = sanitize_intake_months_payload(payload)
+        if (
+            intake_clear_requested
+            and (targeted_fields is None or "intake_months" in targeted_fields)
+            and normalize_intake_months(payload.get("intake_months")) is None
+        ):
+            # Explicitly clear an invalid old value even when the extractor's
+            # cleaned result is None.  Do not touch unrelated fields or their
+            # evidence.
+            payload["intake_months"] = None
+        elif (
+            (targeted_fields is None or "intake_months" in targeted_fields)
+            and "intake_months" not in payload
+        ):
+            # An all-fields/explicit-intake Fix can also encounter a legacy
+            # row whose old value is already invalid while the fresh extractor
+            # omitted the field.  Clean that stale value, but leave a valid
+            # existing month list untouched.
+            current_intake = getattr(row, "intake_months", None)
+            cleaned_current_intake = normalize_intake_months(current_intake)
+            if (
+                current_intake not in (None, [])
+                and current_intake != cleaned_current_intake
+            ):
+                payload["intake_months"] = cleaned_current_intake
+
         out = {
             **out,
             "payload": payload,
@@ -2599,6 +2644,19 @@ async def re_extract_staged(
             changed_fields.append("scrape_warnings")
 
         incoming_evidence = out.get("evidence") or []
+        if (
+            intake_clear_requested
+            and payload.get("intake_months") is None
+            and (targeted_fields is None or "intake_months" in targeted_fields)
+        ):
+            # A period label is not valid evidence for a calendar-month
+            # column.  Removing only this field's candidates keeps unrelated
+            # selected evidence intact while preventing a stale/invalid
+            # Rolling candidate from being refreshed into the review modal.
+            incoming_evidence = [
+                item for item in incoming_evidence
+                if str(item.get("field_key") or "") != "intake_months"
+            ]
         unchanged_payload_fields = {
             field_key
             for field_key in payload
@@ -4227,7 +4285,17 @@ async def staged_update(
     changed = False
     for camel, snake in _STAGED_EDITABLE_FIELDS.items():
         if camel in body:
-            setattr(sc, snake, body[camel])
+            value = body[camel]
+            if snake == "intake_months":
+                # Manual edits are another persistence boundary for the same
+                # JSONB field.  Keep only explicit calendar months; never
+                # allow Rolling/ROI/Research Term labels into the row.
+                from app.services.scraper.field_normalizers import (
+                    normalize_intake_months,
+                )
+
+                value = normalize_intake_months(value)
+            setattr(sc, snake, value)
             changed = True
     if changed:
         # Recompute completeness so the UI badge updates after save.

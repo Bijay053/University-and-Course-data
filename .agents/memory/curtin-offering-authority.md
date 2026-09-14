@@ -24,3 +24,12 @@ returns postgraduate international fee cards only when Curtin’s
 only AUD international year-one Offers or exact `YR1_IND_INT` cards, retain the
 stated fee year, and keep amount, currency, Annual period, and evidence atomic.
 Ignore total-course and domestic values.
+
+Intake values must be calendar months, never Rolling or Research Term labels.
+Unknown research intake months remain empty for review.
+
+**Why:** Converting Research Term 1/2 to Rolling falsely marked intake complete
+and displayed an invalid “Rol” value. The user explicitly requires months only.
+
+**How to apply:** Preserve verified calendar month evidence; do not translate
+year-round admission into arbitrary months or infer dates from deadlines.
