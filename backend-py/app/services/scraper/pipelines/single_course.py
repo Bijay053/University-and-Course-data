@@ -1406,6 +1406,7 @@ METHOD_AUTHORITY: dict[str, float] = {
     "ecu_pre_seed": _AUTHORITY_PRE_SEED,
     "uwa_static": _AUTHORITY_PRE_SEED,
     "curtin_static": _AUTHORITY_PRE_SEED,
+    "unsw_static": _AUTHORITY_PRE_SEED,
 }
 
 # ── Structural course-page method protection ──────────────────────────────────
@@ -3582,6 +3583,27 @@ async def extract_course(
                 )
         except Exception as _s0_exc:
             log.debug("[STAGE0] Rule application failed (non-fatal): %s", _s0_exc)
+
+    # ── UNSW pre-seed: audience fee fields and embedded English options ─────
+    try:
+        from app.services.scraper.unsw_static_extract import (
+            apply_unsw_static_extraction as _unsw_apply,
+            is_unsw_url as _is_unsw,
+        )
+        if _is_unsw(url):
+            _unsw_pre = _unsw_apply(url, html)
+            for _k, _v in _unsw_pre.items():
+                payload[_k] = _v
+                evidence.append({
+                    "field_key": _k,
+                    "value": _v,
+                    "confidence": 0.98,
+                    "method": "unsw_static",
+                    "source_url": url,
+                    "snippet": f"UNSW structured field: {_v}",
+                })
+    except Exception as _unsw_exc:
+        log.warning("unsw_static_extract failed on %s: %s", url, _unsw_exc)
 
     # ── Curtin pre-seed: current offering fact blocks ───────────────────────
     # Curtin pages repeat related majors and recommendation cards.  Run the
