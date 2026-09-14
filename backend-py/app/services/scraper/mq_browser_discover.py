@@ -60,6 +60,7 @@ accepts (the user's local machine, the prod droplet, etc.)::
 from __future__ import annotations
 
 import asyncio
+import html
 import json
 import logging
 import re
@@ -374,6 +375,187 @@ _MQ_SESSION_MONTHS = {
 }
 
 
+_MQ_RESEARCH_INDEX_URL = (
+    "https://www.mq.edu.au/research/phd-and-research-degrees/"
+    "explore-research-degrees"
+)
+_MQ_RESEARCH_FEES_URL = (
+    "https://www.mq.edu.au/study/admissions-and-entry/fees-and-costs/"
+    "research-students"
+)
+_MQ_RESEARCH_AUTHORITIES: tuple[dict[str, object], ...] = (
+    {
+        "title": "Doctor of Philosophy",
+        "url": (
+            "https://www.mq.edu.au/research/phd-and-research-degrees/"
+            "explore-research-degrees/doctor-of-philosophy"
+        ),
+        "duration": 3.0,
+        "duration_text": "Three years full-time equivalent",
+        "admissions_url": (
+            "https://www.mq.edu.au/study/find-a-course/research/"
+            "doctor-of-philosophy"
+        ),
+    },
+    {
+        "title": "Master of Philosophy",
+        "url": (
+            "https://www.mq.edu.au/research/phd-and-research-degrees/"
+            "explore-research-degrees/master-of-philosophy"
+        ),
+        "duration": 2.0,
+        "duration_text": "Two years full-time equivalent",
+        "admissions_url": (
+            "https://www.mq.edu.au/study/find-a-course/research/"
+            "master-of-philosophy"
+        ),
+    },
+)
+
+
+def _normalise_mq_research_title(title: str) -> str:
+    """Return a stable identity for the two MQ research qualifications."""
+    key = re.sub(r"[^a-z0-9]+", " ", (title or "").lower()).strip()
+    aliases = {
+        "phd": "doctor of philosophy",
+        "doctor of philosophy": "doctor of philosophy",
+        "mphil": "master of philosophy",
+        "master of philosophy": "master of philosophy",
+    }
+    return aliases.get(key, key)
+
+
+def _research_route_identity(url: str) -> str:
+    """Return the exact qualification identity encoded by an MQ route slug."""
+    path = urlparse(url or "").path.rstrip("/")
+    slug = path.rsplit("/", 1)[-1] if path else ""
+    return _normalise_mq_research_title(slug.replace("-", " ").replace("_", " "))
+
+
+def _extract_research_program_title(program: dict) -> str:
+    """Read the page-data qualification title without accepting a route slug."""
+    if not isinstance(program, dict):
+        return ""
+    for key in ("course_name", "course_title", "courseName", "title", "name"):
+        value = program.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    # A few MQ page-data generations nest the title under a course object.
+    for key in ("course", "course_details", "courseDetails"):
+        nested = program.get(key)
+        if isinstance(nested, dict):
+            title = _extract_research_program_title(nested)
+            if title:
+                return title
+    return ""
+
+
+def _research_authority_text(body: str | None) -> str:
+    """Flatten an authority page without trusting arbitrary embedded markup."""
+    if not body:
+        return ""
+    cleaned = re.sub(
+        r"<(?:script|style|noscript)\b[^>]*>.*?</(?:script|style|noscript)>",
+        " ",
+        body,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    cleaned = re.sub(r"<[^>]+>", " ", cleaned)
+    return re.sub(r"\s+", " ", html.unescape(cleaned)).strip()
+
+
+def _extract_research_authority_evidence(
+    body: str | None,
+    authority: dict[str, object],
+) -> dict[str, object] | None:
+    """Validate the official title, full-time duration, and intl evidence."""
+    text = _research_authority_text(body)
+    title = str(authority.get("title") or "").strip()
+    duration_text = str(authority.get("duration_text") or "").strip()
+    if not text or not title or not duration_text:
+        return None
+    if not re.search(rf"\b{re.escape(title)}\b", text, re.IGNORECASE):
+        return None
+    page_titles = re.findall(r"<title\b[^>]*>(.*?)</title>", body or "", re.I | re.S)
+    if page_titles:
+        page_title = re.sub(r"\s+", " ", html.unescape(page_titles[0])).strip()
+        if not re.match(
+            rf"^{re.escape(title)}(?:\s*[|—-]|\s*$)",
+            page_title,
+            re.IGNORECASE,
+        ):
+            return None
+    full_time = re.search(
+        r"\bfull[\s-]*time(?:\s+equivalent)?\b", text, re.IGNORECASE
+    )
+    duration = re.search(
+        r"\b(?:\d+|one|two|three|four)\s+years?\s+full[\s-]*time"
+        r"(?:\s+equivalent)?\b",
+        text,
+        re.IGNORECASE,
+    )
+    if not full_time or not duration:
+        return None
+    expected_duration = float(authority.get("duration") or 0)
+    duration_numbers = {
+        "one": 1.0,
+        "two": 2.0,
+        "three": 3.0,
+        "four": 4.0,
+    }
+    duration_token = duration.group(0).lower().split()[0]
+    try:
+        observed_duration = float(duration_token)
+    except ValueError:
+        observed_duration = duration_numbers.get(duration_token, 0.0)
+    if not expected_duration or observed_duration != expected_duration:
+        return None
+    international = re.search(
+        r"\b(?:international|overseas)\s+students?\b",
+        text,
+        re.IGNORECASE,
+    )
+    if not international:
+        return None
+    return {
+        "title": title,
+        "duration_text": duration.group(0),
+        "full_time_text": full_time.group(0),
+        "international_text": international.group(0),
+        "source_url": str(authority.get("url") or ""),
+    }
+
+
+def _extract_research_fee_authority_evidence(
+    body: str | None,
+) -> dict[str, str] | None:
+    """Verify that MQ's research-fees page names international tuition."""
+    text = _research_authority_text(body)
+    if not text:
+        return None
+    match = re.search(
+        r"\b(?:international|overseas)\s+students?\b"
+        r".{0,180}\b(?:international\s+)?(?:tuition\s+)?fees?\b",
+        text,
+        re.IGNORECASE,
+    )
+    if not match:
+        # Some current renderings put "fees" before "international
+        # students"; accept that order only when both terms are close.
+        match = re.search(
+            r"\b(?:international\s+)?(?:tuition\s+)?fees?\b"
+            r".{0,180}\b(?:international|overseas)\s+students?\b",
+            text,
+            re.IGNORECASE,
+        )
+    if not match:
+        return None
+    return {
+        "source_url": _MQ_RESEARCH_FEES_URL,
+        "snippet": match.group(0),
+    }
+
+
 def _mq_international_intake_months(offerings: object) -> list[str]:
     """Map MQ's international offering sessions to their start months."""
     if not isinstance(offerings, list):
@@ -406,7 +588,8 @@ def _mq_international_intake_months(offerings: object) -> list[str]:
 def _canonical_mq_admissions_url(url: str) -> str:
     """Use MQ's current-course route instead of a stale year snapshot."""
     return re.sub(
-        r"(/study/find-a-course/courses/)20\d{2}/",
+        r"(/study/find-a-course/(?:undergraduate|postgraduate|research|courses)/)"
+        r"20\d{2}/",
         r"\1",
         (url or "").strip().rstrip("/") + "/",
         count=1,
@@ -447,6 +630,8 @@ def _build_scrapy_result(
     url: str,
     funnelback_meta: dict,
     program: dict,
+    *,
+    include_funnelback_title_evidence: bool = True,
 ) -> dict:
     """Combine Funnelback metadata + page-data.json program dict into a
     ``scrapy_result``-compatible payload + evidence list.
@@ -476,10 +661,11 @@ def _build_scrapy_result(
     }
     evidence: list[dict] = []
 
-    evidence.append(_ev(
-        "course_name", name, "funnelback:title", url, "course",
-        f"Funnelback result title: {name}", 0.95,
-    ))
+    if include_funnelback_title_evidence:
+        evidence.append(_ev(
+            "course_name", name, "funnelback:title", url, "course",
+            f"Funnelback result title: {name}", 0.95,
+        ))
 
     # ── Degree level from Funnelback studyLevel ────────────────────────
     study_level_raw = funnelback_meta.get("studyLevel", "")
@@ -706,6 +892,333 @@ def _build_scrapy_result(
     return {"name": name, "url": url, "payload": payload, "evidence": evidence}
 
 
+def _build_research_authority_result(
+    authority: dict[str, object],
+    source_evidence: dict[str, object],
+    program: dict | None = None,
+    fee_source_evidence: dict[str, str] | None = None,
+) -> dict:
+    """Build an extractor-compatible result for an authority-backed row.
+
+    The research pages do not expose a domestic fee amount and are not a
+    reason to copy any domestic/default fee.  An international amount is
+    copied only when the structured page-data program contains an explicitly
+    labelled international fee.  Otherwise the fee remains unknown while
+    source evidence proves the qualification is internationally relevant.
+    """
+    title = str(authority["title"])
+    admissions_url = _canonical_mq_admissions_url(
+        str(authority.get("admissions_url") or authority["url"])
+    )
+    source_url = str(source_evidence["source_url"])
+    result = _build_scrapy_result(
+        title,
+        admissions_url,
+        {},
+        program if isinstance(program, dict) else {},
+        include_funnelback_title_evidence=False,
+    )
+    payload = result["payload"]
+    evidence = result["evidence"]
+    qualification_identity = _normalise_mq_research_title(title)
+    if qualification_identity == "doctor of philosophy":
+        degree_level = "Doctorate"
+        academic_level = "Doctorate"
+    elif qualification_identity == "master of philosophy":
+        degree_level = "Master's"
+        academic_level = "Postgraduate"
+    else:
+        # The authority list is intentionally bounded, but fail closed if a
+        # future edit introduces a third title without a classification.
+        raise ValueError(
+            f"unsupported MQ research qualification identity: {title!r}"
+        )
+    payload["course_name"] = title
+    payload["course_website"] = admissions_url
+    payload["degree_level"] = degree_level
+    payload["academic_level"] = academic_level
+    payload["duration"] = float(authority["duration"])
+    payload["duration_term"] = "year"
+    payload["study_load"] = "Full Time"
+    payload["research_authority_url"] = source_url
+    payload["research_fee_source_url"] = _MQ_RESEARCH_FEES_URL
+    payload["international_full_time_source_verified"] = True
+    # The official research-fees authority is a central fee page.  Marking
+    # that fact lets the staging gate accept a verified metadata-only row for
+    # review without inventing an annual amount from a domestic/default tier.
+    if fee_source_evidence:
+        payload["has_central_fee_page"] = True
+    evidence.extend([
+        {
+            "field_key": "degree_level",
+            "value": degree_level,
+            "normalized": degree_level,
+            "source_url": source_url,
+            "page_type": "research_authority",
+            "method": "mq:research_authority_title",
+            "snippet": f"Official research-degree title: {title}",
+            "confidence": 0.98,
+            "decision_status": "selected",
+        },
+        {
+            "field_key": "duration",
+            "value": float(authority["duration"]),
+            "normalized": float(authority["duration"]),
+            "source_url": source_url,
+            "page_type": "research_authority",
+            "method": "mq:research_authority_full_time_duration",
+            "snippet": str(authority["duration_text"]),
+            "confidence": 0.98,
+            "decision_status": "selected",
+        },
+        {
+            "field_key": "study_load",
+            "value": "Full Time",
+            "normalized": "Full Time",
+            "source_url": source_url,
+            "page_type": "research_authority",
+            "method": "mq:research_authority_full_time",
+            "snippet": (
+                f"{source_evidence['duration_text']}; "
+                f"Time commitment evidence: {source_evidence['full_time_text']}"
+            ),
+            "confidence": 0.98,
+            "decision_status": "selected",
+        },
+        {
+            "field_key": "international_full_time",
+            "value": True,
+            "normalized": True,
+            "source_url": source_url,
+            "page_type": "research_authority",
+            "method": "mq:research_authority_international_evidence",
+            "snippet": (
+                "Official research-degree page contains international-student "
+                f"evidence: {source_evidence['international_text']}"
+            ),
+            "confidence": 0.95,
+            "decision_status": "selected",
+        },
+        {
+            "field_key": "international_fee_source",
+            "value": _MQ_RESEARCH_FEES_URL,
+            "normalized": _MQ_RESEARCH_FEES_URL,
+            "source_url": _MQ_RESEARCH_FEES_URL,
+            "page_type": "research_fee_authority",
+            "method": "mq:research_fee_authority",
+            "snippet": (
+                fee_source_evidence.get("snippet")
+                if fee_source_evidence
+                else (
+                    "Official research-fees authority distinguishes "
+                    "international fees from domestic Research Training "
+                    "Program funding; no domestic amount was copied as "
+                    "tuition."
+                )
+            ),
+            "confidence": 0.90,
+            "decision_status": "selected",
+        },
+    ])
+    return result
+
+
+_MQ_RESEARCH_AUTHORITY_MIN_CATALOGUE = 200
+_MQ_RESEARCH_ROUTE_RE = re.compile(
+    r"""(?ix)
+    (?:
+        https://(?:www\.)?mq\.edu\.au
+    )?
+    /study/find-a-course/
+    (?:undergraduate|postgraduate|research|courses)
+    /[^"' <>&#\s]+
+    """
+)
+
+
+def _research_admissions_route(
+    body: str | None,
+    authority: dict[str, object],
+) -> str | None:
+    """Return only a route whose slug exactly identifies this qualification."""
+    fallback = _canonical_mq_admissions_url(
+        str(authority.get("admissions_url") or authority["url"])
+    )
+    expected_identity = _normalise_mq_research_title(
+        str(authority.get("title") or "")
+    )
+    if _research_route_identity(fallback) != expected_identity:
+        return None
+    if not body:
+        return fallback
+    for match in _MQ_RESEARCH_ROUTE_RE.finditer(body):
+        raw = match.group(0)
+        if not raw.startswith("http"):
+            raw = "https://www.mq.edu.au" + raw
+        raw = raw.split("?", 1)[0].split("#", 1)[0].rstrip("/")
+        candidate = _canonical_mq_admissions_url(raw)
+        # Avoid treating a generic link to a listing page as this degree.
+        if candidate.rstrip("/").rsplit("/", 1)[-1].lower() in {
+            "undergraduate",
+            "postgraduate",
+            "research",
+            "courses",
+        }:
+            continue
+        if _research_route_identity(candidate) == expected_identity:
+            return candidate
+    return fallback
+
+
+async def _fetch_mq_research_source(url: str) -> str | None:
+    """Fetch an official MQ research page without accepting challenge HTML."""
+    try:
+        from app.services.scraper.http_fetcher import fetch_html_scrape_do
+    except Exception:  # noqa: BLE001
+        fetch_html_scrape_do = None
+
+    if fetch_html_scrape_do is not None:
+        try:
+            body = await fetch_html_scrape_do(
+                url,
+                render=True,
+                rate_limit=True,
+                max_retries=0,
+            )
+            if body and not is_challenge_shell(body):
+                return body
+        except ScrapedoAccountError:
+            # Provider-account failures are job-fatal elsewhere in this
+            # module too; do not turn one into a silent research omission.
+            raise
+        except Exception:  # noqa: BLE001
+            pass
+
+    # This fallback is useful on an accepted production IP and keeps the
+    # pure parser independently testable.  A challenge shell is explicitly
+    # rejected rather than parsed as source evidence.
+    try:
+        import httpx as _httpx
+
+        async with _httpx.AsyncClient(
+            headers={"User-Agent": _SCRAPE_DO_UA},
+            follow_redirects=True,
+            timeout=_PAGE_DATA_TIMEOUT_S,
+        ) as client:
+            response = await client.get(url)
+        if response.status_code == 200 and not is_challenge_shell(response.text):
+            return response.text
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
+async def _discover_from_research_authority(
+    existing_names: set[str],
+    emit_fn,
+    *,
+    max_courses: int,
+) -> list[dict]:
+    """Discover omitted PhD/MPhil rows from MQ's official research pages.
+
+    The Funnelback profile is intentionally not used as the sole research
+    authority.  This bounded supplement only emits a row after the exact
+    title, full-time duration, and international-student evidence have all
+    been verified.  It is run after the regular 80%/70% rich-provider guards,
+    so an authority row without a published annual amount never weakens those
+    guards and never receives a domestic/default fee.
+    """
+    out: list[dict] = []
+    seen = set(existing_names)
+    fee_source_evidence: dict[str, str] | None = None
+    fee_source_checked = False
+    for authority in _MQ_RESEARCH_AUTHORITIES:
+        title = str(authority["title"])
+        identity = _normalise_mq_research_title(title)
+        if identity in seen:
+            continue
+        source_url = str(authority["url"])
+        body = await _fetch_mq_research_source(source_url)
+        source_evidence = _extract_research_authority_evidence(body, authority)
+        if not source_evidence:
+            await emit_fn(
+                "[DISCOVER] MQ: research authority did not verify "
+                f"{title}; leaving it out rather than staging an unverified row"
+            )
+            continue
+        if not fee_source_checked:
+            fee_source_checked = True
+            fee_body = await _fetch_mq_research_source(_MQ_RESEARCH_FEES_URL)
+            fee_source_evidence = _extract_research_fee_authority_evidence(
+                fee_body
+            )
+            if not fee_source_evidence:
+                await emit_fn(
+                    "[DISCOVER] MQ: research-fees authority did not verify "
+                    "international tuition; leaving PhD/MPhil rows out "
+                    "rather than accepting domestic/default fees"
+                )
+                return out
+
+        route = _research_admissions_route(body, authority)
+        if not route:
+            await emit_fn(
+                "[DISCOVER] MQ: research authority route identity mismatch "
+                f"for {title}; leaving it out rather than risking a "
+                "wrong-course page-data fee"
+            )
+            continue
+        authority_for_result = {**authority, "admissions_url": route}
+        # Enrich from the current admissions route where possible.  This is
+        # deliberately optional: the authority page remains the source for
+        # qualification identity and full-time route.  A missing page-data
+        # document must not cause domestic HTML/default fee fallback.
+        program: dict = {}
+        page_data_body = await _fetch_mq_research_source(_page_data_url(route))
+        if page_data_body:
+            program = _extract_program_from_page_data(page_data_body)
+            page_data_title = _extract_research_program_title(program)
+            if (
+                _normalise_mq_research_title(page_data_title)
+                != identity
+            ):
+                await emit_fn(
+                    "[DISCOVER] MQ: page-data title identity mismatch for "
+                    f"{title} (got {page_data_title or 'missing title'}); "
+                    "discarding page-data enrichment"
+                )
+                # Keep the authority-backed metadata-only row, but never
+                # carry a fee or duration from an unrelated course payload.
+                program = {}
+
+        result = _build_research_authority_result(
+            authority_for_result,
+            source_evidence,
+            program,
+            fee_source_evidence,
+        )
+        payload = result.get("payload") or {}
+        # Source route accounting is explicit so current/year aliases collapse
+        # before this supplement is handed to staging.
+        result["url"] = _canonical_mq_admissions_url(
+            str(payload.get("course_website") or route)
+        )
+        result["name"] = title
+        out.append({
+            "name": title,
+            "url": result["url"],
+            "scrapy_result": result,
+        })
+        seen.add(identity)
+        if len(out) >= max_courses:
+            break
+        await emit_fn(
+            "[DISCOVER] MQ: authoritative research course verified — "
+            f"{title} ({result['url']})"
+        )
+    return out
+
+
 async def _discover_from_funnelback_api(
     emit_fn,
     *,
@@ -904,8 +1417,10 @@ async def _discover_from_funnelback_api(
     # Build the (url, name, metaData) triples.
     course_triples: list[tuple[str, str, dict]] = []
     seen_course_urls: set[str] = set()
+    course_triple_indexes: dict[str, int] = {}
     for r in results:
-        live_url = _canonical_mq_admissions_url(r.get("liveUrl") or "")
+        raw_live_url = (r.get("liveUrl") or "").strip().rstrip("/")
+        live_url = _canonical_mq_admissions_url(raw_live_url)
         title = (r.get("title") or "").strip()
         meta = r.get("metaData") or {}
         if not live_url or not title:
@@ -916,10 +1431,16 @@ async def _discover_from_funnelback_api(
             continue
         # Funnelback can return both a stale year-stamped route and the current
         # unversioned route for the same degree.  They become identical only
-        # after canonicalisation, so deduplicate here as well as at ingestion.
+        # after canonicalisation.  Prefer the unversioned/current record when
+        # both are present so stale year metadata never wins the enrichment.
         if live_url in seen_course_urls:
+            if raw_live_url == live_url:
+                course_triples[course_triple_indexes[live_url]] = (
+                    live_url, title, meta
+                )
             continue
         seen_course_urls.add(live_url)
+        course_triple_indexes[live_url] = len(course_triples)
         course_triples.append((live_url, title, meta))
 
     await emit_fn(
@@ -1214,6 +1735,28 @@ async def _discover_from_funnelback_api(
         )
         await emit_fn(f"[DISCOVER] MQ: ERROR — {message}")
         raise MqEnrichmentCoverageError(message)
+
+    # Task 467: the official Graduate Research Academy pages are a separate
+    # authority from the international Funnelback profile.  Add only omitted
+    # PhD/MPhil rows, and only after the ordinary page-data and fee guards
+    # have passed.  This preserves the 80%/70% denominators and leaves an
+    # unpublished research fee blank rather than copying a domestic/default
+    # amount.
+    if (
+        len(course_triples) >= _MQ_RESEARCH_AUTHORITY_MIN_CATALOGUE
+        and len(links) < max_courses
+    ):
+        research_links = await _discover_from_research_authority(
+            {
+                _normalise_mq_research_title(
+                    str(link.get("name") or "")
+                )
+                for link in links
+            },
+            emit_fn,
+            max_courses=max_courses - len(links),
+        )
+        links.extend(research_links)
 
     await emit_fn(
         f"[DISCOVER] MQ: Tier 0 — Funnelback API complete: "
