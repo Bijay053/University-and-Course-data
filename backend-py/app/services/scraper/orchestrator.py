@@ -511,6 +511,16 @@ def _catalogue_floor_guard(
     }
 
 
+def _has_per_university_yaml(yaml_root: Path, slug: str) -> bool:
+    """Return whether a slug has either a shared or ID-specific YAML recipe."""
+    normalized_slug = (slug or "").strip().lower()
+    if not normalized_slug:
+        return False
+    return (yaml_root / f"{normalized_slug}.yaml").exists() or any(
+        yaml_root.glob(f"{normalized_slug}_*.yaml")
+    )
+
+
 async def _apply_render_listing_pages(
     *,
     links: list[dict],
@@ -7552,7 +7562,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 from pathlib import Path as _P
                 _slug = (_uni_cfg.slug or "").lower() if _uni_cfg else ""
                 _yaml_root = _P(__file__).resolve().parents[3] / "scraper_config" / "unis"
-                _has_yaml = bool(_slug) and (_yaml_root / f"{_slug}.yaml").exists()
+                _has_yaml = _has_per_university_yaml(_yaml_root, _slug)
                 _staged_n = int(summary.get("staged") or 0)
                 # avg completeness across this job's staged rows
                 from sqlalchemy import select as _sel, func as _func
