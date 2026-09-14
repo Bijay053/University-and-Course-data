@@ -33,3 +33,10 @@ and displayed an invalid “Rol” value. The user explicitly requires months on
 
 **How to apply:** Preserve verified calendar month evidence; do not translate
 year-round admission into arbitrary months or infer dates from deadlines.
+
+Treat prevention and historical repair as separate deliverables.
+**Why:** An undeployed parser correction left production review rows displaying
+“Rol”; fixing future extraction alone does not clear stored invalid values.
+**How to apply:** Verify the serving release and repair affected pending rows
+with before-images, refreshed review scores, and invalidated stale evidence.
+Do not interrupt unrelated active scrapes just to restart corrected workers.
