@@ -967,22 +967,35 @@ async def _discover_from_funnelback_api(
                     pass
                 return url, None
 
-            retry_tasks = [
-                asyncio.create_task(_retry_rendered_page_data(url))
-                for url in missing_urls
-            ]
-            for completed in asyncio.as_completed(retry_tasks):
-                url, prog = await completed
-                retry_count += 1
-                if prog:
-                    programs[url] = prog
-                    scrape_do_ok += 1
-                if retry_count % 25 == 0 or retry_count == len(missing_urls):
-                    await emit_fn(
-                        "[DISCOVER] MQ: Tier 0 — rendered page-data.json retry "
-                        f"progress: {retry_count}/{len(missing_urls)} attempted, "
-                        f"{scrape_do_ok} recovered"
-                    )
+            # The rendering proxy can transiently fail a small minority of a
+            # large concurrent sweep. Retry only those misses once more rather
+            # than failing a healthy catalogue a fraction below the fee guard.
+            # The second pass remains bounded by the same semaphore and makes
+            # no request for a URL already recovered by the first pass.
+            for sweep in (1, 2):
+                sweep_urls = [
+                    url for url in missing_urls if url not in programs
+                ]
+                if not sweep_urls:
+                    break
+                retry_count = 0
+                retry_tasks = [
+                    asyncio.create_task(_retry_rendered_page_data(url))
+                    for url in sweep_urls
+                ]
+                for completed in asyncio.as_completed(retry_tasks):
+                    url, prog = await completed
+                    retry_count += 1
+                    if prog:
+                        programs[url] = prog
+                        scrape_do_ok += 1
+                    if retry_count % 25 == 0 or retry_count == len(sweep_urls):
+                        await emit_fn(
+                            "[DISCOVER] MQ: Tier 0 — rendered page-data.json "
+                            f"sweep {sweep} progress: "
+                            f"{retry_count}/{len(sweep_urls)} attempted, "
+                            f"{scrape_do_ok} recovered total"
+                        )
             if missing_urls:
                 await emit_fn(
                     f"[DISCOVER] MQ: Tier 0 — page-data.json via scrape.do retry: "

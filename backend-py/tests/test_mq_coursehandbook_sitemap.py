@@ -735,6 +735,80 @@ class TestFunnelbackRichProvider:
             await mq._discover_from_funnelback_api(emit, max_courses=100)
 
     @pytest.mark.asyncio
+    async def test_retries_only_transient_rendered_page_data_misses(
+        self, monkeypatch,
+    ):
+        import httpx
+        import app.services.scraper.http_fetcher as http_fetcher
+
+        rows = [
+            {
+                "title": f"Bachelor of Test {i}",
+                "liveUrl": (
+                    "https://www.mq.edu.au/study/find-a-course/"
+                    f"courses/course-{i}"
+                ),
+                "metaData": {},
+            }
+            for i in range(50)
+        ]
+        attempts: dict[str, int] = {}
+        page_data = json.dumps({
+            "result": {"data": {"current": {"fields": {"json": json.dumps({
+                "study_level": "Undergraduate",
+                "fees": [{
+                    "fee_type": {"label": "International"},
+                    "estimated_annual_fee": "40000",
+                }],
+            })}}}},
+        })
+
+        async def fake_scrape_do(url, **kwargs):
+            if "s/search.json" in url:
+                return json.dumps({
+                    "response": {"resultPacket": {"results": rows}},
+                })
+            attempts[url] = attempts.get(url, 0) + 1
+            if attempts[url] == 1 and url.endswith("course-0/page-data.json"):
+                return None
+            return page_data
+
+        class FakeResponse:
+            status_code = 403
+            text = ""
+
+        class FakeClient:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def get(self, *args, **kwargs):
+                return FakeResponse()
+
+        async def emit(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(
+            http_fetcher, "fetch_html_scrape_do", fake_scrape_do,
+        )
+        monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
+        monkeypatch.setattr(mq, "_RICH_COURSE_MIN_RESULTS", 1)
+
+        links = await mq._discover_from_funnelback_api(emit, max_courses=100)
+
+        assert len(links) == 50
+        failed_url = next(url for url in attempts if "course-0/" in url)
+        assert attempts[failed_url] == 2
+        assert all(
+            count == 1 for url, count in attempts.items() if url != failed_url
+        )
+
+    @pytest.mark.asyncio
     async def test_deduplicates_year_routes_after_canonicalisation(
         self, monkeypatch,
     ):
