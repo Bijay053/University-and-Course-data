@@ -5,6 +5,29 @@ description: Macquarie requires rendered Funnelback discovery plus structured pa
 
 ## Source authority
 
+The international Funnelback profile is not an exhaustive authority for
+research degrees: check the separate Graduate Research Academy PhD and MPhil
+pages before revising the catalogue baseline.
+
+**Why:** The official research site advertises international full-time PhD and
+MPhil routes that were absent from the profile-backed staged catalogue.
+Counting taught doctorates or Master of Research courses does not establish
+coverage of these qualifications.
+
+**How to apply:** Reconcile current-route identities, year aliases, dual
+public/page-data not-found confirmations, and staging eligibility before
+comparing counts. Pre-enrichment index rows are not validated current degrees;
+neither a higher raw count nor a clean enrichment pass proves completeness.
+
+Dual origin-not-found confirmation is a per-run exclusion, not proof of
+permanent retirement.
+
+**Why:** Two MQ courses returned on the next same-release scrape after both
+their public and page-data routes had reported origin 404 in the prior run.
+
+**How to apply:** Preserve live records and avoid deriving a lower permanent
+catalogue floor solely from one run's dual-404 exclusions.
+
 Funnelback can include postgraduate/undergraduate specialisation subpaths and
 retired degree links. Classify exact subpath segments and confirm both public
 detail and page-data origin-not-found before excluding stale links.

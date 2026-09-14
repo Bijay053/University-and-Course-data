@@ -35,6 +35,27 @@ def test_partial_catalogue_finishes_with_warning_not_success():
     assert guard["kind"] == "catalogue_below_expected_min"
 
 
+def test_macquarie_validated_provider_count_does_not_waive_catalogue_warning():
+    """Provider data quality is not independent proof of catalogue completeness."""
+    from app.services.scraper.config.loader import load_uni_config
+
+    config = load_uni_config(
+        slug="mq",
+        scrape_url="https://www.mq.edu.au/",
+        name="Macquarie University",
+    )
+    assert config.discovery.expected_min_courses == 300
+    guard = _catalogue_floor_guard(
+        raw_discovered=181,
+        extractable=181,
+        staged=180,
+        expected_min_courses=config.discovery.expected_min_courses,
+    )
+    assert guard is not None
+    assert guard["status"] == "completed_with_warnings"
+    assert guard["kind"] == "catalogue_below_expected_min"
+
+
 def test_catalogue_at_floor_is_not_flagged():
     assert _catalogue_floor_guard(
         raw_discovered=236,

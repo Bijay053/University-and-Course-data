@@ -1,0 +1,319 @@
+{
+  "task": "466",
+  "checked_at": "2026-09-14",
+  "purpose": "Bounded Macquarie catalogue baseline audit; no provider repair or production write",
+  "source": {
+    "funnelback_collection": "mqu~sp-courses",
+    "profile": "international",
+    "query": "!padrenull",
+    "pages": [
+      {
+        "start_rank": 1,
+        "num_ranks": 200,
+        "fully_matching": 372
+      },
+      {
+        "start_rank": 201,
+        "num_ranks": 200,
+        "fully_matching": 372
+      }
+    ],
+    "raw_result_counts": {
+      "unique_urls": 372,
+      "course": 138,
+      "majors_and_specialisations": 160,
+      "double_degree": 74,
+      "course_or_double_degree_pre_enrichment": 212
+    },
+    "canonicalisation": {
+      "rule": "Remove /2026/ from /study/find-a-course/courses/ routes and remove trailing slash; compare host-insensitively",
+      "pre_enrichment_records": 212,
+      "canonical_urls": 209,
+      "duplicate_year_route_alias_pairs": 3,
+      "duplicate_aliases": [
+        {
+          "course_codes": [
+            "C000492",
+            "D000073"
+          ],
+          "title": "Bachelor of Commerce and Bachelor of Psychology",
+          "unversioned_url": "https://www.mq.edu.au/study/find-a-course/courses/bachelor-of-commerce-and-bachelor-of-psychology",
+          "year_versioned_url": "https://www.mq.edu.au/study/find-a-course/courses/2026/bachelor-of-commerce-and-bachelor-of-psychology"
+        },
+        {
+          "course_codes": [
+            "C000486",
+            "D006302"
+          ],
+          "title": "Bachelor of Science and Bachelor of Engineering (Honours)",
+          "unversioned_url": "https://www.mq.edu.au/study/find-a-course/courses/bachelor-of-science-and-bachelor-of-engineering-honours",
+          "year_versioned_url": "https://www.mq.edu.au/study/find-a-course/courses/2026/bachelor-of-science-and-bachelor-of-engineering-honours"
+        },
+        {
+          "course_codes": [
+            "C000487",
+            "D000058"
+          ],
+          "title": "Bachelor of Information Technology and Bachelor of Engineering (Honours)",
+          "unversioned_url": "https://www.mq.edu.au/study/find-a-course/courses/bachelor-of-information-technology-and-bachelor-of-engineering-honours",
+          "year_versioned_url": "https://www.mq.edu.au/study/find-a-course/courses/2026/bachelor-of-information-technology-and-bachelor-of-engineering-honours"
+        }
+      ]
+    }
+  },
+  "production_terminal": {
+    "job_id": "job_d4bcad741d9b",
+    "url_list_evidence": "task466-mq-readonly-verification.json",
+    "raw_discovered": 181,
+    "extractable": 181,
+    "dual_404_retired": 28,
+    "dual_404_evidence": "task466-mq-terminal-dual-404.json",
+    "online_only_skipped": 1,
+    "staged": 180,
+    "fetch_failed": 0,
+    "errors": 0,
+    "expected_min_courses": 300,
+    "status": "completed_with_warnings"
+  },
+  "reconciliation": {
+    "transition": "212 -> 209 -> 181 -> 180",
+    "interpretation": "Three year-route aliases deduplicated; 28 canonical routes had page-data and public-detail rendered origin 404; one live Graduate Diploma of Applied Finance route was skipped by online_only.",
+    "terminal_canonical_ledger_count": 29
+  },
+  "canonical_non_staged_ledger": [
+    {
+      "course_code": "C000003",
+      "title": "Bachelor of Environment",
+      "type": "Course",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/bachelor-of-environment"
+    },
+    {
+      "course_code": "D000065",
+      "title": "Bachelor of Commerce and Bachelor of Engineering (Honours)",
+      "type": "Double Degree",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/bachelor-of-commerce-and-bachelor-of-engineering-honours"
+    },
+    {
+      "course_code": "D000047",
+      "title": "Bachelor of Environment and Bachelor of Laws",
+      "type": "Double Degree",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/bachelor-of-environment-and-bachelor-of-laws"
+    },
+    {
+      "course_code": "C000008",
+      "title": "Bachelor of Planning",
+      "type": "Course",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/bachelor-of-planning"
+    },
+    {
+      "course_code": "C000088",
+      "title": "Graduate Certificate of Editing and Electronic Publishing",
+      "type": "Course",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/graduate-certificate-of-editing-and-electronic-publishing"
+    },
+    {
+      "course_code": "C000139",
+      "title": "Graduate Certificate of Early Childhood",
+      "type": "Course",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/graduate-certificate-of-early-childhood"
+    },
+    {
+      "course_code": "C000431",
+      "title": "Graduate Certificate of Health Leadership",
+      "type": "Course",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/graduate-certificate-of-health-leadership"
+    },
+    {
+      "course_code": "C000069",
+      "title": "Graduate Diploma of Environment",
+      "type": "Course",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/graduate-diploma-of-environment"
+    },
+    {
+      "course_code": "C000001",
+      "title": "Bachelor of Biodiversity and Conservation",
+      "type": "Course",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/bachelor-of-biodiversity-and-conservation"
+    },
+    {
+      "course_code": "C000058",
+      "title": "Graduate Diploma of Conservation Biology",
+      "type": "Course",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/graduate-diploma-of-conservation-biology"
+    },
+    {
+      "course_code": "D000119",
+      "title": "Master of Business Analytics and Master of Information Systems Management",
+      "type": "Double Degree",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-business-analytics-and-master-of-information-systems-management"
+    },
+    {
+      "course_code": "D000107",
+      "title": "Master of Criminology and Master of Cyber Security Analysis",
+      "type": "Double Degree",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-criminology-and-master-of-cyber-security-analysis"
+    },
+    {
+      "course_code": "C000063",
+      "title": "Master of Conservation Biology",
+      "type": "Course",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-conservation-biology"
+    },
+    {
+      "course_code": "C000399",
+      "title": "Master of Engineering (Professional) in Environmental Engineering",
+      "type": "Course",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-engineering-professional-in-environmental-engineering"
+    },
+    {
+      "course_code": "C000397",
+      "title": "Master of Engineering (Professional) in Mechanical Engineering",
+      "type": "Course",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-engineering-professional-in-mechanical-engineering"
+    },
+    {
+      "course_code": "C000401",
+      "title": "Master of Engineering (Professional) in Mechatronics and Automation Engineering",
+      "type": "Course",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-engineering-professional-in-mechatronics-and-automation-engineering"
+    },
+    {
+      "course_code": "C000398",
+      "title": "Master of Engineering (Professional) in Civil and Construction Engineering",
+      "type": "Course",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-engineering-professional-in-civil-and-construction-engineering"
+    },
+    {
+      "course_code": "C000400",
+      "title": "Master of Engineering (Professional) in Renewable Energy and Electrical Engineering",
+      "type": "Course",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-engineering-professional-in-renewable-energy-and-electrical-engineering"
+    },
+    {
+      "course_code": "D005887",
+      "title": "Master of Environment and Master of Sustainable Development",
+      "type": "Double Degree",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-environment-and-master-of-sustainable-development"
+    },
+    {
+      "course_code": "C000023",
+      "title": "Master of Environment",
+      "type": "Course",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-environment"
+    },
+    {
+      "course_code": "C000430",
+      "title": "Master of Health Leadership",
+      "type": "Course",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-health-leadership"
+    },
+    {
+      "course_code": "C000372",
+      "title": "Master of Information Technology in Artificial Intelligence",
+      "type": "Course",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-information-technology-in-artificial-intelligence"
+    },
+    {
+      "course_code": "C000125",
+      "title": "Master of Information Technology in Cyber Security",
+      "type": "Course",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-information-technology-in-cyber-security"
+    },
+    {
+      "course_code": "D000121",
+      "title": "Master of International Relations and Master of Public and Social Policy",
+      "type": "Double Degree",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-international-relations-and-master-of-public-and-social-policy"
+    },
+    {
+      "course_code": "D000149",
+      "title": "Master of International Relations and Master of International Trade and Commerce Law",
+      "type": "Double Degree",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-international-relations-and-master-of-international-trade-and-commerce-law"
+    },
+    {
+      "course_code": "D000131",
+      "title": "Master of Intelligence and Master of Public and Social Policy",
+      "type": "Double Degree",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-intelligence-and-master-of-public-and-social-policy"
+    },
+    {
+      "course_code": "D000120",
+      "title": "Master of International Trade and Commerce Law and Master of Public and Social Policy",
+      "type": "Double Degree",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-international-trade-and-commerce-law-and-master-of-public-and-social-policy"
+    },
+    {
+      "course_code": "D000104",
+      "title": "Master of Public and Social Policy and Master of Security and Strategic Studies",
+      "type": "Double Degree",
+      "disposition": "dual_404",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-public-and-social-policy-and-master-of-security-and-strategic-studies"
+    },
+    {
+      "course_code": "C000152",
+      "title": "Graduate Diploma of Applied Finance",
+      "type": "Course",
+      "disposition": "online_only_skip",
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/graduate-diploma-of-applied-finance"
+    }
+  ],
+  "research_authority": {
+    "structured_capture_sha256": "f4f7433da156f69e85dbec9be3c5da0a3e127c52383b857ad03a331b14c4ee52",
+    "index_url": "https://www.mq.edu.au/research/phd-and-research-degrees/explore-research-degrees",
+    "fees_url": "https://www.mq.edu.au/study/admissions-and-entry/fees-and-costs/research-students",
+    "exact_title_omissions_from_production": [
+      {
+        "title": "Doctor of Philosophy",
+        "url": "https://www.mq.edu.au/research/phd-and-research-degrees/explore-research-degrees/doctor-of-philosophy",
+        "exact_title_in_terminal_production": false,
+        "duration": "Three years full-time equivalent",
+        "international_evidence": "Scholarships may include Overseas Student Health Cover and/or visa application costs for international students"
+      },
+      {
+        "title": "Master of Philosophy",
+        "url": "https://www.mq.edu.au/research/phd-and-research-degrees/explore-research-degrees/master-of-philosophy",
+        "exact_title_in_terminal_production": false,
+        "duration": "Two years full-time equivalent",
+        "international_evidence": "Scholarships may include Overseas Student Health Cover and/or visa application costs for international students"
+      }
+    ],
+    "unresolved_handbook_research_certificates": [
+      "C000410 Graduate Certificate of Research in Arts",
+      "C000405 Graduate Certificate of Research in Science and Engineering"
+    ],
+    "classification_note": "Domestic-default rendering and omission from the international Funnelback profile do not prove that the two certificates are domestic-only."
+  },
+  "decision": {
+    "expected_min_courses": 300,
+    "lower_baseline": false,
+    "status": "baseline_warning_retained; research_authority_gap_recorded"
+  }
+}

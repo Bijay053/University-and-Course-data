@@ -1,0 +1,123 @@
+{
+  "task": "466",
+  "terminal_job_id": "job_d4bcad741d9b",
+  "captured_at": "2026-09-14",
+  "source_capture_sha256": "fc583ae03e4342142f92a7b6998105f68a23d9cdb52741f5ba2f525c800a6922",
+  "count": 28,
+  "proof_template": "[DISCOVER] MQ: confirmed missing public detail <url> — page-data and public detail both origin_not_found HTTP 404; excluding from enrichment candidates",
+  "interpretation": "Every record below has terminal-log confirmation of both the canonical public detail and Gatsby page-data.json origin 404. These are retired canonical routes, not unverified source candidates.",
+  "records": [
+    {
+      "sequence": 18,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/bachelor-of-environment"
+    },
+    {
+      "sequence": 19,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/bachelor-of-commerce-and-bachelor-of-engineering-honours"
+    },
+    {
+      "sequence": 20,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/bachelor-of-environment-and-bachelor-of-laws"
+    },
+    {
+      "sequence": 21,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/bachelor-of-planning"
+    },
+    {
+      "sequence": 22,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/graduate-certificate-of-editing-and-electronic-publishing"
+    },
+    {
+      "sequence": 23,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/graduate-certificate-of-early-childhood"
+    },
+    {
+      "sequence": 24,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/graduate-certificate-of-health-leadership"
+    },
+    {
+      "sequence": 25,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/graduate-diploma-of-environment"
+    },
+    {
+      "sequence": 26,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/bachelor-of-biodiversity-and-conservation"
+    },
+    {
+      "sequence": 27,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/graduate-diploma-of-conservation-biology"
+    },
+    {
+      "sequence": 28,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-business-analytics-and-master-of-information-systems-management"
+    },
+    {
+      "sequence": 29,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-criminology-and-master-of-cyber-security-analysis"
+    },
+    {
+      "sequence": 30,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-conservation-biology"
+    },
+    {
+      "sequence": 31,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-engineering-professional-in-environmental-engineering"
+    },
+    {
+      "sequence": 32,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-engineering-professional-in-mechanical-engineering"
+    },
+    {
+      "sequence": 33,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-engineering-professional-in-mechatronics-and-automation-engineering"
+    },
+    {
+      "sequence": 34,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-engineering-professional-in-civil-and-construction-engineering"
+    },
+    {
+      "sequence": 35,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-engineering-professional-in-renewable-energy-and-electrical-engineering"
+    },
+    {
+      "sequence": 36,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-environment-and-master-of-sustainable-development"
+    },
+    {
+      "sequence": 37,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-environment"
+    },
+    {
+      "sequence": 38,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-health-leadership"
+    },
+    {
+      "sequence": 39,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-information-technology-in-artificial-intelligence"
+    },
+    {
+      "sequence": 40,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-information-technology-in-cyber-security"
+    },
+    {
+      "sequence": 41,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-international-relations-and-master-of-public-and-social-policy"
+    },
+    {
+      "sequence": 42,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-international-relations-and-master-of-international-trade-and-commerce-law"
+    },
+    {
+      "sequence": 43,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-intelligence-and-master-of-public-and-social-policy"
+    },
+    {
+      "sequence": 44,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-international-trade-and-commerce-law-and-master-of-public-and-social-policy"
+    },
+    {
+      "sequence": 45,
+      "url": "https://www.mq.edu.au/study/find-a-course/courses/master-of-public-and-social-policy-and-master-of-security-and-strategic-studies"
+    }
+  ]
+}

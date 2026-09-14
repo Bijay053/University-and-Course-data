@@ -1,0 +1,2615 @@
+{
+  "task": "Task466",
+  "generated_at": "2026-09-14T07:12:12Z",
+  "last_readonly_evidence_at": "2026-09-14T07:24:42Z",
+  "read_only": true,
+  "ssm_summary_command_id": "df8e151a-1c7f-4dd9-a964-c0f7db8df251",
+  "production_host": "ip-172-31-40-159.ap-south-1.compute.internal",
+  "repository": {
+    "head": "",
+    "last_commit": "",
+    "origin_sanitized": "<missing>",
+    "status_porcelain": []
+  },
+  "macquarie": {
+    "active_runtime_counts": [
+      {
+        "count": 1,
+        "status": "running"
+      }
+    ],
+    "active_runtime_jobs": [
+      {
+        "created_at": "2026-09-14T07:06:36.700195+00:00",
+        "current": 44,
+        "errors": 0,
+        "imported": 0,
+        "job_type": "single",
+        "runtime_job_id": "job_4fd2b910eda0",
+        "skipped": 0,
+        "started_at": "2026-09-14T07:06:36.700195+00:00",
+        "status": "running",
+        "total_found": 246,
+        "university_id": 33,
+        "university_name": "Curtin University"
+      }
+    ],
+    "config": {
+      "db_scrape_config": {
+        "auto_config": {
+          "_auto_generated": true,
+          "_library_situation": "cloudflare_stealth",
+          "_platform_type": "cloudflare_stealth",
+          "_probe_summary": {
+            "bot_protected": false,
+            "cloudflare": true,
+            "confidence": 0.4,
+            "detected_apis": [],
+            "has_sitemap": false,
+            "js_spa": false,
+            "sitemap_course_count": 0,
+            "wayback_count": 0
+          },
+          "_strategy": "proxy",
+          "discovery": {
+            "use_stealth_browser": false
+          },
+          "extraction": {
+            "fees": {
+              "default_currency": "AUD"
+            },
+            "skip_browser_rescue": true
+          }
+        }
+      },
+      "derived_slug": "mq",
+      "effective_relevant": {
+        "allow_url_patterns": [],
+        "always_browser_discover": false,
+        "always_sitemap_supplement": false,
+        "block_url_patterns": [],
+        "course_detail_url_patterns": [],
+        "expected_min_courses": 300,
+        "extra_course_urls": [],
+        "extraction_fees": {
+          "allow_bucket_match": false,
+          "annual_fee_warning_max_aud": null,
+          "central_fee_exact_match_only": false,
+          "central_page": null,
+          "course_pdf_aliases": {},
+          "credit_points_per_unit": null,
+          "currency_override": null,
+          "default_currency": "AUD",
+          "degree_level_defaults": {},
+          "fee_calculation_mode": null,
+          "fee_crit_min_aud": null,
+          "fee_prevent_full_course_rollup": null,
+          "fee_term": null,
+          "fee_url_suffix": null,
+          "fees_pdf_url": null,
+          "follow_links": [],
+          "force_central_fee_stage": false,
+          "international_fee_keywords": [],
+          "max_annual_fee": null,
+          "pdf_fee_term": null,
+          "pdf_overrides_page_regex": false,
+          "pdf_parser": null,
+          "pdf_row_pattern": null,
+          "prefer_annual_over_total": true,
+          "prefer_international": true,
+          "prefer_year_one_over_total": false,
+          "reject_keywords": [],
+          "require_explicit_international_context": false
+        },
+        "extraction_filters": {
+          "broken_cms_retry_strip_query": false,
+          "domestic_only": "enabled=False require_international_evidence=False international_markers=[] domestic_markers=[]",
+          "online_only": "enabled=False reject_if_mode_is_exactly=[] keep_if_location_present=True",
+          "reject_parttime_only": false
+        },
+        "extraction_scrape_do_render": true,
+        "extraction_staging": {
+          "dedup_use_full_url": false,
+          "reject_if_missing": [
+            "course_name"
+          ],
+          "reject_slug_name_with_no_data": false,
+          "require_international_fee": false,
+          "skip_degree_qualifier_check": true,
+          "skip_duplicate_fee_check": false,
+          "stage_on_parser_error": false
+        },
+        "failure_guard_threshold": 0.3,
+        "seed_urls": [],
+        "sitemap_url": null,
+        "skip_browser_discovery": true,
+        "skip_sitemap_fallback": false,
+        "use_stealth_browser": false
+      },
+      "hostname": "www.mq.edu.au",
+      "precedence": [
+        "Pydantic defaults",
+        "scraper_config/defaults.yaml",
+        "DB scrape_config.uniPages translation",
+        "DB scrape_config.auto_config",
+        "per-university YAML (mq.yaml)",
+        "DB scrape_config.admin_config",
+        "locked_config_paths re-applied last"
+      ],
+      "recipe_is_id_specific": false,
+      "recipe_path": "/opt/university-portal/backend-py/scraper_config/unis/mq.yaml",
+      "recipe_path_relative": "backend-py/scraper_config/unis/mq.yaml",
+      "recipe_sha256": "2b06f14f37831540eeccd2cd62e40f65e45d210c10f80ec40721f2d823b8ef39",
+      "recipe_text": "discovery:\n  # MQ uses its dedicated Funnelback + page-data provider. Unlike the generic\n  # search provider, it preserves international fees, IELTS, duration and source\n  # evidence in scrapy_result so domestic-default HTML is never re-extracted.\n  expected_min_courses: 300\n  always_sitemap_supplement: false\n  skip_browser_discovery: true\n\nextraction:\n  fees:\n    default_currency: AUD\n    prefer_international: true\n    prefer_annual_over_total: true\n  course_name:\n    strip_title_suffixes:\n      - ' | Macquarie University'\n      - ' - Macquarie University'\n      - ' — Macquarie University'\n  # Per-course pages are also CF-protected; use scrape.do render=true for extraction.\n  scrape_do_render: true\n  filters:\n    domestic_only:\n      enabled: false\n    online_only:\n      enabled: false\n  staging:\n    reject_if_missing:\n      - course_name\n    skip_degree_qualifier_check: true\n    require_international_fee: false\n"
+    },
+    "latest_legacy_jobs": [],
+    "latest_runtime_jobs": [
+      {
+        "completed_at": "2026-09-14T07:17:07.803637+00:00",
+        "created_at": "2026-09-14T07:06:38.743766+00:00",
+        "current": 183,
+        "error_message": "Catalogue coverage below configured minimum: 183 raw candidates became 183 extractable URLs and 182 staged courses; expected at least 300. The run cannot be reported as an ordinary successful completion.",
+        "errors": 0,
+        "gate_skip_counts": {
+          "catalogue_guard": {
+            "expected_min_courses": 300,
+            "extractable": 183,
+            "kind": "catalogue_below_expected_min",
+            "level": "warning",
+            "message": "Catalogue coverage below configured minimum: 183 raw candidates became 183 extractable URLs and 182 staged courses; expected at least 300. The run cannot be reported as an ordinary successful completion.",
+            "raw_discovered": 183,
+            "staged": 182,
+            "status": "completed_with_warnings"
+          },
+          "html_compaction": {
+            "acceptance_rate": 0.0,
+            "accepted": 0,
+            "attempts": 0,
+            "elapsed_ms": 0.0,
+            "fail_open": 0,
+            "fail_open_reasons": {},
+            "input_bytes": 0,
+            "output_bytes": 0,
+            "reduction_rate": 0.0,
+            "skipped_small": 0
+          }
+        },
+        "imported": 182,
+        "job_type": "single",
+        "release_revision": "b07a55245a7c41886cbb1b15d84c562055195caa",
+        "runtime_job_id": "job_257702eef633",
+        "skipped": 1,
+        "started_at": "2026-09-14T07:06:38.743766+00:00",
+        "status": "completed_with_warnings",
+        "total_found": 183
+      },
+      {
+        "completed_at": "2026-09-14T06:56:38.542685+00:00",
+        "created_at": "2026-09-14T06:50:23.199456+00:00",
+        "current": 181,
+        "error_message": "Catalogue coverage below configured minimum: 181 raw candidates became 181 extractable URLs and 180 staged courses; expected at least 300. The run cannot be reported as an ordinary successful completion.",
+        "errors": 0,
+        "gate_skip_counts": {
+          "catalogue_guard": {
+            "expected_min_courses": 300,
+            "extractable": 181,
+            "kind": "catalogue_below_expected_min",
+            "level": "warning",
+            "message": "Catalogue coverage below configured minimum: 181 raw candidates became 181 extractable URLs and 180 staged courses; expected at least 300. The run cannot be reported as an ordinary successful completion.",
+            "raw_discovered": 181,
+            "staged": 180,
+            "status": "completed_with_warnings"
+          },
+          "html_compaction": {
+            "acceptance_rate": 0.0,
+            "accepted": 0,
+            "attempts": 0,
+            "elapsed_ms": 0.0,
+            "fail_open": 0,
+            "fail_open_reasons": {},
+            "input_bytes": 0,
+            "output_bytes": 0,
+            "reduction_rate": 0.0,
+            "skipped_small": 0
+          }
+        },
+        "imported": 180,
+        "job_type": "single",
+        "release_revision": "b07a55245a7c41886cbb1b15d84c562055195caa",
+        "runtime_job_id": "job_d4bcad741d9b",
+        "skipped": 1,
+        "started_at": "2026-09-14T06:50:23.199456+00:00",
+        "status": "completed_with_warnings",
+        "total_found": 181
+      },
+      {
+        "completed_at": "2026-09-14T06:49:57.120632+00:00",
+        "created_at": "2026-09-14T06:40:30.090472+00:00",
+        "current": 0,
+        "error_message": "Stopped by user",
+        "errors": 0,
+        "gate_skip_counts": null,
+        "imported": 0,
+        "job_type": "single",
+        "release_revision": "9fa5e0cf037ec2a9ba5086316839fdc58f6697cd",
+        "runtime_job_id": "job_eb684bda5da4",
+        "skipped": 0,
+        "started_at": "2026-09-14T06:40:30.090472+00:00",
+        "status": "stopped",
+        "total_found": 181
+      },
+      {
+        "completed_at": null,
+        "created_at": "2026-09-14T05:21:22.447119+00:00",
+        "current": 0,
+        "error_message": "Macquarie international-fee coverage is too low (176/254, 69.3%; required 70.0%). Refusing to stage a misleading low-fee catalogue.",
+        "errors": 0,
+        "gate_skip_counts": null,
+        "imported": 0,
+        "job_type": "single",
+        "release_revision": "d43c08386268e4fa17d9ea141f26bea50db08703",
+        "runtime_job_id": "job_e8b53dc2f8fd",
+        "skipped": 0,
+        "started_at": "2026-09-14T05:21:22.447119+00:00",
+        "status": "failed",
+        "total_found": 0
+      },
+      {
+        "completed_at": null,
+        "created_at": "2026-09-14T04:42:55.412655+00:00",
+        "current": 0,
+        "error_message": "Macquarie international-fee coverage is too low (176/254, 69.3%; required 70.0%). Refusing to stage a misleading low-fee catalogue.",
+        "errors": 0,
+        "gate_skip_counts": null,
+        "imported": 0,
+        "job_type": "single",
+        "release_revision": "c7a23fc3d073b22bc7bceb089414ac0cd7b39edf",
+        "runtime_job_id": "job_110f32c3316f",
+        "skipped": 0,
+        "started_at": "2026-09-14T04:42:55.412655+00:00",
+        "status": "failed",
+        "total_found": 0
+      },
+      {
+        "completed_at": null,
+        "created_at": "2026-09-14T04:33:08.047935+00:00",
+        "current": 0,
+        "error_message": "Macquarie international-fee coverage is too low (176/254, 69.3%; required 70.0%). Refusing to stage a misleading low-fee catalogue.",
+        "errors": 0,
+        "gate_skip_counts": null,
+        "imported": 0,
+        "job_type": "single",
+        "release_revision": "c7a23fc3d073b22bc7bceb089414ac0cd7b39edf",
+        "runtime_job_id": "job_82d4fade5fe6",
+        "skipped": 0,
+        "started_at": "2026-09-14T04:33:08.047935+00:00",
+        "status": "failed",
+        "total_found": 0
+      },
+      {
+        "completed_at": null,
+        "created_at": "2026-09-14T02:32:23.654872+00:00",
+        "current": 0,
+        "error_message": "Macquarie international-fee coverage is too low (181/260, 70%; required 70%). Refusing to stage a misleading low-fee catalogue.",
+        "errors": 0,
+        "gate_skip_counts": null,
+        "imported": 0,
+        "job_type": "single",
+        "release_revision": "3f5372d37b038f8bfaef53e284d4bea3d66c8001",
+        "runtime_job_id": "job_b65cefae98b8",
+        "skipped": 0,
+        "started_at": "2026-09-14T02:32:23.654872+00:00",
+        "status": "failed",
+        "total_found": 0
+      },
+      {
+        "completed_at": "2026-09-11T06:21:06.205460+00:00",
+        "created_at": "2026-09-11T06:06:11.002399+00:00",
+        "current": 0,
+        "error_message": "Stopped by user",
+        "errors": 0,
+        "gate_skip_counts": null,
+        "imported": 0,
+        "job_type": "single",
+        "release_revision": "238c66f2c0b87c7cf0f1c240e35491305597b0f3",
+        "runtime_job_id": "job_9fdf889798aa",
+        "skipped": 0,
+        "started_at": "2026-09-11T06:06:11.002399+00:00",
+        "status": "stopped",
+        "total_found": 0
+      },
+      {
+        "completed_at": "2026-09-11T05:10:41.078045+00:00",
+        "created_at": "2026-09-11T04:55:31.929774+00:00",
+        "current": 0,
+        "error_message": "Macquarie international-fee coverage is too low (179/260, 69%; required 70%). Refusing to stage a misleading low-fee catalogue.",
+        "errors": 0,
+        "gate_skip_counts": null,
+        "imported": 0,
+        "job_type": "single",
+        "release_revision": "238c66f2c0b87c7cf0f1c240e35491305597b0f3",
+        "runtime_job_id": "job_bdbe5a5169da",
+        "skipped": 0,
+        "started_at": "2026-09-11T04:55:31.929774+00:00",
+        "status": "failed",
+        "total_found": 0
+      },
+      {
+        "completed_at": null,
+        "created_at": "2026-09-11T03:28:28.118957+00:00",
+        "current": 0,
+        "error_message": "Macquarie international-fee coverage is too low (179/260, 69%; required 70%). Refusing to stage a misleading low-fee catalogue.",
+        "errors": 0,
+        "gate_skip_counts": null,
+        "imported": 0,
+        "job_type": "single",
+        "release_revision": "afb3aac7a84e629ef2e5f35647c8d41db1c8ae3b",
+        "runtime_job_id": "job_f8e431eaa830",
+        "skipped": 0,
+        "started_at": "2026-09-11T03:28:28.118957+00:00",
+        "status": "failed",
+        "total_found": 0
+      },
+      {
+        "completed_at": "2026-09-11T03:25:33.395471+00:00",
+        "created_at": "2026-09-11T03:22:20.620155+00:00",
+        "current": 0,
+        "error_message": "Worker restarted — slot freed on startup",
+        "errors": 0,
+        "gate_skip_counts": null,
+        "imported": 0,
+        "job_type": "single",
+        "release_revision": "70b2922d110c8e9c926678d9da7e2b2233e2d727",
+        "runtime_job_id": "job_4e3260ce5d54",
+        "skipped": 0,
+        "started_at": "2026-09-11T03:22:20.620155+00:00",
+        "status": "failed",
+        "total_found": 0
+      },
+      {
+        "completed_at": "2026-09-11T02:44:30.817928+00:00",
+        "created_at": "2026-09-11T02:43:00.640923+00:00",
+        "current": 0,
+        "error_message": "Stopped by user",
+        "errors": 0,
+        "gate_skip_counts": null,
+        "imported": 0,
+        "job_type": "single",
+        "release_revision": "3a1ba7e07cdb9f8fc0f5f38fc08f44788098861b",
+        "runtime_job_id": "job_f822893fd6ab",
+        "skipped": 0,
+        "started_at": "2026-09-11T02:43:00.640923+00:00",
+        "status": "stopped",
+        "total_found": 0
+      },
+      {
+        "completed_at": "2026-09-11T01:46:31.807678+00:00",
+        "created_at": "2026-09-11T01:23:11.694005+00:00",
+        "current": 259,
+        "error_message": null,
+        "errors": 0,
+        "gate_skip_counts": {
+          "html_compaction": {
+            "acceptance_rate": 0.0,
+            "accepted": 0,
+            "attempts": 0,
+            "elapsed_ms": 0.0,
+            "fail_open": 0,
+            "fail_open_reasons": {},
+            "input_bytes": 0,
+            "output_bytes": 0,
+            "reduction_rate": 0.0,
+            "skipped_small": 0
+          }
+        },
+        "imported": 255,
+        "job_type": "single",
+        "release_revision": "3a1ba7e07cdb9f8fc0f5f38fc08f44788098861b",
+        "runtime_job_id": "job_ad720e295c66",
+        "skipped": 4,
+        "started_at": "2026-09-11T01:23:11.694005+00:00",
+        "status": "completed",
+        "total_found": 259
+      },
+      {
+        "completed_at": "2026-09-11T01:08:08.905334+00:00",
+        "created_at": "2026-09-11T00:44:45.941869+00:00",
+        "current": 259,
+        "error_message": null,
+        "errors": 0,
+        "gate_skip_counts": {
+          "html_compaction": {
+            "acceptance_rate": 0.0,
+            "accepted": 0,
+            "attempts": 0,
+            "elapsed_ms": 0.0,
+            "fail_open": 0,
+            "fail_open_reasons": {},
+            "input_bytes": 0,
+            "output_bytes": 0,
+            "reduction_rate": 0.0,
+            "skipped_small": 0
+          }
+        },
+        "imported": 254,
+        "job_type": "single",
+        "release_revision": "ca671c36b7ca04797826b72e69887f9e950761f1",
+        "runtime_job_id": "job_82de14d67e1a",
+        "skipped": 5,
+        "started_at": "2026-09-11T00:44:45.941869+00:00",
+        "status": "completed",
+        "total_found": 259
+      },
+      {
+        "completed_at": "2026-09-10T08:28:25.448078+00:00",
+        "created_at": "2026-09-10T08:27:15.558199+00:00",
+        "current": 0,
+        "error_message": "Stopped by user",
+        "errors": 0,
+        "gate_skip_counts": null,
+        "imported": 0,
+        "job_type": "single",
+        "release_revision": "3311a1299167331af502b62ef0c9bd409aa8c6ff",
+        "runtime_job_id": "job_b6a80e75ac0b",
+        "skipped": 0,
+        "started_at": "2026-09-10T08:27:15.558199+00:00",
+        "status": "stopped",
+        "total_found": 0
+      },
+      {
+        "completed_at": null,
+        "created_at": "2026-09-10T06:58:00.044929+00:00",
+        "current": 0,
+        "error_message": "Macquarie structured page-data coverage is too low (0/259, 0%; required 80%). Refusing to stage domestic-default course data.",
+        "errors": 0,
+        "gate_skip_counts": null,
+        "imported": 0,
+        "job_type": "single",
+        "release_revision": "3311a1299167331af502b62ef0c9bd409aa8c6ff",
+        "runtime_job_id": "job_f185c3a40695",
+        "skipped": 0,
+        "started_at": "2026-09-10T06:58:00.044929+00:00",
+        "status": "failed",
+        "total_found": 0
+      },
+      {
+        "completed_at": null,
+        "created_at": "2026-09-10T06:39:05.779156+00:00",
+        "current": 0,
+        "error_message": "Macquarie structured page-data coverage is too low (0/259, 0%; required 80%). Refusing to stage domestic-default course data.",
+        "errors": 0,
+        "gate_skip_counts": null,
+        "imported": 0,
+        "job_type": "single",
+        "release_revision": "3311a1299167331af502b62ef0c9bd409aa8c6ff",
+        "runtime_job_id": "job_f64c4e3451b5",
+        "skipped": 0,
+        "started_at": "2026-09-10T06:39:05.779156+00:00",
+        "status": "failed",
+        "total_found": 0
+      },
+      {
+        "completed_at": null,
+        "created_at": "2026-09-10T05:54:51.968766+00:00",
+        "current": 0,
+        "error_message": "Macquarie Funnelback catalogue page 1 returned invalid JSON (Expecting value: line 1 column 1 (char 0)). Transport detail: response was not valid JSON. Refusing to supplement with domestic-default HTML.",
+        "errors": 0,
+        "gate_skip_counts": null,
+        "imported": 0,
+        "job_type": "single",
+        "release_revision": "3d6a9c363bd3",
+        "runtime_job_id": "job_eda1bada79d3",
+        "skipped": 0,
+        "started_at": "2026-09-10T05:54:51.968766+00:00",
+        "status": "failed",
+        "total_found": 0
+      },
+      {
+        "completed_at": "2026-09-10T05:54:51.032331+00:00",
+        "created_at": "2026-09-10T05:54:42.289006+00:00",
+        "current": 0,
+        "error_message": "Stopped by user",
+        "errors": 0,
+        "gate_skip_counts": null,
+        "imported": 0,
+        "job_type": "single",
+        "release_revision": null,
+        "runtime_job_id": "job_5a00dca77062",
+        "skipped": 0,
+        "started_at": "2026-09-10T05:54:42.289006+00:00",
+        "status": "stopped",
+        "total_found": 0
+      },
+      {
+        "completed_at": "2026-09-10T02:31:45.564795+00:00",
+        "created_at": "2026-09-10T02:10:40.242487+00:00",
+        "current": 0,
+        "error_message": "Stopped by user",
+        "errors": 0,
+        "gate_skip_counts": null,
+        "imported": 0,
+        "job_type": "single",
+        "release_revision": null,
+        "runtime_job_id": "job_9165e4395dbc",
+        "skipped": 0,
+        "started_at": "2026-09-10T02:10:40.242487+00:00",
+        "status": "stopped",
+        "total_found": 0
+      },
+      {
+        "completed_at": null,
+        "created_at": "2026-09-10T01:29:29.180337+00:00",
+        "current": 0,
+        "error_message": "Macquarie Funnelback catalogue page 1 returned invalid JSON (Expecting value: line 1 column 1 (char 0)). Transport detail: response was not valid JSON. Refusing to supplement with domestic-default HTML.",
+        "errors": 0,
+        "gate_skip_counts": null,
+        "imported": 0,
+        "job_type": "single",
+        "release_revision": "3d6a9c363bd3",
+        "runtime_job_id": "job_805a36ffbfaf",
+        "skipped": 0,
+        "started_at": "2026-09-10T01:29:29.180337+00:00",
+        "status": "failed",
+        "total_found": 0
+      },
+      {
+        "completed_at": null,
+        "created_at": "2026-09-10T00:52:11.939359+00:00",
+        "current": 0,
+        "error_message": "Macquarie Funnelback catalogue page 1 returned invalid JSON (Expecting value: line 1 column 1 (char 0)). Transport detail: response was not valid JSON. Refusing to supplement with domestic-default HTML.",
+        "errors": 0,
+        "gate_skip_counts": null,
+        "imported": 0,
+        "job_type": "single",
+        "release_revision": "3d6a9c363bd3",
+        "runtime_job_id": "job_15898b3f90ec",
+        "skipped": 0,
+        "started_at": "2026-09-10T00:52:11.939359+00:00",
+        "status": "failed",
+        "total_found": 0
+      },
+      {
+        "completed_at": null,
+        "created_at": "2026-09-10T00:51:23.417117+00:00",
+        "current": 0,
+        "error_message": "Macquarie Funnelback catalogue page 1 returned invalid JSON (Expecting value: line 1 column 1 (char 0)). Transport detail: response was not valid JSON. Refusing to supplement with domestic-default HTML.",
+        "errors": 0,
+        "gate_skip_counts": null,
+        "imported": 0,
+        "job_type": "single",
+        "release_revision": "3d6a9c363bd3",
+        "runtime_job_id": "job_823405d61137",
+        "skipped": 0,
+        "started_at": "2026-09-10T00:51:23.417117+00:00",
+        "status": "failed",
+        "total_found": 0
+      },
+      {
+        "completed_at": null,
+        "created_at": "2026-09-10T00:50:34.299631+00:00",
+        "current": 0,
+        "error_message": "Macquarie Funnelback catalogue page 1 returned invalid JSON (Expecting value: line 1 column 1 (char 0)). Transport detail: response was not valid JSON. Refusing to supplement with domestic-default HTML.",
+        "errors": 0,
+        "gate_skip_counts": null,
+        "imported": 0,
+        "job_type": "single",
+        "release_revision": "3d6a9c363bd3",
+        "runtime_job_id": "job_27632b3ae5b5",
+        "skipped": 0,
+        "started_at": "2026-09-10T00:50:34.299631+00:00",
+        "status": "failed",
+        "total_found": 0
+      },
+      {
+        "completed_at": null,
+        "created_at": "2026-09-10T00:49:56.009386+00:00",
+        "current": 0,
+        "error_message": "Macquarie Funnelback catalogue page 1 returned invalid JSON (Expecting value: line 1 column 1 (char 0)). Transport detail: response was not valid JSON. Refusing to supplement with domestic-default HTML.",
+        "errors": 0,
+        "gate_skip_counts": null,
+        "imported": 0,
+        "job_type": "single",
+        "release_revision": "3d6a9c363bd3",
+        "runtime_job_id": "job_09adbee1df3f",
+        "skipped": 0,
+        "started_at": "2026-09-10T00:49:56.009386+00:00",
+        "status": "failed",
+        "total_found": 0
+      }
+    ],
+    "latest_terminal_runtime_job": {
+      "completed_at": "2026-09-14T07:17:07.803637+00:00",
+      "created_at": "2026-09-14T07:06:38.743766+00:00",
+      "current": 183,
+      "error_message": "Catalogue coverage below configured minimum: 183 raw candidates became 183 extractable URLs and 182 staged courses; expected at least 300. The run cannot be reported as an ordinary successful completion.",
+      "errors": 0,
+      "gate_skip_counts": {
+        "catalogue_guard": {
+          "expected_min_courses": 300,
+          "extractable": 183,
+          "kind": "catalogue_below_expected_min",
+          "level": "warning",
+          "message": "Catalogue coverage below configured minimum: 183 raw candidates became 183 extractable URLs and 182 staged courses; expected at least 300. The run cannot be reported as an ordinary successful completion.",
+          "raw_discovered": 183,
+          "staged": 182,
+          "status": "completed_with_warnings"
+        },
+        "html_compaction": {
+          "acceptance_rate": 0.0,
+          "accepted": 0,
+          "attempts": 0,
+          "elapsed_ms": 0.0,
+          "fail_open": 0,
+          "fail_open_reasons": {},
+          "input_bytes": 0,
+          "output_bytes": 0,
+          "reduction_rate": 0.0,
+          "skipped_small": 0
+        }
+      },
+      "imported": 182,
+      "job_type": "single",
+      "release_revision": "b07a55245a7c41886cbb1b15d84c562055195caa",
+      "runtime_job_id": "job_257702eef633",
+      "skipped": 1,
+      "started_at": "2026-09-14T07:06:38.743766+00:00",
+      "status": "completed_with_warnings",
+      "total_found": 183
+    },
+    "prior_terminal_staging": {
+      "categories": [
+        {
+          "category": "Business & Management",
+          "count": 70
+        },
+        {
+          "category": "Arts, Humanities & Social Sciences",
+          "count": 26
+        },
+        {
+          "category": "Medicine & Health",
+          "count": 17
+        },
+        {
+          "category": "Other",
+          "count": 13
+        },
+        {
+          "category": "Computer Science & IT",
+          "count": 12
+        },
+        {
+          "category": "Law & Legal Studies",
+          "count": 12
+        },
+        {
+          "category": "Education & Social Work",
+          "count": 10
+        },
+        {
+          "category": "Engineering & Technology",
+          "count": 8
+        },
+        {
+          "category": "Media & Communications",
+          "count": 7
+        },
+        {
+          "category": "Science & Mathematics",
+          "count": 3
+        },
+        {
+          "category": "Agriculture & Environmental Science",
+          "count": 2
+        }
+      ],
+      "counts": [
+        {
+          "count": 180,
+          "status": "pending"
+        }
+      ],
+      "current_db_status_counts": {
+        "approved": 180
+      },
+      "status_counts_note": "The initial terminal staging query captured these 180 rows as pending; the final read-only DB query found the earlier-job rows approved.",
+      "degree_levels": [
+        {
+          "count": 75,
+          "degree_level": "Master's"
+        },
+        {
+          "count": 74,
+          "degree_level": "Bachelor's"
+        },
+        {
+          "count": 8,
+          "degree_level": "Diploma"
+        },
+        {
+          "count": 8,
+          "degree_level": "Graduate Certificate"
+        },
+        {
+          "count": 7,
+          "degree_level": "Doctorate"
+        },
+        {
+          "count": 6,
+          "degree_level": "Graduate Diploma"
+        },
+        {
+          "count": 2,
+          "degree_level": "(unknown)"
+        }
+      ],
+      "job_id": "job_d4bcad741d9b",
+      "terminal_logs": [
+        {
+          "created_at": "2026-09-14T06:56:38.941326+00:00",
+          "event": "done",
+          "payload": {
+            "catalogue_guard": {
+              "expected_min_courses": 300,
+              "extractable": 181,
+              "kind": "catalogue_below_expected_min",
+              "level": "warning",
+              "message": "Catalogue coverage below configured minimum: 181 raw candidates became 181 extractable URLs and 180 staged courses; expected at least 300. The run cannot be reported as an ordinary successful completion.",
+              "raw_discovered": 181,
+              "staged": 180,
+              "status": "completed_with_warnings"
+            },
+            "errors": 0,
+            "fetchFailed": 0,
+            "imported": 180,
+            "level": "warning",
+            "message": "══ DONE ══ Found:181 | Staged:180 | Skipped:1 (online_only=1) | FetchFailed:0 | Errors:0 | CatalogueFloor:300 | Raw:181 | Discovery:276s | Extraction:99s | Sweep:0s | Staging:0s",
+            "phase": "complete",
+            "phase_timings": {
+              "discovery_s": 275.8,
+              "extraction_s": 99.0,
+              "staging_s": 0.0,
+              "sweep_s": 0.0
+            },
+            "skip_reasons": {
+              "online_only": 1
+            },
+            "skipped": 1,
+            "totalFound": 181
+          },
+          "sequence": 604
+        },
+        {
+          "created_at": "2026-09-14T06:56:38.941326+00:00",
+          "event": "status",
+          "payload": {
+            "kind": "data_quality_summary",
+            "level": "warn",
+            "message": "[DATA QUALITY] 181 course(s) checked — 0 critical / 2 warning / 23 info",
+            "phase": "complete"
+          },
+          "sequence": 599
+        }
+      ],
+      "total": 180
+    },
+    "latest_terminal_staging": {
+      "categories": [
+        {
+          "category": "Agriculture & Environmental Science",
+          "count": 1
+        },
+        {
+          "category": "Engineering & Technology",
+          "count": 1
+        }
+      ],
+      "counts": [
+        {
+          "count": 2,
+          "status": "pending"
+        }
+      ],
+      "degree_levels": [
+        {
+          "count": 2,
+          "degree_level": "Master's"
+        }
+      ],
+      "job_id": "job_257702eef633",
+      "terminal_logs": [
+        {
+          "created_at": "2026-09-14T07:17:08.245979+00:00",
+          "event": "done",
+          "payload": {
+            "catalogue_guard": {
+              "expected_min_courses": 300,
+              "extractable": 183,
+              "kind": "catalogue_below_expected_min",
+              "level": "warning",
+              "message": "Catalogue coverage below configured minimum: 183 raw candidates became 183 extractable URLs and 182 staged courses; expected at least 300. The run cannot be reported as an ordinary successful completion.",
+              "raw_discovered": 183,
+              "staged": 182,
+              "status": "completed_with_warnings"
+            },
+            "errors": 0,
+            "fetchFailed": 0,
+            "imported": 182,
+            "level": "warning",
+            "message": "══ DONE ══ Found:183 | Staged:182 | Skipped:1 (online_only=1) | FetchFailed:0 | Errors:0 | CatalogueFloor:300 | Raw:183 | Discovery:546s | Extraction:83s | Sweep:0s | Staging:0.3s",
+            "phase": "complete",
+            "skip_reasons": {
+              "online_only": 1
+            },
+            "skipped": 1,
+            "totalFound": 183
+          },
+          "sequence": 73
+        },
+        {
+          "created_at": "2026-09-14T07:17:08.245979+00:00",
+          "event": "status",
+          "payload": {
+            "kind": "data_quality_summary",
+            "level": "warn",
+            "message": "[DATA QUALITY] 3 course(s) checked — 0 critical / 8 warning / 8 info",
+            "phase": "complete",
+            "critical": 0,
+            "warnings": 8,
+            "total_courses": 3
+          },
+          "sequence": 64
+        }
+      ],
+      "total": 2
+    },
+    "selected_university": {
+      "city": "Sydney",
+      "country": "Australia",
+      "id": 25,
+      "name": "Macquarie University",
+      "scrape_url": "https://www.mq.edu.au",
+      "website": "https://www.mq.edu.au"
+    },
+    "selected_university_id": 25,
+    "university_candidates": [
+      {
+        "id": 25,
+        "name": "Macquarie University",
+        "scrape_url": "https://www.mq.edu.au",
+        "website": "https://www.mq.edu.au"
+      }
+    ]
+  },
+  "gate_readiness": {
+    "api_health": {
+      "body": "{\"status\":\"ok\",\"service\":\"uniportal-py\",\"timestamp\":\"2026-09-14T07:11:30.815246+00:00\"}",
+      "ok": true
+    },
+    "celery_ping": {
+      "ok": true,
+      "output": "->  uni-celery@ip-172-31-40-159: OK\n        pong\n\n1 node online."
+    },
+    "proof_gate": {
+      "expected_account_configured": false,
+      "expected_account_source": null,
+      "proof_path_exists": true,
+      "signers_path_exists": true,
+      "template_path_exists": true,
+      "validation": "blocked: independent expected rehearsal account is not configured"
+    },
+    "sample_html": {
+      "ok": false,
+      "result": "403|text/html"
+    },
+    "service_state": {
+      "git_head": "",
+      "python_path_expected": "/opt/university-portal/backend-py/.venv/bin/python",
+      "release_file_exists": true,
+      "release_revision": "b07a55245a7c41886cbb1b15d84c562055195caa",
+      "units": {
+        "uni-api-py.service": "MainPID=1004053\nActiveState=active\nSubState=running\nActiveEnterTimestamp=Mon 2026-09-14 06:50:04 UTC",
+        "uni-celery.service": "MainPID=1004105\nActiveState=active\nSubState=running\nActiveEnterTimestamp=Mon 2026-09-14 06:50:07 UTC"
+      }
+    }
+  },
+  "current_url_list": [
+    {
+      "course_name": "Bachelor of Actuarial Studies",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-actuarial-studies"
+    },
+    {
+      "course_name": "Bachelor of Actuarial Studies and Bachelor of Information Technology",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-actuarial-studies-and-bachelor-of-information-technology"
+    },
+    {
+      "course_name": "Bachelor of Applied Finance",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-applied-finance"
+    },
+    {
+      "course_name": "Bachelor of Applied Finance and Bachelor of Actuarial Studies",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-applied-finance-and-bachelor-of-actuarial-studies"
+    },
+    {
+      "course_name": "Bachelor of Applied Finance and Bachelor of Business Analytics",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-applied-finance-and-bachelor-of-business-analytics"
+    },
+    {
+      "course_name": "Bachelor of Applied Finance and Bachelor of Economics",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-applied-finance-and-bachelor-of-economics"
+    },
+    {
+      "course_name": "Bachelor of Applied Finance and Bachelor of Professional Accounting",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-applied-finance-and-bachelor-of-professional-accounting"
+    },
+    {
+      "course_name": "Bachelor of Arts",
+      "status": "pending",
+      "category": "Arts, Humanities & Social Sciences",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-arts"
+    },
+    {
+      "course_name": "Bachelor of Arts and Bachelor of Business",
+      "status": "pending",
+      "category": "Arts, Humanities & Social Sciences",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-arts-and-bachelor-of-business"
+    },
+    {
+      "course_name": "Bachelor of Arts and Bachelor of Commerce",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-arts-and-bachelor-of-commerce"
+    },
+    {
+      "course_name": "Bachelor of Arts and Bachelor of Information Technology",
+      "status": "pending",
+      "category": "Computer Science & IT",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-arts-and-bachelor-of-information-technology"
+    },
+    {
+      "course_name": "Bachelor of Arts and Bachelor of Laws",
+      "status": "pending",
+      "category": "Arts, Humanities & Social Sciences",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-arts-and-bachelor-of-laws"
+    },
+    {
+      "course_name": "Bachelor of Arts and Bachelor of Science",
+      "status": "pending",
+      "category": "Arts, Humanities & Social Sciences",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-arts-and-bachelor-of-science"
+    },
+    {
+      "course_name": "Bachelor of Business",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Bachelor's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-business"
+    },
+    {
+      "course_name": "Bachelor of Business Analytics",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-business-analytics"
+    },
+    {
+      "course_name": "Bachelor of Business Analytics and Bachelor of Economics",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-business-analytics-and-bachelor-of-economics"
+    },
+    {
+      "course_name": "Bachelor of Business and Bachelor of Engineering (Honours)",
+      "status": "pending",
+      "category": "Engineering & Technology",
+      "degree_level": "Bachelor's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-business-and-bachelor-of-engineering-honours"
+    },
+    {
+      "course_name": "Bachelor of Business and Bachelor of Information Technology",
+      "status": "pending",
+      "category": "Computer Science & IT",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-business-and-bachelor-of-information-technology"
+    },
+    {
+      "course_name": "Bachelor of Business and Bachelor of International Studies",
+      "status": "pending",
+      "category": "Arts, Humanities & Social Sciences",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-business-and-bachelor-of-international-studies"
+    },
+    {
+      "course_name": "Bachelor of Business and Bachelor of Laws",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-business-and-bachelor-of-laws"
+    },
+    {
+      "course_name": "Bachelor of Business and Bachelor of Psychology",
+      "status": "pending",
+      "category": "Arts, Humanities & Social Sciences",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-business-and-bachelor-of-psychology"
+    },
+    {
+      "course_name": "Bachelor of Business and Bachelor of Science",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-business-and-bachelor-of-science"
+    },
+    {
+      "course_name": "Bachelor of Chiropractic Science",
+      "status": "pending",
+      "category": "Medicine & Health",
+      "degree_level": "Bachelor's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-chiropractic-science"
+    },
+    {
+      "course_name": "Bachelor of Clinical Science",
+      "status": "pending",
+      "category": "Medicine & Health",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-clinical-science"
+    },
+    {
+      "course_name": "Bachelor of Commerce",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-commerce"
+    },
+    {
+      "course_name": "Bachelor of Commerce and Bachelor of Actuarial Studies",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-commerce-and-bachelor-of-actuarial-studies"
+    },
+    {
+      "course_name": "Bachelor of Commerce and Bachelor of Economics",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-commerce-and-bachelor-of-economics"
+    },
+    {
+      "course_name": "Bachelor of Commerce and Bachelor of Information Technology",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-commerce-and-bachelor-of-information-technology"
+    },
+    {
+      "course_name": "Bachelor of Commerce and Bachelor of Laws",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-commerce-and-bachelor-of-laws"
+    },
+    {
+      "course_name": "Bachelor of Commerce and Bachelor of Psychology",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Bachelor's",
+      "completeness": 77,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-commerce-and-bachelor-of-psychology"
+    },
+    {
+      "course_name": "Bachelor of Commerce and Bachelor of Science",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-commerce-and-bachelor-of-science"
+    },
+    {
+      "course_name": "Bachelor of Criminology",
+      "status": "pending",
+      "category": "Law & Legal Studies",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-criminology"
+    },
+    {
+      "course_name": "Bachelor of Criminology and Bachelor of Laws",
+      "status": "pending",
+      "category": "Law & Legal Studies",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-criminology-and-bachelor-of-laws"
+    },
+    {
+      "course_name": "Bachelor of Cyber Security",
+      "status": "pending",
+      "category": "Computer Science & IT",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-cyber-security"
+    },
+    {
+      "course_name": "Bachelor of Economics",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-economics"
+    },
+    {
+      "course_name": "Bachelor of Economics and Bachelor of Actuarial Studies",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-economics-and-bachelor-of-actuarial-studies"
+    },
+    {
+      "course_name": "Bachelor of Economics and Bachelor of Laws",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-economics-and-bachelor-of-laws"
+    },
+    {
+      "course_name": "Bachelor of Education (Early Childhood)",
+      "status": "pending",
+      "category": "Education & Social Work",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-education-early-childhood"
+    },
+    {
+      "course_name": "Bachelor of Education (Early Childhood and Primary)",
+      "status": "pending",
+      "category": "Education & Social Work",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-education-early-childhood-and-primary"
+    },
+    {
+      "course_name": "Bachelor of Education (Primary)",
+      "status": "pending",
+      "category": "Education & Social Work",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-education-primary"
+    },
+    {
+      "course_name": "Bachelor of Education (Secondary)",
+      "status": "pending",
+      "category": "Education & Social Work",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-education-secondary"
+    },
+    {
+      "course_name": "Bachelor of Engineering (Honours)",
+      "status": "pending",
+      "category": "Engineering & Technology",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-engineering-honours"
+    },
+    {
+      "course_name": "Bachelor of Environment and Conservation",
+      "status": "pending",
+      "category": "Agriculture & Environmental Science",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-environment-and-conservation"
+    },
+    {
+      "course_name": "Bachelor of Exercise and Sports Science",
+      "status": "pending",
+      "category": "Science & Mathematics",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-exercise-and-sports-science"
+    },
+    {
+      "course_name": "Bachelor of Game Design and Development",
+      "status": "pending",
+      "category": "Media & Communications",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-game-design-and-development"
+    },
+    {
+      "course_name": "Bachelor of Health Sciences",
+      "status": "pending",
+      "category": "Medicine & Health",
+      "degree_level": "Bachelor's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-health-sciences"
+    },
+    {
+      "course_name": "Bachelor of History",
+      "status": "pending",
+      "category": "Arts, Humanities & Social Sciences",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-history"
+    },
+    {
+      "course_name": "Bachelor of Information Technology",
+      "status": "pending",
+      "category": "Computer Science & IT",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-information-technology"
+    },
+    {
+      "course_name": "Bachelor of Information Technology and Bachelor of Engineering (Honours)",
+      "status": "pending",
+      "category": "Computer Science & IT",
+      "degree_level": "Bachelor's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-information-technology-and-bachelor-of-engineering-honours"
+    },
+    {
+      "course_name": "Bachelor of International Studies",
+      "status": "pending",
+      "category": "Arts, Humanities & Social Sciences",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-international-studies"
+    },
+    {
+      "course_name": "Bachelor of International Studies and Bachelor of Laws",
+      "status": "pending",
+      "category": "Arts, Humanities & Social Sciences",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-international-studies-and-bachelor-of-laws"
+    },
+    {
+      "course_name": "Bachelor of International Studies and Bachelor of Media and Communications",
+      "status": "pending",
+      "category": "Media & Communications",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-international-studies-and-bachelor-of-media-and-communications"
+    },
+    {
+      "course_name": "Bachelor of International Studies and Bachelor of Security Studies",
+      "status": "pending",
+      "category": "Arts, Humanities & Social Sciences",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-international-studies-and-bachelor-of-security-studies"
+    },
+    {
+      "course_name": "Bachelor of Laws",
+      "status": "pending",
+      "category": "Law & Legal Studies",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-laws"
+    },
+    {
+      "course_name": "Bachelor of Laws and Bachelor of Psychology",
+      "status": "pending",
+      "category": "Arts, Humanities & Social Sciences",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-laws-and-bachelor-of-psychology"
+    },
+    {
+      "course_name": "Bachelor of Marketing and Media",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-marketing-and-media"
+    },
+    {
+      "course_name": "Bachelor of Media and Communications",
+      "status": "pending",
+      "category": "Media & Communications",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-media-and-communications"
+    },
+    {
+      "course_name": "Bachelor of Media and Communications and Bachelor of Laws",
+      "status": "pending",
+      "category": "Media & Communications",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-media-and-communications-and-bachelor-of-laws"
+    },
+    {
+      "course_name": "Bachelor of Medical Sciences",
+      "status": "pending",
+      "category": "Medicine & Health",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-medical-sciences"
+    },
+    {
+      "course_name": "Bachelor of Medical Sciences and Bachelor of Laws",
+      "status": "pending",
+      "category": "Medicine & Health",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-medical-sciences-and-bachelor-of-laws"
+    },
+    {
+      "course_name": "Bachelor of Professional Accounting",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-professional-accounting"
+    },
+    {
+      "course_name": "Bachelor of Psychological Sciences (Honours)",
+      "status": "pending",
+      "category": "Other",
+      "degree_level": "Bachelor's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-psychological-sciences-honours"
+    },
+    {
+      "course_name": "Bachelor of Psychology",
+      "status": "pending",
+      "category": "Arts, Humanities & Social Sciences",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-psychology"
+    },
+    {
+      "course_name": "Bachelor of Science",
+      "status": "pending",
+      "category": "Science & Mathematics",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-science"
+    },
+    {
+      "course_name": "Bachelor of Science and Bachelor of Actuarial Studies",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-science-and-bachelor-of-actuarial-studies"
+    },
+    {
+      "course_name": "Bachelor of Science and Bachelor of Engineering (Honours)",
+      "status": "pending",
+      "category": "Engineering & Technology",
+      "degree_level": "Bachelor's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-science-and-bachelor-of-engineering-honours"
+    },
+    {
+      "course_name": "Bachelor of Science and Bachelor of Information Technology",
+      "status": "pending",
+      "category": "Computer Science & IT",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-science-and-bachelor-of-information-technology"
+    },
+    {
+      "course_name": "Bachelor of Security Studies",
+      "status": "pending",
+      "category": "Other",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-security-studies"
+    },
+    {
+      "course_name": "Bachelor of Security Studies and Bachelor of Laws",
+      "status": "pending",
+      "category": "Law & Legal Studies",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-security-studies-and-bachelor-of-laws"
+    },
+    {
+      "course_name": "Bachelor of Social Sciences",
+      "status": "pending",
+      "category": "Arts, Humanities & Social Sciences",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-social-sciences"
+    },
+    {
+      "course_name": "Bachelor of Social Sciences and Bachelor of Laws",
+      "status": "pending",
+      "category": "Arts, Humanities & Social Sciences",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-social-sciences-and-bachelor-of-laws"
+    },
+    {
+      "course_name": "Bachelor of Speech and Hearing Sciences",
+      "status": "pending",
+      "category": "Other",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-speech-and-hearing-sciences"
+    },
+    {
+      "course_name": "Bachelor of Speech and Hearing Sciences and Bachelor of Psychology",
+      "status": "pending",
+      "category": "Arts, Humanities & Social Sciences",
+      "degree_level": "Bachelor's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-speech-and-hearing-sciences-and-bachelor-of-psychology"
+    },
+    {
+      "course_name": "Bachelor of Urban and Regional Planning",
+      "status": "pending",
+      "category": "Arts, Humanities & Social Sciences",
+      "degree_level": "Bachelor's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/bachelor-of-urban-and-regional-planning"
+    },
+    {
+      "course_name": "Diploma of Arts Media and Communications",
+      "status": "pending",
+      "category": "Media & Communications",
+      "degree_level": "Diploma",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/diploma-of-arts-media-and-communications"
+    },
+    {
+      "course_name": "Diploma of Business",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Diploma",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/diploma-of-business"
+    },
+    {
+      "course_name": "Diploma of Business Analytics",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Diploma",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/diploma-of-business-analytics"
+    },
+    {
+      "course_name": "Diploma of Commerce",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Diploma",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/diploma-of-commerce"
+    },
+    {
+      "course_name": "Diploma of Engineering",
+      "status": "pending",
+      "category": "Engineering & Technology",
+      "degree_level": "Diploma",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/diploma-of-engineering"
+    },
+    {
+      "course_name": "Diploma of Health Sciences",
+      "status": "pending",
+      "category": "Medicine & Health",
+      "degree_level": "Diploma",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/diploma-of-health-sciences"
+    },
+    {
+      "course_name": "Diploma of Information Technology",
+      "status": "pending",
+      "category": "Computer Science & IT",
+      "degree_level": "Diploma",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/diploma-of-information-technology"
+    },
+    {
+      "course_name": "Diploma of Marketing and Media",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Diploma",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/diploma-of-marketing-and-media"
+    },
+    {
+      "course_name": "Doctor of Medicine",
+      "status": "pending",
+      "category": "Medicine & Health",
+      "degree_level": "Doctorate",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/doctor-of-medicine"
+    },
+    {
+      "course_name": "Doctor of Physiotherapy",
+      "status": "pending",
+      "category": "Medicine & Health",
+      "degree_level": "Doctorate",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/doctor-of-physiotherapy"
+    },
+    {
+      "course_name": "Graduate Certificate of Accounting Practice",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Graduate Certificate",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/graduate-certificate-of-accounting-practice"
+    },
+    {
+      "course_name": "Graduate Certificate of Business Administration",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Graduate Certificate",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/graduate-certificate-of-business-administration"
+    },
+    {
+      "course_name": "Graduate Certificate of Clinical Trial Operations",
+      "status": "pending",
+      "category": "Medicine & Health",
+      "degree_level": "Graduate Certificate",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/graduate-certificate-of-clinical-trial-operations"
+    },
+    {
+      "course_name": "Graduate Certificate of Finance",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Graduate Certificate",
+      "completeness": 77,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/graduate-certificate-of-finance"
+    },
+    {
+      "course_name": "Graduate Certificate of Research in Business",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Graduate Certificate",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/graduate-certificate-of-research-in-business"
+    },
+    {
+      "course_name": "Graduate Certificate of Research in Medicine, Health and Human Sciences",
+      "status": "pending",
+      "category": "Medicine & Health",
+      "degree_level": "Graduate Certificate",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/graduate-certificate-of-research-in-medicine-health-and-human-sciences"
+    },
+    {
+      "course_name": "Graduate Certificate of Strategic Policy",
+      "status": "pending",
+      "category": "Other",
+      "degree_level": "Graduate Certificate",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/graduate-certificate-of-strategic-policy"
+    },
+    {
+      "course_name": "Graduate Certificate of TESOL",
+      "status": "pending",
+      "category": "Education & Social Work",
+      "degree_level": "Graduate Certificate",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/graduate-certificate-of-tesol"
+    },
+    {
+      "course_name": "Graduate Diploma of Accounting Practice",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Graduate Diploma",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/graduate-diploma-of-accounting-practice"
+    },
+    {
+      "course_name": "Graduate Diploma of Business Administration",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Graduate Diploma",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/graduate-diploma-of-business-administration"
+    },
+    {
+      "course_name": "Graduate Diploma of Research in Arts",
+      "status": "pending",
+      "category": "Arts, Humanities & Social Sciences",
+      "degree_level": "Graduate Diploma",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/graduate-diploma-of-research-in-arts"
+    },
+    {
+      "course_name": "Graduate Diploma of Research in Business",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Graduate Diploma",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/graduate-diploma-of-research-in-business"
+    },
+    {
+      "course_name": "Graduate Diploma of Research in Medicine, Health and Human Sciences",
+      "status": "pending",
+      "category": "Medicine & Health",
+      "degree_level": "Graduate Diploma",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/graduate-diploma-of-research-in-medicine-health-and-human-sciences"
+    },
+    {
+      "course_name": "Graduate Diploma of Research in Science and Engineering",
+      "status": "pending",
+      "category": "Engineering & Technology",
+      "degree_level": "Graduate Diploma",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/graduate-diploma-of-research-in-science-and-engineering"
+    },
+    {
+      "course_name": "Intensive Program",
+      "status": "pending",
+      "category": "Other",
+      "degree_level": null,
+      "completeness": 77,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/intensive-program"
+    },
+    {
+      "course_name": "Juris Doctor",
+      "status": "pending",
+      "category": "Law & Legal Studies",
+      "degree_level": "Doctorate",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/juris-doctor"
+    },
+    {
+      "course_name": "Master of Accounting",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-accounting"
+    },
+    {
+      "course_name": "Master of Actuarial Practice",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-actuarial-practice"
+    },
+    {
+      "course_name": "Master of Applied Economics",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-applied-economics"
+    },
+    {
+      "course_name": "Master of Applied Economics and Master of Banking and Finance",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-applied-economics-and-master-of-banking-and-finance"
+    },
+    {
+      "course_name": "Master of Applied Economics and Master of Management",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-applied-economics-and-master-of-management"
+    },
+    {
+      "course_name": "Master of Applied Finance",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 77,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-applied-finance"
+    },
+    {
+      "course_name": "Master of Applied Linguistics and TESOL",
+      "status": "pending",
+      "category": "Education & Social Work",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-applied-linguistics-and-tesol"
+    },
+    {
+      "course_name": "Master of Artificial Intelligence",
+      "status": "pending",
+      "category": "Computer Science & IT",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-artificial-intelligence"
+    },
+    {
+      "course_name": "Master of Banking and Finance",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-banking-and-finance"
+    },
+    {
+      "course_name": "Master of Banking and Finance and Master of Commerce",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-banking-and-finance-and-master-of-commerce"
+    },
+    {
+      "course_name": "Master of Banking and Finance and Master of International Business",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-banking-and-finance-and-master-of-international-business"
+    },
+    {
+      "course_name": "Master of Banking and Finance and Master of Management",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-banking-and-finance-and-master-of-management"
+    },
+    {
+      "course_name": "Master of Banking and Finance and Master of Marketing",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-banking-and-finance-and-master-of-marketing"
+    },
+    {
+      "course_name": "Master of Biotechnology",
+      "status": "pending",
+      "category": "Science & Mathematics",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-biotechnology"
+    },
+    {
+      "course_name": "Master of Business Administration",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-business-administration"
+    },
+    {
+      "course_name": "Master of Business Analytics",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-business-analytics"
+    },
+    {
+      "course_name": "Master of Chiropractic",
+      "status": "pending",
+      "category": "Medicine & Health",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-chiropractic"
+    },
+    {
+      "course_name": "Master of Clinical Audiology",
+      "status": "pending",
+      "category": "Medicine & Health",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-clinical-audiology"
+    },
+    {
+      "course_name": "Master of Clinical Neuropsychology",
+      "status": "pending",
+      "category": "Medicine & Health",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-clinical-neuropsychology"
+    },
+    {
+      "course_name": "Master of Clinical Psychology",
+      "status": "pending",
+      "category": "Medicine & Health",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-clinical-psychology"
+    },
+    {
+      "course_name": "Master of Commerce",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-commerce"
+    },
+    {
+      "course_name": "Master of Commerce and Master of International Business",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-commerce-and-master-of-international-business"
+    },
+    {
+      "course_name": "Master of Commerce and Master of Management",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-commerce-and-master-of-management"
+    },
+    {
+      "course_name": "Master of Commerce and Master of Marketing",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-commerce-and-master-of-marketing"
+    },
+    {
+      "course_name": "Master of Commerce and Master of Media and Communications",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-commerce-and-master-of-media-and-communications"
+    },
+    {
+      "course_name": "Master of Conference Interpreting",
+      "status": "pending",
+      "category": "Arts, Humanities & Social Sciences",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-conference-interpreting"
+    },
+    {
+      "course_name": "Master of Creative Industries",
+      "status": "pending",
+      "category": "Other",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-creative-industries"
+    },
+    {
+      "course_name": "Master of Creative Industries and Master of Management",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-creative-industries-and-master-of-management"
+    },
+    {
+      "course_name": "Master of Creative Industries and Master of Marketing",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-creative-industries-and-master-of-marketing"
+    },
+    {
+      "course_name": "Master of Creative Industries and Master of Media and Communications",
+      "status": "pending",
+      "category": "Media & Communications",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-creative-industries-and-master-of-media-and-communications"
+    },
+    {
+      "course_name": "Master of Creative Writing",
+      "status": "pending",
+      "category": "Arts, Humanities & Social Sciences",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-creative-writing"
+    },
+    {
+      "course_name": "Master of Criminology",
+      "status": "pending",
+      "category": "Law & Legal Studies",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-criminology"
+    },
+    {
+      "course_name": "Master of Criminology and Master of Intelligence",
+      "status": "pending",
+      "category": "Law & Legal Studies",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-criminology-and-master-of-intelligence"
+    },
+    {
+      "course_name": "Master of Criminology and Master of International Relations",
+      "status": "pending",
+      "category": "Law & Legal Studies",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-criminology-and-master-of-international-relations"
+    },
+    {
+      "course_name": "Master of Criminology and Master of Laws",
+      "status": "pending",
+      "category": "Law & Legal Studies",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-criminology-and-master-of-laws"
+    },
+    {
+      "course_name": "Master of Criminology and Master of Strategy and Security",
+      "status": "pending",
+      "category": "Law & Legal Studies",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-criminology-and-master-of-strategy-and-security"
+    },
+    {
+      "course_name": "Master of Cyber Security",
+      "status": "pending",
+      "category": "Computer Science & IT",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-cyber-security"
+    },
+    {
+      "course_name": "Master of Data Science",
+      "status": "pending",
+      "category": "Computer Science & IT",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-data-science"
+    },
+    {
+      "course_name": "Master of Education",
+      "status": "pending",
+      "category": "Education & Social Work",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-education"
+    },
+    {
+      "course_name": "Master of Engineering Management",
+      "status": "pending",
+      "category": "Engineering & Technology",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-engineering-management"
+    },
+    {
+      "course_name": "Master of Engineering (Professional)",
+      "status": "pending",
+      "category": "Engineering & Technology",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-engineering-professional"
+    },
+    {
+      "course_name": "Master of Environment and Conservation",
+      "status": "pending",
+      "category": "Agriculture & Environmental Science",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-environment-and-conservation"
+    },
+    {
+      "course_name": "Master of Information Systems Management",
+      "status": "pending",
+      "category": "Computer Science & IT",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-information-systems-management"
+    },
+    {
+      "course_name": "Master of Information Technology",
+      "status": "pending",
+      "category": "Computer Science & IT",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-information-technology"
+    },
+    {
+      "course_name": "Master of Intelligence",
+      "status": "pending",
+      "category": "Other",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-intelligence"
+    },
+    {
+      "course_name": "Master of Intelligence and Master of International Relations",
+      "status": "pending",
+      "category": "Arts, Humanities & Social Sciences",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-intelligence-and-master-of-international-relations"
+    },
+    {
+      "course_name": "Master of Intelligence and Master of Laws",
+      "status": "pending",
+      "category": "Law & Legal Studies",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-intelligence-and-master-of-laws"
+    },
+    {
+      "course_name": "Master of Intelligence and Master of Strategy and Security",
+      "status": "pending",
+      "category": "Other",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-intelligence-and-master-of-strategy-and-security"
+    },
+    {
+      "course_name": "Master of International Business",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-international-business"
+    },
+    {
+      "course_name": "Master of International Business and Master of International Relations",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-international-business-and-master-of-international-relations"
+    },
+    {
+      "course_name": "Master of International Business and Master of Laws",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-international-business-and-master-of-laws"
+    },
+    {
+      "course_name": "Master of International Business and Master of Management",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-international-business-and-master-of-management"
+    },
+    {
+      "course_name": "Master of International Business and Master of Marketing",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-international-business-and-master-of-marketing"
+    },
+    {
+      "course_name": "Master of International Business and Master of Media and Communications",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-international-business-and-master-of-media-and-communications"
+    },
+    {
+      "course_name": "Master of International Relations",
+      "status": "pending",
+      "category": "Arts, Humanities & Social Sciences",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-international-relations"
+    },
+    {
+      "course_name": "Master of International Relations and Master of Strategy and Security",
+      "status": "pending",
+      "category": "Arts, Humanities & Social Sciences",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-international-relations-and-master-of-strategy-and-security"
+    },
+    {
+      "course_name": "Master of Laws",
+      "status": "pending",
+      "category": "Law & Legal Studies",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-laws"
+    },
+    {
+      "course_name": "Master of Management",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-management"
+    },
+    {
+      "course_name": "Master of Management and Master of Marketing",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-management-and-master-of-marketing"
+    },
+    {
+      "course_name": "Master of Management and Master of Media and Communications",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-management-and-master-of-media-and-communications"
+    },
+    {
+      "course_name": "Master of Marketing",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-marketing"
+    },
+    {
+      "course_name": "Master of Marketing and Master of Media and Communications",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-marketing-and-master-of-media-and-communications"
+    },
+    {
+      "course_name": "Master of Media and Communications",
+      "status": "pending",
+      "category": "Media & Communications",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-media-and-communications"
+    },
+    {
+      "course_name": "Master of Organisational Psychology",
+      "status": "pending",
+      "category": "Arts, Humanities & Social Sciences",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-organisational-psychology"
+    },
+    {
+      "course_name": "Master of Professional Accounting",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-professional-accounting"
+    },
+    {
+      "course_name": "Master of Public Health",
+      "status": "pending",
+      "category": "Medicine & Health",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-public-health"
+    },
+    {
+      "course_name": "Master of Research in Arts",
+      "status": "pending",
+      "category": "Arts, Humanities & Social Sciences",
+      "degree_level": "Doctorate",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-research-in-arts"
+    },
+    {
+      "course_name": "Master of Research in Business",
+      "status": "pending",
+      "category": "Business & Management",
+      "degree_level": "Doctorate",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-research-in-business"
+    },
+    {
+      "course_name": "Master of Research in Medicine, Health and Human Sciences",
+      "status": "pending",
+      "category": "Medicine & Health",
+      "degree_level": "Doctorate",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-research-in-medicine-health-and-human-sciences"
+    },
+    {
+      "course_name": "Master of Research in Science and Engineering",
+      "status": "pending",
+      "category": "Engineering & Technology",
+      "degree_level": "Doctorate",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-research-in-science-and-engineering"
+    },
+    {
+      "course_name": "Master of Speech and Language Pathology",
+      "status": "pending",
+      "category": "Arts, Humanities & Social Sciences",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-speech-and-language-pathology"
+    },
+    {
+      "course_name": "Master of Strategy and Security",
+      "status": "pending",
+      "category": "Other",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-strategy-and-security"
+    },
+    {
+      "course_name": "Master of Sustainable Development",
+      "status": "pending",
+      "category": "Other",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-sustainable-development"
+    },
+    {
+      "course_name": "Master of Teaching (Birth to Five Years)",
+      "status": "pending",
+      "category": "Education & Social Work",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-teaching-birth-to-five-years"
+    },
+    {
+      "course_name": "Master of Teaching (Primary)",
+      "status": "pending",
+      "category": "Education & Social Work",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-teaching-primary"
+    },
+    {
+      "course_name": "Master of Teaching (Secondary)",
+      "status": "pending",
+      "category": "Education & Social Work",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-teaching-secondary"
+    },
+    {
+      "course_name": "Master of Translation and Interpreting Studies (Advanced)",
+      "status": "pending",
+      "category": "Arts, Humanities & Social Sciences",
+      "degree_level": "Master's",
+      "completeness": 92,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-translation-and-interpreting-studies-advanced"
+    },
+    {
+      "course_name": "Masters Qualifying Program (Accelerated)",
+      "status": "pending",
+      "category": "Other",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/masters-qualifying-program-accelerated"
+    },
+    {
+      "course_name": "Masters Qualifying Program (Standard)",
+      "status": "pending",
+      "category": "Other",
+      "degree_level": "Master's",
+      "completeness": 85,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/masters-qualifying-program-standard"
+    },
+    {
+      "course_name": "Standard Foundation Program",
+      "status": "pending",
+      "category": "Other",
+      "degree_level": null,
+      "completeness": 77,
+      "canonical_course_url": "mq.edu.au/study/find-a-course/courses/standard-foundation-program"
+    }
+  ],
+  "url_chunk_counts": [
+    60,
+    60,
+    60
+  ],
+  "latest_mq_status_check": {
+    "checked_at": "2026-09-14T07:24:10Z",
+    "ssm_command_id": "f842634c-8c61-4a0c-b2ed-73c6e87f3963",
+    "source_evidence_path": "/tmp/task466_mq_final_now.json",
+    "no_new_dispatch": true,
+    "result": {
+      "runtime_job_id": "job_257702eef633",
+      "university_id": 25,
+      "university_name": "Macquarie University",
+      "status": "completed_with_warnings",
+      "job_type": "single",
+      "created_at": "2026-09-14T07:06:38.743766+00:00",
+      "started_at": "2026-09-14T07:06:38.743766+00:00",
+      "completed_at": "2026-09-14T07:17:07.803637+00:00",
+      "current": 183,
+      "total_found": 183,
+      "imported": 182,
+      "skipped": 1,
+      "errors": 0,
+      "error_message": "Catalogue coverage below configured minimum: 183 raw candidates became 183 extractable URLs and 182 staged courses; expected at least 300. The run cannot be reported as an ordinary successful completion.",
+      "release_revision": "b07a55245a7c41886cbb1b15d84c562055195caa",
+      "gate_skip_counts": {
+        "catalogue_guard": {
+          "kind": "catalogue_below_expected_min",
+          "level": "warning",
+          "staged": 182,
+          "status": "completed_with_warnings",
+          "message": "Catalogue coverage below configured minimum: 183 raw candidates became 183 extractable URLs and 182 staged courses; expected at least 300. The run cannot be reported as an ordinary successful completion.",
+          "extractable": 183,
+          "raw_discovered": 183,
+          "expected_min_courses": 300
+        },
+        "html_compaction": {
+          "accepted": 0,
+          "attempts": 0,
+          "elapsed_ms": 0.0,
+          "fail_open": 0,
+          "input_bytes": 0,
+          "output_bytes": 0,
+          "skipped_small": 0,
+          "reduction_rate": 0.0,
+          "acceptance_rate": 0.0,
+          "fail_open_reasons": {}
+        }
+      }
+    },
+    "evidence_scope": "single read-only status query for the already-running Macquarie job; it was terminal at capture time"
+  },
+  "final_terminal_staging_capture": {
+    "checked_at": "2026-09-14T07:24:42Z",
+    "ssm_command_id": "40e24534-b00c-4f5e-849c-58ea51d31158",
+    "source_evidence_path": "/tmp/task466_mq_final_detail.json",
+    "runtime_terminal_capture": {
+      "runtime_job_id": "job_257702eef633",
+      "status": "completed_with_warnings",
+      "current": 183,
+      "total_found": 183,
+      "imported_staged": 182,
+      "skipped": 1,
+      "skip_reasons": {
+        "online_only": 1
+      },
+      "errors": 0,
+      "fetch_failed": 0,
+      "terminal_message": "══ DONE ══ Found:183 | Staged:182 | Skipped:1 (online_only=1) | FetchFailed:0 | Errors:0 | CatalogueFloor:300 | Raw:183"
+    },
+    "scraped_courses_job_scope": {
+      "query": "scraped_courses WHERE university_id=25 AND scrape_job_id='job_257702eef633'",
+      "row_count": 2,
+      "status_counts": {
+        "pending": 2
+      },
+      "url_count": 2,
+      "unique_url_count": 2,
+      "category_counts": {
+        "Agriculture & Environmental Science": 1,
+        "Engineering & Technology": 1
+      },
+      "degree_level_counts": {
+        "Master's": 2
+      },
+      "staged_urls": [
+        {
+          "course_name": "Master of Engineering (Professional) in Mechanical Engineering",
+          "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-engineering-professional-in-mechanical-engineering",
+          "category": "Engineering & Technology",
+          "degree_level": "Master's",
+          "status": "pending"
+        },
+        {
+          "course_name": "Master of Environment and Master of Sustainable Development",
+          "canonical_course_url": "mq.edu.au/study/find-a-course/courses/master-of-environment-and-master-of-sustainable-development",
+          "category": "Agriculture & Environmental Science",
+          "degree_level": "Master's",
+          "status": "pending"
+        }
+      ]
+    },
+    "related_job_status_counts": [
+      {
+        "scrape_job_id": "job_257702eef633",
+        "status": "pending",
+        "count": 2
+      },
+      {
+        "scrape_job_id": "job_d4bcad741d9b",
+        "status": "approved",
+        "count": 180
+      }
+    ],
+    "reconciliation_note": "The runtime terminal metric reports 182 imported/staged courses, while the direct current-job scraped_courses scope exposes only 2 pending rows and no complete 182-URL durable row list. Both observations are retained without inferring a cause or substituting the 2-row scope for the runtime metric."
+  },
+  "route_reconciliation": {
+    "terminal_job_id": "job_d4bcad741d9b",
+    "source_evidence_paths": [
+      "/tmp/mq-current-evidence/funnelback-accounting.txt",
+      "/tmp/mq-current-evidence/jina/funnelback-1.json",
+      "/tmp/mq-current-evidence/jina/funnelback-201.json",
+      "/tmp/mq-current-evidence/jina/funnelback-401.json"
+    ],
+    "raw_funnelback_results": 372,
+    "audit_accepted_source_rows": 212,
+    "audit_accepted_by_course_type": {
+      "Course": 138,
+      "Double Degree": 74
+    },
+    "production_valid_unique_candidates": 209,
+    "confirmed_dual_origin_404_exclusions": 28,
+    "page_data_enriched_candidates": 181,
+    "online_only_rejections": 1,
+    "terminal_staged_rows": 180,
+    "source_row_difference_to_staged": 32,
+    "source_row_difference_decomposition": {
+      "year_route_duplicate_source_rows_collapsed": 3,
+      "dual_origin_404_exclusions": 28,
+      "online_only_rejection": 1
+    },
+    "canonical_duplicate_crosswalk": [
+      {
+        "canonical_url": "https://www.mq.edu.au/study/find-a-course/courses/bachelor-of-commerce-and-bachelor-of-psychology",
+        "source_rows": [
+          {
+            "url": "https://www.mq.edu.au/study/find-a-course/courses/bachelor-of-commerce-and-bachelor-of-psychology",
+            "course_type": "Course",
+            "course_code": "C000492"
+          },
+          {
+            "url": "https://www.mq.edu.au/study/find-a-course/courses/2026/bachelor-of-commerce-and-bachelor-of-psychology",
+            "course_type": "Double Degree",
+            "course_code": "D000073"
+          }
+        ]
+      },
+      {
+        "canonical_url": "https://www.mq.edu.au/study/find-a-course/courses/bachelor-of-science-and-bachelor-of-engineering-honours",
+        "source_rows": [
+          {
+            "url": "https://www.mq.edu.au/study/find-a-course/courses/bachelor-of-science-and-bachelor-of-engineering-honours",
+            "course_type": "Course",
+            "course_code": "C000486"
+          },
+          {
+            "url": "https://www.mq.edu.au/study/find-a-course/courses/2026/bachelor-of-science-and-bachelor-of-engineering-honours",
+            "course_type": "Double Degree",
+            "course_code": "D006302"
+          }
+        ]
+      },
+      {
+        "canonical_url": "https://www.mq.edu.au/study/find-a-course/courses/bachelor-of-information-technology-and-bachelor-of-engineering-honours",
+        "source_rows": [
+          {
+            "url": "https://www.mq.edu.au/study/find-a-course/courses/bachelor-of-information-technology-and-bachelor-of-engineering-honours",
+            "course_type": "Course",
+            "course_code": "C000487"
+          },
+          {
+            "url": "https://www.mq.edu.au/study/find-a-course/courses/2026/bachelor-of-information-technology-and-bachelor-of-engineering-honours",
+            "course_type": "Double Degree",
+            "course_code": "D000058"
+          }
+        ]
+      }
+    ],
+    "terminal_exclusion_evidence": {
+      "terminal_job_id": "job_d4bcad741d9b",
+      "count": 28,
+      "sequence_range": [
+        18,
+        45
+      ],
+      "exact_records_path": "/tmp/task466_mq_exact_exclusions.json",
+      "proof_template": "[DISCOVER] MQ: confirmed missing public detail <url> — page-data and public detail both origin_not_found HTTP 404; excluding from enrichment candidates"
+    },
+    "route_term_search": {
+      "source_evidence_path": "/tmp/task466_mq_route_terms.json",
+      "terms": "retir|stale|route exclusion/filter|year-stamped",
+      "matches": 0
+    },
+    "interpretation": "The 32-row source-to-staged difference is reconciled as three year-route duplicate source rows, 28 dual-origin-404 exclusions, and one online-only rejection. The three duplicate pairs are not independent proof of retired routes; production logs provide only the aggregate 372-to-209 route/course filter count."
+  },
+  "scoped_journal_evidence": {
+    "source_evidence_path": "/tmp/task466_mq_exclusions.json",
+    "unit": "uni-celery.service",
+    "terminal_job_id": "job_d4bcad741d9b",
+    "journal_match_count": 22,
+    "selected_matches": [
+      "[2026-09-14 06:54:59,546: WARNING/ForkPoolWorker-8] [MQ DISCOVERY] Below-floor alert persisted (harvested=181, floor=300, job=job_d4bcad741d9b)",
+      "[2026-09-14 06:56:28,844: INFO/ForkPoolWorker-8] [REJECT CHECK] course='Graduate Diploma of Applied Finance' detected_modes=[Online] detected_locations=[none] decision=reject (online_only — study_mode is authoritative) global_policy=true",
+      "[2026-09-14 06:56:38,531: ERROR/ForkPoolWorker-8] [CATALOGUE FLOOR] Catalogue coverage below configured minimum: 181 raw candidates became 181 extractable URLs and 180 staged courses; expected at least 300. The run cannot be reported as an ordinary successful completion.",
+      "[2026-09-14 06:56:38,546: INFO/ForkPoolWorker-8] Scrape job_d4bcad741d9b completed_with_warnings: {'discovered': 181, 'staged': 180, 'skipped': 1, 'errors': 0, 'fetch_failed': 0, 'discovered_raw': 181}",
+      "[2026-09-14 06:56:38,693: INFO/ForkPoolWorker-8] [ALERTS] run job_d4bcad741d9b: 28 alerts (21 critical, 7 warning)",
+      "[2026-09-14 06:56:38,756: INFO/ForkPoolWorker-8] [SNAPSHOT] uni=25 run=job_d4bcad741d9b: wrote 180 snapshots",
+      "[2026-09-14 06:56:38,810: INFO/ForkPoolWorker-8] [CHANGE_DETECT] uni=25 run=job_d4bcad741d9b: 242 events (new=0 removed=70 field=172 critical=167)"
+    ],
+    "route_term_matches": 0
+  },
+  "safety_notes": [
+    "No restart, deploy, scrape dispatch, or database write was issued.",
+    "Database queries used the production application environment and SELECT-only SQL.",
+    "All SSM credentials were sourced from dedicated AWS_SSM_* environment secrets and never printed."
+  ],
+  "follow_up_mq_check": {
+    "checked_at": "2026-09-14T07:14:03Z",
+    "ssm_command_id": "b4dcb909-30a2-4956-b0ae-6515cb243a8d",
+    "no_new_dispatch": true,
+    "result": {
+      "runtime_job_id": "job_257702eef633",
+      "university_id": 25,
+      "university_name": "Macquarie University",
+      "status": "running",
+      "job_type": "single",
+      "created_at": "2026-09-14 07:06:38.743766+00:00",
+      "started_at": "2026-09-14 07:06:38.743766+00:00",
+      "completed_at": null,
+      "current": 0,
+      "total_found": 0,
+      "imported": 0,
+      "skipped": 0,
+      "errors": 0,
+      "error_message": null,
+      "release_revision": "b07a55245a7c41886cbb1b15d84c562055195caa",
+      "gate_skip_counts": null
+    },
+    "evidence_scope": "single read-only status query for the already-running Macquarie job"
+  },
+  "operational_helper": {
+    "workspace_path": null,
+    "tmp_path": "/tmp/task466_ssm_readonly.py",
+    "repository_deliverable": false,
+    "regex_checks_are_not_a_security_boundary": true
+  }
+}
