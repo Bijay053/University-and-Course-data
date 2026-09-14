@@ -311,17 +311,29 @@ class TestSitemapIndexUrl:
         )
 
 
-class TestEarlyReturnFloor:
-    """Pin the current Funnelback-first tiering without live network calls."""
+class TestFunnelbackAuthoritativeReturn:
+    """Pin the validated Funnelback result as the discovery authority."""
 
     @pytest.mark.asyncio
-    async def test_returns_early_when_funnelback_yields_enough(
+    async def test_returns_exact_nonempty_rich_result_without_fallback(
         self, monkeypatch,
     ):
         fake_links = [
-            {"url": f"https://coursehandbook.mq.edu.au/2026/courses/C{i:06d}",
-             "name": ""}
-            for i in range(1, 301)
+            {
+                "url": f"https://www.mq.edu.au/study/find-a-course/"
+                f"undergraduate/course-{i:03d}",
+                "name": f"Course {i}",
+                "scrapy_result": {
+                    "name": f"Course {i}",
+                    "url": (
+                        "https://www.mq.edu.au/study/find-a-course/"
+                        f"undergraduate/course-{i:03d}"
+                    ),
+                    "payload": {"degree_level": "Undergraduate"},
+                    "evidence": {"degree_level": "Funnelback"},
+                },
+            }
+            for i in range(181)
         ]
 
         async def fake_funnelback(emit, *, max_courses):
@@ -333,37 +345,35 @@ class TestEarlyReturnFloor:
 
         async def _fail_sitemap(*a, **kw):
             raise AssertionError(
-                "Sitemap ran despite Funnelback returning a complete catalogue"
+                "Sitemap ran despite Funnelback returning validated links"
             )
 
         monkeypatch.setattr(
             mq, "_discover_from_coursehandbook_sitemap", _fail_sitemap,
         )
+        monkeypatch.setattr(mq, "_discover_from_search_page", _fail_sitemap)
 
         emits: list[str] = []
 
         async def emit(kind, msg=None, **kw):
             emits.append(f"[{kind}] {msg}")
 
-        result = await mq.browser_discover_mq(emit=emit, max_courses=300)
+        result = await mq.browser_discover_mq(emit=emit, max_courses=500)
 
-        assert len(result) == 300
-        assert all(
-            u["url"].startswith("https://coursehandbook.mq.edu.au/")
-            for u in result
-        )
+        assert result == fake_links
         assert not any(
             "starting browser sweep across" in m for m in emits
-        ), f"Widget sweep should NOT have started; emits: {emits}"
+        ), f"Fallback discovery should NOT have started; emits: {emits}"
 
     @pytest.mark.asyncio
-    async def test_falls_through_when_sitemap_returns_too_few(
+    async def test_falls_through_when_funnelback_empty_and_sitemap_partial(
         self, monkeypatch,
     ):
         async def fake_funnelback(emit, *, max_courses):
             return []
 
-        # 19 URLs is under the floor of 20 → fall through to widget sweep.
+        # A zero Funnelback result plus a small handbook result enters the
+        # browser sweep, which can supplement the partial fallback stream.
         async def fake_sitemap(emit, *, max_courses):
             return [
                 {"url": f"https://coursehandbook.mq.edu.au/2026/courses/C{i:06d}",

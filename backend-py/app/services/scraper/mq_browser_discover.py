@@ -36,13 +36,15 @@ This module is a Macquarie-specific browser sweep modelled on
 * Returns ``[{"url": str, "name": str}, ...]`` or ``[]`` on failure (caller
   falls back to ``browser_discover_generic`` then Wayback CDX).
 
-Discovery floor / defence-in-depth
+Browser-sweep discovery floor / defence-in-depth
 ----------------------------------
-A successful sweep should return at least ~150 course URLs (Macquarie's
-catalogue is ~300 UG+PG). When the count falls below
-``_DISCOVERY_FLOOR``, this module emits a loud ``[DISCOVER] MQ: WARNING``
-status so the operator notices the regression in the live job log — but it
-still returns whatever it found so partial discovery is better than zero.
+This floor applies only to the fallback Playwright sweep. A successful rich
+Funnelback response is authoritative regardless of its count because that
+provider validates pagination and enrichment coverage before returning.
+When the browser-sweep count falls below ``_DISCOVERY_FLOOR``, this module
+emits a loud ``[DISCOVER] MQ: WARNING`` status so the operator notices the
+regression in the live job log — but it still returns whatever it found so
+partial discovery is better than zero.
 
 Live verification
 -----------------
@@ -739,8 +741,9 @@ async def _discover_from_funnelback_api(
     4. Build a ``scrapy_result`` payload per course from Funnelback metadata
        + page-data.json program dict.
 
-    Returns ``[]`` on any unrecoverable error (caller falls through to
-    the coursehandbook sitemap + browser-sweep tiers).
+    Raises ``MqEnrichmentCoverageError`` when the API or enrichment coverage
+    is not trustworthy; callers must not supplement such failures with
+    lower-quality catalogue tiers.
     """
     import httpx as _httpx
 
@@ -2182,9 +2185,11 @@ async def browser_discover_mq(
     # description.  Returns scrapy_result-shaped links so per-course HTML
     # extraction is bypassed entirely.
     #
-    # If this tier returns a full catalogue (≥ 300 courses), skip the
-    # expensive Tier 1 (coursehandbook sitemap + stealth browser resolver),
-    # Tier 1.5 (search-page browser harvest), and Tier 2 (faculty BFS sweep).
+    # A non-empty result from this tier is authoritative.  The provider
+    # validates pagination, raw/rich minimums, page-data coverage, and
+    # international-fee coverage before returning, so a valid catalogue
+    # smaller than the historical live-count estimate must not be sent
+    # through stale browser fallback tiers.
     try:
         fb_links = await _discover_from_funnelback_api(
             _emit, max_courses=max_courses,
@@ -2201,23 +2206,18 @@ async def browser_discover_mq(
         )
         fb_links = []
 
-    if len(fb_links) >= 300:
+    if fb_links:
         await _emit(
-            f"[DISCOVER] MQ: Tier 0 success — {len(fb_links)} courses from "
-            "Funnelback API; skipping coursehandbook + browser tiers"
+            f"[DISCOVER] MQ: Tier 0 authoritative success — {len(fb_links)} "
+            "validated courses from Funnelback API; skipping all fallback "
+            "discovery tiers"
         )
         return fb_links[:max_courses]
 
-    if fb_links:
-        await _emit(
-            f"[DISCOVER] MQ: Tier 0 partial — {len(fb_links)} courses from "
-            "Funnelback API; supplementing with coursehandbook + search tiers"
-        )
-    else:
-        await _emit(
-            "[DISCOVER] MQ: Tier 0 returned 0 — falling through to "
-            "coursehandbook sitemap"
-        )
+    await _emit(
+        "[DISCOVER] MQ: Tier 0 returned 0 — falling through to "
+        "coursehandbook sitemap"
+    )
 
     # ── Tier 1: coursehandbook sitemap (real catalogue host) ────────
     # Try the structured handbook sitemap FIRST.  The www.mq.edu.au SPA
@@ -2235,11 +2235,9 @@ async def browser_discover_mq(
             _ch_exc,
         )
         ch_links = []
-    # Seed the merged dict with Funnelback + handbook results so BFS
-    # additions below de-duplicate on admissions URL.
-    # Funnelback links carry scrapy_result; handbook links are URL-only.
-    # setdefault means Funnelback's richer form wins over handbook duplicates.
-    merged: dict[str, dict] = {d["url"]: d for d in fb_links}
+    # Funnelback returned no validated links above, so the fallback stream
+    # starts with the handbook results.  Handbook links are URL-only.
+    merged: dict[str, dict] = {}
     for d in ch_links:
         merged.setdefault(d["url"], d)
 
@@ -2276,10 +2274,9 @@ async def browser_discover_mq(
         f"{len(merged)} unique course URL(s)"
     )
 
-    # If the two structured tiers already produced a full catalogue, skip
-    # the expensive browser sweep.  The threshold is 450 (well above the
-    # 367 target) to allow for a small future catalogue growth before
-    # the sweep is wrongly skipped.
+    # If the two fallback structured tiers already produce a large catalogue,
+    # skip the expensive browser sweep.  This guard only applies after the
+    # authoritative Funnelback tier returned no validated links.
     if len(merged) >= 450:
         await _emit(
             f"[DISCOVER] MQ: {len(merged)} courses from handbook + search — "

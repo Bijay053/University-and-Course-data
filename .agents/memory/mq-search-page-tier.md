@@ -16,7 +16,10 @@ use thousands separators, so numeric conversion must accept valid grouping.
 
 **How to apply:** Preserve the coverage thresholds, retain blocked/unknown
 courses in their denominator, and never use discovery exclusions to delete
-existing live catalogue records.
+existing live catalogue records. Accept the fully validated rich-provider
+catalogue without a second fixed course-count gate: removing stale/non-degree
+links legitimately lowers its size, and bare-link supplementation reintroduces
+the domestic-default data the rich provider avoids.
 
 Use the international Funnelback catalogue only through the rich MQ provider that retains structured page-data fees, English scores, duration, and evidence. A generic provider that returns only URLs is unsafe because downstream detail pages render the domestic audience by default.
 
