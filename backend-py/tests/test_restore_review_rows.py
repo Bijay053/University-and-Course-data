@@ -302,6 +302,41 @@ def test_exact_backup_suppresses_legacy_fetched_url_duplicate():
     assert len(db.added) == 1
 
 
+def test_exact_backup_is_not_suppressed_by_same_name_at_different_url():
+    jobs = {"parent": _job("parent")}
+    original = ScrapedCourse(
+        scrape_job_id="parent",
+        university_id=42,
+        course_name="Bachelor of Computer Science",
+        course_website="https://uni.test/current/computer-science",
+        status="pending",
+    )
+    exact = _snapshot(
+        1,
+        "parent",
+        original.course_website,
+        original.course_name,
+        31000,
+        snapshot_type="staged_row",
+        snapshot_schema="staged_row_v1",
+        extra=staged_row_backup_payload(original),
+    )
+    stale = SimpleNamespace(
+        course_website="https://uni.test/old/computer-science",
+        course_name=original.course_name,
+        status="pending",
+    )
+    db = _FakeDb(jobs, [exact], staged=[stale])
+
+    result = asyncio.run(restore_review_rows("parent", commit=True, db=db))
+
+    assert result["restored"] == 1
+    assert result["skipped_existing"] == 0
+    assert len(db.added) == 1
+    assert db.added[0].course_website == original.course_website
+    assert db.added[0].scrape_job_id == "parent"
+
+
 def test_exact_staged_row_backup_round_trips_final_review_values():
     jobs = {"parent": _job("parent")}
     original = ScrapedCourse(

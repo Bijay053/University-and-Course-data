@@ -278,7 +278,17 @@ async def restore_review_rows(
             if not name:
                 skipped_unusable += 1
                 continue
-            if normalized_url in occupied_urls or name.casefold() in occupied_names:
+            # Final staged-row backups carry the canonical review URL and can
+            # therefore use the same URL identity as the database constraint.
+            # A name match alone is not identity: separate courses can share a
+            # title, and stale rows left by an interrupted run must not suppress
+            # restoration of a different URL. Legacy extractor snapshots still
+            # need the broader name fallback because their fetched URL may not
+            # be the final canonical course URL.
+            if (
+                normalized_url in occupied_urls
+                or (not is_exact_backup and name.casefold() in occupied_names)
+            ):
                 skipped_existing += 1
                 continue
 
