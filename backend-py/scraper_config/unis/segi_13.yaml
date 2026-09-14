@@ -41,7 +41,12 @@ discovery:
 extraction:
   skip_browser_rescue: true
   skip_per_course_browser: true
-  max_parallel_fetch: 4
+  # The Colleges supplement contains 225 rendered WordPress pages. Keep the
+  # provider calls bounded and use enough slots to avoid a long apparent stall
+  # when extraction transitions from the fast University host.
+  max_parallel_fetch: 8
+  per_course_timeout_seconds: 60
+  html_compaction_enabled: true
   scrape_do_render_hostnames:
     - "www.segi.edu.my"
 

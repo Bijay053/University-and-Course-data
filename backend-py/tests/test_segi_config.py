@@ -66,6 +66,9 @@ def test_segi_production_config_uses_current_official_catalogue() -> None:
     assert config.extraction.scrape_do_render_hostnames == [
         "www.segi.edu.my",
     ]
+    assert config.extraction.max_parallel_fetch == 8
+    assert config.extraction.per_course_timeout_seconds == 60
+    assert config.extraction.html_compaction_enabled is True
     assert config.extraction.scrape_do_skip_fallbacks is False
     assert config.extraction.staging.require_international_fee is False
     assert config.extraction.staging.stage_on_parser_error is True
@@ -441,6 +444,43 @@ async def test_segi_college_page_uses_course_owned_metadata_campus() -> None:
     assert len(results) == 1
     assert results[0].value == "SEGi College Kuala Lumpur"
     assert results[0].method == "location.segi_course_campus"
+
+
+@pytest.mark.asyncio
+async def test_segi_transition_from_university_to_college_keeps_course_owned_english() -> None:
+    """The first Colleges result remains extractable after University pages."""
+    from app.services.scraper.config import set_uni_config
+    from app.services.scraper.pipelines.single_course import extract_course
+
+    config = load_uni_config(
+        slug="segi",
+        scrape_url="https://www.segi.edu.my/",
+        university_id=13,
+        name="SEGi University & Colleges",
+    )
+    set_uni_config(config)
+    university = await extract_course(
+        "https://university.segi.edu.my/course/master-of-accountancy/",
+        country="Malaysia",
+        html="<h1>Master of Accountancy</h1><p>Campus: SEGi University</p><p>IELTS 5.0</p>",
+        use_ai_fallback=False,
+    )
+    college = await extract_course(
+        "https://www.segi.edu.my/bachelor-of-accounting-and-finance-honours-1/",
+        country="Malaysia",
+        html=(
+            "<html><head><meta property='og:description' content='"
+            "Programme ID: ABC Campus: SEGi College Kuala Lumpur "
+            "Level of Study: Bachelor Degree'></head><body>"
+            "<h1>Bachelor of Accounting and Finance (Honours)</h1>"
+            "<h2>English requirements</h2><p>IELTS 5.5</p></body></html>"
+        ),
+        use_ai_fallback=False,
+    )
+
+    assert university["payload"]["ielts_overall"] == 5.0
+    assert college["payload"]["ielts_overall"] == 5.5
+    assert college["payload"]["course_location"] == "SEGi College Kuala Lumpur"
 
 
 @pytest.mark.asyncio
