@@ -9,6 +9,7 @@ Covers:
 """
 import os
 import pytest
+from unittest.mock import patch
 
 # ── ai_extractor_run ──────────────────────────────────────────────────────────
 
@@ -117,6 +118,83 @@ class TestApplyExtractionRulesCSS:
         value, method = result["course_name"]
         assert value is None
         assert method == "ai_rule:miss"
+
+    def test_segi_deep_generated_css_uses_xpath_fallback_without_select(self):
+        """SEGi's deep generated chains must not enter SoupSieve's matcher.
+
+        The production rules had a seven-level descendant/sibling relation for
+        the campus value and a 22-level child chain for the fee value. Keep
+        those shapes here so a future rule-regeneration change cannot
+        reintroduce a synchronous CPU stall on the ~600 KB Colleges pages.
+        """
+        from bs4.element import Tag
+        from app.services.scraper.ai_extractor_run import apply_extraction_rules
+
+        html = (
+            "<html><body>"
+            '<span data-field="campus">SEGi College Kuala Lumpur</span>'
+            '<span data-field="fee">MYR 42,000</span>'
+            "</body></html>"
+        )
+        # Exact live SEGi rule: SIX descendant relations plus one sibling
+        # relation. Counting each kind separately misses the actual hang.
+        descendant_css = (
+            "h3:contains('English Language Requirements') ~ "
+            "div div div div div div div:contains('English')"
+        )
+        sibling_css = " ~ ".join(["div"] * 8) + ' span[data-field="campus"]'
+        child_css = " > ".join(["div"] * 22) + ' > span[data-field="fee"]'
+        rules = {
+            "course_location": {
+                "css": descendant_css,
+                "xpath": '//span[@data-field="campus"]',
+                "attribute": "text",
+            },
+            "study_mode": {
+                "css": sibling_css,
+                "xpath": '//span[@data-field="campus"]',
+                "attribute": "text",
+            },
+            "international_fee": {
+                "css": child_css,
+                "xpath": '//span[@data-field="fee"]',
+                "attribute": "text",
+            },
+        }
+
+        # If either selector reaches BeautifulSoup.select_one this test fails
+        # immediately; the XPath fallbacks still prove output parity.
+        with patch.object(
+            Tag,
+            "select_one",
+            side_effect=AssertionError("pathological selector reached SoupSieve"),
+        ):
+            result = apply_extraction_rules(html, rules)
+
+        assert result["course_location"] == (
+            "SEGi College Kuala Lumpur",
+            "ai_rule:xpath",
+        )
+        assert result["study_mode"] == (
+            "SEGi College Kuala Lumpur",
+            "ai_rule:xpath",
+        )
+        assert result["international_fee"] == ("MYR 42,000", "ai_rule:xpath")
+
+    def test_shallow_generated_css_still_uses_css(self):
+        """The guard must not change ordinary generated selector behavior."""
+        from app.services.scraper.ai_extractor_run import apply_extraction_rules
+
+        result = apply_extraction_rules(
+            '<span class="fee">MYR 42,000</span>',
+            {
+                "international_fee": {
+                    "css": "span.fee",
+                    "attribute": "text",
+                }
+            },
+        )
+        assert result["international_fee"] == ("MYR 42,000", "ai_rule:css")
 
 
 class TestApplyExtractionRulesRegex:
