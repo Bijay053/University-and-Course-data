@@ -218,6 +218,19 @@ The cryptographic restart-proof gate must obtain its expected disposable account
 from independently configured deployment/service state. Never derive that
 expected account from the proof being validated.
 
+An authenticated STS identity check using the separately provisioned disposable
+AWS credentials can establish the missing expected account independently.
+
+**Why:** The signed proof can be valid while the production service has never
+been configured with its independent expected account; copying the account
+from the proof would defeat that check.
+
+**How to apply:** Verify the dedicated disposable identity, preserve unrelated
+environment content and permissions when provisioning the nonsecret setting,
+and verify the environment loader accepts it. Existing service processes will
+not inherit the new setting until restart; configuring it does not waive the
+idle requirement or authorize interrupting active scrapes.
+
 **Why:** A planned release found neither the documented root application
 environment file nor `DATABASE_REFRESH_REHEARSAL_ACCOUNT_ID` in the running
 Celery process. The checked-in gate correctly failed closed before Git pull or
