@@ -26,6 +26,7 @@ import asyncio
 import pytest
 
 from app.services.scraper import per_course_browser
+from app.services.scraper.extractors.base import ExtractionResult
 
 
 @pytest.mark.asyncio
@@ -212,6 +213,112 @@ async def test_uow_fee_missing_still_runs_force_browser(monkeypatch):
     )
 
     assert called == ["https://www.uow.edu.au/study/courses/example/"]
+
+
+@pytest.mark.asyncio
+async def test_configured_full_rendered_extraction_recovers_missing_fee(
+    monkeypatch,
+):
+    class _Extraction:
+        actions = []
+        skip_per_course_browser = False
+        full_rendered_extraction = True
+
+    class _Config:
+        extraction = _Extraction()
+
+    async def _render(url: str, **kw):  # noqa: ANN001
+        return "<html><body>International tuition fee: $42,500</body></html>"
+
+    async def _fee_extract(rendered: str, url: str):  # noqa: ANN001
+        assert "42,500" in rendered
+        return [
+            ExtractionResult(
+                field_key="international_fee",
+                normalized={
+                    "international_fee": 42_500,
+                    "fee_currency": "AUD",
+                    "fee_term": "Annual",
+                },
+                confidence=0.9,
+                snippet="International tuition fee: $42,500",
+            )
+        ]
+
+    async def _empty_extract(rendered: str, url: str):  # noqa: ANN001
+        return []
+
+    monkeypatch.setattr(per_course_browser, "get_uni_config", lambda: _Config())
+    monkeypatch.setattr(per_course_browser.browser_pool, "fetch_html", _render)
+    monkeypatch.setattr(per_course_browser.fee, "extract", _fee_extract)
+    for extractor in (
+        per_course_browser.course_name_extractor,
+        per_course_browser.english_test,
+        per_course_browser.intake,
+        per_course_browser.duration,
+        per_course_browser.location,
+        per_course_browser.study_mode,
+    ):
+        monkeypatch.setattr(extractor, "extract", _empty_extract)
+
+    filled, evidence, rendered, override = (
+        await per_course_browser.maybe_browser_refetch(
+            "https://configured.example/course",
+            {"international_fee": None},
+        )
+    )
+
+    assert filled["international_fee"] == 42_500
+    assert filled["fee_currency"] == "AUD"
+    assert filled["fee_term"] == "Annual"
+    assert any(
+        row["field_key"] == "international_fee"
+        and row["method"] == "per_course_browser_extended"
+        for row in evidence
+    )
+    assert rendered is not None
+    assert override is False
+
+
+@pytest.mark.asyncio
+async def test_full_rendered_extraction_is_disabled_by_default(monkeypatch):
+    class _Extraction:
+        actions = []
+        skip_per_course_browser = False
+
+    class _Config:
+        extraction = _Extraction()
+
+    async def _render(url: str, **kw):  # noqa: ANN001
+        return "<html><body>Rendered course page</body></html>"
+
+    extended_called = False
+
+    async def _extended(*args, **kwargs):  # noqa: ANN002, ANN003
+        nonlocal extended_called
+        extended_called = True
+        return {"international_fee": 42_500}, []
+
+    async def _english_extract(rendered: str, url: str):  # noqa: ANN001
+        return []
+
+    monkeypatch.setattr(per_course_browser, "get_uni_config", lambda: _Config())
+    monkeypatch.setattr(per_course_browser.browser_pool, "fetch_html", _render)
+    monkeypatch.setattr(per_course_browser, "_extended_extract", _extended)
+    monkeypatch.setattr(
+        per_course_browser.english_test,
+        "extract",
+        _english_extract,
+    )
+
+    filled, _, rendered, _ = await per_course_browser.maybe_browser_refetch(
+        "https://ordinary.example/course",
+        {"international_fee": None},
+    )
+
+    assert extended_called is False
+    assert filled == {}
+    assert rendered is not None
 
 
 @pytest.mark.asyncio

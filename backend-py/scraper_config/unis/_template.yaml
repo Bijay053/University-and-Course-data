@@ -819,6 +819,19 @@ extraction:
   #   Log line: "[per-course browser skipped] <url> — YAML skip_per_course_browser"
   skip_per_course_browser: false
 
+  # Run the full extractor suite (course name, fees, English scores, intakes,
+  # duration, location, and study mode) against browser-rendered HTML. Without
+  # this, the ordinary browser fallback only re-runs English-score extraction.
+  # Enable when JavaScript-rendered fields such as international fees are blank
+  # after static extraction.
+  #
+  # Pair with force_browser: true when static extraction may already populate an
+  # English score or other fields, because that normally prevents the fallback
+  # from running. force_browser also lets authoritative rendered values replace
+  # misleading static values; without it, full rendered extraction only fills
+  # fields that remain blank.
+  full_rendered_extraction: false
+
   # browser_wait_strategy: networkidle | domcontentloaded | null
   #   Override the Playwright wait_until strategy. YAML alternative to adding the
   #   host to _NETWORKIDLE_HOSTS or _DCL_SETTLE_MS_OVERRIDES in code.

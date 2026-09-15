@@ -844,6 +844,18 @@ def _force_browser_for_url(url: str) -> bool:
     return any(host == h or host.endswith("." + h) for h in _FORCE_BROWSER_HOSTS)
 
 
+def _full_rendered_extraction_enabled() -> bool:
+    """Return whether YAML opts this university into full rendered extraction."""
+    try:
+        cfg = get_uni_config()
+        return bool(
+            cfg
+            and getattr(cfg.extraction, "full_rendered_extraction", False)
+        )
+    except Exception:
+        return False
+
+
 async def maybe_browser_refetch(
     url: str,
     payload: dict[str, Any],
@@ -1034,12 +1046,15 @@ async def maybe_browser_refetch(
         return {}, [], None, False
 
     host = (urlparse(url).hostname or "").lower()
-    _is_extended = host in _EXTENDED_EXTRACT_HOSTS
+    _is_extended = (
+        _full_rendered_extraction_enabled()
+        or host in _EXTENDED_EXTRACT_HOSTS
+    )
 
     if _is_extended:
-        # UOW / UniSQ: run the FULL extractor suite (fee + IELTS + intake +
-        # duration + location + study_mode) against the rendered HTML.  The
-        # plain english_test-only path below never sees fee at all.
+        # Configured and legacy extended hosts run the FULL extractor suite
+        # (fee + IELTS + intake + duration + location + study_mode) against the
+        # rendered HTML. The plain english_test-only path never sees fee at all.
         # Pass override=force so that force-browser hosts (UniSQ, UOW) let
         # browser-rendered values replace any wrong static-HTML values.
         filled, evidence = await _extended_extract(rendered, url, payload, override=force)

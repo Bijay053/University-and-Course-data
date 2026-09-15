@@ -3589,6 +3589,19 @@ class ExtractionConfig(BaseModel):
             "YAML alternative to _FORCE_BROWSER_HOSTS in per_course_browser.py."
         ),
     )
+    full_rendered_extraction: bool = Field(
+        default=False,
+        description=(
+            "When True, run the full course-field extractor suite (course name, "
+            "fee, English tests, intake, duration, location, and study mode) "
+            "against the Playwright-rendered HTML instead of re-running only "
+            "English extraction. Use when critical fields such as fees are "
+            "JavaScript-rendered. Pair with force_browser=true when the browser "
+            "must run even if static extraction already populated English or "
+            "other fields; force_browser also allows authoritative rendered "
+            "values to replace misleading static values."
+        ),
+    )
     skip_initial_http_fetch: bool = Field(
         default=False,
         description=(
