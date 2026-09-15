@@ -156,3 +156,4 @@
 - [UWA campus and fee authority](uwa-campus-fee-authority.md) — use the current course’s labelled campus card and exact course-code lookup against UWA’s international fee calculator.
 - [Curtin structured offering authority](curtin-offering-authority.md) — use labelled key-information blocks and newest international year-1 JSON-LD offer; mixed year/month durations need conversion.
 - [Staged-row restore identity](staged-row-restore-identity.md) — exact backups deduplicate by canonical URL; name fallback is only for legacy snapshots whose fetched URL may differ.
+- [Auckland qualification filtering](auckland-qualification-filtering.md) — the shared study-option path mixes programmes and subjects; trust its explicit discovery labels before extraction.
