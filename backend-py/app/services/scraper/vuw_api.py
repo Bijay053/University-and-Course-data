@@ -289,7 +289,21 @@ def _study_mode(item: dict) -> Optional[str]:
 def _location(item: dict) -> Optional[str]:
     # Prefer internationalLocation — describes where international students study
     loc = (item.get("internationalLocation") or item.get("location") or "").strip()
-    return loc or None
+    if not loc:
+        return None
+    # course_location stores physical campuses only. If VUW publishes a mixed
+    # value such as "Wellington campuses and online", retain the campus portion;
+    # stage_course's universal virtual scrub would otherwise discard the whole
+    # unsplit phrase because it contains "online".
+    physical = re.sub(
+        r"\s*(?:,?\s+and\s+|,\s*)(?:online|distance(?:\s+learning)?)\s*$",
+        "",
+        loc,
+        flags=re.IGNORECASE,
+    ).strip(" ,")
+    if physical.lower() in {"online", "distance", "distance learning"}:
+        return None
+    return physical or None
 
 
 # ── Evidence helper ──────────────────────────────────────────────────────────

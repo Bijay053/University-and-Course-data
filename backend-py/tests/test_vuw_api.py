@@ -140,7 +140,7 @@ def test_teaching_diploma_maps_current_fee_intake_and_location():
     assert payload["fee_term"] == "Total"
     assert payload["fee_year"] == 2027
     assert payload["intake_months"] == ["February"]
-    assert payload["course_location"] == "Wellington campuses and online"
+    assert payload["course_location"] == "Wellington campuses"
 
 
 # ── _map_item — enforce_source_evidence compatibility ─────────────────────────
