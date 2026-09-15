@@ -1083,7 +1083,12 @@ async def _fetch_mq_research_source(url: str) -> str | None:
                 url,
                 render=True,
                 rate_limit=True,
-                max_retries=0,
+                # Authority pages are fetched one at a time, but Scrape.do
+                # can transiently return ROTATION_FAILED/502 for a single
+                # source.  Keep this bounded to one provider retry so a
+                # transient transport result cannot silently omit one of the
+                # two required research qualifications.
+                max_retries=1,
             )
             if body and not is_challenge_shell(body):
                 return body

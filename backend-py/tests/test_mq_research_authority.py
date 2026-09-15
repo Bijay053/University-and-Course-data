@@ -257,6 +257,56 @@ async def test_authority_supplement_uses_current_combined_route_and_page_data(
 
 
 @pytest.mark.asyncio
+async def test_authority_source_requests_one_bounded_render_retry(monkeypatch):
+    """The provider gets one retry for a transient authority transport failure."""
+    import app.services.scraper.http_fetcher as http_fetcher
+
+    authority = next(
+        item for item in mq._MQ_RESEARCH_AUTHORITIES
+        if item["title"] == "Master of Philosophy"
+    )
+    valid_body = (
+        "<title>Master of Philosophy | Research degrees | Macquarie University"
+        "</title><p>Two years full-time equivalent</p>"
+        "<p>International students may apply.</p>"
+    )
+    calls: list[dict] = []
+
+    async def provider_retry_success(url, **kwargs):
+        calls.append(kwargs)
+        return valid_body
+
+    monkeypatch.setattr(
+        http_fetcher,
+        "fetch_html_scrape_do",
+        provider_retry_success,
+    )
+
+    class _FallbackClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def get(self, *args, **kwargs):
+            raise AssertionError("direct fallback should not run before retry")
+
+    import httpx
+
+    monkeypatch.setattr(httpx, "AsyncClient", _FallbackClient)
+
+    body = await mq._fetch_mq_research_source(str(authority["url"]))
+
+    assert body == valid_body
+    assert len(calls) == 1
+    assert calls[0]["max_retries"] == 1
+
+
+@pytest.mark.asyncio
 async def test_unrelated_page_data_title_cannot_supply_research_fee(
     monkeypatch,
 ):
