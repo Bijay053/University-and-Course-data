@@ -178,6 +178,14 @@ def test_splits_plain_hyphen_homepage_title() -> None:
     [
         ("Home | Western Sydney University", "Western Sydney University"),
         ("Welcome – University of Canberra", "University of Canberra"),
+        ("AUT | Auckland, New Zealand", "AUT"),
+        ("Auckland, New Zealand | AUT", "AUT"),
+        ("Auckland, New Zealand", ""),
+        ("Sydney, Australia", ""),
+        ("New Zealand", ""),
+        ("University of Auckland", "University of Auckland"),
+        ("University of California, Berkeley", "University of California, Berkeley"),
+        ("Notre Dame", "Notre Dame"),
         (
             "Study with us | INTI International University &amp; Colleges",
             "INTI International University & Colleges",
@@ -203,6 +211,70 @@ def test_rejects_generic_only_institution_name_metadata() -> None:
 
 def test_known_jcu_domain_has_authoritative_official_name() -> None:
     assert _HOSTNAME_OFFICIAL_NAMES["jcu.edu.au"] == "James Cook University"
+
+
+def test_aut_domain_has_official_name_including_subdomains() -> None:
+    from app.routers.universities import _institution_domain
+
+    assert _HOSTNAME_OFFICIAL_NAMES[
+        _institution_domain("https://www.aut.ac.nz")
+    ] == "Auckland University of Technology"
+    assert _institution_domain("https://aut.ac.nz.attacker.example") != "aut.ac.nz"
+
+
+@pytest.mark.asyncio
+async def test_add_aut_url_repairs_location_name_without_duplicate(monkeypatch):
+    from unittest.mock import AsyncMock
+    from app.routers import universities as routes
+
+    existing = SimpleNamespace(
+        id=123, name="Auckland, New Zealand",
+        country="New Zealand", city="Auckland",
+    )
+    db = SimpleNamespace(commit=AsyncMock())
+    monkeypatch.setattr(routes, "_fetch_onboarding_homepage", AsyncMock(
+        return_value='<meta property="og:site_name" content="Auckland, New Zealand">'
+        '<title>AUT | Auckland, New Zealand</title>',
+    ))
+    monkeypatch.setattr(routes, "_resolve_university_identity_openai", AsyncMock(return_value={}))
+    monkeypatch.setattr(routes, "_find_existing_university_by_domain", AsyncMock(return_value=existing))
+    monkeypatch.setattr(routes, "_upsert_discovered_locations", AsyncMock(return_value=False))
+
+    result = await routes.add_university_by_url(
+        {"url": "https://www.aut.ac.nz"}, db, {},
+    )
+    assert result["name"] == "Auckland University of Technology"
+    assert result["university_id"] == 123
+    assert result["already_exists"] is True
+    assert existing.name == result["name"]
+    db.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_manual_create_and_edit_reject_location_names():
+    from unittest.mock import AsyncMock, Mock
+    from fastapi import HTTPException
+    from app.routers import universities as routes
+
+    result = Mock()
+    result.scalar_one_or_none.return_value = None
+    db = SimpleNamespace(
+        execute=AsyncMock(return_value=result),
+        get=AsyncMock(return_value=SimpleNamespace(id=123)),
+        commit=AsyncMock(),
+    )
+    with pytest.raises(HTTPException) as create_error:
+        await routes.create_university(
+            routes.UniversityCreate(name="Auckland, New Zealand", country="New Zealand", city="Auckland"),
+            db, {},
+        )
+    assert create_error.value.status_code == 422
+    with pytest.raises(HTTPException) as edit_error:
+        await routes.update_university(
+            123, routes.UniversityUpdate(name="Auckland, New Zealand"), db, {},
+        )
+    assert edit_error.value.status_code == 422
+    db.commit.assert_not_awaited()
 
 
 def test_known_unsw_domain_has_authoritative_official_name() -> None:

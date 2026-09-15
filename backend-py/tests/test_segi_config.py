@@ -291,8 +291,12 @@ async def test_segi_tls_exception_does_not_apply_to_other_hosts() -> None:
 
 
 @pytest.mark.asyncio
-async def test_segi_online_mode_title_overrides_campus_derived_mode() -> None:
+async def test_segi_online_mode_title_skips_expensive_enrichment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from app.services.scraper.config import set_uni_config
+    from app.services.scraper import per_course_vision
+    from app.services.scraper.extractors import ai_fallback, gemini_primary
     from app.services.scraper.pipelines.single_course import extract_course
 
     config = load_uni_config(
@@ -315,21 +319,134 @@ async def test_segi_online_mode_title_overrides_campus_derived_mode() -> None:
     </html>
     """
 
+    primary = AsyncMock(side_effect=AssertionError("Gemini primary must be skipped"))
+    vision = AsyncMock(side_effect=AssertionError("vision OCR must be skipped"))
+
+    def fail_fallback(*args, **kwargs):
+        raise AssertionError("AI fallback must be skipped")
+
+    monkeypatch.setattr(gemini_primary, "extract_primary", primary)
+    monkeypatch.setattr(per_course_vision, "maybe_vision_refetch", vision)
+    monkeypatch.setattr(ai_fallback, "fill_missing", fail_fallback)
     result = await extract_course(
         "https://university.segi.edu.my/course/bachelor-of-psychology-honours-odl/",
         country="Malaysia",
         html=html,
-        use_ai_fallback=False,
+        use_ai_fallback=True,
     )
 
     assert result.get("error") is None
     assert result["payload"]["study_mode"] == "Online"
+    assert result["payload"]["online_only"] is True
+    assert result["payload"]["online_only_segi"] is True
+    assert result["payload"]["online_only_authoritative"] is True
+    assert result["_perf"]["ai_skipped_online_only"] is True
+    assert result["_perf"]["vision_skipped"] is True
+    primary.assert_not_awaited()
+    vision.assert_not_awaited()
     assert any(
         evidence.get("field_key") == "study_mode"
         and evidence.get("method") == "study_mode:title_keyword"
         and evidence.get("value") == "Online"
         for evidence in result["evidence"]
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Bachelor of Business (Online Mode or On Campus)",
+        "Bachelor of Business (Online Learning and On Campus)",
+    ],
+)
+async def test_segi_mixed_title_does_not_take_online_fast_path(title: str) -> None:
+    from app.services.scraper.config import set_uni_config
+    from app.services.scraper.pipelines.single_course import extract_course
+    from app.services.scraper.guards import should_stage_course
+
+    config = load_uni_config(
+        slug="segi",
+        scrape_url="https://www.segi.edu.my/",
+        university_id=13,
+        name="SEGi University & Colleges",
+    )
+    set_uni_config(config)
+    events: list[dict] = []
+
+    async def emit(*args, **kwargs):
+        events.append(kwargs)
+
+    result = await extract_course(
+        "https://university.segi.edu.my/course/bachelor-of-business/",
+        country="Malaysia",
+        html=f"""
+        <html><body>
+          <h1>{title}</h1>
+          <dl><dt>Study mode</dt><dd>Online or On Campus</dd></dl>
+          <dl><dt>Campus</dt><dd>SEGi University</dd></dl>
+          <p>International tuition fee: MYR 20,000</p>
+        </body></html>
+        """,
+        use_ai_fallback=False,
+        emit=emit,
+    )
+
+    # The new fast path must not classify either explicit mixed title as
+    # Online-only.  This also proves the title authority was not moved ahead
+    # of the existing mixed/on-campus correction.
+    assert result["payload"].get("online_only_authoritative") is not True
+    assert result["payload"].get("online_only_segi") is not True
+    assert result["_perf"].get("ai_skipped_online_only") is not True
+    assert not any(event.get("kind") == "online_only_skip" for event in events)
+
+    eligible_payload = dict(result["payload"])
+    eligible_payload.update(
+        {
+            "course_name": title,
+            "study_mode": "Blended",
+            "international_fee": 20_000,
+        }
+    )
+    accepted, reason = should_stage_course(
+        title,
+        eligible_payload,
+        source_url="https://university.segi.edu.my/course/bachelor-of-business/",
+    )
+    assert accepted is True, reason
+
+
+@pytest.mark.asyncio
+async def test_segi_rule_online_with_physical_campus_does_not_take_fast_path() -> None:
+    from app.services.scraper.config import set_uni_config
+    from app.services.scraper.pipelines.single_course import extract_course
+
+    config = load_uni_config(
+        slug="segi",
+        scrape_url="https://www.segi.edu.my/",
+        university_id=13,
+        name="SEGi University & Colleges",
+    )
+    set_uni_config(config)
+    result = await extract_course(
+        "https://university.segi.edu.my/course/bachelor-of-business/",
+        country="Malaysia",
+        html="""
+        <html><body>
+          <h1>Bachelor of Business Administration</h1>
+          <p>Online course information and resources are available.</p>
+          <p>Campus: SEGi University</p>
+          <p>International tuition fee: MYR 20,000</p>
+        </body></html>
+        """,
+        use_ai_fallback=False,
+    )
+
+    # A broad study_mode:rule Online result is not authoritative.  The
+    # physical campus route must remain eligible for the normal pipeline.
+    assert result["payload"].get("online_only_authoritative") is not True
+    assert result["payload"].get("online_only_segi") is not True
+    assert result["_perf"].get("ai_skipped_online_only") is not True
 
 
 @pytest.mark.asyncio

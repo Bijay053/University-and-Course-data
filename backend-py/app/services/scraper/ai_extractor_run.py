@@ -37,6 +37,123 @@ _MONTH_MAP: dict[str, int] = {
 _MONTH_NAMES = ["January", "February", "March", "April", "May", "June",
                 "July", "August", "September", "October", "November", "December"]
 
+# SoupSieve evaluates ancestor and sibling relations by walking back from
+# every candidate element.  A generated selector with a long relation chain
+# can therefore turn one ``select_one`` into a near-full-document search.  In
+# particular, the SEGi Colleges rules generated a seven-level descendant
+# selector and a 22-level direct-child selector.  Those selectors were valid
+# CSS, but their evaluation on the ~600 KB WordPress document was effectively
+# unbounded (the worker stayed at 100% CPU in
+# ``soupsieve.match_past_relations``).
+#
+# Keep these limits specific to generated CSS rules.  A selector over either
+# limit is skipped here and the existing XPath/regex fallback for the same
+# rule is still attempted by ``apply_extraction_rules``.  This avoids changing
+# extraction semantics for ordinary selectors, and avoids trying to interrupt
+# SoupSieve after it has entered its synchronous matcher.
+_MAX_GENERATED_CSS_DESCENDANT_RELATIONS = 7
+_MAX_GENERATED_CSS_CHILD_RELATIONS = 16
+_MAX_GENERATED_CSS_OTHER_RELATIONS = 7
+
+
+def _css_selector_complexity(selector: str) -> tuple[int, int, int]:
+    """Return ``(descendant, child, other)`` top-level CSS relations.
+
+    This is intentionally a small lexical scan rather than a CSS parser.  It
+    only needs to identify generated selectors whose relation chain is
+    pathological, and scanning outside attribute/function contents avoids
+    counting ``>`` or ``~`` characters in quoted values.  Comma-separated
+    selector alternatives are counted together; a generated rule with one
+    unusually deep alternative should be bounded just like a single selector.
+    """
+    descendant = 0
+    child = 0
+    other = 0
+    bracket_depth = 0
+    paren_depth = 0
+    quote: str | None = None
+    escaped = False
+    pending_space = False
+    explicit_relation = False
+
+    for char in selector:
+        if quote is not None:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == quote:
+                quote = None
+            continue
+
+        if char in {"'", '"'} and (bracket_depth or paren_depth):
+            quote = char
+            continue
+        if char == "[":
+            bracket_depth += 1
+            continue
+        if char == "]" and bracket_depth:
+            bracket_depth -= 1
+            continue
+        if char == "(":
+            paren_depth += 1
+            continue
+        if char == ")" and paren_depth:
+            paren_depth -= 1
+            continue
+
+        if bracket_depth or paren_depth:
+            continue
+
+        if char.isspace():
+            pending_space = True
+            continue
+
+        if char in {">", "+", "~"}:
+            if char == ">":
+                child += 1
+            else:
+                other += 1
+            pending_space = False
+            explicit_relation = True
+            continue
+
+        # Whitespace between two compound selectors is a descendant
+        # combinator.  Whitespace around an explicit combinator is not.
+        if pending_space and not explicit_relation:
+            descendant += 1
+        pending_space = False
+        explicit_relation = False
+
+    return descendant, child, other
+
+
+def _is_pathological_generated_css(selector: str) -> bool:
+    """Return whether a generated selector must bypass SoupSieve.
+
+    Generated rules are allowed to fall back to XPath/regex, so rejecting only
+    this narrow shape is safer than adding a timeout around the whole
+    extraction call.  A timeout cannot stop SoupSieve while it is executing
+    synchronous Python on the worker's event loop.
+    """
+    descendant, child, other = _css_selector_complexity(selector)
+    pathological = (
+        descendant >= _MAX_GENERATED_CSS_DESCENDANT_RELATIONS
+        or descendant + other >= _MAX_GENERATED_CSS_DESCENDANT_RELATIONS
+        or child >= _MAX_GENERATED_CSS_CHILD_RELATIONS
+        or other >= _MAX_GENERATED_CSS_OTHER_RELATIONS
+    )
+    if pathological:
+        log.warning(
+            "[EXTRACTOR_RUN] skipping pathological generated CSS selector "
+            "(descendant=%d child=%d other=%d): %s",
+            descendant,
+            child,
+            other,
+            selector[:240],
+        )
+    return pathological
+
 
 def _apply_transform(value: str, transform: str | None) -> str:
     """Post-process an extracted string according to the transform hint."""
@@ -77,6 +194,10 @@ def _apply_css(soup: Any, selector: str, attribute: str | None) -> str | None:
     inner text.  Any other attribute string is treated as an HTML attribute name
     (e.g. ``"href"``, ``"content"``, ``"data-value"``).
     """
+    if not isinstance(selector, str):
+        return None
+    if _is_pathological_generated_css(selector):
+        return None
     try:
         el = soup.select_one(selector)
         if el is None:
@@ -100,11 +221,13 @@ def _apply_xpath(html: str, expr: str, attribute: str | None) -> str | None:
         if not results:
             return None
         first = results[0]
-        if attribute:
+        if attribute and attribute.lower() != "text":
             val = first.get(attribute) if hasattr(first, "get") else None
             return val.strip() if val else None
         if hasattr(first, "text_content"):
             return first.text_content().strip() or None
+        if hasattr(first, "itertext"):
+            return " ".join(first.itertext()).strip() or None
         return str(first).strip() or None
     except Exception as exc:
         log.debug("[EXTRACTOR_RUN] XPath %r failed: %s", expr, exc)

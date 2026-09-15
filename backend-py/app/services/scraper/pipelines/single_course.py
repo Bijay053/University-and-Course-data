@@ -162,6 +162,106 @@ _UOW_CANONICAL_FOR: dict[str, str] = {
 }
 
 
+# Course-owned title delivery signals are authoritative, but must be applied
+# before the remote enrichment stages.  SEGi's ODL pages are the canonical
+# example: the title says "(Online Mode)" while the page also contains a
+# generic university campus value.  Keep this list deliberately narrower than
+# a bare "online" keyword so mixed/on-campus courses whose title merely
+# mentions online material are not rejected.
+_ONLINE_TITLE_SIGNALS: tuple[str, ...] = (
+    "online learning",
+    "online mode",
+    "fully online",
+    "100% online",
+    "online only",
+    "distance learning",
+    "distance education",
+)
+_ONLINE_TITLE_ODL_RE = _re.compile(
+    r"(?:\[\s*odl\s*\]|\(\s*odl\s*\)|\bopen\s+distance\s+learning\b)",
+    _re.IGNORECASE,
+)
+_MIXED_ONLINE_TITLE_RE = _re.compile(
+    r"\b(?:online(?:\s+(?:mode|learning))?|on[\s-]?campus)"
+    r"\s+(?:and|or)\s+"
+    r"(?:online(?:\s+(?:mode|learning))?|on[\s-]?campus)\b",
+    _re.IGNORECASE,
+)
+
+
+def _course_title_declares_mixed_delivery(payload: dict[str, Any]) -> bool:
+    """Return True when the course title itself names both delivery routes."""
+    title = str(payload.get("course_name") or "").strip()
+    if not title:
+        return False
+    normalized = _re.sub(r"[^a-z0-9]+", " ", title.casefold()).strip()
+    return bool(
+        _MIXED_ONLINE_TITLE_RE.search(title)
+        or _re.search(
+            r"\bonline\b.{0,35}\b(?:hybrid|blended|mixed\s+mode)\b"
+            r"|\b(?:hybrid|blended|mixed\s+mode)\b.{0,35}\bonline\b",
+            normalized,
+        )
+    )
+
+
+def _apply_explicit_online_title_authority(
+    payload: dict[str, Any],
+    evidence: list[dict[str, Any]],
+) -> bool:
+    """Apply an explicit course-title Online/ODL signal once.
+
+    Keeping the evidence method as ``study_mode:title_keyword`` lets the
+    existing ``has_authoritative_online_location_evidence`` policy decide
+    whether the course is ineligible; generic page-wide ``study_mode:rule``
+    matches are intentionally not promoted here.  The legacy late title pass
+    remains separate because it has broader historical behavior.
+    """
+    course_name = str(payload.get("course_name") or "").strip()
+    lowered_name = course_name.casefold()
+    # Do not promote a title that explicitly offers both routes.  In
+    # particular, "(Online Mode or On Campus)" and "(Online Learning and On
+    # Campus)" must remain eligible for the mixed/on-campus route.  This guard
+    # is also mirrored by the broader legacy late title pass below so that a
+    # mixed title cannot be reclassified after the fast path.
+    if _course_title_declares_mixed_delivery(payload):
+        return False
+    if not (
+        any(signal in lowered_name for signal in _ONLINE_TITLE_SIGNALS)
+        or _ONLINE_TITLE_ODL_RE.search(course_name)
+    ):
+        return False
+
+    previous_mode = payload.get("study_mode")
+    payload["study_mode"] = "Online"
+    if not any(
+        item.get("field_key") == "study_mode"
+        and item.get("method") == "study_mode:title_keyword"
+        and str(item.get("value") or "").casefold() == "online"
+        for item in evidence
+    ):
+        evidence.append(
+            {
+                "field_key": "study_mode",
+                "value": "Online",
+                "confidence": 0.90,
+                "method": "study_mode:title_keyword",
+                "snippet": (
+                    "Course title contains online keyword — overriding "
+                    f"{previous_mode!r}: {course_name[:80]}"
+                ),
+            }
+        )
+    if previous_mode != "Online":
+        log.info(
+            "[STUDY_MODE TITLE] course=%r — title keyword → 'Online' "
+            "(was %r)",
+            course_name,
+            previous_mode,
+        )
+    return True
+
+
 def _uow_timeout_guessed_fields(
     payload: dict, missing: list[str] | set[str]
 ) -> list[str]:
@@ -4436,6 +4536,43 @@ async def extract_course(
         except Exception:
             pass
 
+    # ── Authoritative Online fast path ───────────────────────────────────────
+    # All deterministic/static extraction is complete at this point.  Do not
+    # pay for Gemini, a browser rescue, vision OCR, or the generic AI fallback
+    # when a course-owned/scoped source already says the delivery is Online.
+    # ``study_mode:rule`` is deliberately excluded by the shared helper: broad
+    # page text can be navigation or marketing copy and must not reject a
+    # mixed/on-campus course.
+    _apply_explicit_online_title_authority(payload, evidence)
+    _authoritative_online = (
+        not _course_title_declares_mixed_delivery(payload)
+        and study_mode.has_authoritative_online_location_evidence(
+            payload.get("study_mode"),
+            evidence,
+        )
+    )
+    if _authoritative_online:
+        payload["online_only"] = True
+        payload["online_only_authoritative"] = True
+        if "segi.edu.my" in (urlparse(url).netloc or "").casefold():
+            payload["online_only_segi"] = True
+        _perf_flags["vision_skipped"] = True
+        _perf_flags["ai_skipped_online_only"] = True
+        if emit:
+            await emit(
+                "status",
+                f"[ONLINE ONLY] {url} — authoritative delivery evidence; skipping enrichment",
+                phase="extract",
+                kind="online_only_skip",
+                url=url,
+            )
+        return {
+            "url": url,
+            "payload": payload,
+            "evidence": evidence,
+            "_perf": _perf_flags,
+        }
+
     # T002: per-course Bootstrap-modal English-test extractor. Runs BEFORE
     # the per-course browser pass because (a) it's pure-CPU (no Playwright
     # spin-up, no network), (b) the english_test extractor often misses
@@ -7696,7 +7833,13 @@ async def extract_course(
             _cn_for_online,
         )
     )
-    if any(sig in _cn_for_online for sig in _ONLINE_TITLE_SIGNALS) or _title_says_odl:
+    if (
+        not _course_title_declares_mixed_delivery(payload)
+        and (
+            any(sig in _cn_for_online for sig in _ONLINE_TITLE_SIGNALS)
+            or _title_says_odl
+        )
+    ):
         _prev_mode = payload.get("study_mode")
         payload["study_mode"] = "Online"
         if not any(
