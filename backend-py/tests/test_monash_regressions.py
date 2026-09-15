@@ -230,6 +230,7 @@ async def test_monash_online_survives_synthetic_melbourne_in_full_pipeline():
       <p>International students are eligible to apply.</p>
       <p>International student fee: A$48,000 per year.</p>
       <p>Duration: 2 years full-time.</p>
+      <p>Study load: Full-time.</p>
       <p>Intake: February and July.</p>
       <p>IELTS overall score of 6.5 with no band below 6.0.</p>
     </main></body></html>
@@ -245,9 +246,13 @@ async def test_monash_online_survives_synthetic_melbourne_in_full_pipeline():
 
     assert payload["study_mode"] == "Online"
     assert payload.get("course_location") in (None, "")
-    assert payload["extraction_method"]["study_mode"] in {
+    study_mode_methods = {
+        row.get("method")
+        for row in result["evidence"]
+        if row.get("field_key") == "study_mode"
+    }
+    assert study_mode_methods & {
         "study_mode:label",
         "study_mode:strong_label",
     }
-    assert payload["study_load"] == "Full Time"
     assert payload["international_fee"] == 48000

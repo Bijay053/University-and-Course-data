@@ -57,6 +57,77 @@ async def _cleanup(prefix: str) -> None:
 
 
 @pytest.mark.asyncio
+async def test_otago_metadata_fee_is_saved_for_review_with_selected_evidence():
+    from app.services.scraper.config.context import current_uni_config
+    from app.services.scraper.config.loader import load_uni_config
+    from app.services.scraper.pipelines.single_course import extract_course
+
+    uni_id = await _pick_university()
+    prefix = f"test_otago_meta_{uuid.uuid4().hex[:10]}"
+    url = "https://www.otago.ac.nz/study/qualifications/master-of-music-coursework"
+    config = load_uni_config(
+        slug="otago",
+        university_id=2189,
+        scrape_url="https://www.otago.ac.nz/study/qualifications",
+        name="University of Otago",
+    )
+    token = current_uni_config.set(config)
+    html = """
+      <html><head>
+        <meta name="internationalFeesMin" content="66255">
+        <meta name="internationalFeesYear" content="2027">
+      </head><body><main>
+        <h1>Master of Music (Coursework) (MMus(Coursework))</h1>
+        <p>Domestic fee 2026: NZ $13,000 – NZ $15,500</p>
+        <p>Duration: 1 year full-time.</p>
+        <p>Intake: February.</p>
+        <p>Location: Dunedin.</p>
+        <p>Study mode: On Campus.</p>
+        <p>IELTS overall score of 6.5 with no band below 6.0.</p>
+      </main></body></html>
+    """
+    try:
+        extracted = await extract_course(
+            url,
+            country="New Zealand",
+            html=html,
+            use_ai_fallback=False,
+        )
+        async with AsyncSessionLocal() as db:
+            staged = await stage_course(
+                db,
+                scrape_job_id=prefix,
+                university_id=uni_id,
+                course_name=extracted["payload"]["course_name"],
+                payload=extracted["payload"],
+                evidence=extracted["evidence"],
+                source_url=url,
+            )
+            assert staged.saved
+            fresh = await db.get(ScrapedCourse, staged.scraped_course_id)
+            assert fresh.international_fee == 66255
+            assert fresh.currency == "NZD"
+            assert fresh.fee_year == 2027
+            selected = (
+                await db.execute(
+                    select(ScrapedFieldEvidence).where(
+                        ScrapedFieldEvidence.scraped_course_id == fresh.id,
+                        ScrapedFieldEvidence.field_key == "international_fee",
+                        ScrapedFieldEvidence.selected.is_(True),
+                    )
+                )
+            ).scalars().all()
+            assert any(
+                row.extraction_method == "fee.explicit_international_meta"
+                and row.normalized_value == "66255"
+                for row in selected
+            )
+    finally:
+        current_uni_config.reset(token)
+        await _cleanup(prefix)
+
+
+@pytest.mark.asyncio
 async def test_bond_source_empty_fee_is_not_inherited_from_approved_row():
     uni_id = await _pick_university()
     prefix = f"test_bond_empty_{uuid.uuid4().hex[:10]}"

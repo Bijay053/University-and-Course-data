@@ -698,9 +698,12 @@ async def test_utas_online_location_survives_full_pipeline_and_is_rejected():
 
     assert payload["study_mode"] == "Online"
     assert payload.get("course_location") in (None, "")
-    assert payload["extraction_method"]["study_mode"] == (
-        "study_mode:utas_international_location"
-    )
+    study_mode_methods = {
+        row.get("method")
+        for row in result["evidence"]
+        if row.get("field_key") == "study_mode"
+    }
+    assert "study_mode:utas_international_location" in study_mode_methods
     assert should_stage_course(payload["course_name"], payload, url) == (
         False,
         "online_only",

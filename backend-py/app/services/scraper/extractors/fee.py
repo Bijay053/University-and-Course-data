@@ -85,7 +85,7 @@ def _extract_explicit_international_fee_meta(
         from bs4 import BeautifulSoup
 
         soup = BeautifulSoup(html, "html.parser")
-        metadata: dict[str, str] = {}
+        metadata: dict[str, tuple[str, str]] = {}
         for meta in soup.find_all("meta"):
             raw_name = str(meta.get("name") or "").strip()
             name = re.sub(
@@ -95,7 +95,9 @@ def _extract_explicit_international_fee_meta(
             )
             content = str(meta.get("content") or "").strip()
             if name and content:
-                metadata[name] = content
+                metadata[name] = (raw_name, content)
+
+        for name, (raw_name, content) in metadata.items():
             if name not in {
                 "fees_international",
                 "international_fee",
@@ -104,13 +106,19 @@ def _extract_explicit_international_fee_meta(
             }:
                 continue
             match = _AMOUNT_RE.search(content)
-            amount = (
-                _parse_amount(match.group(2) or match.group(3) or "")
-                if match
-                else _parse_amount(content)
-            )
+            if match:
+                amount = _parse_amount(match.group(2) or match.group(3) or "")
+            elif name == "international_fees_min":
+                # Otago's authoritative camelCase field is a bare integer.
+                # Keep this tightly scoped and bounded so unrelated metadata
+                # placeholders cannot become high-confidence tuition.
+                amount = _parse_amount(content)
+                if amount is None or not 5_000 <= amount <= 250_000:
+                    continue
+            else:
+                continue
             if amount is not None and amount > 0:
-                year = metadata.get("international_fees_year", "")
+                year = metadata.get("international_fees_year", ("", ""))[1]
                 currency = "NZD" if name == "international_fees_min" else ""
                 return amount, (
                     f"International fee {year}: {currency} {content} "
