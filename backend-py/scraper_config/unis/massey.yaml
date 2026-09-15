@@ -1,0 +1,42 @@
+# Massey University
+# The generic /study/courses/ page is a paper/course-code search, not the
+# qualification catalogue. The complete qualification index is static HTML and
+# currently exposes roughly 190 degree links in one response.
+
+hostname_guard: www.massey.ac.nz
+
+locked_config_paths:
+  - discovery.seed_urls
+  - discovery.bfs_page_budget
+  - discovery.allow_url_patterns
+  - discovery.listing_only_patterns
+  - discovery.force_candidate_url_patterns
+  - discovery.course_detail_url_patterns
+  - discovery.skip_sitemap_fallback
+  - discovery.skip_browser_discovery
+
+discovery:
+  seed_urls:
+    - https://www.massey.ac.nz/study/all-qualifications-and-degrees/
+
+  # Every qualification is linked directly from the single static index.
+  bfs_page_budget: 1
+  expected_min_courses: 170
+  skip_sitemap_fallback: true
+  always_sitemap_supplement: false
+  skip_browser_discovery: true
+
+  # Keep discovery and extraction restricted to individual qualification pages.
+  # The final non-empty path segment includes Massey's qualification code.
+  allow_url_patterns:
+    - '^https://www\.massey\.ac\.nz/study/all-qualifications-and-degrees/[^/?#]+/?$'
+  listing_only_patterns:
+    - '^/study/all-qualifications-and-degrees/?$'
+  force_candidate_url_patterns:
+    - '^/study/all-qualifications-and-degrees/[^/?#]+/?$'
+  course_detail_url_patterns:
+    - '^https://www\.massey\.ac\.nz/study/all-qualifications-and-degrees/[^/?#]+/?$'
+
+extraction:
+  fees:
+    default_currency: NZD
