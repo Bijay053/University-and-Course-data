@@ -22,4 +22,12 @@ the database-generated rules and therefore did not reproduce the stall.
 selector complexity before matching, and retain normal extraction fallbacks.
 Do not call a network-only probe a proof that full job extraction is fixed.
 
+**Enrichment ordering:** Confirmed course-owned online-only delivery should
+exit before remote AI/OCR work, while mixed on-campus options remain eligible.
+**Why:** Removing a selector stall still left a serial catalogue spending
+remote enrichment time on courses the final eligibility gate would reject.
+**How to apply:** Use authoritative evidence, not generic page-wide "online"
+text; preserve the normal skip flags/counters. Do not assume a selector fix
+alone proves that increasing parallel extraction is safe.
+
 **How to apply:** Keep the university host on exact-host, HTTPS-only direct TLS handling with redirect revalidation. Discover the main-host supplement through bounded rendered WordPress search, require exact host/root path plus programme and qualification evidence, and bound every rendered attempt below the whole-course deadline so provider failures cannot stale the worker heartbeat. Retry only within that deadline and require a successful single-page provider probe before launching a full production proof. Read campus only from course-owned metadata/hero content; never use a global SEGi campus default. Treat explicit “Online Mode” titles as authoritative Online delivery. Leave unpublished tuition blank rather than inferring ancillary charges.
