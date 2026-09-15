@@ -74,6 +74,14 @@ discovery:
     - '/accommodation'                                       # student housing
     - '/about'                                               # about/university pages
 
+  # The same listing mixes qualifications with subject/major landing pages.
+  # Its link metadata explicitly labels them "Subject name: …"; discard those
+  # before page fetch, browser rescue, OCR, or AI enrichment.
+  non_degree_classifier:
+    enabled: true
+    force_title_patterns:
+      - '^Subject name:'
+
   # ── Expected minimum ────────────────────────────────────────────────────────
   # Auckland publishes ~183 international courses.  Alert if discovery falls
   # significantly below this — it signals a site restructure or config drift.
