@@ -115,9 +115,9 @@ async def continuation_review_scope(
     seen = {job_id}
     resume_course_ids: set[int] = set()
     full_catalogue_scope = True
-    current = job
-    for _ in range(max_depth):
-        payload = current.request_payload or {}
+    def collect_scope_metadata(candidate: ScrapeRuntimeJob) -> None:
+        nonlocal full_catalogue_scope
+        payload = candidate.request_payload or {}
         raw_resume_ids = payload.get("resumeCourseIds")
         if isinstance(raw_resume_ids, list):
             resume_course_ids.update(
@@ -134,11 +134,16 @@ async def continuation_review_scope(
             payload.get("resumeCourseIds"),
         )
         if (
-            getattr(current, "job_type", None)
+            getattr(candidate, "job_type", None)
             not in {"single", "bulk", "full", "scrape", "university_full"}
             or any(bool(value) for value in targeted_values)
         ):
             full_catalogue_scope = False
+
+    current = job
+    for _ in range(max_depth):
+        payload = current.request_payload or {}
+        collect_scope_metadata(current)
         parent_id = payload.get("retrySourceJobId")
         if not isinstance(parent_id, str):
             break
@@ -151,6 +156,41 @@ async def continuation_review_scope(
         chain.append(parent_id)
         seen.add(parent_id)
         current = parent
+
+    # Review pages commonly remain linked to the original full scrape even
+    # after one or more targeted continuations replace its unresolved rows.
+    # Walking only toward parents makes those recovered rows disappear from
+    # the original review page. Starting at the root reached above, include all
+    # same-university descendants in the explicit retrySourceJobId graph.
+    candidates = (
+        await db.execute(
+            select(ScrapeRuntimeJob).where(
+                ScrapeRuntimeJob.university_id == university_id
+            )
+        )
+    ).scalars().all()
+    children_by_parent: dict[str, list[ScrapeRuntimeJob]] = {}
+    for candidate in candidates:
+        payload = candidate.request_payload or {}
+        parent_id = payload.get("retrySourceJobId")
+        if isinstance(parent_id, str) and parent_id.strip():
+            children_by_parent.setdefault(parent_id.strip(), []).append(candidate)
+
+    frontier = [current.runtime_job_id]
+    for _ in range(max_depth):
+        next_frontier: list[str] = []
+        for parent_id in frontier:
+            for child in children_by_parent.get(parent_id, []):
+                child_id = child.runtime_job_id
+                if child_id in seen:
+                    continue
+                seen.add(child_id)
+                chain.append(child_id)
+                collect_scope_metadata(child)
+                next_frontier.append(child_id)
+        if not next_frontier:
+            break
+        frontier = next_frontier
     return chain, university_id, resume_course_ids, full_catalogue_scope
 
 
