@@ -63,6 +63,17 @@ page-data fills fields Funnelback omits.
 
 ## Transport
 
+A missing Graduate Research Academy qualification after a scrape can be a
+transient rendered-provider failure, not a source eligibility change.
+
+**Why:** A production run staged PhD but omitted MPhil; a bounded follow-up
+fetch recovered valid MPhil authority while PhD instead hit a transient
+provider rotation failure.
+
+**How to apply:** Keep research authority fetches bounded but retry transient
+transport failures. Verify both exact qualifications in actual staged output;
+passing provider coverage gates alone cannot prove the supplement completed.
+
 Current research-certificate eligibility should come from the official
 year-specific handbook's structured offering record, not default admissions
 HTML or absence from Funnelback.

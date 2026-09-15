@@ -66,6 +66,44 @@ from app.services.scraper.nz_programme_points import (
 log = logging.getLogger(__name__)
 
 
+def _build_extraction_method_map(
+    payload: dict[str, Any],
+    evidence: list[dict[str, Any]],
+) -> dict[str, str]:
+    """Build the field-to-method provenance map from extraction evidence.
+
+    This is kept as a small shared helper because some successful extraction
+    paths return before the normal end-of-pipeline provenance assembly (for
+    example, the authoritative online-only fast path).
+    """
+    extraction_method: dict[str, str] = {}
+    seen_fields: set[str] = set()
+    for item in evidence:
+        field_key = item.get("field_key", "")
+        if not field_key or field_key in seen_fields:
+            continue
+        method = item.get("method") or "unknown"
+        if payload.get(field_key) not in (None, "", 0, []):
+            # Successful extraction — credit this method, lock the field.
+            extraction_method[field_key] = method
+            seen_fields.add(field_key)
+        elif field_key not in extraction_method:
+            # Attempted but returned null/empty. A later successful evidence
+            # row is allowed to replace this sentinel.
+            extraction_method[field_key] = f"{method}:null"
+    return extraction_method
+
+
+def _attach_extraction_method_map(
+    payload: dict[str, Any],
+    evidence: list[dict[str, Any]],
+) -> None:
+    """Attach extraction provenance to *payload* when evidence exists."""
+    extraction_method = _build_extraction_method_map(payload, evidence)
+    if extraction_method:
+        payload["extraction_method"] = extraction_method
+
+
 def _apply_configured_field_overrides(payload: dict[str, Any], url: str) -> None:
     """Apply YAML URL-specific overrides before final warning generation.
 
@@ -1135,6 +1173,56 @@ def _infer_study_load_from_text(text: str) -> str | None:
     if _PARTTIME_ONLY_PT_RE.search(text):
         return "Part Time"
     return None
+
+
+def _apply_study_load_extraction(
+    payload: dict[str, Any],
+    evidence: list[dict[str, Any]],
+    *,
+    html: str,
+    rendered_html: str | None,
+) -> None:
+    """Fill the normalized study-load field and record its provenance."""
+    # Authoritative duration wording wins over earlier AI/fallback guesses.
+    # When both options are shown, this portal records the eligible Full Time
+    # option. A genuinely part-time-only course was rejected by the early gate.
+    duration_html = rendered_html or html or ""
+    if (payload.get("study_load") or "").strip().lower() == "both":
+        payload["study_load"] = "Full Time"
+        evidence.append({
+            "field_key": "study_load",
+            "value": "Full Time",
+            "confidence": 0.90,
+            "method": "normalize:international_full_time",
+            "snippet": "Both includes a full-time study option",
+        })
+    study_load_sources = [
+        (payload.get("duration_text") or "").lower(),
+        *[value.lower() for value in _duration_labeled_values(duration_html)],
+    ]
+    if not any(study_load_sources):
+        study_load_sources.append(duration_html[:3000].lower())
+    study_load_text = " ".join(study_load_sources)
+    inferred_study_load = _infer_study_load_from_text(study_load_text)
+    if inferred_study_load and (
+        not payload.get("study_load") or inferred_study_load == "Full Time"
+    ):
+        payload["study_load"] = inferred_study_load
+        evidence.append({
+            "field_key": "study_load",
+            "value": inferred_study_load,
+            "confidence": 0.82 if len(study_load_sources) > 1 else 0.75,
+            "method": "regex:study_load",
+            "snippet": next(
+                (
+                    source
+                    for source in study_load_sources
+                    if _PARTTIME_ONLY_FT_RE.search(source)
+                    or _PARTTIME_ONLY_PT_RE.search(source)
+                ),
+                "",
+            )[:120],
+        })
 
 
 def _is_parttime_only_page(html: str) -> bool:
@@ -4556,6 +4644,19 @@ async def extract_course(
         payload["online_only_authoritative"] = True
         if "segi.edu.my" in (urlparse(url).netloc or "").casefold():
             payload["online_only_segi"] = True
+        # Study load is deterministic page processing, not remote enrichment.
+        # Apply it before this early return so the fast path keeps the same
+        # normalized payload contract as the normal path.
+        _apply_study_load_extraction(
+            payload,
+            evidence,
+            html=html,
+            rendered_html=None,
+        )
+        # This return intentionally skips the rest of the enrichment pipeline,
+        # so attach the same field provenance contract used by the normal path
+        # before returning.
+        _attach_extraction_method_map(payload, evidence)
         _perf_flags["vision_skipped"] = True
         _perf_flags["ai_skipped_online_only"] = True
         if emit:
@@ -9316,47 +9417,12 @@ async def extract_course(
             )
 
     # ── Study load (Full Time / Part Time) ───────────────────────────────────
-    # Authoritative duration wording wins over earlier AI/fallback guesses.
-    # When both options are shown ("2 years full-time or part-time equivalent"),
-    # this international-course portal always records the eligible Full Time
-    # option. A genuinely part-time-only course was rejected by the early gate.
-    _sl_html = rendered_html or html or ""
-    if (payload.get("study_load") or "").strip().lower() == "both":
-        payload["study_load"] = "Full Time"
-        evidence.append({
-            "field_key": "study_load",
-            "value": "Full Time",
-            "confidence": 0.90,
-            "method": "normalize:international_full_time",
-            "snippet": "Both includes a full-time study option",
-        })
-    _sl_sources = [
-        (payload.get("duration_text") or "").lower(),
-        *[value.lower() for value in _duration_labeled_values(_sl_html)],
-    ]
-    if not any(_sl_sources):
-        _sl_sources.append(_sl_html[:3000].lower())
-    _sl_text = " ".join(_sl_sources)
-    _inferred_study_load = _infer_study_load_from_text(_sl_text)
-    if _inferred_study_load and (
-        not payload.get("study_load") or _inferred_study_load == "Full Time"
-    ):
-        payload["study_load"] = _inferred_study_load
-        evidence.append({
-            "field_key": "study_load",
-            "value": _inferred_study_load,
-            "confidence": 0.82 if len(_sl_sources) > 1 else 0.75,
-            "method": "regex:study_load",
-            "snippet": next(
-                (
-                    source
-                    for source in _sl_sources
-                    if _PARTTIME_ONLY_FT_RE.search(source)
-                    or _PARTTIME_ONLY_PT_RE.search(source)
-                ),
-                "",
-            )[:120],
-        })
+    _apply_study_load_extraction(
+        payload,
+        evidence,
+        html=html,
+        rendered_html=rendered_html,
+    )
 
     # ── Host-specific fee_term correction ────────────────────────────────────
     # Some universities publish a FULL COURSE total on their course pages
@@ -9915,26 +9981,9 @@ async def extract_course(
     # pipeline).  The :null sentinel is overwritten if a later evidence entry
     # produces a real value — we do not add null-fields to _seen_em so the
     # overwrite can happen.
-    _extraction_method: dict[str, str] = {}
-    _seen_em: set[str] = set()
-    for _ev in evidence:
-        _fk = _ev.get("field_key", "")
-        if not _fk or _fk in _seen_em:
-            continue
-        _method = _ev.get("method") or "unknown"
-        if payload.get(_fk) not in (None, "", 0, []):
-            # Successful extraction — credit this method, lock the field.
-            _extraction_method[_fk] = _method
-            _seen_em.add(_fk)
-        elif _fk not in _extraction_method:
-            # Attempted but returned null/empty — record with :null suffix.
-            # A later evidence entry that produces a value will overwrite this
-            # (field not added to _seen_em, so the loop continues for _fk).
-            _extraction_method[_fk] = f"{_method}:null"
     # Persist in payload so stage_course can store it without schema changes to
     # extract_course's callers (it is stripped in stage_course before DB write).
-    if _extraction_method:
-        payload["extraction_method"] = _extraction_method
+    _attach_extraction_method_map(payload, evidence)
 
     # ── Confidence scoring ─────────────────────────────────────────────────
     # Compute a 0-100 aggregate confidence score for this course payload based

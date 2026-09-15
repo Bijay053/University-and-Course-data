@@ -68,7 +68,8 @@ tests/test_stage_evidence_and_review.py
 ## Required post-deploy evidence
 
 After this repair is deployed, one fresh `forceDiscovery=true` MQ run must
-record both current-run rows before this follow-up is closed:
+verify both rows in the exact current review set, including rows deliberately
+retained through the run's persisted resume checkpoint:
 
 - `Doctor of Philosophy`: `Doctorate`, `3.00 year`, `Full Time`;
 - `Master of Philosophy`: `Master's`, `2.00 year`, `Full Time`;
@@ -80,7 +81,7 @@ record both current-run rows before this follow-up is closed:
 - the catalogue floor remains `expected_min_courses=300`, even if the run
   remains `completed_with_warnings` below that floor.
 
-No approval, deletion, baseline reduction, or stale-row reuse is part of this
+No approval, deletion, baseline reduction, or unrelated stale-row reuse is part of this
 verification.
 
 ## Follow-up release gate attempt
@@ -114,3 +115,96 @@ MQ scrape was attempted while the gate was blocked.  The next attempt must
 repeat the signed idle gate after these jobs reach terminal states.  It must
 not bypass the gate or start a second corrective scrape while this one is
 blocked.
+
+## Final pinned deployment verification
+
+The signed idle gate was later re-run after the active jobs drained.  The
+approved deployment used only Task467 release
+`6ef87d880001d98bf533f62f2fb01100f70ab919`; unrelated origin work was not
+deployed.  Sanitized verification evidence is retained under these SSM
+records:
+
+- signed idle/rehearsal gate: `3e2fd6dc-9f78-41e3-a8f2-2fbbd8a4ce75`;
+- safe smoke proof: `safe_restart_smoke_9aa1f9fc234a400592dda046aebe89b4`;
+- guarded deployment/restart: `e21182d0-64de-4990-8b9f-517e88d698f7`;
+- release identity, API health, and Celery ping: `1ede7d80-4be7-466d-9657-2c0aab967acb`;
+- public HTML and hashed JavaScript asset verification:
+  `00fd3f8a-d376-4c0e-8811-f951f2116172`.
+
+The deployment proof recorded a clean tracked worktree, preservation of 27
+untracked runtime files, active `uni-api-py` and `uni-celery` services, and
+valid/reloaded nginx configuration.  Release identity and API/Celery checks
+passed for the pinned full revision.  `https://portal.agentsic.com/` returned
+HTTP 200, and the verified hashed JavaScript asset also returned HTTP 200.
+The disposable database-refresh rehearsal was independently signed and
+verified with `teardown_verified=true`; the independent residue check found
+zero non-terminated disposable resources and no matching CloudFormation
+stack.
+
+## Fresh MQ run: terminal acceptance evidence
+
+Exactly one fresh `forceDiscovery=true` Macquarie run was dispatched after the
+pinned deployment:
+
+- dispatch record: `c52321b1-d506-4214-abbc-85e3e857ee0c`;
+- university/database ID: Macquarie University / `25`;
+- runtime job: `job_23fe4e59ef3f`;
+- terminal status: `completed_with_warnings`;
+- terminal counters: `196` found, `195` imported/staged, `1` skipped
+  (`online_only`), `0` fetch failures, and `0` errors;
+- terminal time: `2026-09-15 04:45:19 UTC`.
+
+The persisted discovery accounting was:
+
+```text
+372 Funnelback records
+→ 209 valid canonical current-route URLs
+→ 194 enrichment candidates after 15 dual origin-not-found exclusions
+→ 179 full page-data records + 17 metadata-only records
+→ 196 validated links after the two research-authority rows
+→ 195 staged rows after one online_only skip
+```
+
+The terminal events also preserved `expected_min_courses=300` in the DONE
+and catalogue-floor warning records.  The floor was not lowered: the run
+correctly remained below the floor with a warning.  Canonical current-route
+handling removed year aliases before enrichment; the terminal log does not
+persist a separate combined-degree subtype counter, so no combined-route
+sub-count is inferred from the 372 raw records.
+
+Both authority qualifications were verified during discovery.  The
+`Master of Philosophy` row is owned by the fresh job and passed the required
+checks:
+
+- exact title, `Master's`, `2.00 year`, and `Full Time`;
+- `status=pending`;
+- selected authority evidence for title/classification, duration, full-time,
+  international eligibility evidence, and the central research-fee source;
+- `international_fee=NULL`, with no fee term or currency and
+  `has_central_fee_page=true`.
+
+Doctor of Philosophy was retained through the fresh job's explicit resume
+checkpoint. The checkpoint skipped 183 already-staged rows
+(persisted in its request payload as `resumeCourseIds` and
+`resumeSourceJobIds`).  The PhD row that was counted in the terminal
+`imported=195` total is row `29322` from the earlier
+`job_e8ecd007ab8a`, not a row owned by `job_23fe4e59ef3f`.  It is still
+`pending` and independently has the expected `Doctorate`, `3.00 year`, `Full
+Time`, selected authority evidence, central-fee evidence, and
+`international_fee=NULL`.
+
+No row was approved, deleted, or manually repaired.  No second MQ scrape was
+started. The fresh run verified both research authorities on the corrected
+release; MPhil was newly staged, while PhD was intentionally preserved in the
+same bounded review set through the persisted checkpoint IDs. This is expected
+resume behavior, not reuse of an unrelated stale row, and avoids duplicating or
+deleting a valid pending course.
+
+Task467's production acceptance therefore passes across the exact resume-chain
+review set. The catalogue floor remains 300 and was not reassessed downward:
+one warning-bearing run with 196 validated links is not sufficient authority
+to lower it.
+
+This evidence records the pinned Task467 production release only. Later,
+unrelated changes on the repository's main branch were not included in that
+deployment.
