@@ -2163,6 +2163,14 @@ class FeesConfig(BaseModel):
             "or domestic amounts and the central schedule is authoritative."
         ),
     )
+    discard_domestic_fee: bool = Field(
+        default=False,
+        description=(
+            "When true, remove domestic_fee from the final course payload. "
+            "Use for international-only catalogue ingestion where domestic "
+            "amounts must not trigger misleading fee quality failures."
+        ),
+    )
     follow_links: list[str] = Field(
         default_factory=list,
         description=(

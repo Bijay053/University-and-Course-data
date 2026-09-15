@@ -20,6 +20,7 @@ locked_config_paths:
   - extraction.fees.central_page
   - extraction.fees.currency_override
   - extraction.fees.central_fee_priority
+  - extraction.fees.discard_domestic_fee
   - extraction.english.degree_level_defaults
 
 discovery:
@@ -60,6 +61,7 @@ extraction:
     prefer_international: true
     central_fee_exact_match_only: true
     central_fee_priority: true
+    discard_domestic_fee: true
     reject_keywords:
       - Non-tuition fees
       - Student services fee

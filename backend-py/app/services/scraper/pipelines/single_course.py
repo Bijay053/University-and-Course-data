@@ -8655,6 +8655,17 @@ async def extract_course(
                                 filled=_filled_fee_keys,
                             )
 
+            try:
+                _fee_policy_cfg = get_uni_config()
+                _discard_domestic = bool(
+                    _fee_policy_cfg
+                    and _fee_policy_cfg.extraction.fees.discard_domestic_fee
+                )
+            except Exception:  # noqa: BLE001
+                _discard_domestic = False
+            if _discard_domestic:
+                payload["domestic_fee"] = None
+
             # ── English-requirements fallback ────────────────────────────
             # Two data paths, in priority order:
             #
