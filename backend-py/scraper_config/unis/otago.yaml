@@ -79,6 +79,12 @@ extraction:
       - 'NZ student'
       - 'Part time'
       - 'Part-time'
+    # Qualification pages show Domestic and International rows in the same
+    # fee block.  The explicit audience label must win over the broad
+    # "Domestic" rejection when the selected amount is from the International
+    # row (for example NZ $66,255 for Master of Music (Coursework)).
+    international_fee_keywords:
+      - 'International fee'
 
   english:
     trust_vision_ocr: false
