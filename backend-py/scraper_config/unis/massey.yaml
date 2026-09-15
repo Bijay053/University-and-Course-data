@@ -14,6 +14,10 @@ locked_config_paths:
   - discovery.course_detail_url_patterns
   - discovery.skip_sitemap_fallback
   - discovery.skip_browser_discovery
+  - extraction.max_parallel_fetch
+  - extraction.fees.central_page
+  - extraction.fees.currency_override
+  - extraction.english.degree_level_defaults
 
 discovery:
   seed_urls:
@@ -38,5 +42,40 @@ discovery:
     - '^https://www\.massey\.ac\.nz/study/all-qualifications-and-degrees/[^/?#]+/?$'
 
 extraction:
+  # Massey starts returning blocked/empty responses during concurrent catalogue
+  # bursts. One request at a time is still fast on its server-rendered pages and
+  # prevents a partial catalogue followed by an ineffective browser sweep.
+  max_parallel_fetch: 1
+
   fees:
+    central_page: https://www.massey.ac.nz/study/fees-and-funding/tuition-fees-for-international-students/
     default_currency: NZD
+    currency_override: NZD
+    prefer_international: true
+    central_fee_exact_match_only: true
+    reject_keywords:
+      - Non-tuition fees
+      - Student services fee
+      - Student Services Levy
+
+  english:
+    # The combined requirements table contains component minima alongside
+    # overall scores. Use Massey's published institution-wide overall scores by
+    # degree level so a component minimum cannot be mistaken for an overall.
+    degree_level_defaults:
+      undergraduate:
+        ielts: 6.0
+        pte: 50
+        toefl: 80
+      postgraduate:
+        ielts: 6.5
+        pte: 58
+        toefl: 90
+      doctorate:
+        ielts: 6.5
+        pte: 58
+        toefl: 90
+      research:
+        ielts: 6.5
+        pte: 58
+        toefl: 90

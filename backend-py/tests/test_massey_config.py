@@ -48,3 +48,19 @@ def test_massey_only_promotes_qualification_detail_urls() -> None:
         "https://www.massey.ac.nz/study/planning-your-study/"
         "prospectus-booklets-and-guides/"
     )
+
+
+def test_massey_pins_safe_extraction_sources_and_concurrency() -> None:
+    config = _config()
+
+    assert config.extraction.max_parallel_fetch == 1
+    assert config.extraction.fees.central_page == (
+        "https://www.massey.ac.nz/study/fees-and-funding/"
+        "tuition-fees-for-international-students/"
+    )
+    assert config.extraction.fees.currency_override == "NZD"
+    assert config.extraction.fees.central_fee_exact_match_only is True
+    assert "Non-tuition fees" in config.extraction.fees.reject_keywords
+    assert config.extraction.english.central_page is None
+    assert config.extraction.english.degree_level_defaults["undergraduate"].ielts == 6.0
+    assert config.extraction.english.degree_level_defaults["postgraduate"].ielts == 6.5
