@@ -9,7 +9,13 @@ from __future__ import annotations
 
 import pytest
 
-from app.services.scraper.vuw_api import _ev, _fee, _map_item
+from app.services.scraper.vuw_api import (
+    _endpoint_urls,
+    _ev,
+    _fee,
+    _intake_months,
+    _map_item,
+)
 from app.services.scraper.config.schema import VuwApiConfig
 from app.services.scraper.guards import enforce_source_evidence
 
@@ -95,6 +101,46 @@ def test_fee_none_when_missing():
 def test_fee_zero_treated_as_none():
     amt, _, _ = _fee({"internationalFeeTotal": 0})
     assert amt is None
+
+
+def test_endpoint_urls_select_international_current_catalogue():
+    urls = _endpoint_urls("https://www.wgtn.ac.nz/")
+    assert urls
+    assert all(url.endswith("?international=true") for url in urls)
+
+
+def test_intakes_use_fee_year_and_return_canonical_month_names():
+    dates = [
+        {"international": True, "startDate": {"date": "2026-07-13T00:00:00+12:00"}},
+        {"international": True, "startDate": {"date": "2027-02-08T00:00:00+13:00"}},
+        {"international": True, "startDate": {"date": "1970-01-01T12:00:00+12:00"}},
+        {"international": False, "startDate": {"date": "2027-11-01T00:00:00+13:00"}},
+    ]
+    assert _intake_months(dates, target_year="2027") == ["February"]
+
+
+def test_teaching_diploma_maps_current_fee_intake_and_location():
+    item = {
+        "name": "Graduate Diploma of Teaching (Secondary)",
+        "url": "https://www.wgtn.ac.nz/explore/graduate-quals/diploma-of-teaching-secondary/overview",
+        "duration": "3 trimesters",
+        "internationalLocation": "Wellington campuses and online",
+        "fullTimeQual": "yes",
+        "partTimeQual": "no",
+        "internationalFeeTotal": "44650",
+        "internationalFeeTerm": "for the full programme",
+        "internationalFeeYear": "2027",
+        "keyDateSet": [
+            {"international": True, "startDate": {"date": "2026-07-13T00:00:00+12:00"}},
+            {"international": True, "startDate": {"date": "2027-02-08T00:00:00+13:00"}},
+        ],
+    }
+    payload = _map_item(item, _cfg())["searchstax_result"]["payload"]
+    assert payload["international_fee"] == pytest.approx(44650)
+    assert payload["fee_term"] == "Total"
+    assert payload["fee_year"] == 2027
+    assert payload["intake_months"] == ["February"]
+    assert payload["course_location"] == "Wellington campuses and online"
 
 
 # ── _map_item — enforce_source_evidence compatibility ─────────────────────────

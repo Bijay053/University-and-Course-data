@@ -44,6 +44,7 @@ Each item shape (key fields)::
 from __future__ import annotations
 
 import asyncio
+import calendar
 import logging
 import re
 from typing import Any, Optional
@@ -61,6 +62,11 @@ _ENDPOINTS = [
     "/endpoints/grad-quals",
     "/endpoints/other-quals",
 ]
+
+
+def _endpoint_urls(base: str) -> list[str]:
+    root = base.rstrip("/")
+    return [f"{root}{ep}?international=true" for ep in _ENDPOINTS]
 
 
 # ── Degree level from programme name ─────────────────────────────────────────
@@ -133,9 +139,13 @@ def _parse_duration(item: dict) -> tuple[Optional[float], Optional[str]]:
 
 # ── Intakes ──────────────────────────────────────────────────────────────────
 
-def _intake_months(key_date_set: list) -> list[int]:
-    """Extract distinct months from international keyDateSet entries."""
-    months: set[int] = set()
+def _intake_months(key_date_set: list, *, target_year: str = "") -> list[str]:
+    """Extract canonical month names from current international start dates.
+
+    Prefer dates in the fee year so review shows the same intake cycle as the
+    published international fee. Ignore VUW's 1970 placeholder dates.
+    """
+    dated_months: list[tuple[int, int]] = []
     for kd in (key_date_set or []):
         if not isinstance(kd, dict):
             continue
@@ -147,10 +157,27 @@ def _intake_months(key_date_set: list) -> list[int]:
         date_str = start.get("date", "")
         if len(date_str) >= 7:
             try:
-                months.add(int(date_str[5:7]))
+                year = int(date_str[:4])
+                month = int(date_str[5:7])
+                if year >= 2000 and 1 <= month <= 12:
+                    dated_months.append((year, month))
             except ValueError:
                 pass
-    return sorted(months)
+    if not dated_months:
+        return []
+    try:
+        preferred_year = int(target_year)
+    except (TypeError, ValueError):
+        preferred_year = max(year for year, _ in dated_months)
+    selected = {
+        month for year, month in dated_months if year == preferred_year
+    }
+    if not selected:
+        latest_year = max(year for year, _ in dated_months)
+        selected = {
+            month for year, month in dated_months if year == latest_year
+        }
+    return [calendar.month_name[month] for month in sorted(selected)]
 
 
 # ── Fee ──────────────────────────────────────────────────────────────────────
@@ -319,8 +346,11 @@ def _map_item(item: dict, cfg: VuwApiConfig) -> Optional[dict]:
     degree_level = _degree_level(name)
     acad_level = _academic_level(degree_level)
     duration, duration_term = _parse_duration(item)
-    months = _intake_months(item.get("keyDateSet") or [])
     fee_amount, fee_term, fee_year = _fee(item)
+    months = _intake_months(
+        item.get("keyDateSet") or [],
+        target_year=fee_year,
+    )
     mode = _study_mode(item)
     location = _location(item)
     description = (item.get("description") or "").strip() or None
@@ -426,7 +456,10 @@ async def fetch_vuw_links(
     ``_extract_only`` returns it verbatim without any HTML fetch.
     """
     base = cfg.base_url.rstrip("/") if cfg.base_url else _BASE
-    endpoints = [f"{base}{ep}" for ep in _ENDPOINTS]
+    # VUW's CDN serves a stale prior-year catalogue for the bare endpoint URL.
+    # The international query both selects the intended audience and bypasses
+    # that stale cache entry.
+    endpoints = _endpoint_urls(base)
 
     async def _fetch_one(url: str) -> list[dict]:
         try:
