@@ -15,6 +15,8 @@ locked_config_paths:
   - discovery.skip_sitemap_fallback
   - discovery.skip_browser_discovery
   - extraction.max_parallel_fetch
+  - extraction.scrape_do_static
+  - extraction.skip_per_course_browser
   - extraction.fees.central_page
   - extraction.fees.currency_override
   - extraction.fees.central_fee_priority
@@ -43,10 +45,13 @@ discovery:
     - '^https://www\.massey\.ac\.nz/study/all-qualifications-and-degrees/[^/?#]+/?$'
 
 extraction:
-  # Massey starts returning blocked/empty responses during concurrent catalogue
-  # bursts. One request at a time is still fast on its server-rendered pages and
-  # prevents a partial catalogue followed by an ineffective browser sweep.
-  max_parallel_fetch: 1
+  # Massey's origin blocks the production worker IP after roughly 60 direct
+  # qualification requests, even sequentially. Its pages are server-rendered,
+  # so use the static proxy transport and avoid a browser pass that adds no
+  # fields before degree-level English defaults are applied.
+  scrape_do_static: true
+  skip_per_course_browser: true
+  max_parallel_fetch: 2
 
   fees:
     central_page: https://www.massey.ac.nz/study/fees-and-funding/tuition-fees-for-international-students/

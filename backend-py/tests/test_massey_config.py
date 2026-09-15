@@ -53,7 +53,9 @@ def test_massey_only_promotes_qualification_detail_urls() -> None:
 def test_massey_pins_safe_extraction_sources_and_concurrency() -> None:
     config = _config()
 
-    assert config.extraction.max_parallel_fetch == 1
+    assert config.extraction.max_parallel_fetch == 2
+    assert config.extraction.scrape_do_static is True
+    assert config.extraction.skip_per_course_browser is True
     assert config.extraction.fees.central_page == (
         "https://www.massey.ac.nz/study/fees-and-funding/"
         "tuition-fees-for-international-students/"
