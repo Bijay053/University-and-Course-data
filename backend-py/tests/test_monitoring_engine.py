@@ -13,6 +13,7 @@ from app.services.monitoring_engine import (
     get_monitoring_stats,
     get_or_create_watcher,
     next_check_interval_hours,
+    trigger_scrape,
 )
 
 
@@ -250,6 +251,26 @@ class TestGetOrCreateWatcher:
         assert len(created) == 1
         assert isinstance(created[0], UniversityWatcher)
         assert created[0].probe_url == "https://example.edu/courses"
+
+
+class TestTriggerScrape:
+    async def test_reuses_active_job_without_creating_or_dispatching(self):
+        watcher = _make_watcher(total_scrapes_triggered=3)
+        db = AsyncMock()
+        advisory_result = MagicMock()
+        active_result = MagicMock()
+        active_result.scalar_one_or_none.return_value = "job_already_running"
+        db.execute.side_effect = [advisory_result, active_result]
+
+        with patch("app.tasks.scrape_tasks.scrape_university.delay") as delay:
+            result = await trigger_scrape(watcher, db)
+
+        assert result == "job_already_running"
+        db.add.assert_not_called()
+        db.commit.assert_awaited_once()
+        delay.assert_not_called()
+        assert watcher.total_scrapes_triggered == 3
+        assert watcher.last_scrape_job_id is None
 
 
 # ── monitoring_stats ──────────────────────────────────────────────────────────

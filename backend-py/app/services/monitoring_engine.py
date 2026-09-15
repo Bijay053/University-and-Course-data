@@ -238,6 +238,43 @@ async def trigger_scrape(watcher: UniversityWatcher, db: AsyncSession) -> str | 
     """Create a scrape_runtime_jobs row and dispatch to Celery. Returns job_id or None."""
     from app.models.scrape_runtime import ScrapeRuntimeJob
 
+    # Monitoring runs outside the /scrape/start route, so it must enforce the
+    # same per-university start fence itself.  Without this transaction lock a
+    # changed-site probe can enqueue a second job while a manual scrape is
+    # already running; the worker then briefly claims it before the Redis lock
+    # stops it, producing a misleading "claimed" → "duplicate aborted" lifecycle.
+    await db.execute(
+        text("SELECT pg_advisory_xact_lock(:uid)"),
+        {"uid": watcher.university_id},
+    )
+    fresh_cutoff = datetime.now(timezone.utc) - timedelta(minutes=2)
+    active_job_id = (
+        await db.execute(
+            select(ScrapeRuntimeJob.runtime_job_id)
+            .where(
+                ScrapeRuntimeJob.university_id == watcher.university_id,
+                (
+                    ScrapeRuntimeJob.status.in_(["running", "awaiting_approval"])
+                    | (
+                        (ScrapeRuntimeJob.status == "queued")
+                        & (ScrapeRuntimeJob.created_at > fresh_cutoff)
+                    )
+                ),
+            )
+            .order_by(ScrapeRuntimeJob.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if active_job_id:
+        await db.commit()
+        log.info(
+            "trigger_scrape: university %d already has active job %s; "
+            "monitor trigger reused it",
+            watcher.university_id,
+            active_job_id,
+        )
+        return active_job_id
+
     uni_result = await db.execute(select(University).where(University.id == watcher.university_id))
     uni = uni_result.scalar_one_or_none()
     if not uni:
