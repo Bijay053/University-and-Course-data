@@ -138,3 +138,4 @@
 - [Staged-row restore identity](staged-row-restore-identity.md) — exact backups deduplicate by canonical URL; name fallback is only for legacy snapshots whose fetched URL may differ.
 - [Auckland qualification filtering](auckland-qualification-filtering.md) — the shared study-option path mixes programmes and subjects; trust its explicit discovery labels before extraction.
 - [Otago mixed fee rows](otago-mixed-fee-rows.md) — qualification pages place Domestic and International rows together; an explicit International fee label must outrank domestic rejection.
+- [Massey qualification catalogue](massey-qualification-catalogue.md) — `/study/courses/` is not the degree catalogue; use the static all-qualifications index and restrict extraction to its detail URLs.
