@@ -2154,6 +2154,15 @@ class FeesConfig(BaseModel):
             "Default false preserves guarded fuzzy matching."
         ),
     )
+    central_fee_priority: bool = Field(
+        default=False,
+        description=(
+            "When true, a confident programme-name match from the configured "
+            "central international fee schedule replaces a fee found on the "
+            "course page. Use only when course pages expose misleading ancillary "
+            "or domestic amounts and the central schedule is authoritative."
+        ),
+    )
     follow_links: list[str] = Field(
         default_factory=list,
         description=(

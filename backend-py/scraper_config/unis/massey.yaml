@@ -17,6 +17,7 @@ locked_config_paths:
   - extraction.max_parallel_fetch
   - extraction.fees.central_page
   - extraction.fees.currency_override
+  - extraction.fees.central_fee_priority
   - extraction.english.degree_level_defaults
 
 discovery:
@@ -53,6 +54,7 @@ extraction:
     currency_override: NZD
     prefer_international: true
     central_fee_exact_match_only: true
+    central_fee_priority: true
     reject_keywords:
       - Non-tuition fees
       - Student services fee

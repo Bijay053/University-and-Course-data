@@ -8504,7 +8504,16 @@ async def extract_course(
             # ── Fee fallback ─────────────────────────────────────────────
             _fee_slots = ("international_fee", "domestic_fee", "currency", "fee_term", "fee_year")
             _fee_missing = any(payload.get(k) in (None, "", 0) for k in ("international_fee",))
-            if _fee_missing and _central_fees:
+            _central_fee_priority = False
+            try:
+                _priority_cfg = get_uni_config()
+                _central_fee_priority = bool(
+                    _priority_cfg
+                    and _priority_cfg.extraction.fees.central_fee_priority
+                )
+            except Exception:  # noqa: BLE001
+                pass
+            if (_fee_missing or _central_fee_priority) and _central_fees:
                 _course_name_for_fee = payload.get("course_name") or ""
                 _central_fee_exact_only = False
                 try:
@@ -8609,13 +8618,23 @@ async def extract_course(
                             _v = matched.get(_src_k)
                             if _v in (None, "", 0):
                                 continue
-                            if payload.get(_k) not in (None, "", 0):
+                            if (
+                                payload.get(_k) not in (None, "", 0)
+                                and not (
+                                    _central_fee_priority
+                                    and _k in {"international_fee", "currency", "fee_term"}
+                                )
+                            ):
                                 continue
                             payload[_k] = _v
                             evidence.append({
                                 "field_key": _k,
                                 "value": _v,
-                                "confidence": _confidence_numeric,
+                                "confidence": (
+                                    max(_confidence_numeric, 0.85)
+                                    if _central_fee_priority
+                                    else _confidence_numeric
+                                ),
                                 "method": f"central_page:fees:{_fee_confidence}",
                                 "source_url": _central_fee_url or url,
                                 "snippet": f"central_page fee: {_k}={_v}",

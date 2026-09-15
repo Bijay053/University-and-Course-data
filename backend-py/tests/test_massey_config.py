@@ -60,6 +60,7 @@ def test_massey_pins_safe_extraction_sources_and_concurrency() -> None:
     )
     assert config.extraction.fees.currency_override == "NZD"
     assert config.extraction.fees.central_fee_exact_match_only is True
+    assert config.extraction.fees.central_fee_priority is True
     assert "Non-tuition fees" in config.extraction.fees.reject_keywords
     assert config.extraction.english.central_page is None
     assert config.extraction.english.degree_level_defaults["undergraduate"].ielts == 6.0
