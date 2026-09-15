@@ -85,21 +85,37 @@ def _extract_explicit_international_fee_meta(
         from bs4 import BeautifulSoup
 
         soup = BeautifulSoup(html, "html.parser")
+        metadata: dict[str, str] = {}
         for meta in soup.find_all("meta"):
-            name = re.sub(r"[-\s]+", "_", str(meta.get("name") or "").strip().lower())
+            raw_name = str(meta.get("name") or "").strip()
+            name = re.sub(
+                r"[-\s]+",
+                "_",
+                re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", raw_name).lower(),
+            )
+            content = str(meta.get("content") or "").strip()
+            if name and content:
+                metadata[name] = content
             if name not in {
                 "fees_international",
                 "international_fee",
                 "international_fees",
+                "international_fees_min",
             }:
                 continue
-            content = str(meta.get("content") or "").strip()
             match = _AMOUNT_RE.search(content)
-            if not match:
-                continue
-            amount = _parse_amount(match.group(2) or match.group(3) or "")
+            amount = (
+                _parse_amount(match.group(2) or match.group(3) or "")
+                if match
+                else _parse_amount(content)
+            )
             if amount is not None and amount > 0:
-                return amount, content
+                year = metadata.get("international_fees_year", "")
+                currency = "NZD" if name == "international_fees_min" else ""
+                return amount, (
+                    f"International fee {year}: {currency} {content} "
+                    f"(meta {raw_name})"
+                ).strip()
     except Exception:  # noqa: BLE001 — malformed metadata must not break extraction
         return None
     return None

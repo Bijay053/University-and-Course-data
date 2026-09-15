@@ -37,3 +37,23 @@ async def test_otago_visible_fee_block_extracts_international_amount():
     assert best.value == 66255
     assert best.normalized["currency"] == "NZD"
     assert "International fee 2027" in best.snippet
+
+
+async def test_otago_structured_fee_metadata_extracts_international_amount():
+    html = """
+      <meta name="domesticFeesMin" content="13000">
+      <meta name="domesticFeesMax" content="15500">
+      <meta name="internationalFeesYear" content="2027">
+      <meta name="internationalFeesMin" content="66255">
+      <meta name="internationalFeesMax" content="">
+    """
+    results = await extract(
+        html,
+        "https://www.otago.ac.nz/study/qualifications/master-of-music-coursework",
+    )
+    assert len(results) == 1
+    result = results[0]
+    assert result.value == 66255
+    assert result.normalized["currency"] == "NZD"
+    assert result.normalized["fee_year"] == 2027
+    assert result.method == "fee.explicit_international_meta"
