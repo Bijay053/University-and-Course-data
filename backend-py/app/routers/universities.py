@@ -189,6 +189,7 @@ _MULTI_LABEL_EDUCATION_SUFFIXES = {
     "ac.au", "ac.nz", "ac.uk", "edu.au", "edu.hk", "edu.my", "edu.nz", "edu.sg",
 }
 _HOSTNAME_OFFICIAL_NAMES = {
+    "aut.ac.nz": "Auckland University of Technology",
     "csu.edu.au": "Charles Sturt University",
     "jcu.edu.au": "James Cook University",
     "lincoln.edu.my": "Lincoln University College",
@@ -611,12 +612,27 @@ def _normalise_institution_name(value: str) -> str:
         segment
         for segment in segments
         if segment.casefold() not in _GENERIC_TITLE_SEGMENTS
+        and not _is_location_only_institution_name(segment)
         and not (
             re.search(r"\bsites?$", segment, re.I)
             and not _INSTITUTION_KEYWORDS.search(segment)
         )
     ]
     return (max(non_generic, key=len)[:200] if non_generic else "")
+
+
+def _is_location_only_institution_name(value: str) -> bool:
+    """Reject geographic metadata without rejecting named institutions."""
+    decoded = _decode_metadata_text(value).strip(" ,.")
+    if not decoded or _INSTITUTION_KEYWORDS.search(decoded):
+        return False
+    countries = {
+        country.casefold()
+        for country in (*_COUNTRY_CODE_NAMES.values(), *_TLD_COUNTRY_NAMES.values())
+    }
+    # SEO descriptions such as "Auckland, New Zealand" are not brands.
+    tail = decoded.rsplit(",", 1)[-1].strip()
+    return _normalise_metadata_country(tail).casefold() in countries
 
 
 def _has_generic_title_prefix(value: str | None) -> bool:
@@ -1267,6 +1283,11 @@ async def create_university(
                 },
             )
     payload = body.model_dump(exclude_none=True)
+    if _is_location_only_institution_name(body.name):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Enter the institution name, not a city or country.",
+        )
     for url_key in (
         "website",
         "scrape_url",
@@ -1295,6 +1316,11 @@ async def update_university(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="University not found")
     payload = body.model_dump(exclude_none=True)
     if "name" in payload:
+        if _is_location_only_institution_name(payload["name"]):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Enter the institution name, not a city or country.",
+            )
         dupe_stmt = select(University.id).where(
             func.lower(University.name) == payload["name"].lower(), University.id != uni_id
         )
@@ -1998,6 +2024,7 @@ async def add_university_by_url(
         _needs_update = False
         if (
             _contains_encoded_html_entity(existing.name)
+            or _is_location_only_institution_name(existing.name)
             or _is_hostname_fallback_name(existing.name, hostname)
             or _has_generic_title_prefix(existing.name)
             or _can_upgrade_to_official_name(existing.name, name, hostname)
