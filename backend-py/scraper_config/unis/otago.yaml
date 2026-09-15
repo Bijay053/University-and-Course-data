@@ -69,6 +69,12 @@ discovery:
     - '/study/qualifications/apply-for-a-programme/'
 
 extraction:
+  # Static Scrape.do HTML contains the qualification content but not the
+  # client-rendered Estimated fees rows. Always run the per-course browser when
+  # a fee is still missing, even after central English defaults have populated
+  # the English slots (the generic browser gate otherwise exits early).
+  force_browser: true
+
   fees:
     default_currency: 'NZD'
     prefer_international: true

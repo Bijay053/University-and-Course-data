@@ -12,7 +12,9 @@ def _config():
 
 
 def test_otago_explicit_international_label_overrides_domestic_reject_marker():
-    fees = _config().extraction.fees
+    config = _config()
+    fees = config.extraction.fees
+    assert config.extraction.force_browser is True
     assert "Domestic" in fees.reject_keywords
     assert "International fee" in fees.international_fee_keywords
 
