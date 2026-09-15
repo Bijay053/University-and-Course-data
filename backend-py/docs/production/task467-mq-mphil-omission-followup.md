@@ -55,6 +55,16 @@ requests one provider retry while preserving the existing exact-title,
 duration, international-evidence, route-identity, fee-safety, and two-row
 staging regressions.
 
+Focused local regression run on the merged primary worktree:
+
+```text
+137 passed, 1 skipped
+tests/test_mq_research_authority.py
+tests/test_mq_coursehandbook_sitemap.py
+tests/test_mq_coursehandbook_to_admissions.py
+tests/test_stage_evidence_and_review.py
+```
+
 ## Required post-deploy evidence
 
 After this repair is deployed, one fresh `forceDiscovery=true` MQ run must
