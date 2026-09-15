@@ -82,3 +82,35 @@ record both current-run rows before this follow-up is closed:
 
 No approval, deletion, baseline reduction, or stale-row reuse is part of this
 verification.
+
+## Follow-up release gate attempt
+
+The corrected primary head was pushed normally after an origin recheck:
+
+```text
+origin/main=bb2c24b
+```
+
+Focused local regressions passed before the push.  The signed idle gate was
+then invoked with the independently verified rehearsal account and failed
+closed before any deployment or restart:
+
+```text
+safe restart smoke aborted: active scrape jobs prevent restart smoke:
+queued=0, running=2, awaiting_approval=0
+```
+
+The bounded read-only active-job detail command
+`e2a5224b-0d66-4958-b2ad-041a225aa48c` found:
+
+```text
+job_ab89ec575175  University of Auckland  running  282/551
+job_f1e69a13338d  University of Otago    running  194/194
+```
+
+Production therefore remains on the prior deployed release
+`7d13d75ed92c35966493c082705007b5925a8002`; no restart, deployment, or fresh
+MQ scrape was attempted while the gate was blocked.  The next attempt must
+repeat the signed idle gate after these jobs reach terminal states.  It must
+not bypass the gate or start a second corrective scrape while this one is
+blocked.
