@@ -21,3 +21,15 @@ single-segment marketing titles.
 Branded CMS wrappers ending in “Site” or “Sites” are not institution names.
 Known domain mappings must also be allowed to repair older stored names even
 when the official brand and bad wrapper both lack words such as “University.”
+
+Do not create new university records using hostname-derived display names
+when identity resolution fails. Return a visible validation error instead.
+Preserve already verified names during temporary homepage failures.
+
+**Why:** Rejecting geographic marketing text did not address the fallback:
+an unavailable homepage still created an acronym-like guessed name, and the
+background scraper probe did not subsequently resolve that identity.
+
+**How to apply:** Test both unknown domains with unavailable pages and
+existing records with valid names. Known-domain mappings are a recovery aid,
+not a replacement for the generic no-guessing rule.

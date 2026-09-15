@@ -277,6 +277,66 @@ async def test_manual_create_and_edit_reject_location_names():
     db.commit.assert_not_awaited()
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("existing_name", [None, "Unverified"])
+async def test_url_add_does_not_persist_hostname_guess(monkeypatch, existing_name):
+    from unittest.mock import AsyncMock
+    from fastapi import HTTPException
+    from app.routers import universities as routes
+
+    existing = (
+        SimpleNamespace(id=123, name=existing_name)
+        if existing_name else None
+    )
+    db = SimpleNamespace(commit=AsyncMock())
+    monkeypatch.setattr(routes, "_fetch_onboarding_homepage", AsyncMock(return_value=""))
+    monkeypatch.setattr(routes, "_resolve_university_identity_openai", AsyncMock(return_value={}))
+    monkeypatch.setattr(routes, "_find_existing_university_by_domain", AsyncMock(return_value=existing))
+    with pytest.raises(HTTPException) as error:
+        await routes.add_university_by_url({"url":"https://unverified.ac.nz"}, db, {})
+    assert error.value.status_code == 422
+    assert "Could not verify" in error.value.detail
+    db.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_op_url_repairs_hostname_guess_even_when_homepage_unavailable(monkeypatch):
+    from unittest.mock import AsyncMock
+    from app.routers import universities as routes
+
+    existing = SimpleNamespace(id=68, name="Op", country="New Zealand", city="Unknown")
+    db = SimpleNamespace(commit=AsyncMock())
+    monkeypatch.setattr(routes, "_fetch_onboarding_homepage", AsyncMock(return_value=""))
+    monkeypatch.setattr(routes, "_resolve_university_identity_openai", AsyncMock(return_value={}))
+    monkeypatch.setattr(routes, "_find_existing_university_by_domain", AsyncMock(return_value=existing))
+    monkeypatch.setattr(routes, "_upsert_discovered_locations", AsyncMock(return_value=False))
+    result = await routes.add_university_by_url({"url":"https://www.op.ac.nz"}, db, {})
+    assert result["name"] == "Otago Polytechnic"
+    assert result["university_id"] == 68
+    assert result["already_exists"] is True
+    assert result["city"] == "Unknown"  # Never guess a campus from the brand.
+    db.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_unavailable_homepage_preserves_existing_official_name(monkeypatch):
+    from unittest.mock import AsyncMock
+    from app.routers import universities as routes
+
+    existing = SimpleNamespace(
+        id=123, name="Example Polytechnic", country="New Zealand", city="Dunedin",
+    )
+    db = SimpleNamespace(commit=AsyncMock())
+    monkeypatch.setattr(routes, "_fetch_onboarding_homepage", AsyncMock(return_value=""))
+    monkeypatch.setattr(routes, "_resolve_university_identity_openai", AsyncMock(return_value={}))
+    monkeypatch.setattr(routes, "_find_existing_university_by_domain", AsyncMock(return_value=existing))
+    monkeypatch.setattr(routes, "_upsert_discovered_locations", AsyncMock(return_value=False))
+    result = await routes.add_university_by_url({"url":"https://unverified.ac.nz"}, db, {})
+    assert result["name"] == "Example Polytechnic"
+    assert result["already_exists"] is True
+    db.commit.assert_not_awaited()
+
+
 def test_known_unsw_domain_has_authoritative_official_name() -> None:
     assert _HOSTNAME_OFFICIAL_NAMES["unsw.edu.au"] == "UNSW Sydney"
 

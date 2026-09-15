@@ -190,6 +190,7 @@ _MULTI_LABEL_EDUCATION_SUFFIXES = {
 }
 _HOSTNAME_OFFICIAL_NAMES = {
     "aut.ac.nz": "Auckland University of Technology",
+    "op.ac.nz": "Otago Polytechnic",
     "csu.edu.au": "Charles Sturt University",
     "jcu.edu.au": "James Cook University",
     "lincoln.edu.my": "Lincoln University College",
@@ -1913,7 +1914,7 @@ async def add_university_by_url(
                             )
 
     except Exception:
-        pass  # Best-effort; we'll fall back to hostname-derived name
+        pass  # Try grounded identity resolution; never invent a hostname name.
 
     ai_identity = await _resolve_university_identity_openai(
         root_url=root_url,
@@ -2001,12 +2002,6 @@ async def add_university_by_url(
     elif not name or _is_hostname_fallback_name(name, hostname):
         name = _HOSTNAME_OFFICIAL_NAMES.get(_stripped_hostname, name)
 
-    if not name:
-        # Fallback: derive a readable name from the hostname.
-        # Strip generic prefixes (www, courses, study) and known TLD suffixes
-        # so that "www.canterbury.ac.uk" → "Canterbury" not "Canterbury Ac".
-        name = _hostname_fallback_label(hostname)
-
     # Protected homepages can occasionally exhaust the rendering provider.
     # Retain source-verified fallbacks so a transient provider failure cannot
     # recreate a weak hostname label or an empty Locations tab.
@@ -2017,6 +2012,24 @@ async def add_university_by_url(
 
     # ── Step 2: Check for existing university with same website ───────────
     existing = await _find_existing_university_by_domain(db, hostname)
+
+    # A hostname label is not institution identity. If this is a new URL, do
+    # not persist a guessed draft and queue a probe that never repairs its
+    # name. Preserve an existing real name during temporary homepage failures.
+    if not name and (
+        existing is None
+        or _is_hostname_fallback_name(existing.name, hostname)
+        or _is_location_only_institution_name(existing.name)
+        or _has_generic_title_prefix(existing.name)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Could not verify the institution name from this website. "
+                "No university was created. Retry when the website is available "
+                "or use Add University to enter its official name manually."
+            ),
+        )
 
     if existing:
         # Repair metadata-created names from older versions that persisted raw
