@@ -63,6 +63,19 @@ page-data fills fields Funnelback omits.
 
 ## Transport
 
+Current research-certificate eligibility should come from the official
+year-specific handbook's structured offering record, not default admissions
+HTML or absence from Funnelback.
+
+**Why:** The Arts and Science/Engineering certificates had published handbook
+records but explicitly false international eligibility and non-offered
+sessions. A published qualification is not necessarily a current offering;
+neither default domestic HTML nor an empty CRICOS field alone proves this.
+
+**How to apply:** Recheck the current year's international and session-offering
+fields together. Record ineligibility for that year without calling the course
+permanently domestic-only or deleting live records.
+
 Every part of `www.mq.edu.au` and both Funnelback endpoints are behind Cloudflare Enterprise.
 - Direct httpx / requests / curl_cffi / Scrapy → CF 403
 - scrape.do render=false (static proxy) → 502 ROTATION_FAILED for all MQ URLs
