@@ -70,9 +70,10 @@ discovery:
 
 extraction:
   # Static Scrape.do HTML contains the qualification content but not the
-  # client-rendered Estimated fees rows. Always run the per-course browser when
-  # a fee is still missing, even after central English defaults have populated
-  # the English slots (the generic browser gate otherwise exits early).
+  # client-rendered Estimated fees rows. Render the primary extraction response
+  # so the normal fee extractor receives those rows. Keep the browser fallback
+  # forced as a secondary rescue when rendering is incomplete.
+  scrape_do_render: true
   force_browser: true
 
   fees:
