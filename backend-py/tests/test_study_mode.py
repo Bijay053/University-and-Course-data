@@ -67,6 +67,52 @@ def test_extract_returns_extraction_result():
     assert out[0].normalized == {"study_mode": "On Campus"}
 
 
+def test_apu_standard_course_ignores_sitewide_online_catalogue_text():
+    html = """
+    <title>Master of Science in Artificial Intelligence | APU</title>
+    <nav>Online Learning · Postgraduate Online Studies (ODL)</nav>
+    <main><h1>Master of Science in Artificial Intelligence</h1>
+      <a href="/course/msc-in-artificial-intelligence-odl">ODL version</a>
+      <p>Related courses: Open &amp; Distance Learning (ODL), 100% Online.</p>
+    </main>
+    """
+    out = asyncio.run(
+        study_mode.extract(
+            html, "https://www.apu.edu.my/course/msc-in-artificial-intelligence"
+        )
+    )
+    assert out[0].value == "On Campus"
+    assert out[0].method == "study_mode:apu_course_authority"
+
+
+def test_apu_odl_course_identity_is_online():
+    html = """
+    <title>Master of Science in Artificial Intelligence (ODL) | APU</title>
+    <nav>Online Learning · Postgraduate Online Studies (ODL)</nav>
+    <main><h1>Master of Science in Artificial Intelligence (ODL)</h1>
+      <p>Open &amp; Distance Learning (ODL), 100% Online.</p>
+    </main>
+    """
+    out = asyncio.run(
+        study_mode.extract(
+            html,
+            "https://www.apu.edu.my/course/msc-in-artificial-intelligence-odl",
+        )
+    )
+    assert out[0].value == "Online"
+    assert out[0].method == "study_mode:apu_course_authority"
+
+
+def test_apu_authority_is_scoped_to_course_paths_and_host():
+    html = "<title>Online Learning</title><h1>Online Learning</h1>"
+    assert study_mode.extract_apu_course_mode(
+        html, "https://www.apu.edu.my/online-learning"
+    ) == (None, None)
+    assert study_mode.extract_apu_course_mode(
+        html, "https://example.com/course/msc-in-artificial-intelligence"
+    ) == (None, None)
+
+
 # --- Bug G regression tests --------------------------------------------------
 
 
@@ -705,6 +751,68 @@ async def test_utas_online_location_survives_full_pipeline_and_is_rejected():
     }
     assert "study_mode:utas_international_location" in study_mode_methods
     assert should_stage_course(payload["course_name"], payload, url) == (
+        False,
+        "online_only",
+    )
+
+
+@pytest.mark.asyncio
+async def test_apu_full_pipeline_keeps_standard_masters_and_rejects_odl():
+    """APU's related-course ODL links must not reject its standard Masters."""
+    from app.services.scraper.config.context import set_uni_config
+    from app.services.scraper.config.loader import get_config_for_host
+    from app.services.scraper.guards import should_stage_course
+    from app.services.scraper.pipelines.single_course import extract_course
+
+    set_uni_config(get_config_for_host(
+        hostname="www.apu.edu.my",
+        name="Asia Pacific University",
+        scrape_url="https://www.apu.edu.my/",
+        university_id=9991,
+        create_missing_stub=False,
+    ))
+    common = """
+      <nav>Online Learning · Postgraduate Online Studies (ODL)</nav>
+      <p>Related course: Open &amp; Distance Learning (ODL), 100% Online.</p>
+      <p>International student fee: RM 50,000.</p>
+      <p>Duration: 2 years full-time. IELTS overall score of 6.0.</p>
+    """
+    standard_url = (
+        "https://www.apu.edu.my/course/msc-in-artificial-intelligence"
+    )
+    standard = await extract_course(
+        standard_url,
+        country="Malaysia",
+        html=(
+            "<title>Master of Science in Artificial Intelligence | APU</title>"
+            "<h1>Master of Science in Artificial Intelligence</h1>" + common
+        ),
+        use_ai_fallback=False,
+    )
+    standard_payload = standard["payload"]
+    standard_payload["international_fee"] = 50000
+    assert standard_payload["study_mode"] == "On Campus"
+    assert should_stage_course(
+        standard_payload["course_name"], standard_payload, standard_url
+    ) == (True, "accepted")
+
+    odl_url = (
+        "https://www.apu.edu.my/course/msc-in-artificial-intelligence-odl"
+    )
+    odl = await extract_course(
+        odl_url,
+        country="Malaysia",
+        html=(
+            "<title>Master of Science in Artificial Intelligence (ODL) | APU"
+            "</title><h1>Master of Science in Artificial Intelligence (ODL)"
+            "</h1>" + common
+        ),
+        use_ai_fallback=False,
+    )
+    odl_payload = odl["payload"]
+    assert odl_payload["study_mode"] == "Online"
+    assert odl_payload["online_only"] is True
+    assert should_stage_course(odl_payload["course_name"], odl_payload, odl_url) == (
         False,
         "online_only",
     )

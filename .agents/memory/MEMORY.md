@@ -141,3 +141,4 @@
 - [Massey qualification catalogue](massey-qualification-catalogue.md) — use the all-qualifications index; route detail extraction through static proxy because the origin blocks long direct-request runs.
 - [VUW current international catalogue](vuw-current-international-catalogue.md) — bare JSON endpoints can serve stale prior-year fees; use the international query and align intakes to the fee year.
 - [Release cleanup paths](release-cleanup-paths.md) — deployment EXIT traps must use absolute paths or reset cwd before restoring paused consumers.
+- [APU course delivery identity](apu-course-delivery-identity.md) — APU’s page-wide catalogue contaminates mode keywords; classify delivery from the current course title/H1/URL only.

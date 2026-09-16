@@ -12,6 +12,7 @@ modes is what "Blended" actually means.
 from __future__ import annotations
 
 import re
+import urllib.parse
 
 from bs4 import BeautifulSoup
 
@@ -182,6 +183,7 @@ def has_authoritative_online_location_evidence(
             "study_mode:strong_label",
             "study_mode:label",
             "study_mode:title_keyword",
+            "study_mode:apu_course_authority",
         }:
             return True
     return False
@@ -340,6 +342,43 @@ def _extract_span_id_delivery(html: str) -> tuple[str | None, str | None]:
     if canonical:
         return canonical, f'<span id="delivery">{value}</span>'
     return None, None
+
+
+def extract_apu_course_mode(html: str, url: str) -> tuple[str | None, str | None]:
+    """Extract APU's delivery mode from the current course identity only.
+
+    APU puts links to its ODL catalogue and online-learning navigation on
+    otherwise ordinary course pages.  Consequently a page-wide keyword scan
+    is not a useful signal for this host.  The course title, H1, and URL are
+    the only authoritative fields here; a standard ``/course/`` page is an
+    on-campus course unless that identity explicitly says ODL.
+
+    This intentionally remains narrowly scoped to APU course URLs so it
+    cannot change mode extraction for other sites or for APU catalogue pages.
+    """
+    if not html or not url:
+        return None, None
+    parsed = urllib.parse.urlparse(url)
+    if parsed.netloc.lower() not in {"apu.edu.my", "www.apu.edu.my"} or not re.match(
+        r"^/course(?:/|$)", parsed.path or "", re.IGNORECASE
+    ):
+        return None, None
+
+    soup = BeautifulSoup(html, "html.parser")
+    title = soup.title.get_text(" ", strip=True) if soup.title else ""
+    headings = " ".join(
+        node.get_text(" ", strip=True) for node in soup.find_all("h1")
+    )
+    is_odl = bool(re.search(r"\bODL\b", f"{title} {headings}", re.IGNORECASE))
+    is_odl = is_odl or bool(
+        re.search(r"(?:^|[-_/])odl(?:$|[-_/])", parsed.path, re.IGNORECASE)
+    )
+    mode = "Online" if is_odl else "On Campus"
+    snippet = (
+        f"APU course authority: title={title!r}; h1={headings!r}; "
+        f"url_path={parsed.path!r}"
+    )
+    return mode, snippet
 
 
 # PR-6 Bug 2: ASA / VIT publish delivery as `<strong>Delivery</strong>`
@@ -657,6 +696,21 @@ _STUDY_MODE_RULE_SUPPRESSED_HOSTS: frozenset[str] = frozenset({
 async def extract(html: str, url: str) -> list[ExtractionResult]:
     import urllib.parse as _up
     _host = _up.urlparse(url).netloc.lower()
+    # APU course identity is authoritative.  Do this before all generic
+    # label/keyword passes: its page-wide navigation and related-course
+    # catalogue contain many unrelated "Online" / "ODL" mentions.
+    _apu_mode, _apu_snippet = extract_apu_course_mode(html, url)
+    if _apu_mode:
+        return [
+            ExtractionResult(
+                field_key=field_key,
+                value=_apu_mode,
+                normalized={"study_mode": _apu_mode},
+                confidence=1.0,
+                method="study_mode:apu_course_authority",
+                snippet=_apu_snippet,
+            )
+        ]
     if _host == "utas.edu.au" or _host.endswith(".utas.edu.au"):
         _utas_mode, _utas_snippet = _utas_international_location_mode(html)
         if _utas_mode:
