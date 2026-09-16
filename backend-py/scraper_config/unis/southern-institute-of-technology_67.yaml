@@ -1,0 +1,37 @@
+# Southern Institute of Technology (SIT)
+#
+# SIT course pages contain a very large site shell and local Zero Fees/resource
+# costs. International tuition is published separately in a named-programme
+# schedule.
+
+hostname_guard: sit.ac.nz
+
+locked_config_paths:
+  - extraction.max_parallel_fetch
+  - extraction.skip_per_course_browser
+  - extraction.fees.central_page
+  - extraction.fees.default_currency
+  - extraction.fees.currency_override
+  - extraction.fees.prefer_international
+  - extraction.fees.central_fee_priority
+  - extraction.fees.central_fee_exact_match_only
+  - extraction.fees.discard_domestic_fee
+  - extraction.fees.reject_keywords
+
+extraction:
+  max_parallel_fetch: 6
+  skip_per_course_browser: true
+
+  fees:
+    central_page: https://www.sit.ac.nz/Fees-Enrolments/International-Fees
+    default_currency: NZD
+    currency_override: NZD
+    prefer_international: true
+    central_fee_priority: true
+    central_fee_exact_match_only: true
+    discard_domestic_fee: true
+    reject_keywords:
+      - Zero Fees
+      - No Tuition Fees
+      - Direct Material Costs
+      - Resource Fee

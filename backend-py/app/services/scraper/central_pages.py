@@ -29,6 +29,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+from urllib.parse import urlparse
 import unicodedata
 from typing import Any
 
@@ -180,6 +181,8 @@ def _parse_fee_page_html(html: str, page_url: str) -> list[CentralFeeRecord]:
         return []
 
     records: list[CentralFeeRecord] = []
+    page_host = (urlparse(page_url).hostname or "").lower()
+    is_sit_fee_schedule = page_host in {"sit.ac.nz", "www.sit.ac.nz"}
     page_text = soup.get_text(" ", strip=True)
     page_declares_aud = bool(
         re.search(
@@ -263,6 +266,18 @@ def _parse_fee_page_html(html: str, page_url: str) -> list[CentralFeeRecord]:
             ),
             None,
         )
+        sit_tuition_col = (
+            next(
+                (
+                    i
+                    for i, h in enumerate(effective_header_cells)
+                    if h.strip().startswith("tuition fee")
+                ),
+                None,
+            )
+            if is_sit_fee_schedule
+            else None
+        )
         table_is_international = "international" in " ".join(
             effective_header_cells
         )
@@ -279,15 +294,21 @@ def _parse_fee_page_html(html: str, page_url: str) -> list[CentralFeeRecord]:
         if intl_col is not None and intl_col == prog_col:
             intl_col = None
 
-        primary_fee_col = intl_col if intl_col is not None else (
+        primary_fee_col = sit_tuition_col if sit_tuition_col is not None else (
+            intl_col if intl_col is not None else (
             total_col if total_col is not None else (
                 unit_col if unit_col is not None else safe_plain_fee_col
             )
-        )
+        ))
 
         # Sniff the per-term from the header row text.
         header_text = " ".join(effective_header_cells)
         per_term = _infer_per_term(header_text)
+        if is_sit_fee_schedule:
+            if "total fee (per year)" in header_text:
+                per_term = "Annual"
+            elif "total fee (whole course)" in header_text:
+                per_term = "Full Course"
         if safe_plain_fee_col is not None:
             per_term = per_term or page_fee_term
         # "Course fee" column = full program total → "Full Course";

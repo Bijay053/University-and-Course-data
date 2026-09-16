@@ -3157,6 +3157,14 @@ async def extract_course(
     if _flinders_html.is_flinders_host(url):
         html = _flinders_html.compact_course_html(html)
 
+    # SIT pages contain roughly 400 KB of shared navigation, contact forms and
+    # related programme options around a compact course-owned summary. Parsing
+    # the shell repeatedly causes course timeouts and lets the "0800 4 0 FEES"
+    # contact number leak into location. Keep only the current programme panel.
+    from app.services.scraper.extractors import sit_html as _sit_html
+    if _sit_html.is_sit_course_url(url):
+        html = _sit_html.compact_course_html(html)
+
     # Shared conservative compaction for large CMS pages. Unlike the Flinders
     # specialization this keeps the complete course body and all scripts, and
     # removes only high-confidence semantic chrome. Safety guards return the
