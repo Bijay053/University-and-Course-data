@@ -7,7 +7,7 @@ SIT course pages wrap a small current-programme summary in a very large shared s
 
 **Why:** Repeatedly parsing the full page exceeded the per-course deadline, while shared contact text turned “0800 4 0 FEES” into a location and module levels corrupted duration. Semester end dates also looked like intakes.
 
-**How to apply:** Compact before generic extraction. Emit explicit labelled facts and only semester start months. If the expected component changes, retain bounded title evidence rather than restoring the full shell.
+**How to apply:** Compact before generic extraction. Emit explicit labelled facts and only numbered Semester/Intake start months. Skip title-only shells whose current programme panel is absent. Treat SIT course-route case and space encoding variants as one URL identity.
 
 SIT’s central international schedule is the tuition authority. Use its Tuition Fee column, not Resource Fee or Total Fee, force NZD, and require exact award-name matching.
 

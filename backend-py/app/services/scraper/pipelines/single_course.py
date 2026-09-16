@@ -3174,6 +3174,23 @@ async def extract_course(
     # contact number leak into location. Keep only the current programme panel.
     from app.services.scraper.extractors import sit_html as _sit_html
     if _sit_html.is_sit_course_url(url):
+        if not _sit_html.has_current_course_panel(html):
+            if emit:
+                await emit(
+                    "status",
+                    "[SIT] skipped title-only page without a current programme panel",
+                    phase="extract",
+                    kind="sit_course_panel_missing",
+                    url=url,
+                )
+            return {
+                "url": url,
+                "error": "skipped:sit_course_panel_missing",
+                "skip_reason": "sit_course_panel_missing",
+                "payload": {},
+                "evidence": [],
+                "_perf": {**_perf_flags, "sit_course_panel_missing": True},
+            }
         html = _sit_html.compact_course_html(html)
 
     # Shared conservative compaction for large CMS pages. Unlike the Flinders

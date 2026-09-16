@@ -8,7 +8,7 @@ key for deduplication without rewriting the URL that is actually fetched.
 """
 from __future__ import annotations
 
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit, urlunsplit
 
 
 _NOISE_QUERY_KEYS = frozenset(
@@ -115,6 +115,11 @@ def canonical_course_url_key(url: str | None) -> str:
             host_port = f"{host}:{port}"
 
         path = parts.path or ""
+        decoded_path = unquote(path)
+        sit_prefix = "/programme/course/"
+        if host == "sit.ac.nz" and decoded_path.lower().startswith(sit_prefix):
+            course_part = decoded_path[len(sit_prefix):].strip()
+            path = sit_prefix + quote(course_part, safe="()'-,")
         if path != "/":
             path = path.rstrip("/")
 

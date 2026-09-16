@@ -1,4 +1,5 @@
 import asyncio
+import re
 
 from app.services.scraper.config.loader import load_uni_config
 from app.services.scraper.orchestrator import (
@@ -21,11 +22,13 @@ from app.services.scraper.extractors import (
 )
 from app.services.scraper.extractors.sit_html import (
     compact_course_html,
+    has_current_course_panel,
     is_sit_course_url,
 )
 from app.services.scraper.pipelines.single_course import (
     _central_fee_match_has_usable_tuition,
 )
+from app.services.scraper.url_identity import canonical_course_url_key
 
 
 def _run(coro):
@@ -90,6 +93,37 @@ def test_sit_compacted_page_extracts_location_mode_and_duration():
     english = _run(english_test.extract(compacted, "https://www.sit.ac.nz/x"))
     assert english[0].value == 6.0
     assert english[1].value == 50.0
+
+
+def test_sit_compaction_uses_intake_start_dates_not_end_dates():
+    html, replacements = re.subn(
+        r"Dates:.*?Fees:",
+        "Dates: 2027 Intake 1: 15 February to 25 June 2027 "
+        "Intake 2: 27 April to 3 September 2027 "
+        "Intake 3: 12 July to 19 November 2027 Fees:",
+        _sit_html(),
+        flags=re.S,
+    )
+    assert replacements == 1
+    compacted = compact_course_html(html)
+    assert _run(intake.extract(compacted, "https://www.sit.ac.nz/x"))[0].value == [
+        "February",
+        "April",
+        "July",
+    ]
+
+
+def test_sit_title_only_shell_has_no_current_course_panel():
+    html = "<html><h1>Master of Applied Management</h1><div class='CourseInfo CourseSummary'></div></html>"
+    assert has_current_course_panel(html) is False
+
+
+def test_sit_url_identity_collapses_case_and_space_encoding_variants():
+    assert canonical_course_url_key(
+        "https://www.sit.ac.nz/Programme/Course/Bachelor of Commerce"
+    ) == canonical_course_url_key(
+        "https://www.sit.ac.nz/programme/course/Bachelor%20of%20Commerce"
+    )
 
 
 def test_sit_yaml_uses_international_schedule_and_static_extraction():

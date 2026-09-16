@@ -18,13 +18,26 @@ def is_sit_course_url(url: str) -> bool:
     )
 
 
+def has_current_course_panel(html: str) -> bool:
+    """Return whether SIT rendered the current programme's usable fact panel."""
+    if not html:
+        return False
+    soup = BeautifulSoup(html, "html.parser")
+    summary = soup.select_one(".CourseInfo.CourseSummary")
+    return bool(
+        summary
+        and summary.select_one("#currentCampusName")
+        and summary.select_one(".keyInfoPane .row.no-gutters")
+    )
+
+
 def compact_course_html(html: str) -> str:
     """Keep only SIT's current programme heading and course-owned summary."""
     if not html:
         return html
 
     soup = BeautifulSoup(html, "html.parser")
-    course_name = soup.select_one("#courseName")
+    course_name = soup.select_one("#courseName") or soup.find("h1")
     summary = soup.select_one(".CourseInfo.CourseSummary")
     if course_name is None or summary is None:
         return _minimal_safe_page(soup, course_name)
@@ -51,7 +64,7 @@ def compact_course_html(html: str) -> str:
             date_and_fee_panel.get_text(" ", strip=True).split()
         )
         for match in re.finditer(
-            r"\bSemester\s+\d+\s*:\s*\d{1,2}\s+"
+            r"\b(?:Semester|Intake)\s+\d+\s*:\s*\d{1,2}\s+"
             r"(January|February|March|April|May|June|July|August|"
             r"September|October|November|December)\b",
             panel_text,
