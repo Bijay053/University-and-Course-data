@@ -2410,6 +2410,187 @@ def _from_leeds_beckett_international_panel(
     return None
 
 
+# A Massey detail page can contain several dollar amounts in its Fees and
+# scholarships section (most notably the Student Services Fee / levy).  Keep
+# this sentinel separate from ``None``: on a Massey qualification page where
+# the current tuition section explicitly has no international row, the generic
+# scanner must not promote a domestic or ancillary amount instead.
+_MASSEY_NO_INTERNATIONAL_FEE = object()
+
+
+def _from_massey_qualification_detail_fee(
+    html: str,
+    url: str,
+) -> "tuple[int, int, str] | object | None":
+    """Read Massey's course-owned international tuition row.
+
+    Massey qualification pages use a predictable hierarchy:
+
+        Fees and scholarships > 2026 tuition fees >
+        International students: $38,080
+
+    The page also puts domestic tuition and Student Services Fee/levy values
+    nearby.  Those values are deliberately not scored: only the explicit
+    ``International students`` row inside the latest ``YEAR tuition fees``
+    subsection is eligible.
+
+    This is intentionally narrower than a university-wide fee-page parser.
+    Requiring the exact Massey qualification host/path prevents a central
+    fees page or a related page embedded in a course response from becoming
+    course-owned evidence.
+    """
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url or "")
+    if parsed.scheme not in {"http", "https"}:
+        return None
+    if (parsed.hostname or "").lower() != "www.massey.ac.nz":
+        return None
+    if not re.fullmatch(
+        r"/study/all-qualifications-and-degrees/[^/?#]+/?",
+        parsed.path or "",
+        re.IGNORECASE,
+    ):
+        return None
+    if not html:
+        return None
+
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:  # noqa: BLE001 - malformed page must not break extraction
+        return None
+
+    # Work from heading boundaries rather than flattened page text.  This
+    # prevents a related accordion/card or the following site section from
+    # bleeding into the current qualification's fee subsection.
+    tags = soup.find_all(True)
+    headings: list[tuple[int, int, object, str]] = []
+    for index, tag in enumerate(tags):
+        name = str(getattr(tag, "name", "") or "").lower()
+        if not re.fullmatch(r"h[1-6]", name):
+            continue
+        text = compact(tag.get_text(" ", strip=True))
+        headings.append((index, int(name[1]), tag, text))
+
+    fees_heading: tuple[int, int, object, str] | None = None
+    for heading in headings:
+        if re.fullmatch(r"fees\s+and\s+scholarships", heading[3], re.IGNORECASE):
+            fees_heading = heading
+            break
+    if fees_heading is None:
+        return None
+
+    fees_index, fees_level, _, _ = fees_heading
+    fees_end = len(tags)
+    for index, level, _, _ in headings:
+        if index > fees_index and level <= fees_level:
+            fees_end = index
+            break
+
+    year_sections: list[tuple[int, int, int, int]] = []
+    for heading_index, level, _, heading_text in headings:
+        if not fees_index < heading_index < fees_end:
+            continue
+        year_match = re.search(
+            r"\b(20\d{2})\b(?=.*\btuition\s+fees\b)",
+            heading_text,
+            re.IGNORECASE,
+        )
+        if year_match is None:
+            continue
+        year = int(year_match.group(1))
+        section_end = fees_end
+        for next_index, next_level, _, _ in headings:
+            if (
+                next_index > heading_index
+                and next_index < fees_end
+                and next_level <= level
+            ):
+                section_end = next_index
+                break
+        year_sections.append((year, heading_index, section_end, level))
+
+    if not year_sections:
+        return None
+
+    # The latest published tuition subsection is authoritative.  In
+    # particular, do not fall back to an older international value when the
+    # current section explicitly has domestic-only pricing.
+    year, section_start, section_end, _ = max(
+        year_sections, key=lambda section: (section[0], section[1])
+    )
+    section_tags = tags[section_start + 1 : section_end]
+
+    amount_re = re.compile(
+        r"\bInternational\s+students\s*:?\s*"
+        r"(?:NZD?\s*)?\$\s*"
+        r"([0-9][0-9,\u00a0\u202f ]*)",
+        re.IGNORECASE,
+    )
+    label_re = re.compile(r"^\s*International\s+students\s*:?\s*$", re.IGNORECASE)
+
+    def parse_amount(text: str) -> int | None:
+        match = amount_re.search(text)
+        if match is None:
+            return None
+        raw = re.sub(r"[,\u00a0\u202f ]", "", match.group(1))
+        try:
+            value = int(raw)
+        except ValueError:
+            return None
+        return value if 2_000 <= value <= 250_000 else None
+
+    # A table row is the most reliable representation: require the label cell
+    # itself to be exactly "International students", then read only that row.
+    # This excludes a neighbouring Domestic students or levy row even when the
+    # table is flattened later.
+    for tag in section_tags:
+        if str(getattr(tag, "name", "") or "").lower() != "tr":
+            continue
+        cells = tag.find_all(["th", "td"], recursive=False)
+        if not cells:
+            continue
+        for cell_index, cell in enumerate(cells):
+            label = compact(cell.get_text(" ", strip=True))
+            if not label_re.fullmatch(label):
+                continue
+            row_text = compact(tag.get_text(" ", strip=True))
+            amount = parse_amount(row_text)
+            if amount is not None:
+                return amount, year, row_text
+            # Some tables put the label in one cell and a formatted amount in
+            # the next cell without repeating the label in the row text in
+            # browser-generated HTML.  Keep this fallback to immediate cells
+            # only; never search the entire table.
+            for value_cell in cells[cell_index + 1 :]:
+                amount = parse_amount(
+                    f"International students: {compact(value_cell.get_text(' ', strip=True))}"
+                )
+                if amount is not None:
+                    return amount, year, compact(value_cell.get_text(" ", strip=True))
+
+    # Non-table layouts generally keep the complete labelled value in one
+    # paragraph/list item/card.  Limit the text length and require the label
+    # at the beginning, so an ancestor containing multiple fee rows cannot
+    # join a domestic/levy amount to the international label.
+    for tag in section_tags:
+        tag_name = str(getattr(tag, "name", "") or "").lower()
+        if tag_name not in {"p", "li", "dt", "dd", "div", "span"}:
+            continue
+        text = compact(tag.get_text(" ", strip=True))
+        if len(text) > 300 or text.lower().count("international students") != 1:
+            continue
+        if not re.match(r"^\s*International\s+students\s*:?", text, re.IGNORECASE):
+            continue
+        amount = parse_amount(text)
+        if amount is not None:
+            return amount, year, text
+
+    return _MASSEY_NO_INTERNATIONAL_FEE
+
+
 async def extract(
     html: str, url: str, *, country: str | None = None
 ) -> list[ExtractionResult]:
@@ -2435,6 +2616,31 @@ async def extract(
     except Exception:  # noqa: BLE001 — defensive; keep extractor working
         prefer_yr1 = False
         require_explicit_intl_context = False
+
+    massey_fee = _from_massey_qualification_detail_fee(html, url)
+    if massey_fee is _MASSEY_NO_INTERNATIONAL_FEE:
+        return []
+    if isinstance(massey_fee, tuple):
+        amount, fee_year, row_text = massey_fee
+        context = (
+            "Fees and scholarships > "
+            f"{fee_year} tuition fees > {row_text}"
+        )
+        return [
+            ExtractionResult(
+                field_key="international_fee",
+                value=amount,
+                normalized={
+                    "international_fee": amount,
+                    "currency": "NZD",
+                    "fee_term": "Annual",
+                    "fee_year": fee_year,
+                },
+                confidence=0.99,
+                snippet=context[:240],
+                method="fee.massey_qualification_detail",
+            )
+        ]
 
     qut_fee = _from_qut_current_course_json(html, url)
     if qut_fee is _QUT_NO_CURRENT_COURSE_INTL_FEE:

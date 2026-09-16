@@ -4248,10 +4248,15 @@ async def extract_course(
                     # field as evidence too, so Gemini PRIMARY cannot detach an
                     # annual amount from its label and relabel it Full Course.
                     if (
-                        r.method.startswith("fee.audience_structural")
-                        and k == "fee_term"
-                        and k != r.field_key
-                    ):
+                        (
+                            r.method.startswith("fee.audience_structural")
+                            and k == "fee_term"
+                        )
+                        or (
+                            r.method == "fee.massey_qualification_detail"
+                            and k in {"currency", "fee_term", "fee_year"}
+                        )
+                    ) and k != r.field_key:
                         evidence.append(
                             {
                                 "field_key": k,
@@ -4270,7 +4275,9 @@ async def extract_course(
                     # structural extractor — which reads from an explicit DOM panel
                     # and has confidence ≥ 0.90 — should always win.
                     # _stage0_covered tracks exactly which fields Stage-0 wrote.
-                    if r.method.startswith("fee.audience_structural"):
+                    if r.method.startswith("fee.audience_structural") or (
+                        r.method == "fee.massey_qualification_detail"
+                    ):
                         payload[k] = v
                     elif (
                         _is_bond_page
@@ -8513,6 +8520,19 @@ async def extract_course(
                 )
             except Exception:  # noqa: BLE001
                 pass
+            # Massey's qualification detail page has an explicit,
+            # course-owned tuition row.  Its YAML central schedule remains a
+            # useful last resort for courses whose detail page is missing the
+            # row, but it must not replace a present detail tuple (amount,
+            # currency, term, year) with a potentially different central row.
+            _course_owned_massey_fee = any(
+                e.get("field_key") == "international_fee"
+                and e.get("method") == "fee.massey_qualification_detail"
+                and e.get("value") not in (None, "", 0)
+                for e in evidence
+            )
+            if _course_owned_massey_fee:
+                _central_fee_priority = False
             if (_fee_missing or _central_fee_priority) and _central_fees:
                 _course_name_for_fee = payload.get("course_name") or ""
                 _central_fee_exact_only = False
@@ -8529,6 +8549,7 @@ async def extract_course(
                     _central_fees,
                     degree_level=payload.get("degree_level"),
                     exact_only=_central_fee_exact_only,
+                    course_url=url,
                 )
                 if matched and _fee_confidence != "none":
                     _prog = matched.get("program_pattern", "?")
@@ -8549,6 +8570,13 @@ async def extract_course(
                             _bv = matched.get("international_fee")
                             if _bv not in (None, "", 0):
                                 payload["international_fee"] = _bv
+                                if _central_fee_priority:
+                                    _central_fee_year = matched.get("fee_year")
+                                    payload["fee_year"] = (
+                                        _central_fee_year
+                                        if _central_fee_year not in (None, "", 0)
+                                        else None
+                                    )
                                 for _bk, _bsk in (
                                     ("international_fee", "international_fee"),
                                     ("currency", "currency"),
@@ -8608,12 +8636,24 @@ async def extract_course(
                             0.55 if _fee_confidence == "high" else
                             0.45  # medium
                         )
+                        # A priority replacement owns the complete fee
+                        # tuple.  Do not leave a course-page year attached to
+                        # a central amount when the central record has no
+                        # corresponding year.
+                        if _central_fee_priority:
+                            _central_fee_year = matched.get("fee_year")
+                            payload["fee_year"] = (
+                                _central_fee_year
+                                if _central_fee_year not in (None, "", 0)
+                                else None
+                            )
                         _filled_fee_keys: list[str] = []
                         for _k, _src_k in (
                             ("international_fee", "international_fee"),
                             ("domestic_fee", "domestic_fee"),
                             ("currency", "currency"),
                             ("fee_term", "per"),
+                            ("fee_year", "fee_year"),
                         ):
                             _v = matched.get(_src_k)
                             if _v in (None, "", 0):
@@ -8622,7 +8662,12 @@ async def extract_course(
                                 payload.get(_k) not in (None, "", 0)
                                 and not (
                                     _central_fee_priority
-                                    and _k in {"international_fee", "currency", "fee_term"}
+                                    and _k in {
+                                        "international_fee",
+                                        "currency",
+                                        "fee_term",
+                                        "fee_year",
+                                    }
                                 )
                             ):
                                 continue

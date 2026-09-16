@@ -29,6 +29,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import unicodedata
 from typing import Any
 
 from app.services.scraper.extractors._text import html_to_text
@@ -2588,15 +2589,22 @@ def match_central_fee(
     *,
     threshold: float = 80.0,
     exact_only: bool = False,
+    course_url: str | None = None,
 ) -> tuple[CentralFeeRecord | None, str]:
     """Find the best-matching fee record for a course name.
 
     Returns ``(record, confidence)`` where *confidence* is one of:
       - ``"exact"``       — normalised names match exactly (score=100).
+        A catalogue URL/code slug join is also treated as exact because it
+        identifies the qualification without relaxing the name policy.
       - ``"high"``        — WRatio score ≥ 85 (very likely the same program).
       - ``"medium"``      — WRatio score ≥ 80 (plausible; used with a warning).
       - ``"bucket"``      — degree-level bucket fallback only (low precision).
       - ``"none"``        — no match found.
+
+    ``course_url`` is optional so callers with catalogue URLs can recover an
+    exact qualification-name join when a site appends its short qualification
+    code to the URL/title but not to the central fee row.
 
     **Algorithm change (was token_set_ratio):**
     ``token_set_ratio`` rewards any subset relationship with score=100
@@ -2771,6 +2779,42 @@ def match_central_fee(
                 rec.get("international_fee"),
             )
             return rec, "exact"
+
+    # Some catalogues put the qualification code only in the detail URL/title
+    # (for example Massey: ``bachelor-of-accountancy-UBACC`` and
+    # ``Bachelor of Accountancy – BAcc``), while the authoritative fee schedule
+    # contains the qualification name without that code.  This is deliberately
+    # a URL-slug exact join, not a relaxed name/fuzzy match: the URL must end in
+    # an all-uppercase code and the part before that code must equal the
+    # normalised central-row slug.  Keeping this separate from the fuzzy pass
+    # means ``exact_match_only`` remains safe for genuinely different names.
+    if course_url:
+        from urllib.parse import urlparse
+
+        path_slug = urlparse(course_url).path.rstrip("/").rsplit("/", 1)[-1]
+        code_match = re.fullmatch(
+            r"(?P<base>.+)-(?P<code>[A-Z][A-Z0-9&()/-]{1,20})",
+            path_slug,
+        )
+
+        def _fee_slug(value: str) -> str:
+            folded = unicodedata.normalize("NFKD", value)
+            ascii_text = folded.encode("ascii", "ignore").decode("ascii").lower()
+            ascii_text = ascii_text.replace("&", " and ")
+            return re.sub(r"-+", "-", re.sub(r"[^a-z0-9]+", "-", ascii_text)).strip("-")
+
+        if code_match:
+            url_base_slug = _fee_slug(code_match.group("base"))
+            for rec in central_fees:
+                pattern = rec.get("program_pattern") or ""
+                if pattern and _fee_slug(pattern) == url_base_slug:
+                    log.info(
+                        "[FEE match] course=%r matched_row=%r fee=%s confidence=exact_url_code",
+                        course_name,
+                        pattern,
+                        rec.get("international_fee"),
+                    )
+                    return rec, "exact"
 
     if exact_only:
         return None, "none"

@@ -27,6 +27,114 @@ def _run(coro):
     return asyncio.run(coro)
 
 
+def _massey_fee_page(rows: str, *, year: int = 2026) -> str:
+    return f"""
+    <html>
+      <body>
+        <main>
+          <h1>Bachelor of Accountancy</h1>
+          <h2>Fees and scholarships</h2>
+          <h3>{year} tuition fees</h3>
+          <table><tbody>{rows}</tbody></table>
+        </main>
+      </body>
+    </html>
+    """
+
+
+def test_massey_detail_fee_extracts_bachelor_accountancy_38080():
+    html = _massey_fee_page(
+        "<tr><th>International students:</th><td>$38,080</td></tr>"
+    )
+    out = _run(
+        fee.extract(
+            html,
+            "https://www.massey.ac.nz/study/all-qualifications-and-degrees/"
+            "bachelor-of-accountancy-UBACC/",
+        )
+    )
+
+    assert len(out) == 1
+    assert out[0].value == 38080
+    assert out[0].normalized == {
+        "international_fee": 38080,
+        "currency": "NZD",
+        "fee_term": "Annual",
+        "fee_year": 2026,
+    }
+    assert out[0].method == "fee.massey_qualification_detail"
+
+
+def test_massey_detail_fee_extracts_pg_dip_veterinary_science_59620():
+    html = _massey_fee_page(
+        "<tr><td>International students:</td><td>$59,620</td></tr>"
+    ).replace("Bachelor of Accountancy", "PGDip Veterinary Science")
+    out = _run(
+        fee.extract(
+            html,
+            "https://www.massey.ac.nz/study/all-qualifications-and-degrees/"
+            "postgraduate-diploma-veterinary-science-UUVT/",
+        )
+    )
+
+    assert len(out) == 1
+    assert out[0].value == 59620
+    assert out[0].normalized["currency"] == "NZD"
+    assert out[0].normalized["fee_term"] == "Annual"
+    assert out[0].normalized["fee_year"] == 2026
+
+
+def test_massey_detail_fee_excludes_student_services_levy():
+    html = _massey_fee_page(
+        """
+        <tr><td>International students:</td><td>$38,080</td></tr>
+        <tr><td>Student Services Levy:</td><td>$1,000</td></tr>
+        """
+    )
+    out = _run(
+        fee.extract(
+            html,
+            "https://www.massey.ac.nz/study/all-qualifications-and-degrees/"
+            "bachelor-of-accountancy-UBACC/",
+        )
+    )
+
+    assert len(out) == 1
+    assert out[0].value == 38080
+
+
+def test_massey_detail_fee_excludes_domestic_row():
+    html = _massey_fee_page(
+        "<tr><td>Domestic students:</td><td>$9,000</td></tr>"
+    )
+    out = _run(
+        fee.extract(
+            html,
+            "https://www.massey.ac.nz/study/all-qualifications-and-degrees/"
+            "bachelor-of-accountancy-UBACC/",
+        )
+    )
+
+    assert out == []
+
+
+def test_massey_detail_fee_has_no_effect_on_non_massey_pages():
+    html = _massey_fee_page(
+        "<tr><td>International students:</td><td>$38,080</td></tr>"
+    )
+    out = _run(
+        fee.extract(
+            html,
+            "https://www.example.ac.nz/study/all-qualifications-and-degrees/"
+            "bachelor-of-accountancy-UBACC/",
+        )
+    )
+
+    # The Massey-only pre-pass is inert; this deliberately generic page has
+    # no international tuition context outside the Massey hierarchy.
+    assert out == []
+
+
 def test_explicit_international_fee_meta_beats_domestic_csp_body_amounts():
     html = """
     <head>
