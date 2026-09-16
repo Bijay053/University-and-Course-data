@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import re
 from typing import Iterable
+from urllib.parse import urlparse
 
 from app.services.scraper.extractors._text import compact, html_to_text
 from app.services.scraper.extractors.base import ExtractionResult
@@ -2616,6 +2617,80 @@ async def extract(
     except Exception:  # noqa: BLE001 — defensive; keep extractor working
         prefer_yr1 = False
         require_explicit_intl_context = False
+
+    # APU publishes domestic and international totals side by side, with an
+    # indicative USD conversion in parentheses after the international MYR
+    # total.  This course-owned fact must beat the generic amount tournament
+    # (which can otherwise select the USD number or domestic total).
+    apu_url = urlparse(url or "")
+    if (
+        apu_url.netloc.lower() in {"apu.edu.my", "www.apu.edu.my"}
+        and re.match(r"^/course(?:/|$)", apu_url.path or "", re.I)
+    ):
+        try:
+            from bs4 import BeautifulSoup
+
+            soup = BeautifulSoup(html, "html.parser")
+            h1 = soup.find("h1")
+            owner = h1.find_parent("article") if h1 is not None else None
+            owner = owner or (h1.find_parent("main") if h1 is not None else None)
+            apu_blocks = (
+                owner.select("#feeCalcBlockContent, .fee-calc-text_container")
+                if owner is not None
+                else []
+            )
+            def _apu_visible(tag) -> bool:
+                cur = tag
+                while cur is not None and getattr(cur, "name", None) != "[document]":
+                    attrs = getattr(cur, "attrs", {}) or {}
+                    if str(attrs.get("aria-hidden", "")).lower() == "true":
+                        return False
+                    style = str(attrs.get("style", "")).replace(" ", "").lower()
+                    if "display:none" in style or "visibility:hidden" in style:
+                        return False
+                    markers = " ".join(
+                        [str(attrs.get("id", "")), *(str(x) for x in (attrs.get("class") or []))]
+                    ).lower()
+                    if re.search(r"(?:related|recommend|carousel|compare)", markers):
+                        return False
+                    cur = getattr(cur, "parent", None)
+                return True
+            apu_text = next(
+                (
+                    compact(block.get_text(" ", strip=True))
+                    for block in apu_blocks
+                    if _apu_visible(block)
+                ),
+                "",
+            )
+        except Exception:
+            apu_text = ""
+        apu_match = re.search(
+            r"\bInternational\s+RM\s*"
+            r"((?:\d{1,3}(?:,\d{3})+)|\d{4,7})\b"
+            r"(?=\s+(?:Total\s+for\s+International|International\b)|\s*\()",
+            apu_text,
+            re.I,
+        )
+        if apu_match is not None:
+            amount = _parse_amount(apu_match.group(1))
+            if amount is not None:
+                context = apu_text[max(0, apu_match.start() - 80):apu_match.end() + 100]
+                return [
+                    ExtractionResult(
+                        field_key="international_fee",
+                        value=amount,
+                        normalized={
+                            "international_fee": amount,
+                            "currency": "MYR",
+                            "fee_term": "Full Course",
+                            "fee_year": _extract_year(context),
+                        },
+                        confidence=0.99,
+                        snippet=f"APU course fee authority: {context[:240]}",
+                        method="fee:apu_course_authority",
+                    )
+                ]
 
     massey_fee = _from_massey_qualification_detail_fee(html, url)
     if massey_fee is _MASSEY_NO_INTERNATIONAL_FEE:

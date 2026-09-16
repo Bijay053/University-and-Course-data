@@ -44,6 +44,80 @@ def test_aut_points_override_incorrect_one_year_duration_metadata():
     assert out[0].method == "duration.aut_points"
 
 
+def test_apu_msc_computing_uses_first_course_details_duration_only():
+    html = """
+    <main>
+      <h1>Master of Science in Computing</h1>
+      <div id="course-details" class="tabs MAIN_CONTAINER">
+        <strong>Course Details</strong>
+        Full Time Part Time Duration 2 years Intake Date 30 November 2026
+        <p>Duration 3 years 6 months (Part-time)</p>
+        <p>Compare Course</p>
+      </div>
+      <section><h2>Modules</h2><p>Duration: 1 month (Full-time)</p></section>
+    </main>
+    """
+    out = _run(duration.extract(
+        html, "https://www.apu.edu.my/course/msc-in-computing"
+    ))
+    assert out[0].normalized == {"duration": 2.0, "duration_term": "Year"}
+    assert out[0].method == "duration:apu_course_authority"
+
+
+def test_apu_cyber_first_one_plus_year_beats_part_time_and_modules():
+    html = """
+    <main>
+      <h1>Master of Cyber Security (ODL)</h1>
+      <div id="course-details" class="tabs MAIN_CONTAINER">
+        <strong>Course Details</strong>
+        Full Time Part Time Duration 1+ year Intake Date 30 November 2026
+        <p>Duration 2 years 6 months (Part-time)</p>
+      </div>
+      <section><h2>Modules</h2><p>Duration: 4 months (Part-time)</p></section>
+    </main>
+    """
+    out = _run(duration.extract(
+        html, "https://www.apu.edu.my/course/msc-cyber-security-odl"
+    ))
+    assert out[0].normalized == {"duration": 1.0, "duration_term": "Year"}
+    assert out[0].method == "duration:apu_course_authority"
+
+
+def test_apu_duration_ignores_hidden_and_related_fake_blocks():
+    html = """
+    <article>
+      <h1>Master of Science in Computing</h1>
+      <div id="course-details" class="related-course" style="display:none">
+        Course Details Duration 9 years
+      </div>
+      <div class="course-details-block compare-carousel" aria-hidden="true">
+        Course Details Duration 8 years
+      </div>
+      <div id="course-details" class="tabs MAIN_CONTAINER">
+        Course Details Full Time Part Time Duration 2 years
+      </div>
+    </article>
+    """
+    out = _run(duration.extract(
+        html, "https://www.apu.edu.my/course/msc-in-computing"
+    ))
+    assert out[0].normalized["duration"] == 2.0
+
+
+def test_apu_duration_is_scoped_to_exact_host_and_course_path():
+    html = """
+    <article><h1>Course</h1>
+      <div id="course-details">Course Details Duration 2 years</div>
+    </article>
+    """
+    assert not any(r.method == "duration:apu_course_authority" for r in _run(duration.extract(
+        html, "https://example.apu.edu.my/course/msc-in-computing"
+    )))
+    assert not any(r.method == "duration:apu_course_authority" for r in _run(duration.extract(
+        html, "https://www.apu.edu.my/programmes/msc-in-computing"
+    )))
+
+
 def test_strong_duration_sibling_div_classifies_via_structural_pass():
     """ASA-style adjacent-div idiom: `<div><strong>Duration</strong>
     </div><div>3 years</div>`. Pre-fix the keyword fallback could

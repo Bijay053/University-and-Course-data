@@ -1613,6 +1613,10 @@ METHOD_AUTHORITY: dict[str, float] = {
     "ecu_pre_seed": _AUTHORITY_PRE_SEED,
     "uwa_static": _AUTHORITY_PRE_SEED,
     "curtin_static": _AUTHORITY_PRE_SEED,
+    # APU's current-course facts bar is stronger than generic AI/browser
+    # values; its amount, currency and full-course term are one atomic source.
+    "duration:apu_course_authority": _AUTHORITY_PRE_SEED,
+    "fee:apu_course_authority": _AUTHORITY_PRE_SEED,
     "unsw_static": _AUTHORITY_PRE_SEED,
 }
 
@@ -3737,6 +3741,9 @@ async def extract_course(
     # remain blank through all later AI/browser fallback passes.
     _apu_authoritative_location = False
     _apu_authoritative_empty_location = False
+    _apu_authoritative_fee = False
+    _apu_authoritative_duration = False
+    _apu_authoritative_values: dict[str, Any] = {}
     if extraction_rules:
         try:
             from app.services.scraper.ai_extractor_run import (
@@ -4271,6 +4278,12 @@ async def extract_course(
                 if r.value in (None, "", []):
                     _apu_authoritative_empty_location = True
                     payload["course_location"] = None
+            if r.method == "fee:apu_course_authority":
+                _apu_authoritative_fee = True
+                _apu_authoritative_values.update(r.normalized or {})
+            if r.method == "duration:apu_course_authority":
+                _apu_authoritative_duration = True
+                _apu_authoritative_values.update(r.normalized or {})
             evidence.append(
                 {
                     "field_key": r.field_key,
@@ -4302,6 +4315,14 @@ async def extract_course(
                             r.method == "fee.massey_qualification_detail"
                             and k in {"currency", "fee_term", "fee_year"}
                         )
+                        or (
+                            r.method == "fee:apu_course_authority"
+                            and k in {"currency", "fee_term", "fee_year"}
+                        )
+                        or (
+                            r.method == "duration:apu_course_authority"
+                            and k == "duration_term"
+                        )
                     ) and k != r.field_key:
                         evidence.append(
                             {
@@ -4323,6 +4344,10 @@ async def extract_course(
                     # _stage0_covered tracks exactly which fields Stage-0 wrote.
                     if r.method.startswith("fee.audience_structural") or (
                         r.method == "fee.massey_qualification_detail"
+                        or r.method in {
+                            "fee:apu_course_authority",
+                            "duration:apu_course_authority",
+                        }
                     ):
                         payload[k] = v
                     elif (
@@ -10148,6 +10173,18 @@ async def extract_course(
 
     if _scrape_warnings:
         payload["scrape_warnings"] = _scrape_warnings
+
+    # APU's current-course DOM blocks are atomic authorities.  Later Gemini,
+    # browser, and configured-default passes may have attempted to fill these
+    # slots, but must never detach or replace their normalized tuple.
+    if _apu_authoritative_fee:
+        for _key in ("international_fee", "currency", "fee_term", "fee_year"):
+            if _key in _apu_authoritative_values:
+                payload[_key] = _apu_authoritative_values[_key]
+    if _apu_authoritative_duration:
+        for _key in ("duration", "duration_term"):
+            if _key in _apu_authoritative_values:
+                payload[_key] = _apu_authoritative_values[_key]
 
     footer = build_course_page_provenance_footer(payload)
 

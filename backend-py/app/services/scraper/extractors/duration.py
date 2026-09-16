@@ -702,6 +702,83 @@ def _from_duration_meta(html: str) -> tuple[tuple[float, str], str] | None:
     return None
 
 
+def _from_apu_course_header(
+    html: str, url: str
+) -> tuple[tuple[float, str], str] | None:
+    """Read APU's current-course duration facts bar.
+
+    APU course pages repeat durations for related ODL courses and individual
+    modules in the same document.  Only the facts bar immediately following
+    the current H1 is course-owned; do not let the page-wide tournament choose
+    one of those later values.
+    """
+    parsed_url = urlparse(url or "")
+    if (
+        parsed_url.netloc.lower() not in {"apu.edu.my", "www.apu.edu.my"}
+        or not re.match(r"^/course(?:/|$)", parsed_url.path or "", re.I)
+    ):
+        return None
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:
+        return None
+    h1 = soup.find("h1")
+    if h1 is None:
+        return None
+    def visible(tag) -> bool:
+        cur = tag
+        while cur is not None and getattr(cur, "name", None) != "[document]":
+            attrs = getattr(cur, "attrs", {}) or {}
+            if str(attrs.get("aria-hidden", "")).lower() == "true":
+                return False
+            style = str(attrs.get("style", "")).replace(" ", "").lower()
+            if "display:none" in style or "visibility:hidden" in style:
+                return False
+            markers = " ".join(
+                [str(attrs.get("id", "")), *(str(x) for x in (attrs.get("class") or []))]
+            ).lower()
+            if re.search(r"(?:related|recommend|carousel|compare)", markers):
+                return False
+            cur = getattr(cur, "parent", None)
+        return True
+
+    owner = h1.find_parent("article") or h1.find_parent("main")
+    if owner is None:
+        return None
+    candidates = []
+    for candidate in owner.select("#course-details, .course-details-block"):
+        if not visible(candidate):
+            continue
+        text = compact(candidate.get_text(" ", strip=True))
+        if re.search(r"\bCourse\s+Details\b", text, re.I) and re.search(
+            r"\bDuration\b", text, re.I
+        ):
+            candidates.append(text)
+    if not candidates:
+        return None
+    # The first Duration after Course Details is the current programme value.
+    # ``1+ year`` is an APU notation for one year, not a range.  Do not
+    # consume the later part-time duration or module-duration labels.
+    match = re.search(
+        r"\bCourse\s+Details\b.{0,500}?\bDuration\b\s*:?\s*"
+        r"(\d+(?:\.\d+)?\s*\+?\s*(years?|months?))\b",
+        candidates[0],
+        re.I | re.S,
+    )
+    if not match:
+        return None
+    amount_match = re.search(r"\d+(?:\.\d+)?", match.group(1))
+    if amount_match is None:
+        return None
+    amount = float(amount_match.group(0))
+    unit = _normalise_unit(match.group(2))
+    if unit is None or amount <= 0 or amount > _DURATION_CAP[unit]:
+        return None
+    return (amount, unit), f"APU course header: {match.group(0)[:160]}"
+
+
 def _from_inti_duration_badge(
     html: str,
     url: str,
@@ -1002,6 +1079,20 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
                 confidence=0.99,
                 snippet=snippet,
                 method="duration.aut_points",
+            )
+        ]
+
+    apu_header = _from_apu_course_header(html, url)
+    if apu_header is not None:
+        (amount, unit), snippet = apu_header
+        return [
+            ExtractionResult(
+                field_key="duration",
+                value=amount,
+                normalized={"duration": amount, "duration_term": unit},
+                confidence=0.99,
+                snippet=snippet,
+                method="duration:apu_course_authority",
             )
         ]
 

@@ -42,6 +42,66 @@ def _massey_fee_page(rows: str, *, year: int = 2026) -> str:
     """
 
 
+def test_apu_course_fee_uses_international_myr_total_not_domestic_or_usd():
+    html = """
+    <main>
+      <h1>Master of Science in Artificial Intelligence</h1>
+      <section id="feeCalcBlockContent">
+        <p>Malaysian RM42,800 Total for Malaysian
+           International RM45,800 (USD12,050) Total for International</p>
+      </section>
+      <p>All fees payable in Ringgit Malaysia.</p>
+    </main>
+    """
+    out = _run(fee.extract(
+        html, "https://www.apu.edu.my/course/msc-in-artificial-intelligence"
+    ))
+    assert len(out) == 1
+    assert out[0].value == 45800
+    assert out[0].normalized["currency"] == "MYR"
+    assert out[0].normalized["fee_term"] == "Full Course"
+    assert out[0].method == "fee:apu_course_authority"
+
+
+def test_apu_fee_ignores_hidden_and_related_fake_blocks():
+    html = """
+    <article>
+      <h1>Master of Science in Computing</h1>
+      <section id="feeCalcBlockContent" class="related" style="display:none">
+        International RM99,999 (USD99,999) Total for International
+      </section>
+      <section class="fee-calc-text_container compare-carousel" aria-hidden="true">
+        International RM88,888 Total for International
+      </section>
+      <section id="feeCalcBlockContent">
+        Malaysian RM42,800 Total for Malaysian
+        International RM45,800 (USD12,050) Total for International
+      </section>
+    </article>
+    """
+    out = _run(fee.extract(
+        html, "https://www.apu.edu.my/course/msc-in-computing"
+    ))
+    assert out[0].value == 45800
+    assert out[0].normalized["currency"] == "MYR"
+
+
+def test_apu_fee_is_scoped_to_exact_host_and_course_path():
+    html = """
+    <article><h1>Course</h1>
+      <section id="feeCalcBlockContent">
+        International RM45,800 Total for International
+      </section>
+    </article>
+    """
+    assert not _run(fee.extract(
+        html, "https://example.apu.edu.my/course/msc-in-computing"
+    ))
+    assert not _run(fee.extract(
+        html, "https://www.apu.edu.my/programmes/msc-in-computing"
+    ))
+
+
 def test_massey_detail_fee_extracts_bachelor_accountancy_38080():
     html = _massey_fee_page(
         "<tr><th>International students:</th><td>$38,080</td></tr>"
