@@ -2152,6 +2152,34 @@ def _apply_ai_duration_mapping(payload: dict[str, Any], ai_filled: dict[str, Any
             payload["duration_term"] = ai_filled["duration_term"]
 
 
+def _restore_matching_static_duration_term(
+    payload: dict[str, Any],
+    static_pairs: list[tuple[Any, str]],
+) -> bool:
+    """Keep duration value and unit atomic after later field merges.
+
+    A later mapper may corrupt only ``duration_term`` while leaving the
+    deterministic duration value untouched. Restore a valid static unit only
+    when its paired numeric value still exactly matches the final payload.
+    """
+    current = payload.get("duration")
+    if current in (None, ""):
+        return False
+    try:
+        current_value = float(current)
+    except (TypeError, ValueError):
+        return False
+    for value, term in static_pairs:
+        try:
+            matches = float(value) == current_value
+        except (TypeError, ValueError):
+            continue
+        if matches and term in {"Year", "Month", "Week", "Semester", "Trimester"}:
+            payload["duration_term"] = term
+            return True
+    return False
+
+
 def _resolve_configured_english_defaults(
     payload: dict[str, Any],
     english_config: Any,
@@ -4345,6 +4373,7 @@ async def extract_course(
     except Exception as _ecu_exc:  # noqa: BLE001
         log.warning("ecu_static_extract pre-seed failed on %s: %s", url, _ecu_exc)
 
+    _static_duration_pairs: list[tuple[Any, str]] = []
     for module, extra_keys in _EXTRACTORS:
         kwargs: dict[str, Any] = {}
         for k in extra_keys:
@@ -4364,6 +4393,13 @@ async def extract_course(
             log.warning("Extractor %s failed on %s: %s", module.__name__, url, exc)
             continue
         for r in results:
+            if r.field_key == "duration" and r.normalized:
+                _duration_unit = r.normalized.get("duration_term")
+                _duration_value = r.normalized.get("duration")
+                if _duration_unit and _duration_value not in (None, ""):
+                    _static_duration_pairs.append(
+                        (_duration_value, str(_duration_unit))
+                    )
             if (
                 r.method in {
                     "location.otago_course_meta",
@@ -10043,6 +10079,7 @@ async def extract_course(
             )
 
     # ── Suspicious duration ─────────────────────────────────────────────────
+    _restore_matching_static_duration_term(payload, _static_duration_pairs)
     _dur_val = payload.get("duration")
     if _dur_val is not None:
         try:

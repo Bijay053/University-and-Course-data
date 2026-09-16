@@ -27,6 +27,7 @@ from app.services.scraper.extractors.sit_html import (
 )
 from app.services.scraper.pipelines.single_course import (
     _central_fee_match_has_usable_tuition,
+    _restore_matching_static_duration_term,
 )
 from app.services.scraper.url_identity import canonical_course_url_key
 
@@ -124,6 +125,25 @@ def test_sit_url_identity_collapses_case_and_space_encoding_variants():
     ) == canonical_course_url_key(
         "https://www.sit.ac.nz/programme/course/Bachelor%20of%20Commerce"
     )
+
+
+def test_static_duration_unit_is_restored_when_numeric_value_is_unchanged():
+    payload = {
+        "duration": 8.0,
+        "duration_term": "Graduate Diploma in Audio Production",
+    }
+    assert _restore_matching_static_duration_term(
+        payload, [(8.0, "Month")]
+    )
+    assert payload == {"duration": 8.0, "duration_term": "Month"}
+
+
+def test_static_duration_unit_does_not_override_a_replaced_duration():
+    payload = {"duration": 1.0, "duration_term": "Year"}
+    assert not _restore_matching_static_duration_term(
+        payload, [(8.0, "Month")]
+    )
+    assert payload == {"duration": 1.0, "duration_term": "Year"}
 
 
 def test_sit_yaml_uses_international_schedule_and_static_extraction():
