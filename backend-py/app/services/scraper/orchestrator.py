@@ -1222,6 +1222,41 @@ def _normalize_course_url(url: str | None) -> str:
     return canonical_course_url_key(url)
 
 
+def _resume_checkpoint_policy_allows(uni_config: object) -> bool:
+    """Return whether pending rows can safely satisfy resume checkpoints.
+
+    Rows staged by an older interrupted run do not retain enough provenance to
+    prove which central fee schedule supplied their fee. Universities that
+    require an exact central-schedule match must therefore re-extract rather
+    than inherit those rows.
+    """
+    extraction = getattr(uni_config, "extraction", None)
+    fees = getattr(extraction, "fees", None)
+    return not bool(
+        fees
+        and getattr(fees, "require_central_fee_match", False)
+        and getattr(fees, "central_page", None)
+    )
+
+
+async def _discard_bypassed_resume_rows(
+    db: AsyncSession, course_ids: list[int]
+) -> int:
+    """Delete exact superseded pending checkpoints after a clean replacement."""
+    if not course_ids:
+        return 0
+    from sqlalchemy import delete as _delete
+    from app.models.scraped_course import ScrapedCourse as _ScrapedCourse
+
+    result = await db.execute(
+        _delete(_ScrapedCourse).where(
+            _ScrapedCourse.id.in_(course_ids),
+            _ScrapedCourse.status == "pending",
+        )
+    )
+    return result.rowcount or 0
+
+
 async def _already_staged_checkpoint_rows(
     db: AsyncSession, university_id: int, *, current_job_id: str | None = None
 ) -> dict[str, tuple[int, str]]:
@@ -1671,6 +1706,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
     _GLOBAL_SLOT_KEY = "scrape:active_runs"
     # Must exist before any early stop path can call _finalize_stopped().
     _resume_already_staged = 0
+    _bypassed_resume_course_ids: list[int] = []
 
     async def _finalize_stopped() -> dict:
         """Mark the job as user-stopped and emit a terminal log row."""
@@ -5337,9 +5373,36 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             and links
         ):
             try:
-                _done_rows = await _already_staged_checkpoint_rows(
+                _candidate_rows = await _already_staged_checkpoint_rows(
                     db, job.university_id, current_job_id=runtime_job_id
                 )
+                _resume_allowed = _resume_checkpoint_policy_allows(_uni_cfg)
+                if _resume_allowed:
+                    _done_rows = _candidate_rows
+                else:
+                    _done_rows = {}
+                    (
+                        _bypassed_resume_keys,
+                        _bypassed_resume_course_ids,
+                        _bypassed_resume_source_jobs,
+                    ) = _matched_resume_provenance(
+                        links, _candidate_rows
+                    )
+                    log.info(
+                        "[RESUME] bypassed %d pending checkpoints for %s because "
+                        "the current recipe requires an exact central fee match",
+                        len(_bypassed_resume_course_ids),
+                        uni_name,
+                    )
+                    await emit(
+                        "status",
+                        "[RESUME] reprocessing prior rows to verify the required "
+                        "international fee schedule",
+                        phase="extract",
+                        kind="resume_checkpoint_bypassed_required_fee",
+                        bypassed_rows=len(_bypassed_resume_course_ids),
+                        remaining=len(links),
+                    )
                 _done_urls = set(_done_rows)
                 if _done_urls:
                     _before = len(links)
@@ -7354,6 +7417,23 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             job.status = _forced_status
         else:
             job.status = "completed" if finished_cleanly else "failed"
+        if job.status == "completed" and _bypassed_resume_course_ids:
+            _discarded_resume_rows = await _discard_bypassed_resume_rows(
+                db, _bypassed_resume_course_ids
+            )
+            log.info(
+                "[RESUME] discarded %d superseded pending checkpoint row(s) "
+                "after clean required-fee replacement",
+                _discarded_resume_rows,
+            )
+            await emit(
+                "status",
+                f"[RESUME] removed {_discarded_resume_rows} superseded review "
+                "row(s) after fee verification completed",
+                phase="complete",
+                kind="resume_checkpoint_rows_discarded",
+                discarded_rows=_discarded_resume_rows,
+            )
         # Always update progress counters from this run.
         # `_resume_already_staged` (Task #229 resume checkpoint, fixed after
         # a real QMUL bug report) folds courses skipped as already-staged

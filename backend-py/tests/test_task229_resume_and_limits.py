@@ -12,14 +12,17 @@ clause, and the Celery time-limit wiring is asserted against ``settings``.
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 
 import pytest
 
 from app.config import settings
 from app.services.scraper import rate_limiter
 from app.services.scraper.orchestrator import (
+    _discard_bypassed_resume_rows,
     _matched_resume_provenance,
     _normalize_course_url,
+    _resume_checkpoint_policy_allows,
 )
 
 
@@ -87,6 +90,56 @@ def test_resume_filter_noop_when_nothing_staged():
         if _normalize_course_url(lk.get("url")) not in done
     ]
     assert remaining == links
+
+
+def test_required_central_fee_recipe_reprocesses_resume_checkpoints():
+    config = SimpleNamespace(
+        extraction=SimpleNamespace(
+            fees=SimpleNamespace(
+                require_central_fee_match=True,
+                central_page="https://uni.example/international-fees",
+            )
+        )
+    )
+    assert _resume_checkpoint_policy_allows(config) is False
+
+
+def test_optional_fee_recipe_can_reuse_resume_checkpoints():
+    config = SimpleNamespace(
+        extraction=SimpleNamespace(
+            fees=SimpleNamespace(
+                require_central_fee_match=False,
+                central_page="https://uni.example/fees",
+            )
+        )
+    )
+    assert _resume_checkpoint_policy_allows(config) is True
+
+
+def test_discard_bypassed_resume_rows_is_exact_and_pending_only():
+    class _Result:
+        rowcount = 2
+
+    class _DB:
+        statement = None
+
+        async def execute(self, statement):
+            self.statement = statement
+            return _Result()
+
+    db = _DB()
+    assert _run(_discard_bypassed_resume_rows(db, [101, 202])) == 2
+    sql = str(db.statement.compile(compile_kwargs={"literal_binds": True}))
+    assert "scraped_courses.id IN (101, 202)" in sql
+    assert "scraped_courses.status = 'pending'" in sql
+
+
+def test_discard_bypassed_resume_rows_noops_for_empty_ids():
+    class _DB:
+        async def execute(self, statement):
+            raise AssertionError("empty cleanup must not execute SQL")
+
+    assert _run(_discard_bypassed_resume_rows(_DB(), [])) == 0
 
 
 def test_resume_provenance_records_only_checkpoint_rows_used_by_current_links():

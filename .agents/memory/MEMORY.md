@@ -143,3 +143,4 @@
 - [Release cleanup paths](release-cleanup-paths.md) — deployment EXIT traps must use absolute paths or reset cwd before restoring paused consumers.
 - [APU course delivery identity](apu-course-delivery-identity.md) — APU’s page-wide catalogue contaminates mode keywords; classify delivery from the current course title/H1/URL only.
 - [SIT course panel and fee authority](sit-course-panel-fee-authority.md) — compact to the current programme panel; central international tuition excludes resource fees and requires exact award matching.
+- [Required-fee resume checkpoints](required-fee-resume-checkpoints.md) — exact central-fee recipes must reprocess unproven pending checkpoints and retire only matched rows after clean completion.
