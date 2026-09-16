@@ -15,6 +15,7 @@ locked_config_paths:
   - extraction.fees.prefer_international
   - extraction.fees.central_fee_priority
   - extraction.fees.central_fee_exact_match_only
+  - extraction.fees.require_central_fee_match
   - extraction.fees.discard_domestic_fee
   - extraction.fees.reject_keywords
 
@@ -29,6 +30,7 @@ extraction:
     prefer_international: true
     central_fee_priority: true
     central_fee_exact_match_only: true
+    require_central_fee_match: true
     discard_domestic_fee: true
     reject_keywords:
       - Zero Fees

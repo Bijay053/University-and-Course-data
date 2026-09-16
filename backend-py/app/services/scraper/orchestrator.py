@@ -206,6 +206,15 @@ def _extraction_failure_details(
             ),
             "retryable": True,
         }
+    if normalized == "central_fee_schedule_unavailable":
+        return {
+            "reason": "central_fee_schedule_unavailable",
+            "detail": (
+                "The authoritative international programme fee schedule was "
+                "unavailable; retry when the central source can be fetched."
+            ),
+            "retryable": True,
+        }
     if normalized.startswith("fetch") or "fetch_failed" in normalized:
         return {
             "reason": "fetch_failed",

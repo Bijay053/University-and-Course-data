@@ -1,6 +1,7 @@
 import asyncio
 
 from app.services.scraper.config.loader import load_uni_config
+from app.services.scraper.orchestrator import _extraction_failure_details
 from app.services.scraper.central_pages import _parse_fee_page_html, match_central_fee
 from app.services.scraper.extractors import (
     duration,
@@ -90,6 +91,7 @@ def test_sit_yaml_uses_international_schedule_and_static_extraction():
     assert cfg.extraction.max_parallel_fetch == 6
     assert cfg.extraction.fees.central_fee_priority is True
     assert cfg.extraction.fees.central_fee_exact_match_only is True
+    assert cfg.extraction.fees.require_central_fee_match is True
     assert cfg.extraction.fees.currency_override == "NZD"
     assert "Direct Material Costs" in cfg.extraction.fees.reject_keywords
 
@@ -145,3 +147,9 @@ def test_sit_template_drift_returns_bounded_page_without_contact_chrome():
     compacted = compact_course_html(html)
     assert "Bachelor of Testing" in compacted
     assert "0800 4 0" not in compacted
+
+
+def test_sit_central_schedule_outage_is_classified_for_recovery():
+    details = _extraction_failure_details("central_fee_schedule_unavailable")
+    assert details["reason"] == "central_fee_schedule_unavailable"
+    assert details["retryable"] is True

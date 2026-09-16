@@ -8706,6 +8706,34 @@ async def extract_course(
     # fees (lower than every earlier stage) and 0.50 for English requirements
     # (central admissions pages are authoritative for English policy, but we
     # still want course-page data and sibling cache to win when present).
+    try:
+        _fee_policy_cfg = get_uni_config()
+        _require_central_fee_match = bool(
+            _fee_policy_cfg
+            and _fee_policy_cfg.extraction.fees.require_central_fee_match
+        )
+    except Exception:  # noqa: BLE001
+        _fee_policy_cfg = None
+        _require_central_fee_match = False
+    if _require_central_fee_match and not (
+        central_data and central_data.get("fees")
+    ):
+        if emit:
+            await emit(
+                "error",
+                "Authoritative international fee schedule unavailable",
+                phase="fallback",
+                kind="central_fee_schedule_unavailable",
+                url=url,
+            )
+        return {
+            "url": url,
+            "error": "central_fee_schedule_unavailable",
+            "retryable": True,
+            "payload": {},
+            "evidence": evidence,
+        }
+
     if central_data:
         try:
             from app.services.scraper.central_pages import match_central_fee
@@ -8723,6 +8751,7 @@ async def extract_course(
             _fee_slots = ("international_fee", "domestic_fee", "currency", "fee_term", "fee_year")
             _fee_missing = any(payload.get(k) in (None, "", 0) for k in ("international_fee",))
             _central_fee_priority = False
+            _central_fee_match_found = False
             try:
                 _priority_cfg = get_uni_config()
                 _central_fee_priority = bool(
@@ -8763,6 +8792,7 @@ async def extract_course(
                     course_url=url,
                 )
                 if matched and _fee_confidence != "none":
+                    _central_fee_match_found = True
                     _prog = matched.get("program_pattern", "?")
                     if _fee_confidence == "bucket":
                         # Check per-uni YAML opt-in: allow_bucket_match
@@ -8911,8 +8941,25 @@ async def extract_course(
                                 filled=_filled_fee_keys,
                             )
 
+            if _require_central_fee_match and not _central_fee_match_found:
+                if emit:
+                    await emit(
+                        "status",
+                        "Skipped: programme is not listed in the authoritative "
+                        "international fee schedule",
+                        phase="fallback",
+                        kind="central_fee_schedule_no_match",
+                        url=url,
+                    )
+                return {
+                    "url": url,
+                    "error": "skipped:not_listed_in_international_fee_schedule",
+                    "skip_reason": "central_fee_schedule_no_match",
+                    "payload": {},
+                    "evidence": evidence,
+                }
+
             try:
-                _fee_policy_cfg = get_uni_config()
                 _discard_domestic = bool(
                     _fee_policy_cfg
                     and _fee_policy_cfg.extraction.fees.discard_domestic_fee

@@ -13,4 +13,4 @@ SIT’s central international schedule is the tuition authority. Use its Tuition
 
 **Why:** Course pages advertise domestic Zero Fees and direct material costs. The schedule’s total combines tuition and resource costs, while fuzzy matching can map certificates to diplomas or unrelated awards.
 
-**How to apply:** Central tuition may override local amounts only after an exact programme match. Unmatched titles remain blank for review rather than inheriting a nearby award’s price.
+**How to apply:** Central tuition may override local amounts only after an exact programme match. A course absent from the populated international schedule is not eligible for staging; a schedule fetch failure remains retryable.

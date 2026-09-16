@@ -2163,6 +2163,16 @@ class FeesConfig(BaseModel):
             "or domestic amounts and the central schedule is authoritative."
         ),
     )
+    require_central_fee_match: bool = Field(
+        default=False,
+        description=(
+            "When true, a course is eligible only when it matches a row in the "
+            "configured central international fee schedule. An unavailable or "
+            "empty schedule is retryable; a populated schedule with no course "
+            "match skips the course. Use only when the schedule is also the "
+            "institution's authoritative international programme catalogue."
+        ),
+    )
     discard_domestic_fee: bool = Field(
         default=False,
         description=(
