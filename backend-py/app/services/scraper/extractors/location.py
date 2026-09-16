@@ -1645,6 +1645,32 @@ def _from_uow_campus_select(soup: BeautifulSoup) -> str | None:
 async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG001
     if not html:
         return []
+
+    # APU's course identity is the authority for delivery and campus.  The
+    # site-wide course shell contains related ODL links and campus menus, so
+    # letting the generic location cascade inspect it produces either a
+    # synthetic campus on ODL pages or unrelated navigation text.  Keep this
+    # local import to avoid a location <-> study_mode module cycle.
+    try:
+        from app.services.scraper.extractors.study_mode import extract_apu_course_mode
+        _apu_mode, _apu_snippet = extract_apu_course_mode(html, url)
+    except Exception:  # pragma: no cover - defensive import/parser guard
+        _apu_mode, _apu_snippet = None, None
+    if _apu_mode:
+        _apu_location = "Kuala Lumpur" if _apu_mode == "On Campus" else None
+        return [
+            ExtractionResult(
+                field_key="course_location",
+                value=_apu_location,
+                normalized={"course_location": _apu_location},
+                confidence=1.0,
+                method="location:apu_course_authority",
+                snippet=(
+                    f"{_apu_snippet}; course_location="
+                    f"{_apu_location or '(none: explicit ODL)'}"
+                ),
+            )
+        ]
     soup = BeautifulSoup(html, "html.parser")
 
     # Otago qualification metadata outranks every structural/text/AI-derived

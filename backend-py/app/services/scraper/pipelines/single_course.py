@@ -1656,6 +1656,7 @@ _STRUCTURAL_COURSE_PAGE_PREFIXES: tuple[str, ...] = (
     "course_name.",    # course_name.h1, course_name.title, …
     "description.",    # description.meta, description.og, …
     "study_mode:",     # study_mode:rule — reads explicit Delivery/Mode label
+    "location:",       # location:apu_course_authority — APU course identity
     "location.",       # location.strong, location.structured, …
     "intake.",         # intake.structural, intake.summary_start, intake.session_names,
                        # intake.semester, intake.ecu_semester, intake.campus_pivot —
@@ -3732,6 +3733,10 @@ async def extract_course(
     # Authoritative-empty Otago metadata is distinct from an absent tag:
     # preserve the blank through AI/default fallbacks.
     _otago_authoritative_empty: set[str] = set()
+    # Explicit APU ODL is course-owned negative location evidence.  It must
+    # remain blank through all later AI/browser fallback passes.
+    _apu_authoritative_location = False
+    _apu_authoritative_empty_location = False
     if extraction_rules:
         try:
             from app.services.scraper.ai_extractor_run import (
@@ -4258,6 +4263,14 @@ async def extract_course(
                 # Clear a weaker Stage-0 value immediately; normalized fields
                 # intentionally skip None below, so this must be explicit.
                 payload[r.field_key] = None
+            if (
+                r.method == "location:apu_course_authority"
+                and r.field_key == "course_location"
+            ):
+                _apu_authoritative_location = True
+                if r.value in (None, "", []):
+                    _apu_authoritative_empty_location = True
+                    payload["course_location"] = None
             evidence.append(
                 {
                     "field_key": r.field_key,
@@ -4331,7 +4344,13 @@ async def extract_course(
                         # Otago's course-owned metadata is authoritative even
                         # when a weaker Stage-0 regex/AI guess wrote first.
                         payload[k] = v
-                    elif r.method.startswith("location.") and k in _stage0_covered:
+                    elif (
+                        (
+                            r.method.startswith("location.")
+                            or r.method.startswith("location:")
+                        )
+                        and k in _stage0_covered
+                    ):
                         payload[k] = v  # structural extractor overrides Stage-0 guess
                     else:
                         # First-write-wins so the highest-confidence result (which
@@ -5517,6 +5536,10 @@ async def extract_course(
                 if (
                     _gp_k in _otago_authoritative_empty
                     or (
+                        _apu_authoritative_empty_location
+                        and _gp_k in ("course_location", "location_text")
+                    )
+                    or (
                         _gp_k == "location_text"
                         and "course_location" in _otago_authoritative_empty
                     )
@@ -5661,6 +5684,12 @@ async def extract_course(
                     continue
 
                 if _gp_k == "course_location":
+                    if _apu_authoritative_empty_location:
+                        log.info(
+                            "[APU LOC BLOCK] suppressing AI course_location on explicit ODL page %s",
+                            url,
+                        )
+                        continue
                     # BCU hard block: NEVER allow Gemini PRIMARY to set
                     # course_location for bcu.ac.uk pages.  The structural
                     # cascade (_from_bcu_keyfacts) is the ONLY permitted
@@ -5884,6 +5913,14 @@ async def extract_course(
             await maybe_browser_refetch(url, payload, emit=emit, force=_force)
         )
         for k, v in browser_filled.items():
+            # Explicit APU ODL has authoritative negative location evidence.
+            # Protect both canonical and Gemini/browser alias keys even when
+            # the browser pass is in forced-override mode.
+            if _apu_authoritative_location and k in (
+                "course_location",
+                "location_text",
+            ):
+                continue
             if k in _otago_authoritative_empty or (
                 k == "location_text"
                 and "course_location" in _otago_authoritative_empty
@@ -7846,6 +7883,11 @@ async def extract_course(
         # nothing, the field stays blank — no AI fallback for location on BCU.
         _is_bcu_host_fb = "bcu.ac.uk" in (url or "").lower()
         for k, v in ai_filled.items():
+            if (
+                _apu_authoritative_empty_location
+                and k in ("location_text", "course_location")
+            ):
+                continue
             if k in _otago_authoritative_empty or (
                 k == "location_text" and "course_location" in _otago_authoritative_empty
             ):

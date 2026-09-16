@@ -113,6 +113,29 @@ def test_apu_authority_is_scoped_to_course_paths_and_host():
     ) == (None, None)
 
 
+def test_apu_location_authority_never_reads_related_campus_or_odl_nav():
+    from app.services.scraper.extractors import location
+
+    html = """
+    <title>Master of Science | APU</title>
+    <nav>Kuala Lumpur · Online Learning · ODL</nav>
+    <main><h1>Master of Science</h1>
+      <p>Related course: Master of Science (ODL)</p>
+    </main>
+    """
+    standard = asyncio.run(location.extract(
+        html, "https://www.apu.edu.my/course/master-of-science"
+    ))
+    assert standard[0].value == "Kuala Lumpur"
+    odl = asyncio.run(location.extract(
+        html.replace("<title>Master of Science | APU</title>",
+                     "<title>Master of Science (ODL) | APU</title>")
+        .replace("<h1>Master of Science</h1>", "<h1>Master of Science (ODL)</h1>"),
+        "https://www.apu.edu.my/course/master-of-science-odl",
+    ))
+    assert odl[0].value is None
+
+
 # --- Bug G regression tests --------------------------------------------------
 
 
@@ -792,6 +815,11 @@ async def test_apu_full_pipeline_keeps_standard_masters_and_rejects_odl():
     standard_payload = standard["payload"]
     standard_payload["international_fee"] = 50000
     assert standard_payload["study_mode"] == "On Campus"
+    assert standard_payload["course_location"] == "Kuala Lumpur"
+    assert any(
+        row.get("method") == "location:apu_course_authority"
+        for row in standard["evidence"]
+    )
     assert should_stage_course(
         standard_payload["course_name"], standard_payload, standard_url
     ) == (True, "accepted")
@@ -811,6 +839,12 @@ async def test_apu_full_pipeline_keeps_standard_masters_and_rejects_odl():
     )
     odl_payload = odl["payload"]
     assert odl_payload["study_mode"] == "Online"
+    assert odl_payload.get("course_location") in (None, "")
+    assert any(
+        row.get("method") == "location:apu_course_authority"
+        and row.get("value") in (None, "")
+        for row in odl["evidence"]
+    )
     assert odl_payload["online_only"] is True
     assert should_stage_course(odl_payload["course_name"], odl_payload, odl_url) == (
         False,
