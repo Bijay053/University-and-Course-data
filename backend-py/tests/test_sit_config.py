@@ -101,6 +101,10 @@ def test_sit_yaml_uses_international_schedule_and_static_extraction():
     )
     assert cfg.extraction.skip_per_course_browser is True
     assert cfg.extraction.max_parallel_fetch == 6
+    assert cfg.discovery.allow_url_patterns == ["/Programme/Course/[^/?#]+"]
+    assert cfg.discovery.course_detail_url_patterns == [
+        "/Programme/Course/[^/?#]+"
+    ]
     assert cfg.extraction.fees.central_fee_priority is True
     assert cfg.extraction.fees.central_fee_exact_match_only is True
     assert cfg.extraction.fees.require_central_fee_match is True

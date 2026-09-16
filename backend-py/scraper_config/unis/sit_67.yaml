@@ -20,6 +20,12 @@ locked_config_paths:
   - extraction.fees.discard_domestic_fee
   - extraction.fees.reject_keywords
 
+discovery:
+  allow_url_patterns:
+    - /Programme/Course/[^/?#]+
+  course_detail_url_patterns:
+    - /Programme/Course/[^/?#]+
+
 extraction:
   max_parallel_fetch: 6
   skip_per_course_browser: true
