@@ -481,13 +481,21 @@ def _catalogue_floor_guard(
     expected_min_courses: int | None,
     targeted_retry: bool = False,
 ) -> dict[str, Any] | None:
-    """Classify a full scrape that finishes below its configured catalogue floor."""
+    """Classify an empty or below-floor full scrape before finalizing status."""
     expected = int(expected_min_courses or 0)
-    if targeted_retry or expected <= 0:
+    if targeted_retry:
         return None
 
+    # A run which discovered URLs but extracted/staged none is never an
+    # ordinary success, even when the university has not configured an
+    # expected_min_courses floor.  Previously the expected-floor early return
+    # let a 100% post-discovery filter drop finish as ``completed``.  Keep the
+    # configured-floor behaviour for a genuine zero-discovery run; the caller's
+    # earlier discovery guard handles the no-floor zero-discovery case.
     collapsed = extractable == 0 or staged == 0
-    if not collapsed and extractable >= expected:
+    if raw_discovered <= 0 and expected <= 0:
+        return None
+    if not collapsed and (expected <= 0 or extractable >= expected):
         return None
     return {
         "status": "failed_degraded" if collapsed else "completed_with_warnings",
@@ -496,7 +504,11 @@ def _catalogue_floor_guard(
         "message": (
             f"Catalogue coverage below configured minimum: {raw_discovered} raw candidates "
             f"became {extractable} extractable URLs and {staged} staged courses; "
-            f"expected at least {expected}. "
+            + (
+                f"expected at least {expected}. "
+                if expected
+                else "no configured catalogue floor was present. "
+            )
             + (
                 "Discovery/filter collapse detected; existing published and Review rows "
                 "were left unchanged."
@@ -1852,6 +1864,22 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             db_scrape_config=uni_scrape_config,
         )
         set_uni_config(_uni_cfg)
+        # Preserve the filter configuration that was actually used by this
+        # run. Diagnostics must not silently substitute a newer admin/YAML
+        # config when an operator edits the university while a scrape is in
+        # flight (the generic portal recovery case).
+        _filter_config_snapshot = {
+            "allow_url_patterns": list(_uni_cfg.discovery.allow_url_patterns or []),
+            "must_contain": list(_uni_cfg.discovery.must_contain or []),
+            "block_url_patterns": list(_uni_cfg.discovery.block_url_patterns or []),
+            "course_detail_url_patterns": list(
+                _uni_cfg.discovery.course_detail_url_patterns or []
+            ),
+        }
+        _start_dc = dict(job.discovered_config or {})
+        _start_dc["filter_config"] = _filter_config_snapshot
+        job.discovered_config = _start_dc
+        await db.commit()
         # Task #233: start a fresh per-run browser-only tally (see
         # per_course_browser.reset_browser_only_hosts).  Reset here — at run
         # start, alongside set_uni_config — so a prior run on the same Celery
@@ -4226,7 +4254,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         _r = _bdd["rule"]
                         _block_pat_counts[_r] = _block_pat_counts.get(_r, 0) + 1
                     _block_dropped_sample = [_bdd["url"] for _bdd in _block_dropped_detail[:10]]
-                    _filter_dropped_sample = list(_block_dropped_sample)
+                    _filter_dropped_sample.extend(_block_dropped_sample)
                     log.info(
                         "[EXTRACT] block_url_patterns: dropped %d / %d blocked URLs (%d remain)",
                         _block_dropped_a5b, _pre_block_a5b, len(links),
@@ -4242,6 +4270,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         drop_pct=_block_drop_pct,
                         dropped_sample=_block_dropped_sample,
                         pattern_breakdown=_block_pat_counts,
+                        patterns=_block_pats_raw_a5b,
                     )
 
         # Phase A.5b — per-uni YAML allow_url_patterns whitelist.
@@ -4281,7 +4310,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     _dropped_sample_urls = [
                         _lk.get("url", "") for _lk in _dropped_links[:10] if _lk.get("url")
                     ]
-                    _filter_dropped_sample = list(_dropped_sample_urls)
+                    _filter_dropped_sample.extend(_dropped_sample_urls)
                     _log_fn = log.warning if _drop_pct > 50 else log.info
                     _log_fn(
                         "[EXTRACT] allow_url_patterns: kept %d / %d (dropped %d = %.0f%% of discovered URLs)%s",
@@ -4311,6 +4340,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         kept=len(links),
                         drop_pct=round(_drop_pct, 1),
                         dropped_sample=_dropped_sample_urls,
+                        patterns=_allow_pats_raw,
                     )
 
         # Phase A.5b — per-uni YAML must_contain substring whitelist.
@@ -4344,6 +4374,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     for _lk in _links_before_mc
                     if not any(_sub in (_lk.get("url") or "").lower() for _sub in _mc_lower)
                 ]
+                _filter_dropped_sample.extend(_dropped_urls[:10])
                 for _du in _dropped_urls[:20]:
                     log.info("[EXTRACT] must_contain drop: %s", _du)
                 if len(_dropped_urls) > 20:
@@ -4361,6 +4392,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     dropped=_mc_dropped,
                     kept=len(links),
                     dropped_sample=_dropped_urls[:5],
+                    patterns=_must_contain_raw,
                 )
 
         # Phase A.5c — per-uni YAML course_detail_url_patterns final extraction gate.
@@ -4412,6 +4444,9 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 links = _cdp_kept
                 _cdp_n_dropped = _pre_cdp - len(links)
                 if _cdp_n_dropped:
+                    _filter_dropped_sample.extend(
+                        d.get("url", "") for d in _cdp_dropped[:10] if d.get("url")
+                    )
                     _cdp_drop_pct = (_cdp_n_dropped / _pre_cdp * 100) if _pre_cdp else 0
                     log.info(
                         "[EXTRACT] course_detail_url_patterns: kept %d / %d"
@@ -4429,6 +4464,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         kept=len(links),
                         drop_pct=round(_cdp_drop_pct, 1),
                         dropped_sample=[d.get("url", "") for d in _cdp_dropped[:5]],
+                        patterns=_cdp_raw,
                     )
 
         # Phase A.5c — Known canonical course-path aliases before extraction ─────
@@ -4912,6 +4948,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             "filter_drop_count": _raw - len(links),
             "filter_drop_pct": round((_raw - len(links)) / _raw * 100) if _raw else 0,
             "dropped_sample": _filter_dropped_sample[:10],
+            "filter_config": _dc.get("filter_config") or {},
             "non_degree_prefetch_skipped": _non_degree_prefetch_count,
             "non_degree_prefetch_sample": _non_degree_prefetch_sample,
             "non_degree_browser_launches_avoided": _non_degree_prefetch_count,
@@ -7140,6 +7177,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             html_compaction=_html_compaction_stats or None,
             phase_timings=_phase_timings,
             catalogue_guard=_catalogue_guard,
+            pipeline_stats=_dc.get("pipeline_stats"),
             level="success" if not _catalogue_guard else _catalogue_guard["level"],
         )
         await emit(

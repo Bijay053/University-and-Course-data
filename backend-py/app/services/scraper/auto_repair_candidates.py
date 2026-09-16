@@ -13,8 +13,10 @@ Problem classes handled:
 
 from __future__ import annotations
 
-import re
+import hashlib
+import json
 import logging
+import re
 from dataclasses import dataclass, field, asdict
 from urllib.parse import urlparse
 
@@ -32,6 +34,103 @@ _ASSET_PATH_RE = re.compile(
     r"/(images?|assets?|globalassets|static|media|uploads?|files?|fonts?|icons?|styles?|scripts?)/",
     re.IGNORECASE,
 )
+
+_FILTER_CONFIG_KEYS = (
+    "allow_url_patterns",
+    "must_contain",
+    "block_url_patterns",
+    "course_detail_url_patterns",
+)
+
+
+def normalized_filter_config(config: dict | None) -> dict[str, list[str]]:
+    """Return the canonical filter-only snapshot used for CAS comparisons."""
+    source = config or {}
+    def _values(value: object) -> list[object]:
+        if value is None:
+            return []
+        if isinstance(value, (list, tuple)):
+            return list(value)
+        return [value]
+
+    return {
+        key: [str(value) for value in _values(source.get(key)) if value is not None]
+        for key in _FILTER_CONFIG_KEYS
+    }
+
+
+def filter_config_fingerprint(config: dict | None) -> str:
+    """Return a stable SHA-256 fingerprint for a canonical filter snapshot."""
+    payload = json.dumps(
+        normalized_filter_config(config),
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def filter_config_drifted(
+    run_filter_config: dict | None,
+    current_filter_config: dict | None,
+) -> bool:
+    """Return whether the live filter config differs from the config that ran."""
+    if not run_filter_config:
+        return False
+    run = normalized_filter_config(run_filter_config)
+    current = normalized_filter_config(current_filter_config)
+    return any(
+        run[key] != current[key]
+        for key in _FILTER_CONFIG_KEYS
+    )
+
+
+def filter_repair_safety_issue(
+    run_filter_config: dict | None,
+    current_filter_config: dict | None,
+    *,
+    snapshot_present: bool | None = None,
+) -> str | None:
+    """Explain why stale run-time rules must not produce clear-filter recipes."""
+    if snapshot_present is False or (snapshot_present is None and not run_filter_config):
+        return (
+            "This job has no run-start URL-filter snapshot. No filter-clearing "
+            "recommendation is safe for a legacy job without compare-and-swap evidence."
+        )
+    if snapshot_present is True:
+        has_drift = normalized_filter_config(run_filter_config) != normalized_filter_config(
+            current_filter_config
+        )
+    else:
+        has_drift = filter_config_drifted(run_filter_config, current_filter_config)
+    if not has_drift:
+        return None
+    return (
+        "The job used a different URL-filter config than the current live config. "
+        "No filter-clearing recommendation is safe until the operator confirms "
+        "which run-start rules should be restored."
+    )
+
+
+def strip_stale_filter_suggestions(
+    suggested_config: dict,
+    safety_issue: str | None,
+) -> dict:
+    """Remove URL-filter recipes from AI output when the run snapshot is stale."""
+    if not safety_issue or not isinstance(suggested_config, dict):
+        return suggested_config
+    discovery = suggested_config.get("discovery")
+    if not isinstance(discovery, dict):
+        return suggested_config
+    filter_keys = set(_FILTER_CONFIG_KEYS)
+    safe_discovery = {
+        key: value for key, value in discovery.items() if key not in filter_keys
+    }
+    sanitized = dict(suggested_config)
+    if safe_discovery:
+        sanitized["discovery"] = safe_discovery
+    else:
+        sanitized.pop("discovery", None)
+    return sanitized
 
 
 def _is_course_url(url: str) -> bool:
@@ -227,6 +326,7 @@ class AutoRepairEngine:
         imported: int,
         historical_urls: list[str],
         pipeline_stats: dict,
+        current_course_detail_pats: list[str] | None = None,
         dropped_sample: list[str] | None = None,
     ):
         self.uni_id = uni_id
@@ -235,6 +335,7 @@ class AutoRepairEngine:
         self.allow_pats = current_allow_pats
         self.must_contain = current_must_contain
         self.block_pats = current_block_pats
+        self.course_detail_pats = current_course_detail_pats or []
         self.raw_discovered = raw_discovered
         self.after_filter = after_filter
         self.imported = imported
@@ -260,9 +361,9 @@ class AutoRepairEngine:
             and self.block_dropped_count > self.pre_block_discovered * 0.80
         ):
             return "block_catastrophic"
-        if self.raw_discovered > 5 and self.after_filter == 0:
+        if self.raw_discovered > 0 and self.after_filter == 0:
             return "url_filter_drop"
-        if self.raw_discovered > 5 and self.after_filter < self.raw_discovered * 0.5:
+        if self.raw_discovered > 0 and self.after_filter < self.raw_discovered * 0.5:
             return "partial_filter"
         if self.raw_discovered == 0:
             return "low_discovery"
@@ -291,15 +392,20 @@ class AutoRepairEngine:
         allow_pats: list[str],
         must_contain: list[str],
         block_pats: list[str],
+        course_detail_pats: list[str] | None = None,
+        *,
+        sample_urls: list[str] | None = None,
     ) -> SimulationResult:
         """Apply a candidate filter config to historical URLs and measure the effect."""
-        urls = self.historical_urls
+        urls = self.historical_urls if sample_urls is None else sample_urls
         hist_count = len(urls)
         total_raw = self.raw_discovered
 
         # ── No historical data — estimate from job stats ─────────────────────
         if not urls:
-            has_any_filter = bool(allow_pats or must_contain or block_pats)
+            has_any_filter = bool(
+                allow_pats or must_contain or block_pats or course_detail_pats
+            )
             if not has_any_filter:
                 # Clearing all filters → all raw_discovered URLs would pass
                 return SimulationResult(
@@ -330,13 +436,17 @@ class AutoRepairEngine:
 
         cur_allow = _compile(self.allow_pats)
         cur_block = _compile(self.block_pats)
+        cur_detail = _compile(self.course_detail_pats)
         cur_mc = [m.lower() for m in self.must_contain if m]
 
         new_allow = _compile(allow_pats)
         new_block = _compile(block_pats)
+        new_detail = _compile(
+            self.course_detail_pats if course_detail_pats is None else course_detail_pats
+        )
         new_mc = [m.lower() for m in must_contain if m]
 
-        def _passes(url: str, a_pats, mc, b_pats) -> bool:
+        def _passes(url: str, a_pats, mc, b_pats, detail_pats) -> bool:
             ul = url.lower()
             if a_pats and not any(p.search(url) for p in a_pats):
                 return False
@@ -344,12 +454,22 @@ class AutoRepairEngine:
                 return False
             if b_pats and any(p.search(url) for p in b_pats):
                 return False
+            if detail_pats and not any(p.search(url) for p in detail_pats):
+                return False
             return True
 
-        before_passing = [u for u in urls if _passes(u, cur_allow, cur_mc, cur_block)]
-        before_dropped = [u for u in urls if not _passes(u, cur_allow, cur_mc, cur_block)]
-        after_passing = [u for u in urls if _passes(u, new_allow, new_mc, new_block)]
-        after_dropped = [u for u in urls if not _passes(u, new_allow, new_mc, new_block)]
+        before_passing = [
+            u for u in urls if _passes(u, cur_allow, cur_mc, cur_block, cur_detail)
+        ]
+        before_dropped = [
+            u for u in urls if not _passes(u, cur_allow, cur_mc, cur_block, cur_detail)
+        ]
+        after_passing = [
+            u for u in urls if _passes(u, new_allow, new_mc, new_block, new_detail)
+        ]
+        after_dropped = [
+            u for u in urls if not _passes(u, new_allow, new_mc, new_block, new_detail)
+        ]
 
         rescued = [u for u in after_passing if u in set(before_dropped)]
 
@@ -395,15 +515,21 @@ class AutoRepairEngine:
             return 90 if has_hist else no_hist_val
 
         # Fix A — Remove ALL filters
-        if self.allow_pats or self.must_contain or self.block_pats:
-            sim = self._simulate_filter([], [], [])
+        if (
+            self.allow_pats
+            or self.must_contain
+            or self.block_pats
+            or self.course_detail_pats
+        ):
+            sim = self._simulate_filter([], [], [], [])
             gate = sim.after_count > 0 and sim.drop_rate_after_pct < 70
             candidates.append(RepairCandidate(
                 id="clear_all_filters",
                 rank=0,
                 label="Remove all URL filters",
                 description=(
-                    "Clears allow_url_patterns, must_contain, and block_url_patterns. "
+                    "Clears allow_url_patterns, must_contain, block_url_patterns, and "
+                    "course_detail_url_patterns. "
                     "The scraper will accept every discovered link. "
                     "Use this to confirm discovery is working, then re-add targeted filters."
                 ),
@@ -413,6 +539,7 @@ class AutoRepairEngine:
                     "allow_url_patterns": [],
                     "must_contain": [],
                     "block_url_patterns": [],
+                    "course_detail_url_patterns": [],
                 }},
                 simulation=sim,
                 confidence=_conf_base(88) if total_raw > 0 else 50,
@@ -521,7 +648,37 @@ class AutoRepairEngine:
                 expected_gain=max(0, sim.after_count - sim.before_count),
             ))
 
-        # Fix E — Relax allow_url_patterns (drop alternation, keep path prefix)
+        # Fix E — Remove only the final course-detail URL gate.
+        if self.course_detail_pats:
+            sim = self._simulate_filter(
+                self.allow_pats,
+                self.must_contain,
+                self.block_pats,
+                [],
+            )
+            gate = sim.after_count > 0 and sim.drop_rate_after_pct < 70
+            label_pats = ", ".join(f'"{p}"' for p in self.course_detail_pats[:2])
+            if len(self.course_detail_pats) > 2:
+                label_pats += f" +{len(self.course_detail_pats) - 2} more"
+            candidates.append(RepairCandidate(
+                id="clear_course_detail_patterns",
+                rank=0,
+                label="Remove course_detail_url_patterns",
+                description=(
+                    f"Clears the final course-detail URL gate: {label_pats}. "
+                    "This gate was rejecting URLs before extraction; allow, must_contain, "
+                    "and block_url_patterns are kept."
+                ),
+                category="url_filter",
+                problem_addressed="course_detail_url_patterns regex rejects discovered course URLs",
+                recipe_patch={"discovery": {"course_detail_url_patterns": []}},
+                simulation=sim,
+                confidence=_conf_base(85) if total_raw > 0 else 40,
+                safety_gate_passed=gate,
+                expected_gain=max(0, sim.after_count - sim.before_count),
+            ))
+
+        # Fix F — Relax allow_url_patterns (drop alternation, keep path prefix)
         if self.allow_pats:
             relaxed = self._derive_relaxed_pattern()
             if relaxed != self.allow_pats:
@@ -700,26 +857,40 @@ class AutoRepairEngine:
             if not any(re.search(b, p, re.IGNORECASE) for p in new_pats)
         ]
 
-        # Simulate the new filter against historical URLs (or estimate from raw)
-        sim = self._simulate_filter(new_pats, [], [])
+        # Simulate the exact merged resulting filter state. Replacing only the
+        # allowlist must not accidentally make the candidate look safe by
+        # clearing the existing must_contain/block/detail gates.
+        proposed_block_pats = block_pats
+        sim = self._simulate_filter(
+            new_pats,
+            self.must_contain,
+            proposed_block_pats,
+            self.course_detail_pats,
+        )
 
         # For a brand-new uni with no historical URLs, at least we know the
-        # dropped_sample itself should now pass — use that as the before/after.
+        # dropped_sample itself should now pass. Compare the exact current and
+        # proposed merged configs against that sample.
         if not self.historical_urls:
-            compiled = [re.compile(p, re.IGNORECASE) for p in new_pats if p]
-            rescued = [u for u in course_urls if compiled and any(c.search(u) for c in compiled)]
-            sim = SimulationResult(
-                method="dropped_sample_filter",
-                before_count=0,
-                after_count=len(rescued),
-                drop_rate_before_pct=100,
-                drop_rate_after_pct=0 if rescued else 100,
-                historical_url_count=len(self.dropped_sample),
-                sample_urls_rescued=rescued[:5],
-                note=(
-                    f"Simulated against {len(self.dropped_sample)} dropped-URL sample(s). "
-                    f"{len(rescued)} would pass the new pattern."
-                ),
+            baseline = self._simulate_filter(
+                self.allow_pats,
+                self.must_contain,
+                self.block_pats,
+                self.course_detail_pats,
+                sample_urls=course_urls,
+            )
+            sim = self._simulate_filter(
+                new_pats,
+                self.must_contain,
+                proposed_block_pats,
+                self.course_detail_pats,
+                sample_urls=course_urls,
+            )
+            sim.method = "dropped_sample_filter"
+            sim.note = (
+                f"Simulated the merged allow/must/block/detail config against "
+                f"{len(course_urls)} dropped-URL sample(s): "
+                f"{baseline.after_count} before → {sim.after_count} after."
             )
 
         gate = sim.after_count > 0
@@ -846,6 +1017,7 @@ async def generate_repair_candidates(
     imported: int,
     historical_urls: list[str],
     pipeline_stats: dict,
+    current_course_detail_pats: list[str] | None = None,
     dropped_sample: list[str] | None = None,
 ) -> list[dict]:
     """Async entry point — returns ranked candidate dicts ready for JSON serialisation."""
@@ -856,6 +1028,7 @@ async def generate_repair_candidates(
         current_allow_pats=current_allow_pats,
         current_must_contain=current_must_contain,
         current_block_pats=current_block_pats,
+        current_course_detail_pats=current_course_detail_pats,
         raw_discovered=raw_discovered,
         after_filter=after_filter,
         imported=imported,

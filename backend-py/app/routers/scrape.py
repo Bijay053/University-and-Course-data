@@ -28,6 +28,12 @@ from app.schemas.scrape import (
     ScrapeStartResponse,
     StartScrapeBody,
 )
+from app.services.scraper.auto_repair_candidates import (
+    filter_config_fingerprint,
+    filter_config_drifted,
+    filter_repair_safety_issue,
+    strip_stale_filter_suggestions,
+)
 
 router = APIRouter()
 
@@ -5414,6 +5420,7 @@ async def trigger_job_quality_optimizer(
 async def diagnose_scrape_job(
     job_id: str,
     db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(require_permission("scraping.view"))],
 ) -> dict:
     """Use OpenAI to explain why a scrape produced poor results and suggest fixes.
 
@@ -5522,6 +5529,23 @@ async def diagnose_scrape_job(
     _filter_drop_count: int = _pipeline_stats.get("filter_drop_count", 0)
     _filter_drop_pct: float = _pipeline_stats.get("filter_drop_pct", 0.0)
     _has_pipeline_stats: bool = bool(_pipeline_stats)
+    # The worker stores the exact URL-filter config used at run start.  The
+    # university's live admin/YAML config may have changed by the time an
+    # operator opens diagnostics, so prefer this snapshot for explaining the
+    # failed run.
+    _discovered_config: dict = job.discovered_config or {}
+    _run_filter_snapshot = _discovered_config.get(
+        "filter_config",
+        _pipeline_stats.get("filter_config"),
+    )
+    _filter_snapshot_present = (
+        isinstance(_run_filter_snapshot, dict)
+    )
+    _job_filter_config: dict = (
+        dict(_run_filter_snapshot or {})
+        if _filter_snapshot_present
+        else {}
+    )
 
     # ── Deterministic issue detection ─────────────────────────────────────────
     # Rules that can be determined without AI based purely on course counts.
@@ -5531,14 +5555,15 @@ async def diagnose_scrape_job(
     # HIGHEST PRIORITY: URL filter removed all discovered URLs.
     # Must be checked BEFORE the zero-discovery check — both show total_found=0
     # but they have completely different fixes.
-    if _raw_discovered > 10 and _after_filter == 0:
+    if _raw_discovered > 0 and _after_filter == 0:
         deterministic_issues.append({
             "issue": "URL filter removed all discovered course URLs",
             "severity": "critical",
             "check": "all_filtered",
             "detail": (
                 f"Discovery successfully found {_raw_discovered} candidate course URL(s). "
-                f"A URL filter (allow_url_patterns, must_contain, or block_url_patterns) "
+                f"A URL filter (allow_url_patterns, must_contain, block_url_patterns, or "
+                f"course_detail_url_patterns) "
                 f"then dropped 100% of them — 0 URLs reached the extraction step. "
                 f"Discovery worked correctly; the problem is in the filter config."
             ),
@@ -5546,6 +5571,7 @@ async def diagnose_scrape_job(
                 "allow_url_patterns regex doesn't match actual course page URL structure",
                 "must_contain substring is too restrictive or uses the wrong path segment",
                 "block_url_patterns accidentally matching all course pages",
+                "course_detail_url_patterns does not match the discovered course URL shape",
                 "AI Fix previously applied a bad filter pattern — check admin_config",
             ],
             "fix": {
@@ -5653,7 +5679,13 @@ async def diagnose_scrape_job(
     # flag it — the regex is likely too strict and is eating course pages.
     try:
         _effective_disc_tmp = {}
-        if uni and uni.scrape_url:
+        if "allow_url_patterns" in _job_filter_config:
+            _effective_disc_tmp = {
+                "allow_url_patterns": list(
+                    _job_filter_config.get("allow_url_patterns") or []
+                ),
+            }
+        elif uni and uni.scrape_url:
             from app.services.scraper.config.loader import get_config_for_host as _gcfh2
             from urllib.parse import urlparse as _up2
             _h2 = _up2(uni.scrape_url).hostname or ""
@@ -5802,6 +5834,7 @@ async def diagnose_scrape_job(
     _current_admin_cfg: dict = _sc_raw.get("admin_config") or {}
 
     _effective_disc: dict = {}
+    _current_effective_disc: dict = {}
     _effective_extr: dict = {}
     if uni and uni.scrape_url:
         try:
@@ -5821,6 +5854,8 @@ async def diagnose_scrape_job(
                 "seed_urls": list(_disc_obj.seed_urls or []),
                 "must_contain": list(_disc_obj.must_contain or []),
                 "block_url_patterns": list(_disc_obj.block_url_patterns or []),
+                "allow_url_patterns": list(_disc_obj.allow_url_patterns or []),
+                "course_detail_url_patterns": list(_disc_obj.course_detail_url_patterns or []),
                 "always_browser_discover": _disc_obj.always_browser_discover,
                 "always_sitemap_supplement": _disc_obj.always_sitemap_supplement,
                 "bfs_page_budget": _disc_obj.bfs_page_budget,
@@ -5831,8 +5866,27 @@ async def diagnose_scrape_job(
             _effective_disc = {k: v for k, v in _effective_disc.items()
                                if v is not None and v != [] and v is not False or k in (
                                    "always_browser_discover", "always_sitemap_supplement")}
+            _current_effective_disc = dict(_effective_disc)
         except Exception as _cfg_err:
             log.debug("diagnose: could not load effective UniConfig: %s", _cfg_err)
+
+    _filter_config_drift_reason = filter_repair_safety_issue(
+        _job_filter_config,
+        _current_effective_disc,
+        snapshot_present=_filter_snapshot_present,
+    )
+    _filter_config_changed_since_run = bool(_filter_config_drift_reason)
+    if _filter_snapshot_present:
+        # Use the run-start values for deterministic diagnosis and Gemini
+        # context. Empty lists must override a newer non-empty live config.
+        for _key in (
+            "allow_url_patterns",
+            "must_contain",
+            "block_url_patterns",
+            "course_detail_url_patterns",
+        ):
+            if _key in _job_filter_config:
+                _effective_disc[_key] = list(_job_filter_config.get(_key) or [])
 
     # ── Inject recipe_patch into deterministic issues ─────────────────────────
     # Now that _effective_disc and _current_admin_cfg are populated we know
@@ -5843,13 +5897,15 @@ async def diagnose_scrape_job(
     # Priority order for "what is causing 100% drop":
     #   1. must_contain   — substring allowlist, drops everything that doesn't contain it
     #   2. allow_url_patterns — regex allowlist, drops everything that doesn't match
-    #   3. block_url_patterns — blocklist, only fires on matching URLs
+    #   3. course_detail_url_patterns — final detail-page allowlist
+    #   4. block_url_patterns — blocklist, only fires on matching URLs
     #
     # allow_url_patterns is checked BEFORE block_url_patterns because an allowlist
     # configured incorrectly causes 100% drop far more often than a blocklist.
     _eff_must_contain: list = list(_effective_disc.get("must_contain")       or [])
     _eff_block_pats:   list = list(_effective_disc.get("block_url_patterns") or [])
     _eff_allow_pats:   list = list(_effective_disc.get("allow_url_patterns") or [])
+    _eff_detail_pats:  list = list(_effective_disc.get("course_detail_url_patterns") or [])
 
     # What is actually stored in admin_config (may override YAML values)
     _admin_disc:       dict = (_current_admin_cfg.get("discovery") or {})
@@ -5857,6 +5913,10 @@ async def diagnose_scrape_job(
 
     for _di in deterministic_issues:
         if _di.get("check") == "all_filtered":
+            if _filter_config_changed_since_run:
+                _di["filter_config_changed_since_run"] = True
+                _di["recipe_patch_description"] = _filter_config_drift_reason
+                continue
             if _eff_must_contain:
                 # must_contain is an allowlist — drops every URL that lacks the substring
                 _di["recipe_patch"] = {"discovery": {"must_contain": []}}
@@ -5893,6 +5953,18 @@ async def diagnose_scrape_job(
                         "Clearing it lets all discovered URLs through; "
                         "re-add a corrected pattern after inspecting the discovered URLs."
                     )
+            elif _eff_detail_pats and _after_filter == 0 and _raw_discovered > 0:
+                # course_detail_url_patterns is the final extraction gate. It
+                # can independently remove every URL after discovery succeeds.
+                _di["recipe_patch"] = {"discovery": {"course_detail_url_patterns": []}}
+                _pat_preview = ", ".join(f'"{p}"' for p in _eff_detail_pats[:3])
+                if len(_eff_detail_pats) > 3:
+                    _pat_preview += " …"
+                _di["recipe_patch_description"] = (
+                    f"Clear {len(_eff_detail_pats)} course_detail_url_patterns "
+                    f"({_pat_preview}) that reject all discovered URLs. Re-run the "
+                    "scrape to verify the URL shape, then add back a corrected gate."
+                )
             elif _eff_block_pats and _after_filter == 0 and _raw_discovered > 0:
                 # block_url_patterns is a blocklist — only fires on matching URLs,
                 # so it causes 100% drop only when it matches every discovered link.
@@ -5937,12 +6009,36 @@ async def diagnose_scrape_job(
                 _probe_lines.append(f"  Evidence: {snip[:120]}")
     _probe_summary_text = "\n".join(_probe_lines) if _probe_lines else "(no pages probed)"
 
+    def _bound_prompt_value(value: object, depth: int = 0) -> object:
+        """Keep operator-config payloads bounded before sending them to OpenAI."""
+        if depth > 3:
+            return "[truncated]"
+        if isinstance(value, dict):
+            return {
+                str(key): _bound_prompt_value(item, depth + 1)
+                for key, item in list(value.items())[:64]
+            }
+        if isinstance(value, (list, tuple)):
+            return [
+                _bound_prompt_value(item, depth + 1)
+                for item in list(value)[:64]
+            ]
+        if isinstance(value, str):
+            return value[:1024]
+        return value
+
+    _prompt_effective_disc = _bound_prompt_value(_effective_disc)
+    _prompt_admin_cfg = _bound_prompt_value(
+        {k: v for k, v in _current_admin_cfg.items() if not k.startswith("_")}
+    )
+
     # ── Build prompt ──────────────────────────────────────────────────────────
     # Build pipeline summary line for prompt
     if _has_pipeline_stats:
         _pipeline_summary = (
             f"Raw URLs discovered by crawler: {_raw_discovered}\n"
-            f"URLs after URL filters (allow_url_patterns / must_contain / block_url_patterns): {_after_filter}\n"
+            f"URLs after URL filters (allow_url_patterns / must_contain / block_url_patterns / "
+            f"course_detail_url_patterns): {_after_filter}\n"
             f"Filter drop count: {_filter_drop_count} ({_filter_drop_pct:.0f}% of raw)\n"
             f"Courses staged (passed extraction): {job.imported or 0}"
         )
@@ -5950,6 +6046,20 @@ async def diagnose_scrape_job(
         _pipeline_summary = (
             f"URLs discovered / after filters: {job.total_found or 0} (pipeline stats not available for this job)\n"
             f"Courses staged: {job.imported or 0}"
+        )
+    if _filter_snapshot_present:
+        _filter_config_note = (
+            "The discovery filter config below is the run-start snapshot."
+            + (
+                " It differs from the university's current live config; do not apply a "
+                "filter-clearing patch to the current config without operator confirmation."
+                if _filter_config_changed_since_run else ""
+            )
+        )
+    else:
+        _filter_config_note = (
+            "No run-start discovery filter snapshot was recorded for this legacy job. "
+            "Filter-clearing fixes are disabled until an operator confirms the live config."
         )
 
     prompt = f"""You are an expert web scraping engineer diagnosing why a university course scraper produced poor results.
@@ -5977,10 +6087,11 @@ Blank fields across sample ({staged_count} courses):
 {json.dumps(blank_fields, indent=2)}
 Bad location values detected (nav/footer text saved as location):
 {bad_locations[:3] if bad_locations else 'None detected'}
-EFFECTIVE DISCOVERY CONFIG (fully merged: defaults + YAML + admin_config — this is what the scraper actually uses):
-{json.dumps(_effective_disc, indent=2) if _effective_disc else "(using built-in defaults — nothing custom configured yet)"}
+ {_filter_config_note}
+ EFFECTIVE DISCOVERY CONFIG (fully merged: defaults + YAML + admin_config — this is what the scraper actually uses):
+    {json.dumps(_prompt_effective_disc, indent=2) if _effective_disc else "(using built-in defaults — nothing custom configured yet)"}
 ADMIN PANEL OVERRIDES (values the operator set via UI — already applied on top of YAML):
-{json.dumps({k: v for k, v in _current_admin_cfg.items() if not k.startswith("_")}, indent=2) if _current_admin_cfg else "(none)"}
+    {json.dumps(_prompt_admin_cfg, indent=2) if _current_admin_cfg else "(none)"}
 
 LIVE COURSE PAGE PROBE RESULTS (httpx fetch of {_course_probe.get("probed", 0)} real course pages):
 {_probe_summary_text}
@@ -6153,6 +6264,10 @@ Return only valid JSON, no markdown fences."""
                 out[k] = v
         return out
     suggested_config = _clean_cfg(suggested_config)
+    suggested_config = strip_stale_filter_suggestions(
+        suggested_config,
+        _filter_config_drift_reason,
+    )
 
     # ── Diff suggested_config against what's already in admin_config ──────────
     # Remove any key/value pairs from the suggestion that are already set
@@ -6210,6 +6325,16 @@ Return only valid JSON, no markdown fences."""
         "deterministic_issues": deterministic_issues,
         "diagnosis": diagnosis,
         "suggested_config": suggested_config,
+        "filter_config_snapshot": (
+            _job_filter_config if _filter_snapshot_present else None
+        ),
+        "filter_config_fingerprint": (
+            filter_config_fingerprint(_job_filter_config)
+            if _filter_snapshot_present
+            else None
+        ),
+        "filter_repair_blocked": bool(_filter_config_drift_reason),
+        "filter_repair_block_reason": _filter_config_drift_reason,
         "already_applied": already_applied,
         "phase3_recommendations": _phase3_recs,
         "course_probe_summary": _probe_summary_fe,
@@ -6881,8 +7006,11 @@ async def extraction_quality_report(
 
 
 @router.post("/test-url-filter")
-async def test_url_filter(body: dict) -> dict:
-    """Simulate allow_url_patterns / must_contain / block_url_patterns against a list of test URLs.
+async def test_url_filter(
+    body: dict,
+    _: Annotated[dict, Depends(require_permission("scraping.view"))],
+) -> dict:
+    """Simulate URL filters against a list of test URLs.
 
     Body::
 
@@ -6890,7 +7018,8 @@ async def test_url_filter(body: dict) -> dict:
           "urls": ["https://…/courses/bachelor-of-science", …],
           "allow_url_patterns": ["(?i)/courses/[^/]+-[^/]+$"],
           "must_contain": [],
-          "block_url_patterns": []
+          "block_url_patterns": [],
+          "course_detail_url_patterns": []
         }
 
     Returns per-URL pass/fail with first matching pattern (or mismatch reason).
@@ -6898,10 +7027,28 @@ async def test_url_filter(body: dict) -> dict:
     """
     import re as _re
 
-    urls: list[str] = body.get("urls") or []
-    allow_pats: list[str] = body.get("allow_url_patterns") or []
-    must_contain: list[str] = body.get("must_contain") or []
-    block_pats: list[str] = body.get("block_url_patterns") or []
+    def _bounded_strings(field: str, limit: int, max_length: int) -> list[str]:
+        value = body.get(field) or []
+        if not isinstance(value, list):
+            raise HTTPException(status_code=422, detail=f"{field} must be a list")
+        if len(value) > limit:
+            raise HTTPException(
+                status_code=422,
+                detail=f"{field} is limited to {limit} items",
+            )
+        values = [item for item in value if isinstance(item, str)]
+        if len(values) != len(value) or any(len(item) > max_length for item in values):
+            raise HTTPException(
+                status_code=422,
+                detail=f"{field} items must be strings of at most {max_length} characters",
+            )
+        return values
+
+    urls = _bounded_strings("urls", 200, 2048)
+    allow_pats = _bounded_strings("allow_url_patterns", 64, 512)
+    must_contain = _bounded_strings("must_contain", 64, 512)
+    block_pats = _bounded_strings("block_url_patterns", 64, 512)
+    detail_pats = _bounded_strings("course_detail_url_patterns", 64, 512)
 
     # Compile patterns — skip invalid regexes
     compiled_allow: list[tuple[str, _re.Pattern]] = []
@@ -6918,12 +7065,20 @@ async def test_url_filter(body: dict) -> dict:
         except _re.error as e:
             return {"ok": False, "error": f"Invalid block_url_patterns regex: {p!r} — {e}"}
 
+    compiled_detail: list[tuple[str, _re.Pattern]] = []
+    for p in detail_pats:
+        try:
+            compiled_detail.append((p, _re.compile(p, _re.IGNORECASE)))
+        except _re.error as e:
+            return {"ok": False, "error": f"Invalid course_detail_url_patterns regex: {p!r} — {e}"}
+
     results: list[dict] = []
     for url in urls[:200]:  # cap at 200
         passed = True
         drop_reason: str | None = None
         matching_allow: str | None = None
         blocking_block: str | None = None
+        matching_detail: str | None = None
         failed_must: str | None = None
 
         # 1. allow_url_patterns — URL must match at least one pattern
@@ -6958,12 +7113,23 @@ async def test_url_filter(body: dict) -> dict:
                     drop_reason = f"block_url_patterns: matched {pat_str!r}"
                     break
 
+        # 4. course_detail_url_patterns — final course-page shape gate
+        if passed and compiled_detail:
+            matching_detail = next(
+                (pat_str for pat_str, pat_re in compiled_detail if pat_re.search(url)),
+                None,
+            )
+            if matching_detail is None:
+                passed = False
+                drop_reason = "course_detail_url_patterns: no pattern matched"
+
         results.append({
             "url": url,
             "passed": passed,
             "drop_reason": drop_reason,
             "matching_allow_pattern": matching_allow,
             "blocking_block_pattern": blocking_block,
+            "matching_course_detail_pattern": matching_detail,
         })
 
     kept = [r for r in results if r["passed"]]
@@ -6987,6 +7153,7 @@ async def test_url_filter_for_job(
     job_id: str,
     body: dict,
     db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(require_permission("scraping.view"))],
 ) -> dict:
     """Test allow_url_patterns / must_contain / block_url_patterns from the job's university config.
 
@@ -7012,6 +7179,7 @@ async def test_url_filter_for_job(
     allow_pats: list[str] = []
     must_contain: list[str] = []
     block_pats: list[str] = []
+    detail_pats: list[str] = []
 
     if uni and uni.scrape_url:
         try:
@@ -7027,6 +7195,7 @@ async def test_url_filter_for_job(
             allow_pats = list(_uc3.discovery.allow_url_patterns or [])
             must_contain = list(_uc3.discovery.must_contain or [])
             block_pats = list(_uc3.discovery.block_url_patterns or [])
+            detail_pats = list(_uc3.discovery.course_detail_url_patterns or [])
         except Exception as _e:
             log.debug("test_url_filter_for_job: config load failed: %s", _e)
 
@@ -7036,12 +7205,16 @@ async def test_url_filter_for_job(
         "allow_url_patterns": allow_pats,
         "must_contain": must_contain,
         "block_url_patterns": block_pats,
+        "course_detail_url_patterns": detail_pats,
     }
-    result = await test_url_filter(general_body)
+    # The route dependency has already authorized this request; pass a
+    # placeholder user when reusing the pure simulation implementation.
+    result = await test_url_filter(general_body, {})
     result["config_used"] = {
         "allow_url_patterns": allow_pats,
         "must_contain": must_contain,
         "block_url_patterns": block_pats,
+        "course_detail_url_patterns": detail_pats,
     }
     return result
 
@@ -7051,7 +7224,7 @@ async def apply_scrape_fix(
     job_id: str,
     body: dict,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[dict, Depends(get_current_user)],
+    _: Annotated[dict, Depends(require_permission("scraping.trigger"))],
 ) -> dict:
     """Apply an AI-suggested or manually-specified config patch to the university's admin_config.
 
@@ -7063,6 +7236,13 @@ async def apply_scrape_fix(
             "extraction": {"filters": {"online_only": {"enabled": true}}},
             "_min_expected_courses": 100
           },
+          "expected_filter_config": {
+            "allow_url_patterns": [],
+            "must_contain": ["/courses/"],
+            "block_url_patterns": [],
+            "course_detail_url_patterns": []
+          },
+          "expected_filter_config_fingerprint": "sha256…",
           "force": false   # set true to override the 30-70% drop-rate warning (not the 100% block)
         }
 
@@ -7085,9 +7265,14 @@ async def apply_scrape_fix(
     uni_id = job["university_id"]
     config_patch: dict = body.get("config_patch") or {}
     force: bool = bool(body.get("force", False))
+    if not isinstance(config_patch, dict):
+        raise HTTPException(status_code=422, detail="config_patch must be an object")
 
     row = (await db.execute(
-        _text("SELECT scrape_config FROM universities WHERE id = :id"),
+        _text(
+            "SELECT name, scrape_url, scrape_config FROM universities "
+            "WHERE id = :id FOR UPDATE"
+        ),
         {"id": uni_id},
     )).mappings().first()
     if not row:
@@ -7097,19 +7282,112 @@ async def apply_scrape_fix(
     existing: dict = sc.get("admin_config") or {}
 
     # ── Safety guard: validate ALL URL filters before saving ─────────────────
-    # Tests allow_url_patterns + must_contain + block_url_patterns combined.
+    # Tests allow_url_patterns + must_contain + block_url_patterns +
+    # course_detail_url_patterns combined.
     # Thresholds: ≥70% drop → hard block (even with force=true)
     #             ≥20% drop → soft block (overridable with force=true)
     import re as _re_guard
 
     disc_patch = config_patch.get("discovery") or {}
-    _URL_FILTER_KEYS = ("allow_url_patterns", "must_contain", "block_url_patterns")
+    if not isinstance(disc_patch, dict):
+        raise HTTPException(
+            status_code=422,
+            detail="config_patch.discovery must be an object",
+        )
+    _URL_FILTER_KEYS = (
+        "allow_url_patterns",
+        "must_contain",
+        "block_url_patterns",
+        "course_detail_url_patterns",
+    )
     url_warning: dict | None = None
 
     if any(k in disc_patch for k in _URL_FILTER_KEYS):
-        # Merge patch into existing discovery config to get the FULL proposed state
-        existing_disc = (existing.get("discovery") or {}) if isinstance(existing.get("discovery"), dict) else {}
-        proposed_disc: dict = {**existing_disc}
+        expected_filter_config = body.get("expected_filter_config")
+        expected_filter_fingerprint = body.get("expected_filter_config_fingerprint")
+        if not isinstance(expected_filter_config, dict) or not isinstance(
+            expected_filter_fingerprint, str
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "filter_snapshot_required",
+                    "message": (
+                        "URL-filter changes require a run-start filter snapshot and "
+                        "fingerprint. Legacy jobs without that evidence cannot clear "
+                        "filters automatically."
+                    ),
+                },
+            )
+        expected_filter_fingerprint = expected_filter_fingerprint.strip().lower()
+        if (
+            expected_filter_fingerprint
+            != filter_config_fingerprint(expected_filter_config)
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "filter_snapshot_invalid",
+                    "message": "The supplied URL-filter snapshot fingerprint is invalid.",
+                },
+            )
+
+        current_filter_config: dict = {}
+        try:
+            from app.services.scraper.config.loader import get_config_for_host as _gcfh_apply
+            from urllib.parse import urlparse as _urlparse_apply
+
+            _apply_cfg = _gcfh_apply(
+                hostname=_urlparse_apply(row.get("scrape_url") or "").hostname or "",
+                name=row.get("name") or str(uni_id),
+                scrape_url=row.get("scrape_url") or "",
+                university_id=uni_id,
+                db_scrape_config=sc,
+            )
+            current_filter_config = {
+                "allow_url_patterns": list(
+                    _apply_cfg.discovery.allow_url_patterns or []
+                ),
+                "must_contain": list(_apply_cfg.discovery.must_contain or []),
+                "block_url_patterns": list(
+                    _apply_cfg.discovery.block_url_patterns or []
+                ),
+                "course_detail_url_patterns": list(
+                    _apply_cfg.discovery.course_detail_url_patterns or []
+                ),
+            }
+        except Exception as _cfg_apply_exc:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "filter_snapshot_unavailable",
+                    "message": (
+                        "The current effective URL-filter config could not be loaded; "
+                        "no filter mutation was applied."
+                    ),
+                },
+            ) from _cfg_apply_exc
+
+        current_filter_fingerprint = filter_config_fingerprint(current_filter_config)
+        if current_filter_fingerprint != expected_filter_fingerprint:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "filter_config_changed",
+                    "message": (
+                        "The university URL-filter config changed after this diagnosis. "
+                        "Refresh diagnostics before applying a filter fix."
+                    ),
+                    "expected_filter_config_fingerprint": expected_filter_fingerprint,
+                    "current_filter_config_fingerprint": current_filter_fingerprint,
+                    "expected_filter_config": expected_filter_config,
+                    "current_filter_config": current_filter_config,
+                },
+            )
+
+        # Merge the patch into the fully-effective current discovery config,
+        # including YAML defaults and every remaining filter gate.
+        proposed_disc: dict = {**current_filter_config}
         for k in _URL_FILTER_KEYS:
             if k in disc_patch:
                 proposed_disc[k] = disc_patch[k] or []
@@ -7117,8 +7395,11 @@ async def apply_scrape_fix(
         allow_pats = [p for p in (proposed_disc.get("allow_url_patterns") or []) if p]
         mc_patterns = [m for m in (proposed_disc.get("must_contain") or []) if m]
         block_pats = [p for p in (proposed_disc.get("block_url_patterns") or []) if p]
+        detail_pats = [
+            p for p in (proposed_disc.get("course_detail_url_patterns") or []) if p
+        ]
 
-        if allow_pats or mc_patterns or block_pats:
+        if allow_pats or mc_patterns or block_pats or detail_pats:
             url_rows = (await db.execute(
                 select(_SC.course_website)
                 .where(_SC.university_id == uni_id)
@@ -7143,6 +7424,13 @@ async def apply_scrape_fix(
                     except _re_guard.error:
                         pass
 
+                compiled_detail = []
+                for p in detail_pats:
+                    try:
+                        compiled_detail.append(_re_guard.compile(p, _re_guard.IGNORECASE))
+                    except _re_guard.error:
+                        pass
+
                 mc_lower = [m.lower() for m in mc_patterns]
 
                 passing: list[str] = []
@@ -7155,6 +7443,10 @@ async def apply_scrape_fix(
                     if ok and mc_lower and not any(m in ul for m in mc_lower):
                         ok = False
                     if ok and compiled_block and any(pat.search(u) for pat in compiled_block):
+                        ok = False
+                    if ok and compiled_detail and not any(
+                        pat.search(u) for pat in compiled_detail
+                    ):
                         ok = False
                     (passing if ok else dropped).append(u)
 
@@ -7207,6 +7499,7 @@ async def apply_scrape_fix(
                         )
 
     # ── Store previous config for rollback before overwriting ─────────────────
+    before_sc = dict(sc)
     if existing:
         sc["_prev_admin_config"] = existing
 
@@ -7221,10 +7514,26 @@ async def apply_scrape_fix(
 
     sc["admin_config"] = _deep_merge_local(existing, config_patch)
 
-    await db.execute(
-        _text("UPDATE universities SET scrape_config = CAST(:cfg AS jsonb) WHERE id = :id"),
-        {"cfg": json.dumps(sc), "id": uni_id},
+    update_result = await db.execute(
+        _text(
+            "UPDATE universities SET scrape_config = CAST(:cfg AS jsonb) "
+            "WHERE id = :id AND scrape_config = CAST(:expected_sc AS jsonb)"
+        ),
+        {
+            "cfg": json.dumps(sc),
+            "expected_sc": json.dumps(before_sc),
+            "id": uni_id,
+        },
     )
+    if update_result.rowcount != 1:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "config_changed",
+                "message": "Scraper config changed during apply; no fix was saved.",
+            },
+        )
     await db.commit()
 
     # ── Also write the patch into the YAML file on disk ───────────────────────
@@ -7534,7 +7843,7 @@ async def auto_repair_filter(
     job_id: str,
     body: dict,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[dict, Depends(get_current_user)],
+    _: Annotated[dict, Depends(require_permission("scraping.trigger"))],
 ) -> dict:
     """Auto-repair a 100% URL-filter-drop without any operator action.
 
@@ -7552,7 +7861,14 @@ async def auto_repair_filter(
 
         {
           "recipe_patch": {"discovery": {"must_contain": []}},
-          "filter_cleared": "must_contain"
+          "filter_cleared": "must_contain",
+          "expected_filter_config": {
+            "allow_url_patterns": [],
+            "must_contain": ["/courses/"],
+            "block_url_patterns": [],
+            "course_detail_url_patterns": []
+          },
+          "expected_filter_config_fingerprint": "sha256…"
         }
 
     Returns::
@@ -7580,6 +7896,8 @@ async def auto_repair_filter(
     filter_cleared: str = body.get("filter_cleared") or "unknown"
     trigger_scrape: bool = bool(body.get("trigger_scrape", True))
 
+    if not isinstance(recipe_patch, dict):
+        raise HTTPException(status_code=422, detail="recipe_patch must be an object")
     if not recipe_patch:
         return {
             "status": "no_patch",
@@ -7588,7 +7906,10 @@ async def auto_repair_filter(
 
     # ── 2. Load existing scrape_config ───────────────────────────────────────
     uni_row = (await db.execute(
-        _text("SELECT id, name, scrape_url, scrape_config FROM universities WHERE id = :id"),
+        _text(
+            "SELECT id, name, scrape_url, scrape_config FROM universities "
+            "WHERE id = :id FOR UPDATE"
+        ),
         {"id": uni_id},
     )).mappings().first()
     if not uni_row:
@@ -7597,7 +7918,86 @@ async def auto_repair_filter(
     sc: dict = dict(uni_row.get("scrape_config") or {})
     existing: dict = dict(sc.get("admin_config") or {})
 
+    disc_patch = recipe_patch.get("discovery") or {}
+    if not isinstance(disc_patch, dict):
+        raise HTTPException(status_code=422, detail="recipe_patch.discovery must be an object")
+    _URL_FILTER_KEYS = (
+        "allow_url_patterns",
+        "must_contain",
+        "block_url_patterns",
+        "course_detail_url_patterns",
+    )
+    if any(key in disc_patch for key in _URL_FILTER_KEYS):
+        expected_filter_config = body.get("expected_filter_config")
+        expected_filter_fingerprint = body.get("expected_filter_config_fingerprint")
+        if not isinstance(expected_filter_config, dict) or not isinstance(
+            expected_filter_fingerprint, str
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "filter_snapshot_required",
+                    "message": (
+                        "Automatic URL-filter repair requires a run-start filter "
+                        "snapshot and fingerprint. No legacy filter was cleared."
+                    ),
+                },
+            )
+        expected_filter_fingerprint = expected_filter_fingerprint.strip().lower()
+        if expected_filter_fingerprint != filter_config_fingerprint(expected_filter_config):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "filter_snapshot_invalid",
+                    "message": "The supplied URL-filter snapshot fingerprint is invalid.",
+                },
+            )
+
+        try:
+            from app.services.scraper.config.loader import get_config_for_host as _gcfh_auto
+            from urllib.parse import urlparse as _urlparse_auto
+
+            _auto_cfg = _gcfh_auto(
+                hostname=_urlparse_auto(uni_row.get("scrape_url") or "").hostname or "",
+                name=uni_row.get("name") or str(uni_id),
+                scrape_url=uni_row.get("scrape_url") or "",
+                university_id=uni_id,
+                db_scrape_config=sc,
+            )
+            current_filter_config = {
+                "allow_url_patterns": list(_auto_cfg.discovery.allow_url_patterns or []),
+                "must_contain": list(_auto_cfg.discovery.must_contain or []),
+                "block_url_patterns": list(_auto_cfg.discovery.block_url_patterns or []),
+                "course_detail_url_patterns": list(
+                    _auto_cfg.discovery.course_detail_url_patterns or []
+                ),
+            }
+        except Exception as _cfg_auto_exc:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "filter_snapshot_unavailable",
+                    "message": "No URL-filter mutation was applied because the current config could not be loaded.",
+                },
+            ) from _cfg_auto_exc
+
+        current_filter_fingerprint = filter_config_fingerprint(current_filter_config)
+        if current_filter_fingerprint != expected_filter_fingerprint:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "filter_config_changed",
+                    "message": (
+                        "The URL-filter config changed after this diagnosis. "
+                        "Refresh diagnostics before retrying."
+                    ),
+                    "expected_filter_config_fingerprint": expected_filter_fingerprint,
+                    "current_filter_config_fingerprint": current_filter_fingerprint,
+                },
+            )
+
     # ── 3. Apply patch (deep-merge, same logic as apply_scrape_fix) ──────────
+    before_sc = dict(sc)
     if existing:
         sc["_prev_admin_config"] = existing
 
@@ -7612,10 +8012,26 @@ async def auto_repair_filter(
 
     sc["admin_config"] = _deep_merge(existing, recipe_patch)
 
-    await db.execute(
-        _text("UPDATE universities SET scrape_config = CAST(:cfg AS jsonb) WHERE id = :id"),
-        {"cfg": _json.dumps(sc), "id": uni_id},
+    update_result = await db.execute(
+        _text(
+            "UPDATE universities SET scrape_config = CAST(:cfg AS jsonb) "
+            "WHERE id = :id AND scrape_config = CAST(:expected_sc AS jsonb)"
+        ),
+        {
+            "cfg": _json.dumps(sc),
+            "expected_sc": _json.dumps(before_sc),
+            "id": uni_id,
+        },
     )
+    if update_result.rowcount != 1:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "config_changed",
+                "message": "Scraper config changed during apply; no fix was saved.",
+            },
+        )
     await db.commit()
 
     log.info(
@@ -7749,6 +8165,21 @@ async def auto_repair_candidates(
     pipeline_stats: dict = discovered_cfg.get("pipeline_stats") or {}
     raw_discovered: int = pipeline_stats.get("raw_discovered", job_row.get("total_found") or 0)
     after_filter: int = pipeline_stats.get("after_filter", job_row.get("total_found") or 0)
+    filter_snapshot_present = (
+        isinstance(
+            discovered_cfg.get("filter_config", pipeline_stats.get("filter_config")),
+            dict,
+        )
+    )
+    _run_filter_snapshot = discovered_cfg.get(
+        "filter_config",
+        pipeline_stats.get("filter_config"),
+    )
+    job_filter_config: dict = (
+        dict(_run_filter_snapshot or {})
+        if filter_snapshot_present
+        else {}
+    )
 
     # ── 2. Load university + effective config ─────────────────────────────────
     uni_row = (await db.execute(
@@ -7766,6 +8197,8 @@ async def auto_repair_candidates(
     allow_pats: list[str] = []
     must_contain: list[str] = []
     block_pats: list[str] = []
+    course_detail_pats: list[str] = []
+    current_filter_config: dict = {}
     try:
         _h = _up(scrape_url).hostname or ""
         _uc = _gcfh(
@@ -7777,8 +8210,50 @@ async def auto_repair_candidates(
         allow_pats = list(_uc.discovery.allow_url_patterns or [])
         must_contain = list(_uc.discovery.must_contain or [])
         block_pats = list(_uc.discovery.block_url_patterns or [])
+        course_detail_pats = list(_uc.discovery.course_detail_url_patterns or [])
+        current_filter_config = {
+            "allow_url_patterns": allow_pats,
+            "must_contain": must_contain,
+            "block_url_patterns": block_pats,
+            "course_detail_url_patterns": course_detail_pats,
+        }
     except Exception as _exc:
         log.warning("auto_repair_candidates: config load failed: %s", _exc)
+
+    filter_config_changed_since_run = filter_config_drifted(
+        job_filter_config,
+        current_filter_config,
+    )
+    if job_filter_config:
+        # Simulate the filters that actually ran, not a newer live config.
+        allow_pats = list(job_filter_config.get("allow_url_patterns") or [])
+        must_contain = list(job_filter_config.get("must_contain") or [])
+        block_pats = list(job_filter_config.get("block_url_patterns") or [])
+        course_detail_pats = list(
+            job_filter_config.get("course_detail_url_patterns") or []
+        )
+    filter_repair_block_reason = filter_repair_safety_issue(
+        job_filter_config,
+        current_filter_config,
+        snapshot_present=filter_snapshot_present,
+    )
+    if filter_repair_block_reason:
+        # Never recommend a recipe derived from stale run-time rules against a
+        # newer live config. In particular, clearing an old allow/detail gate
+        # could silently remove a valid current safety rule.
+        return {
+            "ok": True,
+            "problem": "url_filter_config_changed",
+            "raw_discovered": raw_discovered,
+            "after_filter": after_filter,
+            "imported": imported,
+            "historical_url_count": 0,
+            "dropped_sample": pipeline_stats.get("dropped_sample") or [],
+            "filter_config_changed_since_run": True,
+            "repair_blocked": True,
+            "repair_block_reason": filter_repair_block_reason,
+            "candidates": [],
+        }
 
     # ── 3. Load historical course URLs ────────────────────────────────────────
     url_rows = (await db.execute(
@@ -7800,6 +8275,7 @@ async def auto_repair_candidates(
         current_allow_pats=allow_pats,
         current_must_contain=must_contain,
         current_block_pats=block_pats,
+        current_course_detail_pats=course_detail_pats,
         raw_discovered=raw_discovered,
         after_filter=after_filter,
         imported=imported,
@@ -7807,6 +8283,18 @@ async def auto_repair_candidates(
         pipeline_stats=pipeline_stats,
         dropped_sample=dropped_sample,
     )
+    candidate_snapshot = (
+        job_filter_config if filter_snapshot_present else current_filter_config
+    )
+    candidate_snapshot_fingerprint = filter_config_fingerprint(candidate_snapshot)
+    candidates = [
+        {
+            **candidate,
+            "expected_filter_config": candidate_snapshot,
+            "expected_filter_config_fingerprint": candidate_snapshot_fingerprint,
+        }
+        for candidate in candidates
+    ]
 
     _block_dropped = pipeline_stats.get("block_dropped_count", 0)
     _pre_block = pipeline_stats.get("pre_block_discovered", raw_discovered)
@@ -7814,9 +8302,9 @@ async def auto_repair_candidates(
     problem = "unknown"
     if _pre_block > 5 and _block_dropped > 0 and _block_dropped > _pre_block * 0.80:
         problem = "block_catastrophic"
-    elif raw_discovered > 5 and after_filter == 0:
+    elif raw_discovered > 0 and after_filter == 0:
         problem = "url_filter_drop"
-    elif raw_discovered > 5 and after_filter < raw_discovered * 0.5:
+    elif raw_discovered > 0 and after_filter < raw_discovered * 0.5:
         problem = "partial_filter"
     elif raw_discovered == 0:
         problem = "low_discovery"
@@ -7834,6 +8322,7 @@ async def auto_repair_candidates(
         "imported": imported,
         "historical_url_count": len(historical_urls),
         "dropped_sample": dropped_sample,
+        "filter_config_changed_since_run": filter_config_changed_since_run,
         "candidates": candidates,
     }
 
@@ -7851,7 +8340,7 @@ async def simulate_fix(
     job_id: str,
     body: SimulateFixBody,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[dict, Depends(get_current_user)],
+    _: Annotated[dict, Depends(require_permission("scraping.view"))],
 ) -> dict:
     """Simulate proposed allow/block URL patterns against a list of dropped URLs.
 

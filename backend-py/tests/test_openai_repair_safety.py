@@ -260,6 +260,18 @@ def test_repair_target_requires_terminal_job_with_filter_failure_evidence() -> N
     )[0] is False
 
 
+def test_small_all_filtered_job_is_repairable_with_dropped_url_evidence() -> None:
+    evidence = {
+        "pipeline_stats": {
+            "raw_discovered": 4,
+            "after_filter": 0,
+            "dropped_sample": ["https://example.edu/study/course/arts"],
+        }
+    }
+
+    assert validate_url_repair_target("failed_degraded", evidence)[0] is True
+
+
 def test_unisc_verified_recipe_wins_for_recreated_database_id() -> None:
     config = get_config_for_host(
         hostname="www.unisc.edu.au",

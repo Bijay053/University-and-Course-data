@@ -22,6 +22,19 @@ def test_unsw_style_filter_collapse_cannot_report_success():
     assert "0 staged courses" in guard["message"]
 
 
+def test_filter_collapse_is_degraded_without_configured_catalogue_floor():
+    guard = _catalogue_floor_guard(
+        raw_discovered=4,
+        extractable=0,
+        staged=0,
+        expected_min_courses=None,
+    )
+
+    assert guard is not None
+    assert guard["status"] == "failed_degraded"
+    assert guard["kind"] == "discovery_filter_collapse"
+
+
 def test_partial_catalogue_finishes_with_warning_not_success():
     guard = _catalogue_floor_guard(
         raw_discovered=236,

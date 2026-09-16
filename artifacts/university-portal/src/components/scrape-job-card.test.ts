@@ -8,6 +8,7 @@ import {
   runtimeProgressFromStatus,
   shouldOfferIdenticalContinuation,
   shouldShowAutomaticUrlRepair,
+  shouldShowScrapeDiagnostics,
 } from "./scrape-job-card";
 
 describe("runtimeProgressFromStatus", () => {
@@ -117,6 +118,17 @@ describe("shouldShowAutomaticUrlRepair", () => {
   it("does not offer URL-filter repair without a completed job or for category-page diagnosis", () => {
     expect(shouldShowAutomaticUrlRepair(null, "high_drop_rate")).toBe(false);
     expect(shouldShowAutomaticUrlRepair("job_123", "category_pages")).toBe(false);
+  });
+});
+
+describe("shouldShowScrapeDiagnostics", () => {
+  it("keeps diagnostics available when a filter-collapse job ends in error", () => {
+    expect(shouldShowScrapeDiagnostics("job_filter_collapse", "error")).toBe(true);
+  });
+
+  it("does not expose terminal diagnostics while a job is still running", () => {
+    expect(shouldShowScrapeDiagnostics("job_running", "extract")).toBe(false);
+    expect(shouldShowScrapeDiagnostics(null, "error")).toBe(false);
   });
 });
 

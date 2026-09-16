@@ -22,6 +22,13 @@ type ScrapeLog = {
   dropped?: number; kept?: number;
   category_count?: number; total_kept?: number; category_pct?: number;
   pattern_breakdown?: Record<string, number>;
+  patterns?: string[];
+  pipeline_stats?: {
+    raw_discovered?: number;
+    after_filter?: number;
+    filter_drop_pct?: number;
+    dropped_sample?: string[];
+  } | null;
   /** Granular per-guard skip counts — present only on the "done" event. */
   skip_reasons?: Record<string, number>;
   /** Per-sub-reason sample URLs+names (up to 10 each) — present only on the "done" event. */
@@ -140,6 +147,16 @@ export function shouldShowAutomaticUrlRepair(
   warningKind: "high_drop_rate" | "category_pages" | null,
 ): boolean {
   return Boolean(completedJobId && warningKind === "high_drop_rate");
+}
+
+export function shouldShowScrapeDiagnostics(
+  completedJobId: string | null,
+  phase: string,
+): boolean {
+  return Boolean(
+    completedJobId
+    && (phase === "done" || phase === "error")
+  );
 }
 
 type QualityAction = {
@@ -330,6 +347,12 @@ type LevelBreakdown = {
   other: number;
   unknown: number;
 };
+type FilterConfigSnapshot = {
+  allow_url_patterns?: string[];
+  must_contain?: string[];
+  block_url_patterns?: string[];
+  course_detail_url_patterns?: string[];
+};
 type DeterministicIssue = {
   issue: string;
   severity: "critical" | "warning";
@@ -338,6 +361,7 @@ type DeterministicIssue = {
   potential_causes?: string[];
   recipe_patch?: Record<string, unknown>;
   recipe_patch_description?: string;
+  filter_config_changed_since_run?: boolean;
 };
 type DiagnoseResult = {
   ok: boolean;
@@ -351,6 +375,10 @@ type DiagnoseResult = {
   diagnosis?: DiagnosisPayload;
   fallback?: DiagnosisPayload;
   suggested_config?: Record<string, unknown>;
+  filter_config_snapshot?: FilterConfigSnapshot | null;
+  filter_config_fingerprint?: string | null;
+  filter_repair_blocked?: boolean;
+  filter_repair_block_reason?: string | null;
   error?: string;
 };
 
@@ -587,7 +615,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
 
   type UrlFilterWarning = {
     kind: "high_drop_rate" | "category_pages";
-    ruleType?: "block" | "allow";
+    ruleType?: "block" | "allow" | "must_contain" | "course_detail" | "unknown";
     patternBreakdown?: Record<string, number>;
     dropPct?: number; dropped?: number; kept?: number;
     droppedSample?: string[];
@@ -596,7 +624,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
   const [urlFilterWarning, setUrlFilterWarning] = useState<UrlFilterWarning | null>(null);
 
   // URL filter test tool state
-  type UrlTestResult = { url: string; passed: boolean; drop_reason?: string | null; matching_allow_pattern?: string | null; blocking_block_pattern?: string | null };
+  type UrlTestResult = { url: string; passed: boolean; drop_reason?: string | null; matching_allow_pattern?: string | null; blocking_block_pattern?: string | null; matching_course_detail_pattern?: string | null };
   type UrlTestSummary = { total: number; kept_count: number; dropped_count: number; drop_pct: number };
   const [urlTestInput, setUrlTestInput] = useState("");
   const [urlTestResults, setUrlTestResults] = useState<{ results: UrlTestResult[]; summary: UrlTestSummary } | null>(null);
@@ -659,6 +687,8 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
     expected_gain: number;
     problem_addressed?: string;
     simulation?: { before_count: number; after_count: number; method: string; note?: string };
+    expected_filter_config?: FilterConfigSnapshot;
+    expected_filter_config_fingerprint?: string;
   };
   const [repairCandidates, setRepairCandidates] = useState<RepairCandidateData[] | null>(null);
   const [repairLoading, setRepairLoading] = useState(false);
@@ -1001,7 +1031,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
   }, [selectedUni]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (phase === "done" && urlFilterWarning && urlFilterWarning.kind !== "category_pages" && completedJobId && repairCandidates === null && !repairLoading) {
+    if (shouldShowScrapeDiagnostics(completedJobId, phase) && urlFilterWarning && urlFilterWarning.kind !== "category_pages" && repairCandidates === null && !repairLoading) {
       setRepairLoading(true);
       fetch(`/api/scrape/jobs/${completedJobId}/auto-repair-candidates`, {
         method: "POST",
@@ -1105,7 +1135,11 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ config_patch: candidate.recipe_patch }),
+        body: JSON.stringify({
+          config_patch: candidate.recipe_patch,
+          expected_filter_config: candidate.expected_filter_config,
+          expected_filter_config_fingerprint: candidate.expected_filter_config_fingerprint,
+        }),
       });
       const data = await res.json();
       if (data.ok) setRepairFixApplied(true);
@@ -1235,14 +1269,23 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
     }
   }, [completedJobId, toast]);
 
-  const applyFix = useCallback(async (jobId: string, patch: Record<string, unknown>) => {
+  const applyFix = useCallback(async (
+    jobId: string,
+    patch: Record<string, unknown>,
+    expectedFilterConfig?: FilterConfigSnapshot | null,
+    expectedFilterFingerprint?: string | null,
+  ) => {
     setApplyingFix(true);
     try {
       const res = await fetch(`/api/scrape/jobs/${jobId}/apply-fix`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ config_patch: patch }),
+        body: JSON.stringify({
+          config_patch: patch,
+          expected_filter_config: expectedFilterConfig,
+          expected_filter_config_fingerprint: expectedFilterFingerprint,
+        }),
       });
       if (!res.ok) {
         const msg = await getFetchErrorMessage(res);
@@ -1465,6 +1508,25 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
             if (doneLog.performance_savings) {
               setPerformanceSavings(doneLog.performance_savings);
             }
+            // A discovery-stage filter can remove every URL before its
+            // post-discovery counterpart emits a granular filter event. The
+            // terminal pipeline stats are durable, so use them as a fallback
+            // warning source for small all-filtered jobs as well.
+            const pipeline = doneLog.pipeline_stats;
+            if (
+              pipeline
+              && (pipeline.raw_discovered ?? 0) > 0
+              && (pipeline.after_filter ?? 0) === 0
+            ) {
+              setUrlFilterWarning((previous) => previous ?? {
+                kind: "high_drop_rate",
+                ruleType: "unknown",
+                dropPct: pipeline.filter_drop_pct ?? 100,
+                dropped: pipeline.raw_discovered,
+                kept: 0,
+                droppedSample: pipeline.dropped_sample,
+              });
+            }
           }
 
           // Detect URL filter warnings in live log stream
@@ -1499,6 +1561,30 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                   kept: l.kept,
                   droppedSample: l.dropped_sample,
                   patternBreakdown: l.pattern_breakdown,
+                };
+              });
+            } else if (l.kind === "extract_must_contain_filter" && (l.drop_pct ?? 0) > 40) {
+              setUrlFilterWarning((prev) => {
+                if (prev?.kind === "category_pages") return prev;
+                return {
+                  kind: "high_drop_rate",
+                  ruleType: "must_contain",
+                  dropPct: l.drop_pct,
+                  dropped: l.dropped,
+                  kept: l.kept,
+                  droppedSample: l.dropped_sample,
+                };
+              });
+            } else if (l.kind === "extract_course_detail_filter" && (l.drop_pct ?? 0) > 40) {
+              setUrlFilterWarning((prev) => {
+                if (prev?.kind === "category_pages") return prev;
+                return {
+                  kind: "high_drop_rate",
+                  ruleType: "course_detail",
+                  dropPct: l.drop_pct,
+                  dropped: l.dropped,
+                  kept: l.kept,
+                  droppedSample: l.dropped_sample,
                 };
               });
             }
@@ -2176,6 +2262,12 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                     <p className="text-amber-700 leading-relaxed">
                       {urlFilterWarning.ruleType === "block"
                         ? <><code className="font-mono bg-amber-100 px-0.5 rounded">block_url_patterns</code> removed {urlFilterWarning.dropped} URLs — only {urlFilterWarning.kept} remain for extraction.</>
+                        : urlFilterWarning.ruleType === "must_contain"
+                        ? <><code className="font-mono bg-amber-100 px-0.5 rounded">must_contain</code> removed {urlFilterWarning.dropped} URLs — only {urlFilterWarning.kept} remain for extraction.</>
+                        : urlFilterWarning.ruleType === "course_detail"
+                        ? <><code className="font-mono bg-amber-100 px-0.5 rounded">course_detail_url_patterns</code> removed {urlFilterWarning.dropped} URLs — only {urlFilterWarning.kept} remain for extraction.</>
+                        : urlFilterWarning.ruleType === "unknown"
+                        ? <>A URL filter removed {urlFilterWarning.dropped} discovered URLs before extraction; no URLs remained.</>
                         : <><code className="font-mono bg-amber-100 px-0.5 rounded">allow_url_patterns</code> only matched {urlFilterWarning.kept} URLs — {urlFilterWarning.dropped} were not matched and dropped.</>
                       }
                     </p>
@@ -2311,6 +2403,12 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                     <p className="text-amber-700 leading-relaxed">
                       {urlFilterWarning.ruleType === "block"
                         ? <><code className="font-mono bg-amber-100 px-0.5 rounded">block_url_patterns</code> removed {urlFilterWarning.dropped} course URLs. Only {urlFilterWarning.kept} were extracted.</>
+                        : urlFilterWarning.ruleType === "must_contain"
+                        ? <><code className="font-mono bg-amber-100 px-0.5 rounded">must_contain</code> removed {urlFilterWarning.dropped} course URLs. Only {urlFilterWarning.kept} were extracted.</>
+                        : urlFilterWarning.ruleType === "course_detail"
+                        ? <><code className="font-mono bg-amber-100 px-0.5 rounded">course_detail_url_patterns</code> removed {urlFilterWarning.dropped} course URLs. Only {urlFilterWarning.kept} were extracted.</>
+                        : urlFilterWarning.ruleType === "unknown"
+                        ? <>A URL filter removed {urlFilterWarning.dropped} discovered URLs before extraction; no courses were staged.</>
                         : <><code className="font-mono bg-amber-100 px-0.5 rounded">allow_url_patterns</code> only matched {urlFilterWarning.kept} URLs — {urlFilterWarning.dropped} valid course pages may have been dropped.</>
                       }
                     </p>
@@ -2425,7 +2523,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                     {showUrlTestPanel && (
                       <div className="space-y-1.5 pt-1">
                         <p className="text-[9px] text-gray-500 leading-relaxed">
-                          Paste candidate URLs below (one per line). The test uses this university's current allow_url_patterns, must_contain, and block_url_patterns config automatically.
+                          Paste candidate URLs below (one per line). The test uses this university's current URL-filter config automatically.
                         </p>
                         <textarea
                           value={urlTestInput}
@@ -3231,14 +3329,14 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
             )}
 
             {/* ── AI Diagnostic Panel ─────────────────────────────────── */}
-            {completedJobId && (
+            {shouldShowScrapeDiagnostics(completedJobId, phase) && (
               <div className="border border-blue-200 rounded-lg overflow-hidden">
                 <button
                   type="button"
                   className="w-full flex items-center justify-between px-3 py-2 bg-blue-50 hover:bg-blue-100 transition-colors"
                   onClick={() => {
                     if (!diagnoseResult && !diagnoseLoading) {
-                      fetchDiagnose(completedJobId);
+                      fetchDiagnose(completedJobId!);
                     } else {
                       setShowDiagnosePanel((v) => !v);
                     }
@@ -3348,6 +3446,11 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                                       </ul>
                                     </div>
                                   )}
+                                  {issue.filter_config_changed_since_run && issue.recipe_patch_description && (
+                                    <p className="mt-1.5 pt-1.5 border-t border-red-200 text-[9px] text-red-600 leading-snug">
+                                      <span className="font-semibold">Safety hold: </span>{issue.recipe_patch_description}
+                                    </p>
+                                  )}
                                   {issue.recipe_patch && (
                                     <div className="mt-1.5 pt-1.5 border-t border-red-200">
                                       {issue.recipe_patch_description && (
@@ -3356,7 +3459,12 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                                         </p>
                                       )}
                                       <button
-                                        onClick={() => applyFix(diagnoseResult!.job_id, issue.recipe_patch!)}
+                                        onClick={() => applyFix(
+                                          diagnoseResult!.job_id,
+                                          issue.recipe_patch!,
+                                          diagnoseResult!.filter_config_snapshot,
+                                          diagnoseResult!.filter_config_fingerprint,
+                                        )}
                                         disabled={applyingFix || fixApplied}
                                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                       >
@@ -3483,7 +3591,12 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                                   ) : (
                                     <button
                                       type="button"
-                                      onClick={() => applyFix(completedJobId, sc as Record<string, unknown>)}
+                                       onClick={() => applyFix(
+                                         completedJobId!,
+                                         sc as Record<string, unknown>,
+                                         diagnoseResult?.filter_config_snapshot,
+                                         diagnoseResult?.filter_config_fingerprint,
+                                       )}
                                       disabled={applyingFix}
                                       className="text-[10px] bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded flex items-center gap-1 disabled:opacity-50"
                                     >
@@ -3500,7 +3613,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                           <div className="flex items-center gap-2 pt-1 border-t border-gray-100 flex-wrap">
                             <button
                               type="button"
-                              onClick={() => fetchDiagnose(completedJobId)}
+                              onClick={() => fetchDiagnose(completedJobId!)}
                               disabled={diagnoseLoading}
                               className="text-[10px] text-blue-500 hover:text-blue-700 disabled:opacity-50 flex items-center gap-1"
                             >

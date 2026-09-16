@@ -486,8 +486,8 @@ def validate_url_repair_target(status: str, discovered_config: dict) -> tuple[bo
     after = int(pipeline.get("after_filter") or 0)
     pre_block = int(pipeline.get("pre_block_discovered") or raw)
     block_dropped = int(pipeline.get("block_dropped_count") or 0)
-    has_filter_failure = raw > 5 and (after == 0 or after < raw * 0.5)
-    has_block_failure = pre_block > 5 and block_dropped > pre_block * 0.8
+    has_filter_failure = raw > 0 and (after == 0 or after < raw * 0.5)
+    has_block_failure = pre_block > 0 and block_dropped > pre_block * 0.8
     dropped_sample = pipeline.get("dropped_sample") or []
     if not (has_filter_failure or has_block_failure) or not dropped_sample:
         return (
@@ -1531,6 +1531,18 @@ async def _gather_context(job_id: str, db) -> dict:
 
     sc           = row["scrape_config_raw"] or {}
     admin_config = sc.get("admin_config") or {}
+    _run_filter_snapshot = disc_cfg.get(
+        "filter_config",
+        pipeline.get("filter_config"),
+    )
+    filter_config_snapshot_present = (
+        isinstance(_run_filter_snapshot, dict)
+    )
+    filter_config_snapshot = (
+        dict(_run_filter_snapshot or {})
+        if filter_config_snapshot_present
+        else {}
+    )
 
     unis_dir = Path(__file__).parent.parent.parent.parent / "scraper_config" / "unis"
     yaml_files: list[Path] = []
@@ -1670,6 +1682,9 @@ async def _gather_context(job_id: str, db) -> dict:
         "repair_url_sample": list(dict.fromkeys(repair_course_url_sample + dropped_sample)),
         "passed_sample":   passed_sample,
         "admin_config":    admin_config,
+        "scrape_config_snapshot": dict(sc),
+        "filter_config_snapshot": filter_config_snapshot,
+        "filter_config_snapshot_present": filter_config_snapshot_present,
         "effective_discovery": effective_discovery,
         "yaml_content":    yaml_content[:4000],
         "quality":         quality,
@@ -1853,7 +1868,13 @@ def _merge_repair_patch(base: dict, patch: dict) -> dict:
     return result
 
 
-async def _apply_to_db(uni_id: int, config_patch: dict, db) -> dict:
+async def _apply_to_db(
+    uni_id: int,
+    config_patch: dict,
+    db,
+    *,
+    expected_config: dict | None = None,
+) -> dict:
     """Merge config_patch into universities.scrape_config.admin_config and commit."""
     from sqlalchemy import text
     import json as _json
@@ -1864,15 +1885,31 @@ async def _apply_to_db(uni_id: int, config_patch: dict, db) -> dict:
     )).mappings().first()
 
     sc       = dict((row.get("scrape_config") or {}) if row else {})
+    if expected_config is not None and sc != expected_config:
+        raise RuntimeError(
+            "Scraper config changed during URL-filter validation; no repair was saved."
+        )
     existing = sc.get("admin_config") or {}
     sc["_prev_admin_config"] = existing
     original_sc = dict(sc)
     sc["admin_config"] = _merge_repair_patch(existing, config_patch)
 
-    await db.execute(
-        text("UPDATE universities SET scrape_config = CAST(:cfg AS jsonb) WHERE id = :id"),
-        {"cfg": _json.dumps(sc), "id": uni_id},
+    result = await db.execute(
+        text(
+            "UPDATE universities SET scrape_config = CAST(:cfg AS jsonb) "
+            "WHERE id = :id AND scrape_config = CAST(:expected AS jsonb)"
+        ),
+        {
+            "cfg": _json.dumps(sc),
+            "expected": _json.dumps(original_sc),
+            "id": uni_id,
+        },
     )
+    if result.rowcount != 1:
+        await db.rollback()
+        raise RuntimeError(
+            "Scraper config changed during URL-filter apply; no repair was saved."
+        )
     await db.commit()
     return original_sc
 
@@ -1915,9 +1952,20 @@ async def _restore_db_config(
     await db.commit()
 
 
-async def _apply_discovery_to_db(uni_id: int, disc_patch: dict, db) -> dict:
+async def _apply_discovery_to_db(
+    uni_id: int,
+    disc_patch: dict,
+    db,
+    *,
+    expected_config: dict | None = None,
+) -> dict:
     """Write discovery-section patch into admin_config.discovery."""
-    return await _apply_to_db(uni_id, {"discovery": disc_patch}, db)
+    return await _apply_to_db(
+        uni_id,
+        {"discovery": disc_patch},
+        db,
+        expected_config=expected_config,
+    )
 
 
 async def _read_scrape_config(uni_id: int, db) -> dict:
@@ -2520,58 +2568,73 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
                 "course_detail_url_patterns",
             }
             if _URL_FILTER_FIELDS.intersection(disc_patch):
-                from sqlalchemy import text as _text
-                dc_row = (await db.execute(
-                    _text("SELECT discovered_config FROM scrape_runtime_jobs WHERE runtime_job_id = :j"),
-                    {"j": job_id},
-                )).first()
-                dc: dict = (dc_row[0] or {}) if dc_row else {}
-                dropped = simulation_urls or dc.get("pipeline_stats", {}).get("dropped_sample") or []
-                baseline_sim = _simulate_filter(
-                    dropped,
-                    current_disc.get("allow_url_patterns", []),
-                    current_disc.get("block_url_patterns", []),
-                    current_disc.get("must_contain", []),
-                    current_disc.get("course_detail_url_patterns", []),
+                from app.services.scraper.auto_repair_candidates import (
+                    filter_repair_safety_issue,
                 )
-                proposed_disc = {**current_disc, **disc_patch}
-                sim = _simulate_filter(
-                    dropped,
-                    proposed_disc.get("allow_url_patterns", []),
-                    proposed_disc.get("block_url_patterns", []),
-                    proposed_disc.get("must_contain", []),
-                    proposed_disc.get("course_detail_url_patterns", []),
-                )
-                sim["before"] = baseline_sim["after"]
 
-                minimum_rescue = max(1, (sim["total"] + 1) // 2)
-                if (
-                    sim["total"] == 0
-                    or sim["after"] <= sim["before"]
-                    or (ctx["after_filter"] == 0 and sim["after"] < minimum_rescue)
-                ):
+                filter_safety_issue = filter_repair_safety_issue(
+                    ctx.get("filter_config_snapshot"),
+                    current_disc,
+                    snapshot_present=ctx.get("filter_config_snapshot_present"),
+                )
+                if filter_safety_issue:
                     validation_errors.append(
-                        "OpenAI URL patch rejected: full effective-filter simulation "
-                        f"rescued {sim['after']}/{sim['total']} URLs "
-                        f"(before {sim['before']}); at least {minimum_rescue} required."
-                    )
-                    log.warning(
-                        "ai_repair: rejecting non-improving URL patch before apply: %s",
-                        validation_errors[-1],
+                        f"OpenAI URL patch rejected: {filter_safety_issue}"
                     )
                     disc_patch = {}
+                else:
+                    from sqlalchemy import text as _text
+                    dc_row = (await db.execute(
+                        _text("SELECT discovered_config FROM scrape_runtime_jobs WHERE runtime_job_id = :j"),
+                        {"j": job_id},
+                    )).first()
+                    dc: dict = (dc_row[0] or {}) if dc_row else {}
+                    dropped = simulation_urls or dc.get("pipeline_stats", {}).get("dropped_sample") or []
+                    baseline_sim = _simulate_filter(
+                        dropped,
+                        current_disc.get("allow_url_patterns", []),
+                        current_disc.get("block_url_patterns", []),
+                        current_disc.get("must_contain", []),
+                        current_disc.get("course_detail_url_patterns", []),
+                    )
+                    proposed_disc = {**current_disc, **disc_patch}
+                    sim = _simulate_filter(
+                        dropped,
+                        proposed_disc.get("allow_url_patterns", []),
+                        proposed_disc.get("block_url_patterns", []),
+                        proposed_disc.get("must_contain", []),
+                        proposed_disc.get("course_detail_url_patterns", []),
+                    )
+                    sim["before"] = baseline_sim["after"]
 
-                # Update ctx drop_rate immediately so next iteration uses the improved value
-                if disc_patch and sim.get("after", 0) > sim.get("before", 0):
-                    _raw      = ctx["raw_discovered"]
-                    _new_after = ctx["after_filter"] + sim["after"]
-                    ctx["drop_rate"] = max(0, round(100 * (1 - _new_after / _raw))) if _raw > 0 else 0
-                    if ctx["drop_rate"] <= 20:
-                        _discovery_phase_done = True
-                        log.info(
-                            "ai_repair: discovery phase complete — drop_rate now %s%% after simulation",
-                            ctx["drop_rate"],
+                    minimum_rescue = max(1, (sim["total"] + 1) // 2)
+                    if (
+                        sim["total"] == 0
+                        or sim["after"] <= sim["before"]
+                        or (ctx["after_filter"] == 0 and sim["after"] < minimum_rescue)
+                    ):
+                        validation_errors.append(
+                            "OpenAI URL patch rejected: full effective-filter simulation "
+                            f"rescued {sim['after']}/{sim['total']} URLs "
+                            f"(before {sim['before']}); at least {minimum_rescue} required."
                         )
+                        log.warning(
+                            "ai_repair: rejecting non-improving URL patch before apply: %s",
+                            validation_errors[-1],
+                        )
+                        disc_patch = {}
+
+                    # Update ctx drop_rate immediately so next iteration uses the improved value
+                    if disc_patch and sim.get("after", 0) > sim.get("before", 0):
+                        _raw      = ctx["raw_discovered"]
+                        _new_after = ctx["after_filter"] + sim["after"]
+                        ctx["drop_rate"] = max(0, round(100 * (1 - _new_after / _raw))) if _raw > 0 else 0
+                        if ctx["drop_rate"] <= 20:
+                            _discovery_phase_done = True
+                            log.info(
+                                "ai_repair: discovery phase complete — drop_rate now %s%% after simulation",
+                                ctx["drop_rate"],
+                            )
 
             # ⑥ Apply discovery patch
             patch_applied_ok  = False
@@ -2600,6 +2663,7 @@ async def run_ai_repair_loop(job_id: str, db, *, lease_token: str | None = None)
                         ctx["university_id"],
                         disc_patch,
                         db,
+                        expected_config=ctx.get("scrape_config_snapshot"),
                     )
                     await _assert_effective_discovery_patch(
                         ctx["university_id"],

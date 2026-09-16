@@ -225,12 +225,21 @@ type DiagnoseResult = {
   diagnosis?: DiagnosisPayload;
   fallback?: DiagnosisPayload;
   suggested_config?: Record<string, unknown>;
+  filter_config_snapshot?: FilterConfigSnapshot | null;
+  filter_config_fingerprint?: string | null;
   already_applied?: boolean;
   error?: string;
   phase3_recommendations?: Phase3Rec[];
   course_probe_summary?: CourseProbeSummary;
   deterministic_issues?: DeterministicIssue[];
   level_breakdown?: Record<string, number>;
+};
+
+type FilterConfigSnapshot = {
+  allow_url_patterns?: string[];
+  must_contain?: string[];
+  block_url_patterns?: string[];
+  course_detail_url_patterns?: string[];
 };
 
 type SimChange = { field: string; before: string | null; after: string | null };
@@ -404,6 +413,8 @@ type RepairCandidate = {
   safety_gate_passed: boolean;
   expected_gain: number;
   selection_reason: string;
+  expected_filter_config?: FilterConfigSnapshot;
+  expected_filter_config_fingerprint?: string;
 };
 
 type RepairCandidatesResult = {
@@ -744,6 +755,8 @@ export default function ScrapeAgentPage() {
           recipe_patch: candidate.recipe_patch,
           filter_cleared: candidate.id,
           trigger_scrape: false,
+            expected_filter_config: candidate.expected_filter_config,
+            expected_filter_config_fingerprint: candidate.expected_filter_config_fingerprint,
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -990,6 +1003,8 @@ export default function ScrapeAgentPage() {
             body: JSON.stringify({
               recipe_patch: allFilteredIssue.recipe_patch,
               filter_cleared: filterCleared,
+              expected_filter_config: data.filter_config_snapshot,
+              expected_filter_config_fingerprint: data.filter_config_fingerprint,
             }),
           });
           if (!repairRes.ok) throw new Error(await repairRes.text());
@@ -1044,7 +1059,12 @@ export default function ScrapeAgentPage() {
       const res = await fetch(`${BASE}/api/scrape/jobs/${jobId}/apply-fix`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ config_patch: patch, force }),
+        body: JSON.stringify({
+          config_patch: patch,
+          force,
+          expected_filter_config: diagnoseResult?.filter_config_snapshot,
+          expected_filter_config_fingerprint: diagnoseResult?.filter_config_fingerprint,
+        }),
       });
       if (res.status === 422) {
         const errBody = await res.json();
@@ -2166,7 +2186,14 @@ export default function ScrapeAgentPage() {
                     </span>
                   </p>
                   {diagnoseResult.phase3_recommendations.map((rec) => (
-                    <Phase3RecCard key={rec.id} rec={rec} jobId={config?.latest_job_id ?? null} uniId={uniId} />
+                    <Phase3RecCard
+                      key={rec.id}
+                      rec={rec}
+                      jobId={config?.latest_job_id ?? null}
+                      uniId={uniId}
+                      expectedFilterConfig={diagnoseResult.filter_config_snapshot}
+                      expectedFilterFingerprint={diagnoseResult.filter_config_fingerprint}
+                    />
                   ))}
                 </div>
               )}
@@ -3939,12 +3966,16 @@ function FixPreviewModal({
   uniId,
   onClose,
   onApplied,
+  expectedFilterConfig,
+  expectedFilterFingerprint,
 }: {
   rec: Phase3Rec;
   jobId: string;
   uniId: number;
   onClose: () => void;
   onApplied: () => void;
+  expectedFilterConfig?: FilterConfigSnapshot | null;
+  expectedFilterFingerprint?: string | null;
 }) {
   const { toast } = useToast();
   const [preview, setPreview] = useState<FixPreviewResult | null>(null);
@@ -4021,7 +4052,11 @@ function FixPreviewModal({
       const res = await fetch(`${BASE}/api/scrape/jobs/${jobId}/apply-fix`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ config_patch: rec.fix.recipe_patch }),
+        body: JSON.stringify({
+          config_patch: rec.fix.recipe_patch,
+          expected_filter_config: expectedFilterConfig,
+          expected_filter_config_fingerprint: expectedFilterFingerprint,
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -4508,7 +4543,19 @@ function FixPreviewModal({
 
 // ── Phase 3 Recommendation Card ───────────────────────────────────────────────
 
-function Phase3RecCard({ rec, jobId, uniId }: { rec: Phase3Rec; jobId: string | null; uniId: number }) {
+function Phase3RecCard({
+  rec,
+  jobId,
+  uniId,
+  expectedFilterConfig,
+  expectedFilterFingerprint,
+}: {
+  rec: Phase3Rec;
+  jobId: string | null;
+  uniId: number;
+  expectedFilterConfig?: FilterConfigSnapshot | null;
+  expectedFilterFingerprint?: string | null;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [probing, setProbing] = useState(false);
@@ -4550,6 +4597,8 @@ function Phase3RecCard({ rec, jobId, uniId }: { rec: Phase3Rec; jobId: string | 
           rec={rec}
           jobId={jobId}
           uniId={uniId}
+          expectedFilterConfig={expectedFilterConfig}
+          expectedFilterFingerprint={expectedFilterFingerprint}
           onClose={() => setShowPreview(false)}
           onApplied={() => { /* applied — keep modal open for validation */ }}
         />
