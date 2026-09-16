@@ -1322,6 +1322,48 @@ async def _already_staged_checkpoint_rows(
     return checkpoints
 
 
+async def _pending_review_rows_for_replacement(
+    db: AsyncSession, university_id: int, *, current_job_id: str | None = None
+) -> dict[str, list[int]]:
+    """Return all prior pending URL rows eligible for exact replacement.
+
+    Required-fee full scrapes supersede pending review data from completed jobs
+    as well as interrupted resume checkpoints. The caller must intersect this
+    map with the current discovery set and delete only after clean completion.
+    """
+    from sqlalchemy import text as _text
+
+    params: dict = {"uid": university_id}
+    not_current = ""
+    if current_job_id:
+        not_current = "AND sc.scrape_job_id <> :cur_job"
+        params["cur_job"] = current_job_id
+    rows = (
+        await db.execute(
+            _text(
+                f"""
+                SELECT sc.id, sc.course_website
+                FROM scraped_courses sc
+                WHERE sc.university_id = :uid
+                  AND sc.status = 'pending'
+                  AND sc.course_website IS NOT NULL
+                  AND sc.course_website <> ''
+                  {not_current}
+                ORDER BY sc.created_at DESC
+                """
+            ),
+            params,
+        )
+    ).all()
+
+    pending: dict[str, list[int]] = {}
+    for course_id, course_url in rows:
+        key = _normalize_course_url(course_url)
+        if key:
+            pending.setdefault(key, []).append(int(course_id))
+    return pending
+
+
 async def _already_staged_urls(
     db: AsyncSession, university_id: int, *, current_job_id: str | None = None
 ) -> set[str]:
@@ -5373,20 +5415,28 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             and links
         ):
             try:
-                _candidate_rows = await _already_staged_checkpoint_rows(
-                    db, job.university_id, current_job_id=runtime_job_id
-                )
                 _resume_allowed = _resume_checkpoint_policy_allows(_uni_cfg)
                 if _resume_allowed:
+                    _candidate_rows = await _already_staged_checkpoint_rows(
+                        db, job.university_id, current_job_id=runtime_job_id
+                    )
                     _done_rows = _candidate_rows
                 else:
+                    _pending_rows = await _pending_review_rows_for_replacement(
+                        db, job.university_id, current_job_id=runtime_job_id
+                    )
                     _done_rows = {}
-                    (
-                        _bypassed_resume_keys,
-                        _bypassed_resume_course_ids,
-                        _bypassed_resume_source_jobs,
-                    ) = _matched_resume_provenance(
-                        links, _candidate_rows
+                    _current_link_keys = {
+                        _normalize_course_url(link.get("url"))
+                        for link in links
+                        if _normalize_course_url(link.get("url"))
+                    }
+                    _bypassed_resume_course_ids = sorted(
+                        {
+                            course_id
+                            for key in _current_link_keys
+                            for course_id in _pending_rows.get(key, [])
+                        }
                     )
                     log.info(
                         "[RESUME] bypassed %d pending checkpoints for %s because "

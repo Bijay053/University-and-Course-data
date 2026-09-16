@@ -7,4 +7,4 @@ Pending rows from an interrupted scrape cannot prove which central fee source pr
 
 **Why:** A resumed SIT scrape inherited fee-less pending rows from an earlier attempt. The new extraction path correctly failed closed for newly processed courses, but the inherited rows still appeared in the new review chain.
 
-**How to apply:** Intersect prior checkpoints with the current discovered work list, reprocess those URLs, and retain their exact row IDs. Remove only those still-pending IDs after the replacement job finishes cleanly; preserve them if the replacement stops, fails, degrades, or completes with warnings.
+**How to apply:** Intersect all prior pending review URLs—including rows owned by completed jobs—with the current discovered work list, reprocess those URLs, and retain their exact row IDs. Remove only those still-pending IDs after the replacement job finishes cleanly; preserve them if the replacement stops, fails, degrades, or completes with warnings.

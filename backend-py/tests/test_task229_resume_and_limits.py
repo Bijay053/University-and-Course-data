@@ -22,6 +22,7 @@ from app.services.scraper.orchestrator import (
     _discard_bypassed_resume_rows,
     _matched_resume_provenance,
     _normalize_course_url,
+    _pending_review_rows_for_replacement,
     _resume_checkpoint_policy_allows,
 )
 
@@ -140,6 +141,41 @@ def test_discard_bypassed_resume_rows_noops_for_empty_ids():
             raise AssertionError("empty cleanup must not execute SQL")
 
     assert _run(_discard_bypassed_resume_rows(_DB(), [])) == 0
+
+
+def test_required_fee_replacement_queries_all_prior_pending_jobs():
+    class _Rows:
+        def all(self):
+            return [
+                (101, "https://uni.edu/course/a"),
+                (102, "http://www.uni.edu/course/a/"),
+                (202, "https://uni.edu/course/b"),
+            ]
+
+    class _DB:
+        statement = None
+        params = None
+
+        async def execute(self, statement, params):
+            self.statement = statement
+            self.params = params
+            return _Rows()
+
+    db = _DB()
+    rows = _run(
+        _pending_review_rows_for_replacement(
+            db, 42, current_job_id="job_current"
+        )
+    )
+    sql = str(db.statement)
+    assert "scrape_runtime_jobs" not in sql
+    assert "sc.status = 'pending'" in sql
+    assert "sc.scrape_job_id <> :cur_job" in sql
+    assert db.params == {"uid": 42, "cur_job": "job_current"}
+    assert rows == {
+        "uni.edu/course/a": [101, 102],
+        "uni.edu/course/b": [202],
+    }
 
 
 def test_resume_provenance_records_only_checkpoint_rows_used_by_current_links():
