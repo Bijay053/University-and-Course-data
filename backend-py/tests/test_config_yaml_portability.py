@@ -1,3 +1,4 @@
+import hashlib
 from pathlib import Path
 
 from app.services.scraper.config import loader
@@ -16,20 +17,25 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def _generated_stub(body: str) -> str:
+    digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
+    return f"# Generated-stub-sha256: {digest}\n{body}"
+
+
 def test_generated_id_stub_cannot_shadow_matching_shared_recipe(
     monkeypatch, tmp_path
 ) -> None:
     monkeypatch.setattr(loader, "_UNIS_DIR", tmp_path)
     _write(
         tmp_path / "portable_11.yaml",
-        """# Hostname: portable.edu
+        _generated_stub("""# Hostname: portable.edu
 # Auto-generated: 2026-09-03
 # This stub was created automatically on the first scrape of this university.
 discovery: {}
 extraction:
   fees:
     default_currency: USD
-""",
+"""),
     )
     _write(
         tmp_path / "portable.yaml",
@@ -54,12 +60,12 @@ def test_generated_id_stub_cannot_shadow_matching_numeric_recipe(
     monkeypatch.setattr(loader, "_UNIS_DIR", tmp_path)
     _write(
         tmp_path / "portable_11.yaml",
-        """# Hostname: portable.edu
+        _generated_stub("""# Hostname: portable.edu
 # Auto-generated: 2026-09-05
 # This stub was created automatically on the first scrape of this university.
 discovery:
   allow_url_patterns: ["/wrong/"]
-""",
+"""),
     )
     _write(
         tmp_path / "portable_2215.yaml",
@@ -90,6 +96,86 @@ discovery:
 
     assert config.discovery.allow_url_patterns == ["/course/"]
     assert not (tmp_path / "portable_11.yaml").exists()
+
+
+def test_runtime_generated_overlay_preserves_only_non_conflicting_settings(
+    monkeypatch, tmp_path
+) -> None:
+    unis = tmp_path / "unis"
+    runtime_unis = tmp_path / "runtime_unis"
+    unis.mkdir()
+    runtime_unis.mkdir()
+    monkeypatch.setattr(loader, "_UNIS_DIR", unis)
+    monkeypatch.setattr(loader, "_RUNTIME_UNIS_DIR", runtime_unis)
+    _write(
+        unis / "portable_11.yaml",
+        """hostname_guard: portable.edu
+discovery:
+  bfs_page_budget: 9
+extraction:
+  fees:
+    default_currency: CAD
+""",
+    )
+    _write(
+        runtime_unis / "portable_11.yaml",
+        """discovery:
+  bfs_page_budget: 3
+  max_candidates: 77
+extraction:
+  fees:
+    default_currency: USD
+""",
+    )
+
+    config = _load(slug="portable", host="portable.edu", university_id=11)
+
+    assert config.discovery.bfs_page_budget == 9
+    assert config.discovery.max_candidates == 77
+    assert config.extraction.fees.default_currency == "CAD"
+
+
+def test_generated_stub_identity_fails_after_manual_edit(tmp_path) -> None:
+    body = """# Hostname: portable.edu
+# Auto-generated: 2026-09-16
+# This stub was created automatically on the first scrape of this university.
+discovery: {}
+"""
+    path = tmp_path / "portable_11.yaml"
+    _write(path, _generated_stub(body))
+    assert loader._is_generated_stub(path)
+
+    path.write_text(
+        path.read_text().replace(
+            "discovery: {}", "discovery: {bfs_page_budget: 9}"
+        )
+    )
+    assert not loader._is_generated_stub(path)
+
+
+def test_untouched_legacy_generated_stub_identity_is_recognized(tmp_path) -> None:
+    path = tmp_path / "portable_11.yaml"
+    _write(
+        path,
+        """# Portable Test University
+# Hostname: portable.edu
+# Country: United States  |  Currency: USD
+# Slug: portable
+# Auto-generated: 2026-09-16
+#
+# This stub was created automatically on the first scrape of this university.
+# Review and expand it to improve discovery and extraction quality.
+# See scraper_config/defaults.yaml for all available options.
+
+discovery: {}
+
+extraction:
+  fees:
+    default_currency: USD
+""",
+    )
+
+    assert loader._is_generated_stub(path)
 
 
 def test_hostname_recipe_matching_fails_closed_when_ambiguous(

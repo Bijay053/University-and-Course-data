@@ -28,6 +28,7 @@ defaults only (plus the DB scrape_config backwards-compat translation).
 from __future__ import annotations
 
 import copy
+import hashlib
 import logging
 import re
 from datetime import date
@@ -44,6 +45,26 @@ log = logging.getLogger(__name__)
 _CONFIGS_ROOT = Path(__file__).parent.parent.parent.parent.parent / "scraper_config"
 _DEFAULTS_FILE = _CONFIGS_ROOT / "defaults.yaml"
 _UNIS_DIR = _CONFIGS_ROOT / "unis"
+_RUNTIME_UNIS_DIR = _CONFIGS_ROOT / "runtime_unis"
+_GENERATED_STUB_DIGEST_PREFIX = "# Generated-stub-sha256: "
+_LEGACY_GENERATED_STUB_RE = re.compile(
+    r"\A# (?P<name>[^\n]+)\n"
+    r"# Hostname: (?P<hostname>\S+)\n"
+    r"# Country: (?P<country>[^\n]+)  \|  Currency: (?P<currency>[A-Z]{3})\n"
+    r"# Slug: (?P<slug>[a-z0-9_-]+)\n"
+    r"# Auto-generated: \d{4}-\d{2}-\d{2}\n"
+    r"#\n"
+    r"# This stub was created automatically on the first scrape of this university\.\n"
+    r"# Review and expand it to improve discovery and extraction quality\.\n"
+    r"# See scraper_config/defaults\.yaml for all available options\.\n"
+    r"\n"
+    r"discovery: \{\}\n"
+    r"\n"
+    r"extraction:\n"
+    r"  fees:\n"
+    r"    default_currency: (?P<body_currency>[A-Z]{3})\n"
+    r"\Z"
+)
 
 # Common TLD-style tokens that should not become the slug.
 _TLD_TOKENS: frozenset[str] = frozenset(
@@ -196,7 +217,7 @@ def _create_stub_yaml(
     country = _infer_country(hostname)
     today = date.today().isoformat()
 
-    content = (
+    body = (
         f"# {name}\n"
         f"# Hostname: {hostname}\n"
         f"# Country: {country}  |  Currency: {currency}\n"
@@ -212,6 +233,11 @@ def _create_stub_yaml(
         "extraction:\n"
         "  fees:\n"
         f"    default_currency: {currency}\n"
+    )
+    digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
+    content = (
+        f"{_GENERATED_STUB_DIGEST_PREFIX}{digest}\n"
+        f"{body}"
     )
 
     try:
@@ -272,14 +298,24 @@ def _declared_yaml_hostname(path: Path) -> str:
 
 
 def _is_generated_stub(path: Path) -> bool:
-    """Identify minimal files created by ``_create_stub_yaml``."""
+    """Identify an unchanged file created by ``_create_stub_yaml``."""
     try:
-        header = path.read_text(encoding="utf-8")[:4096]
+        content = path.read_text(encoding="utf-8")
     except OSError:
         return False
-    return (
-        "# Auto-generated:" in header
-        and "This stub was created automatically" in header
+    first_line, separator, body = content.partition("\n")
+    if separator and first_line.startswith(_GENERATED_STUB_DIGEST_PREFIX):
+        claimed = first_line.removeprefix(_GENERATED_STUB_DIGEST_PREFIX).strip()
+        return bool(
+            re.fullmatch(r"[0-9a-f]{64}", claimed)
+            and hashlib.sha256(body.encode("utf-8")).hexdigest() == claimed
+            and "# Auto-generated:" in body
+            and "This stub was created automatically" in body
+        )
+    legacy = _LEGACY_GENERATED_STUB_RE.fullmatch(content)
+    return bool(
+        legacy
+        and legacy.group("currency") == legacy.group("body_currency")
     )
 
 
@@ -562,6 +598,13 @@ def load_uni_config(
         university_id=university_id,
         scrape_url=scrape_url,
     )
+    runtime_yaml_path = _RUNTIME_UNIS_DIR / uni_yaml_path.name
+    runtime_uni = _load_yaml_file(runtime_yaml_path)
+    if runtime_uni:
+        # A guarded release moves a verified generated stub here when the
+        # incoming release starts tracking the same filename. Apply the old
+        # generated values first so the tracked recipe wins every conflict.
+        merged = _deep_merge(merged, runtime_uni)
     per_uni = _load_yaml_file(uni_yaml_path)
     locked_config_values: dict[str, Any] = {}
     if per_uni:

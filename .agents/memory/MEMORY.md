@@ -145,3 +145,4 @@
 - [SIT course panel and fee authority](sit-course-panel-fee-authority.md) — compact to the current programme panel; central international tuition excludes resource fees and requires exact award matching.
 - [Required-fee resume checkpoints](required-fee-resume-checkpoints.md) — exact central-fee recipes must reprocess unproven pending checkpoints and retire only matched rows after clean completion.
 - [Duration value-unit atomicity](duration-value-unit-atomicity.md) — preserve deterministic duration value/unit pairs; restore the unit only while the numeric value still matches.
+- [Generated config release collisions](generated-config-release-collisions.md) — reconcile only integrity-verified stubs; preserve them below tracked recipe precedence and keep unknown files blocking.

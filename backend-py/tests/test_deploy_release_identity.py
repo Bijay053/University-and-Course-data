@@ -6,6 +6,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import json
 import stat
+import subprocess
 
 import pytest
 
@@ -14,6 +15,11 @@ from deploy.safe_restart_smoke import (
     _main,
     persist_deployment_timing_evidence,
     recent_deployment_timing_evidence,
+)
+from deploy.reconcile_generated_configs import (
+    ReleaseCollisionError,
+    reconcile_generated_config_collisions,
+    rollback_generated_config_collisions,
 )
 
 
@@ -24,6 +30,43 @@ RELEASE_ENV = "/opt/university-portal/backend-py/.release.env"
 OPENAI_ENV = "-/etc/university-portal/openai.env"
 SNAPSHOT_ENV = "-/etc/university-portal/snapshot-storage.env"
 DATABASE_ENV = "/etc/university-portal/database.env"
+
+
+def _git(repo: Path, *args: str) -> str:
+    return subprocess.check_output(
+        ["git", *args], cwd=repo, text=True
+    ).strip()
+
+
+def _collision_repo(
+    tmp_path: Path, *, stub_body: str, signed: bool = True
+) -> tuple[Path, str, Path]:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    _git(repo, "config", "user.email", "release-test@example.invalid")
+    _git(repo, "config", "user.name", "Release Test")
+    (repo / ".gitignore").write_text(
+        "backend-py/scraper_config/runtime_unis/\n", encoding="utf-8"
+    )
+    _git(repo, "add", ".gitignore")
+    _git(repo, "commit", "-qm", "base")
+    base = _git(repo, "rev-parse", "HEAD")
+
+    collision = repo / "backend-py/scraper_config/unis/portable_11.yaml"
+    collision.parent.mkdir(parents=True)
+    collision.write_text("discovery:\n  bfs_page_budget: 9\n", encoding="utf-8")
+    _git(repo, "add", str(collision.relative_to(repo)))
+    _git(repo, "commit", "-qm", "incoming config")
+    target = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "-q", base)
+
+    collision.parent.mkdir(parents=True, exist_ok=True)
+    if signed:
+        digest = __import__("hashlib").sha256(stub_body.encode("utf-8")).hexdigest()
+        stub_body = f"# Generated-stub-sha256: {digest}\n{stub_body}"
+    collision.write_text(stub_body, encoding="utf-8")
+    return repo, target, collision
 
 
 def _environment_files(service_name: str) -> list[str]:
@@ -54,6 +97,156 @@ def test_openai_client_is_a_declared_runtime_dependency() -> None:
 
     assert any(line.startswith("openai>=") for line in requirements.splitlines())
     assert '"openai>=' in pyproject
+
+
+def test_guarded_release_preserves_verified_generated_filename_collision(
+    tmp_path: Path,
+) -> None:
+    body = """# Portable Test University
+# Hostname: portable.edu
+# Country: United States  |  Currency: USD
+# Slug: portable
+# Auto-generated: 2026-09-16
+#
+# This stub was created automatically on the first scrape of this university.
+# Review and expand it to improve discovery and extraction quality.
+# See scraper_config/defaults.yaml for all available options.
+
+discovery: {}
+
+extraction:
+  fees:
+    default_currency: USD
+"""
+    repo, target, collision = _collision_repo(
+        tmp_path, stub_body=body, signed=False
+    )
+
+    reconcile_generated_config_collisions(repo, target, tmp_path / "manifest.json")
+
+    assert not collision.exists()
+    overlay = repo / "backend-py/scraper_config/runtime_unis/portable_11.yaml"
+    assert overlay.read_text(encoding="utf-8").endswith(body)
+
+
+def test_guarded_release_preserves_digest_bearing_generated_collision(
+    tmp_path: Path,
+) -> None:
+    body = """# Hostname: portable.edu
+# Auto-generated: 2026-09-16
+# This stub was created automatically on the first scrape of this university.
+discovery:
+  max_candidates: 77
+"""
+    repo, target, collision = _collision_repo(tmp_path, stub_body=body)
+
+    reconcile_generated_config_collisions(repo, target, tmp_path / "manifest.json")
+
+    assert not collision.exists()
+    overlay = repo / "backend-py/scraper_config/runtime_unis/portable_11.yaml"
+    assert overlay.read_text(encoding="utf-8").endswith(body)
+
+
+def test_guarded_release_still_blocks_manually_edited_generated_collision(
+    tmp_path: Path,
+) -> None:
+    body = """# Hostname: portable.edu
+# Auto-generated: 2026-09-16
+# This stub was created automatically on the first scrape of this university.
+discovery: {}
+"""
+    repo, target, collision = _collision_repo(tmp_path, stub_body=body)
+    collision.write_text(
+        collision.read_text(encoding="utf-8").replace(
+            "discovery: {}", "discovery: {bfs_page_budget: 4}"
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ReleaseCollisionError, match="Untracked runtime file would be overwritten"
+    ):
+        reconcile_generated_config_collisions(repo, target, tmp_path / "manifest.json")
+    assert collision.exists()
+
+
+def test_guarded_release_prevalidates_all_collisions_before_moving_any(
+    tmp_path: Path,
+) -> None:
+    body = """# Hostname: portable.edu
+# Auto-generated: 2026-09-16
+# This stub was created automatically on the first scrape of this university.
+discovery: {}
+"""
+    repo, target, verified = _collision_repo(tmp_path, stub_body=body)
+    verified_content = verified.read_text(encoding="utf-8")
+    verified.unlink()
+    _git(repo, "checkout", "-q", target)
+    unknown = repo / "backend-py/scraper_config/unis/unknown_12.yaml"
+    unknown.write_text("discovery: {}\n", encoding="utf-8")
+    _git(repo, "add", str(unknown.relative_to(repo)))
+    _git(repo, "commit", "-qm", "incoming second config")
+    target = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "-q", "HEAD~2")
+    verified.parent.mkdir(parents=True, exist_ok=True)
+    verified.write_text(verified_content, encoding="utf-8")
+    unknown.write_text("manually_owned: true\n", encoding="utf-8")
+
+    with pytest.raises(ReleaseCollisionError):
+        reconcile_generated_config_collisions(
+            repo, target, tmp_path / "manifest.json"
+        )
+
+    assert verified.exists()
+    assert unknown.exists()
+    assert not (repo / "backend-py/scraper_config/runtime_unis").exists()
+
+
+def test_failed_release_can_restore_every_prepared_generated_collision(
+    tmp_path: Path,
+) -> None:
+    body = """# Hostname: portable.edu
+# Auto-generated: 2026-09-16
+# This stub was created automatically on the first scrape of this university.
+discovery: {}
+"""
+    repo, target, collision = _collision_repo(tmp_path, stub_body=body)
+    original = collision.read_bytes()
+    manifest = tmp_path / "manifest.json"
+
+    reconcile_generated_config_collisions(repo, target, manifest)
+    assert not collision.exists()
+
+    restored = rollback_generated_config_collisions(manifest)
+
+    assert restored == [collision]
+    assert collision.read_bytes() == original
+    assert not (
+        repo / "backend-py/scraper_config/runtime_unis/portable_11.yaml"
+    ).exists()
+    assert not manifest.exists()
+
+
+def test_rollback_keeps_an_identical_preexisting_runtime_overlay(
+    tmp_path: Path,
+) -> None:
+    body = """# Hostname: portable.edu
+# Auto-generated: 2026-09-16
+# This stub was created automatically on the first scrape of this university.
+discovery: {}
+"""
+    repo, target, collision = _collision_repo(tmp_path, stub_body=body)
+    original = collision.read_bytes()
+    overlay = repo / "backend-py/scraper_config/runtime_unis/portable_11.yaml"
+    overlay.parent.mkdir(parents=True)
+    overlay.write_bytes(original)
+    manifest = tmp_path / "manifest.json"
+
+    reconcile_generated_config_collisions(repo, target, manifest)
+    rollback_generated_config_collisions(manifest)
+
+    assert collision.read_bytes() == original
+    assert overlay.read_bytes() == original
 
 
 def test_release_identity_smoke_check_covers_fastapi_and_celery() -> None:

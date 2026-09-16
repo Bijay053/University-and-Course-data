@@ -12,7 +12,28 @@ test "$(git -c safe.directory=/opt/university-portal rev-parse HEAD)" = 7d13d75e
   --expected-rehearsal-account-id __EXPECTED_DISPOSABLE_ACCOUNT__
 
 # Pause consumption, then inspect every task state before changing code.
-trap 'cd /opt/university-portal/backend-py && .venv/bin/celery -A app.tasks.celery_app control add_consumer scrape >/dev/null 2>&1 || true' EXIT
+reconciler=""
+reconciliation_manifest=""
+reconciliation_committed=0
+cleanup_release() {
+  cd /opt/university-portal
+  rollback_failed=0
+  if [ "$reconciliation_committed" != 1 ] && [ -n "$reconciler" ] && [ -s "$reconciliation_manifest" ]; then
+    if ! sudo -u ubuntu backend-py/.venv/bin/python -B "$reconciler" rollback \
+      --manifest "$reconciliation_manifest"; then
+      rollback_failed=1
+    fi
+  fi
+  rm -f "$reconciler"
+  if [ "$rollback_failed" = 1 ]; then
+    echo "Generated config rollback failed; consumers remain paused and manifest is retained at $reconciliation_manifest" >&2
+    return 1
+  fi
+  rm -f "$reconciliation_manifest"
+  cd backend-py
+  .venv/bin/celery -A app.tasks.celery_app control add_consumer scrape >/dev/null 2>&1 || true
+}
+trap cleanup_release EXIT
 .venv/bin/python -B - <<'PY'
 import asyncio
 from app.tasks.celery_app import celery_app
@@ -44,14 +65,18 @@ sudo -u ubuntu git diff --cached --quiet
 sudo -u ubuntu git fetch origin main
 test "$(sudo -u ubuntu git rev-parse origin/main)" = "$target"
 sudo -u ubuntu git merge-base --is-ancestor HEAD "$target"
-TARGET_RELEASE="$target" backend-py/.venv/bin/python -B - <<'PY'
-import os,subprocess
-def paths(*args):
-    return set(subprocess.check_output(["git","-c","safe.directory=/opt/university-portal",*args]).decode().splitlines())
-assert not paths("ls-files","--others") & paths("ls-tree","-r","--name-only",os.environ["TARGET_RELEASE"]), "Untracked runtime file would be overwritten"
-PY
+reconciler="$(mktemp)"
+reconciliation_manifest="$(mktemp)"
+sudo -u ubuntu git show "$target":backend-py/deploy/reconcile_generated_configs.py > "$reconciler"
+chmod 0644 "$reconciler"
+chown ubuntu:ubuntu "$reconciliation_manifest"
+sudo -u ubuntu backend-py/.venv/bin/python -B "$reconciler" prepare \
+  --repo-root /opt/university-portal --target "$target" \
+  --manifest "$reconciliation_manifest"
 sudo -u ubuntu git pull --ff-only origin main
 test "$(sudo -u ubuntu git rev-parse HEAD)" = "$target"
+reconciliation_committed=1
+rm -f "$reconciler" "$reconciliation_manifest"
 release_env="$(mktemp backend-py/.release.env.XXXXXX)"
 printf 'RELEASE_REVISION=%s\n' "$target" > "$release_env"
 chmod 0644 "$release_env"
