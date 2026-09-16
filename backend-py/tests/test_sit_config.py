@@ -94,7 +94,7 @@ def test_sit_compacted_page_extracts_location_mode_and_duration():
 
 def test_sit_yaml_uses_international_schedule_and_static_extraction():
     cfg = load_uni_config(
-        slug="southern-institute-of-technology",
+        slug="sit",
         scrape_url="https://www.sit.ac.nz",
         university_id=67,
         name="Southern Institute of Technology",
@@ -112,7 +112,7 @@ def test_sit_yaml_uses_international_schedule_and_static_extraction():
 def test_sit_yaml_applies_to_apex_and_www_hosts():
     for scrape_url in ("https://sit.ac.nz", "https://www.sit.ac.nz"):
         cfg = load_uni_config(
-            slug="southern-institute-of-technology",
+            slug="sit",
             scrape_url=scrape_url,
             university_id=67,
             name="Southern Institute of Technology",
@@ -170,7 +170,7 @@ def test_sit_central_schedule_outage_is_classified_for_recovery():
 
 def test_sit_required_schedule_replaces_stale_legacy_fee_page():
     cfg = load_uni_config(
-        slug="southern-institute-of-technology",
+        slug="sit",
         scrape_url="https://www.sit.ac.nz",
         university_id=67,
         name="Southern Institute of Technology",
@@ -189,7 +189,7 @@ def test_sit_required_schedule_replaces_stale_legacy_fee_page():
 
 def test_central_prefetch_uses_loaded_yaml_when_context_is_empty():
     loaded = load_uni_config(
-        slug="southern-institute-of-technology",
+        slug="sit",
         scrape_url="https://www.sit.ac.nz",
         university_id=67,
         name="Southern Institute of Technology",
