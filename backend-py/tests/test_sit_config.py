@@ -2,8 +2,10 @@ import asyncio
 
 from app.services.scraper.config.loader import load_uni_config
 from app.services.scraper.orchestrator import (
+    _apply_central_page_overrides,
     _extraction_failure_details,
     _inject_yaml_fee_page,
+    _select_yaml_config,
 )
 from app.services.scraper.central_pages import (
     _cache_source_matches,
@@ -180,6 +182,27 @@ def test_sit_required_schedule_replaces_stale_legacy_fee_page():
     }
 
     assert _inject_yaml_fee_page(effective, cfg.extraction.fees) is True
+    assert effective["uniPages"]["feePage"] == (
+        "https://www.sit.ac.nz/Fees-Enrolments/International-Fees"
+    )
+
+
+def test_central_prefetch_uses_loaded_yaml_when_context_is_empty():
+    loaded = load_uni_config(
+        slug="southern-institute-of-technology",
+        scrape_url="https://www.sit.ac.nz",
+        university_id=67,
+        name="Southern Institute of Technology",
+    )
+    selected = _select_yaml_config(None, loaded)
+    effective: dict = {"uniPages": {}}
+    assert _inject_yaml_fee_page(effective, selected.extraction.fees) is True
+    applied = _apply_central_page_overrides(
+        effective,
+        {"feePage": "https://www.sit.ac.nz/International/How-to-Apply"},
+        selected.extraction.fees,
+    )
+    assert applied == []
     assert effective["uniPages"]["feePage"] == (
         "https://www.sit.ac.nz/Fees-Enrolments/International-Fees"
     )

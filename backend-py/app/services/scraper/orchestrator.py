@@ -261,6 +261,31 @@ def _inject_yaml_fee_page(effective_config: dict, yaml_fees: object) -> bool:
     return True
 
 
+def _select_yaml_config(context_config: object, loaded_config: object) -> object:
+    """Use the loaded config when the task-local context is no longer set."""
+    return context_config or loaded_config
+
+
+def _apply_central_page_overrides(
+    effective_config: dict,
+    overrides: dict[str, str | None],
+    yaml_fees: object | None,
+) -> list[str]:
+    """Apply request overrides without replacing a required YAML fee source."""
+    required_fee_source = bool(
+        yaml_fees
+        and getattr(yaml_fees, "require_central_fee_match", False)
+        and getattr(yaml_fees, "central_page", None)
+    )
+    applied: list[str] = []
+    for key, value in overrides.items():
+        if not value or (key == "feePage" and required_fee_source):
+            continue
+        effective_config.setdefault("uniPages", {})[key] = value
+        applied.append(f"{key}={value}")
+    return applied
+
+
 def _select_recovery_work(
     links: list[dict],
     max_items: int,
@@ -3847,9 +3872,9 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             # but publish a stable central fee schedule URL.
             try:
                 from app.services.scraper.config.context import get_uni_config
-                _yaml_cfg = get_uni_config()
+                _yaml_cfg = _select_yaml_config(get_uni_config(), _uni_cfg)
             except Exception:  # noqa: BLE001
-                _yaml_cfg = None
+                _yaml_cfg = _uni_cfg
             if _yaml_cfg is not None:
                 _yaml_fees = _yaml_cfg.extraction.fees
                 _yaml_pages = effective_config.setdefault("uniPages", {})
@@ -3919,11 +3944,11 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 "scholarshipPage": rp.get("scholarshipPage"),
                 "academicRequirementsPage": rp.get("academicRequirementsPage"),
             }
-            _applied_overrides: list[str] = []
-            for _k, _v in _ui_overrides.items():
-                if _v:
-                    effective_config.setdefault("uniPages", {})[_k] = _v
-                    _applied_overrides.append(f"{_k}={_v}")
+            _applied_overrides = _apply_central_page_overrides(
+                effective_config,
+                _ui_overrides,
+                _yaml_cfg.extraction.fees if _yaml_cfg is not None else None,
+            )
             if _applied_overrides:
                 await emit(
                     "status",
