@@ -521,6 +521,9 @@ def _is_only_delivery_method(text: str) -> bool:
         return True
     # Pass 2 — strip delivery-mode tokens and check what's left.
     stripped = _REMOVE_VIRTUAL.sub("", text)
+    # Delivery phrases such as "Distance and online" leave only the connector
+    # after virtual-mode tokens are removed. A conjunction is not a campus.
+    stripped = re.sub(r"\b(?:and|or)\b", "", stripped, flags=re.IGNORECASE)
     stripped = re.sub(r"[\s,;/&\-–—]+", "", stripped).strip()
     return not stripped
 
@@ -692,7 +695,11 @@ def _sanitise_for_display(raw: str | None) -> str | None:
         return ", ".join(out)
     cleaned = _REMOVE_VIRTUAL.sub("", raw)
     cleaned = re.sub(r"\s+", " ", cleaned).strip(", ").strip()
-    if not cleaned or cleaned.lower() in _COUNTRY_NAME_PARTS_LC:
+    if (
+        not cleaned
+        or cleaned.lower() in _COUNTRY_NAME_PARTS_LC
+        or _is_only_delivery_method(cleaned)
+    ):
         return None
     return cleaned
 

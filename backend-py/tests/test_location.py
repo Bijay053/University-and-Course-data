@@ -175,6 +175,19 @@ def test_strong_location_strips_online_virtual_from_value():
     assert out[0].method == "location.strong"
 
 
+def test_location_sanitizer_rejects_connector_left_by_virtual_delivery() -> None:
+    assert location._sanitise_for_display("Distance and online") is None
+    assert location._sanitise_for_display("Online and") is None
+    assert location._sanitise_for_display("Online, and") is None
+    assert location._normalise("Distance and online") is None
+    html = "<dl><dt>Location</dt><dd>Distance and online</dd></dl>"
+    assert _run(location.extract(html, "https://e/x")) == []
+
+
+def test_location_sanitizer_preserves_physical_campus_before_online() -> None:
+    assert location._sanitise_for_display("London Moorgate and Online") == "London Moorgate"
+
+
 def test_strong_location_does_not_misfire_on_unrelated_strong_tags():
     """`<strong>Apply Now</strong>` is not a location label; the
     structural pre-pass must skip it. `<strong>Course Overview</strong>`

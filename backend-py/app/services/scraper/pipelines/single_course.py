@@ -494,6 +494,73 @@ _DOMESTIC_ONLY_SOFT_RE: _re.Pattern[str] = _re.compile(
     _re.IGNORECASE,
 )
 
+_MASSEY_NOT_OPEN_TO_INTERNATIONAL_RE: _re.Pattern[str] = _re.compile(
+    r"\s*not\s+open\s+to\s+international\s+students?\.?\s*",
+    _re.IGNORECASE,
+)
+
+
+def _massey_not_open_to_international_quick_fact(
+    html: str,
+    url: str | None,
+) -> bool:
+    """Read Massey's visible course-owned international eligibility fact."""
+    if not html or not url:
+        return False
+    parsed = urlparse(url)
+    if (
+        (parsed.hostname or "").lower()
+        not in {"massey.ac.nz", "www.massey.ac.nz"}
+        or not parsed.path.startswith("/study/all-qualifications-and-degrees/")
+    ):
+        return False
+    try:
+        from bs4 import BeautifulSoup as _BS4_massey_eligibility
+
+        soup = _BS4_massey_eligibility(html, "html.parser")
+        for item in soup.select(
+            ".key-facts.key-facts--qualification .key-facts__item"
+        ):
+            hidden = False
+            for node in (item, *item.parents):
+                style = str(node.get("style") or "").replace(" ", "").lower()
+                classes = {
+                    str(value).lower()
+                    for value in (node.get("class") or [])
+                }
+                if (
+                    node.name == "template"
+                    or node.has_attr("hidden")
+                    or str(node.get("aria-hidden") or "").lower() == "true"
+                    or "display:none" in style
+                    or "visibility:hidden" in style
+                    or "hidden" in classes
+                    or "is-hidden" in classes
+                ):
+                    hidden = True
+                    break
+            if hidden:
+                continue
+            heading = item.select_one("dt .key-facts__heading")
+            value = item.find("dd", recursive=False)
+            if heading is None or value is None:
+                continue
+            heading_text = _re.sub(
+                r"\s+", " ", heading.get_text(" ", strip=True)
+            ).strip().lower()
+            value_text = _re.sub(
+                r"\s+", " ", value.get_text(" ", strip=True)
+            ).strip()
+            if (
+                heading_text == "international students"
+                and _MASSEY_NOT_OPEN_TO_INTERNATIONAL_RE.fullmatch(value_text)
+            ):
+                return True
+    except Exception:
+        return False
+    return False
+
+
 _UTAS_DISTANCE_DISCLAIMER_RE: _re.Pattern[str] = _re.compile(
     r"please\s+see\s+the\s+list\s+of\s+distance\s+courses",
     _re.IGNORECASE,
@@ -778,6 +845,8 @@ def _is_domestic_only_page(html: str, url: str | None = None) -> bool:
     """
     if not html:
         return False
+    if _massey_not_open_to_international_quick_fact(html, url):
+        return True
     if _utas_has_advisory_only_international_panel(html, url):
         return True
     # Adelaide University usually publishes the eligible audiences as

@@ -108,6 +108,94 @@ def test_scu_visible_audience_selector_keeps_international_course() -> None:
     )
 
 
+def test_massey_not_open_quick_fact_rejects_qualification() -> None:
+    html = """
+    <div class="key-facts key-facts--qualification">
+      <dl class="key-facts__main">
+        <div class="key-facts__item">
+          <dt><span class="key-facts__heading">International students</span></dt>
+          <dd>Not open to international students</dd>
+        </div>
+      </dl>
+    </div>
+    """
+    assert _is_domestic_only_page(
+        html,
+        "https://www.massey.ac.nz/study/all-qualifications-and-degrees/"
+        "bachelor-of-health-science-UBHLS/",
+    )
+
+
+def test_massey_related_or_mode_caveat_does_not_reject_qualification() -> None:
+    html = """
+    <div class="key-facts key-facts--qualification">
+      <dl class="key-facts__main">
+        <div class="key-facts__item">
+          <dt><span class="key-facts__heading">International students</span></dt>
+          <dd>Open to international students on campus in New Zealand</dd>
+        </div>
+      </dl>
+    </div>
+    <aside>
+      One optional part-time mode is not open to international students.
+      A related qualification is not open to international students.
+    </aside>
+    """
+    assert not _is_domestic_only_page(
+        html,
+        "https://www.massey.ac.nz/study/all-qualifications-and-degrees/"
+        "bachelor-of-accountancy-UBACC/",
+    )
+
+
+def test_massey_hidden_quick_fact_does_not_reject_qualification() -> None:
+    html = """
+    <div aria-hidden="true">
+      <div class="key-facts key-facts--qualification">
+        <dl class="key-facts__main">
+          <div class="key-facts__item">
+            <dt><span class="key-facts__heading">International students</span></dt>
+            <dd>Not open to international students</dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+    <div class="key-facts key-facts--qualification">
+      <dl class="key-facts__main">
+        <div class="key-facts__item">
+          <dt><span class="key-facts__heading">International students</span></dt>
+          <dd>Open to international students on campus in New Zealand</dd>
+        </div>
+      </dl>
+    </div>
+    """
+    assert not _is_domestic_only_page(
+        html,
+        "https://www.massey.ac.nz/study/all-qualifications-and-degrees/"
+        "bachelor-of-accountancy-UBACC/",
+    )
+
+
+def test_massey_template_quick_fact_does_not_reject_qualification() -> None:
+    html = """
+    <template>
+      <div class="key-facts key-facts--qualification">
+        <dl class="key-facts__main">
+          <div class="key-facts__item">
+            <dt><span class="key-facts__heading">International students</span></dt>
+            <dd>Not open to international students</dd>
+          </div>
+        </dl>
+      </div>
+    </template>
+    """
+    assert not _is_domestic_only_page(
+        html,
+        "https://www.massey.ac.nz/study/all-qualifications-and-degrees/"
+        "bachelor-of-accountancy-UBACC/",
+    )
+
+
 def test_adelaide_dormant_domestic_modal_does_not_reject_international_degree() -> None:
     html = """
     <meta property="studentType" content="Domestic|International"/>
