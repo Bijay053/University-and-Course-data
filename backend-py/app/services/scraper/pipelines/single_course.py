@@ -84,12 +84,9 @@ def _build_extraction_method_map(
             continue
         method = item.get("method") or "unknown"
         if payload.get(field_key) not in (None, "", 0, []):
-            # Successful extraction — credit this method, lock the field.
             extraction_method[field_key] = method
             seen_fields.add(field_key)
         elif field_key not in extraction_method:
-            # Attempted but returned null/empty. A later successful evidence
-            # row is allowed to replace this sentinel.
             extraction_method[field_key] = f"{method}:null"
     return extraction_method
 
@@ -100,6 +97,27 @@ def _attach_extraction_method_map(
 ) -> None:
     """Attach extraction provenance to *payload* when evidence exists."""
     extraction_method = _build_extraction_method_map(payload, evidence)
+    # Otago metadata is a deliberately narrow exception to legacy
+    # first-evidence attribution: Stage 0 may have written a weaker value
+    # before the course-owned metadata was read. Select the metadata evidence
+    # that actually won, including its authoritative-empty :null result.
+    for field_key, otago_method in (
+        ("course_location", "location.otago_course_meta"),
+        ("intake_months", "intake.otago_course_meta"),
+    ):
+        otago_rows = [
+            row for row in evidence
+            if row.get("field_key") == field_key
+            and row.get("method") == otago_method
+        ]
+        if not otago_rows:
+            continue
+        winner = otago_rows[-1]
+        if field_key in {"course_location", "intake_months"}:
+            if winner.get("value") in (None, "", []):
+                extraction_method[field_key] = f"{otago_method}:null"
+            elif winner.get("value") == payload.get(field_key):
+                extraction_method[field_key] = otago_method
     if extraction_method:
         payload["extraction_method"] = extraction_method
 
@@ -3711,6 +3729,9 @@ async def extract_course(
     # to zero.  Results written with method "ai_rule:css/xpath/regex" so the
     # Evidence panel tracks provenance correctly.
     _stage0_covered: set[str] = set()
+    # Authoritative-empty Otago metadata is distinct from an absent tag:
+    # preserve the blank through AI/default fallbacks.
+    _otago_authoritative_empty: set[str] = set()
     if extraction_rules:
         try:
             from app.services.scraper.ai_extractor_run import (
@@ -4226,6 +4247,17 @@ async def extract_course(
             log.warning("Extractor %s failed on %s: %s", module.__name__, url, exc)
             continue
         for r in results:
+            if (
+                r.method in {
+                    "location.otago_course_meta",
+                    "intake.otago_course_meta",
+                }
+                and r.value in (None, "", [])
+            ):
+                _otago_authoritative_empty.add(r.field_key)
+                # Clear a weaker Stage-0 value immediately; normalized fields
+                # intentionally skip None below, so this must be explicit.
+                payload[r.field_key] = None
             evidence.append(
                 {
                     "field_key": r.field_key,
@@ -4237,6 +4269,7 @@ async def extract_course(
                     # silently dropped before the DB insert.
                     "source_url": url,
                     "snippet": r.snippet,
+                    **({"extras": r.extras} if r.extras else {}),
                 }
             )
             if r.normalized:
@@ -4288,6 +4321,15 @@ async def extract_course(
                     ):
                         # Main program-page evidence outranks Bond's narrow
                         # central-table recovery, which exists only to fill gaps.
+                        payload[k] = v
+                    elif (
+                        r.method in {
+                            "location.otago_course_meta",
+                            "intake.otago_course_meta",
+                        }
+                    ):
+                        # Otago's course-owned metadata is authoritative even
+                        # when a weaker Stage-0 regex/AI guess wrote first.
                         payload[k] = v
                     elif r.method.startswith("location.") and k in _stage0_covered:
                         payload[k] = v  # structural extractor overrides Stage-0 guess
@@ -5470,6 +5512,20 @@ async def extract_course(
             for _gp_k, _gp_v in _gp_filled.items():
                 if _gp_k in ("duration_value", "duration_unit"):
                     continue  # consumed by the mapped keys above
+                # Otago course-owned empty metadata locks both canonical
+                # fields and the Gemini aliases that are mapped into them.
+                if (
+                    _gp_k in _otago_authoritative_empty
+                    or (
+                        _gp_k == "location_text"
+                        and "course_location" in _otago_authoritative_empty
+                    )
+                    or (
+                        _gp_k == "intake_text"
+                        and "intake_months" in _otago_authoritative_empty
+                    )
+                ):
+                    continue
                 # Remap Gemini's "mode" JSON key to the canonical payload key.
                 # The Gemini prompt asks for "mode" (shorter, less verbose) but
                 # the rest of the pipeline — evidence lookup, FIELD TRACE, staging
@@ -5491,6 +5547,8 @@ async def extract_course(
                     and _existing_gp_value != []
                     and _existing_gp_value != {}
                 ):
+                    continue
+                if _gp_k in _otago_authoritative_empty:
                     continue
 
                 # Taxonomy fields are fill-only. Deterministic extractors,
@@ -5826,6 +5884,11 @@ async def extract_course(
             await maybe_browser_refetch(url, payload, emit=emit, force=_force)
         )
         for k, v in browser_filled.items():
+            if k in _otago_authoritative_empty or (
+                k == "location_text"
+                and "course_location" in _otago_authoritative_empty
+            ):
+                continue
             if _override:
                 payload[k] = v
             else:
@@ -7783,6 +7846,10 @@ async def extract_course(
         # nothing, the field stays blank — no AI fallback for location on BCU.
         _is_bcu_host_fb = "bcu.ac.uk" in (url or "").lower()
         for k, v in ai_filled.items():
+            if k in _otago_authoritative_empty or (
+                k == "location_text" and "course_location" in _otago_authoritative_empty
+            ):
+                continue
             # Discard chrome text returned by the FALLBACK AI for location fields.
             # UTAS pages have "Key Information Entry requirements Course rules"
             # immediately after the Location heading; the AI sometimes copies it
@@ -9940,7 +10007,11 @@ async def extract_course(
     # intake was not extracted from the course page. Curtin's current-course
     # provider is authoritative even when it returns no calendar month, so
     # never replace that explicit empty result with a configured guess.
-    if not _intake_months and not _curtin_intake_authoritative:
+    if (
+        not _intake_months
+        and not _curtin_intake_authoritative
+        and "intake_months" not in _otago_authoritative_empty
+    ):
         try:
             _uc_intk = get_uni_config()
             _intk_cfg = _uc_intk.extraction.intake if _uc_intk else None
@@ -10178,6 +10249,7 @@ async def extract_course(
             _default_loc
             and not (payload.get("course_location") or "").strip()
             and not _online_only
+            and "course_location" not in _otago_authoritative_empty
         ):
             payload["course_location"] = _default_loc
             evidence.append({

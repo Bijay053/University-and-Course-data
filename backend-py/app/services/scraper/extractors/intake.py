@@ -12,12 +12,44 @@ Strategy in passes:
 from __future__ import annotations
 
 import re
+from urllib.parse import urlparse
 
 from app.services.scraper.extractors._text import compact, html_to_text
 from app.services.scraper.extractors.base import ExtractionResult
 
 
 field_key = "intake_months"
+
+
+def _otago_course_meta_start_dates(
+    html: str, url: str
+) -> tuple[bool, tuple[list[str], int | None, str] | None]:
+    """Return Otago's authoritative course-owned ``startDates`` metadata.
+
+    The qualification page also contains dates in navigation and application
+    content, so this source must short-circuit all page-text extraction.  The
+    boolean distinguishes an absent tag from an explicitly empty tag.
+    """
+    parsed = urlparse(url or "")
+    if (parsed.hostname or "").lower() not in {"otago.ac.nz", "www.otago.ac.nz"}:
+        return False, None
+    if not parsed.path.rstrip("/").startswith("/study/qualifications/"):
+        return False, None
+    try:
+        from bs4 import BeautifulSoup
+        tags = BeautifulSoup(html or "", "html.parser").find_all(
+            "meta", attrs={"name": re.compile(r"^startDates$", re.I)}
+        )
+    except Exception:
+        return True, None
+    if not tags:
+        return False, None
+    from html import unescape
+    raw = re.sub(r"\s+", " ", unescape(str(tags[0].get("content") or ""))).strip()
+    if not raw:
+        return True, None
+    parsed_value = _classify_intake_value(raw)
+    return True, ((parsed_value[0], parsed_value[1], raw) if parsed_value else None)
 
 _MONTHS = (
     "January",
@@ -1203,6 +1235,38 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
     from urllib.parse import urlparse as _up
 
     _host = (_up(url).hostname or "").lower()
+
+    # Otago's startDates meta is course-owned and selected for the current
+    # qualification.  It must beat regex, navigation, and AI guesses; an
+    # empty tag must remain empty rather than acquire invented months.
+    _otago_meta_present, _otago_meta = _otago_course_meta_start_dates(html, url)
+    if _otago_meta_present:
+        if not _otago_meta:
+            return [
+                ExtractionResult(
+                    field_key="intake_months",
+                    value=None,
+                    normalized={"intake_months": None, "intake_days": None},
+                    confidence=0.99,
+                    snippet='meta[name="startDates"]: (empty)',
+                    method="intake.otago_course_meta",
+                )
+            ]
+        _otago_months, _otago_day, _otago_raw = _otago_meta
+        _otago_months = [month for month in _MONTHS if month in set(_otago_months)]
+        return [
+            ExtractionResult(
+                field_key="intake_months",
+                value=_otago_months,
+                normalized={
+                    "intake_months": _otago_months,
+                    "intake_days": _otago_day,
+                },
+                confidence=0.99,
+                snippet=f'meta[name="startDates"]: {_otago_raw}',
+                method="intake.otago_course_meta",
+            )
+        ]
 
     # UQ's Drupal settings value backs the visible "Start semester" course
     # fact and is authoritative for the selected year + international audience.

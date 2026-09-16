@@ -13,12 +13,31 @@ Output is normalised + sanitised the same way the Node code does it
 from __future__ import annotations
 
 import re
+from urllib.parse import urlparse
 from typing import List
 
 from bs4 import BeautifulSoup
 
 from app.services.scraper.extractors._text import compact, html_to_text
 from app.services.scraper.extractors.base import ExtractionResult
+
+
+def _otago_course_meta_location(html: str, url: str) -> tuple[bool, str | None]:
+    """Read the course-owned location metadata on Otago qualifications."""
+    parsed = urlparse(url or "")
+    if (parsed.hostname or "").lower() not in {"otago.ac.nz", "www.otago.ac.nz"}:
+        return False, None
+    if not parsed.path.rstrip("/").startswith("/study/qualifications/"):
+        return False, None
+    tags = BeautifulSoup(html or "", "html.parser").find_all(
+        "meta", attrs={"name": re.compile(r"^location$", re.I)}
+    )
+    if not tags:
+        return False, None
+    from html import unescape
+    raw = unescape(str(tags[0].get("content") or ""))
+    value = re.sub(r"\s+", " ", raw).strip(" ,;|")
+    return True, (value or None)
 
 LOCATION_LABEL = re.compile(
     r"^\s*(?:campus(?:\s*locations?)?|location|locations|"
@@ -1627,6 +1646,22 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
     if not html:
         return []
     soup = BeautifulSoup(html, "html.parser")
+
+    # Otago qualification metadata outranks every structural/text/AI-derived
+    # location.  In particular, do not allow the footer campus menu to replace
+    # an empty course-owned metadata value.
+    _otago_meta_present, _otago_meta_location = _otago_course_meta_location(html, url)
+    if _otago_meta_present:
+        return [
+            ExtractionResult(
+                field_key="course_location",
+                value=_otago_meta_location,
+                normalized={"course_location": _otago_meta_location},
+                confidence=0.99,
+                method="location.otago_course_meta",
+                snippet=f'meta[name="location"]: {_otago_meta_location or "(empty)"}',
+            )
+        ]
 
     # Per-uni text-cleaning strip_patterns (Option C).
     # Loaded from the contextvar set by set_uni_config() before extraction.
