@@ -1,8 +1,15 @@
 import asyncio
 
 from app.services.scraper.config.loader import load_uni_config
-from app.services.scraper.orchestrator import _extraction_failure_details
-from app.services.scraper.central_pages import _parse_fee_page_html, match_central_fee
+from app.services.scraper.orchestrator import (
+    _extraction_failure_details,
+    _inject_yaml_fee_page,
+)
+from app.services.scraper.central_pages import (
+    _cache_source_matches,
+    _parse_fee_page_html,
+    match_central_fee,
+)
 from app.services.scraper.extractors import (
     duration,
     english_test,
@@ -13,6 +20,9 @@ from app.services.scraper.extractors import (
 from app.services.scraper.extractors.sit_html import (
     compact_course_html,
     is_sit_course_url,
+)
+from app.services.scraper.pipelines.single_course import (
+    _central_fee_match_has_usable_tuition,
 )
 
 
@@ -92,6 +102,7 @@ def test_sit_yaml_uses_international_schedule_and_static_extraction():
     assert cfg.extraction.fees.central_fee_priority is True
     assert cfg.extraction.fees.central_fee_exact_match_only is True
     assert cfg.extraction.fees.require_central_fee_match is True
+    assert cfg.extraction.fees.force_central_fee_stage is False
     assert cfg.extraction.fees.currency_override == "NZD"
     assert "Direct Material Costs" in cfg.extraction.fees.reject_keywords
 
@@ -153,3 +164,43 @@ def test_sit_central_schedule_outage_is_classified_for_recovery():
     details = _extraction_failure_details("central_fee_schedule_unavailable")
     assert details["reason"] == "central_fee_schedule_unavailable"
     assert details["retryable"] is True
+
+
+def test_sit_required_schedule_replaces_stale_legacy_fee_page():
+    cfg = load_uni_config(
+        slug="southern-institute-of-technology",
+        scrape_url="https://www.sit.ac.nz",
+        university_id=67,
+        name="Southern Institute of Technology",
+    )
+    effective = {
+        "uniPages": {
+            "feePage": "https://www.sit.ac.nz/International/How-to-Apply"
+        }
+    }
+
+    assert _inject_yaml_fee_page(effective, cfg.extraction.fees) is True
+    assert effective["uniPages"]["feePage"] == (
+        "https://www.sit.ac.nz/Fees-Enrolments/International-Fees"
+    )
+
+
+def test_sit_name_only_schedule_row_does_not_satisfy_fee_gate():
+    name_only = {
+        "program_pattern": "Bachelor of Information Technology",
+        "international_fee": None,
+    }
+    assert _central_fee_match_has_usable_tuition(name_only, "exact") is False
+    assert _central_fee_match_has_usable_tuition(
+        {**name_only, "international_fee": 19000},
+        "exact",
+    ) is True
+
+
+def test_sit_stale_central_cache_source_is_rejected():
+    authoritative = "https://www.sit.ac.nz/Fees-Enrolments/International-Fees"
+    assert _cache_source_matches(authoritative + "/", authoritative) is True
+    assert _cache_source_matches(
+        "https://www.sit.ac.nz/International/How-to-Apply",
+        authoritative,
+    ) is False

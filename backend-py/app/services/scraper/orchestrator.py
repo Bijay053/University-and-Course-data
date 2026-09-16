@@ -241,6 +241,26 @@ def _extraction_failure_details(
     }
 
 
+def _inject_yaml_fee_page(effective_config: dict, yaml_fees: object) -> bool:
+    """Bridge the typed YAML fee source into the legacy central-page config.
+
+    Required schedule policies are authoritative and must replace stale
+    operator/auto-discovered fee pages. Optional central pages retain the
+    historical fill-only behavior.
+    """
+    central_page = str(getattr(yaml_fees, "central_page", "") or "").strip()
+    if not central_page:
+        return False
+    pages = effective_config.setdefault("uniPages", {})
+    if not (
+        bool(getattr(yaml_fees, "require_central_fee_match", False))
+        or not pages.get("feePage")
+    ):
+        return False
+    pages["feePage"] = central_page
+    return True
+
+
 def _select_recovery_work(
     links: list[dict],
     max_items: int,
@@ -3833,8 +3853,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             if _yaml_cfg is not None:
                 _yaml_fees = _yaml_cfg.extraction.fees
                 _yaml_pages = effective_config.setdefault("uniPages", {})
-                if _yaml_fees.central_page and not _yaml_pages.get("feePage"):
-                    _yaml_pages["feePage"] = _yaml_fees.central_page
+                if _inject_yaml_fee_page(effective_config, _yaml_fees):
                     await emit(
                         "status",
                         f"[YAML] fee page from per-uni config: {_yaml_fees.central_page}",

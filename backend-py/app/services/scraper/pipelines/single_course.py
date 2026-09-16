@@ -1786,6 +1786,17 @@ def _gemini_may_override_course_page_value(
     )
 
 
+def _central_fee_match_has_usable_tuition(
+    matched: dict | None,
+    confidence: str,
+) -> bool:
+    return bool(
+        matched
+        and confidence != "none"
+        and matched.get("international_fee") not in (None, "", 0)
+    )
+
+
 _GEMINI_PRIMARY_CANONICAL_FIELDS = {
     "duration_value": "duration",
     "duration_unit": "duration_term",
@@ -8734,6 +8745,7 @@ async def extract_course(
             "evidence": evidence,
         }
 
+    _central_fee_match_found = False
     if central_data:
         try:
             from app.services.scraper.central_pages import match_central_fee
@@ -8751,7 +8763,6 @@ async def extract_course(
             _fee_slots = ("international_fee", "domestic_fee", "currency", "fee_term", "fee_year")
             _fee_missing = any(payload.get(k) in (None, "", 0) for k in ("international_fee",))
             _central_fee_priority = False
-            _central_fee_match_found = False
             try:
                 _priority_cfg = get_uni_config()
                 _central_fee_priority = bool(
@@ -8792,7 +8803,10 @@ async def extract_course(
                     course_url=url,
                 )
                 if matched and _fee_confidence != "none":
-                    _central_fee_match_found = True
+                    _central_fee_match_found = _central_fee_match_has_usable_tuition(
+                        matched,
+                        _fee_confidence,
+                    )
                     _prog = matched.get("program_pattern", "?")
                     if _fee_confidence == "bucket":
                         # Check per-uni YAML opt-in: allow_bucket_match
@@ -9356,6 +9370,27 @@ async def extract_course(
 
         except Exception as exc:  # noqa: BLE001 — never abort extraction
             log.warning("central_pages fallback errored on %s: %s", url, exc)
+
+        if _require_central_fee_match and (
+            not _central_fee_match_found
+            or payload.get("international_fee") in (None, "", 0)
+        ):
+            if emit:
+                await emit(
+                    "error",
+                    "Authoritative international fee schedule could not be "
+                    "applied safely",
+                    phase="fallback",
+                    kind="central_fee_schedule_unavailable",
+                    url=url,
+                )
+            return {
+                "url": url,
+                "error": "central_fee_schedule_unavailable",
+                "retryable": True,
+                "payload": {},
+                "evidence": evidence,
+            }
 
         # ── PG English clear-out (safety net) ────────────────────────────────
         # When ``central_english_pg_skip`` is True AND the browser fetch did

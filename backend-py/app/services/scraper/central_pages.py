@@ -1379,7 +1379,26 @@ def _english_cache_is_current(parsed_data: dict[str, Any]) -> bool:
     )
 
 
-async def _cache_get(university_id: int, page_type: str) -> dict[str, Any] | None:
+def _cache_source_matches(cached_url: str, expected_url: str) -> bool:
+    def _canonical(url: str) -> tuple[str, str, str, str]:
+        parsed = urlparse((url or "").strip())
+        path = parsed.path.rstrip("/") or "/"
+        return (
+            parsed.scheme.lower(),
+            parsed.netloc.lower(),
+            path,
+            parsed.query,
+        )
+
+    return _canonical(cached_url) == _canonical(expected_url)
+
+
+async def _cache_get(
+    university_id: int,
+    page_type: str,
+    *,
+    expected_url: str | None = None,
+) -> dict[str, Any] | None:
     """Return unexpired cached parsed_data for (university_id, page_type), or None."""
     try:
         from datetime import datetime, timezone
@@ -1397,6 +1416,16 @@ async def _cache_get(university_id: int, page_type: str) -> dict[str, Any] | Non
                 )
             )
             if row is None:
+                return None
+            if expected_url and not _cache_source_matches(row.url, expected_url):
+                log.info(
+                    "central_page_cache: source changed for %s/%s "
+                    "(cached=%s requested=%s) — treating as miss",
+                    university_id,
+                    page_type,
+                    row.url,
+                    expected_url,
+                )
                 return None
             # Normalise to UTC-aware before comparison
             expires = row.expires_at
@@ -1612,7 +1641,11 @@ async def prefetch_central_pages(
         # Check cache first when university_id is known
         _fee_cached: dict[str, Any] | None = None
         if university_id is not None:
-            _fee_cached = await _cache_get(university_id, "fee_schedule")
+            _fee_cached = await _cache_get(
+                university_id,
+                "fee_schedule",
+                expected_url=fee_url,
+            )
             if _fee_cached is not None:
                 result["fees"] = _fee_cached.get("fees", [])
                 if emit:
