@@ -137,6 +137,37 @@ def test_gemini_primary_requests_only_canonical_missing_fields():
     assert missing == ["mode", "ielts_overall"]
 
 
+def test_gemini_missing_lookup_covers_full_request_and_save_contract():
+    """Every request field has an extractor-owned missing-slot lookup."""
+    assert tuple(gemini_primary.GEMINI_PRIMARY_MISSING_FIELD_TARGETS) == (
+        gemini_primary.GEMINI_PRIMARY_SUPPORTED_FIELDS
+    )
+    assert set(gemini_primary.GEMINI_PRIMARY_MISSING_FIELD_TARGETS) == set(
+        gemini_primary.GEMINI_PRIMARY_FIELD_TARGETS
+    )
+
+
+def test_gemini_missing_lookup_matches_save_targets_except_duration_text():
+    """Duration text intentionally checks canonical duration; all else matches."""
+    differences = {
+        field: (gemini_primary.GEMINI_PRIMARY_FIELD_TARGETS[field], missing_target)
+        for field, missing_target in (
+            gemini_primary.GEMINI_PRIMARY_MISSING_FIELD_TARGETS.items()
+        )
+        if gemini_primary.GEMINI_PRIMARY_FIELD_TARGETS[field] != missing_target
+    }
+
+    assert differences == {"duration_text": ("duration_text", "duration")}
+    assert _gemini_primary_missing_fields(
+        {"duration": 2.0, "duration_text": None},
+        ("duration_text",),
+    ) == []
+    assert _gemini_primary_missing_fields(
+        {"duration": None, "duration_text": "2 years full-time"},
+        ("duration_text",),
+    ) == ["duration_text"]
+
+
 def test_gemini_cannot_refill_fee_after_authoritative_no_international_signal():
     payload = {
         "international_fee": None,

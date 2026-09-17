@@ -262,6 +262,17 @@ GEMINI_PRIMARY_FIELD_TARGETS: Mapping[str, str] = MappingProxyType({
     "location_text": "course_location",
 })
 
+# Immutable lookup contract used to decide whether a requested AI field is
+# still missing from the pipeline payload. By default this is identical to the
+# save target above. ``duration_text`` is the intentional exception: duration
+# text is supporting evidence for the canonical numeric duration, so a
+# populated ``duration`` slot suppresses another AI request even when the
+# separate ``duration_text`` payload slot is empty.
+GEMINI_PRIMARY_MISSING_FIELD_TARGETS: Mapping[str, str] = MappingProxyType({
+    **GEMINI_PRIMARY_FIELD_TARGETS,
+    "duration_text": "duration",
+})
+
 _PROMPT_TEMPLATE = """\
 You are a precise data extractor for a university course admission page.
 Return ONLY a single JSON object with exactly the keys listed below.

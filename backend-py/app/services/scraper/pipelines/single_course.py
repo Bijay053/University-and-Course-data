@@ -1856,19 +1856,13 @@ def _apply_sit_central_fee_before_remote_enrichment(
     return "applied"
 
 
-_GEMINI_PRIMARY_CANONICAL_FIELDS = {
-    "duration_value": "duration",
-    "duration_unit": "duration_term",
-    "duration_text": "duration",
-    "intake_text": "intake_months",
-    "location_text": "course_location",
-    "mode": "study_mode",
-}
-
-
 def _gemini_primary_field_blocked(payload: dict, field: str) -> bool:
     """Return whether authoritative deterministic evidence forbids an AI fill."""
-    canonical = _GEMINI_PRIMARY_CANONICAL_FIELDS.get(field, field)
+    # Keep Gemini's heavier dependency chain lazy while reading the
+    # extractor-owned request/save contract.
+    from app.services.scraper.extractors import gemini_primary as _gp
+
+    canonical = _gp.GEMINI_PRIMARY_MISSING_FIELD_TARGETS.get(field, field)
     return bool(
         canonical == "international_fee"
         and payload.get("fee_table_confirmed_no_international")
@@ -1880,9 +1874,13 @@ def _gemini_primary_missing_fields(
     candidate_fields: list[str] | tuple[str, ...],
 ) -> list[str]:
     """Return only fields that deterministic extraction has not populated."""
+    # Keep Gemini's heavier dependency chain lazy while reading the
+    # extractor-owned request/save contract.
+    from app.services.scraper.extractors import gemini_primary as _gp
+
     missing: list[str] = []
     for field in candidate_fields:
-        canonical = _GEMINI_PRIMARY_CANONICAL_FIELDS.get(field, field)
+        canonical = _gp.GEMINI_PRIMARY_MISSING_FIELD_TARGETS.get(field, field)
         if _gemini_primary_field_blocked(payload, field):
             continue
         value = payload.get(canonical)
