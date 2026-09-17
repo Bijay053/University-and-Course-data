@@ -85,6 +85,12 @@ const EXPECTED_POLICY_SKIP_REASONS = new Set([
   "domestic_only",
   "part_time_only",
   "non_degree_program",
+  // These are deterministic safety outcomes, not transient discovery
+  // failures. Re-running with fresh discovery applies the same rules and
+  // cannot recover them.
+  "not_listed_in_international_fee_schedule",
+  "sit_course_panel_missing",
+  "duplicate_url_in_job",
 ]);
 
 export function countSuspiciousSkipped(

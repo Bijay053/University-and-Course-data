@@ -65,6 +65,16 @@ describe("countSuspiciousSkipped", () => {
   it("never returns a negative count when reason totals drift", () => {
     expect(countSuspiciousSkipped(5, { online_only: 7 })).toBe(0);
   });
+
+  it("does not offer recovery for SIT policy, stale-panel, and alias skips", () => {
+    expect(countSuspiciousSkipped(259, {
+      online_only: 101,
+      not_listed_in_international_fee_schedule: 74,
+      sit_course_panel_missing: 40,
+      duplicate_url_in_job: 34,
+      domestic_only: 10,
+    })).toBe(0);
+  });
 });
 
 describe("hasReviewableCourses", () => {
