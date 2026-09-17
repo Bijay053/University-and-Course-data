@@ -17,6 +17,7 @@ from deploy.safe_restart_smoke import (
     DEFAULT_UNIVERSITY_ID,
     SmokeFailure,
     _main,
+    _wait_for_done,
     resolve_expected_release,
     verify_service_release_identity,
     warn_slow_release_identity_matches,
@@ -89,6 +90,56 @@ def test_rejects_staged_rows_errors_or_extra_skip_reasons() -> None:
         validate_done_payload(
             {**clean, "skip_reasons": {"domestic_only": 1, "parser_error": 1}}
         )
+
+
+@pytest.mark.asyncio
+async def test_completed_smoke_waits_for_delayed_done_log(monkeypatch) -> None:
+    done_payload = {
+        "totalFound": 1,
+        "imported": 0,
+        "skipped": 1,
+        "errors": 0,
+        "skip_reasons": {"domestic_only": 1},
+    }
+    done_reads = iter([None, done_payload])
+
+    class FakeResult:
+        def __init__(self, value):
+            self.value = value
+
+        def scalar_one_or_none(self):
+            return self.value
+
+        def scalar_one(self):
+            return self.value
+
+    class FakeSession:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+        async def get(self, _model, _job_id):
+            return type("Job", (), {"status": "completed", "error_message": None})()
+
+        async def execute(self, statement):
+            if "scrape_runtime_logs" in str(statement):
+                return FakeResult(next(done_reads))
+            return FakeResult(0)
+
+    async def no_sleep(_seconds):
+        return None
+
+    monkeypatch.setattr(
+        "deploy.safe_restart_smoke.AsyncSessionLocal", FakeSession
+    )
+    monkeypatch.setattr("deploy.safe_restart_smoke.asyncio.sleep", no_sleep)
+
+    payload, staged_rows = await _wait_for_done("smoke-job", timeout_seconds=1)
+
+    assert payload == done_payload
+    assert staged_rows == 0
 
 
 def test_checked_in_sample_resolves_university_by_hostname() -> None:

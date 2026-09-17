@@ -554,6 +554,7 @@ async def _wait_for_done(
     job_id: str, timeout_seconds: int
 ) -> tuple[Mapping[str, Any], int]:
     deadline = asyncio.get_running_loop().time() + timeout_seconds
+    saw_completed = False
     while asyncio.get_running_loop().time() < deadline:
         async with AsyncSessionLocal() as db:
             job = await db.get(ScrapeRuntimeJob, job_id)
@@ -565,6 +566,7 @@ async def _wait_for_done(
                         f"smoke job ended as {job.status}: "
                         f"{job.error_message or 'no error'}"
                     )
+                saw_completed = True
                 row = (
                     await db.execute(
                         select(ScrapeRuntimeLog.payload)
@@ -587,8 +589,9 @@ async def _wait_for_done(
                         ).scalar_one()
                     )
                     return row, staged_rows
-                raise SmokeFailure("completed sample has no persisted DONE payload")
         await asyncio.sleep(2)
+    if saw_completed:
+        raise SmokeFailure("completed sample has no persisted DONE payload")
     raise SmokeFailure(f"sample did not finish within {timeout_seconds}s")
 
 
