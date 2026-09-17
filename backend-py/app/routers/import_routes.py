@@ -7,6 +7,7 @@ import uuid
 import zipfile
 from datetime import datetime, timezone
 from typing import Annotated, Any
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, File, status
 from openpyxl import load_workbook
@@ -147,6 +148,16 @@ _COLUMN_MAP: dict[str, str] = {
     "cricos": "cricos_code",
 }
 
+_UNIVERSITY_COLUMN_MAP: dict[str, str] = {
+    "universityname": "name",
+    "universitycountry": "country",
+    "universitycity": "city",
+    "universityurl": "url",
+    "universitywebsite": "website",
+    "universityscrapeurl": "scrape_url",
+    "universitycourselistingurl": "scrape_url",
+}
+
 _FLOAT_FIELDS = {
     "duration", "international_fee", "academic_score",
     "ielts_overall", "ielts_listening", "ielts_speaking", "ielts_writing", "ielts_reading",
@@ -242,6 +253,20 @@ def _coerce(field: str, value: Any) -> Any:
     return value
 
 
+def _validated_http_url(value: str | None, *, field_label: str) -> str | None:
+    """Return a stripped HTTP(S) URL or reject an invalid university URL."""
+    cleaned = str(value or "").strip()
+    if not cleaned:
+        return None
+    parsed = urlsplit(cleaned)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": f"{field_label} must be a valid http:// or https:// URL."},
+        )
+    return cleaned
+
+
 # ─── /api/import/excel ──────────────────────────────────────────────────────
 @router.post("/excel")
 async def import_excel(
@@ -252,11 +277,13 @@ async def import_excel(
     universityName: str | None = Form(None),
     universityCountry: str | None = Form(None),
     universityCity: str | None = Form(None),
+    universityUrl: str | None = Form(None),
 ) -> dict[str, Any]:
     """Bulk-import course rows from an XLSX file into ``scraped_courses``.
 
-    The frontend sends either ``universityId`` (existing uni) or
-    ``universityName`` + optional country/city (create-on-the-fly).
+    The frontend sends either ``universityId`` (existing uni), manual
+    university details, or a workbook containing University Name/Country/City/
+    URL columns (create-on-the-fly).
     Each row becomes a ``scraped_courses`` row with ``status='pending'`` and
     ``auto_publish_status='pending_review'`` so it surfaces in the normal
     review queue. Duplicates within the same university (case-insensitive
@@ -277,44 +304,6 @@ async def import_excel(
             detail={"error": f"File exceeds {MAX_BYTES // (1024 * 1024)} MB limit."},
         )
     _validate_xlsx_archive(raw)
-
-    # ── Resolve target university ──────────────────────────────────────────
-    uni: University | None = None
-    if universityId:
-        try:
-            uni_id_int = int(universityId)
-        except ValueError:
-            raise HTTPException(
-                status_code=400, detail={"error": "universityId must be an integer."}
-            ) from None
-        uni = await db.get(University, uni_id_int)
-        if uni is None:
-            raise HTTPException(
-                status_code=404,
-                detail={"error": f"University id={uni_id_int} not found."},
-            )
-    elif universityName and universityName.strip():
-        name_clean = universityName.strip()
-        existing = (
-            await db.execute(
-                select(University).where(func.lower(University.name) == name_clean.lower())
-            )
-        ).scalar_one_or_none()
-        if existing is not None:
-            uni = existing
-        else:
-            uni = University(
-                name=name_clean,
-                country=(universityCountry or "").strip() or "Unknown",
-                city=(universityCity or "").strip() or "Unknown",
-            )
-            db.add(uni)
-            await db.flush()  # populate uni.id without committing yet
-    else:
-        raise HTTPException(
-            status_code=400,
-            detail={"error": "Provide either universityId or universityName."},
-        )
 
     # ── Parse workbook ─────────────────────────────────────────────────────
     try:
@@ -339,17 +328,115 @@ async def import_excel(
             status_code=400, detail={"error": "Sheet is empty."}
         ) from None
 
-    # Build header → field index map. Unknown columns are silently ignored.
+    # Build separate course and university header maps. University details
+    # must never leak into ScrapedCourse constructor kwargs.
     col_to_field: dict[int, str] = {}
+    university_columns: dict[int, str] = {}
     for idx, raw_header in enumerate(header_row):
         norm = _norm_header(raw_header)
         if norm in _COLUMN_MAP:
             col_to_field[idx] = _COLUMN_MAP[norm]
+        if norm in _UNIVERSITY_COLUMN_MAP:
+            university_columns[idx] = _UNIVERSITY_COLUMN_MAP[norm]
     if "course_name" not in col_to_field.values():
         raise HTTPException(
             status_code=400,
             detail={"error": "Sheet must include a 'Course Name' column."},
         )
+
+    workbook_university: dict[str, str] = {}
+    for line_no, row in enumerate(
+        ws.iter_rows(min_row=2, values_only=True),
+        start=2,
+    ):
+        for idx, field in university_columns.items():
+            if idx >= len(row):
+                continue
+            value = str(row[idx] or "").strip()
+            if not value:
+                continue
+            previous = workbook_university.get(field)
+            if previous is not None and previous.casefold() != value.casefold():
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "error": (
+                            f"Conflicting University {field.replace('_', ' ').title()} "
+                            f"values in the workbook (row {line_no})."
+                        )
+                    },
+                )
+            workbook_university[field] = value
+
+    # ── Resolve target university ──────────────────────────────────────────
+    uni: University | None = None
+    if universityId:
+        try:
+            uni_id_int = int(universityId)
+        except ValueError:
+            raise HTTPException(
+                status_code=400, detail={"error": "universityId must be an integer."}
+            ) from None
+        uni = await db.get(University, uni_id_int)
+        if uni is None:
+            raise HTTPException(
+                status_code=404,
+                detail={"error": f"University id={uni_id_int} not found."},
+            )
+    else:
+        name_clean = (
+            str(universityName or "").strip()
+            or workbook_university.get("name", "")
+        )
+        if not name_clean:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": (
+                        "Provide universityName or include a 'University Name' "
+                        "column in the workbook."
+                    )
+                },
+            )
+
+        existing = (
+            await db.execute(
+                select(University).where(func.lower(University.name) == name_clean.lower())
+            )
+        ).scalar_one_or_none()
+        if existing is not None:
+            uni = existing
+        else:
+            general_url = _validated_http_url(
+                str(universityUrl or "").strip()
+                or workbook_university.get("url"),
+                field_label="University URL",
+            )
+            website = _validated_http_url(
+                workbook_university.get("website") or general_url,
+                field_label="University Website",
+            )
+            scrape_url = _validated_http_url(
+                workbook_university.get("scrape_url") or general_url or website,
+                field_label="University Scrape URL",
+            )
+            uni = University(
+                name=name_clean,
+                country=(
+                    str(universityCountry or "").strip()
+                    or workbook_university.get("country")
+                    or "Unknown"
+                ),
+                city=(
+                    str(universityCity or "").strip()
+                    or workbook_university.get("city")
+                    or "Unknown"
+                ),
+                website=website,
+                scrape_url=scrape_url,
+            )
+            db.add(uni)
+            await db.flush()  # populate uni.id without committing yet
 
     job_id = f"excel-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:6]}"
 
@@ -371,7 +458,10 @@ async def import_excel(
     skipped = 0
     errors: list[str] = []
 
-    for line_no, row in enumerate(rows_iter, start=2):
+    for line_no, row in enumerate(
+        ws.iter_rows(min_row=2, values_only=True),
+        start=2,
+    ):
         if row is None or all(cell is None or cell == "" for cell in row):
             continue
         total_rows += 1

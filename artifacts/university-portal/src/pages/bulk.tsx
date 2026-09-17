@@ -25,6 +25,11 @@ type ImportResult = {
   errors: string[];
 };
 
+type ImportApiResponse = ImportResult & {
+  error?: string;
+  detail?: string | { error?: string };
+};
+
 type University = {
   id: number;
   name: string;
@@ -219,11 +224,12 @@ export default function Bulk() {
 
   // ── Excel Import state ────────────────────────────────────────────────────
   const [file, setFile] = useState<File | null>(null);
-  const [uniMode, setUniMode] = useState<"existing" | "new">("existing");
+  const [uniMode, setUniMode] = useState<"existing" | "new" | "spreadsheet">("existing");
   const [universityId, setUniversityId] = useState<string>("");
   const [newUniName, setNewUniName] = useState("");
   const [newUniCountry, setNewUniCountry] = useState("Australia");
   const [newUniCity, setNewUniCity] = useState("");
+  const [newUniUrl, setNewUniUrl] = useState("");
   const [importLoading, setImportLoading] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -422,21 +428,38 @@ export default function Bulk() {
     if (!file) { setImportError("Please select a file."); return; }
     if (uniMode === "existing" && !universityId) { setImportError("Please select a university."); return; }
     if (uniMode === "new" && !newUniName.trim()) { setImportError("Please enter a university name."); return; }
+    if (uniMode === "new" && !newUniUrl.trim()) { setImportError("Please enter the university URL."); return; }
+    if (uniMode === "new") {
+      try {
+        const parsed = new URL(newUniUrl.trim());
+        if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("invalid protocol");
+      } catch {
+        setImportError("University URL must be a valid http:// or https:// URL.");
+        return;
+      }
+    }
     setImportLoading(true);
     setImportError(null);
     setImportResult(null);
     const formData = new FormData();
     formData.append("file", file);
     if (uniMode === "existing") formData.append("universityId", universityId);
-    else {
+    else if (uniMode === "new") {
       formData.append("universityName", newUniName.trim());
       formData.append("universityCountry", newUniCountry.trim());
       formData.append("universityCity", newUniCity.trim());
+      formData.append("universityUrl", newUniUrl.trim());
     }
     try {
       const res = await fetch("/api/import/excel", { method: "POST", body: formData });
-      const data = await readResponseJson<ImportResult & { error?: string }>(res);
-      if (!res.ok) { setImportError(data?.error ?? "Import failed"); return; }
+      const data = await readResponseJson<ImportApiResponse>(res);
+      if (!res.ok) {
+        const detailError = typeof data?.detail === "string"
+          ? data.detail
+          : data?.detail?.error;
+        setImportError(data?.error ?? detailError ?? "Import failed");
+        return;
+      }
       if (!data) { setImportError("Import failed (empty response)"); return; }
       setImportResult(data as ImportResult);
     } catch (err) {
@@ -945,6 +968,7 @@ export default function Bulk() {
             <div className="flex gap-3">
               <Button variant={uniMode === "existing" ? "default" : "outline"} size="sm" onClick={() => setUniMode("existing")}>Existing University</Button>
               <Button variant={uniMode === "new" ? "default" : "outline"} size="sm" onClick={() => setUniMode("new")}>New University</Button>
+              <Button variant={uniMode === "spreadsheet" ? "default" : "outline"} size="sm" onClick={() => setUniMode("spreadsheet")}>From Excel</Button>
             </div>
             {uniMode === "existing" ? (
               <UniCombobox
@@ -952,7 +976,7 @@ export default function Bulk() {
                 value={universityId}
                 onChange={setUniversityId}
               />
-            ) : (
+            ) : uniMode === "new" ? (
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <Label>University Name *</Label>
@@ -968,6 +992,28 @@ export default function Bulk() {
                   <Label>City</Label>
                   <Input className="mt-1" placeholder="e.g. Hull" value={newUniCity} onChange={(e) => setNewUniCity(e.target.value)} />
                 </div>
+                <div className="col-span-2">
+                  <Label>University URL *</Label>
+                  <Input
+                    className="mt-1"
+                    type="url"
+                    placeholder="https://www.example.edu/courses"
+                    value={newUniUrl}
+                    onChange={(e) => setNewUniUrl(e.target.value)}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Saved as both the university website and default course-listing URL.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+                <p className="font-medium">Read university details from this Excel file</p>
+                <p className="mt-1 text-xs text-blue-800">
+                  Include these columns: University Name, University Country, University City,
+                  and University URL. The same university details may be repeated on every
+                  course row.
+                </p>
               </div>
             )}
           </div>

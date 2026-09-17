@@ -183,6 +183,93 @@ def test_creates_new_university_when_name_provided(client, fake_db):
     assert any(u.name == "Brand New Uni" for u in fake_db.universities.values())
 
 
+def test_manual_new_university_url_is_saved_as_website_and_scrape_url(
+    client,
+    fake_db,
+):
+    xlsx = _make_xlsx(["Course Name"], [["Bachelor of Arts"]])
+    r = _post(
+        client,
+        xlsx,
+        fields={
+            "universityName": "URL University",
+            "universityCountry": "Australia",
+            "universityCity": "Melbourne",
+            "universityUrl": "https://url.example.edu/courses",
+        },
+    )
+
+    assert r.status_code == 200, r.text
+    university = next(
+        u for u in fake_db.universities.values()
+        if u.name == "URL University"
+    )
+    assert university.website == "https://url.example.edu/courses"
+    assert university.scrape_url == "https://url.example.edu/courses"
+
+
+def test_creates_new_university_from_excel_columns(client, fake_db):
+    xlsx = _make_xlsx(
+        [
+            "University Name",
+            "University Country",
+            "University City",
+            "University URL",
+            "Course Name",
+        ],
+        [[
+            "Workbook University",
+            "United Kingdom",
+            "Hull",
+            "https://workbook.example.edu/courses",
+            "Bachelor of Science",
+        ]],
+    )
+
+    r = _post(client, xlsx, fields={})
+
+    assert r.status_code == 200, r.text
+    university = next(
+        u for u in fake_db.universities.values()
+        if u.name == "Workbook University"
+    )
+    assert university.country == "United Kingdom"
+    assert university.city == "Hull"
+    assert university.website == "https://workbook.example.edu/courses"
+    assert university.scrape_url == "https://workbook.example.edu/courses"
+    assert fake_db.scraped_courses[0].course_name == "Bachelor of Science"
+
+
+def test_rejects_conflicting_excel_university_details(client):
+    xlsx = _make_xlsx(
+        ["University Name", "University URL", "Course Name"],
+        [
+            ["First University", "https://first.example.edu", "Course A"],
+            ["Second University", "https://first.example.edu", "Course B"],
+        ],
+    )
+
+    r = _post(client, xlsx, fields={})
+
+    assert r.status_code == 400
+    assert "Conflicting University Name" in r.json()["detail"]["error"]
+
+
+def test_rejects_invalid_manual_university_url(client):
+    xlsx = _make_xlsx(["Course Name"], [["Bachelor of Arts"]])
+    r = _post(
+        client,
+        xlsx,
+        fields={
+            "universityName": "Invalid URL University",
+            "universityUrl": "not-a-url",
+        },
+    )
+
+    assert r.status_code == 400
+    assert "valid http:// or https:// URL" in r.json()["detail"]["error"]
+
+
 def test_skips_duplicate_course_names_within_university(client, fake_db):
     xlsx = _make_xlsx(
         ["Course Name"],
