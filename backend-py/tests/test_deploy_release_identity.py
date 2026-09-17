@@ -10,6 +10,7 @@ import subprocess
 
 import pytest
 
+import deploy.reconcile_generated_configs as generated_configs
 from deploy.safe_restart_smoke import (
     SmokeFailure,
     _main,
@@ -18,6 +19,8 @@ from deploy.safe_restart_smoke import (
 )
 from deploy.reconcile_generated_configs import (
     ReleaseCollisionError,
+    cleanup_redundant_generated_overlays,
+    find_redundant_generated_overlays,
     reconcile_generated_config_collisions,
     rollback_generated_config_collisions,
 )
@@ -247,6 +250,201 @@ discovery: {}
 
     assert collision.read_bytes() == original
     assert overlay.read_bytes() == original
+
+
+def _runtime_overlay(repo: Path, name: str, body: str) -> Path:
+    digest = __import__("hashlib").sha256(body.encode("utf-8")).hexdigest()
+    overlay = repo / f"backend-py/scraper_config/runtime_unis/{name}"
+    overlay.parent.mkdir(parents=True, exist_ok=True)
+    overlay.write_text(
+        f"# Generated-stub-sha256: {digest}\n{body}", encoding="utf-8"
+    )
+    return overlay
+
+
+def test_overlay_audit_reports_only_fully_superseded_verified_configs(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    _git(repo, "config", "user.email", "release-test@example.invalid")
+    _git(repo, "config", "user.name", "Release Test")
+    recipe = repo / "backend-py/scraper_config/unis/portable_11.yaml"
+    recipe.parent.mkdir(parents=True)
+    recipe.write_text(
+        "discovery:\n  bfs_page_budget: 9\nextraction:\n  fees:\n    default_currency: CAD\n",
+        encoding="utf-8",
+    )
+    _git(repo, "add", str(recipe.relative_to(repo)))
+    _git(repo, "commit", "-qm", "tracked recipe")
+    overlay = _runtime_overlay(
+        repo,
+        "portable_11.yaml",
+        "# Hostname: portable.edu\n"
+        "# Auto-generated: 2026-09-16\n"
+        "# This stub was created automatically on the first scrape of this university.\n"
+        "discovery:\n  bfs_page_budget: 3\n"
+        "extraction:\n  fees:\n    default_currency: USD\n",
+    )
+
+    report = find_redundant_generated_overlays(repo)
+
+    assert report == [
+        {
+            "overlay": "backend-py/scraper_config/runtime_unis/portable_11.yaml",
+            "recipe": "backend-py/scraper_config/unis/portable_11.yaml",
+            "overlay_sha256": __import__("hashlib").sha256(
+                overlay.read_bytes()
+            ).hexdigest(),
+            "recipe_sha256": __import__("hashlib").sha256(
+                recipe.read_bytes()
+            ).hexdigest(),
+            "superseded_leaf_paths": [
+                "discovery.bfs_page_budget",
+                "extraction.fees.default_currency",
+            ],
+        }
+    ]
+    assert overlay.exists()
+
+
+def test_overlay_cleanup_keeps_generated_only_and_unknown_files(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    _git(repo, "config", "user.email", "release-test@example.invalid")
+    _git(repo, "config", "user.name", "Release Test")
+    recipe = repo / "backend-py/scraper_config/unis/portable_11.yaml"
+    recipe.parent.mkdir(parents=True)
+    recipe.write_text("discovery:\n  bfs_page_budget: 9\n", encoding="utf-8")
+    _git(repo, "add", str(recipe.relative_to(repo)))
+    _git(repo, "commit", "-qm", "tracked recipe")
+    retained = _runtime_overlay(
+        repo,
+        "portable_11.yaml",
+        "# Hostname: portable.edu\n"
+        "# Auto-generated: 2026-09-16\n"
+        "# This stub was created automatically on the first scrape of this university.\n"
+        "discovery:\n  bfs_page_budget: 3\n  max_candidates: 77\n",
+    )
+    unknown = retained.parent / "operator-notes.yaml"
+    unknown.write_text("manually_owned: true\n", encoding="utf-8")
+
+    assert cleanup_redundant_generated_overlays(repo) == []
+    assert retained.exists()
+    assert unknown.exists()
+
+
+def test_overlay_cleanup_removes_only_redundant_verified_overlay(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    _git(repo, "config", "user.email", "release-test@example.invalid")
+    _git(repo, "config", "user.name", "Release Test")
+    recipe = repo / "backend-py/scraper_config/unis/portable_11.yaml"
+    recipe.parent.mkdir(parents=True)
+    recipe.write_text("discovery:\n  bfs_page_budget: 9\n", encoding="utf-8")
+    _git(repo, "add", str(recipe.relative_to(repo)))
+    _git(repo, "commit", "-qm", "tracked recipe")
+    redundant = _runtime_overlay(
+        repo,
+        "portable_11.yaml",
+        "# Hostname: portable.edu\n"
+        "# Auto-generated: 2026-09-16\n"
+        "# This stub was created automatically on the first scrape of this university.\n"
+        "discovery:\n  bfs_page_budget: 3\n",
+    )
+    unknown = redundant.parent / "portable_12.yaml"
+    unknown.write_text("discovery:\n  bfs_page_budget: 3\n", encoding="utf-8")
+    linked = redundant.parent / "linked_13.yaml"
+    linked.symlink_to(redundant)
+
+    assert cleanup_redundant_generated_overlays(repo) == [redundant]
+    assert not redundant.exists()
+    assert unknown.exists()
+    assert linked.is_symlink()
+
+
+def test_overlay_cleanup_rejects_symlink_replacement_after_discovery(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    _git(repo, "config", "user.email", "release-test@example.invalid")
+    _git(repo, "config", "user.name", "Release Test")
+    recipe = repo / "backend-py/scraper_config/unis/portable_11.yaml"
+    recipe.parent.mkdir(parents=True)
+    recipe.write_text("discovery:\n  bfs_page_budget: 9\n", encoding="utf-8")
+    _git(repo, "add", str(recipe.relative_to(repo)))
+    _git(repo, "commit", "-qm", "tracked recipe")
+    overlay = _runtime_overlay(
+        repo,
+        "portable_11.yaml",
+        "# Hostname: portable.edu\n"
+        "# Auto-generated: 2026-09-16\n"
+        "# This stub was created automatically on the first scrape of this university.\n"
+        "discovery:\n  bfs_page_budget: 3\n",
+    )
+    target = tmp_path / "same-content.yaml"
+    target.write_bytes(overlay.read_bytes())
+    original_find = generated_configs.find_redundant_generated_overlays
+
+    def discover_then_replace(root: Path) -> list[dict[str, object]]:
+        proofs = original_find(root)
+        overlay.unlink()
+        overlay.symlink_to(target)
+        return proofs
+
+    monkeypatch.setattr(
+        generated_configs,
+        "find_redundant_generated_overlays",
+        discover_then_replace,
+    )
+
+    assert cleanup_redundant_generated_overlays(repo) == []
+    assert overlay.is_symlink()
+
+
+def test_overlay_cleanup_rejects_recipe_untracked_after_discovery(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    _git(repo, "config", "user.email", "release-test@example.invalid")
+    _git(repo, "config", "user.name", "Release Test")
+    recipe = repo / "backend-py/scraper_config/unis/portable_11.yaml"
+    recipe.parent.mkdir(parents=True)
+    recipe.write_text("discovery:\n  bfs_page_budget: 9\n", encoding="utf-8")
+    _git(repo, "add", str(recipe.relative_to(repo)))
+    _git(repo, "commit", "-qm", "tracked recipe")
+    overlay = _runtime_overlay(
+        repo,
+        "portable_11.yaml",
+        "# Hostname: portable.edu\n"
+        "# Auto-generated: 2026-09-16\n"
+        "# This stub was created automatically on the first scrape of this university.\n"
+        "discovery:\n  bfs_page_budget: 3\n",
+    )
+    original_find = generated_configs.find_redundant_generated_overlays
+
+    def discover_then_untrack(root: Path) -> list[dict[str, object]]:
+        proofs = original_find(root)
+        _git(repo, "rm", "--cached", "-q", str(recipe.relative_to(repo)))
+        return proofs
+
+    monkeypatch.setattr(
+        generated_configs,
+        "find_redundant_generated_overlays",
+        discover_then_untrack,
+    )
+
+    assert cleanup_redundant_generated_overlays(repo) == []
+    assert overlay.exists()
 
 
 def test_release_identity_smoke_check_covers_fastapi_and_celery() -> None:

@@ -9,6 +9,9 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Any
+
+import yaml
 
 
 class ReleaseCollisionError(RuntimeError):
@@ -17,6 +20,9 @@ class ReleaseCollisionError(RuntimeError):
 
 _GENERATED_PATH_RE = re.compile(
     r"^backend-py/scraper_config/unis/[^/]+_[0-9]+\.yaml$"
+)
+_RUNTIME_GENERATED_PATH_RE = re.compile(
+    r"^backend-py/scraper_config/runtime_unis/[^/]+_[0-9]+\.yaml$"
 )
 _DIGEST_PREFIX = "# Generated-stub-sha256: "
 _LEGACY_STUB_RE = re.compile(
@@ -70,6 +76,94 @@ def _is_verified_generated_stub(relative_path: str, content: str) -> bool:
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _leaf_paths(value: Any, prefix: tuple[str, ...] = ()) -> set[tuple[str, ...]]:
+    """Return mapping leaf paths; empty containers contribute no setting."""
+    if isinstance(value, dict):
+        paths: set[tuple[str, ...]] = set()
+        for key, child in value.items():
+            paths.update(_leaf_paths(child, (*prefix, str(key))))
+        return paths
+    return {prefix}
+
+
+def _load_yaml_mapping(path: Path) -> dict[str, Any] | None:
+    try:
+        loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, yaml.YAMLError):
+        return None
+    return loaded if isinstance(loaded, dict) else None
+
+
+def _audit_generated_overlay(
+    repo_root: Path, overlay: Path
+) -> dict[str, Any] | None:
+    """Return a redundancy proof for one currently eligible regular file."""
+    if overlay.is_symlink() or not overlay.is_file():
+        return None
+    try:
+        relative_overlay = overlay.relative_to(repo_root).as_posix()
+    except ValueError:
+        return None
+    if not _RUNTIME_GENERATED_PATH_RE.fullmatch(relative_overlay):
+        return None
+    try:
+        content = overlay.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return None
+    generated_relative = f"backend-py/scraper_config/unis/{overlay.name}"
+    if not _is_verified_generated_stub(generated_relative, content):
+        return None
+    if generated_relative not in _git_paths(repo_root, "ls-files"):
+        return None
+
+    recipe = repo_root / generated_relative
+    if recipe.is_symlink() or not recipe.is_file():
+        return None
+    overlay_config = _load_yaml_mapping(overlay)
+    recipe_config = _load_yaml_mapping(recipe)
+    if overlay_config is None or recipe_config is None:
+        return None
+    overlay_leaves = _leaf_paths(overlay_config)
+    recipe_leaves = _leaf_paths(recipe_config)
+    if overlay_leaves - recipe_leaves:
+        return None
+    return {
+        "overlay": relative_overlay,
+        "recipe": generated_relative,
+        "overlay_sha256": _sha256(overlay),
+        "recipe_sha256": _sha256(recipe),
+        "superseded_leaf_paths": sorted(".".join(path) for path in overlay_leaves),
+    }
+
+
+def find_redundant_generated_overlays(repo_root: Path) -> list[dict[str, Any]]:
+    """Report verified overlays whose setting paths all exist in tracked recipes."""
+    repo_root = repo_root.resolve()
+    runtime_root = repo_root / "backend-py/scraper_config/runtime_unis"
+    if not runtime_root.is_dir():
+        return []
+
+    redundant: list[dict[str, Any]] = []
+    for overlay in sorted(runtime_root.iterdir()):
+        proof = _audit_generated_overlay(repo_root, overlay)
+        if proof is not None:
+            redundant.append(proof)
+    return redundant
+
+
+def cleanup_redundant_generated_overlays(repo_root: Path) -> list[Path]:
+    """Delete only overlays that still match a fresh redundancy audit."""
+    repo_root = repo_root.resolve()
+    removed: list[Path] = []
+    for proof in find_redundant_generated_overlays(repo_root):
+        overlay = repo_root / proof["overlay"]
+        fresh_proof = _audit_generated_overlay(repo_root, overlay)
+        if fresh_proof == proof:
+            overlay.unlink()
+            removed.append(overlay)
+    return removed
 
 
 def reconcile_generated_config_collisions(
@@ -174,15 +268,25 @@ def main() -> None:
     prepare.add_argument("--manifest", type=Path, required=True)
     rollback = subparsers.add_parser("rollback")
     rollback.add_argument("--manifest", type=Path, required=True)
+    audit = subparsers.add_parser("audit-overlays")
+    audit.add_argument("--repo-root", type=Path, required=True)
+    cleanup = subparsers.add_parser("cleanup-overlays")
+    cleanup.add_argument("--repo-root", type=Path, required=True)
     args = parser.parse_args()
     if args.command == "prepare":
         for path in reconcile_generated_config_collisions(
             args.repo_root.resolve(), args.target, args.manifest
         ):
             print(f"Preserved verified generated config overlay: {path}")
-    else:
+    elif args.command == "rollback":
         for path in rollback_generated_config_collisions(args.manifest):
             print(f"Restored generated config after failed release: {path}")
+    elif args.command == "audit-overlays":
+        for proof in find_redundant_generated_overlays(args.repo_root):
+            print(json.dumps(proof, sort_keys=True))
+    else:
+        for path in cleanup_redundant_generated_overlays(args.repo_root):
+            print(f"Removed redundant generated config overlay: {path}")
 
 
 if __name__ == "__main__":

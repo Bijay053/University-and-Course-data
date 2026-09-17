@@ -21,6 +21,33 @@ in `../README.md`.
 | `deploy_database_secret_rotation_stack.py` | Revision-fenced deployment and post-update verification for the database rotation stack |
 | `prove_database_refresh_alert.py` | Publishes one disposable sanitized database-refresh failure alert and proves repeat suppression |
 | `prove_database_refresh_alert_delivery.py` | Temporarily triggers and restores the fixed delivery-failure alarm |
+| `reconcile_generated_configs.py` | Preserves verified generated recipe collisions and audits or removes fully superseded runtime overlays |
+
+## Generated config overlay cleanup
+
+Tracked university recipes override matching settings in verified generated
+runtime overlays. Audit obsolete overlays after checking out a release:
+
+```bash
+cd /opt/university-portal
+PYTHONPATH=backend-py python backend-py/deploy/reconcile_generated_configs.py \
+  audit-overlays --repo-root .
+```
+
+The read-only command emits one JSON record per verified overlay whose every
+YAML leaf path is present in the tracked recipe with the same filename. Values
+may differ because the tracked value is authoritative. It ignores unverified,
+malformed, unexpectedly named, and untracked files. Review the records, then
+remove only the currently proven redundant overlays:
+
+```bash
+PYTHONPATH=backend-py python backend-py/deploy/reconcile_generated_configs.py \
+  cleanup-overlays --repo-root .
+```
+
+Cleanup repeats the full audit and digest checks immediately before each
+deletion. Any generated-only setting retains its overlay, and unknown files are
+never deleted.
 
 ## Refresh the RDS-managed database credential
 
