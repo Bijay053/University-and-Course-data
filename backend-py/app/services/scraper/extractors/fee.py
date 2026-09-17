@@ -2616,7 +2616,10 @@ def _from_otago_polytechnic_international_fee(
                 card_text = compact(card.get_text(" ", strip=True))
                 lowered = card_text.lower()
                 if (
-                    not any(label in lowered for label in ("full tuition", "first year"))
+                    not any(
+                        label in lowered
+                        for label in ("full tuition", "first year", "course one")
+                    )
                     or "standard" not in lowered
                     or "scholarship" in lowered
                 ):
@@ -2628,7 +2631,9 @@ def _from_otago_polytechnic_international_fee(
                 )
                 if amount_match:
                     fee_term = (
-                        "Annual" if "first year" in lowered else "Full Course"
+                        "Annual"
+                        if any(label in lowered for label in ("first year", "course one"))
+                        else "Full Course"
                     )
                     return (
                         float(amount_match.group(1).replace(",", "")),

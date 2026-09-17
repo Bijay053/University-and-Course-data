@@ -356,3 +356,32 @@ async def test_op_fee_parser_marks_first_year_amount_as_annual():
 
     assert results[0].normalized["international_fee"] == 26900.0
     assert results[0].normalized["fee_term"] == "Annual"
+
+
+@pytest.mark.asyncio
+async def test_op_fee_parser_uses_first_standard_doctorate_course_amount():
+    html = """
+    <div><h3>International fees</h3>
+      <div class="programme-fee-boxes">
+        <div>First year</div><div>With scholarship applied</div>
+        <div class="programme-fee">$26,600</div>
+      </div>
+      <div class="programme-fee-boxes">
+        <div>Course one</div><div>Standard</div>
+        <div class="programme-fee">$29,600</div>
+      </div>
+      <div class="programme-fee-boxes">
+        <div>Course two</div><div>Standard</div>
+        <div class="programme-fee">$29,600</div>
+      </div>
+    </div>
+    """
+
+    results = await fee.extract(
+        html,
+        "https://www.op.ac.nz/programmes/nzqa/doctor-of-professional-practice",
+        country="New Zealand",
+    )
+
+    assert results[0].normalized["international_fee"] == 29600.0
+    assert results[0].normalized["fee_term"] == "Annual"
