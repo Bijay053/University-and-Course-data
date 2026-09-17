@@ -327,3 +327,32 @@ async def test_op_fee_parser_selects_standard_international_full_course_amount()
         "fee_year": None,
     }
     assert results[0].method == "fee.otago_polytechnic_international_card"
+
+
+@pytest.mark.asyncio
+async def test_op_fee_parser_marks_first_year_amount_as_annual():
+    html = """
+    <div><h3>International fees</h3>
+      <div class="programme-fee-boxes">
+        <div>First year</div><div>With scholarship applied</div>
+        <div class="programme-fee">$23,400</div>
+      </div>
+      <div class="programme-fee-boxes">
+        <div>First year</div><div>Standard</div>
+        <div class="programme-fee">$26,900</div>
+      </div>
+      <div class="programme-fee-boxes">
+        <div>Second year</div><div>Standard</div>
+        <div class="programme-fee">$26,900</div>
+      </div>
+    </div>
+    """
+
+    results = await fee.extract(
+        html,
+        "https://www.op.ac.nz/programmes/nzqa/bachelor-of-construction",
+        country="New Zealand",
+    )
+
+    assert results[0].normalized["international_fee"] == 26900.0
+    assert results[0].normalized["fee_term"] == "Annual"

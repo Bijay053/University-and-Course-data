@@ -2595,7 +2595,7 @@ def _from_massey_qualification_detail_fee(
 def _from_otago_polytechnic_international_fee(
     html: str,
     url: str,
-) -> tuple[float, str] | None:
+) -> tuple[float, str, str] | None:
     """Read OP's standard international full-qualification tuition card."""
     parsed = urlparse(url or "")
     if (
@@ -2616,7 +2616,7 @@ def _from_otago_polytechnic_international_fee(
                 card_text = compact(card.get_text(" ", strip=True))
                 lowered = card_text.lower()
                 if (
-                    "full tuition" not in lowered
+                    not any(label in lowered for label in ("full tuition", "first year"))
                     or "standard" not in lowered
                     or "scholarship" in lowered
                 ):
@@ -2627,8 +2627,12 @@ def _from_otago_polytechnic_international_fee(
                     fee_node.get_text(" ", strip=True) if fee_node else card_text,
                 )
                 if amount_match:
+                    fee_term = (
+                        "Annual" if "first year" in lowered else "Full Course"
+                    )
                     return (
                         float(amount_match.group(1).replace(",", "")),
+                        fee_term,
                         f"International fees — {card_text}",
                     )
     except Exception:  # noqa: BLE001 — malformed pages fall through safely
@@ -2669,7 +2673,7 @@ async def extract(
     # domestic amount or the lower scholarship amount.
     op_fee = _from_otago_polytechnic_international_fee(html, url)
     if op_fee is not None:
-        op_amount, op_context = op_fee
+        op_amount, op_fee_term, op_context = op_fee
         return [
             ExtractionResult(
                 field_key="international_fee",
@@ -2677,7 +2681,7 @@ async def extract(
                 normalized={
                     "international_fee": op_amount,
                     "currency": "NZD",
-                    "fee_term": "Full Course",
+                    "fee_term": op_fee_term,
                     "fee_year": _extract_year(op_context),
                 },
                 confidence=0.99,
