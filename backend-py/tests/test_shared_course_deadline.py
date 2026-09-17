@@ -38,6 +38,35 @@ def test_required_fields_complete_accepts_canonical_pipeline_slots() -> None:
     assert not course_deadline.required_course_fields_complete(payload)
 
 
+@pytest.mark.parametrize(
+    ("canonical_field", "alias_field", "alias_value"),
+    [
+        ("ielts_overall", "pte_overall", 58),
+        ("duration", "duration_value", 3),
+        ("intake_months", "intake_text", "March, July"),
+        ("course_location", "location_text", "Wollongong"),
+        ("study_mode", "mode", "On Campus"),
+    ],
+)
+def test_required_fields_complete_accepts_extractor_alias_slots(
+    canonical_field: str,
+    alias_field: str,
+    alias_value: object,
+) -> None:
+    payload = {
+        "international_fee": 19_488,
+        "ielts_overall": 6.5,
+        "duration": 3,
+        "intake_months": ["March", "July"],
+        "course_location": "Wollongong",
+        "study_mode": "On Campus",
+    }
+    del payload[canonical_field]
+    payload[alias_field] = alias_value
+
+    assert course_deadline.required_course_fields_complete(payload)
+
+
 def test_online_course_does_not_require_a_physical_location() -> None:
     payload = {
         "international_fee": 30_000,

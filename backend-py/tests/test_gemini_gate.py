@@ -74,15 +74,40 @@ def test_classification_only_when_sub_category_missing():
     assert reason == "classification_only"
 
 
-def test_full_extraction_when_only_required_location_is_missing():
+@pytest.mark.parametrize(
+    "missing_field",
+    [
+        "international_fee",
+        "ielts_overall",
+        "duration",
+        "intake_months",
+        "study_mode",
+        "course_location",
+    ],
+)
+def test_each_missing_required_publishability_field_forces_full_extraction(
+    missing_field: str,
+):
     payload = _full_payload(include_classification=True)
-    del payload["course_location"]
+    del payload[missing_field]
     evidence = _make_evidence(payload, confidence=0.95)
 
     skip, reason = should_skip_gemini_primary(payload, evidence)
 
     assert skip is False
     assert reason == "full_extraction_needed"
+
+
+@pytest.mark.parametrize("taxonomy_field", ["category", "sub_category"])
+def test_classification_only_is_limited_to_taxonomy_gaps(taxonomy_field: str):
+    payload = _full_payload(include_classification=True)
+    del payload[taxonomy_field]
+    evidence = _make_evidence(payload, confidence=0.95)
+
+    skip, reason = should_skip_gemini_primary(payload, evidence)
+
+    assert skip is False
+    assert reason == "classification_only"
 
 
 def test_online_course_can_classify_without_physical_location():
