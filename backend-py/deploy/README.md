@@ -569,13 +569,17 @@ start of each service's identity check until its exact startup line is found;
 the command never prints process environments or unrelated journal lines. The
 same successful check appends a mode-`0600` JSONL record to
 `/var/lib/university-portal/deployment-evidence.jsonl`. Each record contains
-only the revision, UTC timestamp, API match time, and Celery match time. Failed
-or mismatched checks append nothing. The history retains the newest 1,000
-successful activations. Each append takes an exclusive lock and atomically
-replaces the history with complete JSONL records only; the history and lock
-files remain mode `0600`. Readers take a shared lock, so recent-history
-retrieval sees one complete retained version while an append or rotation is in
-progress.
+the revision, UTC timestamp, API match time, and Celery match time. Releases
+using the guarded pull script also record the sanitized redundant-overlay count
+and repository-relative paths, or `overlay_audit_status: "warning"` when the
+non-blocking audit could not produce trusted evidence. YAML contents, digests,
+credentials, and absolute host paths are never stored. Older records without
+overlay fields remain valid. Failed or mismatched identity checks append
+nothing. The history retains the newest 1,000 successful activations. Each
+append takes an exclusive lock and atomically replaces the history with complete
+JSONL records only; the history and lock files remain mode `0600`. Readers take
+a shared lock, so recent-history retrieval sees one complete retained version
+while an append or rotation is in progress.
 
 Retrieve the newest successful activation records through the same command:
 

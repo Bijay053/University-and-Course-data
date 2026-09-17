@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import subprocess
@@ -88,7 +89,45 @@ def _failure_result(repo_root: Path, warning: str) -> int:
     return CORRUPTION_EXIT if repository_corruption_confirmed(repo_root) else 0
 
 
-def run_post_checkout_audit(repo_root: Path) -> int:
+def _write_evidence(
+    evidence_path: Path | None,
+    *,
+    status: str,
+    overlays: list[str] | None = None,
+) -> bool:
+    """Write only the sanitized audit state consumed by release evidence."""
+    if evidence_path is None:
+        return True
+    payload: dict[str, object] = {"status": status}
+    if status == "ok":
+        safe_overlays = overlays or []
+        payload["redundant_overlay_count"] = len(safe_overlays)
+        payload["redundant_overlay_paths"] = safe_overlays
+    try:
+        evidence_path.write_text(
+            json.dumps(payload, separators=(",", ":"), sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        evidence_path.chmod(0o600)
+    except OSError:
+        return False
+    return True
+
+
+def _failure_result_with_evidence(
+    repo_root: Path,
+    warning: str,
+    evidence_path: Path | None,
+) -> int:
+    _write_evidence(evidence_path, status="warning")
+    return _failure_result(repo_root, warning)
+
+
+def run_post_checkout_audit(
+    repo_root: Path,
+    *,
+    evidence_path: Path | None = None,
+) -> int:
     """Emit one atomic summary, containing every ordinary failure."""
     repo_root = repo_root.resolve()
     try:
@@ -99,15 +138,22 @@ def run_post_checkout_audit(repo_root: Path) -> int:
             f"REDUNDANT_CONFIG_OVERLAY_PATH={overlay}" for overlay in overlays
         )
     except Exception:  # noqa: BLE001 - release audit must fail open unless corrupt
-        return _failure_result(
+        return _failure_result_with_evidence(
             repo_root,
             "REDUNDANT_CONFIG_OVERLAY_AUDIT_WARNING=failed_non_blocking",
+            evidence_path,
         )
 
-    if not _safe_emit(sys.stdout, "\n".join(lines)):
+    if not _write_evidence(evidence_path, status="ok", overlays=overlays):
         return _failure_result(
             repo_root,
+            "REDUNDANT_CONFIG_OVERLAY_AUDIT_WARNING=evidence_failed_non_blocking",
+        )
+    if not _safe_emit(sys.stdout, "\n".join(lines)):
+        return _failure_result_with_evidence(
+            repo_root,
             "REDUNDANT_CONFIG_OVERLAY_AUDIT_WARNING=report_failed_non_blocking",
+            evidence_path,
         )
     return 0
 
@@ -115,8 +161,12 @@ def run_post_checkout_audit(repo_root: Path) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo-root", type=Path, required=True)
+    parser.add_argument("--evidence-path", type=Path)
     args = parser.parse_args()
-    return run_post_checkout_audit(args.repo_root)
+    return run_post_checkout_audit(
+        args.repo_root,
+        evidence_path=args.evidence_path,
+    )
 
 
 if __name__ == "__main__":

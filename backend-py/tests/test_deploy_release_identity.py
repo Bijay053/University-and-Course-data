@@ -16,9 +16,11 @@ import pytest
 import deploy.reconcile_generated_configs as generated_configs
 import deploy.post_checkout_overlay_audit as post_checkout_audit
 from deploy.safe_restart_smoke import (
+    MAX_OVERLAY_AUDIT_EVIDENCE_BYTES,
     SmokeFailure,
     _main,
     persist_deployment_timing_evidence,
+    read_overlay_audit_evidence,
     recent_deployment_timing_evidence,
 )
 from deploy.reconcile_generated_configs import (
@@ -530,8 +532,12 @@ def test_post_checkout_audit_reports_count_paths_and_changes_nothing(
         "discovery:\n  bfs_page_budget: 3\n",
     )
     original = overlay.read_bytes()
+    evidence_path = tmp_path / "overlay-audit.json"
 
-    assert post_checkout_audit.run_post_checkout_audit(repo) == 0
+    assert post_checkout_audit.run_post_checkout_audit(
+        repo,
+        evidence_path=evidence_path,
+    ) == 0
 
     output = capsys.readouterr()
     assert output.err == ""
@@ -540,6 +546,14 @@ def test_post_checkout_audit_reports_count_paths_and_changes_nothing(
         "REDUNDANT_CONFIG_OVERLAY_PATH="
         "backend-py/scraper_config/runtime_unis/portable_11.yaml\n"
     )
+    assert json.loads(evidence_path.read_text(encoding="utf-8")) == {
+        "status": "ok",
+        "redundant_overlay_count": 1,
+        "redundant_overlay_paths": [
+            "backend-py/scraper_config/runtime_unis/portable_11.yaml"
+        ],
+    }
+    assert stat.S_IMODE(evidence_path.stat().st_mode) == 0o600
     assert overlay.read_bytes() == original
 
 
@@ -559,10 +573,17 @@ def test_post_checkout_audit_failure_is_non_blocking_when_fsck_is_inconclusive(
         lambda _root: False,
     )
 
-    assert post_checkout_audit.run_post_checkout_audit(tmp_path) == 0
+    evidence_path = tmp_path / "overlay-audit.json"
+    assert post_checkout_audit.run_post_checkout_audit(
+        tmp_path,
+        evidence_path=evidence_path,
+    ) == 0
     assert capsys.readouterr().err == (
         "REDUNDANT_CONFIG_OVERLAY_AUDIT_WARNING=failed_non_blocking\n"
     )
+    assert json.loads(evidence_path.read_text(encoding="utf-8")) == {
+        "status": "warning"
+    }
 
 
 def test_post_checkout_audit_blocks_only_confirmed_corruption(
@@ -875,6 +896,128 @@ def test_successful_identity_persists_only_sanitized_evidence(
         "api_match_elapsed_seconds": 0.25,
         "celery_match_elapsed_seconds": 2.5,
     }
+
+
+def test_successful_identity_persists_sanitized_overlay_audit_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    release = "d" * 40
+    deployment_evidence = tmp_path / "deployments.jsonl"
+    audit_evidence = tmp_path / "overlay-audit.json"
+    audit_evidence.write_text(
+        json.dumps(
+            {
+                "status": "ok",
+                "redundant_overlay_count": 1,
+                "redundant_overlay_paths": [
+                    "backend-py/scraper_config/runtime_unis/portable_11.yaml"
+                ],
+                "overlay_sha256": "must-not-persist",
+                "absolute_path": "/opt/university-portal/private",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "deploy.safe_restart_smoke._verify_release_and_services",
+        lambda **_kwargs: (
+            release,
+            {"uni-api-py": 0.25, "uni-celery": 0.5},
+        ),
+    )
+
+    asyncio.run(
+        _main(
+            Namespace(
+                release_identity_only=True,
+                journal_since="2026-09-17T00:00:00+00:00",
+                release_identity_timeout_seconds=15,
+                deployment_evidence_path=deployment_evidence,
+                overlay_audit_evidence_path=audit_evidence,
+                recent_deployment_evidence=None,
+            )
+        )
+    )
+
+    record = json.loads(deployment_evidence.read_text(encoding="utf-8"))
+    assert record["overlay_audit_status"] == "ok"
+    assert record["redundant_overlay_count"] == 1
+    assert record["redundant_overlay_paths"] == [
+        "backend-py/scraper_config/runtime_unis/portable_11.yaml"
+    ]
+    assert "overlay_sha256" not in record
+    assert "absolute_path" not in record
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "{not json",
+        json.dumps({"status": "ok", "redundant_overlay_count": 1,
+                    "redundant_overlay_paths": ["/opt/private.yaml"]}),
+        json.dumps({"status": "warning", "error": "secret details"}),
+    ],
+)
+def test_untrusted_overlay_audit_handoff_becomes_sanitized_warning(
+    tmp_path: Path,
+    payload: str,
+) -> None:
+    evidence_path = tmp_path / "overlay-audit.json"
+    evidence_path.write_text(payload, encoding="utf-8")
+
+    assert read_overlay_audit_evidence(evidence_path) == {
+        "overlay_audit_status": "warning"
+    }
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b"\xff\xfe\xfa",
+        b" " * (MAX_OVERLAY_AUDIT_EVIDENCE_BYTES + 1),
+        (
+            b'{"status":"ok","redundant_overlay_count":'
+            + b"9" * 5_000
+            + b',"redundant_overlay_paths":[]}'
+        ),
+        b"[" * 10_000 + b"]" * 10_000,
+    ],
+)
+def test_invalid_or_oversized_overlay_handoff_cannot_block_identity_success(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    payload: bytes,
+) -> None:
+    release = "e" * 40
+    audit_evidence = tmp_path / "overlay-audit.json"
+    deployment_evidence = tmp_path / "deployments.jsonl"
+    audit_evidence.write_bytes(payload)
+    monkeypatch.setattr(
+        "deploy.safe_restart_smoke._verify_release_and_services",
+        lambda **_kwargs: (
+            release,
+            {"uni-api-py": 0.1, "uni-celery": 0.2},
+        ),
+    )
+
+    asyncio.run(
+        _main(
+            Namespace(
+                release_identity_only=True,
+                journal_since="2026-09-17T00:00:00+00:00",
+                release_identity_timeout_seconds=15,
+                deployment_evidence_path=deployment_evidence,
+                overlay_audit_evidence_path=audit_evidence,
+                recent_deployment_evidence=None,
+            )
+        )
+    )
+
+    record = json.loads(deployment_evidence.read_text(encoding="utf-8"))
+    assert record["overlay_audit_status"] == "warning"
+    assert "redundant_overlay_count" not in record
+    assert "redundant_overlay_paths" not in record
 
 
 def test_failed_identity_does_not_persist_success_evidence(

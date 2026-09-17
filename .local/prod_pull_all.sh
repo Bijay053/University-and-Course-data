@@ -15,6 +15,7 @@ test "$(git -c safe.directory=/opt/university-portal rev-parse HEAD)" = 7d13d75e
 reconciler=""
 reconciliation_manifest=""
 reconciliation_committed=0
+overlay_audit_evidence=""
 cleanup_release() {
   cd /opt/university-portal
   rollback_failed=0
@@ -25,6 +26,7 @@ cleanup_release() {
     fi
   fi
   rm -f "$reconciler"
+  rm -f "$overlay_audit_evidence"
   if [ "$rollback_failed" = 1 ]; then
     echo "Generated config rollback failed; consumers remain paused and manifest is retained at $reconciliation_manifest" >&2
     return 1
@@ -80,9 +82,12 @@ test "$(sudo -u ubuntu git rev-parse HEAD)" = "$target"
 # fully supersede. The helper contains ordinary audit/report failures and uses
 # exit 42 only when Git output positively identifies repository corruption.
 overlay_audit_status=0
+overlay_audit_evidence="$(mktemp)"
+chown ubuntu:ubuntu "$overlay_audit_evidence"
 sudo -u ubuntu backend-py/.venv/bin/python -B \
   backend-py/deploy/post_checkout_overlay_audit.py \
-  --repo-root /opt/university-portal || overlay_audit_status=$?
+  --repo-root /opt/university-portal \
+  --evidence-path "$overlay_audit_evidence" || overlay_audit_status=$?
 if [ "$overlay_audit_status" = 42 ]; then
   echo "Repository corruption detected after redundant-overlay audit failure; services were not restarted" >&2
   exit 1
@@ -100,7 +105,8 @@ smoke_since="$(date --iso-8601=seconds)"
 systemctl restart uni-api-py.service uni-celery.service
 .venv/bin/python -B deploy/safe_restart_smoke.py \
   --release-identity-only --journal-since "$smoke_since" \
-  --release-identity-timeout-seconds 30
+  --release-identity-timeout-seconds 30 \
+  --overlay-audit-evidence-path "$overlay_audit_evidence"
 curl --fail --silent http://127.0.0.1:8000/api/health
 systemctl is-active uni-api-py uni-celery
 .venv/bin/python -B - <<'PY'

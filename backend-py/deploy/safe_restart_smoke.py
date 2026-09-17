@@ -23,7 +23,7 @@ import urllib.request
 import uuid
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import urlparse
 
@@ -87,6 +87,7 @@ DEFAULT_DEPLOYMENT_EVIDENCE_PATH = Path(
     "/var/lib/university-portal/deployment-evidence.jsonl"
 )
 DEFAULT_DEPLOYMENT_EVIDENCE_MAX_RECORDS = 1_000
+MAX_OVERLAY_AUDIT_EVIDENCE_BYTES = 1_000_000
 DEFAULT_RELEASE_IDENTITY_REGRESSION_MULTIPLIER = 2.0
 DEFAULT_RELEASE_IDENTITY_REGRESSION_MIN_SAMPLES = 3
 DEFAULT_RELEASE_IDENTITY_REGRESSION_HISTORY_RECORDS = 10
@@ -95,6 +96,7 @@ _SERVICE_EVIDENCE_FIELDS = {
     "uni-api-py": "api_match_elapsed_seconds",
     "uni-celery": "celery_match_elapsed_seconds",
 }
+_OVERLAY_PATH_ROOT = PurePosixPath("backend-py/scraper_config/runtime_unis")
 
 
 class SmokeFailure(RuntimeError):
@@ -107,16 +109,17 @@ def persist_deployment_timing_evidence(
     release: str,
     api_match_elapsed_seconds: float,
     celery_match_elapsed_seconds: float,
+    overlay_audit_evidence: Mapping[str, Any] | None = None,
     recorded_at: datetime | None = None,
     max_records: int = DEFAULT_DEPLOYMENT_EVIDENCE_MAX_RECORDS,
-) -> dict[str, str | float]:
+) -> dict[str, Any]:
     """Append one sanitized record, retaining the newest complete records."""
     if max_records < 1:
         raise SmokeFailure("deployment evidence retention must be positive")
     timestamp = recorded_at or datetime.now(UTC)
     if timestamp.tzinfo is None:
         timestamp = timestamp.replace(tzinfo=UTC)
-    record: dict[str, str | float] = {
+    record: dict[str, Any] = {
         "revision": release,
         "timestamp": timestamp.astimezone(UTC).isoformat().replace("+00:00", "Z"),
         "api_match_elapsed_seconds": round(max(0.0, api_match_elapsed_seconds), 3),
@@ -124,6 +127,8 @@ def persist_deployment_timing_evidence(
             max(0.0, celery_match_elapsed_seconds), 3
         ),
     }
+    if overlay_audit_evidence is not None:
+        record.update(_sanitize_overlay_audit_evidence(overlay_audit_evidence))
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     lock_path = path.with_name(f".{path.name}.lock")
     lock_descriptor = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
@@ -163,6 +168,62 @@ def persist_deployment_timing_evidence(
     finally:
         os.close(lock_descriptor)
     return record
+
+
+def _sanitize_overlay_audit_evidence(
+    evidence: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Return the bounded overlay fields allowed in deployment history."""
+    status = evidence.get("overlay_audit_status", evidence.get("status"))
+    if status != "ok":
+        return {"overlay_audit_status": "warning"}
+    count = evidence.get("redundant_overlay_count")
+    paths = evidence.get("redundant_overlay_paths")
+    if (
+        not isinstance(count, int)
+        or isinstance(count, bool)
+        or count < 0
+        or count > 10_000
+        or not isinstance(paths, list)
+        or len(paths) != count
+    ):
+        return {"overlay_audit_status": "warning"}
+    safe_paths: list[str] = []
+    for value in paths:
+        if not isinstance(value, str) or any(
+            ord(character) < 32 or ord(character) == 127 for character in value
+        ):
+            return {"overlay_audit_status": "warning"}
+        path = PurePosixPath(value)
+        if (
+            path.is_absolute()
+            or ".." in path.parts
+            or path.parent != _OVERLAY_PATH_ROOT
+        ):
+            return {"overlay_audit_status": "warning"}
+        safe_paths.append(value)
+    return {
+        "overlay_audit_status": "ok",
+        "redundant_overlay_count": count,
+        "redundant_overlay_paths": safe_paths,
+    }
+
+
+def read_overlay_audit_evidence(path: Path | None) -> dict[str, Any] | None:
+    """Load optional audit handoff; malformed input becomes a warning state."""
+    if path is None:
+        return None
+    try:
+        with path.open("rb") as stream:
+            raw = stream.read(MAX_OVERLAY_AUDIT_EVIDENCE_BYTES + 1)
+        if len(raw) > MAX_OVERLAY_AUDIT_EVIDENCE_BYTES:
+            return {"overlay_audit_status": "warning"}
+        payload = json.loads(raw.decode("utf-8"))
+    except (OSError, UnicodeDecodeError, ValueError, RecursionError):
+        return {"overlay_audit_status": "warning"}
+    if not isinstance(payload, Mapping):
+        return {"overlay_audit_status": "warning"}
+    return _sanitize_overlay_audit_evidence(payload)
 
 
 def recent_deployment_timing_evidence(
@@ -643,6 +704,9 @@ async def _main(args: argparse.Namespace) -> None:
             release=release,
             api_match_elapsed_seconds=match_elapsed_seconds["uni-api-py"],
             celery_match_elapsed_seconds=match_elapsed_seconds["uni-celery"],
+            overlay_audit_evidence=read_overlay_audit_evidence(
+                getattr(args, "overlay_audit_evidence_path", None)
+            ),
         )
         print(
             "release identity passed: "
@@ -723,6 +787,11 @@ def main() -> int:
         type=Path,
         default=DEFAULT_DEPLOYMENT_EVIDENCE_PATH,
         help="append-only sanitized successful activation history",
+    )
+    parser.add_argument(
+        "--overlay-audit-evidence-path",
+        type=Path,
+        help="sanitized post-checkout overlay audit handoff",
     )
     parser.add_argument(
         "--recent-deployment-evidence",
