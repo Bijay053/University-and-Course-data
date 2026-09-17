@@ -34,7 +34,10 @@ from app.services.scraper.pipelines.single_course import (
     _central_fee_match_has_usable_tuition,
     _restore_matching_static_duration_term,
 )
-from app.services.scraper.url_identity import canonical_course_url_key
+from app.services.scraper.url_identity import (
+    canonical_course_url_key,
+    deduplicate_sit_course_urls,
+)
 
 
 def _run(coro):
@@ -491,7 +494,27 @@ def test_sit_url_identity_collapses_case_and_space_encoding_variants():
         "https://www.sit.ac.nz/programme/course/Bachelor%20of%20Commerce"
     )
 
+def test_sit_url_dedup_prefers_current_public_programme_url():
+    public = {
+        "name": "Bachelor of Commerce",
+        "url": "https://www.sit.ac.nz/Programme/Course/Bachelor%20of%20Commerce",
+    }
+    aliases = [
+        {
+            "name": "Bachelor of Commerce",
+            "url": "http://sit.ac.nz/programme/course/bachelor of commerce/",
+        },
+        public,
+        {
+            "name": "Bachelor of Commerce",
+            "url": "https://www.sit.ac.nz/programme/course/BACHELOR%20OF%20COMMERCE",
+        },
+    ]
 
+    kept, dropped = deduplicate_sit_course_urls(aliases)
+
+    assert kept == [public]
+    assert dropped == 2
 def test_static_duration_unit_is_restored_when_numeric_value_is_unchanged():
     payload = {
         "duration": 8.0,
@@ -810,3 +833,15 @@ def test_sit_stale_central_cache_source_is_rejected():
         "https://www.sit.ac.nz/International/How-to-Apply",
         authoritative,
     ) is False
+
+def test_sit_url_dedup_preserves_distinct_programmes_and_non_sit_urls():
+    items = [
+        {"url": "https://www.sit.ac.nz/Programme/Course/Bachelor%20of%20Commerce"},
+        {"url": "https://www.sit.ac.nz/Programme/Course/Bachelor%20of%20Nursing"},
+        {"url": "https://example.edu/Programme/Course/Bachelor%20of%20Commerce"},
+    ]
+
+    kept, dropped = deduplicate_sit_course_urls(items)
+
+    assert kept == items
+    assert dropped == 0

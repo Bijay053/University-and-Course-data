@@ -118,8 +118,8 @@ def canonical_course_url_key(url: str | None) -> str:
         decoded_path = unquote(path)
         sit_prefix = "/programme/course/"
         if host == "sit.ac.nz" and decoded_path.lower().startswith(sit_prefix):
-            course_part = decoded_path[len(sit_prefix):].strip()
-            path = sit_prefix + quote(course_part, safe="()'-,")
+            course_part = decoded_path[len(sit_prefix):].strip().strip("/")
+            path = sit_prefix + quote(course_part.lower(), safe="()'-,")
         if path != "/":
             path = path.rstrip("/")
 
@@ -132,6 +132,48 @@ def canonical_course_url_key(url: str | None) -> str:
         return result
     except (TypeError, ValueError):
         return raw.lower().rstrip("/")
+
+
+def deduplicate_sit_course_urls(items: list[dict]) -> tuple[list[dict], int]:
+    """Collapse SIT programme aliases while retaining the public route form.
+
+    Discovery can return path-casing and encoding variants for one programme.
+    The canonical key identifies those aliases, while the winner score keeps
+    the current public ``/Programme/Course/`` URL whenever it was discovered.
+    """
+    public_prefix = "/Programme/Course/"
+    winners: dict[str, tuple[int, int, dict]] = {}
+    passthrough: list[tuple[int, dict]] = []
+
+    for index, item in enumerate(items):
+        raw_url = item.get("url") or ""
+        try:
+            parts = urlsplit(raw_url)
+            host = (parts.hostname or "").lower().rstrip(".")
+        except (TypeError, ValueError):
+            passthrough.append((index, item))
+            continue
+        if host not in {"sit.ac.nz", "www.sit.ac.nz"}:
+            passthrough.append((index, item))
+            continue
+
+        key = canonical_course_url_key(raw_url)
+        if not key:
+            passthrough.append((index, item))
+            continue
+        score = (
+            4 * int(parts.path.startswith(public_prefix))
+            + 2 * int(host == "www.sit.ac.nz")
+            + int(parts.scheme.lower() == "https")
+        )
+        current = winners.get(key)
+        if current is None or score > current[0]:
+            winners[key] = (score, index, item)
+
+    kept = passthrough + [(index, item) for _, index, item in winners.values()]
+    kept.sort(key=lambda pair: pair[0])
+    result = [item for _, item in kept]
+    return result, len(items) - len(result)
 
 
 def canonicalize_uwa_sitecore_course_urls(

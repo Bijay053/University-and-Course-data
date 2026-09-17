@@ -36,6 +36,7 @@ from app.services.scraper.stage_course import stage_course
 from app.services.scraper.url_identity import (
     canonical_course_url_key,
     canonicalize_uwa_sitecore_course_urls,
+    deduplicate_sit_course_urls,
     deduplicate_latest_course_year_queries,
     strip_and_deduplicate_course_query_parameters,
 )
@@ -4634,6 +4635,33 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     )
 
         # Phase A.5c — Known canonical course-path aliases before extraction ─────
+        # SIT discovery exposes case, encoding, and route aliases for the same
+        # programme. Collapse them before any detail fetch, retaining the
+        # current public /Programme/Course/ representative when available.
+        if links and _discovery_hostname in {"sit.ac.nz", "www.sit.ac.nz"}:
+            links, _sit_duplicates = deduplicate_sit_course_urls(links)
+            if _sit_duplicates:
+                summary["discovery_duplicates"] = (
+                    int(summary.get("discovery_duplicates", 0) or 0)
+                    + _sit_duplicates
+                )
+                log.info(
+                    "[EXTRACT] SIT canonical URL dedup: dropped %d aliases",
+                    _sit_duplicates,
+                )
+                await emit(
+                    "status",
+                    (
+                        "[EXTRACT] SIT canonical URL dedup: dropped "
+                        f"{_sit_duplicates} duplicate programme alias(es)"
+                    ),
+                    phase="extract",
+                    kind="sit_canonical_url_dedup",
+                    dropped=_sit_duplicates,
+                    kept=len(links),
+                    duplicate_total=summary["discovery_duplicates"],
+                )
+
         # UWA's sitemap exposes internal Sitecore copies of public study pages.
         # Rewrite those copies even when no public link was discovered, and when
         # both forms exist retain the public discovery item regardless of order.
