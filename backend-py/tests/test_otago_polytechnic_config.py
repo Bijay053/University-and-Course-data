@@ -11,6 +11,7 @@ from app.services.scraper.algolia_provider import (
 from app.services.scraper.config.schema import AlgoliaDiscoveryConfig
 from app.services.scraper.config.loader import load_uni_config
 from app.services.scraper import orchestrator
+from app.services.scraper.extractors import fee
 from app.services.scraper.orchestrator import _link_matches_post_discovery_allow
 
 
@@ -282,3 +283,47 @@ def test_op_algolia_payload_survives_timeout_recovery_queue():
         url=sweep_links[0]["url"],
     )
     assert recovered["payload"]["domestic_only"] is True
+
+
+@pytest.mark.asyncio
+async def test_op_fee_parser_selects_standard_international_full_course_amount():
+    html = """
+    <div class="programme-fee-grid">
+      <div class="programme-fee-box">
+        <div><h3>Domestic fees</h3>
+          <div class="programme-fee-boxes">
+            <div>Full tuition</div><div>Standard</div>
+            <div class="programme-fee">$4,021</div>
+          </div>
+        </div>
+      </div>
+      <div class="programme-fee-box">
+        <div><h3>International fees</h3>
+          <div class="programme-fee-boxes">
+            <div>Full tuition</div><div>With scholarship applied</div>
+            <div class="programme-fee">$11,800</div>
+          </div>
+          <div class="programme-fee-boxes">
+            <div>Full tuition</div><div>Standard</div>
+            <div class="programme-fee">$13,800</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    """
+
+    results = await fee.extract(
+        html,
+        "https://www.op.ac.nz/programmes/nzqa/"
+        "new-zealand-certificate-in-bicycle-servicing-level-3",
+        country="New Zealand",
+    )
+
+    assert len(results) == 1
+    assert results[0].normalized == {
+        "international_fee": 13800.0,
+        "currency": "NZD",
+        "fee_term": "Full Course",
+        "fee_year": None,
+    }
+    assert results[0].method == "fee.otago_polytechnic_international_card"

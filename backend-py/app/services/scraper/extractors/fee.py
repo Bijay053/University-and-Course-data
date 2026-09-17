@@ -2592,6 +2592,50 @@ def _from_massey_qualification_detail_fee(
     return _MASSEY_NO_INTERNATIONAL_FEE
 
 
+def _from_otago_polytechnic_international_fee(
+    html: str,
+    url: str,
+) -> tuple[float, str] | None:
+    """Read OP's standard international full-qualification tuition card."""
+    parsed = urlparse(url or "")
+    if (
+        (parsed.hostname or "").lower() not in {"op.ac.nz", "www.op.ac.nz"}
+        or not re.match(r"^/programmes/nzqa/[^/]+/?$", parsed.path or "", re.I)
+    ):
+        return None
+
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "html.parser")
+        for heading in soup.find_all(["h2", "h3", "h4"]):
+            if compact(heading.get_text(" ", strip=True)).lower() != "international fees":
+                continue
+            section = heading.parent
+            for card in section.select(".programme-fee-boxes"):
+                card_text = compact(card.get_text(" ", strip=True))
+                lowered = card_text.lower()
+                if (
+                    "full tuition" not in lowered
+                    or "standard" not in lowered
+                    or "scholarship" in lowered
+                ):
+                    continue
+                fee_node = card.select_one(".programme-fee")
+                amount_match = re.search(
+                    r"\$\s*(\d[\d,]*(?:\.\d{1,2})?)",
+                    fee_node.get_text(" ", strip=True) if fee_node else card_text,
+                )
+                if amount_match:
+                    return (
+                        float(amount_match.group(1).replace(",", "")),
+                        f"International fees — {card_text}",
+                    )
+    except Exception:  # noqa: BLE001 — malformed pages fall through safely
+        return None
+    return None
+
+
 async def extract(
     html: str, url: str, *, country: str | None = None
 ) -> list[ExtractionResult]:
@@ -2617,6 +2661,30 @@ async def extract(
     except Exception:  # noqa: BLE001 — defensive; keep extractor working
         prefer_yr1 = False
         require_explicit_intl_context = False
+
+    # Otago Polytechnic renders Domestic first, followed by a separate
+    # International fees panel. Its cards explicitly label the standard amount
+    # as "Full tuition" for the whole qualification. Reading that owned card
+    # prevents the generic flattened-text scan from selecting the first
+    # domestic amount or the lower scholarship amount.
+    op_fee = _from_otago_polytechnic_international_fee(html, url)
+    if op_fee is not None:
+        op_amount, op_context = op_fee
+        return [
+            ExtractionResult(
+                field_key="international_fee",
+                value=op_amount,
+                normalized={
+                    "international_fee": op_amount,
+                    "currency": "NZD",
+                    "fee_term": "Full Course",
+                    "fee_year": _extract_year(op_context),
+                },
+                confidence=0.99,
+                snippet=op_context[:160],
+                method="fee.otago_polytechnic_international_card",
+            )
+        ]
 
     # APU publishes domestic and international totals side by side, with an
     # indicative USD conversion in parentheses after the international MYR
