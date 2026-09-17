@@ -144,6 +144,14 @@ def run_post_checkout_audit(
             evidence_path,
         )
 
+    if repository_corruption_confirmed(repo_root):
+        _write_evidence(evidence_path, status="warning")
+        _safe_emit(
+            sys.stderr,
+            "REDUNDANT_CONFIG_OVERLAY_AUDIT_WARNING="
+            "repository_corruption_confirmed",
+        )
+        return CORRUPTION_EXIT
     if not _write_evidence(evidence_path, status="ok", overlays=overlays):
         return _failure_result(
             repo_root,

@@ -507,6 +507,16 @@ def test_production_release_blocks_only_corrupt_repository_after_audit_failure()
     assert "Repository corruption detected" in audit_failure
     assert 'if [ "$overlay_audit_status" = 42 ]' in audit_failure
     assert audit_failure.index('= 42 ]') < audit_failure.index("exit 1")
+    gate = audit_failure[
+        audit_failure.index('if [ "$overlay_audit_status" = 42 ]') :
+        audit_failure.index("\nfi", audit_failure.index("exit 1"))
+    ]
+    corrupt_branch, inconclusive_branch = gate.split("elif", maxsplit=1)
+    assert "exit 1" in corrupt_branch
+    assert "exit " not in inconclusive_branch
+    assert audit_failure.index("exit 1") < audit_failure.index(
+        "systemctl restart uni-api-py.service uni-celery.service"
+    )
 
 
 def test_post_checkout_audit_reports_count_paths_and_changes_nothing(
@@ -605,6 +615,113 @@ def test_post_checkout_audit_blocks_only_confirmed_corruption(
         post_checkout_audit.run_post_checkout_audit(tmp_path)
         == post_checkout_audit.CORRUPTION_EXIT
     )
+
+
+def test_post_checkout_audit_detects_a_real_missing_git_object(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "damaged-repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    _git(repo, "config", "user.email", "release-test@example.invalid")
+    _git(repo, "config", "user.name", "Release Test")
+    tracked = repo / "tracked.txt"
+    tracked.write_text("reachable blob\n", encoding="utf-8")
+    _git(repo, "add", tracked.name)
+    _git(repo, "commit", "-qm", "reachable object")
+    blob = _git(repo, "rev-parse", "HEAD:tracked.txt").strip()
+    object_path = repo / ".git/objects" / blob[:2] / blob[2:]
+    assert object_path.is_file()
+    object_path.unlink()
+
+    assert post_checkout_audit.repository_corruption_confirmed(repo) is True
+    assert (
+        post_checkout_audit.run_post_checkout_audit(repo)
+        == post_checkout_audit.CORRUPTION_EXIT
+    )
+
+
+def test_real_corruption_status_stops_exact_release_gate_before_restart(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "damaged-repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    _git(repo, "config", "user.email", "release-test@example.invalid")
+    _git(repo, "config", "user.name", "Release Test")
+    tracked = repo / "tracked.txt"
+    tracked.write_text("reachable blob\n", encoding="utf-8")
+    _git(repo, "add", tracked.name)
+    _git(repo, "commit", "-qm", "reachable object")
+    blob = _git(repo, "rev-parse", "HEAD:tracked.txt").strip()
+    (repo / ".git/objects" / blob[:2] / blob[2:]).unlink()
+
+    helper_result = subprocess.run(
+        [
+            sys.executable,
+            str(DEPLOY_DIR / "post_checkout_overlay_audit.py"),
+            "--repo-root",
+            str(repo),
+        ],
+        cwd=BACKEND_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert helper_result.returncode == post_checkout_audit.CORRUPTION_EXIT
+
+    release_script = (
+        BACKEND_ROOT.parent / ".local/prod_pull_all.sh"
+    ).read_text(encoding="utf-8")
+    gate_start = release_script.index('if [ "$overlay_audit_status" = 42 ]')
+    gate_end = release_script.index("\nfi", gate_start) + len("\nfi")
+    exact_gate = release_script[gate_start:gate_end]
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    restart_marker = tmp_path / "restart-reached"
+    fake_systemctl = fake_bin / "systemctl"
+    fake_systemctl.write_text(
+        f"#!/bin/sh\nprintf reached > {restart_marker}\n",
+        encoding="utf-8",
+    )
+    fake_systemctl.chmod(0o755)
+    gate_result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            (
+                f"overlay_audit_status={helper_result.returncode}\n"
+                f"{exact_gate}\n"
+                "systemctl restart uni-api-py.service uni-celery.service\n"
+            ),
+        ],
+        env={**os.environ, "PATH": f"{fake_bin}:{os.environ['PATH']}"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert gate_result.returncode == 1
+    assert not restart_marker.exists()
+    for non_corruption_status in (0, 7):
+        allowed_result = subprocess.run(
+            [
+                "bash",
+                "-c",
+                (
+                    f"overlay_audit_status={non_corruption_status}\n"
+                    f"{exact_gate}\n"
+                    "systemctl restart uni-api-py.service uni-celery.service\n"
+                ),
+            ],
+            env={**os.environ, "PATH": f"{fake_bin}:{os.environ['PATH']}"},
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert allowed_result.returncode == 0
+        assert restart_marker.read_text(encoding="utf-8") == "reached"
+        restart_marker.unlink()
 
 
 def test_post_checkout_audit_rejects_control_character_paths_without_blocking(
@@ -714,16 +831,26 @@ def test_post_checkout_report_failure_uses_corruption_decision(
     monkeypatch.setattr(post_checkout_audit, "_safe_emit", emit)
 
     assert post_checkout_audit.run_post_checkout_audit(tmp_path) == expected_status
-    assert emitted == [
-        (
-            post_checkout_audit.sys.stdout,
-            "REDUNDANT_CONFIG_OVERLAY_COUNT=0",
-        ),
-        (
-            post_checkout_audit.sys.stderr,
-            "REDUNDANT_CONFIG_OVERLAY_AUDIT_WARNING=report_failed_non_blocking",
-        ),
-    ]
+    if corruption_confirmed:
+        assert emitted == [
+            (
+                post_checkout_audit.sys.stderr,
+                "REDUNDANT_CONFIG_OVERLAY_AUDIT_WARNING="
+                "repository_corruption_confirmed",
+            )
+        ]
+    else:
+        assert emitted == [
+            (
+                post_checkout_audit.sys.stdout,
+                "REDUNDANT_CONFIG_OVERLAY_COUNT=0",
+            ),
+            (
+                post_checkout_audit.sys.stderr,
+                "REDUNDANT_CONFIG_OVERLAY_AUDIT_WARNING="
+                "report_failed_non_blocking",
+            ),
+        ]
 
 
 @pytest.mark.parametrize(
@@ -758,10 +885,12 @@ def test_closed_stdout_preserves_post_checkout_audit_exit_status(
     stderr = process.stderr.read()
 
     assert process.wait(timeout=10) == expected_status
-    assert (
-        "REDUNDANT_CONFIG_OVERLAY_AUDIT_WARNING=report_failed_non_blocking"
-        in stderr
+    expected_warning = (
+        "repository_corruption_confirmed"
+        if corruption_confirmed
+        else "report_failed_non_blocking"
     )
+    assert f"REDUNDANT_CONFIG_OVERLAY_AUDIT_WARNING={expected_warning}" in stderr
     assert "Exception ignored" not in stderr
 
 
