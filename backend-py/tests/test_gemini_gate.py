@@ -398,7 +398,81 @@ async def test_pipeline_missing_required_location_invokes_full_extraction(monkey
     assert len(full_calls) == 1
     assert "location_text" in full_calls[0]
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("missing_fields", "expected_labels"),
+    [
+        (("course_location",), ["Location"]),
+        ((), []),
+    ],
+    ids=["missing-location", "no-missing-facts"],
+)
+async def test_primary_ai_completion_event_keeps_required_fact_labels(
+    monkeypatch,
+    missing_fields,
+    expected_labels,
+):
+    from app.services.scraper import course_deadline, gemini_gate
+    from app.services.scraper.config import set_uni_config
+    from app.services.scraper.config.loader import load_uni_config
+    from app.services.scraper.extractors import gemini_primary
+    from app.services.scraper.pipelines import single_course
 
+    set_uni_config(
+        load_uni_config(
+            slug="sit",
+            scrape_url="https://www.sit.ac.nz",
+            university_id=67,
+            name="Southern Institute of Technology",
+        )
+    )
+    emitted: list[tuple[str, str, dict]] = []
+
+    async def capture(event_type, message, **details):
+        emitted.append((event_type, message, details))
+
+    async def complete_primary(*_args, **_kwargs):
+        return {}, 0.0, 0, 0, {}
+
+    monkeypatch.setattr(
+        gemini_gate,
+        "should_skip_gemini_primary",
+        lambda _payload, _evidence: (False, "full_extraction_needed"),
+    )
+    monkeypatch.setattr(
+        course_deadline,
+        "missing_required_course_fields",
+        lambda _payload: missing_fields,
+    )
+    monkeypatch.setattr(
+        single_course,
+        "required_course_fields_complete",
+        lambda _payload: False,
+    )
+    monkeypatch.setattr(gemini_primary, "extract_primary", complete_primary)
+
+    await single_course.extract_course(
+        "https://www.sit.ac.nz/Programme/Course/Bachelor of Testing",
+        country="New Zealand",
+        html=_pipeline_course_html(),
+        use_ai_fallback=False,
+        central_data=_pipeline_central_data(),
+        emit=capture,
+    )
+
+    completion_events = [
+        (message, details)
+        for _event_type, message, details in emitted
+        if details.get("kind") == "gemini_primary_done"
+    ]
+    assert len(completion_events) == 1
+    message, diagnostic = completion_events[0]
+    assert diagnostic["missing_required_fields"] == list(missing_fields)
+    assert diagnostic["missing_required_field_labels"] == expected_labels
+    assert (
+        f"missing required facts: {', '.join(expected_labels) or 'none'}"
+        in message
+    )
 @pytest.mark.asyncio
 async def test_pipeline_taxonomy_only_gap_uses_classification_prompt(monkeypatch):
     from app.services.ai import gemini_client
