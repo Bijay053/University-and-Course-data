@@ -40,6 +40,7 @@ def _evidence_at(intake_conf: float) -> list[dict]:
         {"field_key": "duration",          "confidence": 0.80},
         {"field_key": "intake_months",     "confidence": intake_conf},
         {"field_key": "study_mode",        "confidence": 0.80},
+        {"field_key": "course_location",   "confidence": 0.85},
     ]
 
 
@@ -51,6 +52,7 @@ def _base_payload() -> dict:
         "duration": "3 years",
         "intake_months": ["September"],
         "study_mode": "On Campus",
+        "course_location": "Main Campus",
         "category": None,
         "sub_category": None,
     }

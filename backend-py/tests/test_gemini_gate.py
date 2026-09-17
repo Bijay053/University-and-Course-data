@@ -37,6 +37,7 @@ def _full_payload(include_classification: bool = True) -> dict:
         "intake_months": ["February", "June"],
         "course_name": "Bachelor of Arts",
         "study_mode": "On Campus",
+        "course_location": "Main Campus",
     }
     if include_classification:
         base["category"] = "Arts & Humanities"
@@ -69,6 +70,29 @@ def test_classification_only_when_sub_category_missing():
     del payload["sub_category"]
     evidence = _make_evidence(payload, confidence=0.85)
     skip, reason = should_skip_gemini_primary(payload, evidence)
+    assert skip is False
+    assert reason == "classification_only"
+
+
+def test_full_extraction_when_only_required_location_is_missing():
+    payload = _full_payload(include_classification=True)
+    del payload["course_location"]
+    evidence = _make_evidence(payload, confidence=0.95)
+
+    skip, reason = should_skip_gemini_primary(payload, evidence)
+
+    assert skip is False
+    assert reason == "full_extraction_needed"
+
+
+def test_online_course_can_classify_without_physical_location():
+    payload = _full_payload(include_classification=False)
+    payload["study_mode"] = "Online"
+    del payload["course_location"]
+    evidence = _make_evidence(payload, confidence=0.95)
+
+    skip, reason = should_skip_gemini_primary(payload, evidence)
+
     assert skip is False
     assert reason == "classification_only"
 

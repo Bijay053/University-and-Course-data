@@ -5448,13 +5448,6 @@ async def extract_course(
                 _gate_skip = True
                 _gate_reason = "all_required_fields_complete"
                 use_ai_fallback = False
-            elif _sit_fee_preflight == "applied" and _gate_skip:
-                # The generic Gemini gate deliberately ignores location, but
-                # physical location is required for an on-campus SIT course.
-                # An exact central fee must not suppress remote recovery of a
-                # remaining required field.
-                _gate_skip = False
-                _gate_reason = "full_extraction_needed"
 
             # ── Early content-based staging skip (skip_staging_keywords) ──────────
             # Check BEFORE any Gemini call. CPD/short-course pages identified by

@@ -16,6 +16,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from app.services.scraper.course_deadline import required_course_fields_complete
+
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -92,6 +94,17 @@ def should_skip_gemini_primary(
       ``"classification_only"``             — run, cheap prompt only
       ``"full_extraction_needed"``          — run, full prompt
     """
+    # Publishability takes precedence over the cost-coverage heuristic. The
+    # high-value catalogue intentionally does not model aliases or the
+    # Online-without-campus exception, while this shared helper does. Never let
+    # a nominal 90% coverage score suppress primary or fallback enrichment when
+    # a required course fact is still absent.
+    if not required_course_fields_complete(payload):
+        log.debug(
+            "[GEMINI GATE] full_extraction — required publishability field missing"
+        )
+        return False, "full_extraction_needed"
+
     # Build fast lookup: field_key → max confidence seen in evidence list.
     best_conf: dict[str, float] = {}
     for ev in evidence:

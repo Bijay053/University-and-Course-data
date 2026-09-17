@@ -343,8 +343,8 @@ async def test_sit_exact_fee_does_not_hide_missing_required_location(monkeypatch
     monkeypatch.setattr(gemini_client, "generate", record_gemini)
     monkeypatch.setattr(
         gemini_gate,
-        "should_skip_gemini_primary",
-        lambda *_args, **_kwargs: (True, "all_high_value_fields_populated"),
+        "required_course_fields_complete",
+        lambda _payload: False,
     )
     monkeypatch.setattr(
         single_course,
