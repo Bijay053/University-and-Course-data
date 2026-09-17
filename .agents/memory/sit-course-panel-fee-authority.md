@@ -7,7 +7,13 @@ SIT course pages wrap a small current-programme summary in a very large shared s
 
 **Why:** Repeatedly parsing the full page exceeded the per-course deadline, while shared contact text turned “0800 4 0 FEES” into a location and module levels corrupted duration. Semester end dates also looked like intakes.
 
-**How to apply:** Compact before generic extraction. Emit explicit labelled facts and only numbered Semester/Intake start months. Skip title-only shells whose current programme panel is absent. Treat SIT course-route case and space encoding variants as one URL identity.
+**How to apply:** Compact before generic extraction. Emit explicit labelled facts and only numbered Semester/Intake start months. Treat SIT course-route case and space encoding variants as one URL identity.
+
+An empty base summary may be recovered only when the exact programme (including approved aliases) has usable tuition in the populated international schedule. Follow only same-host child paths under that exact programme's `/campus/` route, cap and deadline the fetches, and require each child to repeat the exact programme name and a valid current panel. If physical/hybrid and online siblings coexist, use the physical/hybrid panels; normalize Hyflex as delivery rather than a campus. Preserve the full-time duration and remove only explicit part-time maxima.
+
+**Why:** Some current multi-campus programmes render facts only on campus child routes, but obsolete and domestic shells expose the same link pattern. Following every shell would create false international records; merging online siblings contaminates otherwise eligible physical offerings; broad duration cleanup can erase legitimate “Up to … full-time” values.
+
+**How to apply:** A schedule outage defers recovery as retryable. An unmatched shell remains excluded without child fetches. Failed or identity-mismatched child fetches fall back to the title-only skip. Never infer eligibility from child-panel existence alone.
 
 SIT’s central international schedule is the tuition authority. Use its Tuition Fee column, not Resource Fee or Total Fee, force NZD, and require exact award-name matching.
 

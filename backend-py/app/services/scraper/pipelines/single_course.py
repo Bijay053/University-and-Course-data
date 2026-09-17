@@ -3203,22 +3203,120 @@ async def extract_course(
     from app.services.scraper.extractors import sit_html as _sit_html
     if _sit_html.is_sit_course_url(url):
         if not _sit_html.has_current_course_panel(html):
-            if emit:
-                await emit(
-                    "status",
-                    "[SIT] skipped title-only page without a current programme panel",
-                    phase="extract",
-                    kind="sit_course_panel_missing",
-                    url=url,
+            _sit_fee_records = (
+                central_data.get("fees") if isinstance(central_data, dict) else None
+            )
+            if not _sit_fee_records:
+                if emit:
+                    await emit(
+                        "status",
+                        "[SIT] current panel needs recovery but the international "
+                        "fee schedule is unavailable",
+                        phase="extract",
+                        kind="central_fee_schedule_unavailable",
+                        url=url,
+                    )
+                return {
+                    "url": url,
+                    "error": "central_fee_schedule_unavailable",
+                    "skip_reason": "central_fee_schedule_unavailable",
+                    "payload": {},
+                    "evidence": [],
+                    "_perf": {
+                        **_perf_flags,
+                        "sit_course_panel_missing": True,
+                        "sit_panel_recovery_deferred": True,
+                    },
+                }
+
+            from app.services.scraper.central_pages import match_central_fee
+
+            _sit_fee_cfg = getattr(
+                getattr(_uc, "extraction", None),
+                "fees",
+                None,
+            )
+            _sit_name = _sit_html.course_name_from_html(html)
+            _sit_fee_match, _sit_fee_confidence = match_central_fee(
+                _sit_name,
+                _sit_fee_records,
+                exact_only=True,
+                course_aliases=dict(
+                    getattr(_sit_fee_cfg, "central_fee_course_aliases", {}) or {}
+                ),
+            )
+            _sit_is_international = _central_fee_match_has_usable_tuition(
+                _sit_fee_match,
+                _sit_fee_confidence,
+            )
+            if _sit_is_international:
+                _sit_campus_urls = _sit_html.current_course_campus_urls(
+                    html,
+                    url,
+                    max_urls=4,
                 )
-            return {
-                "url": url,
-                "error": "skipped:sit_course_panel_missing",
-                "skip_reason": "sit_course_panel_missing",
-                "payload": {},
-                "evidence": [],
-                "_perf": {**_perf_flags, "sit_course_panel_missing": True},
-            }
+                _sit_timeout = clamp_timeout(30.0)
+                if (
+                    _sit_campus_urls
+                    and _sit_timeout is not None
+                    and _sit_timeout >= 1.0
+                ):
+                    try:
+                        _sit_results = await asyncio.wait_for(
+                            asyncio.gather(
+                                *(fetch_html(candidate) for candidate in _sit_campus_urls),
+                                return_exceptions=True,
+                            ),
+                            timeout=_sit_timeout,
+                        )
+                    except (TimeoutError, asyncio.TimeoutError):
+                        _sit_results = []
+                    _sit_pages = [
+                        result
+                        for result in _sit_results
+                        if isinstance(result, str)
+                    ]
+                    html = _sit_html.merge_current_course_panels(
+                        html,
+                        _sit_pages,
+                    )
+                    if _sit_html.has_current_course_panel(html) and emit:
+                        await emit(
+                            "status",
+                            "[SIT] recovered current programme facts from "
+                            f"{len(_sit_pages)} campus panel(s)",
+                            phase="extract",
+                            kind="sit_course_panel_recovered",
+                            url=url,
+                            campus_panel_count=len(_sit_pages),
+                        )
+            if emit:
+                if not _sit_html.has_current_course_panel(html):
+                    await emit(
+                        "status",
+                        "[SIT] skipped title-only page without a current programme panel",
+                        phase="extract",
+                        kind="sit_course_panel_missing",
+                        url=url,
+                        classification=(
+                            "recovery_failed"
+                            if _sit_is_international
+                            else "not_in_international_fee_schedule"
+                        ),
+                    )
+            if not _sit_html.has_current_course_panel(html):
+                return {
+                    "url": url,
+                    "error": "skipped:sit_course_panel_missing",
+                    "skip_reason": "sit_course_panel_missing",
+                    "payload": {},
+                    "evidence": [],
+                    "_perf": {
+                        **_perf_flags,
+                        "sit_course_panel_missing": True,
+                        "sit_panel_recovery_attempted": _sit_is_international,
+                    },
+                }
         html = _sit_html.compact_course_html(html)
 
     # Shared conservative compaction for large CMS pages. Unlike the Flinders

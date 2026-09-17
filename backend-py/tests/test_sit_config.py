@@ -1,6 +1,8 @@
 import asyncio
 import re
 
+import pytest
+
 from app.services.scraper.config.loader import load_uni_config
 from app.services.scraper.orchestrator import (
     _apply_central_page_overrides,
@@ -23,8 +25,10 @@ from app.services.scraper.extractors import (
 )
 from app.services.scraper.extractors.sit_html import (
     compact_course_html,
+    current_course_campus_urls,
     has_current_course_panel,
     is_sit_course_url,
+    merge_current_course_panels,
 )
 from app.services.scraper.pipelines.single_course import (
     _central_fee_match_has_usable_tuition,
@@ -62,6 +66,46 @@ def _sit_html() -> str:
         </div>
       </div>
       <footer>Related course Online Auckland $99,999</footer>
+    </body></html>
+    """
+
+
+def _sit_multi_campus_shell(name: str = "Graduate Diploma in Hotel Management") -> str:
+    return f"""
+    <html><head><title>{name} | SIT</title></head><body>
+      <span id="courseName">{name}</span>
+      <a href="/campus/Invercargill">global campus navigation</a>
+      <a href="/programme/course/{name}/campus/Invercargill">Invercargill</a>
+      <a href="/programme/course/{name}/campus/Queenstown">Queenstown</a>
+      <div class="CourseInfo CourseSummary"></div>
+    </body></html>
+    """
+
+
+def _sit_campus_html(
+    campus: str,
+    *,
+    name: str = "Graduate Diploma in Hotel Management",
+    intake: str = "February",
+) -> str:
+    return f"""
+    <html><head><title>{name} | SIT</title></head><body>
+      <span id="courseName">{name}</span>
+      <div class="CourseInfo CourseSummary">
+        <span id="currentCampusName">{campus}</span>
+        <div class="keyInfoPane"><div class="row no-gutters">
+          <div>Qualification:</div><div>Graduate Diploma</div>
+          <div>Level:</div><div>7</div>
+          <div>Duration:</div><div>One year full-time</div>
+          <div>Study Modes:</div><div>On Campus</div>
+        </div></div>
+        <div class="lightGrey_bg_1 mb-4">
+          Semester 1: 15 {intake} to 25 June 2027
+        </div>
+        <div id="headerApplicationCriteria_123">
+          International applicants require IELTS 6.0 and PTE Academic 50.
+        </div>
+      </div>
     </body></html>
     """
 
@@ -110,6 +154,19 @@ def test_sit_compacted_page_extracts_hyphenated_week_duration():
     assert result.normalized["duration_term"] == "Month"
 
 
+def test_sit_compaction_preserves_up_to_full_time_duration():
+    html = _sit_html().replace(
+        "Three years full-time",
+        "Up to 18 months full-time",
+    )
+    compacted = compact_course_html(html)
+
+    assert "Up to 18 months full-time" in compacted
+    result = _run(duration.extract(compacted, "https://www.sit.ac.nz/x"))[0]
+    assert result.value == 18.0
+    assert result.normalized["duration_term"] == "Month"
+
+
 def test_sit_compaction_uses_intake_start_dates_not_end_dates():
     html, replacements = re.subn(
         r"Dates:.*?Fees:",
@@ -131,6 +188,229 @@ def test_sit_compaction_uses_intake_start_dates_not_end_dates():
 def test_sit_title_only_shell_has_no_current_course_panel():
     html = "<html><h1>Master of Applied Management</h1><div class='CourseInfo CourseSummary'></div></html>"
     assert has_current_course_panel(html) is False
+
+
+def test_sit_multi_campus_recovery_uses_only_current_course_links():
+    name = "Graduate Diploma in Hotel Management"
+    url = f"https://www.sit.ac.nz/Programme/Course/{name}"
+
+    assert current_course_campus_urls(_sit_multi_campus_shell(name), url) == [
+        f"https://www.sit.ac.nz/programme/course/{name}/campus/Invercargill",
+        f"https://www.sit.ac.nz/programme/course/{name}/campus/Queenstown",
+    ]
+
+
+def test_sit_multi_campus_recovery_merges_verified_panels():
+    merged = merge_current_course_panels(
+        _sit_multi_campus_shell(),
+        [
+            _sit_campus_html("Invercargill", intake="February"),
+            _sit_campus_html("Queenstown", intake="July"),
+            _sit_campus_html("Unrelated", name="Bachelor of Unrelated"),
+        ],
+    )
+    compacted = compact_course_html(merged)
+
+    assert has_current_course_panel(merged) is True
+    assert "Invercargill, Queenstown" in compacted
+    assert _run(duration.extract(compacted, "https://www.sit.ac.nz/x"))[0].value == 1.0
+    assert _run(intake.extract(compacted, "https://www.sit.ac.nz/x"))[0].value == [
+        "February",
+        "July",
+    ]
+    assert "Bachelor of Unrelated" not in compacted
+
+
+def test_sit_recovery_prefers_physical_route_and_full_time_duration():
+    name = "Master of Applied Management"
+    merged = merge_current_course_panels(
+        _sit_multi_campus_shell(name),
+        [
+            _sit_campus_html("SIT Online", name=name).replace(
+                "One year full-time",
+                "18 months full-time. Up to five years part-time.",
+            ).replace("On Campus", "Distance Learning"),
+            _sit_campus_html("Invercargill / Hyflex", name=name).replace(
+                "One year full-time",
+                "18 months full-time, Up to five years part-time",
+            ).replace("On Campus", "Onsite or Flexible Distance"),
+        ],
+    )
+    compacted = compact_course_html(merged)
+
+    assert "<dd>Invercargill</dd>" in compacted
+    assert "SIT Online" not in compacted
+    assert "five years part-time" not in compacted
+    duration_result = _run(duration.extract(compacted, "https://www.sit.ac.nz/x"))[0]
+    assert duration_result.value == 18.0
+    assert duration_result.normalized["duration_term"] == "Month"
+    assert _run(study_mode.extract(compacted, "https://www.sit.ac.nz/x"))[0].value == (
+        "Blended"
+    )
+
+
+@pytest.mark.asyncio
+async def test_sit_schedule_listed_shell_recovers_before_extraction(monkeypatch):
+    from app.services.scraper.config import set_uni_config
+    from app.services.scraper import gemini_gate
+    from app.services.scraper.pipelines import single_course
+
+    cfg = load_uni_config(
+        slug="sit",
+        scrape_url="https://www.sit.ac.nz",
+        university_id=67,
+        name="Southern Institute of Technology",
+    )
+    set_uni_config(cfg)
+    fetched: list[str] = []
+
+    async def fake_fetch(url: str, **_kwargs) -> str:
+        fetched.append(url)
+        campus = "Queenstown" if "Queenstown" in url else "Invercargill"
+        intake_month = "July" if campus == "Queenstown" else "February"
+        return _sit_campus_html(campus, intake=intake_month)
+
+    monkeypatch.setattr(single_course, "fetch_html", fake_fetch)
+    monkeypatch.setattr(
+        gemini_gate,
+        "should_skip_gemini_primary",
+        lambda *_args, **_kwargs: (True, "test"),
+    )
+    result = await single_course.extract_course(
+        "https://www.sit.ac.nz/Programme/Course/Graduate Diploma in Hotel Management",
+        country="New Zealand",
+        html=_sit_multi_campus_shell(),
+        use_ai_fallback=False,
+        central_data={
+            "fees": [
+                {
+                    "program_pattern": "Graduate Diploma in Hotel Management",
+                    "international_fee": 19_000,
+                    "currency": "NZD",
+                    "fee_period": "Annual",
+                }
+            ],
+            "fee_page_url": (
+                "https://www.sit.ac.nz/Fees-Enrolments/International-Fees"
+            ),
+        },
+    )
+
+    assert result.get("error") is None
+    assert len(fetched) == 2
+    assert result["payload"]["international_fee"] == 19_000
+    assert result["payload"]["course_location"] == "Invercargill, Queenstown"
+    assert result["payload"]["duration"] == 1.0
+    assert result["payload"]["intake_months"] == ["February", "July"]
+
+
+@pytest.mark.asyncio
+async def test_sit_unlisted_shell_is_not_recovered(monkeypatch):
+    from app.services.scraper.config import set_uni_config
+    from app.services.scraper.pipelines import single_course
+
+    cfg = load_uni_config(
+        slug="sit",
+        scrape_url="https://www.sit.ac.nz",
+        university_id=67,
+        name="Southern Institute of Technology",
+    )
+    set_uni_config(cfg)
+
+    async def fail_fetch(*_args, **_kwargs) -> str:
+        raise AssertionError("an unlisted SIT shell must not trigger recovery")
+
+    monkeypatch.setattr(single_course, "fetch_html", fail_fetch)
+    result = await single_course.extract_course(
+        "https://www.sit.ac.nz/Programme/Course/Graduate Diploma in Hotel Management",
+        country="New Zealand",
+        html=_sit_multi_campus_shell(),
+        use_ai_fallback=False,
+        central_data={
+            "fees": [
+                {
+                    "program_pattern": "Bachelor of Another Programme",
+                    "international_fee": 19_000,
+                }
+            ]
+        },
+    )
+
+    assert result["error"] == "skipped:sit_course_panel_missing"
+    assert result["_perf"]["sit_panel_recovery_attempted"] is False
+
+
+@pytest.mark.asyncio
+async def test_sit_missing_schedule_defers_panel_recovery(monkeypatch):
+    from app.services.scraper.config import set_uni_config
+    from app.services.scraper.pipelines import single_course
+
+    cfg = load_uni_config(
+        slug="sit",
+        scrape_url="https://www.sit.ac.nz",
+        university_id=67,
+        name="Southern Institute of Technology",
+    )
+    set_uni_config(cfg)
+
+    async def fail_fetch(*_args, **_kwargs) -> str:
+        raise AssertionError("recovery must wait for the required fee schedule")
+
+    monkeypatch.setattr(single_course, "fetch_html", fail_fetch)
+    result = await single_course.extract_course(
+        "https://www.sit.ac.nz/Programme/Course/Graduate Diploma in Hotel Management",
+        country="New Zealand",
+        html=_sit_multi_campus_shell(),
+        use_ai_fallback=False,
+        central_data={"fees": []},
+    )
+
+    assert result["error"] == "central_fee_schedule_unavailable"
+    assert result["_perf"]["sit_panel_recovery_deferred"] is True
+
+
+@pytest.mark.asyncio
+async def test_sit_stalled_panel_recovery_cancels_and_keeps_shell_skipped(
+    monkeypatch,
+):
+    from app.services.scraper.config import set_uni_config
+    from app.services.scraper.pipelines import single_course
+
+    cfg = load_uni_config(
+        slug="sit",
+        scrape_url="https://www.sit.ac.nz",
+        university_id=67,
+        name="Southern Institute of Technology",
+    )
+    set_uni_config(cfg)
+    cancelled: list[str] = []
+
+    async def stalled_fetch(url: str, **_kwargs) -> str:
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancelled.append(url)
+
+    monkeypatch.setattr(single_course, "fetch_html", stalled_fetch)
+    monkeypatch.setattr(single_course, "clamp_timeout", lambda _seconds: 1.0)
+    result = await single_course.extract_course(
+        "https://www.sit.ac.nz/Programme/Course/Graduate Diploma in Hotel Management",
+        country="New Zealand",
+        html=_sit_multi_campus_shell(),
+        use_ai_fallback=False,
+        central_data={
+            "fees": [
+                {
+                    "program_pattern": "Graduate Diploma in Hotel Management",
+                    "international_fee": 19_000,
+                }
+            ]
+        },
+    )
+
+    assert result["error"] == "skipped:sit_course_panel_missing"
+    assert result["_perf"]["sit_panel_recovery_attempted"] is True
+    assert len(cancelled) == 2
 
 
 def test_sit_url_identity_collapses_case_and_space_encoding_variants():
