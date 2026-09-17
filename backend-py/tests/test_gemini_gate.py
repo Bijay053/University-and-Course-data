@@ -103,6 +103,47 @@ def test_each_missing_required_publishability_field_forces_full_extraction(
     assert reason == "full_extraction_needed"
 
 
+def test_every_required_fact_is_supported_by_full_ai_request_and_merge():
+    from app.services.scraper.extractors.gemini_primary import _HARD_FIELDS
+    from app.services.scraper.pipelines.single_course import (
+        GEMINI_PRIMARY_FIELD_TARGETS,
+    )
+
+    failures: list[str] = []
+    for fact in REQUIRED_COURSE_FIELDS:
+        if fact.deterministic_only_reason:
+            continue
+        aliases = set(fact.aliases)
+        usable_fields = [
+            ai_field
+            for ai_field in fact.full_ai_fields
+            if ai_field in _HARD_FIELDS
+            and GEMINI_PRIMARY_FIELD_TARGETS.get(ai_field) in aliases
+        ]
+        if not usable_fields:
+            failures.append(
+                f"{fact.name}: AI fields {fact.full_ai_fields!r} are not both "
+                "requestable and merged into one of "
+                f"{fact.aliases!r}"
+            )
+
+    assert not failures, "\n".join(failures)
+
+
+def test_required_fact_must_declare_ai_support_or_deterministic_only_reason():
+    with pytest.raises(ValueError, match="full AI fields or an explicit"):
+        RequiredCourseField("unsupported", "Unsupported", ("unsupported",), ())
+
+    deterministic = RequiredCourseField(
+        "deterministic_fact",
+        "Deterministic Fact",
+        ("deterministic_fact",),
+        (),
+        deterministic_only_reason="Derived from signed catalogue metadata",
+    )
+    assert deterministic.deterministic_only_reason
+
+
 @pytest.mark.parametrize("taxonomy_field", ["category", "sub_category"])
 def test_classification_only_is_limited_to_taxonomy_gaps(taxonomy_field: str):
     payload = _full_payload(include_classification=True)

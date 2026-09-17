@@ -65,6 +65,23 @@ from app.services.scraper.nz_programme_points import (
 
 log = logging.getLogger(__name__)
 
+# Full-AI response fields and the canonical/alias payload slots reached by the
+# merge below. This is intentionally explicit so required publishability facts
+# can be checked against both the prompt schema and the pipeline merge contract.
+GEMINI_PRIMARY_FIELD_TARGETS: dict[str, str] = {
+    "international_fee": "international_fee",
+    "ielts_overall": "ielts_overall",
+    "pte_overall": "pte_overall",
+    "toefl_overall": "toefl_overall",
+    "cambridge_overall": "cambridge_overall",
+    "duolingo_overall": "duolingo_overall",
+    "duration_value": "duration",
+    "duration_text": "duration_text",
+    "intake_text": "intake_months",
+    "location_text": "course_location",
+    "mode": "study_mode",
+}
+
 
 def _build_extraction_method_map(
     payload: dict[str, Any],
@@ -5763,7 +5780,9 @@ async def extract_course(
             # unconditionally (PRIMARY means Gemini beats any earlier regex hit).
             if _gp_filled.get("duration_value") is not None:
                 try:
-                    _gp_filled["duration"] = float(_gp_filled["duration_value"])
+                    _gp_filled[
+                        GEMINI_PRIMARY_FIELD_TARGETS["duration_value"]
+                    ] = float(_gp_filled["duration_value"])
                 except (TypeError, ValueError):
                     pass
             if _gp_filled.get("duration_unit"):
@@ -5788,7 +5807,9 @@ async def extract_course(
                     if _mo and _mo not in _months:
                         _months.append(_mo)
                 if _months:
-                    _gp_filled["intake_months"] = _months
+                    _gp_filled[
+                        GEMINI_PRIMARY_FIELD_TARGETS["intake_text"]
+                    ] = _months
 
             # ── UTAS online-only flag from Gemini's `mode` field ───────────────
             # UTAS course pages publish a single "Location" panel which reads
@@ -5885,7 +5906,9 @@ async def extract_course(
                     # bcu.ac.uk pages unconditionally.
                     _is_bcu_host_gp = "bcu.ac.uk" in (url or "").lower()
                     if not _has_structural_loc and not _is_bcu_host_gp:
-                        _gp_filled["course_location"] = _loc
+                        _gp_filled[
+                            GEMINI_PRIMARY_FIELD_TARGETS["location_text"]
+                        ] = _loc
 
             # Helper: return the method of the current best evidence row for
             # a field, ignoring superseded rows.
@@ -5896,7 +5919,12 @@ async def extract_course(
                 return None
 
             for _gp_k, _gp_v in _gp_filled.items():
-                if _gp_k in ("duration_value", "duration_unit"):
+                if _gp_k in (
+                    "duration_value",
+                    "duration_unit",
+                    "intake_text",
+                    "location_text",
+                ):
                     continue  # consumed by the mapped keys above
                 # Otago course-owned empty metadata locks both canonical
                 # fields and the Gemini aliases that are mapped into them.
@@ -5916,15 +5944,10 @@ async def extract_course(
                     )
                 ):
                     continue
-                # Remap Gemini's "mode" JSON key to the canonical payload key.
-                # The Gemini prompt asks for "mode" (shorter, less verbose) but
-                # the rest of the pipeline — evidence lookup, FIELD TRACE, staging
-                # — all use "study_mode".  Without this remap, Gemini's extracted
-                # study mode goes into payload["mode"] and payload["study_mode"]
-                # stays None, causing the UI to show "-" even when Gemini clearly
-                # returned "On Campus" or "Online".
-                if _gp_k == "mode":
-                    _gp_k = "study_mode"
+                # Route request fields through the production-owned merge
+                # contract. Unknown non-required fields keep their historical
+                # same-name merge behavior.
+                _gp_k = GEMINI_PRIMARY_FIELD_TARGETS.get(_gp_k, _gp_k)
 
                 # Global fill-only policy: Gemini is a fallback for gaps left by
                 # deterministic extraction, never an alternative authority that

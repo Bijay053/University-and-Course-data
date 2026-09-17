@@ -24,17 +24,25 @@ class RequiredCourseField:
     name: str
     operator_label: str
     aliases: tuple[str, ...]
+    full_ai_fields: tuple[str, ...]
     optional_when_online: bool = False
+    deterministic_only_reason: str | None = None
 
     def __post_init__(self) -> None:
         if not self.operator_label.strip():
             raise ValueError(f"Required course field {self.name!r} needs an operator label")
+        if not self.full_ai_fields and not str(self.deterministic_only_reason or "").strip():
+            raise ValueError(
+                f"Required course field {self.name!r} needs full AI fields "
+                "or an explicit deterministic-only reason"
+            )
 
 
 REQUIRED_COURSE_FIELDS: tuple[RequiredCourseField, ...] = (
     RequiredCourseField(
         "international_fee",
         "International Fee",
+        ("international_fee",),
         ("international_fee",),
     ),
     RequiredCourseField(
@@ -47,24 +55,39 @@ REQUIRED_COURSE_FIELDS: tuple[RequiredCourseField, ...] = (
             "cambridge_overall",
             "duolingo_overall",
         ),
+        (
+            "ielts_overall",
+            "pte_overall",
+            "toefl_overall",
+            "cambridge_overall",
+            "duolingo_overall",
+        ),
     ),
     RequiredCourseField(
         "duration",
         "Duration",
         ("duration", "duration_value", "duration_text"),
+        ("duration_value", "duration_text"),
     ),
     RequiredCourseField(
         "intake",
         "Intake",
         ("intake_months", "intake_dates", "intake_text"),
+        ("intake_text",),
     ),
     RequiredCourseField(
         "course_location",
         "Location",
         ("course_location", "location_text", "location"),
+        ("location_text",),
         optional_when_online=True,
     ),
-    RequiredCourseField("study_mode", "Study Mode", ("study_mode", "mode")),
+    RequiredCourseField(
+        "study_mode",
+        "Study Mode",
+        ("study_mode", "mode"),
+        ("mode",),
+    ),
 )
 
 
