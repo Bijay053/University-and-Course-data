@@ -278,3 +278,16 @@ hostname after the release itself had already passed.
 **How to apply:** Parse only records whose first token is exactly
 `server_name`, then exclude `_` and localhost before running public HTML and
 asset checks.
+
+Generated-config reconciliation commands in the release transaction must use
+the production virtual environment's absolute interpreter path for both
+`prepare` and `finalize`.
+
+**Why:** The transaction changes its working directory to `backend-py` before
+the finalizer. A repository-relative `backend-py/.venv/bin/python` therefore
+resolved as `backend-py/backend-py/.venv/bin/python` only after services had
+already restarted, making a healthy release report failure at its final step.
+
+**How to apply:** Do not rely on the release transaction's current directory
+for reconciliation or cleanup helpers. Use absolute repository and interpreter
+paths throughout the remote script.
