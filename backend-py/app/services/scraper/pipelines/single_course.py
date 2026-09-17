@@ -1797,6 +1797,66 @@ def _central_fee_match_has_usable_tuition(
     )
 
 
+def _apply_sit_central_fee_before_remote_enrichment(
+    url: str,
+    payload: dict[str, Any],
+    evidence: list[dict[str, Any]],
+    central_data: dict[str, Any] | None,
+) -> str:
+    """Apply SIT's required exact schedule row before any remote AI gate."""
+    from app.services.scraper.extractors import sit_html
+
+    if not sit_html.is_sit_course_url(url):
+        return "not_sit"
+
+    records = central_data.get("fees") if isinstance(central_data, dict) else None
+    if not records:
+        return "schedule_unavailable"
+
+    from app.services.scraper.central_pages import match_central_fee
+
+    fee_cfg = getattr(getattr(get_uni_config(), "extraction", None), "fees", None)
+    matched, confidence = match_central_fee(
+        payload.get("course_name") or "",
+        records,
+        degree_level=payload.get("degree_level"),
+        exact_only=True,
+        course_url=url,
+        course_aliases=dict(
+            getattr(fee_cfg, "central_fee_course_aliases", {}) or {}
+        ),
+    )
+    if not _central_fee_match_has_usable_tuition(matched, confidence):
+        return "no_match"
+
+    source_url = (
+        central_data.get("fee_page_url")
+        or getattr(fee_cfg, "central_page", None)
+        or url
+    )
+    for key, source_key in (
+        ("international_fee", "international_fee"),
+        ("currency", "currency"),
+        ("fee_term", "per"),
+        ("fee_year", "fee_year"),
+    ):
+        value = matched.get(source_key)
+        if value in (None, "", 0):
+            continue
+        payload[key] = value
+        evidence.append(
+            {
+                "field_key": key,
+                "value": value,
+                "confidence": 0.85,
+                "method": "central_page:fees:exact",
+                "source_url": source_url,
+                "snippet": f"central_page fee: {key}={value}",
+            }
+        )
+    return "applied"
+
+
 _GEMINI_PRIMARY_CANONICAL_FIELDS = {
     "duration_value": "duration",
     "duration_unit": "duration_term",
@@ -4634,6 +4694,36 @@ async def extract_course(
             or str(item.get("method") or "").startswith("curtin_static")
         ]
 
+    # SIT's compact current-programme panel and required international schedule
+    # are deterministic authorities. Apply the exact schedule row now so the
+    # remote-enrichment gate sees the publishable payload. Unlisted programmes
+    # and schedule outages fail closed before incurring any AI cost.
+    _sit_fee_preflight = _apply_sit_central_fee_before_remote_enrichment(
+        url,
+        payload,
+        evidence,
+        central_data,
+    )
+    if _sit_fee_preflight in {"schedule_unavailable", "no_match"}:
+        _sit_error = (
+            "central_fee_schedule_unavailable"
+            if _sit_fee_preflight == "schedule_unavailable"
+            else "skipped:not_listed_in_international_fee_schedule"
+        )
+        return {
+            "url": url,
+            "error": _sit_error,
+            "retryable": _sit_fee_preflight == "schedule_unavailable",
+            "skip_reason": (
+                "central_fee_schedule_unavailable"
+                if _sit_fee_preflight == "schedule_unavailable"
+                else "central_fee_schedule_no_match"
+            ),
+            "payload": {},
+            "evidence": evidence,
+            "_perf": _perf_flags,
+        }
+
     # ── Field-level extraction summary log ───────────────────────────────────
     # After all static extractors have run, emit a structured per-field summary
     # for the five critical fields so the live log shows exactly which strategy
@@ -5358,6 +5448,13 @@ async def extract_course(
                 _gate_skip = True
                 _gate_reason = "all_required_fields_complete"
                 use_ai_fallback = False
+            elif _sit_fee_preflight == "applied" and _gate_skip:
+                # The generic Gemini gate deliberately ignores location, but
+                # physical location is required for an on-campus SIT course.
+                # An exact central fee must not suppress remote recovery of a
+                # remaining required field.
+                _gate_skip = False
+                _gate_reason = "full_extraction_needed"
 
             # ── Early content-based staging skip (skip_staging_keywords) ──────────
             # Check BEFORE any Gemini call. CPD/short-course pages identified by
@@ -9081,6 +9178,14 @@ async def extract_course(
                                         "fee_year",
                                     }
                                 )
+                            ):
+                                continue
+                            if any(
+                                existing.get("field_key") == _k
+                                and existing.get("value") == _v
+                                and existing.get("method")
+                                == f"central_page:fees:{_fee_confidence}"
+                                for existing in evidence
                             ):
                                 continue
                             payload[_k] = _v

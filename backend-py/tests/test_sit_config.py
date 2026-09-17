@@ -252,7 +252,7 @@ def test_sit_recovery_prefers_physical_route_and_full_time_duration():
 @pytest.mark.asyncio
 async def test_sit_schedule_listed_shell_recovers_before_extraction(monkeypatch):
     from app.services.scraper.config import set_uni_config
-    from app.services.scraper import gemini_gate
+    from app.services.ai import gemini_client
     from app.services.scraper.pipelines import single_course
 
     cfg = load_uni_config(
@@ -271,16 +271,15 @@ async def test_sit_schedule_listed_shell_recovers_before_extraction(monkeypatch)
         return _sit_campus_html(campus, intake=intake_month)
 
     monkeypatch.setattr(single_course, "fetch_html", fake_fetch)
-    monkeypatch.setattr(
-        gemini_gate,
-        "should_skip_gemini_primary",
-        lambda *_args, **_kwargs: (True, "test"),
-    )
+    async def fail_gemini(*_args, **_kwargs):
+        raise AssertionError("complete deterministic SIT facts must skip Gemini")
+
+    monkeypatch.setattr(gemini_client, "generate", fail_gemini)
     result = await single_course.extract_course(
         "https://www.sit.ac.nz/Programme/Course/Graduate Diploma in Hotel Management",
         country="New Zealand",
         html=_sit_multi_campus_shell(),
-        use_ai_fallback=False,
+        use_ai_fallback=True,
         central_data={
             "fees": [
                 {
@@ -302,6 +301,78 @@ async def test_sit_schedule_listed_shell_recovers_before_extraction(monkeypatch)
     assert result["payload"]["course_location"] == "Invercargill, Queenstown"
     assert result["payload"]["duration"] == 1.0
     assert result["payload"]["intake_months"] == ["February", "July"]
+    fee_evidence = [
+        item
+        for item in result["evidence"]
+        if item["field_key"] == "international_fee"
+        and item["method"] == "central_page:fees:exact"
+    ]
+    assert len(fee_evidence) == 1
+    assert fee_evidence[0]["source_url"] == (
+        "https://www.sit.ac.nz/Fees-Enrolments/International-Fees"
+    )
+
+
+@pytest.mark.asyncio
+async def test_sit_exact_fee_does_not_hide_missing_required_location(monkeypatch):
+    from app.services.ai import gemini_client
+    from app.services.scraper import gemini_gate
+    from app.services.scraper.config import set_uni_config
+    from app.services.scraper.pipelines import single_course
+
+    cfg = load_uni_config(
+        slug="sit",
+        scrape_url="https://www.sit.ac.nz",
+        university_id=67,
+        name="Southern Institute of Technology",
+    )
+    set_uni_config(cfg)
+    calls: list[str] = []
+
+    async def record_gemini(*_args, **_kwargs):
+        calls.append("gemini")
+        return gemini_client.GeminiResponse(
+            "",
+            0,
+            0,
+            0.0,
+            skipped=True,
+            skip_reason="test",
+        )
+
+    monkeypatch.setattr(gemini_client, "generate", record_gemini)
+    monkeypatch.setattr(
+        gemini_gate,
+        "should_skip_gemini_primary",
+        lambda *_args, **_kwargs: (True, "all_high_value_fields_populated"),
+    )
+    monkeypatch.setattr(
+        single_course,
+        "required_course_fields_complete",
+        lambda _payload: False,
+    )
+    result = await single_course.extract_course(
+        "https://www.sit.ac.nz/Programme/Course/Bachelor of Testing",
+        country="New Zealand",
+        html=_sit_html(),
+        use_ai_fallback=False,
+        central_data={
+            "fees": [
+                {
+                    "program_pattern": "Bachelor of Testing",
+                    "international_fee": 19_000,
+                    "currency": "NZD",
+                    "per": "Annual",
+                }
+            ],
+            "fee_page_url": (
+                "https://www.sit.ac.nz/Fees-Enrolments/International-Fees"
+            ),
+        },
+    )
+
+    assert calls == ["gemini"]
+    assert result["payload"]["international_fee"] == 19_000
 
 
 @pytest.mark.asyncio
