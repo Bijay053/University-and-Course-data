@@ -97,6 +97,19 @@ def test_sit_compacted_page_extracts_location_mode_and_duration():
     assert english[1].value == 50.0
 
 
+def test_sit_compacted_page_extracts_hyphenated_week_duration():
+    html = _sit_html().replace(
+        "Three years full-time",
+        "17-weeks full time",
+    )
+    compacted = compact_course_html(html)
+
+    result = _run(duration.extract(compacted, "https://www.sit.ac.nz/x"))[0]
+
+    assert result.value == 4.0
+    assert result.normalized["duration_term"] == "Month"
+
+
 def test_sit_compaction_uses_intake_start_dates_not_end_dates():
     html, replacements = re.subn(
         r"Dates:.*?Fees:",

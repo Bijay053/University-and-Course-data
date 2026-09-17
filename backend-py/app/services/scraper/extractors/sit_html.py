@@ -54,6 +54,13 @@ def compact_course_html(html: str) -> str:
     for index in range(0, len(columns) - 1, 2):
         label = " ".join(columns[index].get_text(" ", strip=True).split()).rstrip(":")
         value = " ".join(columns[index + 1].get_text(" ", strip=True).split())
+        if label.lower() == "duration":
+            value = re.sub(
+                r"(?<=\d)[-–—](?=(?:years?|months?|weeks?|semesters?|trimesters?)\b)",
+                " ",
+                value,
+                flags=re.I,
+            )
         if label and value:
             facts.append((label, value))
 
