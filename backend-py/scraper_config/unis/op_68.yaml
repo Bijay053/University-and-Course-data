@@ -1,0 +1,70 @@
+# Otago Polytechnic
+#
+# The public /programmes page is a subject-area index: its /study/* links are
+# category pages, not qualifications. The same page exposes a public Algolia
+# search-only key and the opmarketing_live_Page index. ProgrammeInfoPage hits
+# use /programmes/nzqa/<slug> and carry audience-scoped international metadata.
+
+hostname_guard: op.ac.nz
+
+locked_config_paths:
+  - discovery.algolia
+  - discovery.allow_url_patterns
+  - discovery.force_candidate_url_patterns
+  - discovery.course_detail_url_patterns
+  - discovery.block_url_patterns
+  - discovery.expected_min_courses
+  - discovery.use_wayback
+  - discovery.skip_sitemap_fallback
+  - extraction.staging.skip_degree_qualifier_check
+  - extraction.fees.default_currency
+  - extraction.fees.currency_override
+  - extraction.fees.prefer_international
+  - extraction.fees.discard_domestic_fee
+
+discovery:
+  algolia:
+    # Public search credentials embedded in the OP programmes page.
+    app_id: MQP0HWTGJ8
+    api_key: 97190cae972775fea8e204234d7c6643
+    index_name: opmarketing_live_Page
+    url_field: objectLink
+    name_field: objectTitle
+    payload_fields:
+      - objectClassName
+      - QualificationType
+      - Duration
+      - Intake
+      - Delivery
+      - Locations
+    allow_url_patterns:
+      - ^https?://(?:www\.)?op\.ac\.nz/programmes/nzqa/[^/?#]+/?(?:[?#].*)?$
+    required_field_values:
+      objectClassName: App\Pages\ProgrammeInfoPage
+    hits_per_page: 100
+
+  allow_url_patterns:
+    - ^https?://(?:www\.)?op\.ac\.nz/programmes/nzqa/[^/?#]+/?(?:[?#].*)?$
+  force_candidate_url_patterns:
+    - ^https?://(?:www\.)?op\.ac\.nz/programmes/nzqa/[^/?#]+/?(?:[?#].*)?$
+  course_detail_url_patterns:
+    - ^https?://(?:www\.)?op\.ac\.nz/programmes/nzqa/[^/?#]+/?(?:[?#].*)?$
+  block_url_patterns:
+    - ^https?://(?:www\.)?op\.ac\.nz/study(?:/|$)
+  use_wayback: false
+  skip_sitemap_fallback: true
+  expected_min_courses: 120
+
+extraction:
+  staging:
+    # Algolia's typed ProgrammeInfoPage records plus the exact NZQA detail route
+    # are stronger course evidence than a title-prefix heuristic. This retains
+    # valid titles such as the midwife recertification programme without
+    # admitting /study/* category pages.
+    skip_degree_qualifier_check: true
+
+  fees:
+    default_currency: NZD
+    currency_override: NZD
+    prefer_international: true
+    discard_domestic_fee: true

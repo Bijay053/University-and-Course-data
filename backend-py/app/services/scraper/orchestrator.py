@@ -317,15 +317,17 @@ def _queue_recovery_sweep_candidate(
     if key in url_keys:
         return False
     url_keys.add(key)
-    links.append(
-        {
-            "url": sweep_url,
-            "name": result.get("name", "?"),
-            "counter": counter,
-            "source_error": result.get("error"),
-            "reason": failure_details["reason"],
-        }
-    )
+    candidate = {
+        "url": sweep_url,
+        "name": result.get("name", "?"),
+        "counter": counter,
+        "source_error": result.get("error"),
+        "reason": failure_details["reason"],
+    }
+    discovery_payload = result.get("_discovery_payload")
+    if isinstance(discovery_payload, dict):
+        candidate["payload"] = dict(discovery_payload)
+    links.append(candidate)
     return True
 
 
@@ -372,7 +374,7 @@ def _per_course_timeout_result(
     timeout_seconds: float = _PER_COURSE_EXTRACTION_TIMEOUT_SECONDS,
 ) -> dict:
     """Return the stable sentinel used when an extraction exceeds its cap."""
-    return {
+    result = {
         "name": (link.get("name") or "").strip() or "?",
         "url": link.get("url"),
         "error": "per_course_timeout",
@@ -385,6 +387,9 @@ def _per_course_timeout_result(
         "fetch_failed": True,
         "_timed_out": True,
     }
+    if isinstance(link.get("payload"), dict):
+        result["_discovery_payload"] = dict(link["payload"])
+    return result
 
 
 async def _extract_with_hard_timeout(
@@ -1080,13 +1085,22 @@ async def _extract_only(
         # Preserve the exception type as well as its text.  The former is
         # searchable and actionable when a provider returns an unhelpful empty
         # message, while the latter remains compatible with existing logs.
-        return {
+        result = {
             "name": name,
             "url": url,
             "error": f"extract: {type(exc).__name__}: {exc}",
             "error_type": type(exc).__name__,
             "error_reason": str(exc) or type(exc).__name__,
         }
+        if isinstance(link.get("payload"), dict):
+            result["_discovery_payload"] = dict(link["payload"])
+        return result
+
+    if (
+        isinstance(link.get("payload"), dict)
+        and (out.get("error") or out.get("_retry_after"))
+    ):
+        out["_discovery_payload"] = dict(link["payload"])
 
     # Algolia can carry authoritative international-catalogue metadata alongside
     # a discovery link. Merge it only after the full HTML/AI pipeline so the

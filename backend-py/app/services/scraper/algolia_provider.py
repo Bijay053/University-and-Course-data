@@ -209,6 +209,170 @@ def _wsu_provider_values(raw: dict[str, Any]) -> list[tuple[str, Any, str, str]]
     return values
 
 
+def _op_provider_values(raw: dict[str, Any]) -> list[tuple[str, Any, str, str]]:
+    """Normalize Otago Polytechnic's audience-scoped catalogue metadata."""
+    values: list[tuple[str, Any, str, str]] = []
+    international_duration = (raw.get("Duration") or {}).get("international")
+    international_intakes = (raw.get("Intake") or {}).get("international")
+    international_delivery = (raw.get("Delivery") or {}).get("international")
+    international_locations = (raw.get("Locations") or {}).get("international")
+
+    has_international = any(
+        value not in (None, "", [], {})
+        for value in (
+            international_duration,
+            international_intakes,
+            international_delivery,
+            international_locations,
+        )
+    )
+    if not has_international:
+        return [
+            (
+                "domestic_only",
+                True,
+                "Duration/Intake/Delivery/Locations.international",
+                "No international offering is present in the programme index.",
+            )
+        ]
+
+    duration = international_duration if isinstance(international_duration, dict) else {}
+    full_time = duration.get("fullTime") if isinstance(duration, dict) else None
+    part_time = duration.get("partTime") if isinstance(duration, dict) else None
+    selected_duration = full_time or part_time
+    if isinstance(selected_duration, dict):
+        number = selected_duration.get("number")
+        unit = str(selected_duration.get("unit") or "").strip()
+        if number not in (None, "") and unit:
+            values.extend([
+                ("duration", number, "Duration.international", f"{number} {unit}"),
+                ("duration_term", unit.title(), "Duration.international", f"{number} {unit}"),
+            ])
+    if full_time or part_time:
+        values.append((
+            "study_load",
+            "Full Time" if full_time else "Part Time",
+            "Duration.international",
+            (
+                "International full-time offering"
+                if full_time
+                else "International part-time-only offering"
+            ),
+        ))
+
+    delivery = [
+        str(value).strip()
+        for value in (international_delivery or [])
+        if str(value).strip()
+    ]
+    locations = [
+        str(value).strip()
+        for value in (international_locations or [])
+        if str(value).strip()
+    ]
+    combined_delivery = " ".join([*delivery, *locations]).lower()
+    non_remote_locations = [
+        value
+        for value in locations
+        if not re.search(r"\b(?:online|distance|remote)\b", value, re.I)
+    ]
+    has_campus = "on campus" in combined_delivery or bool(non_remote_locations)
+    has_online = any(
+        marker in combined_delivery
+        for marker in ("online", "distance", "remote")
+    )
+    if not delivery and not locations:
+        study_mode = None
+    elif has_online and not has_campus:
+        study_mode = "Online"
+        values.append((
+            "online_only",
+            True,
+            "Delivery/Locations.international",
+            ", ".join([*delivery, *locations]),
+        ))
+    elif has_online and has_campus:
+        study_mode = "Blended"
+    elif has_campus:
+        study_mode = "On Campus"
+    else:
+        study_mode = None
+    if study_mode:
+        values.append((
+            "study_mode",
+            study_mode,
+            "Delivery/Locations.international",
+            ", ".join([*delivery, *locations]),
+        ))
+
+    if non_remote_locations:
+        values.append((
+            "course_location",
+            ", ".join(dict.fromkeys(non_remote_locations)),
+            "Locations.international",
+            ", ".join(non_remote_locations),
+        ))
+
+    months: list[str] = []
+    for value in international_intakes or []:
+        match = re.search(
+            r"\b(January|February|March|April|May|June|July|August|"
+            r"September|October|November|December)\b",
+            str(value),
+            re.I,
+        )
+        if match:
+            month = match.group(1).title()
+            if month not in months:
+                months.append(month)
+    if months:
+        values.append((
+            "intake_months",
+            months,
+            "Intake.international",
+            ", ".join(months),
+        ))
+    return values
+
+
+def _merge_values(
+    extraction_result: dict[str, Any],
+    *,
+    provider_source: str,
+    values: list[tuple[str, Any, str, str]],
+    authoritative: set[str],
+) -> dict[str, Any]:
+    payload = extraction_result.setdefault("payload", {})
+    evidence = extraction_result.setdefault("evidence", [])
+    for field, value, source_field, snippet in values:
+        if value in (None, "", []):
+            continue
+        if field not in authoritative and payload.get(field) not in (None, "", []):
+            continue
+        if payload.get(field) == value:
+            continue
+        if field in authoritative:
+            for prior in evidence:
+                if (
+                    prior.get("field_key") == field
+                    and prior.get("decision_status") != "superseded"
+                ):
+                    prior["decision_status"] = "superseded"
+        payload[field] = value
+        evidence.append({
+            "field_key": field,
+            "value": value,
+            "normalized": value,
+            "source_url": provider_source,
+            "page_type": "api",
+            "method": f"algolia:{source_field}",
+            "snippet": snippet,
+            "confidence": 0.98,
+            "decision_status": "selected",
+        })
+    return extraction_result
+
+
 def merge_algolia_payload(
     extraction_result: dict[str, Any],
     provider_payload: dict[str, Any],
@@ -218,14 +382,32 @@ def merge_algolia_payload(
     """Merge configured Algolia metadata into a completed HTML extraction."""
     if provider_payload.get("_provider") != "algolia":
         return extraction_result
-    if "westernsydney.edu.au" not in url.lower():
+    url_lower = url.lower()
+    provider_source = str(provider_payload.get("_source_url") or "").strip()
+    if "op.ac.nz" in url_lower:
+        if provider_payload.get("objectClassName") != "App\\Pages\\ProgrammeInfoPage":
+            return extraction_result
+        return _merge_values(
+            extraction_result,
+            provider_source=provider_source or url,
+            values=_op_provider_values(provider_payload),
+            authoritative={
+                "domestic_only",
+                "online_only",
+                "duration",
+                "duration_term",
+                "study_load",
+                "study_mode",
+                "course_location",
+                "intake_months",
+            },
+        )
+    if "westernsydney.edu.au" not in url_lower:
         return extraction_result
 
     payload = extraction_result.setdefault("payload", {})
     evidence = extraction_result.setdefault("evidence", [])
-    provider_source = str(
-        provider_payload.get("_source_url") or _WSU_ENGLISH_SOURCE
-    ).strip()
+    provider_source = provider_source or _WSU_ENGLISH_SOURCE
     authoritative = {
         "international_fee",
         "fee_currency",
@@ -319,6 +501,13 @@ async def fetch_algolia_links(
     if cfg.facet_filter:
         facet_filters = [[cfg.facet_filter]]
 
+    allow_patterns: list[re.Pattern[str]] = []
+    for pattern in cfg.allow_url_patterns:
+        try:
+            allow_patterns.append(re.compile(pattern, re.IGNORECASE))
+        except re.error as exc:
+            log.error("[ALGOLIA] invalid allow_url_pattern %r: %s", pattern, exc)
+
     links: list[dict] = []
     seen_urls: set[str] = set()
     page = 0
@@ -330,6 +519,7 @@ async def fetch_algolia_links(
                 cfg.url_field,
                 cfg.name_field,
                 *cfg.payload_fields,
+                *cfg.required_field_values.keys(),
             ]))
             body = {
                 "query": "",
@@ -372,9 +562,18 @@ async def fetch_algolia_links(
 
             hits = data.get("hits", [])
             for hit in hits:
+                if any(
+                    str(hit.get(field) or "") != expected
+                    for field, expected in cfg.required_field_values.items()
+                ):
+                    continue
                 url = (hit.get(cfg.url_field) or hit.get("url") or "").strip()
                 name = (hit.get(cfg.name_field) or "").strip()
                 if not url or not url.startswith("http"):
+                    continue
+                if allow_patterns and not any(
+                    pattern.search(url) for pattern in allow_patterns
+                ):
                     continue
                 if url in seen_urls:
                     continue

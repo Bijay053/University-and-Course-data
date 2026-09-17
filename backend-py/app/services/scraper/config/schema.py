@@ -21,7 +21,7 @@ hallucinations from polluting a brand-new university's scrape).
 """
 from __future__ import annotations
 
-from typing import Any, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -404,6 +404,21 @@ class AlgoliaDiscoveryConfig(BaseModel):
             "Additional hit fields to preserve as authoritative provider metadata "
             "for the normal per-course extraction pipeline. Payload-bearing links "
             "are intentionally excluded from the discovery URL cache."
+        ),
+    )
+    allow_url_patterns: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Optional provider-level URL allow-list. Unlike the shared post-"
+            "discovery filters, this is enforced on Algolia hits before they "
+            "become trusted provider links."
+        ),
+    )
+    required_field_values: Dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Optional exact hit-field values required before an Algolia record "
+            "is emitted, e.g. objectClassName=ProgrammeInfoPage."
         ),
     )
     hits_per_page: int = Field(
