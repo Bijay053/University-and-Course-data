@@ -16,7 +16,10 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from app.services.scraper.course_deadline import required_course_fields_complete
+from app.services.scraper.course_deadline import (
+    missing_required_course_fields,
+    required_course_fields_complete,
+)
 
 log = logging.getLogger(__name__)
 
@@ -99,9 +102,11 @@ def should_skip_gemini_primary(
     # Online-without-campus exception, while this shared helper does. Never let
     # a nominal 90% coverage score suppress primary or fallback enrichment when
     # a required course fact is still absent.
-    if not required_course_fields_complete(payload):
+    missing_required_fields = missing_required_course_fields(payload)
+    if missing_required_fields:
         log.debug(
-            "[GEMINI GATE] full_extraction — required publishability field missing"
+            "[GEMINI GATE] full_extraction — missing required facts: %s",
+            ", ".join(missing_required_fields),
         )
         return False, "full_extraction_needed"
 

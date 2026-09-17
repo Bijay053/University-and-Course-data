@@ -7,6 +7,8 @@ Verifies the three decision branches:
 """
 from __future__ import annotations
 
+import logging
+
 import pytest
 
 from app.services.scraper.gemini_gate import (
@@ -128,6 +130,22 @@ def test_full_extraction_when_fields_missing():
     skip, reason = should_skip_gemini_primary(payload, evidence)
     assert skip is False
     assert reason == "full_extraction_needed"
+
+
+def test_missing_required_alias_groups_are_named_in_gate_log(caplog):
+    payload = _full_payload(include_classification=True)
+    del payload["ielts_overall"]
+    del payload["course_location"]
+
+    with caplog.at_level(logging.DEBUG):
+        skip, reason = should_skip_gemini_primary(
+            payload,
+            _make_evidence(payload, confidence=0.95),
+        )
+
+    assert skip is False
+    assert reason == "full_extraction_needed"
+    assert "english_score, course_location" in caplog.text
 
 
 def test_low_confidence_doesnt_count_as_populated():

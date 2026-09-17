@@ -16,6 +16,24 @@ _course_deadline: ContextVar[float | None] = ContextVar(
     default=None,
 )
 
+_REQUIRED_COURSE_FIELD_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("international_fee", ("international_fee",)),
+    (
+        "english_score",
+        (
+            "ielts_overall",
+            "pte_overall",
+            "toefl_overall",
+            "cambridge_overall",
+            "duolingo_overall",
+        ),
+    ),
+    ("duration", ("duration", "duration_value", "duration_text")),
+    ("intake", ("intake_months", "intake_dates", "intake_text")),
+    ("course_location", ("course_location", "location_text", "location")),
+    ("study_mode", ("study_mode", "mode")),
+)
+
 
 def set_course_deadline(timeout_seconds: float) -> Token:
     """Set a deadline ``timeout_seconds`` from now and return its reset token."""
@@ -56,32 +74,25 @@ def has_budget(minimum_seconds: float = 0.05) -> bool:
     return remaining is None or remaining >= max(0.0, float(minimum_seconds))
 
 
-def required_course_fields_complete(payload: dict[str, Any]) -> bool:
-    """Return True when expensive remote enrichment cannot add a required field.
+def missing_required_course_fields(payload: dict[str, Any]) -> tuple[str, ...]:
+    """Return stable, bounded names for missing required fact or alias groups.
 
     Multiple aliases are accepted because the pipeline carries both canonical
     staging slots (``duration``, ``intake_months``) and extractor-shape slots
     (``duration_value``, ``intake_text``) at different points.
     """
 
-    def present(*keys: str) -> bool:
-        return any(payload.get(key) not in (None, "", 0, []) for key in keys)
-
     mode = payload.get("study_mode") or payload.get("mode")
     is_online = str(mode or "").strip().lower() == "online"
-    return all(
-        (
-            present("international_fee"),
-            present(
-                "ielts_overall",
-                "pte_overall",
-                "toefl_overall",
-                "cambridge_overall",
-                "duolingo_overall",
-            ),
-            present("duration", "duration_value", "duration_text"),
-            present("intake_months", "intake_dates", "intake_text"),
-            is_online or present("course_location", "location_text", "location"),
-            present("study_mode", "mode"),
-        )
-    )
+    missing: list[str] = []
+    for label, aliases in _REQUIRED_COURSE_FIELD_GROUPS:
+        if label == "course_location" and is_online:
+            continue
+        if not any(payload.get(key) not in (None, "", 0, []) for key in aliases):
+            missing.append(label)
+    return tuple(missing)
+
+
+def required_course_fields_complete(payload: dict[str, Any]) -> bool:
+    """Return True when expensive remote enrichment cannot add a required field."""
+    return not missing_required_course_fields(payload)

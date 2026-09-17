@@ -5265,6 +5265,9 @@ async def extract_course(
                 build_classification_only_prompt as _build_class_prompt,
                 should_skip_gemini_primary as _gate_check,
             )
+            from app.services.scraper.course_deadline import (
+                missing_required_course_fields as _missing_required_course_fields,
+            )
             from app.services.scraper.extractors._text import html_to_text as _h2t_gate
             from app.services.ai import gemini_client as _gc
             import json as _gp_json
@@ -5490,6 +5493,9 @@ async def extract_course(
             _gp_out_tok: int = 0
             _gp_cost: float = 0.0
             _gp_full_ran: bool = False
+            _gate_missing_required_fields = list(
+                _missing_required_course_fields(payload)
+            )
 
             if _gate_skip:
                 # All high-value fields already covered — skip Gemini primary.
@@ -6165,13 +6171,16 @@ async def extract_course(
                 await emit(
                     "status",
                     f"[{ai_provider.upper()}] {url[:60]} → {len(_gp_filled)} field(s) "
-                    f"(cost=${_gp_cost:.6f}, in={_gp_in_tok} out={_gp_out_tok}){_gp_skip_note}",
+                    f"(cost=${_gp_cost:.6f}, in={_gp_in_tok} out={_gp_out_tok})"
+                    f" missing_required={_gate_missing_required_fields}{_gp_skip_note}",
                     phase="extract",
                     kind=f"{ai_provider}_primary_done",
                     filled=list(_gp_filled.keys()),
                     cost_usd=_gp_cost,
                     input_tokens=_gp_in_tok,
                     output_tokens=_gp_out_tok,
+                    gate_reason=_gate_reason,
+                    missing_required_fields=_gate_missing_required_fields,
                     url=url,
                 )
     except asyncio.TimeoutError:

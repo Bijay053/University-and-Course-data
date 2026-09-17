@@ -78,6 +78,32 @@ def test_online_course_does_not_require_a_physical_location() -> None:
     assert course_deadline.required_course_fields_complete(payload)
 
 
+def test_missing_required_fields_reports_stable_alias_groups() -> None:
+    payload = {
+        "pte_overall": 58,
+        "duration_text": "Two years",
+        "intake_dates": ["2027-02-01"],
+        "mode": "On Campus",
+    }
+
+    assert course_deadline.missing_required_course_fields(payload) == (
+        "international_fee",
+        "course_location",
+    )
+
+
+def test_missing_required_fields_omits_location_for_online_course() -> None:
+    payload = {
+        "international_fee": 30_000,
+        "duolingo_overall": 105,
+        "duration_value": 2,
+        "intake_text": "February, July",
+        "mode": "Online",
+    }
+
+    assert course_deadline.missing_required_course_fields(payload) == ()
+
+
 def test_sparse_browser_gate_requires_sparse_visible_html() -> None:
     from app.services.scraper.pipelines.single_course import (
         _should_force_sparse_browser,
