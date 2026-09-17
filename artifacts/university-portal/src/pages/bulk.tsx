@@ -924,7 +924,26 @@ export default function Bulk() {
 
       {/* ── Excel Import Tab ─────────────────────────────────────────────────── */}
       {activeTab === "import" && (
-        <div className="space-y-6 max-w-2xl">
+          <div className="space-y-6 max-w-2xl">
+            <div className="flex items-center justify-between gap-4 rounded-lg border bg-slate-50 px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-slate-800">Need the correct Excel columns?</p>
+                <p className="text-xs text-muted-foreground">Download an empty template with all supported fields and instructions.</p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                onClick={() => downloadFile(
+                  "/api/import/excel-template",
+                  "university-course-import-template.xlsx",
+                )}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Download Template
+              </Button>
+            </div>
           <div
             className={`border-2 border-dashed rounded-xl p-10 text-center transition-colors cursor-pointer ${
               file ? "border-blue-400 bg-blue-50" : "border-gray-300 hover:border-blue-300 hover:bg-gray-50"

@@ -7,11 +7,16 @@ from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 
 from app.dependencies import get_current_user, get_db
 from app.main import app
 from app.models import University
+from app.routers.import_routes import (
+    _COLUMN_MAP,
+    _UNIVERSITY_COLUMN_MAP,
+    _norm_header,
+)
 from sqlalchemy.exc import IntegrityError
 
 
@@ -137,6 +142,59 @@ def _post(client, content: bytes, *, fields: dict[str, str], filename="data.xlsx
 
 
 # ───────────────────────── tests ─────────────────────────────────────────────
+def test_download_template_has_supported_headers_and_no_fake_rows(client):
+    response = client.get("/api/import/excel-template")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    assert "university-course-import-template.xlsx" in response.headers[
+        "content-disposition"
+    ]
+
+    workbook = load_workbook(BytesIO(response.content), data_only=True)
+    assert workbook.sheetnames == ["Courses", "Instructions"]
+    courses = workbook["Courses"]
+    headers = [cell.value for cell in courses[1]]
+    assert headers[:5] == [
+        "University Name",
+        "University Country",
+        "University City",
+        "University URL",
+        "Course Name",
+    ]
+    assert {
+        "Category",
+        "Degree Level",
+        "Duration",
+        "Study Mode",
+        "Intake Months",
+        "International Fee",
+        "IELTS Overall",
+        "PTE Overall",
+        "TOEFL Overall",
+        "Academic Level",
+        "Course Website",
+        "Course Location",
+        "Description",
+        "Other Requirement",
+        "CRICOS Code",
+    }.issubset(headers)
+    assert {
+        _COLUMN_MAP[_norm_header(header)]
+        for header in headers[4:]
+    } == set(_COLUMN_MAP.values())
+    assert {
+        _UNIVERSITY_COLUMN_MAP[_norm_header(header)]
+        for header in headers[:4]
+    } == {"name", "country", "city", "url"}
+    assert courses.max_row == 1
+    assert "no example course rows" in str(
+        workbook["Instructions"]["B8"].value
+    ).lower()
+
+
 def test_imports_rows_into_existing_university(client, fake_db):
     xlsx = _make_xlsx(
         ["Course Name", "Degree Level", "Duration", "International Fee", "IELTS Overall", "Intake Month"],

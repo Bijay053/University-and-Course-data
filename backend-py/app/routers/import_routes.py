@@ -10,7 +10,10 @@ from typing import Annotated, Any
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, File, status
-from openpyxl import load_workbook
+from fastapi.responses import Response
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -158,6 +161,47 @@ _UNIVERSITY_COLUMN_MAP: dict[str, str] = {
     "universitycourselistingurl": "scrape_url",
 }
 
+_EXCEL_TEMPLATE_HEADERS: tuple[str, ...] = (
+    "University Name",
+    "University Country",
+    "University City",
+    "University URL",
+    "Course Name",
+    "Category",
+    "Sub Category",
+    "Degree Level",
+    "Duration",
+    "Duration Term",
+    "Study Mode",
+    "Study Load",
+    "Intake Months",
+    "International Fee",
+    "Fee Term",
+    "Fee Year",
+    "Currency",
+    "IELTS Overall",
+    "IELTS Listening",
+    "IELTS Speaking",
+    "IELTS Writing",
+    "IELTS Reading",
+    "PTE Overall",
+    "PTE Listening",
+    "PTE Speaking",
+    "PTE Writing",
+    "PTE Reading",
+    "TOEFL Overall",
+    "Academic Level",
+    "Academic Score",
+    "Academic Country",
+    "Scholarship",
+    "Course Website",
+    "Course Location",
+    "Description",
+    "Other Requirement",
+    "Language",
+    "CRICOS Code",
+)
+
 _FLOAT_FIELDS = {
     "duration", "international_fee", "academic_score",
     "ielts_overall", "ielts_listening", "ielts_speaking", "ielts_writing", "ielts_reading",
@@ -265,6 +309,78 @@ def _validated_http_url(value: str | None, *, field_label: str) -> str | None:
             detail={"error": f"{field_label} must be a valid http:// or https:// URL."},
         )
     return cleaned
+
+
+@router.get("/excel-template")
+async def download_excel_template(
+    _user: Annotated[dict, Depends(get_current_user)],
+) -> Response:
+    """Download an empty, importer-compatible workbook with usage guidance."""
+    workbook = Workbook()
+    courses = workbook.active
+    courses.title = "Courses"
+    courses.append(_EXCEL_TEMPLATE_HEADERS)
+    courses.freeze_panes = "A2"
+    courses.auto_filter.ref = (
+        f"A1:{get_column_letter(len(_EXCEL_TEMPLATE_HEADERS))}1"
+    )
+
+    header_fill = PatternFill("solid", fgColor="1F4E78")
+    for cell in courses[1]:
+        cell.fill = header_fill
+        cell.font = Font(color="FFFFFF", bold=True)
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        courses.column_dimensions[cell.column_letter].width = max(
+            14,
+            min(28, len(str(cell.value)) + 3),
+        )
+    courses.row_dimensions[1].height = 24
+
+    instructions = workbook.create_sheet("Instructions")
+    guidance = (
+        ("University course import template", "Do not rename the Courses sheet headers."),
+        ("Required", "Course Name"),
+        (
+            "From Excel mode",
+            "Fill University Name, University Country, University City, and "
+            "University URL. Repeat the same university details on each course row.",
+        ),
+        (
+            "Existing University mode",
+            "Select the university in the portal. University columns may be left blank.",
+        ),
+        ("URLs", "Use complete http:// or https:// addresses."),
+        ("Intake Months", "Separate multiple months with commas, for example: February, July."),
+        ("Numbers", "Enter duration, fees, years, and test scores as numbers where possible."),
+        (
+            "Safety",
+            "This template contains no example course rows, so uploading it unchanged "
+            "will not create fake data.",
+        ),
+    )
+    for row in guidance:
+        instructions.append(row)
+    instructions["A1"].font = Font(bold=True, size=14, color="1F4E78")
+    instructions["B1"].font = Font(bold=True)
+    instructions.column_dimensions["A"].width = 24
+    instructions.column_dimensions["B"].width = 100
+    for row in instructions.iter_rows():
+        for cell in row:
+            cell.alignment = Alignment(vertical="top", wrap_text=True)
+
+    output = io.BytesIO()
+    workbook.save(output)
+    return Response(
+        content=output.getvalue(),
+        media_type=(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ),
+        headers={
+            "Content-Disposition": (
+                'attachment; filename="university-course-import-template.xlsx"'
+            )
+        },
+    )
 
 
 # ─── /api/import/excel ──────────────────────────────────────────────────────
