@@ -136,6 +136,13 @@ extraction:
   # pass always runs, regardless of whether Gemini already filled a slot.
   force_browser: true
 
+  # The database auto-config may retain browser suppression from an earlier
+  # proxy strategy. UEL's explicit browser-only extraction path must clear both
+  # independent suppression controls or skip_initial_http_fetch below leaves
+  # every course with no transport at all.
+  skip_browser_rescue: false
+  skip_per_course_browser: false
+
   # UEL is 100% Cloudflare-protected: every plain HTTP attempt returns a 403
   # or bot-challenge page before the browser fallback fires.  Skipping the
   # initial HTTP try eliminates the wasted round-trip for every course page

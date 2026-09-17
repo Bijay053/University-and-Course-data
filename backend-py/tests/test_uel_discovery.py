@@ -31,6 +31,28 @@ def test_uel_uses_static_proxy_catalogues_instead_of_dead_discovery_tiers():
     ]
 
 
+def test_uel_browser_extraction_overrides_stale_auto_config_suppression():
+    config = load_uni_config(
+        slug="uel",
+        scrape_url="https://www.uel.ac.uk",
+        university_id=69,
+        name="University of East London",
+        db_scrape_config={
+            "auto_config": {
+                "extraction": {
+                    "skip_browser_rescue": True,
+                    "skip_per_course_browser": True,
+                },
+            },
+        },
+    )
+
+    assert config.extraction.force_browser is True
+    assert config.extraction.skip_initial_http_fetch is True
+    assert config.extraction.skip_browser_rescue is False
+    assert config.extraction.skip_per_course_browser is False
+
+
 @pytest.mark.asyncio
 async def test_uel_static_catalogues_harvest_only_course_detail_urls():
     discovery = _uel_config().discovery
