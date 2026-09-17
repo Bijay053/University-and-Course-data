@@ -35,10 +35,22 @@ import pytest_asyncio
 from sqlalchemy import text
 
 from app.database import AsyncSessionLocal, engine
+from app.services.scraper import orchestrator as orchestrator_mod
 from app.services.scraper import repair as repair_mod
 
 
 # ─── shared fixtures ──────────────────────────────────────────────────────
+
+
+def test_scrape_lock_sql_helper_is_not_shadowed_by_late_local_import() -> None:
+    """The stale-lock query must remain callable before post-run finalization.
+
+    A late ``from sqlalchemy import text as _text`` inside ``run_scrape`` made
+    every earlier ``_text(...)`` reference a local variable access. Recovery
+    jobs then failed to inspect their completed parent's lock and were
+    incorrectly reported as concurrent duplicates.
+    """
+    assert "_text" not in orchestrator_mod.run_scrape.__code__.co_varnames
 
 
 @pytest.fixture(autouse=True)

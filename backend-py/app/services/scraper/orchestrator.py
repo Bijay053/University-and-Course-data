@@ -16,7 +16,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import select, text as _sql_text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -1867,7 +1867,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             if _holder != "unknown" and _uni_lock_redis is not None:
                 try:
                     _holder_row = await db.execute(
-                        _text(
+                        _sql_text(
                             "SELECT status FROM scrape_runtime_jobs "
                             "WHERE runtime_job_id = :jid"
                         ),
@@ -1912,7 +1912,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     level="warn",
                 )
                 await db.execute(
-                    _text(
+                    _sql_text(
                         "UPDATE scrape_runtime_jobs "
                         "SET status = 'stopped', completed_at = NOW(), "
                         "error_message = 'Aborted: another scrape for this university "
@@ -1976,7 +1976,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                         level="warn",
                     )
                     await db.execute(
-                        _text(
+                        _sql_text(
                             "UPDATE scrape_runtime_jobs "
                             "SET status = 'stopped', completed_at = NOW(), "
                             "error_message = 'Deferred: global scrape "
@@ -7323,10 +7323,10 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # in the live log AND server log on any drift so future regressions
         # surface immediately instead of silently lying. Best-effort: a
         # transient SELECT failure must never block the job from finalizing.
-        from sqlalchemy import text as _text
+        from sqlalchemy import text as _row_count_text
         try:
             actual_staged = (await db.execute(
-                _text(
+                _row_count_text(
                     "SELECT COUNT(*) FROM scraped_courses "
                     "WHERE scrape_job_id = :rid"
                 ),
