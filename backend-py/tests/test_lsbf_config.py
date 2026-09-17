@@ -43,6 +43,7 @@ def test_lsbf_tracked_recipe_replaces_stale_generated_courses_path():
     assert cfg.discovery.force_candidate_url_patterns == (
         cfg.discovery.allow_url_patterns
     )
+    assert cfg.extraction.staging.skip_degree_qualifier_check is True
 
 
 def test_lsbf_live_programme_details_survive_but_category_hubs_do_not():

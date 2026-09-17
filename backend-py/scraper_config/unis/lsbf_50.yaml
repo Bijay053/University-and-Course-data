@@ -13,6 +13,7 @@ locked_config_paths:
   - discovery.course_detail_url_patterns
   - discovery.block_url_patterns
   - discovery.use_wayback
+  - extraction.staging.skip_degree_qualifier_check
 
 discovery:
   seed_urls:
@@ -29,3 +30,10 @@ discovery:
     - /programmes/(?:pearson-pte-programme-flyer|ielts-preparatory-programmes)/
     - /programmes/preparatory-course-
   use_wayback: false
+
+extraction:
+  staging:
+    # The exact detail route plus the campaign deny-list already separates
+    # programme pages from category hubs. LSBF's Foundation and ACCA awards
+    # legitimately omit generic degree qualifiers in their titles.
+    skip_degree_qualifier_check: true
