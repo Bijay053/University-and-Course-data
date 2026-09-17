@@ -266,6 +266,34 @@ type CourseReviewPayload = {
   conflicts: ReviewConflict[];
 };
 
+export function formatRecoveryDiagnosticMessage(log: {
+  message?: string;
+  missing_required_fields?: unknown;
+  missing_required_field_labels?: unknown;
+}): string {
+  const message = log.message ?? "";
+  if (/missing required facts:/i.test(message)) return message;
+  const labels = Array.isArray(log.missing_required_field_labels)
+    ? log.missing_required_field_labels.filter(
+        (label): label is string => typeof label === "string" && label.trim().length > 0,
+      )
+    : [];
+  const fields = Array.isArray(log.missing_required_fields)
+    ? log.missing_required_fields.filter(
+        (field): field is string => typeof field === "string" && field.trim().length > 0,
+      )
+    : [];
+  const readable = labels.length === fields.length
+    ? labels
+    : fields.map((field) =>
+        field
+          .replace(/_/g, " ")
+          .replace(/\b\w/g, (letter) => letter.toUpperCase()),
+      );
+  if (readable.length === 0) return message;
+  return `${message} Missing required facts: ${readable.join(", ")}.`;
+}
+
 const ALL = "__new__";
 
 /**
@@ -4974,7 +5002,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                                 const f = historyLogFilter.toLowerCase();
                                 return (
                                   l.event.toLowerCase().includes(f) ||
-                                  String(l.message ?? "").toLowerCase().includes(f) ||
+                                  formatRecoveryDiagnosticMessage(l).toLowerCase().includes(f) ||
                                   String(l.phase ?? "").toLowerCase().includes(f)
                                 );
                               })
@@ -5011,7 +5039,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                                   <div key={l.sequence} className="whitespace-pre-wrap break-words leading-relaxed">
                                     <span className="text-gray-500">[{l.event}]</span>
                                     {l.phase ? <span className="text-blue-300"> [{String(l.phase)}]</span> : null}
-                                    {l.message ? <> {String(l.message)}</> : null}
+                                     {formatRecoveryDiagnosticMessage(l) ? <> {formatRecoveryDiagnosticMessage(l)}</> : null}
                                   </div>
                                 )
                               )}

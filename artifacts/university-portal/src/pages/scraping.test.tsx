@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   annualFeeEquivalentForDisplay,
+  formatRecoveryDiagnosticMessage,
   getFixResultHeading,
   isRequestedFixField,
   ScrapingForTest,
@@ -22,6 +23,35 @@ describe("annualFeeEquivalentForDisplay", () => {
   it("annualizes full-course fees lasting at least one year", () => {
     expect(annualFeeEquivalentForDisplay(48_000, 12, "Month")).toBe(48_000);
     expect(annualFeeEquivalentForDisplay(96_000, 2, "Year")).toBe(48_000);
+  });
+});
+
+describe("formatRecoveryDiagnosticMessage", () => {
+  it("uses backend operator labels for required recovery facts", () => {
+    expect(formatRecoveryDiagnosticMessage({
+      message: "AI extraction finished.",
+      missing_required_fields: ["international_fee", "english_score"],
+      missing_required_field_labels: ["International Fee", "English Requirements"],
+    })).toBe(
+      "AI extraction finished. Missing required facts: International Fee, English Requirements.",
+    );
+  });
+
+  it("keeps future required facts readable when labels are absent", () => {
+    expect(formatRecoveryDiagnosticMessage({
+      message: "AI extraction finished.",
+      missing_required_fields: ["professional_accreditation"],
+    })).toBe(
+      "AI extraction finished. Missing required facts: Professional Accreditation.",
+    );
+  });
+
+  it("does not duplicate readable facts already present in the log message", () => {
+    expect(formatRecoveryDiagnosticMessage({
+      message: "AI extraction finished. Missing required facts: Duration.",
+      missing_required_fields: ["duration"],
+      missing_required_field_labels: ["Duration"],
+    })).toBe("AI extraction finished. Missing required facts: Duration.");
   });
 });
 

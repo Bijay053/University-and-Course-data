@@ -18,6 +18,15 @@ _REQUIRED_TEST_VALUES = {
     "study_mode": "On Campus",
 }
 
+_EXPECTED_OPERATOR_LABELS = {
+    "international_fee": "International Fee",
+    "english_score": "English Requirements",
+    "duration": "Duration",
+    "intake": "Intake",
+    "course_location": "Location",
+    "study_mode": "Study Mode",
+}
+
 
 def _complete_required_payload() -> dict[str, object]:
     return {
@@ -85,6 +94,16 @@ def test_each_contract_field_is_required_automatically(
     assert course_deadline.missing_required_course_fields(payload) == (
         required_field.name,
     )
+
+
+def test_every_required_field_has_its_stable_operator_label() -> None:
+    assert {
+        field.name: field.operator_label
+        for field in course_deadline.REQUIRED_COURSE_FIELDS
+    } == _EXPECTED_OPERATOR_LABELS
+    assert course_deadline.required_course_field_labels(
+        tuple(_EXPECTED_OPERATOR_LABELS)
+    ) == tuple(_EXPECTED_OPERATOR_LABELS.values())
 
 
 def test_online_course_does_not_require_a_physical_location() -> None:

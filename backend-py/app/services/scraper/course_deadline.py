@@ -22,14 +22,24 @@ class RequiredCourseField:
     """One publishability fact and every pipeline slot that can satisfy it."""
 
     name: str
+    operator_label: str
     aliases: tuple[str, ...]
     optional_when_online: bool = False
 
+    def __post_init__(self) -> None:
+        if not self.operator_label.strip():
+            raise ValueError(f"Required course field {self.name!r} needs an operator label")
+
 
 REQUIRED_COURSE_FIELDS: tuple[RequiredCourseField, ...] = (
-    RequiredCourseField("international_fee", ("international_fee",)),
+    RequiredCourseField(
+        "international_fee",
+        "International Fee",
+        ("international_fee",),
+    ),
     RequiredCourseField(
         "english_score",
+        "English Requirements",
         (
             "ielts_overall",
             "pte_overall",
@@ -40,18 +50,21 @@ REQUIRED_COURSE_FIELDS: tuple[RequiredCourseField, ...] = (
     ),
     RequiredCourseField(
         "duration",
+        "Duration",
         ("duration", "duration_value", "duration_text"),
     ),
     RequiredCourseField(
         "intake",
+        "Intake",
         ("intake_months", "intake_dates", "intake_text"),
     ),
     RequiredCourseField(
         "course_location",
+        "Location",
         ("course_location", "location_text", "location"),
         optional_when_online=True,
     ),
-    RequiredCourseField("study_mode", ("study_mode", "mode")),
+    RequiredCourseField("study_mode", "Study Mode", ("study_mode", "mode")),
 )
 
 
@@ -114,6 +127,12 @@ def missing_required_course_fields(payload: dict[str, Any]) -> tuple[str, ...]:
         ):
             missing.append(field.name)
     return tuple(missing)
+
+
+def required_course_field_labels(names: list[str] | tuple[str, ...]) -> tuple[str, ...]:
+    """Return contract-owned operator labels for required fact names."""
+    labels = {field.name: field.operator_label for field in REQUIRED_COURSE_FIELDS}
+    return tuple(labels[name] for name in names)
 
 
 def required_course_fields_complete(payload: dict[str, Any]) -> bool:
