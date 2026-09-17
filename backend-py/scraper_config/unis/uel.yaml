@@ -2,25 +2,17 @@
 # Hostname: www.uel.ac.uk
 #
 # Bug history / rationale:
-#   - Cloudflare protection: HTTP BFS/httpx returns 403 → 0 courses from
-#     plain HTTP tiers.  Browser discovery is mandatory.
-#   - Previous behaviour: always_browser_discover was unset, so browser ran
-#     only as a zero-result fallback.  Even then, it wasted 9+ minutes
-#     following low-value nav pages (apprenticeships, fees, pre-entry,
-#     student-life) before timing out with only ~38 links.
+#   - Cloudflare protection: HTTP BFS/httpx returns 403.
+#   - Playwright began receiving a navigation-only response with 0 course
+#     anchors in September 2026, while Scrape.do render=false still returns the
+#     complete server-rendered catalogue (114 UG links on the first page).
 #
-# Fix applied (2026-05-30):
-#   - always_browser_discover: true  → browser runs every time (not just fallback)
-#   - browser_time_budget_s: 90      → hard 90-second wall-clock cap on nav BFS
-#   - browser_early_stop_courses: 80 → stop nav BFS once 80 course links found
-#   - block_nav_patterns              → suppress the specific UEL low-value paths
-#     that the global blocklist doesn't already catch
-#   - Extra seeds pre-queued in _HOST_EXTRA_SEEDS (browser_discover_generic.py):
-#       /study/undergraduate, /study/postgraduate, /study/courses,
-#       /study/all-courses, /study/course-search
-#   - must_contain: ["/study/"]      → post-filter: only keep URLs with /study/
-#     in the path so nav-page fragments (help pages, staff profiles, etc.)
-#     that slip through _looks_like_course are discarded.
+# Current discovery:
+#   - always_browser_discover skips the blocked BFS tier.
+#   - skip_browser_discovery suppresses the now-unproductive Playwright walk.
+#   - render_listing_pages_static fetches the two SSR catalogue pages through
+#     Scrape.do without JavaScript and keeps only exact course-detail URLs.
+#   - use_wayback=false avoids a 10,000-URL CDX scan that yields 0 UEL courses.
 #
 # NOTE: UEL may be delivered in Australia by a separate partner institution.
 # Verify whether the scrape_url points to the Australian delivery site or the
@@ -28,6 +20,8 @@
 
 discovery:
   always_browser_discover: true
+  skip_browser_discovery: true
+  use_wayback: false
 
   # Direct course catalogue listing pages (2026-05-31 fix).
   # Individual course pages are at /(under|post)graduate/courses/{slug},
@@ -38,6 +32,14 @@ discovery:
     - https://www.uel.ac.uk/study/undergraduate/courses
     - https://www.uel.ac.uk/study/postgraduate/courses
 
+  render_listing_pages_static: true
+  render_listing_pages:
+    - https://www.uel.ac.uk/study/undergraduate/courses
+    - https://www.uel.ac.uk/study/postgraduate/courses
+
+  allow_url_patterns:
+    - '^https://www\.uel\.ac\.uk/(undergraduate|postgraduate)/courses/[^/?#]+/?$'
+
   # Hard wall-clock limit for the browser nav BFS (seconds).
   # Previous value (120 s) was exhausted entirely by 18 useless paginated
   # ?page=N seeds that all returned 0 links. New seeds are 4 targeted URLs
@@ -46,8 +48,8 @@ discovery:
   browser_time_budget_s: 300
 
   # Stop nav BFS once this many course links are collected.
-  # Actual UEL catalogue: ~273 total (114 UG + 159 PG, confirmed 2026-06-04).
-  # Set above 273 so BFS doesn't stop before both seeds are exhausted.
+  # Actual UEL catalogue: 276 total (114 UG + 162 PG, confirmed 2026-09-17).
+  # Set above 276 so discovery doesn't stop before both pages are harvested.
   # The global default pipeline cap is 500 and comfortably covers UEL.
   browser_early_stop_courses: 300
 

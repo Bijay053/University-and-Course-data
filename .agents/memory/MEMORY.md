@@ -148,3 +148,4 @@
 - [Generated config release collisions](generated-config-release-collisions.md) — reconcile only integrity-verified stubs; preserve them below tracked recipe precedence and keep unknown files blocking.
 - [Algolia provider trust boundaries](algolia-provider-trust-boundaries.md) — enforce record type and URL before emitting trusted links; preserve authoritative payloads through retries.
 - [Otago Polytechnic fee cards](otago-polytechnic-fee-cards.md) — use the International Standard card; Full tuition is full-course, while First year/Course one are annual.
+- [UEL static catalogue transport](uel-static-catalogue-transport.md) — Playwright sees navigation-only pages; Scrape.do render=false exposes the complete UG/PG catalogue.
