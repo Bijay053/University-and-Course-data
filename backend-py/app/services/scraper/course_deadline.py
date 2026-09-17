@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import time
 from contextvars import ContextVar, Token
+from dataclasses import dataclass
 from typing import Any
 
 
@@ -16,9 +17,18 @@ _course_deadline: ContextVar[float | None] = ContextVar(
     default=None,
 )
 
-_REQUIRED_COURSE_FIELD_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("international_fee", ("international_fee",)),
-    (
+@dataclass(frozen=True, slots=True)
+class RequiredCourseField:
+    """One publishability fact and every pipeline slot that can satisfy it."""
+
+    name: str
+    aliases: tuple[str, ...]
+    optional_when_online: bool = False
+
+
+REQUIRED_COURSE_FIELDS: tuple[RequiredCourseField, ...] = (
+    RequiredCourseField("international_fee", ("international_fee",)),
+    RequiredCourseField(
         "english_score",
         (
             "ielts_overall",
@@ -28,10 +38,20 @@ _REQUIRED_COURSE_FIELD_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "duolingo_overall",
         ),
     ),
-    ("duration", ("duration", "duration_value", "duration_text")),
-    ("intake", ("intake_months", "intake_dates", "intake_text")),
-    ("course_location", ("course_location", "location_text", "location")),
-    ("study_mode", ("study_mode", "mode")),
+    RequiredCourseField(
+        "duration",
+        ("duration", "duration_value", "duration_text"),
+    ),
+    RequiredCourseField(
+        "intake",
+        ("intake_months", "intake_dates", "intake_text"),
+    ),
+    RequiredCourseField(
+        "course_location",
+        ("course_location", "location_text", "location"),
+        optional_when_online=True,
+    ),
+    RequiredCourseField("study_mode", ("study_mode", "mode")),
 )
 
 
@@ -85,11 +105,14 @@ def missing_required_course_fields(payload: dict[str, Any]) -> tuple[str, ...]:
     mode = payload.get("study_mode") or payload.get("mode")
     is_online = str(mode or "").strip().lower() == "online"
     missing: list[str] = []
-    for label, aliases in _REQUIRED_COURSE_FIELD_GROUPS:
-        if label == "course_location" and is_online:
+    for field in REQUIRED_COURSE_FIELDS:
+        if field.optional_when_online and is_online:
             continue
-        if not any(payload.get(key) not in (None, "", 0, []) for key in aliases):
-            missing.append(label)
+        if not any(
+            payload.get(key) not in (None, "", 0, [])
+            for key in field.aliases
+        ):
+            missing.append(field.name)
     return tuple(missing)
 
 

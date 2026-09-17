@@ -11,6 +11,10 @@ import logging
 
 import pytest
 
+from app.services.scraper.course_deadline import (
+    REQUIRED_COURSE_FIELDS,
+    RequiredCourseField,
+)
 from app.services.scraper.gemini_gate import (
     CONFIDENCE_THRESHOLD,
     GEMINI_HIGH_VALUE_FIELDS,
@@ -32,15 +36,19 @@ def _make_evidence(payload: dict, confidence: float = 0.85) -> list[dict]:
 
 
 def _full_payload(include_classification: bool = True) -> dict:
-    base = {
+    test_values = {
         "international_fee": 29400,
-        "ielts_overall": 6.5,
+        "english_score": 6.5,
         "duration": 3.0,
-        "intake_months": ["February", "June"],
-        "course_name": "Bachelor of Arts",
-        "study_mode": "On Campus",
+        "intake": ["February", "June"],
         "course_location": "Main Campus",
+        "study_mode": "On Campus",
     }
+    base = {
+        field.aliases[0]: test_values.get(field.name, "present")
+        for field in REQUIRED_COURSE_FIELDS
+    }
+    base["course_name"] = "Bachelor of Arts"
     if include_classification:
         base["category"] = "Arts & Humanities"
         base["sub_category"] = "Liberal Arts"
@@ -77,21 +85,16 @@ def test_classification_only_when_sub_category_missing():
 
 
 @pytest.mark.parametrize(
-    "missing_field",
-    [
-        "international_fee",
-        "ielts_overall",
-        "duration",
-        "intake_months",
-        "study_mode",
-        "course_location",
-    ],
+    "required_field",
+    REQUIRED_COURSE_FIELDS,
+    ids=lambda field: field.name,
 )
 def test_each_missing_required_publishability_field_forces_full_extraction(
-    missing_field: str,
+    required_field: RequiredCourseField,
 ):
     payload = _full_payload(include_classification=True)
-    del payload[missing_field]
+    for alias in required_field.aliases:
+        payload.pop(alias, None)
     evidence = _make_evidence(payload, confidence=0.95)
 
     skip, reason = should_skip_gemini_primary(payload, evidence)

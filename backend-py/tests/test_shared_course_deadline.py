@@ -9,6 +9,23 @@ import pytest
 from app.services.scraper import course_deadline
 
 
+_REQUIRED_TEST_VALUES = {
+    "international_fee": 19_488,
+    "english_score": 6.5,
+    "duration": 3,
+    "intake": ["March", "July"],
+    "course_location": "Wollongong",
+    "study_mode": "On Campus",
+}
+
+
+def _complete_required_payload() -> dict[str, object]:
+    return {
+        field.aliases[0]: _REQUIRED_TEST_VALUES.get(field.name, "present")
+        for field in course_deadline.REQUIRED_COURSE_FIELDS
+    }
+
+
 def test_deadline_clamps_stages_and_resets_cleanly() -> None:
     token = course_deadline.set_course_deadline(0.2)
     try:
@@ -24,14 +41,7 @@ def test_deadline_clamps_stages_and_resets_cleanly() -> None:
 
 
 def test_required_fields_complete_accepts_canonical_pipeline_slots() -> None:
-    payload = {
-        "international_fee": 19_488,
-        "ielts_overall": 6.5,
-        "duration": 3,
-        "intake_months": ["March", "July"],
-        "course_location": "Wollongong",
-        "study_mode": "On Campus",
-    }
+    payload = _complete_required_payload()
     assert course_deadline.required_course_fields_complete(payload)
 
     payload["international_fee"] = None
@@ -39,32 +49,42 @@ def test_required_fields_complete_accepts_canonical_pipeline_slots() -> None:
 
 
 @pytest.mark.parametrize(
-    ("canonical_field", "alias_field", "alias_value"),
+    ("required_field", "alias_field"),
     [
-        ("ielts_overall", "pte_overall", 58),
-        ("duration", "duration_value", 3),
-        ("intake_months", "intake_text", "March, July"),
-        ("course_location", "location_text", "Wollongong"),
-        ("study_mode", "mode", "On Campus"),
+        (field, alias)
+        for field in course_deadline.REQUIRED_COURSE_FIELDS
+        for alias in field.aliases[1:]
     ],
+    ids=lambda value: value.name if isinstance(
+        value, course_deadline.RequiredCourseField
+    ) else value,
 )
 def test_required_fields_complete_accepts_extractor_alias_slots(
-    canonical_field: str,
+    required_field: course_deadline.RequiredCourseField,
     alias_field: str,
-    alias_value: object,
 ) -> None:
-    payload = {
-        "international_fee": 19_488,
-        "ielts_overall": 6.5,
-        "duration": 3,
-        "intake_months": ["March", "July"],
-        "course_location": "Wollongong",
-        "study_mode": "On Campus",
-    }
-    del payload[canonical_field]
-    payload[alias_field] = alias_value
+    payload = _complete_required_payload()
+    del payload[required_field.aliases[0]]
+    payload[alias_field] = _REQUIRED_TEST_VALUES.get(required_field.name, "present")
 
     assert course_deadline.required_course_fields_complete(payload)
+
+
+@pytest.mark.parametrize(
+    "required_field",
+    course_deadline.REQUIRED_COURSE_FIELDS,
+    ids=lambda field: field.name,
+)
+def test_each_contract_field_is_required_automatically(
+    required_field: course_deadline.RequiredCourseField,
+) -> None:
+    payload = _complete_required_payload()
+    for alias in required_field.aliases:
+        payload.pop(alias, None)
+
+    assert course_deadline.missing_required_course_fields(payload) == (
+        required_field.name,
+    )
 
 
 def test_online_course_does_not_require_a_physical_location() -> None:
