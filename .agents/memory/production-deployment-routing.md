@@ -34,6 +34,23 @@ make journal-based identity checks compatible with `pipefail`. Treat a failed
 smoke assertion as incomplete until service state and exact release lines are
 checked directly.
 
+When the defect being released is inside the mandatory pre-pull smoke command
+itself, validate with the target revision's smoke implementation without first
+installing the target application code. Fetch and verify the exact target
+revision, materialize only its smoke command as a temporary file beside the
+existing deployment helpers, run it against the unchanged live services, and
+remove it before the clean-tree/pull checks. Never weaken or skip the smoke.
+
+**Why:** The deployed guard once failed immediately after observing a completed
+sample because its persisted DONE log arrived in the next transaction. Repeating
+the old guard reproduced the race and made it impossible to deploy the bounded
+polling fix through the normal old-guard-first sequence.
+
+**How to apply:** Use this exception only for a reviewed and tested change to the
+guard itself. Keep the normal account/proof validation, target SHA verification,
+idle fence, clean-tree check, restart smoke, release-identity proof, and public
+health checks unchanged.
+
 The production storage identity permits object HEAD/get/put/delete but can deny
 bucket-versioning and object-version listing calls. For disposable smoke
 objects, compute a unique key before upload, HEAD that exact key to recover its

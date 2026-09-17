@@ -147,3 +147,4 @@
 - [Duration value-unit atomicity](duration-value-unit-atomicity.md) — preserve deterministic duration value/unit pairs; restore the unit only while the numeric value still matches.
 - [Generated config release collisions](generated-config-release-collisions.md) — reconcile only integrity-verified stubs; preserve them below tracked recipe precedence and keep unknown files blocking.
 - [Algolia provider trust boundaries](algolia-provider-trust-boundaries.md) — enforce record type and URL before emitting trusted links; preserve authoritative payloads through retries.
+- [Otago Polytechnic fee cards](otago-polytechnic-fee-cards.md) — use the International Standard card; Full tuition is full-course, while First year/Course one are annual.
