@@ -1,0 +1,31 @@
+# London School of Business and Finance Malaysia Campus
+#
+# The live catalogue is a static WordPress listing at /programmes/. Individual
+# programme pages are one segment below that path. The old generated recipe
+# expected /courses/<slug>/ and therefore filtered every live programme.
+
+hostname_guard: lsbf.edu.my
+
+locked_config_paths:
+  - discovery.seed_urls
+  - discovery.allow_url_patterns
+  - discovery.force_candidate_url_patterns
+  - discovery.course_detail_url_patterns
+  - discovery.block_url_patterns
+  - discovery.use_wayback
+
+discovery:
+  seed_urls:
+    - https://lsbf.edu.my/programmes/
+  allow_url_patterns:
+    - ^https?://(?:www\.)?lsbf\.edu\.my/programmes/[^/?#]+/?(?:[?#].*)?$
+  force_candidate_url_patterns:
+    - ^https?://(?:www\.)?lsbf\.edu\.my/programmes/[^/?#]+/?(?:[?#].*)?$
+  course_detail_url_patterns:
+    - ^https?://(?:www\.)?lsbf\.edu\.my/programmes/[^/?#]+/?(?:[?#].*)?$
+  block_url_patterns:
+    - /programmes/(?:young-learners|teens)-english-summer-camp-
+    - /programmes/adult-learners-english-programme-
+    - /programmes/(?:pearson-pte-programme-flyer|ielts-preparatory-programmes)/
+    - /programmes/preparatory-course-
+  use_wayback: false
