@@ -5441,10 +5441,13 @@ async def extract_course(
                 _gate_reason = "per_uni_remote_ai_disabled"
                 use_ai_fallback = False
 
-            # Once every required staging field is present, no remote
-            # enrichment can improve publishability. Local taxonomy fallback
-            # later in this function can still classify without an API call.
-            if required_course_fields_complete(payload):
+            # Once every required staging field is present, full remote
+            # enrichment cannot improve publishability. Preserve the gate's
+            # cheap classification-only decision when taxonomy is the sole gap.
+            if (
+                required_course_fields_complete(payload)
+                and _gate_reason != "classification_only"
+            ):
                 _gate_skip = True
                 _gate_reason = "all_required_fields_complete"
                 use_ai_fallback = False

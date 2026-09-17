@@ -221,3 +221,155 @@ def test_single_course_gemini_merge_keeps_nonblank_taxonomy_fill_only():
     source = inspect.getsource(single_course.extract_course)
     assert '_gp_k in {"category", "sub_category"}' in source
     assert "payload.get(_gp_k)" in source
+
+
+def _pipeline_course_html() -> str:
+    return """
+    <html><head><title>Bachelor of Testing | SIT</title></head><body>
+      <span id="courseName">Bachelor of Testing</span>
+      <div class="CourseInfo CourseSummary">
+        <span id="currentCampusName">Invercargill</span>
+        <div class="keyInfoPane">
+          <div class="row no-gutters">
+            <div>Qualification:</div><div>Degree</div>
+            <div>Duration:</div><div>Three years full-time</div>
+            <div>Study Modes:</div><div>On Campus</div>
+          </div>
+        </div>
+        <div class="lightGrey_bg_1 mb-4">
+          Dates: 2027 Semester 1: 15 February to 25 June 2027
+          International Fees can be found here.
+        </div>
+        <div id="headerApplicationCriteria_123">
+          International applicants require IELTS 6.0.
+        </div>
+      </div>
+    </body></html>
+    """
+
+
+def _pipeline_central_data() -> dict:
+    return {
+        "fees": [
+            {
+                "program_pattern": "Bachelor of Testing",
+                "international_fee": 19_000,
+                "currency": "NZD",
+                "per": "Annual",
+            }
+        ],
+        "fee_page_url": "https://www.sit.ac.nz/Fees-Enrolments/International-Fees",
+    }
+
+
+@pytest.mark.asyncio
+async def test_pipeline_missing_required_location_invokes_full_extraction(monkeypatch):
+    from app.services.ai import gemini_client
+    from app.services.scraper import gemini_gate
+    from app.services.scraper.config import set_uni_config
+    from app.services.scraper.config.loader import load_uni_config
+    from app.services.scraper.course_deadline import required_course_fields_complete
+    from app.services.scraper.extractors import gemini_primary, location
+    from app.services.scraper.pipelines import single_course
+
+    set_uni_config(
+        load_uni_config(
+            slug="sit",
+            scrape_url="https://www.sit.ac.nz",
+            university_id=67,
+            name="Southern Institute of Technology",
+        )
+    )
+    original_gate = gemini_gate.should_skip_gemini_primary
+    gate_calls: list[tuple[bool, str]] = []
+    full_calls: list[tuple[str, ...]] = []
+
+    async def no_location(*_args, **_kwargs):
+        return []
+
+    def record_gate(payload, evidence):
+        assert not required_course_fields_complete(payload)
+        assert required_course_fields_complete(
+            {**payload, "course_location": "Invercargill"}
+        )
+        decision = original_gate(payload, evidence)
+        gate_calls.append(decision)
+        return decision
+
+    async def record_full(_html, _url, *, fields, **_kwargs):
+        full_calls.append(tuple(fields))
+        return {}, 0.0, 0, 0, {"skipped": True, "skip_reason": "test"}
+
+    async def fail_classification(*_args, **_kwargs):
+        raise AssertionError("missing location must not use classification-only")
+
+    monkeypatch.setattr(location, "extract", no_location)
+    monkeypatch.setattr(gemini_gate, "should_skip_gemini_primary", record_gate)
+    monkeypatch.setattr(gemini_primary, "extract_primary", record_full)
+    monkeypatch.setattr(gemini_client, "generate", fail_classification)
+
+    await single_course.extract_course(
+        "https://www.sit.ac.nz/Programme/Course/Bachelor of Testing",
+        country="New Zealand",
+        html=_pipeline_course_html(),
+        use_ai_fallback=False,
+        central_data=_pipeline_central_data(),
+    )
+
+    assert gate_calls == [(False, "full_extraction_needed")]
+    assert len(full_calls) == 1
+    assert "location_text" in full_calls[0]
+
+
+@pytest.mark.asyncio
+async def test_pipeline_taxonomy_only_gap_uses_classification_prompt(monkeypatch):
+    from app.services.ai import gemini_client
+    from app.services.scraper import gemini_gate
+    from app.services.scraper.config import set_uni_config
+    from app.services.scraper.config.loader import load_uni_config
+    from app.services.scraper.course_deadline import required_course_fields_complete
+    from app.services.scraper.extractors import gemini_primary
+    from app.services.scraper.pipelines import single_course
+
+    set_uni_config(
+        load_uni_config(
+            slug="sit",
+            scrape_url="https://www.sit.ac.nz",
+            university_id=67,
+            name="Southern Institute of Technology",
+        )
+    )
+    original_gate = gemini_gate.should_skip_gemini_primary
+    classification_calls: list[str | None] = []
+
+    def taxonomy_only_gate(payload, evidence):
+        assert required_course_fields_complete(payload)
+        payload["category"] = None
+        payload["sub_category"] = None
+        return original_gate(payload, evidence)
+
+    async def fail_full(*_args, **_kwargs):
+        raise AssertionError("taxonomy-only gap must not use full extraction")
+
+    async def record_classification(*_args, **kwargs):
+        classification_calls.append(kwargs.get("call_type"))
+        return gemini_client.GeminiResponse(
+            '{"category":"Business & Management","sub_category":"Business"}',
+            10,
+            5,
+            0.0,
+        )
+
+    monkeypatch.setattr(gemini_gate, "should_skip_gemini_primary", taxonomy_only_gate)
+    monkeypatch.setattr(gemini_primary, "extract_primary", fail_full)
+    monkeypatch.setattr(gemini_client, "generate", record_classification)
+
+    await single_course.extract_course(
+        "https://www.sit.ac.nz/Programme/Course/Bachelor of Testing",
+        country="New Zealand",
+        html=_pipeline_course_html(),
+        use_ai_fallback=False,
+        central_data=_pipeline_central_data(),
+    )
+
+    assert classification_calls == ["classification_only"]
