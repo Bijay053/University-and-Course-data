@@ -18,7 +18,8 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any
+from types import MappingProxyType
+from typing import Any, Mapping
 
 from app.services.ai import gemini_client
 from app.services.scraper.extractors._text import html_to_text
@@ -30,7 +31,7 @@ log = logging.getLogger(__name__)
 # Field catalogue
 # ---------------------------------------------------------------------------
 
-_HARD_FIELDS: dict[str, str] = {
+GEMINI_PRIMARY_FIELD_INSTRUCTIONS: Mapping[str, str] = MappingProxyType({
     "international_fee": (
         "International tuition fee (number in local currency, e.g. 34500 or 42194). "
         "MUST come from the International section of the page (see CRITICAL rule above). "
@@ -224,7 +225,15 @@ _HARD_FIELDS: dict[str, str] = {
         "'Semester', 'Trimester', or any intake-period / study-period label. "
         "Null if not explicitly stated or if delivery is online-only."
     ),
-}
+})
+
+# Ordered, immutable public contract for every field the full AI extractor can
+# request and return. Prompt generation, pipeline missing-field selection, and
+# contract tests must use this name instead of depending on the instruction
+# mapping's implementation details.
+GEMINI_PRIMARY_SUPPORTED_FIELDS: tuple[str, ...] = tuple(
+    GEMINI_PRIMARY_FIELD_INSTRUCTIONS
+)
 
 _PROMPT_TEMPLATE = """\
 You are a precise data extractor for a university course admission page.
@@ -800,9 +809,13 @@ async def extract_primary(
         timeout = float(getattr(_settings, "gemini_primary_timeout_s", 20.0))
 
     requested_fields = (
-        list(_HARD_FIELDS)
+        list(GEMINI_PRIMARY_SUPPORTED_FIELDS)
         if fields is None
-        else [field for field in fields if field in _HARD_FIELDS]
+        else [
+            field
+            for field in fields
+            if field in GEMINI_PRIMARY_SUPPORTED_FIELDS
+        ]
     )
     if not requested_fields:
         return {}, 0.0, 0, 0, {
@@ -814,7 +827,8 @@ async def extract_primary(
         }
 
     fields_block = "\n".join(
-        f"- {field}: {_HARD_FIELDS[field]}" for field in requested_fields
+        f"- {field}: {GEMINI_PRIMARY_FIELD_INSTRUCTIONS[field]}"
+        for field in requested_fields
     )
     text = _trim_text(html, url=url)
 

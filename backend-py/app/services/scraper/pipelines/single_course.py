@@ -5727,7 +5727,7 @@ async def extract_course(
                 else:
                     _gp_requested_fields = _gemini_primary_missing_fields(
                         payload,
-                        tuple(_gp._HARD_FIELDS),
+                        _gp.GEMINI_PRIMARY_SUPPORTED_FIELDS,
                     )
                     (
                         _gp_filled,
@@ -5827,7 +5827,7 @@ async def extract_course(
             # the default keeps those from being rejected as online-only.
             #
             # Gemini's `mode` field reads the Location panel directly (the
-            # _HARD_FIELDS prompt explicitly says: "If the page lists
+            # The full-AI field instruction explicitly says: "If the page lists
             # 'Location: Online', always use 'Online'"). Surface that as a
             # payload flag so guards.py can reject online-only UTAS rows even
             # when the YAML default has masked the blank-location signal.

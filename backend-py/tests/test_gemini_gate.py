@@ -104,7 +104,9 @@ def test_each_missing_required_publishability_field_forces_full_extraction(
 
 
 def test_every_required_fact_is_supported_by_full_ai_request_and_merge():
-    from app.services.scraper.extractors.gemini_primary import _HARD_FIELDS
+    from app.services.scraper.extractors.gemini_primary import (
+        GEMINI_PRIMARY_SUPPORTED_FIELDS,
+    )
     from app.services.scraper.pipelines.single_course import (
         GEMINI_PRIMARY_FIELD_TARGETS,
     )
@@ -117,7 +119,7 @@ def test_every_required_fact_is_supported_by_full_ai_request_and_merge():
         usable_fields = [
             ai_field
             for ai_field in fact.full_ai_fields
-            if ai_field in _HARD_FIELDS
+            if ai_field in GEMINI_PRIMARY_SUPPORTED_FIELDS
             and GEMINI_PRIMARY_FIELD_TARGETS.get(ai_field) in aliases
         ]
         if not usable_fields:
@@ -128,6 +130,20 @@ def test_every_required_fact_is_supported_by_full_ai_request_and_merge():
             )
 
     assert not failures, "\n".join(failures)
+
+
+def test_full_ai_supported_field_contract_is_immutable_and_complete():
+    from app.services.scraper.extractors.gemini_primary import (
+        GEMINI_PRIMARY_FIELD_INSTRUCTIONS,
+        GEMINI_PRIMARY_SUPPORTED_FIELDS,
+    )
+
+    assert isinstance(GEMINI_PRIMARY_SUPPORTED_FIELDS, tuple)
+    assert GEMINI_PRIMARY_SUPPORTED_FIELDS == tuple(
+        GEMINI_PRIMARY_FIELD_INSTRUCTIONS
+    )
+    with pytest.raises(TypeError):
+        GEMINI_PRIMARY_FIELD_INSTRUCTIONS["new_field"] = "drift"  # type: ignore[index]
 
 
 def test_required_fact_must_declare_ai_support_or_deterministic_only_reason():

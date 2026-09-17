@@ -14,7 +14,9 @@ from app.services.scraper.taxonomy import (
     TAXONOMY_PAIRS,
     canonical_parent,
 )
-from app.services.scraper.extractors.gemini_primary import _HARD_FIELDS
+from app.services.scraper.extractors.gemini_primary import (
+    GEMINI_PRIMARY_FIELD_INSTRUCTIONS,
+)
 from scripts.apply_migration_040 import _SEED
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -52,7 +54,7 @@ def test_legacy_aliases_only_target_current_parents():
 
 
 def test_primary_ai_prompt_only_offers_canonical_parents():
-    category_prompt = _HARD_FIELDS["category"]
+    category_prompt = GEMINI_PRIMARY_FIELD_INSTRUCTIONS["category"]
     expected_options = ", ".join(f"'{parent}'" for parent in CATEGORIES)
     assert f"Pick the BEST match from: {expected_options}." in category_prompt
 
