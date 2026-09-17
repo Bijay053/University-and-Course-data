@@ -13,6 +13,7 @@ from app.services.scraper.central_pages import (
     _parse_fee_page_html,
     match_central_fee,
 )
+from app.services.scraper.guards import should_stage_course
 from app.services.scraper.extractors import (
     duration,
     english_test,
@@ -161,10 +162,14 @@ def test_sit_yaml_uses_international_schedule_and_static_extraction():
     ]
     assert cfg.extraction.fees.central_fee_priority is True
     assert cfg.extraction.fees.central_fee_exact_match_only is True
+    assert cfg.extraction.staging.skip_degree_qualifier_check is True
     assert cfg.extraction.fees.require_central_fee_match is True
     assert cfg.extraction.fees.force_central_fee_stage is False
     assert cfg.extraction.fees.currency_override == "NZD"
     assert "Direct Material Costs" in cfg.extraction.fees.reject_keywords
+    assert cfg.extraction.fees.central_fee_course_aliases[
+        "New Zealand Diploma in Audio Engineering and Production (Level 5)"
+    ] == "New Zealand Diploma in Audio Engineering (Level 5)"
 
 
 def test_sit_yaml_applies_to_apex_and_www_hosts():
@@ -206,6 +211,162 @@ def test_sit_central_schedule_uses_tuition_not_total_and_exact_award_matching():
         exact_only=True,
     )
     assert wrong_award is None
+    assert kind == "none"
+
+
+def test_sit_verified_aliases_preserve_exact_fee_matching():
+    records = [
+        {
+            "program_pattern": "New Zealand Diploma in Audio Engineering (Level 5)",
+            "international_fee": 19000.0,
+            "currency": "NZD",
+            "per": "Full Course",
+        }
+    ]
+    aliases = {
+        "New Zealand Diploma in Audio Engineering and Production (Level 5)":
+            "New Zealand Diploma in Audio Engineering (Level 5)"
+    }
+    matched, kind = match_central_fee(
+        "New Zealand Diploma in Audio Engineering and Production (Level 5)",
+        records,
+        exact_only=True,
+        course_aliases=aliases,
+    )
+    assert matched is records[0]
+    assert kind == "exact"
+
+    unmatched, kind = match_central_fee(
+        "New Zealand Diploma in Audio Engineering and Production (Level 4)",
+        records,
+        exact_only=True,
+        course_aliases=aliases,
+    )
+    assert unmatched is None
+    assert kind == "none"
+
+
+def test_every_loaded_sit_fee_alias_resolves_exactly_without_crossing_awards():
+    cfg = load_uni_config(
+        slug="sit",
+        scrape_url="https://www.sit.ac.nz",
+        university_id=67,
+        name="Southern Institute of Technology",
+    )
+    aliases = cfg.extraction.fees.central_fee_course_aliases
+    schedule_html = """
+    <table>
+      <tr><th>Programmes</th><th>Duration</th><th>Tuition Fee</th>
+        <th>Resource Fee</th><th>Total Fee (whole course)</th></tr>
+      <tr><td>Graduate Diploma in Screen Arts (Filmmaking)</td><td>1 year</td><td>$19,000</td><td>$1,000</td><td>$20,000</td></tr>
+      <tr><td>Graduate Diploma in Screen Arts (Visual Media)</td><td>1 year</td><td>$19,000</td><td>$1,000</td><td>$20,000</td></tr>
+      <tr><td>Bachelor of Engineering Technology (Majors in Civil Engineering and Mechanical Engineering)</td><td>3 years</td><td>$19,500</td><td>$1,000</td><td>$20,500</td></tr>
+      <tr><td>Bachelor of Screen Arts (with majors in Animation, Digital Content Creation, Film &amp; Game Design</td><td>3 years</td><td>$19,000</td><td>$1,000</td><td>$20,000</td></tr>
+      <tr><td>Diploma in Agriculture (Level 5) (in collaboration with Massey University) only available at Telford specialist campus in Balclutha</td><td>1 year</td><td>$19,500</td><td>$1,000</td><td>$20,500</td></tr>
+      <tr><td>New Zealand Diploma in Audio Engineering (Level 5)</td><td>1 year</td><td>$19,000</td><td>$1,000</td><td>$20,000</td></tr>
+      <tr><td>New Zealand Diploma in Audio Engineering (Level 6)</td><td>1 year</td><td>$19,000</td><td>$1,000</td><td>$20,000</td></tr>
+      <tr><td>New Zealand Diploma in Business (Level 5)</td><td>1 year</td><td>$19,000</td><td>$1,000</td><td>$20,000</td></tr>
+      <tr><td>New Zealand Diploma in Enrolled Nursing (Level 5)</td><td>18 months</td><td>$29,000</td><td>$1,000</td><td>$30,000</td></tr>
+      <tr><td>Diploma in Culinary Excellence (Level 5)</td><td>1 year</td><td>$19,000</td><td>$1,000</td><td>$20,000</td></tr>
+      <tr><td>New Zealand Diploma in Architectural Technology (Level 6)</td><td>2 years</td><td>$19,000</td><td>$1,000</td><td>$20,000</td></tr>
+      <tr><td>New Zealand Diploma in Engineering (Civil/Mechanical) (Level 6)</td><td>2 years</td><td>$19,500</td><td>$1,000</td><td>$20,500</td></tr>
+      <tr><td>New Zealand Diploma in Veterinary Nursing (Companion Animals Veterinary Nursing) (Level 6)</td><td>2 years</td><td>$23,500</td><td>$1,000</td><td>$24,500</td></tr>
+      <tr><td>New Zealand Certificate in Business (Small Business)</td><td>6 months</td><td>$9,250</td><td>$500</td><td>$9,750</td></tr>
+      <tr><td>New Zealand Certificate Study and Employment Pathways (Nursing and Health)</td><td>6 months</td><td>$9,250</td><td>$500</td><td>$9,750</td></tr>
+    </table>
+    """
+    records = _parse_fee_page_html(
+        schedule_html,
+        "https://www.sit.ac.nz/Fees-Enrolments/International-Fees",
+    )
+    expected_fees = {
+        record["program_pattern"]: record["international_fee"]
+        for record in records
+    }
+    assert len(aliases) == 24
+    assert len(records) == 15
+    for source, target in aliases.items():
+        matched, kind = match_central_fee(
+            source,
+            records,
+            exact_only=True,
+            course_aliases=aliases,
+        )
+        assert matched is not None, source
+        assert matched["program_pattern"] == target
+        assert matched["international_fee"] == expected_fees[target]
+        assert matched["international_fee"] > 0
+        assert kind == "exact"
+
+
+def test_central_fee_alias_rejects_cross_award_mapping():
+    records = [
+        {
+            "program_pattern": "New Zealand Diploma in Testing (Level 5)",
+            "international_fee": 19000.0,
+        }
+    ]
+    matched, kind = match_central_fee(
+        "New Zealand Certificate in Testing (Level 4)",
+        records,
+        exact_only=True,
+        course_aliases={
+            "New Zealand Certificate in Testing (Level 4)":
+                "New Zealand Diploma in Testing (Level 5)"
+        },
+    )
+    assert matched is None
+    assert kind == "none"
+
+
+def test_central_fee_alias_rejects_cross_level_mapping():
+    records = [
+        {
+            "program_pattern": "New Zealand Certificate in Testing (Level 5)",
+            "international_fee": 19000.0,
+        }
+    ]
+    matched, kind = match_central_fee(
+        "New Zealand Certificate in Testing (Level 4)",
+        records,
+        exact_only=True,
+        course_aliases={
+            "New Zealand Certificate in Testing (Level 4)":
+                "New Zealand Certificate in Testing (Level 5)"
+        },
+    )
+    assert matched is None
+    assert kind == "none"
+
+
+def test_sit_online_only_programme_remains_globally_rejected():
+    accepted, reason = should_stage_course(
+        "New Zealand Certificate in Testing",
+        {
+            "course_name": "New Zealand Certificate in Testing",
+            "international_fee": 19000.0,
+            "study_mode": "Online",
+            "online_only": True,
+        },
+        "https://www.sit.ac.nz/Programme/Course/New Zealand Certificate in Testing",
+    )
+    assert accepted is False
+    assert reason == "online_only"
+
+
+def test_unlisted_sit_certificate_cannot_receive_an_exact_fee():
+    matched, kind = match_central_fee(
+        "New Zealand Certificate in Unlisted Subject",
+        [
+            {
+                "program_pattern": "New Zealand Certificate in Listed Subject",
+                "international_fee": 19000.0,
+            }
+        ],
+        exact_only=True,
+        course_aliases={},
+    )
+    assert matched is None
     assert kind == "none"
 
 

@@ -2154,6 +2154,14 @@ class FeesConfig(BaseModel):
             "Default false preserves guarded fuzzy matching."
         ),
     )
+    central_fee_course_aliases: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Explicit course-page title to central fee-row title mappings. "
+            "Aliases are normalized and resolved before exact matching, so they "
+            "do not enable fuzzy matching or permit an unlisted programme."
+        ),
+    )
     central_fee_priority: bool = Field(
         default=False,
         description=(

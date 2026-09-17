@@ -8840,11 +8840,16 @@ async def extract_course(
             if (_fee_missing or _central_fee_priority) and _central_fees:
                 _course_name_for_fee = payload.get("course_name") or ""
                 _central_fee_exact_only = False
+                _central_fee_course_aliases: dict[str, str] = {}
                 try:
                     _fee_match_cfg = get_uni_config()
                     if _fee_match_cfg is not None:
                         _central_fee_exact_only = bool(
                             _fee_match_cfg.extraction.fees.central_fee_exact_match_only
+                        )
+                        _central_fee_course_aliases = dict(
+                            _fee_match_cfg.extraction.fees.central_fee_course_aliases
+                            or {}
                         )
                 except Exception:  # noqa: BLE001
                     pass
@@ -8854,6 +8859,7 @@ async def extract_course(
                     degree_level=payload.get("degree_level"),
                     exact_only=_central_fee_exact_only,
                     course_url=url,
+                    course_aliases=_central_fee_course_aliases,
                 )
                 if matched and _fee_confidence != "none":
                     _central_fee_match_found = _central_fee_match_has_usable_tuition(

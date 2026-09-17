@@ -31,7 +31,7 @@ import logging
 import re
 from urllib.parse import urlparse
 import unicodedata
-from typing import Any
+from typing import Any, Mapping
 
 from app.services.scraper.extractors._text import html_to_text
 from app.services.scraper.http_fetcher import fetch_html
@@ -2644,6 +2644,7 @@ def match_central_fee(
     threshold: float = 80.0,
     exact_only: bool = False,
     course_url: str | None = None,
+    course_aliases: Mapping[str, str] | None = None,
 ) -> tuple[CentralFeeRecord | None, str]:
     """Find the best-matching fee record for a course name.
 
@@ -2687,7 +2688,66 @@ def match_central_fee(
     except ImportError:
         use_rapidfuzz = False
 
-    _norm_course = re.sub(r"\s+", " ", course_name).strip().lower()
+    def _normalise_title(value: str) -> str:
+        return re.sub(r"\s+", " ", value).strip().casefold()
+
+    def _award_family(value: str) -> str | None:
+        normalised = _normalise_title(value)
+        families = (
+            ("postgraduate diploma", "postgraduate diploma"),
+            ("graduate diploma", "graduate diploma"),
+            ("master", "master"),
+            ("bachelor", "bachelor"),
+            ("certificate", "certificate"),
+            ("diploma", "diploma"),
+        )
+        return next(
+            (family for token, family in families if token in normalised),
+            None,
+        )
+
+    def _award_level(value: str) -> str | None:
+        match = re.search(r"\blevel\s*([1-9])\b", _normalise_title(value))
+        return match.group(1) if match else None
+
+    _norm_course = _normalise_title(course_name)
+    if course_aliases:
+        _normalised_aliases = {
+            _normalise_title(str(alias)): str(target).strip()
+            for alias, target in course_aliases.items()
+            if str(alias).strip() and str(target).strip()
+        }
+        _aliased_course = _normalised_aliases.get(_norm_course)
+        if _aliased_course:
+            _source_family = _award_family(course_name)
+            _target_family = _award_family(_aliased_course)
+            _source_level = _award_level(course_name)
+            _target_level = _award_level(_aliased_course)
+            if (
+                _source_family
+                and _target_family
+                and _source_family == _target_family
+                and not (
+                    _source_level
+                    and _target_level
+                    and _source_level != _target_level
+                )
+            ):
+                log.info(
+                    "[FEE alias] course=%r resolves to schedule row=%r",
+                    course_name,
+                    _aliased_course,
+                )
+                _norm_course = _normalise_title(_aliased_course)
+            else:
+                log.warning(
+                    "[FEE alias rejected] course=%r target=%r "
+                    "award families do not match (%r != %r)",
+                    course_name,
+                    _aliased_course,
+                    _source_family,
+                    _target_family,
+                )
 
     # Trailing parenthetical abbreviation, e.g. "(BBus)", "(BHealth)", "(BE(Hons))".
     # Stripping it from the fee-table pattern before fuzzy matching avoids a
@@ -2825,7 +2885,7 @@ def match_central_fee(
         pattern = rec.get("program_pattern") or ""
         if not pattern:
             continue
-        if re.sub(r"\s+", " ", pattern).strip().lower() == _norm_course:
+        if _normalise_title(pattern) == _norm_course:
             log.info(
                 "[FEE match] course=%r matched_row=%r fee=%s confidence=exact",
                 course_name,

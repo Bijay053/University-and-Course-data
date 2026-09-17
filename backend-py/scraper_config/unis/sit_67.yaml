@@ -9,12 +9,14 @@ hostname_guard: sit.ac.nz
 locked_config_paths:
   - extraction.max_parallel_fetch
   - extraction.skip_per_course_browser
+  - extraction.staging.skip_degree_qualifier_check
   - extraction.fees.central_page
   - extraction.fees.default_currency
   - extraction.fees.currency_override
   - extraction.fees.prefer_international
   - extraction.fees.central_fee_priority
   - extraction.fees.central_fee_exact_match_only
+  - extraction.fees.central_fee_course_aliases
   - extraction.fees.require_central_fee_match
   - extraction.fees.force_central_fee_stage
   - extraction.fees.discard_domestic_fee
@@ -30,6 +32,12 @@ extraction:
   max_parallel_fetch: 6
   skip_per_course_browser: true
 
+  staging:
+    # SIT's course route and current-programme panel already exclude category
+    # pages. Its official international schedule also contains certificates
+    # and diplomas that the generic degree-name guard otherwise rejects.
+    skip_degree_qualifier_check: true
+
   fees:
     central_page: https://www.sit.ac.nz/Fees-Enrolments/International-Fees
     default_currency: NZD
@@ -37,6 +45,31 @@ extraction:
     prefer_international: true
     central_fee_priority: true
     central_fee_exact_match_only: true
+    central_fee_course_aliases:
+      Graduate Diploma in Screen Arts (Film Making): Graduate Diploma in Screen Arts (Filmmaking)
+      Graduate Diploma in Visual Media: Graduate Diploma in Screen Arts (Visual Media)
+      Bachelor of Engineering Technology: Bachelor of Engineering Technology (Majors in Civil Engineering and Mechanical Engineering)
+      Bachelor of Screen Arts - Animation Major: Bachelor of Screen Arts (with majors in Animation, Digital Content Creation, Film & Game Design
+      Bachelor of Screen Arts - Concept Art and Design Major: Bachelor of Screen Arts (with majors in Animation, Digital Content Creation, Film & Game Design
+      Bachelor of Screen Arts - Film Major: Bachelor of Screen Arts (with majors in Animation, Digital Content Creation, Film & Game Design
+      Bachelor of Screen Arts - Game Design Major: Bachelor of Screen Arts (with majors in Animation, Digital Content Creation, Film & Game Design
+      Massey Diploma in Agriculture (Level 5): Diploma in Agriculture (Level 5) (in collaboration with Massey University) only available at Telford specialist campus in Balclutha
+      New Zealand Diploma in Audio Engineering and Production (Level 5): New Zealand Diploma in Audio Engineering (Level 5)
+      New Zealand Diploma in Audio Engineering and Production (Level 6): New Zealand Diploma in Audio Engineering (Level 6)
+      New Zealand Diploma in Business (Accounting Strand) (Level 5): New Zealand Diploma in Business (Level 5)
+      New Zealand Diploma in Business (Administration and Technology Strand) (Level 5): New Zealand Diploma in Business (Level 5)
+      New Zealand Diploma in Business (Leadership and Management Strand) (Level 5): New Zealand Diploma in Business (Level 5)
+      New Zealand Diploma in Business (Level 5) (Human Resource Management Strand): New Zealand Diploma in Business (Level 5)
+      New Zealand Diploma in Business (Level 5) (Marketing and Sales Strand): New Zealand Diploma in Business (Level 5)
+      New Zealand Diploma in Business (Project Management strand) (Level 5): New Zealand Diploma in Business (Level 5)
+      New Zealand Diploma in Enrolled Nursing: New Zealand Diploma in Enrolled Nursing (Level 5)
+      Diploma in Culinary Excellence Level 5: Diploma in Culinary Excellence (Level 5)
+      New Zealand Diploma in Architectural Technology: New Zealand Diploma in Architectural Technology (Level 6)
+      New Zealand Diploma in Engineering (Civil Engineering major): New Zealand Diploma in Engineering (Civil/Mechanical) (Level 6)
+      New Zealand Diploma in Engineering (Mechanical Engineering major): New Zealand Diploma in Engineering (Civil/Mechanical) (Level 6)
+      New Zealand Diploma in Veterinary Nursing (Companion Animal Veterinary Nursing): New Zealand Diploma in Veterinary Nursing (Companion Animals Veterinary Nursing) (Level 6)
+      New Zealand Certificate in Business (Small Business) (Level 4): New Zealand Certificate in Business (Small Business)
+      New Zealand Certificate in Study and Employment Pathways (Level 4) (Nursing and Health): New Zealand Certificate Study and Employment Pathways (Nursing and Health)
     require_central_fee_match: true
     force_central_fee_stage: false
     discard_domestic_fee: true
