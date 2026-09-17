@@ -54,6 +54,19 @@ def _git_paths(repo_root: Path, *args: str) -> set[str]:
     return set(output.splitlines())
 
 
+def _git_file(repo_root: Path, revision: str, relative_path: str) -> bytes:
+    return subprocess.check_output(
+        [
+            "git",
+            "-c",
+            f"safe.directory={repo_root}",
+            "show",
+            f"{revision}:{relative_path}",
+        ],
+        cwd=repo_root,
+    )
+
+
 def _is_verified_generated_stub(relative_path: str, content: str) -> bool:
     if not _GENERATED_PATH_RE.fullmatch(relative_path):
         return False
@@ -92,6 +105,14 @@ def _load_yaml_mapping(path: Path) -> dict[str, Any] | None:
     try:
         loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, yaml.YAMLError):
+        return None
+    return loaded if isinstance(loaded, dict) else None
+
+
+def _load_yaml_mapping_bytes(content: bytes) -> dict[str, Any] | None:
+    try:
+        loaded = yaml.safe_load(content.decode("utf-8"))
+    except (UnicodeError, yaml.YAMLError):
         return None
     return loaded if isinstance(loaded, dict) else None
 
@@ -169,11 +190,18 @@ def cleanup_redundant_generated_overlays(repo_root: Path) -> list[Path]:
 def reconcile_generated_config_collisions(
     repo_root: Path, target: str, manifest_path: Path
 ) -> list[Path]:
-    """Validate all collisions, record rollback state, then move safe stubs."""
+    """Validate collisions and preserve safe stubs until release verification."""
+    repo_root = repo_root.resolve()
+    manifest_path = manifest_path.resolve()
     tracked_target = _git_paths(repo_root, "ls-tree", "-r", "--name-only", target)
     collisions = _git_paths(repo_root, "ls-files", "--others") & tracked_target
     runtime_root = repo_root / "backend-py/scraper_config/runtime_unis"
-    moves: list[tuple[Path, Path, str, bool]] = []
+    backup_root = (
+        repo_root
+        / ".git/release-generated-config-backups"
+        / manifest_path.name
+    )
+    moves: list[tuple[Path, Path, str, bool, str, str | None]] = []
     unsafe: list[str] = []
 
     for relative in sorted(collisions):
@@ -187,12 +215,32 @@ def reconcile_generated_config_collisions(
             unsafe.append(relative)
             continue
 
-        destination = runtime_root / path.name
+        target_content = _git_file(repo_root, target, relative)
+        generated_config = _load_yaml_mapping(path)
+        target_config = _load_yaml_mapping_bytes(target_content)
+        fully_superseded = bool(
+            generated_config is not None
+            and target_config is not None
+            and not (_leaf_paths(generated_config) - _leaf_paths(target_config))
+        )
+        disposition = "deferred_delete" if fully_superseded else "overlay"
+        destination = (
+            backup_root / relative if fully_superseded else runtime_root / path.name
+        )
         if destination.exists() and destination.read_bytes() != path.read_bytes():
             raise ReleaseCollisionError(
-                f"Generated config overlay already differs: {destination}"
+                f"Generated config preservation destination already differs: {destination}"
             )
-        moves.append((path, destination, _sha256(path), destination.exists()))
+        moves.append(
+            (
+                path,
+                destination,
+                _sha256(path),
+                destination.exists(),
+                disposition,
+                hashlib.sha256(target_content).hexdigest(),
+            )
+        )
 
     if unsafe:
         raise ReleaseCollisionError(
@@ -207,26 +255,36 @@ def reconcile_generated_config_collisions(
                 "destination": str(destination.relative_to(repo_root)),
                 "sha256": digest,
                 "destination_preexisting": destination_preexisting,
+                "disposition": disposition,
+                "target_sha256": target_digest,
             }
-            for source, destination, digest, destination_preexisting in moves
+            for (
+                source,
+                destination,
+                digest,
+                destination_preexisting,
+                disposition,
+                target_digest,
+            ) in moves
         ],
     }
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
-    moved: list[tuple[Path, Path, str, bool]] = []
+    moved: list[tuple[Path, Path, str, bool, str, str | None]] = []
     try:
-        for source, destination, digest, destination_preexisting in moves:
+        for move in moves:
+            source, destination, digest, destination_preexisting, _, _ = move
             destination.parent.mkdir(parents=True, exist_ok=True)
             if not destination.exists():
                 shutil.move(source, destination)
             else:
                 source.unlink()
-            moved.append((source, destination, digest, destination_preexisting))
+            moved.append(move)
     except Exception:
         rollback_generated_config_collisions(manifest_path)
         raise
-    return [destination for _, destination, _, _ in moved]
+    return [destination for _, destination, _, _, _, _ in moved]
 
 
 def rollback_generated_config_collisions(manifest_path: Path) -> list[Path]:
@@ -240,11 +298,35 @@ def rollback_generated_config_collisions(manifest_path: Path) -> list[Path]:
         source = repo_root / move["source"]
         destination = repo_root / move["destination"]
         if source.exists():
-            if _sha256(source) != move["sha256"]:
-                raise ReleaseCollisionError(
-                    f"Original generated config changed during rollback: {source}"
+            if _sha256(source) == move["sha256"]:
+                continue
+            if _sha256(source) == move.get("target_sha256"):
+                if not destination.exists() or _sha256(destination) != move["sha256"]:
+                    raise ReleaseCollisionError(
+                        f"Cannot safely restore generated config from {destination}"
+                    )
+                if move.get("disposition") == "overlay":
+                    restored.append(destination)
+                    continue
+                overlay = (
+                    repo_root
+                    / "backend-py/scraper_config/runtime_unis"
+                    / source.name
                 )
-            continue
+                if overlay.exists() and _sha256(overlay) != move["sha256"]:
+                    raise ReleaseCollisionError(
+                        f"Cannot safely restore generated config over {overlay}"
+                    )
+                overlay.parent.mkdir(parents=True, exist_ok=True)
+                if not overlay.exists():
+                    shutil.move(destination, overlay)
+                else:
+                    destination.unlink()
+                restored.append(overlay)
+                continue
+            raise ReleaseCollisionError(
+                f"Original generated config changed during rollback: {source}"
+            )
         if not destination.exists() or _sha256(destination) != move["sha256"]:
             raise ReleaseCollisionError(
                 f"Cannot safely restore generated config from {destination}"
@@ -259,6 +341,43 @@ def rollback_generated_config_collisions(manifest_path: Path) -> list[Path]:
     return restored
 
 
+def finalize_generated_config_collisions(manifest_path: Path) -> list[Path]:
+    """Delete deferred backups only after the release has been verified."""
+    if not manifest_path.exists():
+        return []
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    repo_root = Path(manifest["repo_root"]).resolve()
+    deferred: list[Path] = []
+    for move in manifest["moves"]:
+        if move.get("disposition") != "deferred_delete":
+            continue
+        source = repo_root / move["source"]
+        destination = repo_root / move["destination"]
+        if not source.exists() or _sha256(source) != move.get("target_sha256"):
+            raise ReleaseCollisionError(
+                f"Target recipe is not verified for finalization: {source}"
+            )
+        if not destination.exists() or _sha256(destination) != move["sha256"]:
+            raise ReleaseCollisionError(
+                f"Cannot safely finalize generated config at {destination}"
+            )
+        deferred.append(destination)
+
+    removed: list[Path] = []
+    for destination in deferred:
+        destination.unlink()
+        removed.append(destination)
+    manifest_path.unlink()
+    for path in sorted({path.parent for path in removed}, reverse=True):
+        while path != manifest_path.parent:
+            try:
+                path.rmdir()
+            except OSError:
+                break
+            path = path.parent
+    return removed
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -268,6 +387,8 @@ def main() -> None:
     prepare.add_argument("--manifest", type=Path, required=True)
     rollback = subparsers.add_parser("rollback")
     rollback.add_argument("--manifest", type=Path, required=True)
+    finalize = subparsers.add_parser("finalize")
+    finalize.add_argument("--manifest", type=Path, required=True)
     audit = subparsers.add_parser("audit-overlays")
     audit.add_argument("--repo-root", type=Path, required=True)
     cleanup = subparsers.add_parser("cleanup-overlays")
@@ -281,6 +402,9 @@ def main() -> None:
     elif args.command == "rollback":
         for path in rollback_generated_config_collisions(args.manifest):
             print(f"Restored generated config after failed release: {path}")
+    elif args.command == "finalize":
+        for path in finalize_generated_config_collisions(args.manifest):
+            print(f"Finalized superseded generated config: {path}")
     elif args.command == "audit-overlays":
         for proof in find_redundant_generated_overlays(args.repo_root):
             print(json.dumps(proof, sort_keys=True))

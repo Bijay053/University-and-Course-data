@@ -24,6 +24,7 @@ from deploy.safe_restart_smoke import (
 from deploy.reconcile_generated_configs import (
     ReleaseCollisionError,
     cleanup_redundant_generated_overlays,
+    finalize_generated_config_collisions,
     find_redundant_generated_overlays,
     reconcile_generated_config_collisions,
     rollback_generated_config_collisions,
@@ -153,7 +154,28 @@ discovery:
     overlay = repo / "backend-py/scraper_config/runtime_unis/portable_11.yaml"
     assert overlay.read_text(encoding="utf-8").endswith(body)
 
+def test_guarded_release_defers_fully_superseded_collision_without_overlay(
+    tmp_path: Path,
+) -> None:
+    body = """# Hostname: portable.edu
+# Auto-generated: 2026-09-16
+# This stub was created automatically on the first scrape of this university.
+discovery:
+  bfs_page_budget: 3
+"""
+    repo, target, collision = _collision_repo(tmp_path, stub_body=body)
+    manifest = tmp_path / "manifest.json"
+    original = collision.read_bytes()
 
+    preserved = reconcile_generated_config_collisions(repo, target, manifest)
+
+    assert not collision.exists()
+    assert not (
+        repo / "backend-py/scraper_config/runtime_unis/portable_11.yaml"
+    ).exists()
+    assert preserved[0].read_bytes() == original
+    move = json.loads(manifest.read_text(encoding="utf-8"))["moves"][0]
+    assert move["disposition"] == "deferred_delete"
 def test_guarded_release_still_blocks_manually_edited_generated_collision(
     tmp_path: Path,
 ) -> None:
@@ -968,3 +990,98 @@ def test_concurrent_deployment_evidence_appends_are_complete_and_retained(
     assert len(records) == len(releases)
     assert {record["revision"] for record in records} == set(releases)
     assert stat.S_IMODE(evidence_path.stat().st_mode) == 0o600
+
+def test_finalize_prevalidates_every_deferred_backup_before_deleting(
+    tmp_path: Path,
+) -> None:
+    body = """# Hostname: portable.edu
+# Auto-generated: 2026-09-16
+# This stub was created automatically on the first scrape of this university.
+discovery:
+  bfs_page_budget: 3
+"""
+    repo, target, _collision = _collision_repo(tmp_path, stub_body=body)
+    manifest = tmp_path / "manifest.json"
+    preserved = reconcile_generated_config_collisions(repo, target, manifest)
+    _git(repo, "checkout", "-q", target)
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    missing_move = dict(payload["moves"][0])
+    missing_move["destination"] = (
+        "backend-py/.git/release-generated-config-backups/missing.yaml"
+    )
+    payload["moves"].append(missing_move)
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(
+        ReleaseCollisionError, match="Cannot safely finalize generated config"
+    ):
+        finalize_generated_config_collisions(manifest)
+
+    assert preserved[0].exists()
+    assert manifest.exists()
+
+def test_failed_release_after_checkout_keeps_generated_only_overlay(
+    tmp_path: Path,
+) -> None:
+    body = """# Hostname: portable.edu
+# Auto-generated: 2026-09-16
+# This stub was created automatically on the first scrape of this university.
+discovery:
+  max_candidates: 77
+"""
+    repo, target, collision = _collision_repo(tmp_path, stub_body=body)
+    original = collision.read_bytes()
+    manifest = tmp_path / "manifest.json"
+    reconcile_generated_config_collisions(repo, target, manifest)
+    _git(repo, "checkout", "-q", target)
+
+    restored = rollback_generated_config_collisions(manifest)
+
+    overlay = repo / "backend-py/scraper_config/runtime_unis/portable_11.yaml"
+    assert restored == [overlay]
+    assert overlay.read_bytes() == original
+    assert not manifest.exists()
+
+def test_failed_release_after_checkout_restores_deferred_collision_as_overlay(
+    tmp_path: Path,
+) -> None:
+    body = """# Hostname: portable.edu
+# Auto-generated: 2026-09-16
+# This stub was created automatically on the first scrape of this university.
+discovery:
+  bfs_page_budget: 3
+"""
+    repo, target, collision = _collision_repo(tmp_path, stub_body=body)
+    original = collision.read_bytes()
+    manifest = tmp_path / "manifest.json"
+    reconcile_generated_config_collisions(repo, target, manifest)
+    _git(repo, "checkout", "-q", target)
+
+    restored = rollback_generated_config_collisions(manifest)
+
+    overlay = repo / "backend-py/scraper_config/runtime_unis/portable_11.yaml"
+    assert restored == [overlay]
+    assert overlay.read_bytes() == original
+    assert collision.read_text(encoding="utf-8") == (
+        "discovery:\n  bfs_page_budget: 9\n"
+    )
+    assert not manifest.exists()
+
+def test_successful_release_finalizes_deferred_collision(tmp_path: Path) -> None:
+    body = """# Hostname: portable.edu
+# Auto-generated: 2026-09-16
+# This stub was created automatically on the first scrape of this university.
+discovery:
+  bfs_page_budget: 3
+"""
+    repo, target, collision = _collision_repo(tmp_path, stub_body=body)
+    manifest = tmp_path / "manifest.json"
+    preserved = reconcile_generated_config_collisions(repo, target, manifest)
+    _git(repo, "checkout", "-q", target)
+
+    removed = finalize_generated_config_collisions(manifest)
+
+    assert removed == preserved
+    assert not preserved[0].exists()
+    assert not manifest.exists()
+    assert collision.exists()

@@ -75,8 +75,6 @@ sudo -u ubuntu backend-py/.venv/bin/python -B "$reconciler" prepare \
   --manifest "$reconciliation_manifest"
 sudo -u ubuntu git pull --ff-only origin main
 test "$(sudo -u ubuntu git rev-parse HEAD)" = "$target"
-reconciliation_committed=1
-rm -f "$reconciler" "$reconciliation_manifest"
 
 # Report verified runtime overlays that the checked-out tracked recipes now
 # fully supersede. The helper contains ordinary audit/report failures and uses
@@ -120,4 +118,7 @@ with urllib.request.urlopen(urllib.parse.urljoin(url,assets[0]),timeout=30) as r
     assert r.status==200 and len(r.read())>100
 print("PUBLIC_HTML_AND_ASSET_OK",url,assets[0])
 PY
+sudo -u ubuntu backend-py/.venv/bin/python -B "$reconciler" finalize \
+  --manifest "$reconciliation_manifest"
+reconciliation_committed=1
 echo "DEPLOYED_RELEASE=$target"
