@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
+
 import pytest
 from app.services.scraper.data_quality import (
     QualityIssue,
@@ -10,6 +12,7 @@ from app.services.scraper.data_quality import (
     _check_duplicates,
     run_quality_checks,
 )
+from app.services.scraper.orchestrator import _record_staged_quality_payload
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -40,6 +43,51 @@ def _run_check(payload: dict, url: str = "https://example.edu/program/mba") -> l
 
 def _codes(issues: list[QualityIssue]) -> list[str]:
     return [i.code for i in issues]
+
+
+def test_quality_input_contains_only_payloads_that_staging_saved():
+    staged_payloads: list[dict] = []
+    rejected = {"course_name": "Online-only course", "international_fee": None}
+    saved = {"course_name": "Eligible course", "international_fee": 19_000}
+
+    assert not _record_staged_quality_payload(
+        staged_payloads,
+        rejected,
+        SimpleNamespace(saved=False),
+        source_url="https://example.edu/online",
+    )
+    assert _record_staged_quality_payload(
+        staged_payloads,
+        saved,
+        SimpleNamespace(saved=True),
+        source_url="https://example.edu/eligible",
+    )
+
+    saved["international_fee"] = None
+    assert staged_payloads == [
+        {
+            "payload": {
+                "course_name": "Eligible course",
+                "international_fee": 19_000,
+            },
+            "url": "https://example.edu/eligible",
+        }
+    ]
+
+
+def test_saved_quality_payload_keeps_url_for_critical_status_updates():
+    staged_payloads: list[dict] = []
+    saved_url = "https://example.edu/program/missing-fee"
+    _record_staged_quality_payload(
+        staged_payloads,
+        _good_payload(international_fee=None, has_central_fee_page=False),
+        SimpleNamespace(saved=True),
+        source_url=saved_url,
+    )
+
+    report = asyncio.run(run_quality_checks(staged_payloads))
+
+    assert report["critical_urls"] == {saved_url}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

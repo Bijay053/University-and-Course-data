@@ -369,6 +369,27 @@ def _record_skip(
     summary["skipped"] = summary.get("skipped", 0) + 1
     skip_reasons[key] = skip_reasons.get(key, 0) + 1
     return key
+
+
+def _record_staged_quality_payload(
+    staged_payloads: list[dict[str, Any]],
+    payload: dict[str, Any],
+    stage_result: Any,
+    *,
+    source_url: str | None,
+) -> bool:
+    """Retain a payload for QA only when staging actually saved its row."""
+    if not getattr(stage_result, "saved", False):
+        return False
+    staged_payloads.append(
+        {
+            "payload": dict(payload),
+            "url": source_url or payload.get("course_website") or "",
+        }
+    )
+    return True
+
+
 def _per_course_timeout_result(
     link: dict,
     timeout_seconds: float = _PER_COURSE_EXTRACTION_TIMEOUT_SECONDS,
@@ -6309,6 +6330,12 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                             skip_url_block=_skip_url_block,
                             targeted_retry=_targeted_retry,
                         )
+                        _record_staged_quality_payload(
+                            _all_staged_dicts,
+                            payload,
+                            res,
+                            source_url=r.get("url"),
+                        )
                         # ── Phase 9: Verification Engine ──────────────────────────
                         # Runs inside the same session (already committed by
                         # stage_course) so evidence rows are visible.  Soft-fail
@@ -6390,11 +6417,6 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 # purely cosmetic for any future code path that reads the
                 # local ``job`` instance before the next commit.
                 job.heartbeat_at = datetime.now(timezone.utc)
-            # Accumulate staged dicts for the data-quality check that runs
-            # after all batches (it inspects payloads, not DB rows).
-            _all_staged_dicts.extend(
-                _r for _r in results if isinstance(_r, dict) and not _r.get("error")
-            )
             # Explicitly free the batch result list so GC can reclaim the
             # memory before the next batch's extraction begins.
             del results
@@ -6644,6 +6666,12 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                                 ),
                                 timeout=_remaining_stage_budget,
                             )
+                        _record_staged_quality_payload(
+                            _all_staged_dicts,
+                            _sw_payload,
+                            _sw_res,
+                            source_url=_sweep_url,
+                        )
                         if _sw_res.saved:
                             summary["staged"] += 1
                             _counter = _sweep_lk.get("counter")
