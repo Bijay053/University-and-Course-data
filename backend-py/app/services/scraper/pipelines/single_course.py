@@ -65,24 +65,6 @@ from app.services.scraper.nz_programme_points import (
 
 log = logging.getLogger(__name__)
 
-# Full-AI response fields and the canonical/alias payload slots reached by the
-# merge below. This is intentionally explicit so required publishability facts
-# can be checked against both the prompt schema and the pipeline merge contract.
-GEMINI_PRIMARY_FIELD_TARGETS: dict[str, str] = {
-    "international_fee": "international_fee",
-    "ielts_overall": "ielts_overall",
-    "pte_overall": "pte_overall",
-    "toefl_overall": "toefl_overall",
-    "cambridge_overall": "cambridge_overall",
-    "duolingo_overall": "duolingo_overall",
-    "duration_value": "duration",
-    "duration_text": "duration_text",
-    "intake_text": "intake_months",
-    "location_text": "course_location",
-    "mode": "study_mode",
-}
-
-
 def _build_extraction_method_map(
     payload: dict[str, Any],
     evidence: list[dict[str, Any]],
@@ -5781,7 +5763,7 @@ async def extract_course(
             if _gp_filled.get("duration_value") is not None:
                 try:
                     _gp_filled[
-                        GEMINI_PRIMARY_FIELD_TARGETS["duration_value"]
+                        _gp.GEMINI_PRIMARY_FIELD_TARGETS["duration_value"]
                     ] = float(_gp_filled["duration_value"])
                 except (TypeError, ValueError):
                     pass
@@ -5789,7 +5771,9 @@ async def extract_course(
                 from app.services.scraper.extractors.duration import _normalise_unit as _nu
                 _gp_term = _nu(str(_gp_filled["duration_unit"]))
                 if _gp_term:
-                    _gp_filled["duration_term"] = _gp_term
+                    _gp_filled[
+                        _gp.GEMINI_PRIMARY_FIELD_TARGETS["duration_unit"]
+                    ] = _gp_term
 
             # Map intake_text → canonical intake_months (JSONB list of month
             # name strings). Gemini returns a comma-separated string like
@@ -5808,7 +5792,7 @@ async def extract_course(
                         _months.append(_mo)
                 if _months:
                     _gp_filled[
-                        GEMINI_PRIMARY_FIELD_TARGETS["intake_text"]
+                        _gp.GEMINI_PRIMARY_FIELD_TARGETS["intake_text"]
                     ] = _months
 
             # ── UTAS online-only flag from Gemini's `mode` field ───────────────
@@ -5907,7 +5891,7 @@ async def extract_course(
                     _is_bcu_host_gp = "bcu.ac.uk" in (url or "").lower()
                     if not _has_structural_loc and not _is_bcu_host_gp:
                         _gp_filled[
-                            GEMINI_PRIMARY_FIELD_TARGETS["location_text"]
+                            _gp.GEMINI_PRIMARY_FIELD_TARGETS["location_text"]
                         ] = _loc
 
             # Helper: return the method of the current best evidence row for
@@ -5944,10 +5928,10 @@ async def extract_course(
                     )
                 ):
                     continue
-                # Route request fields through the production-owned merge
-                # contract. Unknown non-required fields keep their historical
-                # same-name merge behavior.
-                _gp_k = GEMINI_PRIMARY_FIELD_TARGETS.get(_gp_k, _gp_k)
+                # Route response fields through the immutable extractor-owned
+                # save contract. The fallback covers canonical keys derived
+                # immediately above from contracted response aliases.
+                _gp_k = _gp.GEMINI_PRIMARY_FIELD_TARGETS.get(_gp_k, _gp_k)
 
                 # Global fill-only policy: Gemini is a fallback for gaps left by
                 # deterministic extraction, never an alternative authority that

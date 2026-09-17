@@ -235,6 +235,33 @@ GEMINI_PRIMARY_SUPPORTED_FIELDS: tuple[str, ...] = tuple(
     GEMINI_PRIMARY_FIELD_INSTRUCTIONS
 )
 
+# Immutable save contract for every field the full AI extractor may return.
+# Keeping this beside the request contract prevents prompt fields and pipeline
+# payload targets from drifting independently. Same-name targets preserve the
+# historical merge behavior; only extractor aliases are translated.
+GEMINI_PRIMARY_FIELD_TARGETS: Mapping[str, str] = MappingProxyType({
+    "international_fee": "international_fee",
+    "domestic_fee": "domestic_fee",
+    "fee_term": "fee_term",
+    "duration_value": "duration",
+    "duration_unit": "duration_term",
+    "duration_text": "duration_text",
+    "ielts_overall": "ielts_overall",
+    "pte_overall": "pte_overall",
+    "toefl_overall": "toefl_overall",
+    "cambridge_overall": "cambridge_overall",
+    "duolingo_overall": "duolingo_overall",
+    "sub_category": "sub_category",
+    "category": "category",
+    "study_load": "study_load",
+    "mode": "study_mode",
+    "intake_text": "intake_months",
+    "academic_level": "academic_level",
+    "academic_score": "academic_score",
+    "other_requirement": "other_requirement",
+    "location_text": "course_location",
+})
+
 _PROMPT_TEMPLATE = """\
 You are a precise data extractor for a university course admission page.
 Return ONLY a single JSON object with exactly the keys listed below.
