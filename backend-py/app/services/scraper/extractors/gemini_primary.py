@@ -52,12 +52,6 @@ GEMINI_PRIMARY_FIELD_INSTRUCTIONS: Mapping[str, str] = MappingProxyType({
         "    that total and set fee_term='Full Course'. "
         "Null if not explicitly stated in the International section."
     ),
-    "domestic_fee": (
-        "Annual domestic/local tuition fee (number only). "
-        "MUST come from the Domestic section of the page (see CRITICAL rule above). "
-        "Commonwealth Supported Place / CSP / HECS fees belong here, not in international_fee. "
-        "Null if not stated."
-    ),
     "fee_term": (
         "Fee payment period matching the fee you extracted. Pick EXACTLY one: "
         "'Annual', 'Semester', 'Trimester', 'Full Course', 'Per Unit'. "
@@ -80,10 +74,6 @@ GEMINI_PRIMARY_FIELD_INSTRUCTIONS: Mapping[str, str] = MappingProxyType({
         "Unit for duration_value. Use 'years' for year-based programs, "
         "'months' for programs shorter than 1 year. "
         "NEVER use 'units', 'credit points', or 'subjects'."
-    ),
-    "duration_text": (
-        "Raw duration phrase exactly as it appears on the page "
-        "(e.g. '2 years full-time', '18 months'). Null if not found."
     ),
     "ielts_overall": (
         "Minimum IELTS *overall* band score required for admission. "
@@ -241,11 +231,9 @@ GEMINI_PRIMARY_SUPPORTED_FIELDS: tuple[str, ...] = tuple(
 # historical merge behavior; only extractor aliases are translated.
 GEMINI_PRIMARY_FIELD_TARGETS: Mapping[str, str] = MappingProxyType({
     "international_fee": "international_fee",
-    "domestic_fee": "domestic_fee",
     "fee_term": "fee_term",
     "duration_value": "duration",
     "duration_unit": "duration_term",
-    "duration_text": "duration_text",
     "ielts_overall": "ielts_overall",
     "pte_overall": "pte_overall",
     "toefl_overall": "toefl_overall",
@@ -263,15 +251,10 @@ GEMINI_PRIMARY_FIELD_TARGETS: Mapping[str, str] = MappingProxyType({
 })
 
 # Immutable lookup contract used to decide whether a requested AI field is
-# still missing from the pipeline payload. By default this is identical to the
-# save target above. ``duration_text`` is the intentional exception: duration
-# text is supporting evidence for the canonical numeric duration, so a
-# populated ``duration`` slot suppresses another AI request even when the
-# separate ``duration_text`` payload slot is empty.
-GEMINI_PRIMARY_MISSING_FIELD_TARGETS: Mapping[str, str] = MappingProxyType({
-    **GEMINI_PRIMARY_FIELD_TARGETS,
-    "duration_text": "duration",
-})
+# still missing from the pipeline payload.
+GEMINI_PRIMARY_MISSING_FIELD_TARGETS: Mapping[str, str] = (
+    GEMINI_PRIMARY_FIELD_TARGETS
+)
 
 _PROMPT_TEMPLATE = """\
 You are a precise data extractor for a university course admission page.
@@ -291,17 +274,14 @@ Rules you MUST follow when this structure is present:
    "International tuition fee", "International student fee",
    "For international applicants", "Total Tuition Fee (international
    students)", "Tuition fee based on a rate of $X per year").
-2. Extract domestic_fee ONLY from content labelled for domestic students
-   (e.g. "Domestic students", "Commonwealth Supported Place",
-   "CSP fee", "HECS-HELP", "Student Contribution Amount").
-3. NEVER put a Commonwealth Supported Place / CSP / HECS / domestic
+2. NEVER put a Commonwealth Supported Place / CSP / HECS / domestic
    contribution amount into international_fee.  These are always
    domestic-only fees and are typically much lower ($5,000–$15,000/yr)
    than the real international tuition ($25,000–$55,000/yr).
-4. Extract ielts_overall, pte_overall, toefl_overall, cambridge_overall,
+3. Extract ielts_overall, pte_overall, toefl_overall, cambridge_overall,
    duolingo_overall from the International section ONLY.  Domestic
    admission requirements (GPA, ATAR, ATARs) must be ignored.
-5. If the page shows BOTH a per-year amount (e.g. "Indicative year 1
+4. If the page shows BOTH a per-year amount (e.g. "Indicative year 1
    fee", "1st year fee", "Annual rate per year", "$X/yr") AND a
    "Total course fee" / "Total indicative course fee" for international
    students, ALWAYS prefer the per-year amount and set
@@ -692,14 +672,14 @@ def _coerce(field_key: str, value: Any) -> Any | None:
         return None
 
     _FLOAT_FIELDS = {
-        "international_fee", "domestic_fee",
+        "international_fee",
         "duration_value",
         "ielts_overall", "pte_overall", "toefl_overall",
         "cambridge_overall", "duolingo_overall",
         "academic_score",
     }
     _STR_FIELDS = {
-        "fee_term", "duration_unit", "duration_text",
+        "fee_term", "duration_unit",
         "sub_category", "category", "mode", "study_load", "intake_text", "location_text",
         "academic_level", "other_requirement",
     }

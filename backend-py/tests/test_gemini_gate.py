@@ -154,6 +154,24 @@ def test_full_ai_supported_field_contract_is_immutable_and_complete():
         GEMINI_PRIMARY_FIELD_TARGETS["new_field"] = "drift"  # type: ignore[index]
 
 
+def test_every_full_ai_target_is_accepted_by_course_staging():
+    from app.models import ScrapedCourse
+    from app.services.scraper.extractors.gemini_primary import (
+        GEMINI_PRIMARY_FIELD_TARGETS,
+    )
+
+    dropped_targets = {
+        ai_field: target
+        for ai_field, target in GEMINI_PRIMARY_FIELD_TARGETS.items()
+        if not hasattr(ScrapedCourse, target)
+    }
+
+    assert not dropped_targets, (
+        "Full-AI fields target payload keys that stage_course silently drops "
+        f"before ScrapedCourse persistence: {dropped_targets!r}"
+    )
+
+
 def test_required_fact_must_declare_ai_support_or_deterministic_only_reason():
     with pytest.raises(ValueError, match="full AI fields or an explicit"):
         RequiredCourseField("unsupported", "Unsupported", ("unsupported",), ())

@@ -127,7 +127,6 @@ def test_gemini_primary_requests_only_canonical_missing_fields():
             "fee_term",
             "duration_value",
             "duration_unit",
-            "duration_text",
             "location_text",
             "mode",
             "ielts_overall",
@@ -147,25 +146,11 @@ def test_gemini_missing_lookup_covers_full_request_and_save_contract():
     )
 
 
-def test_gemini_missing_lookup_matches_save_targets_except_duration_text():
-    """Duration text intentionally checks canonical duration; all else matches."""
-    differences = {
-        field: (gemini_primary.GEMINI_PRIMARY_FIELD_TARGETS[field], missing_target)
-        for field, missing_target in (
-            gemini_primary.GEMINI_PRIMARY_MISSING_FIELD_TARGETS.items()
-        )
-        if gemini_primary.GEMINI_PRIMARY_FIELD_TARGETS[field] != missing_target
-    }
-
-    assert differences == {"duration_text": ("duration_text", "duration")}
-    assert _gemini_primary_missing_fields(
-        {"duration": 2.0, "duration_text": None},
-        ("duration_text",),
-    ) == []
-    assert _gemini_primary_missing_fields(
-        {"duration": None, "duration_text": "2 years full-time"},
-        ("duration_text",),
-    ) == ["duration_text"]
+def test_gemini_missing_lookup_matches_save_targets():
+    assert (
+        gemini_primary.GEMINI_PRIMARY_MISSING_FIELD_TARGETS
+        is gemini_primary.GEMINI_PRIMARY_FIELD_TARGETS
+    )
 
 
 def test_gemini_cannot_refill_fee_after_authoritative_no_international_signal():
