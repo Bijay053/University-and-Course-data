@@ -603,6 +603,52 @@ async def test_segi_transition_from_university_to_college_keeps_course_owned_eng
     assert college["payload"]["course_location"] == "SEGi College Kuala Lumpur"
 
 
+def test_segi_college_ai_text_ignores_empty_wordpress_content_mount() -> None:
+    from app.services.scraper.extractors.gemini_primary import _trim_text
+
+    html = """
+    <html><head><title>Bachelor of Business Analytics | SEGi</title></head><body>
+      <div id="content"></div>
+      <div class="elementor-widget-theme-post-content">
+        <h1>Bachelor of Business Analytics</h1>
+        <p>Programme ID: R2/345/6/0001</p>
+        <p>Duration: 3 years full-time</p>
+        <p>Intakes: January, May and September</p>
+        <p>International applicants require IELTS 5.5.</p>
+      </div>
+    </body></html>
+    """
+
+    text = _trim_text(
+        html,
+        url="https://www.segi.edu.my/bachelor-of-business-analytics/",
+    )
+
+    assert "Bachelor of Business Analytics" in text
+    assert "Duration: 3 years full-time" in text
+    assert "International applicants require IELTS 5.5" in text
+
+
+def test_ai_text_falls_back_to_document_when_named_content_is_only_a_shell() -> None:
+    from app.services.scraper.extractors.gemini_primary import _trim_text
+
+    html = """
+    <html><body>
+      <div id="content">Loading</div>
+      <section class="programme-facts">
+        <h1>Diploma in Business Studies</h1>
+        <p>This programme is delivered over two years at SEGi College.</p>
+        <p>International applicants require IELTS 5.0.</p>
+      </section>
+    </body></html>
+    """
+
+    text = _trim_text(html, url="https://www.segi.edu.my/diploma-in-business-studies/")
+
+    assert "Diploma in Business Studies" in text
+    assert "International applicants require IELTS 5.0" in text
+
+
 @pytest.mark.asyncio
 async def test_wayback_discovery_uses_configured_cdx_prefix() -> None:
     from app.services.scraper.wayback_discover import wayback_discover

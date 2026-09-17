@@ -290,7 +290,11 @@ Course page text (may be truncated):
 _BOILERPLATE_TAGS = {"nav", "header", "footer", "aside", "form"}
 _BOILERPLATE_CLASS_FRAGS = (
     "nav", "navigation", "menu", "breadcrumb",
-    "header", "footer", "sidebar", "widget",
+    "header", "footer", "sidebar",
+    # Bare "widget" is unsafe: Elementor wraps normal course content in
+    # ``elementor-widget-*`` containers. Keep only explicit WordPress chrome
+    # regions so SEGi programme facts are not stripped with the navigation.
+    "sidebar-widget", "footer-widget", "widget-area",
     "cookie", "banner", "alert", "announcement",
     "social", "share", "search-bar",
     # Lead-capture / enquiry form sections that appear before the actual course
@@ -531,14 +535,30 @@ def _extract_content_html(html: str, url: str = "") -> str:
         # ── Path 3 & 4: full-document strip then find content div ─────────
         _safe_strip(soup, list(_BOILERPLATE_TAGS), class_frags=_BOILERPLATE_CLASS_FRAGS)
 
+        content_candidates: list[tuple[int, Any]] = []
         for tag in soup.find_all(["div", "section"]):
             try:
                 tag_id = (tag.get("id") or "").lower()
                 tag_cls = " ".join(tag.get("class") or []).lower()
                 if "content" in tag_id or "content" in tag_cls or "main" in tag_id:
-                    return str(tag)
+                    visible_len = len(" ".join(tag.stripped_strings))
+                    if visible_len:
+                        content_candidates.append((visible_len, tag))
             except Exception:
                 pass
+
+        # WordPress/Elementor pages often put an empty ``#content`` mount before
+        # the rendered programme body. Returning the first name-matching div
+        # reduced otherwise healthy 500–650 KB SEGi college pages to
+        # ``text_len=0``, after which fallback AI guessed durations from no
+        # course evidence. Prefer the richest matching container instead. If
+        # every named container is only a tiny shell, retain the stripped full
+        # document rather than hiding useful sibling content.
+        if content_candidates:
+            best_len, best = max(content_candidates, key=lambda item: item[0])
+            full_len = len(" ".join(soup.stripped_strings))
+            if best_len >= 100 or best_len >= full_len * 0.5:
+                return str(best)
 
         return str(soup)
     except Exception:
