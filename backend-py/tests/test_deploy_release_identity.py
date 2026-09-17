@@ -5,12 +5,16 @@ from argparse import Namespace
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import json
+import os
 import stat
 import subprocess
+import sys
+from types import SimpleNamespace
 
 import pytest
 
 import deploy.reconcile_generated_configs as generated_configs
+import deploy.post_checkout_overlay_audit as post_checkout_audit
 from deploy.safe_restart_smoke import (
     SmokeFailure,
     _main,
@@ -445,6 +449,277 @@ def test_overlay_cleanup_rejects_recipe_untracked_after_discovery(
 
     assert cleanup_redundant_generated_overlays(repo) == []
     assert overlay.exists()
+
+
+def test_production_release_reports_redundant_overlays_after_checkout() -> None:
+    script = (BACKEND_ROOT.parent / ".local/prod_pull_all.sh").read_text(
+        encoding="utf-8"
+    )
+    helper = (
+        DEPLOY_DIR / "post_checkout_overlay_audit.py"
+    ).read_text(encoding="utf-8")
+
+    checkout_verified = script.index(
+        'test "$(sudo -u ubuntu git rev-parse HEAD)" = "$target"'
+    )
+    audit = script.index("post_checkout_overlay_audit.py")
+    restart = script.index(
+        "systemctl restart uni-api-py.service uni-celery.service"
+    )
+
+    assert checkout_verified < audit < restart
+    assert "REDUNDANT_CONFIG_OVERLAY_COUNT=" in helper
+    assert "REDUNDANT_CONFIG_OVERLAY_PATH=" in helper
+    assert "cleanup-overlays" not in script
+
+
+def test_production_release_blocks_only_corrupt_repository_after_audit_failure() -> None:
+    script = (BACKEND_ROOT.parent / ".local/prod_pull_all.sh").read_text(
+        encoding="utf-8"
+    )
+    audit_failure = script.split("post_checkout_overlay_audit.py", maxsplit=1)[1]
+
+    assert "REDUNDANT_CONFIG_OVERLAY_AUDIT_WARNING=failed_non_blocking" in audit_failure
+    assert "Repository corruption detected" in audit_failure
+    assert 'if [ "$overlay_audit_status" = 42 ]' in audit_failure
+    assert audit_failure.index('= 42 ]') < audit_failure.index("exit 1")
+
+
+def test_post_checkout_audit_reports_count_paths_and_changes_nothing(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    _git(repo, "config", "user.email", "release-test@example.invalid")
+    _git(repo, "config", "user.name", "Release Test")
+    recipe = repo / "backend-py/scraper_config/unis/portable_11.yaml"
+    recipe.parent.mkdir(parents=True)
+    recipe.write_text("discovery:\n  bfs_page_budget: 9\n", encoding="utf-8")
+    _git(repo, "add", str(recipe.relative_to(repo)))
+    _git(repo, "commit", "-qm", "tracked recipe")
+    overlay = _runtime_overlay(
+        repo,
+        "portable_11.yaml",
+        "# Hostname: portable.edu\n"
+        "# Auto-generated: 2026-09-16\n"
+        "# This stub was created automatically on the first scrape of this university.\n"
+        "discovery:\n  bfs_page_budget: 3\n",
+    )
+    original = overlay.read_bytes()
+
+    assert post_checkout_audit.run_post_checkout_audit(repo) == 0
+
+    output = capsys.readouterr()
+    assert output.err == ""
+    assert output.out == (
+        "REDUNDANT_CONFIG_OVERLAY_COUNT=1\n"
+        "REDUNDANT_CONFIG_OVERLAY_PATH="
+        "backend-py/scraper_config/runtime_unis/portable_11.yaml\n"
+    )
+    assert overlay.read_bytes() == original
+
+
+def test_post_checkout_audit_failure_is_non_blocking_when_fsck_is_inconclusive(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(
+        post_checkout_audit,
+        "find_redundant_generated_overlays",
+        lambda _root: (_ for _ in ()).throw(OSError("audit unavailable")),
+    )
+    monkeypatch.setattr(
+        post_checkout_audit,
+        "repository_corruption_confirmed",
+        lambda _root: False,
+    )
+
+    assert post_checkout_audit.run_post_checkout_audit(tmp_path) == 0
+    assert capsys.readouterr().err == (
+        "REDUNDANT_CONFIG_OVERLAY_AUDIT_WARNING=failed_non_blocking\n"
+    )
+
+
+def test_post_checkout_audit_blocks_only_confirmed_corruption(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        post_checkout_audit,
+        "find_redundant_generated_overlays",
+        lambda _root: (_ for _ in ()).throw(OSError("audit unavailable")),
+    )
+    monkeypatch.setattr(
+        post_checkout_audit,
+        "repository_corruption_confirmed",
+        lambda _root: True,
+    )
+
+    assert (
+        post_checkout_audit.run_post_checkout_audit(tmp_path)
+        == post_checkout_audit.CORRUPTION_EXIT
+    )
+
+
+def test_post_checkout_audit_rejects_control_character_paths_without_blocking(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(
+        post_checkout_audit,
+        "find_redundant_generated_overlays",
+        lambda _root: [{"overlay": "backend-py/scraper_config/runtime_unis/a\nb.yaml"}],
+    )
+    monkeypatch.setattr(
+        post_checkout_audit,
+        "repository_corruption_confirmed",
+        lambda _root: False,
+    )
+
+    assert post_checkout_audit.run_post_checkout_audit(tmp_path) == 0
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert output.err == (
+        "REDUNDANT_CONFIG_OVERLAY_AUDIT_WARNING=failed_non_blocking\n"
+    )
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "missing blob abcdef",
+        "broken link from tree abcdef",
+        "refs/heads/main: invalid sha1 pointer abcdef",
+        "fatal: bad object abcdef",
+        "object corrupt or missing: abcdef",
+        "hash mismatch for object abcdef",
+    ],
+)
+def test_repository_corruption_classifier_accepts_only_known_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    message: str,
+) -> None:
+    monkeypatch.setattr(
+        post_checkout_audit.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            returncode=1,
+            stdout="",
+            stderr=message,
+        ),
+    )
+
+    assert post_checkout_audit.repository_corruption_confirmed(tmp_path) is True
+
+
+@pytest.mark.parametrize(
+    "result_or_error",
+    [
+        SimpleNamespace(returncode=0, stdout="", stderr="missing blob abcdef"),
+        SimpleNamespace(returncode=1, stdout="", stderr="permission denied"),
+        SimpleNamespace(returncode=128, stdout="", stderr="not a git repository"),
+        FileNotFoundError("git unavailable"),
+        subprocess.TimeoutExpired(["git", "fsck"], 60),
+    ],
+)
+def test_repository_corruption_classifier_fails_open_when_inconclusive(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    result_or_error: object,
+) -> None:
+    def run(*_args: object, **_kwargs: object) -> object:
+        if isinstance(result_or_error, BaseException):
+            raise result_or_error
+        return result_or_error
+
+    monkeypatch.setattr(post_checkout_audit.subprocess, "run", run)
+
+    assert post_checkout_audit.repository_corruption_confirmed(tmp_path) is False
+
+
+@pytest.mark.parametrize(
+    ("corruption_confirmed", "expected_status"),
+    [(False, 0), (True, post_checkout_audit.CORRUPTION_EXIT)],
+)
+def test_post_checkout_report_failure_uses_corruption_decision(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    corruption_confirmed: bool,
+    expected_status: int,
+) -> None:
+    emitted: list[tuple[object, str]] = []
+    monkeypatch.setattr(
+        post_checkout_audit,
+        "find_redundant_generated_overlays",
+        lambda _root: [],
+    )
+    monkeypatch.setattr(
+        post_checkout_audit,
+        "repository_corruption_confirmed",
+        lambda _root: corruption_confirmed,
+    )
+
+    def emit(stream: object, message: str) -> bool:
+        emitted.append((stream, message))
+        return stream is not post_checkout_audit.sys.stdout
+
+    monkeypatch.setattr(post_checkout_audit, "_safe_emit", emit)
+
+    assert post_checkout_audit.run_post_checkout_audit(tmp_path) == expected_status
+    assert emitted == [
+        (
+            post_checkout_audit.sys.stdout,
+            "REDUNDANT_CONFIG_OVERLAY_COUNT=0",
+        ),
+        (
+            post_checkout_audit.sys.stderr,
+            "REDUNDANT_CONFIG_OVERLAY_AUDIT_WARNING=report_failed_non_blocking",
+        ),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("corruption_confirmed", "expected_status"),
+    [(False, 0), (True, post_checkout_audit.CORRUPTION_EXIT)],
+)
+def test_closed_stdout_preserves_post_checkout_audit_exit_status(
+    corruption_confirmed: bool,
+    expected_status: int,
+) -> None:
+    script = (
+        "from pathlib import Path\n"
+        "import deploy.post_checkout_overlay_audit as audit\n"
+        "audit.find_redundant_generated_overlays = lambda _root: []\n"
+        "audit.repository_corruption_confirmed = "
+        f"lambda _root: {corruption_confirmed!r}\n"
+        "raise SystemExit(audit.run_post_checkout_audit(Path('.')))\n"
+    )
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = str(BACKEND_ROOT)
+    process = subprocess.Popen(
+        [sys.executable, "-B", "-c", script],
+        cwd=BACKEND_ROOT,
+        env=environment,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    assert process.stdout is not None
+    process.stdout.close()
+    assert process.stderr is not None
+    stderr = process.stderr.read()
+
+    assert process.wait(timeout=10) == expected_status
+    assert (
+        "REDUNDANT_CONFIG_OVERLAY_AUDIT_WARNING=report_failed_non_blocking"
+        in stderr
+    )
+    assert "Exception ignored" not in stderr
 
 
 def test_release_identity_smoke_check_covers_fastapi_and_celery() -> None:

@@ -26,7 +26,13 @@ in `../README.md`.
 ## Generated config overlay cleanup
 
 Tracked university recipes override matching settings in verified generated
-runtime overlays. Audit obsolete overlays after checking out a release:
+runtime overlays. The supported production release flow in
+`.local/prod_pull_all.sh` automatically runs this read-only audit after it has
+checked out and verified the target revision, before restarting services. Its
+output includes `REDUNDANT_CONFIG_OVERLAY_COUNT` and one
+`REDUNDANT_CONFIG_OVERLAY_PATH` line per finding.
+
+Run the same audit manually with:
 
 ```bash
 cd /opt/university-portal
@@ -48,6 +54,14 @@ PYTHONPATH=backend-py python backend-py/deploy/reconcile_generated_configs.py \
 Cleanup repeats the full audit and digest checks immediately before each
 deletion. Any generated-only setting retains its overlay, and unknown files are
 never deleted.
+
+An audit or output-format failure emits
+`REDUNDANT_CONFIG_OVERLAY_AUDIT_WARNING=failed_non_blocking`; it does not block
+the service restart. The audit helper independently checks Git connectivity and
+blocks restart with exit code 42 only when `git fsck` output contains recognized
+object-corruption evidence. An unavailable or inconclusive check remains
+warning-only.
+The automatic release audit never invokes `cleanup-overlays`.
 
 ## Refresh the RDS-managed database credential
 

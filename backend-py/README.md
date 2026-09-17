@@ -39,7 +39,12 @@ All 5 demo-blocking Node bugs are baked into the Python implementation from day 
 - `auto_publish.should_auto_publish` does NOT require `international_fee`; English test is any-of IELTS/PTE/TOEFL/Cambridge/Duolingo (Bug #6)
 - Rejection dedup window = 7 days (Bug #7)
 
-## Cutover (do this on production when verified)
+## Historical first cutover
+
+This one-time migration procedure is retained for historical context. Do not
+use its plain `git pull` sequence for current releases. Current production
+releases use the guarded `.local/prod_pull_all.sh` flow, including generated
+config reconciliation and the post-checkout redundant-overlay audit.
 
 ```bash
 cd /root/University-and-Course-data

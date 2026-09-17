@@ -77,6 +77,21 @@ sudo -u ubuntu git pull --ff-only origin main
 test "$(sudo -u ubuntu git rev-parse HEAD)" = "$target"
 reconciliation_committed=1
 rm -f "$reconciler" "$reconciliation_manifest"
+
+# Report verified runtime overlays that the checked-out tracked recipes now
+# fully supersede. The helper contains ordinary audit/report failures and uses
+# exit 42 only when Git output positively identifies repository corruption.
+overlay_audit_status=0
+sudo -u ubuntu backend-py/.venv/bin/python -B \
+  backend-py/deploy/post_checkout_overlay_audit.py \
+  --repo-root /opt/university-portal || overlay_audit_status=$?
+if [ "$overlay_audit_status" = 42 ]; then
+  echo "Repository corruption detected after redundant-overlay audit failure; services were not restarted" >&2
+  exit 1
+elif [ "$overlay_audit_status" != 0 ]; then
+  echo "REDUNDANT_CONFIG_OVERLAY_AUDIT_WARNING=failed_non_blocking" >&2
+fi
+
 release_env="$(mktemp backend-py/.release.env.XXXXXX)"
 printf 'RELEASE_REVISION=%s\n' "$target" > "$release_env"
 chmod 0644 "$release_env"
