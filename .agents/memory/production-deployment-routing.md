@@ -50,6 +50,16 @@ release transaction. The exact-target guard stopped safely before pull.
 **How to apply:** Never bypass the revision mismatch. Integrate the new remote
 tip, rerun affected tests on that exact tree, and render a new release target.
 
+Commit multi-file release restoration before deleting any recovery evidence.
+
+**Why:** Sequential backup deletion can fail partway, leaving a rollback
+manifest that incorrectly describes a complete backup set and making failure
+cleanup unable to distinguish restored state from partial restoration.
+
+**How to apply:** Revalidate every restored source and backup at one commit
+boundary, atomically record the committed state, and only then garbage-collect
+backups. Treat cleanup after that boundary as best effort.
+
 AWS-RunShellScript starts commands under `/bin/sh` on this host. Wrap release
 transactions explicitly in Bash when they use `pipefail` or other Bash-only
 features. Under `pipefail`, do not smoke-check journals with

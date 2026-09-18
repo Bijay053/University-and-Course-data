@@ -23,6 +23,35 @@ in `../README.md`.
 | `prove_database_refresh_alert_delivery.py` | Temporarily triggers and restores the fixed delivery-failure alarm |
 | `reconcile_generated_configs.py` | Preserves verified generated recipe collisions and audits or removes fully superseded runtime overlays |
 
+## Tracked operator recipe preservation
+
+The guarded release accepts tracked worktree edits only when every change is a
+modified, regular YAML file directly under
+`backend-py/scraper_config/unis/`. Staged changes, deleted or renamed recipes,
+symlinks, edits outside that directory, and target revisions that remove an
+edited recipe or change it from a regular non-executable Git blob all block the
+release before pull.
+
+Before the fast-forward pull, the target revision's reconciliation helper
+records the operator, current-HEAD, and target-blob SHA-256 digests in a
+temporary manifest, moves each operator recipe to a repository-private backup,
+and materializes the current tracked blob. The ordinary clean-tree gate then
+runs unchanged. Immediately after the pull and before any service restart, the
+helper accepts only the exact current-HEAD or target blob at each path, restores
+the operator bytes without overwriting a concurrently recreated leaf, and
+verifies their digests. Backups are deleted only after service and public smoke
+verification. Finalization revalidates the complete source and backup set, then
+atomically renames the manifest to a committed marker before best-effort backup
+deletion. A deletion failure can leave stale backup files and the committed
+marker, but cannot turn a completed restoration back into a partial rollback.
+
+The EXIT cleanup repeats the same fenced restoration after an aborted release.
+If a recipe or backup changes after its snapshot, restoration fails closed:
+the scrape consumer remains paused and the manifest, backup, and any race
+quarantine are retained for manual recovery. If consumer cancellation cannot be
+confirmed during failed cleanup, the Celery service is stopped. Unknown dirty
+files are never normalized or overwritten.
+
 ## Generated config overlay cleanup
 
 Tracked university recipes override matching settings in verified generated

@@ -26,10 +26,14 @@ from deploy.safe_restart_smoke import (
 from deploy.reconcile_generated_configs import (
     ReleaseCollisionError,
     cleanup_redundant_generated_overlays,
+    finalize_tracked_recipe_edits,
     finalize_generated_config_collisions,
     find_redundant_generated_overlays,
+    prepare_tracked_recipe_edits,
     reconcile_generated_config_collisions,
+    restore_tracked_recipe_edits,
     rollback_generated_config_collisions,
+    verify_tracked_recipe_edits,
 )
 
 
@@ -256,6 +260,402 @@ discovery: {}
         repo / "backend-py/scraper_config/runtime_unis/portable_11.yaml"
     ).exists()
     assert not manifest.exists()
+
+
+def _tracked_recipe_repo(
+    tmp_path: Path,
+) -> tuple[Path, str, Path, bytes, bytes, bytes]:
+    repo = tmp_path / "tracked-recipe-repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    _git(repo, "config", "user.email", "release-test@example.invalid")
+    _git(repo, "config", "user.name", "Release Test")
+    recipe = repo / "backend-py/scraper_config/unis/portable.yaml"
+    recipe.parent.mkdir(parents=True)
+    head_content = b"discovery:\n  bfs_page_budget: 3\n"
+    target_content = b"discovery:\n  bfs_page_budget: 5\n"
+    operator_content = b"discovery:\n  bfs_page_budget: 9\n"
+    recipe.write_bytes(head_content)
+    _git(repo, "add", str(recipe.relative_to(repo)))
+    _git(repo, "commit", "-qm", "base recipe")
+    base = _git(repo, "rev-parse", "HEAD")
+    recipe.write_bytes(target_content)
+    _git(repo, "add", str(recipe.relative_to(repo)))
+    _git(repo, "commit", "-qm", "target recipe")
+    target = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "-q", base)
+    recipe.write_bytes(operator_content)
+    return (
+        repo,
+        target,
+        recipe,
+        head_content,
+        target_content,
+        operator_content,
+    )
+
+
+def test_guarded_release_restores_validated_tracked_recipe_after_pull(
+    tmp_path: Path,
+) -> None:
+    repo, target, recipe, head_content, _, operator_content = (
+        _tracked_recipe_repo(tmp_path)
+    )
+    manifest = tmp_path / "tracked-manifest.json"
+
+    preserved = prepare_tracked_recipe_edits(repo, target, manifest)
+
+    assert preserved == [recipe]
+    assert recipe.read_bytes() == head_content
+    assert _git(repo, "status", "--porcelain") == ""
+    _git(repo, "checkout", "-q", target)
+    restored = restore_tracked_recipe_edits(manifest)
+    assert restored == [recipe]
+    assert recipe.read_bytes() == operator_content
+    backups = finalize_tracked_recipe_edits(manifest)
+    assert len(backups) == 1
+    assert not manifest.exists()
+    assert not backups[0].exists()
+
+
+def test_guarded_release_rejects_unknown_tracked_change_before_mutation(
+    tmp_path: Path,
+) -> None:
+    repo, target, recipe, _, _, operator_content = _tracked_recipe_repo(tmp_path)
+    unknown = repo / "README.md"
+    unknown.write_text("base\n", encoding="utf-8")
+    _git(repo, "add", unknown.name)
+    _git(repo, "commit", "-qm", "tracked readme")
+    target = _git(repo, "rev-parse", "HEAD")
+    unknown.write_text("operator edit\n", encoding="utf-8")
+    manifest = tmp_path / "tracked-manifest.json"
+
+    with pytest.raises(
+        ReleaseCollisionError,
+        match="Unknown tracked worktree changes block release",
+    ):
+        prepare_tracked_recipe_edits(repo, target, manifest)
+
+    assert recipe.read_bytes() == operator_content
+    assert unknown.read_text(encoding="utf-8") == "operator edit\n"
+    assert not manifest.exists()
+
+
+def test_guarded_release_detects_recipe_change_during_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    repo, target, recipe, _, _, _ = _tracked_recipe_repo(tmp_path)
+    manifest = tmp_path / "tracked-manifest.json"
+    raced_content = b"discovery:\n  bfs_page_budget: 11\n"
+    original_prepare = generated_configs._prepare_tracked_recipe_entry
+
+    def race_then_prepare(root: Path, entry: dict[str, object]) -> None:
+        recipe.write_bytes(raced_content)
+        original_prepare(root, entry)
+
+    monkeypatch.setattr(
+        generated_configs, "_prepare_tracked_recipe_entry", race_then_prepare
+    )
+
+    with pytest.raises(
+        ReleaseCollisionError,
+        match="changed during release preparation",
+    ):
+        prepare_tracked_recipe_edits(repo, target, manifest)
+
+    assert recipe.read_bytes() == raced_content
+    assert manifest.exists()
+
+
+def test_guarded_release_restore_fails_closed_on_post_pull_change(
+    tmp_path: Path,
+) -> None:
+    repo, target, recipe, _, _, _ = _tracked_recipe_repo(tmp_path)
+    manifest = tmp_path / "tracked-manifest.json"
+    prepare_tracked_recipe_edits(repo, target, manifest)
+    _git(repo, "checkout", "-q", target)
+    raced_content = b"discovery:\n  bfs_page_budget: 13\n"
+    recipe.write_bytes(raced_content)
+
+    with pytest.raises(
+        ReleaseCollisionError, match="changed after release snapshot"
+    ):
+        restore_tracked_recipe_edits(manifest)
+
+    assert recipe.read_bytes() == raced_content
+    assert manifest.exists()
+    manifest_data = json.loads(manifest.read_text(encoding="utf-8"))
+    backup = repo / manifest_data["entries"][0]["backup"]
+    assert backup.exists()
+
+
+def test_guarded_release_rejects_target_recipe_symlink(
+    tmp_path: Path,
+) -> None:
+    repo, target, recipe, _, _, operator_content = _tracked_recipe_repo(tmp_path)
+    recipe_relative = str(recipe.relative_to(repo))
+    _git(repo, "restore", "--", recipe_relative)
+    _git(repo, "checkout", "-q", target)
+    recipe.unlink()
+    recipe.symlink_to("elsewhere.yaml")
+    _git(repo, "add", recipe_relative)
+    _git(repo, "commit", "-qm", "replace recipe with symlink")
+    symlink_target = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "-q", "HEAD~2")
+    recipe.write_bytes(operator_content)
+
+    with pytest.raises(
+        ReleaseCollisionError,
+        match="not a regular non-executable Git file",
+    ):
+        prepare_tracked_recipe_edits(
+            repo, symlink_target, tmp_path / "tracked-manifest.json"
+        )
+
+    assert recipe.read_bytes() == operator_content
+
+
+def test_guarded_release_detects_leaf_recreation_during_restore(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    repo, target, recipe, _, _, _ = _tracked_recipe_repo(tmp_path)
+    manifest = tmp_path / "tracked-manifest.json"
+    prepare_tracked_recipe_edits(repo, target, manifest)
+    _git(repo, "checkout", "-q", target)
+    raced_content = b"discovery:\n  bfs_page_budget: 17\n"
+    original_write = generated_configs._write_relative_exclusively
+    recipe_relative = str(recipe.relative_to(repo))
+
+    def recreate_then_write(
+        root: Path, relative: str, content: bytes, mode: int
+    ) -> None:
+        if root == repo and relative == recipe_relative:
+            recipe.write_bytes(raced_content)
+        original_write(root, relative, content, mode)
+
+    monkeypatch.setattr(
+        generated_configs, "_write_relative_exclusively", recreate_then_write
+    )
+
+    with pytest.raises(
+        ReleaseCollisionError, match="recreated concurrently"
+    ):
+        restore_tracked_recipe_edits(manifest)
+
+    assert recipe.read_bytes() == raced_content
+    assert manifest.exists()
+    manifest_data = json.loads(manifest.read_text(encoding="utf-8"))
+    assert (repo / manifest_data["entries"][0]["backup"]).exists()
+    assert (repo / manifest_data["entries"][0]["quarantine"]).exists()
+
+
+def test_guarded_release_prevalidates_all_recipes_before_restoring_any(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "multi-recipe-repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    _git(repo, "config", "user.email", "release-test@example.invalid")
+    _git(repo, "config", "user.name", "Release Test")
+    recipe_root = repo / "backend-py/scraper_config/unis"
+    recipe_root.mkdir(parents=True)
+    first = recipe_root / "first.yaml"
+    second = recipe_root / "second.yaml"
+    first.write_text("value: base-first\n", encoding="utf-8")
+    second.write_text("value: base-second\n", encoding="utf-8")
+    _git(repo, "add", str(recipe_root.relative_to(repo)))
+    _git(repo, "commit", "-qm", "base recipes")
+    base = _git(repo, "rev-parse", "HEAD")
+    first.write_text("value: target-first\n", encoding="utf-8")
+    second.write_text("value: target-second\n", encoding="utf-8")
+    _git(repo, "add", str(recipe_root.relative_to(repo)))
+    _git(repo, "commit", "-qm", "target recipes")
+    target = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "-q", base)
+    first.write_text("value: operator-first\n", encoding="utf-8")
+    second.write_text("value: operator-second\n", encoding="utf-8")
+    manifest = tmp_path / "tracked-manifest.json"
+    prepare_tracked_recipe_edits(repo, target, manifest)
+    _git(repo, "checkout", "-q", target)
+    second.write_text("value: raced-second\n", encoding="utf-8")
+
+    with pytest.raises(
+        ReleaseCollisionError, match="changed after release snapshot"
+    ):
+        restore_tracked_recipe_edits(manifest)
+
+    assert first.read_text(encoding="utf-8") == "value: target-first\n"
+    assert second.read_text(encoding="utf-8") == "value: raced-second\n"
+    manifest_data = json.loads(manifest.read_text(encoding="utf-8"))
+    assert all(
+        (repo / entry["backup"]).exists()
+        for entry in manifest_data["entries"]
+    )
+
+
+def test_guarded_release_post_checkout_fence_rejects_late_unknown_edit(
+    tmp_path: Path,
+) -> None:
+    repo, _, recipe, _, _, operator_content = _tracked_recipe_repo(tmp_path)
+    unknown = repo / "README.md"
+    unknown.write_text("base\n", encoding="utf-8")
+    _git(repo, "add", unknown.name)
+    _git(repo, "commit", "-qm", "tracked readme")
+    target = _git(repo, "rev-parse", "HEAD")
+    manifest = tmp_path / "tracked-manifest.json"
+    prepare_tracked_recipe_edits(repo, target, manifest)
+    _git(repo, "checkout", "-q", target)
+    restore_tracked_recipe_edits(manifest)
+    assert recipe.read_bytes() == operator_content
+    unknown.write_text("late edit\n", encoding="utf-8")
+
+    with pytest.raises(
+        ReleaseCollisionError,
+        match="Unknown tracked worktree changes appeared during release",
+    ):
+        verify_tracked_recipe_edits(manifest)
+
+
+def test_tracked_recipe_finalization_commits_before_partial_backup_cleanup(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "finalize-cleanup-repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    _git(repo, "config", "user.email", "release-test@example.invalid")
+    _git(repo, "config", "user.name", "Release Test")
+    recipe_root = repo / "backend-py/scraper_config/unis"
+    recipe_root.mkdir(parents=True)
+    for name in ("first.yaml", "second.yaml"):
+        (recipe_root / name).write_text("value: base\n", encoding="utf-8")
+    _git(repo, "add", str(recipe_root.relative_to(repo)))
+    _git(repo, "commit", "-qm", "base recipes")
+    base = _git(repo, "rev-parse", "HEAD")
+    for name in ("first.yaml", "second.yaml"):
+        (recipe_root / name).write_text("value: target\n", encoding="utf-8")
+    _git(repo, "add", str(recipe_root.relative_to(repo)))
+    _git(repo, "commit", "-qm", "target recipes")
+    target = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "-q", base)
+    for name in ("first.yaml", "second.yaml"):
+        (recipe_root / name).write_text("value: operator\n", encoding="utf-8")
+    manifest = tmp_path / "tracked-manifest.json"
+    prepare_tracked_recipe_edits(repo, target, manifest)
+    _git(repo, "checkout", "-q", target)
+    restore_tracked_recipe_edits(manifest)
+    original_unlink = generated_configs._unlink_relative
+    calls = 0
+
+    def fail_second_backup(root: Path, relative: str) -> None:
+        nonlocal calls
+        if "release-tracked-config-backups" in relative:
+            calls += 1
+            if calls == 2:
+                raise PermissionError("injected backup deletion failure")
+        original_unlink(root, relative)
+
+    monkeypatch.setattr(
+        generated_configs, "_unlink_relative", fail_second_backup
+    )
+
+    removed = finalize_tracked_recipe_edits(manifest)
+
+    assert len(removed) == 1
+    assert not manifest.exists()
+    assert manifest.with_name(f"{manifest.name}.committed").exists()
+    manifest_data = json.loads(
+        manifest.with_name(f"{manifest.name}.committed").read_text(
+            encoding="utf-8"
+        )
+    )
+    remaining = [
+        repo / entry["backup"]
+        for entry in manifest_data["entries"]
+        if (repo / entry["backup"]).exists()
+    ]
+    assert len(remaining) == 1
+
+
+def test_tracked_recipe_finalization_revalidates_sources_at_commit(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    repo, target, recipe, _, _, _ = _tracked_recipe_repo(tmp_path)
+    manifest = tmp_path / "tracked-manifest.json"
+    prepare_tracked_recipe_edits(repo, target, manifest)
+    _git(repo, "checkout", "-q", target)
+    restore_tracked_recipe_edits(manifest)
+    original_validate = generated_configs._validate_tracked_recipe_finalization
+    calls = 0
+
+    def change_before_commit(
+        root: Path, entries: list[dict[str, object]]
+    ) -> list[Path]:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            recipe.write_text("value: raced-at-commit\n", encoding="utf-8")
+        return original_validate(root, entries)
+
+    monkeypatch.setattr(
+        generated_configs,
+        "_validate_tracked_recipe_finalization",
+        change_before_commit,
+    )
+
+    with pytest.raises(
+        ReleaseCollisionError, match="operator recipe is not restored"
+    ):
+        finalize_tracked_recipe_edits(manifest)
+
+    assert manifest.exists()
+    assert not manifest.with_name(f"{manifest.name}.committed").exists()
+    manifest_data = json.loads(manifest.read_text(encoding="utf-8"))
+    assert (repo / manifest_data["entries"][0]["backup"]).exists()
+
+
+def test_aborted_release_restores_and_cleans_tracked_recipe_backup(
+    tmp_path: Path,
+) -> None:
+    repo, target, recipe, head_content, _, operator_content = (
+        _tracked_recipe_repo(tmp_path)
+    )
+    manifest = tmp_path / "tracked-manifest.json"
+    prepare_tracked_recipe_edits(repo, target, manifest)
+    assert recipe.read_bytes() == head_content
+
+    assert restore_tracked_recipe_edits(manifest) == [recipe]
+    backups = finalize_tracked_recipe_edits(manifest)
+
+    assert recipe.read_bytes() == operator_content
+    assert not manifest.exists()
+    assert all(not backup.exists() for backup in backups)
+
+
+def test_guarded_release_restores_recipes_before_restart_and_stops_on_cleanup_failure() -> None:
+    script = (DEPLOY_DIR / "guarded_release.sh").read_text(encoding="utf-8")
+    checkout = script.index(
+        'test "$(sudo -u ubuntu git rev-parse HEAD)" = "$target"'
+    )
+    restore = script.index("restore-tracked", checkout)
+    restart = script.index(
+        "systemctl restart uni-api-py.service uni-celery.service"
+    )
+    finalize = script.index("finalize-tracked", restart)
+
+    assert checkout < restore < restart < finalize
+    failure = script[
+        script.index('if [ "$rollback_failed" = 1 ]') : script.index(
+            "\n  fi", script.index("systemctl stop uni-celery.service")
+        )
+    ]
+    assert 'cancel_consumer("scrape", reply=True' in failure
+    assert ".active_queues()" in failure
+    assert "systemctl stop uni-celery.service" in failure
+    assert failure.index("cancel_consumer") < failure.index("systemctl stop")
 
 
 def test_rollback_keeps_an_identical_preexisting_runtime_overlay(

@@ -15,6 +15,7 @@ test "$(git -c safe.directory=/opt/university-portal rev-parse HEAD)" = 7d13d75e
 reconciler=""
 reconciliation_manifest=""
 reconciliation_committed=0
+tracked_recipe_manifest=""
 overlay_audit_evidence=""
 cleanup_release() {
   cd /opt/university-portal
@@ -25,15 +26,41 @@ cleanup_release() {
       rollback_failed=1
     fi
   fi
-  rm -f "$reconciler"
-  rm -f "$overlay_audit_evidence"
+  if [ -n "$reconciler" ] && [ -s "$tracked_recipe_manifest" ]; then
+    if ! sudo -u ubuntu /opt/university-portal/backend-py/.venv/bin/python -B "$reconciler" restore-tracked \
+      --manifest "$tracked_recipe_manifest" ||
+      ! sudo -u ubuntu /opt/university-portal/backend-py/.venv/bin/python -B "$reconciler" finalize-tracked \
+      --manifest "$tracked_recipe_manifest"; then
+      rollback_failed=1
+    fi
+  fi
   if [ "$rollback_failed" = 1 ]; then
-    echo "Generated config rollback failed; consumers remain paused and manifest is retained at $reconciliation_manifest" >&2
+    echo "Release config rollback failed; consumers remain paused and manifests are retained" >&2
+    cd /opt/university-portal/backend-py
+    if ! .venv/bin/python -B - <<'PY'
+from app.tasks.celery_app import celery_app
+reply = celery_app.control.cancel_consumer("scrape", reply=True, timeout=10)
+assert reply and all(
+    "ok" in value for item in reply for value in item.values()
+), "Cannot confirm scrape consumer cancellation"
+queues = celery_app.control.inspect(timeout=10).active_queues()
+assert queues and all(
+    all(queue.get("name") != "scrape" for queue in worker_queues)
+    for worker_queues in queues.values()
+), "Scrape consumer is still active"
+PY
+    then
+      systemctl stop uni-celery.service || true
+      test "$(systemctl is-active uni-celery.service || true)" != "active"
+    fi
     return 1
   fi
+  rm -f "$reconciler"
+  rm -f "$overlay_audit_evidence"
   rm -f "$reconciliation_manifest"
+  rm -f "$tracked_recipe_manifest"
   cd backend-py
-  .venv/bin/celery -A app.tasks.celery_app control add_consumer scrape >/dev/null 2>&1 || true
+  /opt/university-portal/backend-py/.venv/bin/celery -A app.tasks.celery_app control add_consumer scrape >/dev/null 2>&1 || true
 }
 trap cleanup_release EXIT
 .venv/bin/python -B - <<'PY'
@@ -62,21 +89,30 @@ asyncio.run(check())
 print("Consumers paused; all workers and jobs idle")
 PY
 cd /opt/university-portal
-sudo -u ubuntu git diff --quiet
 sudo -u ubuntu git diff --cached --quiet
 sudo -u ubuntu git fetch origin main
 test "$(sudo -u ubuntu git rev-parse origin/main)" = "$target"
 sudo -u ubuntu git merge-base --is-ancestor HEAD "$target"
 reconciler="$(mktemp)"
 reconciliation_manifest="$(mktemp)"
+tracked_recipe_manifest="$(mktemp)"
 sudo -u ubuntu git show "$target":backend-py/deploy/reconcile_generated_configs.py > "$reconciler"
 chmod 0644 "$reconciler"
 chown ubuntu:ubuntu "$reconciliation_manifest"
+chown ubuntu:ubuntu "$tracked_recipe_manifest"
+sudo -u ubuntu /opt/university-portal/backend-py/.venv/bin/python -B "$reconciler" prepare-tracked \
+  --repo-root /opt/university-portal --target "$target" \
+  --manifest "$tracked_recipe_manifest"
+sudo -u ubuntu git diff --quiet
 sudo -u ubuntu /opt/university-portal/backend-py/.venv/bin/python -B "$reconciler" prepare \
   --repo-root /opt/university-portal --target "$target" \
   --manifest "$reconciliation_manifest"
 sudo -u ubuntu git pull --ff-only origin main
 test "$(sudo -u ubuntu git rev-parse HEAD)" = "$target"
+sudo -u ubuntu /opt/university-portal/backend-py/.venv/bin/python -B "$reconciler" restore-tracked \
+  --manifest "$tracked_recipe_manifest"
+sudo -u ubuntu /opt/university-portal/backend-py/.venv/bin/python -B "$reconciler" verify-tracked \
+  --manifest "$tracked_recipe_manifest"
 
 # Report verified runtime overlays that the checked-out tracked recipes now
 # fully supersede. The helper contains ordinary audit/report failures and uses
@@ -96,6 +132,8 @@ elif [ "$overlay_audit_status" != 0 ]; then
 fi
 
 release_env="$(mktemp backend-py/.release.env.XXXXXX)"
+sudo -u ubuntu /opt/university-portal/backend-py/.venv/bin/python -B "$reconciler" verify-tracked \
+  --manifest "$tracked_recipe_manifest"
 printf 'RELEASE_REVISION=%s\n' "$target" > "$release_env"
 chmod 0644 "$release_env"
 mv -f "$release_env" backend-py/.release.env
@@ -126,5 +164,7 @@ print("PUBLIC_HTML_AND_ASSET_OK",url,assets[0])
 PY
 sudo -u ubuntu /opt/university-portal/backend-py/.venv/bin/python -B "$reconciler" finalize \
   --manifest "$reconciliation_manifest"
+sudo -u ubuntu /opt/university-portal/backend-py/.venv/bin/python -B "$reconciler" finalize-tracked \
+  --manifest "$tracked_recipe_manifest"
 reconciliation_committed=1
 echo "DEPLOYED_RELEASE=$target"
