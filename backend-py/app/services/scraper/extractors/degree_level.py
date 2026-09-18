@@ -65,7 +65,12 @@ _NAME_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     #   DProf       = Doctor of Professional Studies
     #   DrPH        = Doctor of Public Health
     #   PsyD        = Doctor of Psychology
-    (re.compile(r"\bd\s*clin\w*\b|\beng\s*d\b|\bd\s*prof\b|\bdr\s*ph\b|\bpsy\s*d\b", re.IGNORECASE), "Doctorate"),
+    #   Prof Doc    = Professional Doctorate
+    (re.compile(
+        r"\bd\s*clin\w*\b|\beng\s*d\b|\bd\s*prof\b|\bdr\s*ph\b|"
+        r"\bpsy\s*d\b|\bprof\.?\s*doc\b",
+        re.IGNORECASE,
+    ), "Doctorate"),
     # ── Graduate Diploma / Certificate ───────────────────────────────────────
     (re.compile(r"\bgraduate\s+diploma\b", re.IGNORECASE), "Graduate Diploma"),
     (re.compile(r"\bgraduate\s+certificate\b", re.IGNORECASE), "Graduate Certificate"),

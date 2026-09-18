@@ -31,6 +31,9 @@ def test_classifies_master_from_name():
 def test_classifies_doctorate_from_name():
     assert _classify("Doctor of Philosophy in Engineering") == "Doctorate"
     assert _classify("PhD in Data Science") == "Doctorate"
+    assert _classify("Performing Arts Prof Doc") == "Doctorate"
+    assert _classify("Educational and Child Psychology Prof Doc") == "Doctorate"
+    assert _classify("School of Arts and Creative Industries MPhil PhD") == "Doctorate"
 
 
 def test_classifies_graduate_certificate():

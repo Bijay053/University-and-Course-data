@@ -1043,6 +1043,50 @@ def _from_swinburne_international_hero(
     return None
 
 
+def _from_uel_international_fulltime_option(
+    html: str,
+    url: str,
+) -> tuple[tuple[float, str], str] | None:
+    """Read UEL's audience-scoped full-time duration from Course options.
+
+    UEL renders each Home/International and Full/Part-time combination as a
+    sibling option row. Generic page text can therefore encounter an unrelated
+    one-year duration before the current international full-time row.
+    """
+    host = (urlparse(url or "").hostname or "").lower()
+    if host not in {"uel.ac.uk", "www.uel.ac.uk"}:
+        return None
+
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:  # pragma: no cover - malformed HTML / missing parser
+        return None
+
+    for option in soup.select(".course-option-details-item-wrapper"):
+        applicant = option.select_one(".application-type")
+        attendance = option.select_one(".attendance-type")
+        duration = option.select_one(".attendance-type-yr")
+        if applicant is None or attendance is None or duration is None:
+            continue
+        applicant_text = compact(applicant.get_text(" ", strip=True))
+        attendance_text = compact(attendance.get_text(" ", strip=True))
+        if (
+            "international applicant" not in applicant_text.casefold()
+            or not re.search(r"\bfull[- ]?time\b", attendance_text, re.I)
+        ):
+            continue
+        duration_text = compact(duration.get_text(" ", strip=True))
+        parsed = _classify_duration_value(duration_text)
+        if parsed is not None:
+            return parsed, (
+                "UEL international full-time option: "
+                f"{applicant_text}; {attendance_text} {duration_text}"
+            )
+    return None
+
+
 async def extract(html: str, url: str) -> list[ExtractionResult]:
     # Per-uni: load reject_sentence_patterns from the contextvar set by
     # set_uni_config() before extraction runs.  These are compiled once
@@ -1108,6 +1152,21 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
                 confidence=0.98,
                 snippet=snippet,
                 method="duration.swinburne_international_hero",
+            )
+        ]
+
+    uel_option = _from_uel_international_fulltime_option(html, url)
+    if uel_option is not None:
+        (amount, unit), snippet = uel_option
+        amount, unit = _convert_weeks(amount, unit)
+        return [
+            ExtractionResult(
+                field_key="duration",
+                value=amount,
+                normalized={"duration": amount, "duration_term": unit},
+                confidence=0.99,
+                snippet=snippet,
+                method="duration.uel_international_fulltime_option",
             )
         ]
 

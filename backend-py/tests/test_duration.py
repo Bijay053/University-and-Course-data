@@ -140,6 +140,55 @@ def test_strong_duration_sibling_div_classifies_via_structural_pass():
     assert out[0].method == "duration.structural"
 
 
+def test_uel_uses_international_fulltime_course_option_duration():
+    html = """
+    <main>
+      <h1>MPhil PhD School of Arts and Creative Industries</h1>
+      <div><strong>Duration</strong><span>1 year</span></div>
+      <div class="course-option-details-item-wrapper">
+        <span class="application-type">Home Applicant</span>
+        <span class="attendance-type">Full time,</span>
+        <span class="attendance-type-yr">3 years</span>
+      </div>
+      <div class="course-option-details-item-wrapper">
+        <span class="application-type">International Applicant</span>
+        <span class="attendance-type">Full time,</span>
+        <span class="attendance-type-yr">3 years</span>
+      </div>
+      <div class="course-option-details-item-wrapper">
+        <span class="application-type">International Applicant</span>
+        <span class="attendance-type">Part time,</span>
+        <span class="attendance-type-yr">5 years</span>
+      </div>
+    </main>
+    """
+
+    out = _run(duration.extract(
+        html,
+        "https://www.uel.ac.uk/postgraduate/courses/"
+        "mphil-phd-school-arts-creative-industries",
+    ))
+
+    assert out[0].normalized == {"duration": 3.0, "duration_term": "Year"}
+    assert out[0].method == "duration.uel_international_fulltime_option"
+
+
+def test_uel_duration_override_is_host_scoped():
+    html = """
+    <div class="course-option-details-item-wrapper">
+      <span class="application-type">International Applicant</span>
+      <span class="attendance-type">Full time</span>
+      <span class="attendance-type-yr">3 years</span>
+    </div>
+    <div><strong>Duration</strong><span>1 year</span></div>
+    """
+
+    out = _run(duration.extract(html, "https://example.edu/course"))
+
+    assert out[0].normalized == {"duration": 1.0, "duration_term": "Year"}
+    assert out[0].method == "duration.structural"
+
+
 def test_inti_ignores_sibling_compare_card_durations():
     """INTI's recommendation cards must not beat the current programme badge."""
     html = """
