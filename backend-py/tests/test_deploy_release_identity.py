@@ -52,13 +52,13 @@ def _git(repo: Path, *args: str) -> str:
     ).strip()
 
 
-def _release_revision_gate(
-    repo: Path, predecessor: str, target: str
+def _release_revision_fence(
+    mode: str, repo: Path, predecessor: str, target: str
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [
             str(DEPLOY_DIR / "release_revision_fence.sh"),
-            "checkout",
+            mode,
             str(repo),
             predecessor,
             target,
@@ -67,6 +67,12 @@ def _release_revision_gate(
         text=True,
         check=False,
     )
+
+
+def _release_revision_gate(
+    repo: Path, predecessor: str, target: str
+) -> subprocess.CompletedProcess[str]:
+    return _release_revision_fence("checkout", repo, predecessor, target)
 
 
 def _release_revision_repo(tmp_path: Path) -> tuple[Path, Path, str, str]:
@@ -166,6 +172,36 @@ def test_release_aborts_on_remote_advance_then_retries_exact_new_tip(
     retry_result = _release_revision_gate(checkout, predecessor, new_target)
     assert retry_result.returncode == 0, retry_result.stderr
     assert _git(checkout, "rev-parse", "HEAD") == new_target
+
+
+def test_release_refetch_blocks_remote_advance_between_verify_and_checkout(
+    tmp_path: Path,
+) -> None:
+    checkout, source, predecessor, reviewed_target = _release_revision_repo(tmp_path)
+
+    verify_result = _release_revision_fence(
+        "verify", checkout, predecessor, reviewed_target
+    )
+    assert verify_result.returncode == 0, verify_result.stderr
+    assert _git(checkout, "rev-parse", "HEAD") == predecessor
+
+    _git(source, "checkout", "-q", "main")
+    (source / "release.txt").write_text("advanced during preparation\n", encoding="utf-8")
+    _git(source, "commit", "-qam", "advance during release preparation")
+    newly_reviewed_target = _git(source, "rev-parse", "HEAD")
+    _git(source, "push", "-q", "origin", "main")
+
+    stale_checkout = _release_revision_fence(
+        "checkout", checkout, predecessor, reviewed_target
+    )
+    assert stale_checkout.returncode != 0
+    assert _git(checkout, "rev-parse", "HEAD") == predecessor
+
+    retry_result = _release_revision_fence(
+        "checkout", checkout, predecessor, newly_reviewed_target
+    )
+    assert retry_result.returncode == 0, retry_result.stderr
+    assert _git(checkout, "rev-parse", "HEAD") == newly_reviewed_target
 
 
 def test_guarded_release_refetches_tip_before_checkout() -> None:
