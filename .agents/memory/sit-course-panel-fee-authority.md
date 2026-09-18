@@ -9,6 +9,12 @@ SIT course pages wrap a small current-programme summary in a very large shared s
 
 **How to apply:** Compact before generic extraction. Emit explicit labelled facts and only numbered Semester/Intake start months. Treat SIT course-route case and space encoding variants as one URL identity.
 
+SIT date panels may retain prior-year rolling intakes beside the current year. Keep only start months from the latest explicitly labelled offering year. For merged campus panels, a complete rolling schedule (three or more current-year starts) is authoritative over another campus's shorter semester list; otherwise preserve the union of current starts.
+
+**Why:** Hotel Management's Queenstown panel showed two 2026 starts followed by five 2027 starts, while Invercargill added two semester months. Flattening every panel produced seven unqualified months instead of the five current rolling intakes.
+
+**How to apply:** Carry an explicit year across subsequent unlabelled Semester/Intake entries, discard older labelled years, and select the longest complete rolling schedule only when one exists. Never collect end-date months.
+
 An empty base summary may be recovered only when the exact programme (including approved aliases) has usable tuition in the populated international schedule. Follow only same-host child paths under that exact programme's `/campus/` route, cap and deadline the fetches, and require each child to repeat the exact programme name and a valid current panel. If physical/hybrid and online siblings coexist, use the physical/hybrid panels; normalize Hyflex as delivery rather than a campus. Preserve the full-time duration and remove only explicit part-time maxima.
 
 **Why:** Some current multi-campus programmes render facts only on campus child routes, but obsolete and domestic shells expose the same link pattern. Following every shell would create false international records; merging online siblings contaminates otherwise eligible physical offerings; broad duration cleanup can erase legitimate “Up to … full-time” values.
