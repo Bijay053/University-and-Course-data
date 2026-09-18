@@ -33,6 +33,14 @@ from app.services.scraper.warning_rules import normalize_skip_reason_key
 from app.services.scraper.pipelines.single_course import extract_course
 from app.services.scraper.pipelines.university_pdfs import load_university_pdf_data
 from app.services.scraper.stage_course import stage_course
+from app.services.scraper.autonomous_verification import (
+    VerificationBudgetExceeded,
+    cap_verification_links,
+    persist_verification_metadata,
+    run_bounded_verification,
+    schedule_snapshot,
+    validate_verification,
+)
 from app.services.scraper.url_identity import (
     canonical_course_url_key,
     canonicalize_uwa_sitecore_course_urls,
@@ -1216,7 +1224,7 @@ async def _extract_only(
     if _pre is not None:
         # Save the JSON payload as a snapshot so replay can re-apply guards
         # independently of the HTML path.
-        asyncio.ensure_future(
+        schedule_snapshot(
             _save_api_json_snapshot_safe(link["url"], _pre)
         )
         return _pre
@@ -1317,7 +1325,7 @@ async def _extract_only(
     # Fires after extract_course() succeeds — only the winning HTML is saved,
     # not retries or intermediate fallbacks.
     if not out.get("_retry_after") and not out.get("error"):
-        asyncio.ensure_future(
+        schedule_snapshot(
             _save_extraction_snapshot_safe(out)
         )
 
@@ -1770,6 +1778,26 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         log.warning("run_scrape: no job %s", runtime_job_id)
         return {"ok": False, "reason": "job_not_found"}
 
+    # Validate before any stale-row cleanup, discovery, or billable work.
+    try:
+        verification = await validate_verification(db, job)
+    except ValueError as exc:
+        job.status = "failed_degraded"
+        job.error_message = str(exc)[:1000]
+        job.completed_at = datetime.now(timezone.utc)
+        await db.commit()
+        return {"ok": False, "reason": str(exc)}
+    if verification:
+        return await run_bounded_verification(
+            db, job, verification,
+            lambda: _run_claimed_scrape(db, job, verification),
+        )
+    return await _run_claimed_scrape(db, job)
+
+
+async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict:
+    """Run the existing pipeline with optional internal isolation policy."""
+    runtime_job_id = job.runtime_job_id
     # Start per-job Scrape.do call counter.  All coroutines spawned within
     # this job share the same mutable dict via ContextVar, so gather() batches
     # also contribute their counts without any explicit plumbing.
@@ -1874,54 +1902,8 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
     from app.release_info import get_release_revision
 
     _release_revision = get_release_revision()
-    await emit(
-        "status",
-        (
-            "Worker claimed queued scrape job "
-            f"(job_id={runtime_job_id}, release_revision={_release_revision})"
-        ),
-        phase="queue",
-        release_revision=_release_revision,
-    )
-
     _targeted_retry = _is_targeted_retry_payload(job.request_payload)
     _safe_restart_smoke = _is_safe_restart_smoke_payload(job.request_payload)
-
-    # Wipe replaceable stale pending scraped_courses rows for this university so
-    # a previous failed run cannot block dedup on this attempt. Done before
-    # discovery so the cleared count is visible early in the live log.
-    # Explicit course-URL retries are continuations, not replacement scrapes:
-    # preserve every pending row from their source review chain.
-    if _targeted_retry:
-        await emit(
-            "status",
-            "Targeted retry: preserved pending review rows from the source job",
-            phase="cleanup",
-            cleared=0,
-            kind="targeted_retry_preserve_review",
-        )
-    else:
-        try:
-            cleared = await _clear_stale_dedup(
-                db, job.university_id, current_job_id=runtime_job_id
-            )
-            await emit(
-                "status",
-                f"Cleared {cleared} orphan pending scraped_courses rows "
-                f"(>{_STALE_DEDUP_MINUTES}m old) for university {job.university_id}",
-                phase="cleanup",
-                cleared=cleared,
-                window_minutes=_STALE_DEDUP_MINUTES,
-            )
-        except Exception as exc:  # noqa: BLE001
-            # Cleanup is best-effort — a failure here must never abort the scrape.
-            log.warning("stale dedup cleanup failed for uni %s: %s", job.university_id, exc)
-            await emit(
-                "status",
-                f"Stale-dedup cleanup failed (continuing): {exc}",
-                phase="cleanup",
-                error=str(exc)[:200],
-            )
 
     summary = {"discovered": 0, "staged": 0, "skipped": 0, "errors": 0, "fetch_failed": 0}
     # Track why courses were skipped: {guard_name: count}
@@ -1999,6 +1981,42 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         return {"ok": True, "stopped": True, **summary}
 
     try:
+        # All awaits after background-task creation live inside this try/finally
+        # so the verification deadline also cleans up during early setup.
+        await emit(
+            "status",
+            "Worker claimed queued scrape job "
+            f"(job_id={runtime_job_id}, release_revision={_release_revision})",
+            phase="queue", release_revision=_release_revision,
+        )
+        if _verification or _targeted_retry:
+            await emit(
+                "status",
+                "Verification: preserved all existing review rows; fresh extraction"
+                if _verification else
+                "Targeted retry: preserved pending review rows from the source job",
+                phase="cleanup", cleared=0,
+                kind="verification_preserve_review" if _verification
+                else "targeted_retry_preserve_review",
+            )
+        else:
+            try:
+                cleared = await _clear_stale_dedup(
+                    db, job.university_id, current_job_id=runtime_job_id
+                )
+                await emit(
+                    "status",
+                    f"Cleared {cleared} orphan pending scraped_courses rows "
+                    f"(>{_STALE_DEDUP_MINUTES}m old) for university {job.university_id}",
+                    phase="cleanup", cleared=cleared,
+                    window_minutes=_STALE_DEDUP_MINUTES,
+                )
+            except Exception as exc:  # noqa: BLE001
+                log.warning("stale dedup cleanup failed for uni %s: %s", job.university_id, exc)
+                await emit(
+                    "status", f"Stale-dedup cleanup failed (continuing): {exc}",
+                    phase="cleanup", error=str(exc)[:200],
+                )
         # ── Per-university Redis distributed lock ────────────────────────────
         # Prevents multiple Celery workers from scraping the same university
         # concurrently.  This can happen because:
@@ -2324,6 +2342,9 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     max_pages = int(_yaml_pb)
             except Exception:  # noqa: BLE001
                 pass
+        # Apply the internal bound AFTER every university/YAML override.
+        if _verification:
+            max_courses = min(max_courses, _verification.max_courses)
         # C4 (fetch-layer brief): per-phase wall-clock marks for the ══ DONE ══
         # summary line — Discovery / Extraction / Sweep / Staging.  The 30-min
         # budget can't be managed without seeing where the time goes.
@@ -5616,6 +5637,10 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Bound source-page fetches as well as the final expanded record count.
         # Otherwise a fast/small scrape still fetched an entire UEL catalogue
         # merely to truncate its expanded variants immediately afterwards.
+        if _verification:
+            persist_verification_metadata(
+                job, _verification, discovered_candidates=len(links),
+            )
         try:
             links = await _expand_uel_course_links_for_run(
                 links, max_courses=max_courses, targeted_retry=_targeted_retry,
@@ -5627,6 +5652,12 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             raise
         summary["discovered"] = len(links)
         job.total_found = len(links)
+
+        if _verification:
+            links = cap_verification_links(job, _verification, links, max_courses)
+            summary["discovered"] = len(links)
+            job.total_found = len(links)
+            await db.commit()
 
         # ── Apply final hard cap so merged link sets (BFS + sitemap supplement
         # + always_sitemap_supplement) never exceed max_courses regardless of
@@ -5676,6 +5707,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         if (
             settings.scrape_resume_enabled
             and not _safe_restart_smoke
+            and not _verification
             and job.university_id
             and links
         ):
@@ -5793,7 +5825,10 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         _cost_monitor = _JCM(
             scrape_run_id=runtime_job_id,
             university_slug=_uni_slug,
-            budget_usd=_get_budget(_uni_slug),
+            budget_usd=(
+                _verification.cost_cap_usd if _verification
+                else _get_budget(_uni_slug)
+            ),
         )
 
         # Accumulated across all batches — written to gemini_call_log once
@@ -5855,6 +5890,12 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         if not _yaml_bs and len(links) > 400:
             _effective_batch_size = 100
 
+        if _verification:
+            # Existing monitor observes costs after extraction, not before API
+            # calls. One-course batches prevent a whole concurrent batch from
+            # being launched after the ceiling has already been spent.
+            _effective_batch_size = 1
+
         _link_batches = [
             links[i : i + _effective_batch_size]
             for i in range(0, len(links), _effective_batch_size)
@@ -5911,7 +5952,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             # is expected and acceptable: each run's old↔new diff will still be
             # clean as long as the new code path is equivalent to the old one.
             from app.services.scraper.shadow.mode import is_shadow_enabled as _shadow_on
-            if _shadow_on(uni_id):
+            if not _verification and _shadow_on(uni_id):
                 from app.services.scraper.shadow.diff import diff_staged_runs as _diff_runs
                 from app.services.scraper.shadow.new_path import extract_new_path as _new_path
                 from app.services.scraper.shadow.report import write_shadow_report as _write_report
@@ -6226,6 +6267,17 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     _course_cost = r.get("gemini_primary_cost_usd", 0.0)
                     _total_gemini_cost_usd += _course_cost
                     _cost_monitor.record_call(_course_cost)
+                    if _verification:
+                        job.total_gemini_cost_usd = round(_total_gemini_cost_usd, 8)
+                        job.cost_ceiling_hit = _cost_monitor.aborted
+                        await db.commit()
+                        if not _cost_monitor.can_continue():
+                            raise VerificationBudgetExceeded(
+                                "Autonomous verification reached its observed per-course "
+                                f"Gemini-primary ceiling (${_verification.cost_cap_usd:.2f}); "
+                                "partial review sample only. Other AI/transport costs excluded; "
+                                "in-flight calls may overshoot."
+                            )
 
                 # Stop check between rows: lets the user interrupt mid-batch.
                 # Anything left in ``results`` at this point came back from the
@@ -6562,6 +6614,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                             source_url=r.get("url"),
                             skip_url_block=_skip_url_block,
                             targeted_retry=_targeted_retry,
+                            preserve_existing=bool(_verification),
                         )
                         _record_staged_quality_payload(
                             _all_staged_dicts,
@@ -6662,7 +6715,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # Summary counters are updated in-place so recovered failures no longer
         # look unresolved.
         _ph_marks["sweep_start"] = time.monotonic()  # C4 phase timing
-        if _sweep_links:
+        if _sweep_links and not _verification:
             _sweep_max_items = max(
                 0,
                 int(getattr(_uni_cfg.extraction, "recovery_sweep_max_items", 100)),
@@ -6896,6 +6949,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                                     evidence=_sw_r.get("evidence") or [],
                                     source_url=_sweep_url,
                                     targeted_retry=_targeted_retry,
+                                    preserve_existing=bool(_verification),
                                 ),
                                 timeout=_remaining_stage_budget,
                             )
@@ -7113,7 +7167,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             # Mark courses with critical data-quality issues so operators see
             # DATA QUALITY FAILURE in the Review UI instead of generic review.
             _dq_critical_urls = _dq_report.get("critical_urls") or set()
-            if _dq_critical_urls:
+            if _dq_critical_urls and not _verification:
                 from sqlalchemy import update as _dq_upd, text as _dq_txt
                 from app.models import ScrapedCourse as _DqSC
 
@@ -7165,7 +7219,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         #              so subsequent runs skip re-discovery.
         try:
             from sqlalchemy import text as _qi_sql
-            _qi_row = (await db.execute(
+            _qi_row = None if _verification else (await db.execute(
                 _qi_sql("""
                     SELECT
                         COUNT(*) AS total,
@@ -7392,7 +7446,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             course_count=_c1_course_n,
             expected_min_courses=locals().get("_c1_expected_min"),
         )
-        if _c1_cacheable and _c1_cache_coverage_ok:
+        if not _verification and _c1_cacheable and _c1_cache_coverage_ok:
             _c1_attempted = max(1, summary.get("discovered", 0))
             _c1_fail_rate = summary.get("fetch_failed", 0) / _c1_attempted
             if _c1_fail_rate < 0.30:
@@ -7742,7 +7796,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             job.status = _forced_status
         else:
             job.status = "completed" if finished_cleanly else "failed"
-        if job.status == "completed" and _bypassed_resume_course_ids:
+        if not _verification and job.status == "completed" and _bypassed_resume_course_ids:
             _discarded_resume_rows = await _discard_bypassed_resume_rows(
                 db, _bypassed_resume_course_ids
             )
@@ -7873,6 +7927,16 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         job.completed_at = datetime.now(timezone.utc)
         await db.commit()
         log.info("Scrape %s %s: %s", runtime_job_id, job.status, summary)
+
+        if _verification:
+            # Stop before ALL mutation/dispatch hooks: conflict repair,
+            # certification, CASCADE, P7 quality actions, and recovery.
+            persist_verification_metadata(
+                job, _verification, outcome=job.status,
+                staged_courses=summary["staged"], errors=summary["errors"],
+            )
+            await db.commit()
+            return {"ok": job.status == "completed", **summary}
 
         # ── Priority 5: metrics + alerts ──────────────────────────────────
         # Run only when the job completed cleanly and the university is known.
@@ -8243,6 +8307,10 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             )
 
         return {"ok": finished_cleanly, **summary}
+    except VerificationBudgetExceeded:
+        # The bounded wrapper records failed_degraded AFTER our finally block
+        # releases locks and background tasks. Never run recovery on exhaustion.
+        raise
     except Exception as exc:
         log.exception("Scrape job %s failed: %s", runtime_job_id, exc)
         # Same terminal-status guard for the exception path. If a

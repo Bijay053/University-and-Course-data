@@ -12,6 +12,11 @@ import { getFetchErrorMessage, readResponseJson } from "@/lib/readResponseJson";
 import { CountrySelect } from "@/components/country-select";
 import { useToast } from "@/hooks/use-toast";
 import { countPendingReviewCourses } from "@/utils/pending-review-count";
+import {
+  AiRepairProgress,
+  type AutonomousRepair,
+  type LiveProbe,
+} from "@/components/ai-repair-progress";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type UniOption = { id: number; name: string; scrapeUrl?: string | null; feePageUrl?: string | null; requirementsPageUrl?: string | null };
@@ -297,6 +302,9 @@ type AIRepairSession = {
   started_at:      string | null;
   completed_at:    string | null;
   error:           string | null;
+  max_attempts?:   number;
+  live_probe?:     LiveProbe;
+  autonomous?:     AutonomousRepair;
   rollback_status?: "unchanged" | "restored" | "failed";
   source?: "durable_audit";
   snapshot_refs?: Array<{
@@ -1247,21 +1255,30 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
         toast({ title: "Automatic repair failed to start", description: msg, variant: "destructive" });
         return;
       }
-      const data = await readResponseJson<{ session_id: string; status: string; job_id: string }>(res);
+      const data = await readResponseJson<
+        Partial<AIRepairSession> & {
+          session_id: string;
+          status: AIRepairSession["status"];
+          job_id: string;
+        }
+      >(res);
       if (data) {
-        aiRepairAutoRetryArmedRef.current = true;
-        setAiRepairJobId(completedJobId);
+        // Retain the legacy manual repair follow-up. The autonomous contract
+        // supersedes this and owns its single verification scrape.
+        aiRepairAutoRetryArmedRef.current = !data.autonomous?.enabled;
+        setAiRepairJobId(data.job_id || completedJobId);
         const queuedSession: AIRepairSession = {
-          session_id:      data.session_id,
-          job_id:          completedJobId,
-          status:          "queued",
           current_attempt: 0,
-          attempts:        [],
-          final_verdict:   null,
-          uni_name:        null,
-          started_at:      null,
-          completed_at:    null,
-          error:           null,
+          attempts: [],
+          final_verdict: null,
+          uni_name: null,
+          started_at: null,
+          completed_at: null,
+          error: null,
+          ...data,
+          session_id: data.session_id,
+          job_id: data.job_id || completedJobId,
+          status: data.status ?? "queued",
         };
         setAiRepairRuns(prev => [...prev.filter(run => run.session_id !== data.session_id), queuedSession]);
         setSelectedAiRepairRunId(data.session_id);
@@ -1777,12 +1794,15 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
     }
   }, [scraping, scrapeUrl, selectedUni, newUniName, newUniCountry, newUniCity, feePageUrl, requirementsPageUrl, fastMode, pollJobStatus, slotKey]);
 
-  // A non-technical operator should not have to understand that an AI config
-  // repair is separate from proving the next scrape works. A repair started
-  // from this card automatically launches one verification scrape only after
-  // deterministic URL simulation confirms at least half the known URLs pass.
+  // Compatibility for repair sessions created by older workers. New
+  // autonomous sessions enqueue and poll their own bounded verification job,
+  // so launching a scrape here would create a duplicate.
   useEffect(() => {
     if (!aiRepairAutoRetryArmedRef.current || aiRepairSession?.status !== "completed") return;
+    if (aiRepairSession.autonomous?.enabled) {
+      aiRepairAutoRetryArmedRef.current = false;
+      return;
+    }
     const urlAttempt = [...(aiRepairSession.attempts || [])]
       .reverse()
       .find(attempt => (attempt.total_test_urls ?? 0) > 0);
@@ -2451,7 +2471,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-[9px] font-bold px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded-full border border-violet-200 shrink-0">Automatic repair</span>
                             <span className="text-[10px] text-gray-600 leading-snug">
-                              Checks the URL filters and applies a fix only when real course pages pass validation.
+                              Tests official live sources, applies only a validated config, and automatically runs one verification scrape. Courses stay staged for review.
                             </span>
                           </div>
                           <button
@@ -2465,15 +2485,24 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                               : <Bot className="w-3 h-3" />
                             }
                             {aiRepairPolling
-                              ? `Repairing… attempt ${aiRepairSession?.current_attempt ?? 0}/5`
+                              ? `Repairing… attempt ${aiRepairSession?.current_attempt ?? 0}/${aiRepairSession?.max_attempts ?? aiRepairSession?.autonomous?.limits?.max_attempts ?? 5}`
                               : aiRepairSession?.status === "completed"
-                              ? "Check and repair again"
+                              ? "Run one-click repair again"
                               : aiRepairSession?.status === "failed"
-                              ? "Try automatic repair again"
-                              : "Auto-fix URL filter"
+                              ? "Try one-click AI repair again"
+                              : "One-click AI repair"
                             }
                           </button>
-                          {aiRepairSession?.status === "completed" && aiRepairSession.final_verdict && (() => {
+                          {aiRepairSession?.autonomous && (
+                            <AiRepairProgress
+                              autonomous={aiRepairSession.autonomous}
+                              liveProbe={aiRepairSession.live_probe}
+                              currentAttempt={aiRepairSession.current_attempt}
+                              maxAttempts={aiRepairSession.max_attempts}
+                              onOpenVerificationJob={jobId => onReviewReady(jobId, uniName, true)}
+                            />
+                          )}
+                          {!aiRepairSession?.autonomous && aiRepairSession?.status === "completed" && aiRepairSession.final_verdict && (() => {
                             const lastAttempt = aiRepairSession.attempts?.[aiRepairSession.attempts.length - 1];
                             const total = lastAttempt?.total_test_urls ?? 0;
                             const passing = lastAttempt?.after_pass_count ?? 0;
@@ -2491,7 +2520,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                               </div>
                             );
                           })()}
-                          {aiRepairSession?.status === "failed" && (
+                          {!aiRepairSession?.autonomous && aiRepairSession?.status === "failed" && (
                             <div className="text-[10px] text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1.5">
                               <strong>Automatic repair did not fix the scrape:</strong> {aiRepairSession.error || "The proposed repair did not pass validation."}
                             </div>
@@ -3629,14 +3658,16 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                               type="button"
                               onClick={handleAiRepair}
                               disabled={aiRepairLoading || aiRepairPolling}
-                              title="System AI checks missing or contaminated course names, locations, English scores, fees, and durations, then validates proposed rules against stored page snapshots before applying them."
+                              title="Tests bounded repairs against official live sources, saves only validated config, and runs one automatic verification scrape."
                               className="text-[10px] bg-violet-600 hover:bg-violet-700 text-white px-2 py-1 rounded flex items-center gap-1 disabled:opacity-50 font-semibold"
                             >
                               {(aiRepairLoading || aiRepairPolling)
                                 ? <Loader2 className="w-2.5 h-2.5 animate-spin" />
                                 : <Zap className="w-2.5 h-2.5" />
                               }
-                              {aiRepairPolling ? `System AI repairing… (attempt ${aiRepairSession?.current_attempt ?? 0}/5)` : "Run System AI Fix"}
+                              {aiRepairPolling
+                                ? `One-click AI repair… (attempt ${aiRepairSession?.current_attempt ?? 0}/${aiRepairSession?.max_attempts ?? aiRepairSession?.autonomous?.limits?.max_attempts ?? 5})`
+                                : "One-click AI repair"}
                             </button>
                             {(diagnoseResult?.university_id || (selectedUni && selectedUni !== ALL)) && (
                               <a
@@ -3647,6 +3678,16 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                               </a>
                             )}
                           </div>
+
+                          {aiRepairSession?.autonomous && (
+                            <AiRepairProgress
+                              autonomous={aiRepairSession.autonomous}
+                              liveProbe={aiRepairSession.live_probe}
+                              currentAttempt={aiRepairSession.current_attempt}
+                              maxAttempts={aiRepairSession.max_attempts}
+                              onOpenVerificationJob={jobId => onReviewReady(jobId, uniName, true)}
+                            />
+                          )}
 
                           {/* ── AI Repair Log ─────────────────────────────── */}
                           {aiRepairSession && aiRepairSession.status !== "not_started" && showAiRepairLog && (
@@ -3660,8 +3701,17 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                                   <Zap className="w-3 h-3 text-violet-600" />
                                   <span className="text-[10px] font-semibold text-violet-800">AI Repair Agent Log</span>
                                   {aiRepairPolling && <Loader2 className="w-2.5 h-2.5 animate-spin text-violet-400" />}
-                                  {aiRepairSession.status === "completed" && (
-                                    <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">Done</span>
+                                  {aiRepairSession.status === "completed" && aiRepairSession.autonomous?.phase === "verified" && (
+                                    <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">Sample verified</span>
+                                  )}
+                                  {aiRepairSession.status === "completed" && aiRepairSession.autonomous?.phase === "needs_review" && (
+                                    <span className="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full">Needs review</span>
+                                  )}
+                                  {aiRepairSession.status === "completed" && aiRepairSession.autonomous?.phase === "blocked" && (
+                                    <span className="text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">Blocked</span>
+                                  )}
+                                  {aiRepairSession.status === "completed" && !aiRepairSession.autonomous && (
+                                    <span className="text-[9px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded-full">Completed</span>
                                   )}
                                   {aiRepairSession.status === "failed" && (() => {
                                     const short = shortRepairError(aiRepairSession.error);
@@ -3676,7 +3726,9 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                                     <span className="text-[9px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-full">Running</span>
                                   )}
                                 </div>
-                                <span className="text-[9px] text-violet-500">{aiRepairSession.attempts.length}/{6} attempts</span>
+                                <span className="text-[9px] text-violet-500">
+                                  {aiRepairSession.attempts.length}/{aiRepairSession.max_attempts ?? aiRepairSession.autonomous?.limits?.max_attempts ?? 5} attempts
+                                </span>
                               </button>
 
                               <div className="p-2.5 space-y-2">
@@ -3710,14 +3762,16 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                                 {aiRepairSession.status === "running" && (
                                   <div className="flex items-center gap-1.5 text-[10px] text-violet-600">
                                     <Loader2 className="w-3 h-3 animate-spin" />
-                                    Running attempt {aiRepairSession.current_attempt} of 5…
+                                    Running attempt {aiRepairSession.current_attempt} of {aiRepairSession.max_attempts ?? aiRepairSession.autonomous?.limits?.max_attempts ?? 5}…
                                   </div>
                                 )}
                                 {aiRepairSession.final_verdict && (
                                   <div className={`text-[10px] rounded px-2 py-1.5 leading-relaxed ${
-                                    aiRepairSession.status === "completed"
+                                    aiRepairSession.status === "completed" && aiRepairSession.autonomous?.phase === "verified"
                                       ? "bg-green-50 border border-green-200 text-green-800"
-                                      : "bg-red-50 border border-red-200 text-red-800"
+                                      : aiRepairSession.autonomous?.phase === "needs_review"
+                                        ? "bg-amber-50 border border-amber-200 text-amber-800"
+                                        : "bg-red-50 border border-red-200 text-red-800"
                                   }`}>
                                     <strong>Verdict:</strong> {aiRepairSession.final_verdict}
                                   </div>

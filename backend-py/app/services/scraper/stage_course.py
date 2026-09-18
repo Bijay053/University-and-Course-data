@@ -361,6 +361,7 @@ async def stage_course(
     source_url: str | None = None,
     skip_url_block: bool = False,
     targeted_retry: bool = False,
+    preserve_existing: bool = False,
 ) -> StageResult:
     validate_payload_keys("stage_course payload", payload.keys())
     name = (course_name or "").strip()
@@ -479,7 +480,7 @@ async def stage_course(
     # different paths remain distinct.
     try:
         _source_url_key = canonical_course_url_key(source_url)
-        if _source_url_key:
+        if _source_url_key and not preserve_existing:
             _alias_deleted = await db.execute(
                 delete(ScrapedCourse).where(
                     ScrapedCourse.university_id == university_id,
@@ -557,17 +558,20 @@ async def stage_course(
         uel_variant_key(source_url or "")
     )
     try:
-        _exist_q = await db.execute(
-            select(ScrapedCourse)
-            .where(
-                ScrapedCourse.university_id == university_id,
-                ScrapedCourse.course_name == name,
-                ScrapedCourse.status.in_(["approved", "published"]),
+        _exist = None
+        # Verification measures newly extracted evidence, never approved values.
+        if not preserve_existing:
+            _exist_q = await db.execute(
+                select(ScrapedCourse)
+                .where(
+                    ScrapedCourse.university_id == university_id,
+                    ScrapedCourse.course_name == name,
+                    ScrapedCourse.status.in_(["approved", "published"]),
+                )
+                .order_by(ScrapedCourse.created_at.desc())
+                .limit(1)
             )
-            .order_by(ScrapedCourse.created_at.desc())
-            .limit(1)
-        )
-        _exist = _exist_q.scalar_one_or_none()
+            _exist = _exist_q.scalar_one_or_none()
         if _exist and not _uel_scoped:
             preserved: list[str] = []
             for _fld in _PRESERVE_FIELDS:
@@ -997,6 +1001,9 @@ async def stage_course(
             if k in PERSISTABLE_STAGING_PAYLOAD_FIELDS
         },
     )
+    if preserve_existing:
+        sc.status = "pending"
+        sc.auto_publish_status = "review"
     db.add(sc)
     try:
         await db.flush()  # need sc.id for the FK on evidence rows
@@ -1138,6 +1145,12 @@ async def stage_course(
                 "verification engine failed for sc %s (uni %s): %s",
                 sc.id, university_id, exc,
             )
+
+    if preserve_existing:
+        # Override both eligibility scoring passes, including high confidence.
+        # Ordinary jobs retain their existing auto-publish readiness behavior.
+        sc.status = "pending"
+        sc.auto_publish_status = "review"
 
     try:
         # Durable, post-transform backup of the exact review row.  This is

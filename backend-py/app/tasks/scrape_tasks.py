@@ -15,7 +15,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from celery.exceptions import SoftTimeLimitExceeded
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from app.config import STALE_QUEUED_MINUTES
 from app.database import AsyncSessionLocal, engine
@@ -596,10 +596,26 @@ def bulk_fix_staged_courses(self, runtime_job_id: str) -> dict:  # noqa: ANN001
         _immediate_requeue_hook()
 
 
+def _workflow_owned_child(job) -> bool:
+    """A reserved marker must never enter generic five-attempt recovery."""
+    payload = getattr(job, "request_payload", None)
+    return isinstance(payload, dict) and "autonomousVerification" in payload
+
+
+def _generic_requeue_only(model):
+    """SQL-side fence shared by immediate and periodic generic dispatch."""
+    return or_(
+        model.request_payload.is_(None),
+        ~model.request_payload.has_key("autonomousVerification"),  # noqa: W601
+    )
+
+
 async def _async_find_all_queued() -> list[tuple[str, str, int]]:
     """Return (runtime_job_id, job_type, requeue_count) for every job currently
     in ``queued`` status, with no time cutoff.
 
+    Internal verification children belong exclusively to the durable
+    ai_repair.reconcile_active delivery budget, including malformed markers.
     Used by the post-completion ``_immediate_requeue_hook`` so orphaned jobs
     (whose initial ``.delay()`` call failed silently) are picked up immediately
     when any worker slot frees up.
@@ -608,9 +624,12 @@ async def _async_find_all_queued() -> list[tuple[str, str, int]]:
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(
-            select(ScrapeRuntimeJob).where(ScrapeRuntimeJob.status == "queued")
+            select(ScrapeRuntimeJob).where(
+                ScrapeRuntimeJob.status == "queued",
+                _generic_requeue_only(ScrapeRuntimeJob),
+            )
         )
-        jobs = result.scalars().all()
+        jobs = [j for j in result.scalars().all() if not _workflow_owned_child(j)]
     return [(j.runtime_job_id, j.job_type, j.requeue_count) for j in jobs]
 
 
@@ -635,9 +654,11 @@ async def _async_find_stale() -> list[tuple[str, str, int]]:
             select(ScrapeRuntimeJob).where(
                 ScrapeRuntimeJob.status == "queued",
                 ScrapeRuntimeJob.updated_at < cutoff,
+                _generic_requeue_only(ScrapeRuntimeJob),
             )
         )
-        stale_jobs = result.scalars().all()
+        # Do not even bump timestamps on children: workflow recovery uses them.
+        stale_jobs = [j for j in result.scalars().all() if not _workflow_owned_child(j)]
 
         if not stale_jobs:
             return []
@@ -670,6 +691,7 @@ async def _async_requeue_abandoned_bulk_fixes() -> list[str]:
                 "SET status = 'queued', updated_at = now(), "
                 "    error_message = 'Fix worker heartbeat expired — queued to resume' "
                 "WHERE job_type = 'bulk_fix' AND status = 'running' "
+                "  AND NOT COALESCE(request_payload ? 'autonomousVerification', FALSE) "
                 "  AND COALESCE(heartbeat_at, claimed_at, started_at) < :cutoff "
                 "RETURNING runtime_job_id"
             ),
@@ -707,7 +729,8 @@ async def _async_increment_requeue(runtime_job_id: str) -> None:
                 "                'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'"
                 "            ) "
                 "        )) "
-                "WHERE runtime_job_id = :jid"
+                "WHERE runtime_job_id = :jid "
+                "  AND NOT COALESCE(request_payload ? 'autonomousVerification', FALSE)"
             ),
             {"jid": runtime_job_id, "stale_min": _STALE_QUEUED_MINUTES},
         )
@@ -725,7 +748,7 @@ async def _async_mark_failed_max_requeue(runtime_job_id: str) -> None:
 
     async with AsyncSessionLocal() as db:
         job = await db.get(ScrapeRuntimeJob, runtime_job_id)
-        if job:
+        if job and not _workflow_owned_child(job):
             job.status = "failed"
             job.error_message = (
                 f"Auto-recovery abandoned after {job.requeue_count} requeue attempts "

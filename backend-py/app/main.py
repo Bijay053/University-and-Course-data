@@ -88,6 +88,23 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
     except Exception:  # noqa: BLE001
         log.exception("pg_trgm setup failed (fuzzy search unavailable)")
     try:
+        from app.database import AsyncSessionLocal
+        from app.services.scraper.ai_repair_agent import ensure_ai_repair_audit_schema
+
+        async with AsyncSessionLocal() as _s:
+            await asyncio.wait_for(ensure_ai_repair_audit_schema(_s), timeout=10)
+        log.info("AI repair audit schema ensured")
+    except TimeoutError:
+        log.warning(
+            "AI repair audit schema setup timed out after 10s "
+            "(repair endpoints will retry before accepting work)"
+        )
+    except Exception:  # noqa: BLE001
+        log.exception(
+            "AI repair audit schema setup failed "
+            "(repair endpoints will retry before accepting work)"
+        )
+    try:
         from app.services.snapshot_store import is_enabled as _snap_enabled, setup_lifecycle_rules
         if _snap_enabled():
             ok = await asyncio.wait_for(

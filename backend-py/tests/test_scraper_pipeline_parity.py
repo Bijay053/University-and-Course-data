@@ -370,9 +370,11 @@ def test_t209_orchestrator_run_scrape_emits_timing_and_done_payloads():
     """
     import inspect
 
-    from app.services.scraper.orchestrator import run_scrape
+    from app.services.scraper.orchestrator import _run_claimed_scrape
 
-    src = inspect.getsource(run_scrape)
+    # The public entry point now applies a verification deadline around this
+    # claimed pipeline body; the emitted UI contract is unchanged.
+    src = inspect.getsource(_run_claimed_scrape)
 
     # Human-readable TIMING line the operator sees in the log pane.
     assert "[TIMING]" in src

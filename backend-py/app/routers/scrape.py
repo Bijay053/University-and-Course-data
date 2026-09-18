@@ -7609,33 +7609,22 @@ async def start_ai_repair(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[dict, Depends(require_permission("scraping.trigger"))],
 ) -> dict:
-    """Trigger the AI-powered iterative repair loop for a completed scrape job.
-
-    Enqueues a Celery task (``ai_repair.run_loop``) that calls OpenAI to
-    diagnose the job's failures, generates config patches, applies them,
-    simulates the URL filter improvement, and repeats up to 5 times.
-
-    Progress is written to Redis after every attempt; poll
-    ``GET /jobs/{job_id}/ai-repair-status`` to follow along.
-
-    Returns immediately with ``{"session_id": ..., "status": "queued"}``.
-    """
+    """Start bounded live repair and one isolated, review-only verification run."""
     from sqlalchemy import text as _text
     from app.services.scraper.ai_repair_agent import (
-        _write_session,
         acquire_repair_lease,
-        load_active_repair_audit,
-        persist_repair_audit,
         release_repair_lease,
         validate_ai_repair_target,
     )
+    from app.services import ai_repair_workflow as workflow
     from datetime import datetime, timezone
     import uuid
 
     # Require a terminal job with concrete URL-filter failure evidence.
     row = (await db.execute(
         _text(
-            "SELECT runtime_job_id, status, university_id, discovered_config "
+            "SELECT runtime_job_id, status, university_id, discovered_config, "
+            "total_found, imported, errors, gate_skip_counts "
             "FROM scrape_runtime_jobs WHERE runtime_job_id = :j"
         ),
         {"j": job_id},
@@ -7655,15 +7644,39 @@ async def start_ai_repair(
         ),
         {"j": job_id},
     )).scalar() or 0
+    evidence_config = dict(row["discovered_config"] or {})
+    evidence_config["catalogue_floor_guard"] = (row["gate_skip_counts"] or {}).get("catalogue_guard") or {}
+    catalogue_problem = workflow.has_catalogue_evidence(evidence_config) or (
+        int(row["total_found"] or 0) > 0
+        and int(row["imported"] or 0) < int(row["total_found"]) * 0.5
+    )
     repairable, reason = validate_ai_repair_target(
         str(row["status"] or ""),
         row["discovered_config"] or {},
-        has_extraction_gap=missing_repairable > 0,
+        has_extraction_gap=missing_repairable > 0 or catalogue_problem,
     )
     if not repairable:
         raise HTTPException(status_code=422, detail=reason)
 
+    if row["university_id"] is None:
+        raise HTTPException(status_code=422, detail="The source job has no university owner.")
     university_id = int(row["university_id"])
+    await workflow.lock(db, university_id)
+    locked_source = (await db.execute(
+        _text(
+            "SELECT status, university_id FROM scrape_runtime_jobs "
+            "WHERE runtime_job_id = :j FOR UPDATE"
+        ),
+        {"j": job_id},
+    )).mappings().first()
+    if not locked_source or locked_source["university_id"] != university_id:
+        raise HTTPException(status_code=409, detail="Source job ownership changed; refresh before repair.")
+    still_terminal, reason = validate_ai_repair_target(
+        str(locked_source["status"] or ""), evidence_config,
+        has_extraction_gap=missing_repairable > 0 or catalogue_problem,
+    )
+    if not still_terminal:
+        raise HTTPException(status_code=422, detail=reason)
     active_scrape = (await db.execute(
         _text(
             "SELECT runtime_job_id FROM scrape_runtime_jobs "
@@ -7683,9 +7696,10 @@ async def start_ai_repair(
             ),
         )
 
-    session_id = str(uuid.uuid4())[:8]
-    if not acquire_repair_lease(university_id, session_id):
-        active_repair = await load_active_repair_audit(university_id, db)
+    session_id = str(uuid.uuid4())
+    active_repair = await workflow.active_audit(university_id, db)
+    # A Redis flush must not allow another repair to supersede a durable run.
+    if active_repair or not acquire_repair_lease(university_id, session_id):
         active_job_id = str(active_repair.get("job_id") or "").strip()
         active_session_id = str(active_repair.get("session_id") or "").strip()
         if active_job_id and active_session_id:
@@ -7723,13 +7737,29 @@ async def start_ai_repair(
         "queued_at":       queued_at,
         "completed_at":    None,
         "error":           None,
+        "max_attempts":    5,
+        "autonomous":     {
+            **workflow.autonomous_state(),
+            "catalogue_problem": catalogue_problem,
+            "baseline_counters": {
+                key: int(row[key] or 0) for key in ("total_found", "imported", "errors")
+            },
+        },
     }
-    _write_session(job_id, queued_session)
-    await persist_repair_audit(queued_session, db)
+    try:
+        await workflow.save(queued_session, db)
+    except Exception:
+        release_repair_lease(university_id, session_id)
+        raise
 
     # Enqueue Celery task
     try:
-        from app.tasks.auto_repair_task import run_ai_scrape_repair
+        from app.tasks.auto_repair_task import run_ai_scrape_repair, monitor_ai_scrape_repair
+        # Schedule recovery first: loss of the worker delivery is reconciled
+        # even when the user never opens the status endpoint again.
+        monitor_ai_scrape_repair.apply_async(
+            args=[job_id, session_id], queue="scrape", countdown=30,
+        )
         run_ai_scrape_repair.apply_async(
             args=[job_id, university_id, session_id],
             queue="scrape",
@@ -7737,25 +7767,16 @@ async def start_ai_repair(
     except Exception as exc:
         message = "The OpenAI repair worker could not be queued. Try again shortly."
         log.warning("start_ai_repair: Celery enqueue failed for job=%s: %s", job_id, exc)
-        failed_session = {
-            "session_id": session_id,
-            "job_id": job_id,
-            "university_id": university_id,
-            "status": "failed",
-            "current_attempt": 0,
-            "attempts": [],
-            "final_verdict": None,
-            "queued_at": queued_at,
-            "started_at": None,
-            "completed_at": datetime.now(timezone.utc).isoformat(),
-            "error": message,
-        }
-        _write_session(job_id, failed_session)
-        await persist_repair_audit(failed_session, db)
-        release_repair_lease(university_id, session_id)
+        await workflow.lock(db, university_id)
+        failed_session = await workflow.load(job_id, db, session_id)
+        if await workflow.owns(failed_session, db):
+            if failed_session.get("autonomous", {}).get("worker_claim"):
+                await db.rollback()
+                return failed_session  # Broker accepted delivery before raising.
+            await workflow.finish(failed_session, db, "blocked", message, failed=True)
         raise HTTPException(status_code=503, detail=message) from exc
 
-    return {"session_id": session_id, "status": "queued", "job_id": job_id}
+    return queued_session
 
 
 @router.get("/jobs/{job_id}/ai-repair-status")
@@ -7778,6 +7799,25 @@ async def get_ai_repair_status(
         read_session,
     )
     from datetime import datetime, timezone
+
+    from app.services import ai_repair_workflow as workflow
+
+    durable = await workflow.load(job_id, db)
+    if durable.get("autonomous", {}).get("enabled"):
+        session = await workflow.reconcile(job_id, str(durable["session_id"]), db)
+        # Durable ownership/phase is authoritative; Redis may only enrich the
+        # same session's in-flight attempt progress, never its lifecycle.
+        live = read_session(job_id)
+        workflow.merge_live_progress(session, live)
+        runs = await load_repair_audits(job_id, db)
+        if session.get("status") not in {"queued", "running"}:
+            runs = await attach_repair_snapshot_availability(runs, db)
+        session["source"] = "durable_audit"
+        session["runs"] = [
+            ({**run, **session} if run.get("session_id") == session.get("session_id") else run)
+            for run in runs
+        ]
+        return session
 
     session = read_session(job_id)
     if not session:

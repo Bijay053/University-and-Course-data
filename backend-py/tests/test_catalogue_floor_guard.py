@@ -93,9 +93,9 @@ def test_zero_staged_is_degraded_even_when_url_floor_is_met():
 
 
 def test_authoritative_zero_row_reconciliation_drives_terminal_status():
-    from app.services.scraper.orchestrator import run_scrape
+    from app.services.scraper.orchestrator import _run_claimed_scrape
 
-    source = inspect.getsource(run_scrape)
+    source = inspect.getsource(_run_claimed_scrape)
     reconciled = source.index('summary["staged"] = actual_staged')
     final_guard = source.index("_reconciled_catalogue_guard = _catalogue_floor_guard")
     forced_status = source.index('job.status = _forced_status')
@@ -129,17 +129,17 @@ def test_floor_review_requires_consecutive_below_floor_history():
 
 
 def test_orchestrator_passes_floor_context_to_alert_evaluator():
-    from app.services.scraper.orchestrator import run_scrape
+    from app.services.scraper.orchestrator import _run_claimed_scrape
 
-    source = inspect.getsource(run_scrape)
+    source = inspect.getsource(_run_claimed_scrape)
     assert "expected_min_courses=getattr(" in source
     assert 'current_extractable=int(summary.get("discovered", 0) or 0)' in source
     assert "targeted_retry=bool(_targeted_retry)" in source
 
 
 def test_catalogue_floor_emit_does_not_pass_message_twice():
-    from app.services.scraper.orchestrator import run_scrape
+    from app.services.scraper.orchestrator import _run_claimed_scrape
 
-    source = inspect.getsource(run_scrape)
+    source = inspect.getsource(_run_claimed_scrape)
 
     assert 'if key != "message"' in source
