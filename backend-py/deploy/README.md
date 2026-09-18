@@ -23,6 +23,32 @@ in `../README.md`.
 | `prove_database_refresh_alert_delivery.py` | Temporarily triggers and restores the fixed delivery-failure alarm |
 | `reconcile_generated_configs.py` | Preserves verified generated recipe collisions and audits or removes fully superseded runtime overlays |
 
+## Guarded application release
+
+Invoke the production release entrypoint with the exact currently deployed
+revision, the exact intended `origin/main` revision, and the 12-digit disposable
+AWS account used by the mandatory rehearsal proof:
+
+```bash
+cd /opt/university-portal
+sudo backend-py/deploy/guarded_release.sh \
+  "$PREDECESSOR_FULL_SHA" \
+  "$TARGET_FULL_SHA" \
+  "$DISPOSABLE_AWS_ACCOUNT_ID"
+```
+
+Both revisions must be lowercase 40-character Git commit IDs. Abbreviated and
+symbolic refs are rejected. The checked-out revision must equal the predecessor,
+the predecessor must be an ancestor of the target, and fetched `origin/main`
+must equal the target. The script fetches and checks the remote tip again after
+release preparation and immediately before the fast-forward checkout. If main
+advanced, it exits before changing the checkout or restarting services; rerun
+with the same predecessor and the newly reviewed exact remote tip.
+
+Do not bypass the entrypoint's disposable-account proof, worker/job idle gates,
+tracked and generated config reconciliation, release-identity smoke checks,
+public smoke checks, or EXIT cleanup.
+
 ## Tracked operator recipe preservation
 
 The guarded release accepts tracked worktree edits only when every change is a

@@ -52,6 +52,140 @@ def _git(repo: Path, *args: str) -> str:
     ).strip()
 
 
+def _release_revision_gate(
+    repo: Path, predecessor: str, target: str
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            "bash",
+            "-c",
+            """
+set -euo pipefail
+predecessor="$1"
+target="$2"
+[[ "$predecessor" =~ ^[0-9a-f]{40}$ ]]
+[[ "$target" =~ ^[0-9a-f]{40}$ ]]
+test "$(git rev-parse HEAD)" = "$predecessor"
+git fetch origin main
+test "$(git rev-parse origin/main)" = "$target"
+git cat-file -e "$predecessor^{commit}"
+git cat-file -e "$target^{commit}"
+git merge-base --is-ancestor "$predecessor" "$target"
+git merge --ff-only "$target"
+test "$(git rev-parse HEAD)" = "$target"
+""",
+            "release-revision-gate",
+            predecessor,
+            target,
+        ],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def _release_revision_repo(tmp_path: Path) -> tuple[Path, Path, str, str]:
+    remote = tmp_path / "remote.git"
+    _git(tmp_path, "init", "--bare", "-q", str(remote))
+    source = tmp_path / "source"
+    source.mkdir()
+    _git(source, "init", "-q")
+    _git(source, "config", "user.email", "release-test@example.invalid")
+    _git(source, "config", "user.name", "Release Test")
+    (source / "release.txt").write_text("predecessor\n", encoding="utf-8")
+    _git(source, "add", "release.txt")
+    _git(source, "commit", "-qm", "predecessor")
+    predecessor = _git(source, "rev-parse", "HEAD")
+    _git(source, "branch", "-M", "main")
+    _git(source, "remote", "add", "origin", str(remote))
+    _git(source, "push", "-qu", "origin", "main")
+    (source / "release.txt").write_text("target\n", encoding="utf-8")
+    _git(source, "commit", "-qam", "target")
+    target = _git(source, "rev-parse", "HEAD")
+    _git(source, "push", "-q", "origin", "main")
+    checkout = tmp_path / "checkout"
+    subprocess.run(
+        ["git", "clone", "-q", "--branch", "main", str(remote), str(checkout)],
+        check=True,
+    )
+    _git(checkout, "checkout", "-q", predecessor)
+    return checkout, source, predecessor, target
+
+
+def test_guarded_release_requires_exact_revision_arguments() -> None:
+    entrypoint = DEPLOY_DIR / "guarded_release.sh"
+    script = entrypoint.read_text(encoding="utf-8")
+
+    assert entrypoint.stat().st_mode & stat.S_IXUSR
+    assert 'if [ "$#" -ne 3 ]' in script
+    assert '[[ ! "$predecessor" =~ ^[0-9a-f]{40}$ ]]' in script
+    assert '[[ ! "$target" =~ ^[0-9a-f]{40}$ ]]' in script
+    assert "__TARGET_RELEASE__" not in script
+    assert "__EXPECTED_DISPOSABLE_ACCOUNT__" not in script
+    assert 'rev-parse HEAD)" = "$predecessor"' in script
+    assert '--expected-rehearsal-account-id "$expected_disposable_account"' in script
+
+
+@pytest.mark.parametrize("bad_ref", ["HEAD", "main", "0123456789ab"])
+def test_release_revision_gate_rejects_symbolic_and_abbreviated_refs(
+    tmp_path: Path, bad_ref: str
+) -> None:
+    checkout, _, predecessor, target = _release_revision_repo(tmp_path)
+
+    assert _release_revision_gate(checkout, bad_ref, target).returncode != 0
+    assert _release_revision_gate(checkout, predecessor, bad_ref).returncode != 0
+    assert _git(checkout, "rev-parse", "HEAD") == predecessor
+
+
+def test_release_revision_gate_rejects_non_ancestor_target(tmp_path: Path) -> None:
+    checkout, source, predecessor, _ = _release_revision_repo(tmp_path)
+    _git(source, "checkout", "-q", "--orphan", "unrelated")
+    _git(source, "rm", "-q", "-rf", ".")
+    (source / "unrelated.txt").write_text("unrelated\n", encoding="utf-8")
+    _git(source, "add", "unrelated.txt")
+    _git(source, "commit", "-qm", "unrelated")
+    unrelated = _git(source, "rev-parse", "HEAD")
+    _git(source, "push", "-q", "--force", "origin", "unrelated:main")
+
+    result = _release_revision_gate(checkout, predecessor, unrelated)
+
+    assert result.returncode != 0
+    assert _git(checkout, "rev-parse", "HEAD") == predecessor
+
+
+def test_release_aborts_on_remote_advance_then_retries_exact_new_tip(
+    tmp_path: Path,
+) -> None:
+    checkout, source, predecessor, stale_target = _release_revision_repo(tmp_path)
+    (source / "release.txt").write_text("advanced\n", encoding="utf-8")
+    _git(source, "checkout", "-q", "main")
+    (source / "release.txt").write_text("advanced\n", encoding="utf-8")
+    _git(source, "commit", "-qam", "advanced target")
+    new_target = _git(source, "rev-parse", "HEAD")
+    _git(source, "push", "-q", "origin", "main")
+
+    stale_result = _release_revision_gate(checkout, predecessor, stale_target)
+
+    assert stale_result.returncode != 0
+    assert _git(checkout, "rev-parse", "HEAD") == predecessor
+    retry_result = _release_revision_gate(checkout, predecessor, new_target)
+    assert retry_result.returncode == 0, retry_result.stderr
+    assert _git(checkout, "rev-parse", "HEAD") == new_target
+
+
+def test_guarded_release_refetches_tip_before_checkout() -> None:
+    script = (DEPLOY_DIR / "guarded_release.sh").read_text(encoding="utf-8")
+    prepare = script.index('"$reconciler" prepare \\\n')
+    second_fetch = script.index("git fetch origin main", prepare)
+    second_tip_check = script.index('git rev-parse origin/main)" = "$target"', second_fetch)
+    merge = script.index('git merge --ff-only "$target"', second_tip_check)
+    restart = script.index("systemctl restart uni-api-py.service uni-celery.service")
+
+    assert prepare < second_fetch < second_tip_check < merge < restart
+    assert "git pull" not in script
+
+
 def _collision_repo(
     tmp_path: Path, *, stub_body: str, signed: bool = True
 ) -> tuple[Path, str, Path]:

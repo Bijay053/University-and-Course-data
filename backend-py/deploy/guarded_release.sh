@@ -1,4 +1,26 @@
+#!/usr/bin/env bash
 set -euo pipefail
+
+if [ "$#" -ne 3 ]; then
+  echo "Usage: $0 <predecessor-full-sha> <target-full-sha> <expected-disposable-account-id>" >&2
+  exit 2
+fi
+predecessor="$1"
+target="$2"
+expected_disposable_account="$3"
+if [[ ! "$predecessor" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "Predecessor must be an exact lowercase 40-character Git SHA" >&2
+  exit 2
+fi
+if [[ ! "$target" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "Target must be an exact lowercase 40-character Git SHA" >&2
+  exit 2
+fi
+if [[ ! "$expected_disposable_account" =~ ^[0-9]{12}$ ]]; then
+  echo "Expected disposable account ID must be exactly 12 digits" >&2
+  exit 2
+fi
+
 cd /opt/university-portal/backend-py
 set -a
 source .env
@@ -6,10 +28,9 @@ source .release.env
 source /etc/university-portal/database.env
 set +a
 export PYTHONPATH=.
-target=__TARGET_RELEASE__
-test "$(git -c safe.directory=/opt/university-portal rev-parse HEAD)" = 7d13d75ed92c35966493c082705007b5925a8002
+test "$(git -c safe.directory=/opt/university-portal rev-parse HEAD)" = "$predecessor"
 .venv/bin/python -B deploy/safe_restart_smoke.py \
-  --expected-rehearsal-account-id __EXPECTED_DISPOSABLE_ACCOUNT__
+  --expected-rehearsal-account-id "$expected_disposable_account"
 
 # Pause consumption, then inspect every task state before changing code.
 reconciler=""
@@ -92,7 +113,9 @@ cd /opt/university-portal
 sudo -u ubuntu git diff --cached --quiet
 sudo -u ubuntu git fetch origin main
 test "$(sudo -u ubuntu git rev-parse origin/main)" = "$target"
-sudo -u ubuntu git merge-base --is-ancestor HEAD "$target"
+sudo -u ubuntu git cat-file -e "$predecessor^{commit}"
+sudo -u ubuntu git cat-file -e "$target^{commit}"
+sudo -u ubuntu git merge-base --is-ancestor "$predecessor" "$target"
 reconciler="$(mktemp)"
 reconciliation_manifest="$(mktemp)"
 tracked_recipe_manifest="$(mktemp)"
@@ -107,7 +130,9 @@ sudo -u ubuntu git diff --quiet
 sudo -u ubuntu /opt/university-portal/backend-py/.venv/bin/python -B "$reconciler" prepare \
   --repo-root /opt/university-portal --target "$target" \
   --manifest "$reconciliation_manifest"
-sudo -u ubuntu git pull --ff-only origin main
+sudo -u ubuntu git fetch origin main
+test "$(sudo -u ubuntu git rev-parse origin/main)" = "$target"
+sudo -u ubuntu git merge --ff-only "$target"
 test "$(sudo -u ubuntu git rev-parse HEAD)" = "$target"
 sudo -u ubuntu /opt/university-portal/backend-py/.venv/bin/python -B "$reconciler" restore-tracked \
   --manifest "$tracked_recipe_manifest"
