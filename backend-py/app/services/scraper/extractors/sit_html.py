@@ -9,6 +9,39 @@ from urllib.parse import unquote, urljoin, urlparse
 from bs4 import BeautifulSoup
 
 
+_MONTH_PATTERN = (
+    r"January|February|March|April|May|June|July|August|"
+    r"September|October|November|December"
+)
+_SIT_INTAKE_START_RE = re.compile(
+    rf"\b(?:(20\d{{2}})\s+)?(?:Semester|Intake)\s+\d+\s*:\s*"
+    rf"\d{{1,2}}\s+({_MONTH_PATTERN})\b",
+    re.I,
+)
+
+
+def _current_intake_months(panel_text: str) -> list[str]:
+    """Return SIT start months from the latest explicitly labelled year."""
+    matches: list[tuple[int | None, str]] = []
+    active_year: int | None = None
+    for match in _SIT_INTAKE_START_RE.finditer(panel_text):
+        if match.group(1):
+            active_year = int(match.group(1))
+        matches.append((active_year, match.group(2).title()))
+    if not matches:
+        return []
+
+    labelled_years = [year for year, _ in matches if year is not None]
+    latest_year = max(labelled_years) if labelled_years else None
+    months: list[str] = []
+    for year, month in matches:
+        if latest_year is not None and year != latest_year:
+            continue
+        if month not in months:
+            months.append(month)
+    return months
+
+
 def is_sit_course_url(url: str) -> bool:
     parsed = urlparse(url)
     host = (parsed.hostname or "").lower()
@@ -132,14 +165,15 @@ def merge_current_course_panels(
         if label and value:
             facts.append((label, value))
 
-    date_texts: list[str] = []
+    campus_intake_months: list[list[str]] = []
     criteria_texts: list[str] = []
     for _, _, summary in panels:
         date_panel = summary.select_one(".lightGrey_bg_1.mb-4")
         if date_panel:
             value = " ".join(date_panel.get_text(" ", strip=True).split())
-            if value and value not in date_texts:
-                date_texts.append(value)
+            months = _current_intake_months(value)
+            if months:
+                campus_intake_months.append(months)
         criteria = summary.select_one('[id^="headerApplicationCriteria_"]')
         if criteria:
             value = " ".join(criteria.get_text(" ", strip=True).split())
@@ -152,13 +186,30 @@ def merge_current_course_panels(
         f"<div>{escape(label)}:</div><div>{escape(value)}</div>"
         for label, value in facts
     )
-    dates_html = (
-        '<div class="lightGrey_bg_1 mb-4">'
-        + escape(" ".join(date_texts))
-        + "</div>"
-        if date_texts
-        else ""
-    )
+    rolling_schedules = [
+        months for months in campus_intake_months if len(months) >= 3
+    ]
+    if rolling_schedules:
+        intake_months = max(rolling_schedules, key=len)
+    else:
+        intake_months = list(
+            dict.fromkeys(
+                month
+                for months in campus_intake_months
+                for month in months
+            )
+        )
+    dates_html = ""
+    if intake_months:
+        date_entries = " ".join(
+            f"Intake {index}: 1 {month}"
+            for index, month in enumerate(intake_months, start=1)
+        )
+        dates_html = (
+            '<div class="lightGrey_bg_1 mb-4">'
+            + escape(date_entries)
+            + "</div>"
+        )
     criteria_html = (
         '<div id="headerApplicationCriteria_recovered">'
         + escape(" ".join(criteria_texts))
@@ -241,16 +292,7 @@ def compact_course_html(html: str) -> str:
         panel_text = " ".join(
             date_and_fee_panel.get_text(" ", strip=True).split()
         )
-        for match in re.finditer(
-            r"\b(?:Semester|Intake)\s+\d+\s*:\s*\d{1,2}\s+"
-            r"(January|February|March|April|May|June|July|August|"
-            r"September|October|November|December)\b",
-            panel_text,
-            re.I,
-        ):
-            month = match.group(1).title()
-            if month not in intake_months:
-                intake_months.append(month)
+        intake_months = _current_intake_months(panel_text)
 
     application = summary.select_one('[id^="headerApplicationCriteria_"]')
     head_parts = (

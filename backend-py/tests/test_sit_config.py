@@ -188,6 +188,32 @@ def test_sit_compaction_uses_intake_start_dates_not_end_dates():
     ]
 
 
+def test_sit_compaction_keeps_only_latest_year_rolling_intakes():
+    html, replacements = re.subn(
+        r"Dates:.*?Fees:",
+        "Dates: 2026 Intake 4: 14 September to 11 July "
+        "2026 Intake 5: 23 November to 19 September "
+        "2027 Intake 1: 01 March to 28 November "
+        "2027 Intake 2: 10 May to 05 March "
+        "2027 Intake 3: 19 July to 05 May "
+        "2027 Intake 4: 27 September to 14 July "
+        "2027 Intake 5: 06 December to 22 September Fees:",
+        _sit_html(),
+        flags=re.S,
+    )
+    assert replacements == 1
+
+    compacted = compact_course_html(html)
+
+    assert _run(intake.extract(compacted, "https://www.sit.ac.nz/x"))[0].value == [
+        "March",
+        "May",
+        "July",
+        "September",
+        "December",
+    ]
+
+
 def test_sit_title_only_shell_has_no_current_course_panel():
     html = "<html><h1>Master of Applied Management</h1><div class='CourseInfo CourseSummary'></div></html>"
     assert has_current_course_panel(html) is False
@@ -222,6 +248,43 @@ def test_sit_multi_campus_recovery_merges_verified_panels():
         "July",
     ]
     assert "Bachelor of Unrelated" not in compacted
+
+
+def test_sit_multi_campus_recovery_prefers_current_rolling_intake_schedule():
+    rolling_dates = (
+        "2026 Intake 4: 14 September to 11 July "
+        "2026 Intake 5: 23 November to 19 September "
+        "2027 Intake 1: 01 March to 28 November "
+        "2027 Intake 2: 10 May to 05 March "
+        "2027 Intake 3: 19 July to 05 May "
+        "2027 Intake 4: 27 September to 14 July "
+        "2027 Intake 5: 06 December to 22 September"
+    )
+    queenstown = _sit_campus_html("Queenstown")
+    queenstown, replacements = re.subn(
+        r"Semester 1:.*?</div>",
+        rolling_dates + "</div>",
+        queenstown,
+        flags=re.S,
+    )
+    assert replacements == 1
+    merged = merge_current_course_panels(
+        _sit_multi_campus_shell(),
+        [
+            _sit_campus_html("Invercargill", intake="February"),
+            queenstown,
+        ],
+    )
+
+    compacted = compact_course_html(merged)
+
+    assert _run(intake.extract(compacted, "https://www.sit.ac.nz/x"))[0].value == [
+        "March",
+        "May",
+        "July",
+        "September",
+        "December",
+    ]
 
 
 def test_sit_recovery_prefers_physical_route_and_full_time_duration():
