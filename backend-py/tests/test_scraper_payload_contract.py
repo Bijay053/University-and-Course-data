@@ -11,7 +11,9 @@ from app.services.scraper.extractors.gemini_primary import (
     GEMINI_PRIMARY_FIELD_TARGETS,
 )
 from app.services.scraper.pipelines.single_course import _EXTRACTORS
+from app.services.scraper.stage_course import _reviewable_evidence
 from app.services.scraper.payload_contract import (
+    GUARD_ONLY_PIPELINE_PAYLOAD_FIELDS,
     InvalidPayloadKeyError,
     PERSISTABLE_STAGING_PAYLOAD_FIELDS,
     TRANSIENT_PIPELINE_PAYLOAD_FIELDS,
@@ -82,6 +84,27 @@ def test_documented_transient_keys_are_allowed_but_not_persistable() -> None:
         "provider example_catalogue",
         {"course_name", "duration_text", "international_fee"},
     )
+
+
+def test_domestic_fee_is_guard_only_and_never_reviewable() -> None:
+    model_columns = set(ScrapedCourse.__table__.columns.keys())
+
+    assert GUARD_ONLY_PIPELINE_PAYLOAD_FIELDS == {"domestic_fee"}
+    assert "domestic_fee" in TRANSIENT_PIPELINE_PAYLOAD_FIELDS
+    assert "domestic_fee" not in PERSISTABLE_STAGING_PAYLOAD_FIELDS
+    assert "domestic_fee" not in model_columns
+    validate_payload_keys("extractor fee", {"domestic_fee"})
+
+
+def test_guard_only_domestic_fee_evidence_does_not_reach_review() -> None:
+    evidence = [
+        {"field_key": "domestic_fee", "value": 12_000},
+        {"field_key": "international_fee", "value": 34_000},
+    ]
+
+    assert _reviewable_evidence(evidence) == [
+        {"field_key": "international_fee", "value": 34_000}
+    ]
 
 
 def test_invalid_key_error_reports_producer_and_key() -> None:

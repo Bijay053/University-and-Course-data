@@ -174,7 +174,7 @@ async def test_bond_source_empty_fee_is_not_inherited_from_approved_row():
                         ScrapedFieldEvidence.scraped_course_id == fresh.id,
                         ScrapedFieldEvidence.extraction_method == "approved_row:inherited",
                         ScrapedFieldEvidence.field_key.in_(
-                            ["international_fee", "domestic_fee", "fee_term"]
+                            ["international_fee", "fee_term"]
                         ),
                     )
                 )

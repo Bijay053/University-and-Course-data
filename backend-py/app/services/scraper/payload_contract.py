@@ -67,6 +67,15 @@ PERSISTABLE_STAGING_PAYLOAD_FIELDS: frozenset[str] = frozenset({
     "toefl_writing",
 })
 
+# Guard-only values are deliberately available to extraction and data-quality
+# checks but never cross the staging boundary.  ``domestic_fee`` exists only to
+# prevent a domestic amount from being mistaken for international tuition; it
+# is not reviewer-facing catalogue data and must not be carried forward from an
+# approved row.
+GUARD_ONLY_PIPELINE_PAYLOAD_FIELDS: frozenset[str] = frozenset({
+    "domestic_fee",
+})
+
 # Intentional pipeline-only keys. These support gates, aliases, diagnostics, or
 # paired-field conversion and are consumed before model construction.
 TRANSIENT_PIPELINE_PAYLOAD_FIELDS: frozenset[str] = frozenset({
@@ -74,7 +83,7 @@ TRANSIENT_PIPELINE_PAYLOAD_FIELDS: frozenset[str] = frozenset({
     "_confidence_score",
     "_rejection_reason",
     "course_name",
-    "domestic_fee",
+    *GUARD_ONLY_PIPELINE_PAYLOAD_FIELDS,
     "domestic_only",
     "duration_text",
     "english_test",

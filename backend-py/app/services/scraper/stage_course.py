@@ -45,6 +45,7 @@ from app.services.scraper.guards import (
 )
 from app.services.scraper.field_normalizers import sanitize_intake_months_payload
 from app.services.scraper.payload_contract import (
+    GUARD_ONLY_PIPELINE_PAYLOAD_FIELDS,
     PERSISTABLE_STAGING_PAYLOAD_FIELDS,
     validate_payload_keys,
 )
@@ -84,6 +85,15 @@ def _clean_model_value(field_name: str, value: Any) -> Any:
             return None
 
     return value
+
+
+def _reviewable_evidence(evidence: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Remove guard-only extraction facts before reviewer evidence persistence."""
+    return [
+        item
+        for item in evidence
+        if item.get("field_key") not in GUARD_ONLY_PIPELINE_PAYLOAD_FIELDS
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -523,8 +533,12 @@ async def stage_course(
     # in a previous approved/published row, keep the old value rather than
     # writing NULL.  This prevents a temporary website change or extractor
     # regression from degrading already-reviewed data.
+    #
+    # domestic_fee is intentionally absent: it is a transient guard input used
+    # to detect domestic-only or misclassified international fees, not data
+    # persisted for review.
     _PRESERVE_FIELDS = (
-        "international_fee", "domestic_fee", "fee_term",
+        "international_fee", "fee_term",
         "ielts_overall", "pte_overall", "toefl_overall",
         "cambridge_overall", "duolingo_overall",
         "ielts_listening", "ielts_reading", "ielts_writing", "ielts_speaking",
@@ -535,7 +549,7 @@ async def stage_course(
     _authoritative_fee_omission = "bond_fee_source_empty" in set(
         payload.get("scrape_warnings") or []
     )
-    _fee_preserve_fields = {"international_fee", "domestic_fee", "fee_term"}
+    _fee_preserve_fields = {"international_fee", "fee_term"}
     from app.services.scraper.extractors.uel_variants import (
         is_uel_course_url, uel_variant_key,
     )
@@ -1053,7 +1067,7 @@ async def stage_course(
         evidence_count = await _persist_evidence(
             db,
             scraped_course_id=sc.id,
-            evidence=evidence or [],
+            evidence=_reviewable_evidence(evidence or []),
             source_url=source_url or payload.get("course_website"),
         )
     except Exception as exc:  # noqa: BLE001
