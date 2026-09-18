@@ -4,27 +4,18 @@ import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import Universities from "./universities";
+
+const { useListUniversitiesMock } = vi.hoisted(() => ({
+  useListUniversitiesMock: vi.fn(),
+}));
 
 vi.mock("@workspace/api-client-react", () => ({
   getListUniversitiesQueryKey: () => ["universities"],
   useCreateUniversity: () => ({ mutate: vi.fn(), isPending: false }),
-  useListUniversities: () => ({
-    data: {
-      data: [{
-        id: 7,
-        name: "Accessible University",
-        city: "Sydney",
-        country: "Australia",
-        website: "https://example.edu",
-        courseCount: 12,
-        featured: false,
-      }],
-    },
-    isLoading: false,
-  }),
+  useListUniversities: useListUniversitiesMock,
 }));
 
 vi.mock("@/components/can", () => ({
@@ -46,7 +37,10 @@ vi.mock("@/components/ui/dropdown-menu", () => ({
   DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  useListUniversitiesMock.mockReset();
+});
 
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -58,6 +52,31 @@ function renderPage() {
 }
 
 describe("Universities dialogs", () => {
+  beforeEach(() => {
+    useListUniversitiesMock.mockReturnValue({
+      data: {
+        data: [{
+          id: 7,
+          name: "Accessible University",
+          city: "Sydney",
+          country: "Australia",
+          website: "https://example.edu",
+          courseCount: 12,
+          featured: false,
+        }],
+      },
+      isLoading: false,
+    });
+  });
+
+  it("requests the full API result window before applying client filters", () => {
+    renderPage();
+    expect(useListUniversitiesMock).toHaveBeenCalledWith({
+      search: undefined,
+      limit: 500,
+    });
+  });
+
   it("opens the create dialog", async () => {
     const user = userEvent.setup();
     renderPage();

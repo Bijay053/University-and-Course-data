@@ -13,7 +13,10 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Plus, Search, Globe, Building2, Trash2, Pencil, MoreHorizontal, ExternalLink, BookOpen, Star, Upload, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Zap, Loader2, ShieldCheck, FlaskConical as FlaskRound, AlertTriangle, ShieldX, FileEdit, SlidersHorizontal, X } from "lucide-react";
-import { filterUniversities } from "@/lib/university-filters";
+import {
+  filterUniversities,
+  normalizeUniversityCountry,
+} from "@/lib/university-filters";
 
 type CertStatus = "draft" | "testing" | "certified" | "needs_review" | "failed";
 const CERT_CONFIG: Record<CertStatus, { label: string; bg: string; text: string; border: string; icon: React.ReactNode }> = {
@@ -92,7 +95,12 @@ export default function Universities() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
 
-  const { data, isLoading } = useListUniversities({ search: search || undefined });
+  // Filters and pagination are currently client-side, so request the endpoint's
+  // full supported result window rather than filtering its default first page.
+  const { data, isLoading } = useListUniversities({
+    search: search || undefined,
+    limit: 500,
+  });
   const createUniversity = useCreateUniversity();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -234,7 +242,7 @@ export default function Universities() {
   const countries = useMemo(
     () => Array.from(new Set(
       allUniversities
-        .map((university) => university.country)
+        .map((university) => normalizeUniversityCountry(university.country))
         .filter((country): country is string => !!country),
     )).sort((a, b) => a.localeCompare(b)),
     [allUniversities],
@@ -676,7 +684,7 @@ export default function Universities() {
 
               {/* Range info */}
               <p className="text-xs text-gray-400 order-first sm:order-none">
-                {globalStart + 1}–{Math.min(globalStart + pageSize, allUniversities.length)} of {allUniversities.length}
+                {globalStart + 1}–{Math.min(globalStart + pageSize, filteredUniversities.length)} of {filteredUniversities.length}
               </p>
 
               {/* Nav buttons */}

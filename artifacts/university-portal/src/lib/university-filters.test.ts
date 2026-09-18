@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { filterUniversities } from "./university-filters";
+import {
+  filterUniversities,
+  normalizeUniversityCountry,
+} from "./university-filters";
 
 const universities = [
   { id: 1, country: "Australia", certificationStatus: "certified", featured: true },
@@ -32,5 +35,21 @@ describe("filterUniversities", () => {
       status: "all",
       featured: "not_featured",
     })).toEqual([universities[1], universities[2], universities[3]]);
+  });
+
+  it("groups common country aliases under the same filter", () => {
+    const withAliases = [
+      ...universities,
+      { id: 5, country: "UK", certificationStatus: "draft", featured: false },
+    ];
+    expect(filterUniversities(withAliases, {
+      country: "United Kingdom",
+      status: "all",
+      featured: "all",
+    }).map((university) => university.id)).toEqual([4, 5]);
+  });
+
+  it("normalizes case and surrounding whitespace", () => {
+    expect(normalizeUniversityCountry("  australia ")).toBe("Australia");
   });
 });
