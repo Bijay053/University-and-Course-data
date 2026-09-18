@@ -1,6 +1,8 @@
 """Global enforcement tests for domestic-only and online-only courses."""
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from app.services.scraper.config.context import current_uni_config
@@ -10,6 +12,7 @@ from app.services.scraper.guards import (
     should_stage_course,
 )
 from app.services.scraper.pipelines.single_course import (
+    _apply_study_load_extraction,
     _domestic_only_filter_enabled,
     _duration_labeled_values,
     _infer_study_load_from_text,
@@ -1054,6 +1057,92 @@ def test_part_time_only_duration_is_globally_rejected() -> None:
             "study_load": "Part Time",
         },
         source_url="https://example.edu/master-of-part-time-study",
+    )
+    assert accepted is False
+    assert reason == "part_time_only"
+
+
+def test_uel_captured_options_distinguish_unknown_from_authoritative_part_time() -> None:
+    import json
+    import tarfile
+
+    archive = (
+        Path(__file__).resolve().parents[2]
+        / "docs/verification/uel-duration-source-captures.tar.xz"
+    )
+    route = "/postgraduate/courses/pgcert-autism-spectrum-conditions-learning"
+    with tarfile.open(archive, "r:xz") as tar:
+        manifest = json.load(tar.extractfile("source-html-manifest.json"))
+        record = next(
+            item
+            for item in manifest
+            if item["url"].endswith(route) and item["transport"] == "scrape_do"
+        )
+        html = tar.extractfile(record["file"]).read().decode()
+        part_time_route = (
+            "/postgraduate/courses/edd-professional-doctorate-education"
+        )
+        part_time_record = next(
+            item
+            for item in manifest
+            if item["url"].endswith(part_time_route)
+            and item["transport"] == "scrape_do"
+        )
+        part_time_html = tar.extractfile(part_time_record["file"]).read().decode()
+
+    assert _is_parttime_only_page(html) is False
+    payload = {
+        "study_load": "Part Time",
+        "duration_text": "Modules may change and can be available part-time only.",
+    }
+    evidence = [{
+        "field_key": "study_load",
+        "value": "Part Time",
+        "confidence": 0.70,
+        "method": "gemini:primary",
+        "snippet": "generic module prose",
+    }]
+    _apply_study_load_extraction(
+        payload,
+        evidence,
+        html=html,
+        rendered_html=None,
+        url=f"https://www.uel.ac.uk{route}",
+    )
+
+    assert payload["study_load"] is None
+    assert evidence[-1]["method"] == "uel:course_options_unpublished"
+
+    non_uel_payload = {"study_load": "Part Time"}
+    _apply_study_load_extraction(
+        non_uel_payload,
+        [],
+        html=html,
+        rendered_html=None,
+        url="https://example.edu/postgraduate/courses/example",
+    )
+    assert non_uel_payload["study_load"] == "Part Time"
+
+    payload = {"study_load": "Part Time", "duration_text": "Part-time, 2 years"}
+    evidence = []
+    _apply_study_load_extraction(
+        payload,
+        evidence,
+        html=part_time_html,
+        rendered_html=None,
+        url=f"https://www.uel.ac.uk{part_time_route}",
+    )
+
+    assert payload["study_load"] == "Part Time"
+    accepted, reason = should_stage_course(
+        "Professional Doctorate Education EdD",
+        {
+            "course_name": "Professional Doctorate Education EdD",
+            "international_fee": 30000,
+            "study_mode": "On Campus",
+            "study_load": payload["study_load"],
+        },
+        source_url=f"https://www.uel.ac.uk{part_time_route}",
     )
     assert accepted is False
     assert reason == "part_time_only"

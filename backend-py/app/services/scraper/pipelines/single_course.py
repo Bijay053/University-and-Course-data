@@ -1262,18 +1262,66 @@ def _infer_study_load_from_text(text: str) -> str | None:
     return None
 
 
+def _uel_has_no_published_course_options(html: str, url: str | None) -> bool:
+    """Return True only for UEL's course-owned unpublished-options state."""
+    try:
+        from bs4 import BeautifulSoup as _BS4_uel_options
+
+        if (urlparse(url or "").hostname or "").casefold() not in {
+            "uel.ac.uk",
+            "www.uel.ac.uk",
+        }:
+            return False
+        soup = _BS4_uel_options(html or "", "html.parser")
+        options = soup.select_one("#course-options")
+        if options is None:
+            return False
+        unavailable = _re.compile(
+            r"\bno\s+course\s+options?\s+available\s+for\s+this\s+course\b",
+            _re.IGNORECASE,
+        )
+        for owner in options.parents:
+            if owner.name not in {"section", "div"} or not any(
+                "cpt_course_options_block" in str(class_name)
+                for class_name in (owner.get("class") or [])
+            ):
+                continue
+            text = _re.sub(r"\s+", " ", owner.get_text(" ", strip=True))
+            if unavailable.search(text):
+                return True
+        return False
+    except Exception:
+        return False
+
+
 def _apply_study_load_extraction(
     payload: dict[str, Any],
     evidence: list[dict[str, Any]],
     *,
     html: str,
     rendered_html: str | None,
+    url: str | None = None,
 ) -> None:
     """Fill the normalized study-load field and record its provenance."""
     # Authoritative duration wording wins over earlier AI/fallback guesses.
     # When both options are shown, this portal records the eligible Full Time
     # option. A genuinely part-time-only course was rejected by the early gate.
     duration_html = rendered_html or html or ""
+    if _uel_has_no_published_course_options(duration_html, url):
+        # UEL's empty options panel is authoritative only for absence of a
+        # published mode. It proves neither Full-time nor Part-time. Generic
+        # module-change/careers prose and page-wide AI classification must not
+        # turn this unknown state into a part-time-only rejection.
+        if payload.get("study_load"):
+            payload["study_load"] = None
+            evidence.append({
+                "field_key": "study_load",
+                "value": None,
+                "confidence": 1.0,
+                "method": "uel:course_options_unpublished",
+                "snippet": "No Course options available for this course",
+            })
+        return
     if (payload.get("study_load") or "").strip().lower() == "both":
         payload["study_load"] = "Full Time"
         evidence.append({
@@ -5245,6 +5293,7 @@ async def extract_course(
             evidence,
             html=html,
             rendered_html=None,
+            url=url,
         )
         # This return intentionally skips the rest of the enrichment pipeline,
         # so attach the same field provenance contract used by the normal path
@@ -10243,6 +10292,7 @@ async def extract_course(
         evidence,
         html=html,
         rendered_html=rendered_html,
+        url=url,
     )
 
     # ── Host-specific fee_term correction ────────────────────────────────────

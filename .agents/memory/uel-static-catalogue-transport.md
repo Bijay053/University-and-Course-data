@@ -72,3 +72,14 @@ would manufacture a current international offering.
 
 **How to apply:** Test audience and attendance independently, including an
 unknown attendance value; never coerce that unknown value into Part Time.
+
+UEL’s Course options heading and empty-state message can sit in separate nested
+wrappers inside the same course-options component. “No Course options available”
+means attendance is unknown, not part-time-only.
+
+**Why:** Page-wide AI classified generic part-time module/careers prose as the
+course’s study load after the DOM guard correctly found no labelled duration.
+
+**How to apply:** On exact UEL course hosts, scope the empty-state check to the
+nearest ancestor course-options components, clear unowned study-load guesses,
+and retain genuine Part-time option rows for the global eligibility guard.
