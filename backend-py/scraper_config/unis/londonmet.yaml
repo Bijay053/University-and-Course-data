@@ -2,54 +2,48 @@
 # Hostname: www.londonmet.ac.uk
 # Country: United Kingdom  |  Currency: GBP
 # Discovery: Seeded search lists
-
 discovery:
   always_sitemap_supplement: true
   seed_urls:
-    - 'https://www.londonmet.ac.uk/myprospectus/courses/all/all/Undergraduate/Undergraduate%20degree%20courses/all/list?resultsurl=%2Fcourses%2F'
-    - 'https://www.londonmet.ac.uk/myprospectus/courses/all/all/Postgraduate/Postgraduate%20courses/all/list?resultsurl=%2Fcourses%2F'
-    - 'https://www.londonmet.ac.uk/myprospectus/courses/all/all/Research%20degree/Our%20MPhil,%20PhD%20and%20Professional%20Doctorate%20courses/all/list'
+  - https://www.londonmet.ac.uk/myprospectus/courses/all/all/Undergraduate/Undergraduate%20degree%20courses/all/list?resultsurl=%2Fcourses%2F
+  - https://www.londonmet.ac.uk/myprospectus/courses/all/all/Postgraduate/Postgraduate%20courses/all/list?resultsurl=%2Fcourses%2F
+  - https://www.londonmet.ac.uk/myprospectus/courses/all/all/Research%20degree/Our%20MPhil,%20PhD%20and%20Professional%20Doctorate%20courses/all/list
   allow_url_patterns:
-    - '/courses/'
+  - /courses/
   block_url_patterns:
-    - '/news'
-    - '/events'
-    - '/about'
-    - '/staff'
-    - '/research'
-
+  - /news
+  - /events
+  - /about
+  - /staff
+  always_browser_discover: true
 extraction:
   fees:
-    default_currency: 'GBP'
+    default_currency: GBP
     prefer_international: true
     prefer_annual_over_total: true
     reject_keywords:
-      - 'Home student'
-      - 'Home fee'
-      - 'UK student'
-      - 'UK fee'
-      - 'Domestic'
-
+    - Home student
+    - Home fee
+    - UK student
+    - UK fee
+    - Domestic
   english:
     trust_vision_ocr: false
     default_ielts: 6.0
     default_pte: 60
     default_toefl: 80
-
   intake:
     start_dates_only: true
-
   course_name:
     strip_title_suffixes:
-      - ' | London Metropolitan University'
-      - ' - London Metropolitan University'
-
+    - ' | London Metropolitan University'
+    - ' - London Metropolitan University'
   filters:
     online_only:
       enabled: false
-
   staging:
     reject_if_missing:
-      - course_name
+    - course_name
     skip_degree_qualifier_check: true
     require_international_fee: false
+_min_expected_courses: 200

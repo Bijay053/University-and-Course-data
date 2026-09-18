@@ -289,3 +289,9 @@ recipes. No release, production restart, review approval, or review overwrite
 was performed. The required fresh **post-release full isolated audit is still
 outstanding** until the owner resolves how these edits should be preserved.
 Local tests and offline replay must not be represented as that live proof.
+
+**Subsequent release:** The owner authorized preserving and committing those
+recipe edits. That preservation and the final guarded release are documented
+in [UEL current-template release verification](uel-template-release-verification.md).
+The blocked-release paragraph above records the earlier stop, not the current
+deployment state.

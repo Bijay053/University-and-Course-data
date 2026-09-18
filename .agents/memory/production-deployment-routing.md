@@ -3,6 +3,21 @@ name: Production deployment routing
 description: Non-obvious routing constraints for deploying this project to its external AWS host.
 ---
 
+The production checkout can fetch GitHub without having a usable push
+credential. When an authorized preservation commit is created there, transfer
+the commit to the authenticated workspace as a bounded Git bundle and push
+from the workspace rather than copying credentials onto the server.
+
+**Why:** Committing approved operator recipe edits succeeded on production,
+but its push failed because Git could not obtain a username. A bundle retained
+the exact commit, parentage and recipe bytes without provisioning another
+secret.
+
+**How to apply:** Verify the exact base revision, changed paths and content
+hashes first. Export only the preservation commit relative to that base,
+fast-forward the workspace to it, and push without force. Do not mistake
+temporary stashed baseline bytes for the operator edits being preserved.
+
 Keep supported operational entrypoints outside `.local/`; an ignore exception
 does not make that directory safe for deliverable source code.
 

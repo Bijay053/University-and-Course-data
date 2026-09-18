@@ -1,0 +1,274 @@
+{
+  "release": "eefc53c64c2acbeb1f8a93403ddad3262e0e4cd9",
+  "audit_run_id": "20260918T051153Z_db2486",
+  "targeted_acceptance_passed": true,
+  "job": {
+    "approval_decision": null,
+    "completed_at": "2026-09-18 05:31:52.320697+00:00",
+    "current": 406,
+    "error_message": null,
+    "errors": 0,
+    "imported": 373,
+    "skipped": 33,
+    "started_at": "2026-09-18 05:12:17.889237+00:00",
+    "status": "completed",
+    "total_found": 406
+  },
+  "source": [
+    {
+      "url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-physiotherapy",
+      "file": "html/20f45633701d3adc958e0d7eaa75c0a39869209b521f9b19a16efd13a41ef293.html",
+      "sha256": "20f45633701d3adc958e0d7eaa75c0a39869209b521f9b19a16efd13a41ef293"
+    },
+    {
+      "url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-psychology",
+      "file": "html/eb4df6c936862b38ebfa946f8df8a83711f659ab9779636ec5dc21c4c4f8f4ff.html",
+      "sha256": "eb4df6c936862b38ebfa946f8df8a83711f659ab9779636ec5dc21c4c4f8f4ff"
+    },
+    {
+      "url": "https://www.uel.ac.uk/postgraduate/courses/msc-ai-data-science",
+      "file": "html/09340d675d3ef2fc81253197da431964b3604a76fc840389d7ab5a3c30063166.html",
+      "sha256": "09340d675d3ef2fc81253197da431964b3604a76fc840389d7ab5a3c30063166"
+    }
+  ],
+  "staged_target_rows": [
+    {
+      "course_name": "AI and Data Science MSc",
+      "canonical_course_url": "uel.ac.uk/postgraduate/courses/msc-ai-data-science?uel_variant=msc",
+      "international_eligible": true,
+      "study_load": "Full Time",
+      "duration": 1.0,
+      "duration_term": "Year",
+      "international_fee": 17220,
+      "intake_months": [
+        "September"
+      ],
+      "intake_days": null,
+      "ielts_overall": 6,
+      "ielts_writing": 6,
+      "ielts_speaking": 6,
+      "ielts_listening": 5.5,
+      "ielts_reading": 5.5,
+      "status": "pending"
+    },
+    {
+      "course_name": "AI and Data Science MSc with Placement Year",
+      "canonical_course_url": "uel.ac.uk/postgraduate/courses/msc-ai-data-science?uel_variant=msc-with-placement-year",
+      "international_eligible": true,
+      "study_load": "Full Time",
+      "duration": 2.0,
+      "duration_term": "Year",
+      "international_fee": 17220,
+      "intake_months": [
+        "September"
+      ],
+      "intake_days": null,
+      "ielts_overall": 6,
+      "ielts_writing": 6,
+      "ielts_speaking": 6,
+      "ielts_listening": 5.5,
+      "ielts_reading": 5.5,
+      "status": "pending"
+    },
+    {
+      "course_name": "Physiotherapy BSc (Hons)",
+      "canonical_course_url": "uel.ac.uk/undergraduate/courses/bsc-hons-physiotherapy?uel_variant=degree",
+      "international_eligible": true,
+      "study_load": null,
+      "duration": null,
+      "duration_term": null,
+      "international_fee": null,
+      "intake_months": null,
+      "intake_days": null,
+      "ielts_overall": 7,
+      "ielts_writing": 6.5,
+      "ielts_speaking": 6.5,
+      "ielts_listening": 6.5,
+      "ielts_reading": 6.5,
+      "status": "pending"
+    },
+    {
+      "course_name": "Psychology BSc (Hons)",
+      "canonical_course_url": "uel.ac.uk/undergraduate/courses/bsc-hons-psychology?uel_variant=degree",
+      "international_eligible": true,
+      "study_load": "Full Time",
+      "duration": 3.0,
+      "duration_term": "Year",
+      "international_fee": 16020,
+      "intake_months": [
+        "September"
+      ],
+      "intake_days": null,
+      "ielts_overall": 6,
+      "ielts_writing": 6,
+      "ielts_speaking": 6,
+      "ielts_listening": 5.5,
+      "ielts_reading": 5.5,
+      "status": "pending"
+    },
+    {
+      "course_name": "Psychology BSc (Hons) with foundation year",
+      "canonical_course_url": "uel.ac.uk/undergraduate/courses/bsc-hons-psychology?uel_variant=degree-with-foundation-year",
+      "international_eligible": true,
+      "study_load": "Full Time",
+      "duration": 4.0,
+      "duration_term": "Year",
+      "international_fee": 16020,
+      "intake_months": [
+        "September"
+      ],
+      "intake_days": null,
+      "ielts_overall": 5.5,
+      "ielts_writing": 5.5,
+      "ielts_speaking": 5.5,
+      "ielts_listening": 5.5,
+      "ielts_reading": 5.5,
+      "status": "pending"
+    }
+  ],
+  "independent_target_comparisons": [
+    {
+      "course_name": "AI and Data Science MSc",
+      "differences": {},
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-ai-data-science?uel_variant=msc",
+      "source_ielts_snippets": [],
+      "source_label": "MSc"
+    },
+    {
+      "course_name": "AI and Data Science MSc with Placement Year",
+      "differences": {},
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-ai-data-science?uel_variant=msc-with-placement-year",
+      "source_ielts_snippets": [],
+      "source_label": "MSc with Placement Year"
+    },
+    {
+      "course_name": "Physiotherapy BSc (Hons)",
+      "differences": {},
+      "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-physiotherapy?uel_variant=degree",
+      "source_ielts_snippets": [],
+      "source_label": "Degree"
+    },
+    {
+      "course_name": "Psychology BSc (Hons)",
+      "differences": {},
+      "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-psychology?uel_variant=degree",
+      "source_ielts_snippets": [],
+      "source_label": "Degree"
+    },
+    {
+      "course_name": "Psychology BSc (Hons) with foundation year",
+      "differences": {},
+      "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-psychology?uel_variant=degree-with-foundation-year",
+      "source_ielts_snippets": [],
+      "source_label": "Degree with foundation year"
+    }
+  ],
+  "home_only_exclusion": {
+    "matched_by": "exact_route",
+    "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-physiotherapy?uel_variant=degree-via-foundation-year",
+    "runtime_outcomes": [
+      {
+        "detail": null,
+        "kind": "skipped",
+        "logged_url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-physiotherapy?uel_variant=degree-via-foundation-year",
+        "reason": "rejected: domestic_only",
+        "sequence": 575
+      }
+    ]
+  },
+  "route_identity_audit": {
+    "duplicate_source_route_ids": [],
+    "duplicate_staged_route_ids": [],
+    "identity_basis": "normalized canonical URL plus uel_variant; never name",
+    "parser_enumeration_disagreements": [],
+    "source_missing_staged": [
+      "https://uel.ac.uk/postgraduate/courses/edd-professional-doctorate-education",
+      "https://uel.ac.uk/postgraduate/courses/ma-counselling-psychotherapy",
+      "https://uel.ac.uk/postgraduate/courses/ma-education-distance-learning",
+      "https://uel.ac.uk/postgraduate/courses/ma-english-language-teaching-distance-learning",
+      "https://uel.ac.uk/postgraduate/courses/ma-post-qualifying-professional-practice",
+      "https://uel.ac.uk/postgraduate/courses/ma-special-additional-learning-needs-icep-europe",
+      "https://uel.ac.uk/postgraduate/courses/mba-master-business-administration-business-analytics?uel_variant=mba-with-placement-year",
+      "https://uel.ac.uk/postgraduate/courses/mphil-phd-health-wellbeing-online-harms",
+      "https://uel.ac.uk/postgraduate/courses/msc-integrative-counselling-coaching",
+      "https://uel.ac.uk/postgraduate/courses/pgce-ipgce",
+      "https://uel.ac.uk/postgraduate/courses/pgce-non-qualified-teacher-status-qts",
+      "https://uel.ac.uk/postgraduate/courses/pgcert-independent-supplementary-prescribing",
+      "https://uel.ac.uk/postgraduate/courses/pgcert-understanding-supporting-behaviour",
+      "https://uel.ac.uk/postgraduate/courses/pgdip-counselling-psychotherapy",
+      "https://uel.ac.uk/postgraduate/courses/pgdip-integrative-counselling-coaching",
+      "https://uel.ac.uk/postgraduate/courses/prof-doc-cyber-diplomacy",
+      "https://uel.ac.uk/postgraduate/courses/prof-doc-information-security",
+      "https://uel.ac.uk/undergraduate/courses/ba-hons-applied-education-early-years-online",
+      "https://uel.ac.uk/undergraduate/courses/ba-hons-applied-education-inclusive-practice-online",
+      "https://uel.ac.uk/undergraduate/courses/ba-hons-applied-education-online",
+      "https://uel.ac.uk/undergraduate/courses/ba-hons-education-top-online",
+      "https://uel.ac.uk/undergraduate/courses/ba-hons-sports-journalism?uel_variant=degree-with-foundation-year",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-nursing-adult?uel_variant=degree",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-nursing-adult?uel_variant=degree-via-foundation-year",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-occupational-therapy?uel_variant=degree",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-occupational-therapy?uel_variant=degree-via-foundation-year",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-physiotherapy?uel_variant=degree-via-foundation-year",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-podiatry?uel_variant=degree",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-podiatry?uel_variant=degree-via-foundation-year",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-policing-studies-top",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-psychology-distance-learning",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-sports-coaching-performance-west-ham-united-foundation?uel_variant=degree",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-sports-coaching-performance-west-ham-united-foundation?uel_variant=degree-with-foundation-year"
+    ],
+    "staged_missing_source": [
+      "https://uel.ac.uk/postgraduate/courses/pgce-primary-sen-special-schools"
+    ]
+  },
+  "all_catalogue_quality_claimed": false,
+  "remaining_comparison_counts": {
+    "captured_source_pages": 275,
+    "eligibility_differing_rows": 123,
+    "home_only_routes": 27,
+    "ielts_differing_rows": 60,
+    "source_missing_staged": 33,
+    "source_route_kinds": {
+      "PG:MA": 31,
+      "PG:MFA": 7,
+      "PG:placement": 40,
+      "PG:standard": 132,
+      "UG:foundation": 81,
+      "UG:standard": 114
+    },
+    "source_routes": 405,
+    "staged_missing_source": 1,
+    "staged_rows": 373
+  },
+  "production_before": {
+    "at": "2026-09-18T05:06:50.186240+00:00",
+    "release": "7e0673caa3fb151694a4f22ba66aeb0356c77544",
+    "all_reviews": {
+      "count": 253,
+      "fingerprint": "dfae42188bd00eb4bd085c9de3bd3acd"
+    },
+    "pending_reviews": {
+      "count": 253,
+      "fingerprint": "dfae42188bd00eb4bd085c9de3bd3acd"
+    }
+  },
+  "production_after": {
+    "at": "2026-09-18T05:32:13.493130+00:00",
+    "release": "eefc53c64c2acbeb1f8a93403ddad3262e0e4cd9",
+    "all_reviews": {
+      "count": 253,
+      "fingerprint": "dfae42188bd00eb4bd085c9de3bd3acd"
+    },
+    "pending_reviews": {
+      "count": 253,
+      "fingerprint": "dfae42188bd00eb4bd085c9de3bd3acd"
+    },
+    "hashes": {
+      "backend-py/app/services/scraper/extractors/uel_variants.py": "c18bfa5eb5c49bae64cdf19cffa9d9925a2296ec85dcbe6a79f9372fa7ad631c",
+      "backend-py/app/services/scraper/pipelines/single_course.py": "3de6be65a10fa5c9a78d52946092deb731b1bf3f941f25cb7dca1c47dcbe5c4b",
+      "backend-py/scraper_config/unis/bathspa.yaml": "afc201db9d656c3f864ee5cd5deb9c4d9e69f052a4ff1ddc6e88f7e6849ea135",
+      "backend-py/scraper_config/unis/londonmet.yaml": "bb05cb3ac2bd0d458de25cde16cd363c41444fe99df0342e5abcdce66d5c3869",
+      "backend-py/scraper_config/unis/uel.yaml": "1733f68c4ac6cac8cf57f0e36b0232f236d11612f8da29259ceb0d58afff93e3"
+    },
+    "tracked_changes": ""
+  }
+}
