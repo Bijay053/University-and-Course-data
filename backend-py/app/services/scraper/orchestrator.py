@@ -2359,6 +2359,11 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             {"url": url, "name": "Targeted retry"}
             for url in _target_course_urls
         ]
+        # True only while ``links`` is the successful result of a provider that
+        # already proved each record is a course. Configuration presence alone
+        # is insufficient: disabled providers and targeted retries still need
+        # their normal URL gates.
+        _provider_owns_current_links = False
         _archive_only = bool(
             not _targeted_retry
             and getattr(_uni_cfg.discovery, "archive_only", False)
@@ -2736,6 +2741,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 job.error_message = _failure_msg
                 await db.commit()
                 return
+            _provider_owns_current_links = True
 
         # ── Manchester XML catalogue provider ─────────────────────────────────
         # When discovery.manchester_xml is set, fetch all courses from the
@@ -2766,6 +2772,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 job.error_message = _failure_msg
                 await db.commit()
                 return
+            _provider_owns_current_links = True
 
         # ── SearchStax Solr provider (e.g. University of Huddersfield) ────────
         # ── Swiftype API provider ─────────────────────────────────────────────
@@ -2797,6 +2804,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 job.error_message = _failure_msg
                 await db.commit()
                 return
+            _provider_owns_current_links = True
 
         # ── VUW (Victoria University of Wellington) JSON API provider ────────
         # When discovery.vuw_api is set, fetch all 4 VUW catalogue JSON endpoints
@@ -2926,6 +2934,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 job.error_message = _failure_msg
                 await db.commit()
                 return
+            _provider_owns_current_links = True
 
         # ── TAFE NSW internal API provider ────────────────────────────────────
         # discovery.tafensw_api bypasses BFS/sitemap entirely: calls the Nuxt
@@ -4530,20 +4539,16 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
         # ── End Domain Safety Guard ───────────────────────────────────────────
 
         # Authoritative API-provider short-circuit: these providers already
-        # return course records, so every link IS a course.  allow/block URL
+        # return course records, so every link IS a course.  Post-discovery URL
         # patterns are for BFS/sitemap discovery where arbitrary pages must be
-        # filtered.  Applying stale generated/admin patterns to provider-owned
-        # links drops real courses (for example WSU research degrees whose
-        # international fees are explicitly "To be advised" in Algolia).
-        _skip_url_filters_searchstax = (
-            _searchstax_cfg is not None
-            or (getattr(_uni_cfg.discovery, "swiftype", None) is not None)
-            or (getattr(_uni_cfg.discovery, "manchester_xml", None) is not None)
-            or (getattr(_uni_cfg.discovery, "sruc_api", None) is not None)
-        )
+        # filtered. Applying stale generated/admin patterns to provider-owned
+        # links drops real courses (for example WLV SearchStax returned 61
+        # valid /courses/<slug>/ records that a stale detail allowlist reduced
+        # to zero).
+        _skip_url_filters_searchstax = _provider_owns_current_links
         if _skip_url_filters_searchstax and links:
             log.info(
-                "[EXTRACT] api-provider active — skipping allow/block_url_patterns "
+                "[EXTRACT] api-provider active — skipping post-discovery URL "
                 "filters (API already filtered to course docs; %d links)",
                 len(links),
             )
@@ -4751,7 +4756,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
             list(getattr(_uni_cfg.discovery, "course_detail_url_patterns", None) or [])
             if _uni_cfg and _uni_cfg.discovery else []
         )
-        if _cdp_raw and links:
+        if _cdp_raw and links and not _skip_url_filters_searchstax:
             _compiled_cdp: list[re.Pattern[str]] = []
             for _cdp_str in _cdp_raw:
                 try:

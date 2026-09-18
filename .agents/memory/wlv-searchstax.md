@@ -1,14 +1,25 @@
 ---
 name: WLV SearchStax provider
-description: Wolverhampton uses SearchStax Solr (433 courses); switched to field_map_as_payload=true after scrape.do removal made links_only mode 83-min slow.
+description: Wolverhampton uses SearchStax Solr for course-owned links; provider URLs must bypass stale post-discovery filters.
 ---
 
 ## Rule
-WLV now uses `field_map_as_payload: true` — courses built directly from Solr fields, **zero per-course page fetches**. Do NOT revert to `links_only: true` unless scrape.do (or equivalent paid proxy) is available again.
+WLV uses SearchStax as the authority for which URLs are courses. Provider-owned
+links must bypass every post-discovery URL filter, including the final course
+detail allowlist. WLV may use links-only mode when a reliable static proxy is
+available, or payload mode when detail-page transport is unavailable.
 
-**Why:** WLV's course pages are 100% Cloudflare-blocked. With scrape.do removed, `links_only: true` sent all 432 URLs through httpx→curl_cffi→Wayback each failing after ~15s, giving an 83-minute runtime. Switching to `field_map_as_payload` makes the run complete in <60s.
+**Why:** Without a static proxy, links-only mode once sent hundreds of blocked
+pages through slow fallbacks. After static transport was restored, links-only
+mode became useful again for richer page fields. Separately, a stale
+operator/generated course-detail allowlist rejected every valid provider URL,
+turning a healthy provider result into a zero-course scrape.
 
-**How to apply:** Any WLV scrape config change must keep `links_only: false` + `field_map_as_payload: true`. Only switch back to `links_only` if a residential proxy tier is restored.
+**How to apply:** Choose links-only versus payload mode from current verified
+detail-page transport, not old assumptions. In either mode, validate the
+provider's document type and URL ownership before emitting links, then do not
+apply BFS/sitemap allow, block, must-contain, or detail patterns to that trusted
+set. Provider-side title/type exclusions remain valid.
 
 ## WLV Solr field map (verified 2026-06-04)
 Standard defaults match WLV for `url` (url_t), `name` (title_t), `degree_type` (award_s).
