@@ -210,3 +210,82 @@ initial seed-root representation versus the UG listing URL; they do not alter
 the released discovery/extraction implementation. The process exited 0,
 approval remained null, all 295 rows remained pending, and the source review
 row count was unchanged.
+
+## Targeted parser correction and local verification (2026-09-18)
+
+The two non-option classifications above are now implemented, with strict
+validation retained for every unexplained row:
+
+- Status notices require the explicit International Applicant audience, the
+  observed `.message-type` sentence `International applications will open later
+  this year`, no attendance/duration/application action, no fee amount, and no
+  unexplained residual content.
+- Linked cards require one `.distance-link` to a different UEL course, no
+  applicant/attendance/fee/duration facts, no other actions/links, and no content
+  beyond the course heading and link.
+- A label with no complete option rows still fails explicitly. A status notice
+  establishes international audience evidence, **not** an international
+  attendance offering. Physiotherapy Degree therefore retains its identity and
+  owned requirements with `international_eligible=true`, but `study_load`,
+  duration, intake and international fee remain null. Its Home-only foundation
+  sibling remains explicitly domestic and is rejected by the staging gate.
+- An absent owned requirements panel cannot obtain English values from a
+  shared description, a sibling, institutional defaults, or previous review
+  values. Re-extraction emits explicit null English values in that case.
+- IELTS skill-before-score groups are read only inside the parenthesis directly
+  following the IELTS overall statement, with numeric boundaries and explicit
+  conflict rejection. Existing score-before-skill statements remain supported.
+
+### Available source evidence and fixture provenance
+
+The original `.local/uel-audit/20260918T022553Z_1910e8` captures are not present
+in this checkout. Their recorded findings and hashes above remain historical
+evidence; they have **not** been recreated or relabelled as a new capture.
+Regression fixtures instead use the later retained raw captures from
+`20260918T034045Z_b9e9ee`, in
+`docs/verification/uel-duration-source-captures.tar.xz` (archive SHA-256
+`dbb1cdaca353d16c911786203250a3cfa9762142a40df1302b16d3382897acbb`).
+Those independently retain the same two row forms and the parenthetical IELTS
+statement. Reduced source fixtures and their SHA-256 values are pinned in
+`backend-py/tests/fixtures/uel_option_templates/provenance.json`.
+
+| Source | Raw capture SHA-256 | Retained source snippet |
+|---|---|---|
+| Physiotherapy BSc (Hons) | `609ef6e45de0f35a0fb1680b419b749cd512fab529762fe48fef5a712599b14c` | `International Applicant` / `International applications will open later this year` |
+| Psychology BSc (Hons) | `6ec84ca5cdf745ab3fcaf91e3f160f843ab7067a7b785b798cd3fcc04ef5645d` | `.distance-link` → `/undergraduate/courses/bsc-hons-psychology-distance-learning` |
+| AI and Data Science MSc | `3efa9226a9fa784300147bc2d0eda60bc276d449ebd3fe6e481cc65c810cdf2f` | `IELTS 6.0 (Writing and Speaking 6.0, Listening and Reading 5.5).` |
+
+“AI and Data Science” is one named course with MSc and MSc with Placement Year
+routes, not the separate Artificial Intelligence and Data Science pages. Both
+combined-course routes now extract overall 6.0, Writing/Speaking 6.0 and
+Listening/Reading 5.5.
+
+### Verification performed, and release boundary
+
+- `cd backend-py && PYTHONPATH=. python -m pytest tests/test_uel*.py tests/test_duration.py -q`
+  passed: **131 tests**, with one pre-existing Pydantic deprecation warning.
+- Offline replay checked 313 distinct course-detail capture hashes from the
+  retained archive. Of these, 130 multi-route captures emitted 260 scoped route
+  extractions with **zero exceptions**. These are capture/route counts, not a
+  new live catalogue total; single-route pages were parsed but not re-extracted.
+- The four previously lost Physiotherapy/Psychology identities were all
+  extracted. Physiotherapy Degree attendance/duration remained unknown; its
+  foundation sibling remained Home-only. Psychology retained separate
+  requirements: Degree overall 6.0 with Writing/Speaking 6.0 and
+  Listening/Reading 5.5; foundation overall and components 5.5.
+- The real staging/re-extraction regression uses only a disposable university.
+  It proves selected-route correction, authoritative clearing after owned
+  requirements disappear, unchanged sibling scores/status, unchanged existing
+  review feedback, and no approvals.
+
+**Release remains blocked, not verified.** Read-only production inspection
+still reported deployed revision
+`7e0673caa3fb151694a4f22ba66aeb0356c77544`, both services active, no active
+scrape jobs, and uncommitted tracked changes to `bathspa.yaml` and
+`londonmet.yaml`. Those unrelated operator recipes were left untouched.
+The guarded release requires a clean tracked checkout, and its generated-file
+reconciler does not authorize moving or overwriting these ordinary tracked
+recipes. No release, production restart, review approval, or review overwrite
+was performed. The required fresh **post-release full isolated audit is still
+outstanding** until the owner resolves how these edits should be preserved.
+Local tests and offline replay must not be represented as that live proof.

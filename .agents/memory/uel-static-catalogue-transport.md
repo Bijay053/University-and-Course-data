@@ -61,3 +61,14 @@ row also loses independently valid siblings.
 from actual options before strict validation. Keep unexplained missing
 eligibility as unknown, preserve explicit international status evidence, and
 never invent attendance or copy sibling requirements.
+
+An international application notice does not make the adjacent Home attendance
+option international. Preserve the notice's audience evidence while leaving
+international attendance, fees, duration and intakes unknown.
+
+**Why:** A page can publish a complete Home offering while international
+applications have only a “will open later this year” notice. Combining them
+would manufacture a current international offering.
+
+**How to apply:** Test audience and attendance independently, including an
+unknown attendance value; never coerce that unknown value into Part Time.

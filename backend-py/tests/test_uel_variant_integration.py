@@ -284,6 +284,52 @@ async def test_variant_omissions_explicitly_clear_review_fields():
 
 
 @pytest.mark.asyncio
+async def test_status_only_international_never_borrows_home_option_facts():
+    from pathlib import Path
+
+    html = (Path(__file__).parent / "fixtures/uel_option_templates/"
+            "physiotherapy_status_stub.source.html").read_text()
+    url = "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-physiotherapy"
+    result = await single_course.extract_course(
+        url + "?uel_variant=degree", html=html, country="United Kingdom",
+    )
+    payload = result["payload"]
+    assert payload["international_eligible"] is True
+    assert payload["domestic_only"] is False
+    for field in ("study_load", "duration", "duration_term", "international_fee",
+                  "intake_months", "intake_days"):
+        assert payload[field] is None, (field, payload[field])
+    assert not any(item["field_key"] == "study_load" for item in result["evidence"])
+    assert payload["ielts_overall"] == 7
+    assert all(payload[f"ielts_{part}"] == 6.5 for part in (
+        "listening", "reading", "writing", "speaking",
+    ))
+    home = await single_course.extract_course(
+        url + "?uel_variant=degree-via-foundation-year", html=html,
+        country="United Kingdom",
+    )
+    from app.services.scraper.guards import should_stage_course
+    assert should_stage_course(
+        home["name"], home["payload"], source_url=home["url"],
+    ) == (False, "domestic_only")
+
+
+@pytest.mark.asyncio
+async def test_missing_panel_cannot_take_ielts_from_shared_description():
+    from dataclasses import replace
+
+    placement = next(v for v in parse_uel_variants(
+        mechanical_page(placement_requirements=False), URL,
+    ) if "placement" in v.key)
+    placement = replace(placement, html=placement.html.replace(
+        "</main>", "<p>Other courses: IELTS 9.0 with 9.0 in all bands</p></main>",
+    ))
+    result = await single_course._extract_uel_variant(placement, country="United Kingdom")
+    for part in ("overall", "listening", "reading", "writing", "speaking"):
+        assert result["payload"][f"ielts_{part}"] is None
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("first", [None, "<html>403 Forbidden</html>", "<html>course-options-content-div"])
 async def test_uel_transport_uses_direct_alternate_after_incomplete_static(monkeypatch, first):
     from app.services.scraper import http_fetcher

@@ -1,0 +1,41 @@
+{
+  "run": "20260918T034045Z_b9e9ee",
+  "source_findings": "docs/verification/uel-source-template-findings.md",
+  "fixtures": {
+    "physiotherapy_status_stub.source.html": {
+      "fixture_sha256": "aba4766db3b931eb24ac47d4e40220a927b77c90e240c9fc87d66e70064f43da",
+      "source_url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-physiotherapy",
+      "capture_file": "609ef6e45de0f35a0fb1680b419b749cd512fab529762fe48fef5a712599b14c.html",
+      "capture_sha256": "609ef6e45de0f35a0fb1680b419b749cd512fab529762fe48fef5a712599b14c",
+      "derivation": "Reduced from the archived real DOM, retaining route option rows and route-owned IELTS requirements."
+    },
+    "psychology_linked_course_card.source.html": {
+      "fixture_sha256": "54674b8ff7ca32a0b6749e90201b018311f995e67092992ca49dcffccad7adb3",
+      "source_url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-psychology",
+      "capture_file": "6ec84ca5cdf745ab3fcaf91e3f160f843ab7067a7b785b798cd3fcc04ef5645d.html",
+      "capture_sha256": "6ec84ca5cdf745ab3fcaf91e3f160f843ab7067a7b785b798cd3fcc04ef5645d",
+      "derivation": "Reduced from the archived real DOM, retaining route option rows, the linked-course card, and route-owned IELTS requirements."
+    },
+    "artificial_intelligence_msc.source.html": {
+      "fixture_sha256": "c8c1e149b4087ebeebd23e2af958bb19eb7bfbaa83bb0efe7cf5450d3b7ccb20",
+      "source_url": "https://www.uel.ac.uk/postgraduate/courses/msc-artificial-intelligence",
+      "capture_file": "040394051abcde0a573f632d128a2d766c38736a5416ac1431469ca39489d08c.html",
+      "capture_sha256": "040394051abcde0a573f632d128a2d766c38736a5416ac1431469ca39489d08c",
+      "derivation": "Reduced from the archived real DOM, retaining both route options and each explicitly owned IELTS requirement."
+    },
+    "data_science_msc.source.html": {
+      "fixture_sha256": "69a0e7d915c64ddf5386b46f9920b2b4a61dcd40380f4d333d89d6d18ed9f390",
+      "source_url": "https://www.uel.ac.uk/postgraduate/courses/msc-data-science",
+      "capture_file": "24ae1c89ca3dd5ae20d470e04c5fd43b1c87b5e44134fa8572c3cffc8a777dba.html",
+      "capture_sha256": "24ae1c89ca3dd5ae20d470e04c5fd43b1c87b5e44134fa8572c3cffc8a777dba",
+      "derivation": "Reduced from the archived real DOM, retaining the route option and explicitly owned IELTS requirement."
+    },
+    "ai_and_data_science_msc.source.html": {
+      "fixture_sha256": "cb50f9e0697908f1c1cb02652bafb4cf88a6989d94c5529f48ff24becfd5bf49",
+      "source_url": "https://www.uel.ac.uk/postgraduate/courses/msc-ai-data-science",
+      "capture_file": "3efa9226a9fa784300147bc2d0eda60bc276d449ebd3fe6e481cc65c810cdf2f.html",
+      "capture_sha256": "3efa9226a9fa784300147bc2d0eda60bc276d449ebd3fe6e481cc65c810cdf2f",
+      "derivation": "Reduced from the archived real DOM, retaining all September route options and each explicitly owned exact IELTS requirement."
+    }
+  }
+}

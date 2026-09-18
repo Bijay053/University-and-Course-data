@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from html import escape
 import re
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
 from bs4 import BeautifulSoup
 from bs4.element import Tag
@@ -28,7 +28,7 @@ class UELVariant:
     url: str
     html: str
     international: bool
-    full_time: bool
+    full_time: bool | None
 
 
 def is_uel_course_url(url: str) -> bool:
@@ -108,6 +108,99 @@ def _tab_order(tab: Tag) -> tuple[int, int]:
     return (int(year[0]) if year else 0, month)
 
 
+_STATUS_STUB = re.compile(
+    r"international applications will open later this year\s*[.!]?",
+    re.I,
+)
+
+
+def _only_allowed_row_content(row: Tag, selectors: tuple[str, ...]) -> bool:
+    reduced = BeautifulSoup(str(row), "html.parser")
+    root = reduced.find()
+    if root is None:
+        return False
+    for selector in selectors:
+        for node in root.select(selector):
+            node.decompose()
+    return not _text(root)
+
+
+def _has_course_route_headings_only(row: Tag) -> bool:
+    for route in row.select(".course-route-div"):
+        reduced = BeautifulSoup(str(route), "html.parser")
+        root = reduced.find()
+        if root is None:
+            return False
+        for heading in root.select("h1, h2, h3, h4, h5, h6"):
+            heading.decompose()
+        if _text(root):
+            return False
+    return True
+
+
+def _is_status_stub(row: Tag, audience: str, attendance: str) -> bool:
+    """Recognise an explicitly evidenced application-status row.
+
+    UEL puts these non-option notices in the option-row wrapper.  Keep this
+    deliberately narrow: an applicant audience, no attendance/duration or
+    application control, and nothing except a recognised status sentence.
+    """
+    if not re.fullmatch(r"(?:international|home) applicant\s*,?\s*", audience, re.I):
+        return False
+    if attendance or _text(row.select_one(".attendance-type-yr")):
+        return False
+    if row.select_one("a[href], button, form, input, select"):
+        return False
+    fee = row.select_one(".fee-type")
+    if fee is not None:
+        reduced_fee = BeautifulSoup(str(fee), "html.parser")
+        for node in reduced_fee.select("label, [aria-hidden=true]"):
+            node.decompose()
+        if _text(reduced_fee):
+            return False
+    message = _text(row.select_one(".message-type"))
+    return bool(
+        message
+        and _STATUS_STUB.fullmatch(message)
+        and _has_course_route_headings_only(row)
+        and _only_allowed_row_content(
+            row,
+            (
+                ".course-route-div",
+                ".course-route",
+                ".application-type",
+                ".fee-type",
+                ".message-type",
+            ),
+        )
+    )
+
+
+def _is_linked_course_card(row: Tag, audience: str, attendance: str, source_url: str) -> bool:
+    """Recognise a card linking to another UEL course, not an option."""
+    if audience or attendance:
+        return False
+    if _text(row.select_one(".attendance-type-yr, .fee-type")):
+        return False
+    links = row.select("a[href]")
+    if (
+        len(links) != 1
+        or "distance-link" not in (links[0].get("class") or [])
+        or row.select_one("button, form, input, select")
+    ):
+        return False
+    target = urljoin(source_url, str(links[0].get("href") or ""))
+    if not is_uel_course_url(target) or uel_source_url(target) == uel_source_url(source_url):
+        return False
+    return bool(
+        _text(links[0])
+        and _has_course_route_headings_only(row)
+        and _only_allowed_row_content(
+            row, (".course-route-div", ".course-route", "a.distance-link")
+        )
+    )
+
+
 def _requirements(soup: BeautifulSoup, label: str) -> str:
     matches: list[str] = []
     # Undergraduate pages bind a shared entry dialog to a second labelled
@@ -155,7 +248,7 @@ def _requirements(soup: BeautifulSoup, label: str) -> str:
 
 def _scoped_html(
     soup: BeautifulSoup, title: str, label: str,
-    rows: list[tuple[Tag, Tag]], international: bool, full_time: bool,
+    rows: list[tuple[Tag, Tag]], international: bool, full_time: bool | None,
 ) -> str:
     rows = sorted(rows, key=lambda item: _tab_order(item[0]), reverse=True)
     months: list[str] = []
@@ -176,7 +269,8 @@ def _scoped_html(
         if normal_length and not duration:
             duration = normal_length
         fee = _text(row.select_one(".fee-type"))
-        if fee and not fee_text:
+        audience = _text(row.select_one(".application-type"))
+        if fee and not fee_text and re.search(r"\binternational applicant\b", audience, re.I):
             fee_text = fee
         tab_text = str(tab.get("aria-label") or tab.get("id") or "")
         for month in _MONTHS:
@@ -187,7 +281,9 @@ def _scoped_html(
             node.append(title)
         row_documents.append(str(row))
     months.sort(key=_MONTHS.index)
-    facts = [("Study load", "Full Time" if full_time else "Part Time")]
+    facts = []
+    if full_time is not None:
+        facts.append(("Study load", "Full Time" if full_time else "Part Time"))
     if duration:
         facts.append(("Duration", duration))
     if months:
@@ -270,24 +366,57 @@ def parse_uel_variants(html: str, url: str) -> list[UELVariant]:
         return []
     variants = []
     for key, (label, all_rows) in groups.items():
-        for _, row in all_rows:
+        option_rows: list[tuple[Tag, Tag]] = []
+        status_rows: list[tuple[Tag, Tag]] = []
+        for tab, row in all_rows:
             audience = _text(row.select_one(".application-type"))
             attendance = _text(row.select_one(".attendance-type"))
+            if _is_status_stub(row, audience, attendance):
+                status_rows.append((tab, row))
+                continue
+            if _is_linked_course_card(row, audience, attendance, url):
+                continue
             if not re.search(r"\b(?:international|home) applicant\b", audience, re.I):
                 raise ValueError(f"UEL route {label!r} has unknown applicant eligibility")
             if not re.search(r"\b(?:full|part)[- ]?time\b", attendance, re.I):
                 raise ValueError(f"UEL route {label!r} has unknown attendance")
-        intl = [(tab, row) for tab, row in all_rows
+            option_rows.append((tab, row))
+        if not option_rows:
+            raise ValueError(f"UEL route {label!r} has no complete option rows")
+        intl = [(tab, row) for tab, row in option_rows
                 if re.search(r"\binternational applicant\b", _text(row.select_one(".application-type")), re.I)]
-        eligible = intl or all_rows
-        fulltime = [(tab, row) for tab, row in eligible
-                    if re.search(r"\bfull[- ]?time\b", _text(row.select_one(".attendance-type")), re.I)]
-        eligible = fulltime or eligible
+        status_intl = any(
+            re.search(
+                r"\binternational applicant\b",
+                _text(row.select_one(".application-type")),
+                re.I,
+            )
+            for _, row in status_rows
+        )
+        if intl:
+            eligible = intl
+            fulltime = [(tab, row) for tab, row in eligible
+                        if re.search(r"\bfull[- ]?time\b", _text(row.select_one(".attendance-type")), re.I)]
+            eligible = fulltime or eligible
+            full_time: bool | None = bool(fulltime)
+        elif status_intl:
+            # The status proves international eligibility only. Home options
+            # cannot supply attendance, duration, intake, or fees for that
+            # international audience.
+            eligible = []
+            full_time = None
+        else:
+            eligible = option_rows
+            fulltime = [(tab, row) for tab, row in eligible
+                        if re.search(r"\bfull[- ]?time\b", _text(row.select_one(".attendance-type")), re.I)]
+            eligible = fulltime or eligible
+            full_time = bool(fulltime)
         name = _route_name(title, label)
+        international = bool(intl) or status_intl
         variants.append(UELVariant(
             key=key, name=name, url=_variant_url(url, key),
-            html=_scoped_html(soup, name, label, eligible, bool(intl), bool(fulltime)),
-            international=bool(intl), full_time=bool(fulltime),
+            html=_scoped_html(soup, name, label, eligible, international, full_time),
+            international=international, full_time=full_time,
         ))
     return variants
 
@@ -314,6 +443,20 @@ def uel_requirement_bands(html: str) -> dict[str, float]:
     if panel is None:
         return {}
     scores: dict[str, float] = {}
+    skill = r"(?:writing|speaking|listening|reading)"
+    score_pattern = r"(?<![\d.])([0-9](?:\.[05])?)(?![\d.])"
+    grouped_skills = rf"({skill}(?:\s*(?:,|;|/|&|\band\b)\s*{skill})*)"
+
+    def record(raw_score: str, names: str) -> None:
+        score = float(raw_score)
+        if not 0 < score <= 9:
+            return
+        for name in re.findall(rf"\b{skill}\b", names, re.I):
+            field = f"ielts_{name.casefold()}"
+            if field in scores and scores[field] != score:
+                raise ValueError("UEL route has conflicting IELTS component requirements")
+            scores[field] = score
+
     for paragraph in panel.select("p, li"):
         text = _text(paragraph)
         if not re.search(r"\bIELTS\b", text, re.I):
@@ -323,12 +466,17 @@ def uel_requirement_bands(html: str) -> dict[str, float]:
             r"((?:writing|speaking|listening|reading)\b[^.;\d]*)",
             text, re.I,
         ):
-            score = float(match[1])
-            if not 0 < score <= 9:
-                continue
-            for skill in re.findall(r"\b(writing|speaking|listening|reading)\b", match[2], re.I):
-                field = f"ielts_{skill.casefold()}"
-                if field in scores and scores[field] != score:
-                    raise ValueError("UEL route has conflicting IELTS component requirements")
-                scores[field] = score
+            record(match[1], match[2])
+        # Current UEL AI/Data Science panels put skill names before their
+        # scores. Restrict this grammar to the parenthesis immediately owned
+        # by the IELTS overall statement, not a later PTE/TOEFL clause.
+        for parenthesis in re.finditer(
+            rf"\bIELTS\s+(?:overall\s+)?{score_pattern}\s*\(([^()]*)\)",
+            text, re.I,
+        ):
+            for match in re.finditer(
+                rf"\b{grouped_skills}\s+{score_pattern}",
+                parenthesis[2], re.I,
+            ):
+                record(match[2], match[1])
     return scores

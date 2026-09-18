@@ -2326,10 +2326,15 @@ async def _extract_uel_variant(variant, *, country: str | None) -> dict[str, Any
         "course_website": url,
         "international_eligible": variant.international,
         "domestic_only": not variant.international,
-        "study_load": "Full Time" if variant.full_time else "Part Time",
+        "study_load": (
+            "Full Time" if variant.full_time is True
+            else "Part Time" if variant.full_time is False else None
+        ),
     }
     evidence: list[dict[str, Any]] = []
     for field in ("course_name", "international_eligible", "study_load"):
+        if payload[field] is None:
+            continue
         evidence.append({
             "field_key": field,
             "value": payload[field],
@@ -2339,6 +2344,12 @@ async def _extract_uel_variant(variant, *, country: str | None) -> dict[str, Any
             "snippet": f"UEL course option {variant.key}: {field}={payload[field]}",
         })
     for module, extra_keys in _EXTRACTORS:
+        if module is english_test and scoped_soup.select_one(
+            '[data-uel-requirements="matched"]'
+        ) is None:
+            # No owned panel means no English authority, even if a course
+            # description or option row mentions another route's requirement.
+            continue
         # The bounded parser explicitly identifies these route facts. Without
         # them a generic fallback can mistake the H1 for a campus, or years in
         # entry requirements for a course duration.
