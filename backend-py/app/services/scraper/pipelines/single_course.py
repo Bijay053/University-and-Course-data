@@ -2306,6 +2306,116 @@ _EXTRACTORS = (
 )
 
 
+async def _extract_uel_variant(variant, *, country: str | None) -> dict[str, Any]:
+    """Run page-local extractors on one proven route, without remote enrichment.
+
+    A browser/AI/modal refetch of the public URL would restore all sibling
+    awards. Institutional English defaults are equally unsafe where a route's
+    own requirement modal is absent. Missing facts deliberately stay missing.
+    """
+    url, html = variant.url, variant.html
+    from bs4 import BeautifulSoup
+    scoped_soup = BeautifulSoup(html, "html.parser")
+    route_facts = {
+        term.get_text(" ", strip=True).casefold()
+        for term in scoped_soup.select("dl dt")
+    }
+    payload: dict[str, Any] = {
+        "course_name": variant.name,
+        "course_website": url,
+        "international_eligible": variant.international,
+        "domestic_only": not variant.international,
+        "study_load": "Full Time" if variant.full_time else "Part Time",
+    }
+    evidence: list[dict[str, Any]] = []
+    for field in ("course_name", "international_eligible", "study_load"):
+        evidence.append({
+            "field_key": field,
+            "value": payload[field],
+            "confidence": 0.98,
+            "method": "uel:scoped_route",
+            "source_url": url,
+            "snippet": f"UEL course option {variant.key}: {field}={payload[field]}",
+        })
+    for module, extra_keys in _EXTRACTORS:
+        # The bounded parser explicitly identifies these route facts. Without
+        # them a generic fallback can mistake the H1 for a campus, or years in
+        # entry requirements for a course duration.
+        if (
+            (module is location and "location" not in route_facts)
+            or (module is duration and "duration" not in route_facts)
+            or (module is intake and "intakes" not in route_facts)
+        ):
+            continue
+        kwargs: dict[str, Any] = {}
+        if "country" in extra_keys:
+            kwargs["country"] = country
+        if module is degree_level:
+            kwargs["course_name"] = variant.name
+        # Unlike generic enrichment, failures here are explicit/retryable; do
+        # not silently substitute an undifferentiated parent-page extraction.
+        results = await module.extract(html, url, **kwargs)
+        for result in results:
+            values = result.normalized or {}
+            validate_payload_keys(f"UEL extractor {module.__name__}", values.keys())
+            for field, value in values.items():
+                if value is None:
+                    continue
+                payload.setdefault(field, value)
+                if payload[field] != value:
+                    continue
+                evidence.append({
+                    "field_key": field,
+                    "value": value,
+                    "confidence": result.confidence,
+                    "method": result.method,
+                    "source_url": url,
+                    "snippet": result.snippet,
+                    **({"extras": result.extras} if result.extras else {}),
+                })
+    from app.services.scraper.extractors.uel_variants import uel_requirement_bands
+    for field, value in uel_requirement_bands(html).items():
+        payload[field] = value
+        evidence = [item for item in evidence if item.get("field_key") != field]
+        evidence.append({
+            "field_key": field, "value": value, "confidence": 0.99,
+            "method": "uel:route_ielts_components", "source_url": url,
+            "snippet": f"Selected route {variant.key} IELTS requirement: {field}={value}",
+        })
+    if not variant.international:
+        payload.pop("international_fee", None)
+    # Missing route-local English evidence is authoritative. Explicit nulls
+    # clear previously mixed-page scores during in-place Review → Fix rather
+    # than leaving them untouched merely because the field was omitted.
+    for test in ("ielts", "pte", "toefl"):
+        for part in ("overall", "listening", "reading", "writing", "speaking"):
+            payload.setdefault(f"{test}_{part}", None)
+    for field in ("cambridge_overall", "duolingo_overall", "cambridge_accepted",
+                  "duolingo_accepted", "pte_accepted", "toefl_accepted"):
+        payload.setdefault(field, None)
+    for field in (
+        "international_fee", "domestic_fee", "fee_term", "fee_year", "currency",
+        "duration", "duration_term", "course_location", "intake_months", "intake_days",
+        "academic_level", "academic_score", "score_type", "academic_country",
+    ):
+        payload.setdefault(field, None)
+    category = classify_category(variant.name)
+    if category:
+        payload["category"] = category
+    payload = sanitize_intake_months_payload(payload)
+    _attach_extraction_method_map(payload, evidence)
+    _finalize_evidence_selection(payload, evidence)
+    validate_payload_keys("single_course.uel_variant", payload.keys())
+    return {
+        "name": variant.name,
+        "url": url,
+        "payload": payload,
+        "evidence": evidence,
+        "provenance_footer": build_course_page_provenance_footer(payload),
+        "_uel_variant": True,
+    }
+
+
 async def extract_course(
     url: str,
     *,
@@ -2320,6 +2430,7 @@ async def extract_course(
     seen_pdf_urls: set[str] | None = None,
     discovery_title: str = "",
     ai_provider: str = "gemini",
+    _uel_skip_preflight: bool = False,
 ) -> dict[str, Any]:
     """Fetch (if needed) and run all extractors. Returns merged payload + raw evidence.
 
@@ -2333,6 +2444,43 @@ async def extract_course(
     the *absolute last-resort* fallback (lower confidence than ``uni_pdf_data``)
     for universities that publish fees/IELTS only on central pages (Bug 2).
     """
+    from app.services.scraper.extractors.uel_variants import (
+        is_uel_course_url,
+        parse_uel_variants,
+        uel_source_url,
+        uel_variant_key,
+    )
+    if is_uel_course_url(url):
+        # Internal identity selectors must never be sent to the university.
+        # Every entry point (repair, UI re-extract and snapshot replay included)
+        # performs this selection before any regex, default, AI or refetch.
+        if html is None and not _uel_skip_preflight:
+            from app.services.scraper.uel_transport import fetch_uel_source
+            try:
+                html = await fetch_uel_source(url)
+            except ValueError:
+                if uel_variant_key(url):
+                    raise
+                # An unselected/one-route page may use another UEL template.
+                # Preserve its original configured browser/fetch pipeline
+                # instead of turning the new preflight into a fatal failure.
+                html = None
+        variants = parse_uel_variants(html, url) if html else []
+        selected = uel_variant_key(url)
+        if selected:
+            variant = next((item for item in variants if item.key == selected), None)
+            if variant is None:
+                raise ValueError(f"UEL variant {selected!r} no longer exists")
+            from app.services.scraper.snapshot_context import stage_snapshot
+            # Keep raw evidence for deterministic replay, keyed by the selected
+            # route URL rather than by the shared transport URL.
+            stage_snapshot(variant.url, html, "uel_variant_source")
+            return await _extract_uel_variant(variant, country=country)
+        if variants:
+            raise ValueError(
+                "UEL page has multiple course routes; select a uel_variant URL "
+                "or run catalogue discovery to expand all routes"
+            )
     # Week-1/2 contextvar guard: ensure set_uni_config() was called at the entry
     # point (run_scrape or run_repair).  Soft-fail: logs a WARNING and returns
     # bare defaults if the contextvar is unset.  Never raises in production.
@@ -3215,6 +3363,15 @@ async def extract_course(
             "payload": {},
             "evidence": [],
         }
+
+    # If UEL's preflight failed but its ordinary browser transport recovered,
+    # check the recovered raw source before generic extraction. A newly found
+    # multi-route page must not turn into a single undifferentiated record.
+    if is_uel_course_url(url) and parse_uel_variants(html or "", uel_source_url(url)):
+        raise ValueError(
+            "UEL recovered page has multiple course routes; run catalogue "
+            "discovery or select a uel_variant URL"
+        )
 
     # Preserve Federation's original response before generic HTML compaction
     # and audience-oriented transformations run.  Its authoritative Duration,

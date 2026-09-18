@@ -536,6 +536,12 @@ async def stage_course(
         payload.get("scrape_warnings") or []
     )
     _fee_preserve_fields = {"international_fee", "domestic_fee", "fee_term"}
+    from app.services.scraper.extractors.uel_variants import (
+        is_uel_course_url, uel_variant_key,
+    )
+    _uel_scoped = is_uel_course_url(source_url or "") and bool(
+        uel_variant_key(source_url or "")
+    )
     try:
         _exist_q = await db.execute(
             select(ScrapedCourse)
@@ -548,7 +554,7 @@ async def stage_course(
             .limit(1)
         )
         _exist = _exist_q.scalar_one_or_none()
-        if _exist:
+        if _exist and not _uel_scoped:
             preserved: list[str] = []
             for _fld in _PRESERVE_FIELDS:
                 if _authoritative_fee_omission and _fld in _fee_preserve_fields:

@@ -148,5 +148,5 @@
 - [Generated config release collisions](generated-config-release-collisions.md) — reconcile only integrity-verified stubs; preserve them below tracked recipe precedence and keep unknown files blocking.
 - [Algolia provider trust boundaries](algolia-provider-trust-boundaries.md) — enforce record type and URL before emitting trusted links; preserve authoritative payloads through retries.
 - [Otago Polytechnic fee cards](otago-polytechnic-fee-cards.md) — use the International Standard card; Full tuition is full-course, while First year/Course one are annual.
-- [UEL static catalogue transport](uel-static-catalogue-transport.md) — Playwright sees navigation-only pages; Scrape.do render=false exposes the complete UG/PG catalogue.
+- [UEL catalogue and award routes](uel-static-catalogue-transport.md) — static proxy exposes catalogue; each award owns its options and IELTS panel, never sibling defaults.
 - [Python local-import shadowing](python-local-import-shadowing.md) — a late function-local alias shadows earlier uses across the whole function; caught lock checks can misreport the resulting error as contention.

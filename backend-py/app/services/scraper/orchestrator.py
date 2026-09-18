@@ -993,6 +993,176 @@ async def _stop_poller(runtime_job_id: str, stop_flag: list[bool]) -> None:
             return
 
 
+async def _expand_uel_course_links_for_run(
+    links: list[dict], *, max_courses: int, targeted_retry: bool,
+    emit=None, stop_flag: list[bool] | None = None,
+) -> list[dict]:
+    """Cap source work and scale its bounded budget for a real catalogue."""
+    from app.services.scraper.extractors.uel_variants import (
+        is_uel_course_url, uel_source_url, uel_variant_key,
+    )
+
+    candidates = links if targeted_retry else links[:max_courses]
+    sources = {
+        _normalize_course_url(uel_source_url(link["url"]))
+        for link in candidates
+        if is_uel_course_url(link.get("url") or "")
+        and not uel_variant_key(link["url"]) and not link.get("_uel_html")
+    }
+    # Eight wall-clock seconds per source gives the four-worker queue room
+    # for proxy latency/recovery without granting an unbounded discovery phase.
+    budget = min(1800.0, max(180.0, len(sources) * 8.0))
+    return await _expand_uel_course_links(
+        candidates, emit=emit, stop_flag=stop_flag, phase_timeout=budget,
+    )
+
+
+async def _expand_uel_course_links(
+    links: list[dict], *, emit=None, stop_flag: list[bool] | None = None,
+    deadline: float | None = None, phase_timeout: float = 180.0,
+) -> list[dict]:
+    """Expand route identities before caps/checkpoints, fetching each page once.
+
+    Retain raw HTML (one shared string per source page) so each extraction,
+    including a retry, independently selects its own bounded route. Never
+    clone provider payloads: those describe the undifferentiated parent page.
+    """
+    from app.services.scraper.extractors.uel_variants import (
+        is_uel_course_url,
+        parse_uel_variants,
+        uel_source_url,
+        uel_variant_key,
+    )
+    from app.services.scraper.uel_transport import fetch_uel_source
+
+    if stop_flag and stop_flag[0]:
+        raise asyncio.CancelledError("UEL expansion stopped")
+    phase_deadline = min(
+        deadline if deadline is not None else float("inf"),
+        time.monotonic() + phase_timeout,
+    )
+    sources = {
+        _normalize_course_url(uel_source_url(link["url"])): uel_source_url(link["url"])
+        for link in links if is_uel_course_url(link.get("url") or "")
+        and not uel_variant_key(link["url"])
+    }
+    if not sources:
+        return links
+    semaphore = asyncio.Semaphore(4)
+
+    async def fetch_source(key: str, url: str):
+        async with semaphore:
+            if stop_flag and stop_flag[0]:
+                raise asyncio.CancelledError("UEL expansion stopped")
+            try:
+                # The source helper already tries HTTP and static proxy. Do
+                # not multiply its bounded transport chain by three here.
+                html = await fetch_uel_source(url)
+                return key, (html, None)
+            except ScrapedoAccountError:
+                raise
+            except Exception as exc:
+                return key, (None, f"{type(exc).__name__}: {exc}")
+
+    pages: dict[str, tuple[str | None, str | None]] = {}
+    for link in links:
+        if link.get("_uel_html") and is_uel_course_url(link.get("url") or ""):
+            pages[_normalize_course_url(uel_source_url(link["url"]))] = (
+                link["_uel_html"], None,
+            )
+    tasks = {
+        asyncio.create_task(fetch_source(key, url))
+        for key, url in sources.items() if key not in pages
+    }
+    pending = tasks.copy()
+    try:
+        while pending:
+            if stop_flag and stop_flag[0]:
+                raise asyncio.CancelledError("UEL expansion stopped")
+            remaining = phase_deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("UEL route expansion exceeded its phase deadline")
+            done, pending = await asyncio.wait(
+                pending, timeout=min(0.25, remaining),
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in done:
+                key, page = task.result()
+                pages[key] = page
+                if emit:
+                    await asyncio.wait_for(
+                        emit(
+                            "status", f"[UEL] checked {len(pages)}/{len(sources)} source page(s)",
+                            phase="extract", kind="uel_variant_expansion_progress",
+                            completed=len(pages), total=len(sources),
+                        ),
+                        timeout=max(0.001, phase_deadline - time.monotonic()),
+                    )
+    finally:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+    expanded: list[dict] = []
+    seen: set[str] = set()
+    for link in links:
+        await asyncio.sleep(0)
+        if stop_flag and stop_flag[0]:
+            raise asyncio.CancelledError("UEL expansion stopped")
+        if time.monotonic() >= phase_deadline:
+            raise TimeoutError("UEL route expansion exceeded its phase deadline")
+        url = link.get("url") or ""
+        if not is_uel_course_url(url):
+            expanded.append(link)
+            continue
+        page_key = _normalize_course_url(uel_source_url(url))
+        if page_key not in pages:
+            # Selected URLs already are record identities. Defer their source
+            # fetch until AFTER resume filtering instead of paying to discover
+            # siblings that this targeted request did not ask to process.
+            expanded.append(link)
+            continue
+        html, error = pages[page_key]
+        if error:
+            # Preserve ordinary/browser recovery for an unselected source.
+            # The late raw-source guard rejects any recovered multi-route page.
+            candidates = [
+                link if uel_variant_key(url) else {**link, "_uel_skip_preflight": True}
+            ]
+        else:
+            try:
+                variants = parse_uel_variants(html, url)
+                selected = uel_variant_key(url)
+                if selected:
+                    variants = [variant for variant in variants if variant.key == selected]
+                    if not variants:
+                        raise ValueError(f"UEL variant {selected!r} no longer exists")
+                candidates = [
+                    {"name": variant.name, "url": variant.url, "_uel_html": html}
+                    for variant in variants
+                ] if variants else [{**link, "_uel_html": html}]
+            except ValueError as exc:
+                candidates = [{**link, "_uel_expansion_error": str(exc)}]
+        for candidate in candidates:
+            identity = _normalize_course_url(candidate["url"])
+            if identity not in seen:
+                seen.add(identity)
+                expanded.append(candidate)
+    if emit:
+        await asyncio.wait_for(
+            emit(
+                "status",
+                f"[UEL] resolved {len(sources)} source page(s) into "
+                f"{len(seen)} independent course route(s)",
+                phase="extract",
+                kind="uel_variant_expansion",
+            ),
+            timeout=max(0.001, phase_deadline - time.monotonic()),
+        )
+    return expanded
+
+
 async def _extract_only(
     link: dict,
     country: str | None,
@@ -1036,6 +1206,12 @@ async def _extract_only(
     # or ``swiftype_result``. Return it verbatim — no network fetch, no
     # extraction. Shape matches this function's normal output:
     # {name, url, payload, evidence}.
+    if link.get("_uel_expansion_error"):
+        return {
+            "name": link.get("name") or "Unknown course",
+            "url": link["url"],
+            "error": f"extract: UEL variant expansion failed: {link['_uel_expansion_error']}",
+        }
     _pre = link.get("searchstax_result") or link.get("swiftype_result")
     if _pre is not None:
         # Save the JSON payload as a snapshot so replay can re-apply guards
@@ -1100,6 +1276,8 @@ async def _extract_only(
             seen_pdf_urls=seen_pdf_urls,
             discovery_title=name,
             ai_provider=ai_provider,
+            **({"html": link["_uel_html"]} if link.get("_uel_html") else {}),
+            **({"_uel_skip_preflight": True} if link.get("_uel_skip_preflight") else {}),
         )
     except ScrapedoAccountError:
         raise  # propagate — caller sets scrape_do_dead_flag to abort remaining courses
@@ -1128,7 +1306,7 @@ async def _extract_only(
     # a discovery link. Merge it only after the full HTML/AI pipeline so the
     # provider corrects WSU's domestic-default fee panel and noisy AI durations.
     _algolia_payload = link.get("payload")
-    if isinstance(_algolia_payload, dict):
+    if isinstance(_algolia_payload, dict) and not out.get("_uel_variant"):
         try:
             from app.services.scraper.algolia_provider import merge_algolia_payload
             out = merge_algolia_payload(out, _algolia_payload, url=url)
@@ -5427,6 +5605,24 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 max_elapsed_seconds=_effective_course_timeout,
             )
 
+        # UEL source pages contain independently reviewable awards/routes.
+        # Expand BEFORE resume matching: a staged MSc must not hide its
+        # placement-year sibling, nor may an old parent-URL checkpoint hide both.
+        # Bound source-page fetches as well as the final expanded record count.
+        # Otherwise a fast/small scrape still fetched an entire UEL catalogue
+        # merely to truncate its expanded variants immediately afterwards.
+        try:
+            links = await _expand_uel_course_links_for_run(
+                links, max_courses=max_courses, targeted_retry=_targeted_retry,
+                emit=emit, stop_flag=stop_flag,
+            )
+        except asyncio.CancelledError:
+            if stop_flag[0]:
+                return await _finalize_stopped()
+            raise
+        summary["discovered"] = len(links)
+        job.total_found = len(links)
+
         # ── Apply final hard cap so merged link sets (BFS + sitemap supplement
         # + always_sitemap_supplement) never exceed max_courses regardless of
         # the order in which discovery methods returned results.  This ensures
@@ -5447,6 +5643,7 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                 capped=max_courses,
             )
             links = links[:max_courses]
+            summary["discovered"] = len(links)
             job.total_found = len(links)
             await db.commit()
 
@@ -5750,7 +5947,10 @@ async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
                     backfill_english_from_siblings,
                 )
 
-                sibling_dicts = [r for r in results if isinstance(r, dict)]
+                sibling_dicts = [
+                    r for r in results
+                    if isinstance(r, dict) and not r.get("_uel_variant")
+                ]
                 # Bond University: require at least 2 courses to agree on an
                 # English score before promoting it to the sibling cache.  Bond's
                 # marketing and experience pages mention "IELTS 6.5" in running

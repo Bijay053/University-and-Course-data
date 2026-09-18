@@ -70,19 +70,62 @@ async def approve_scraped_course(
         {"scope": review_restore_lock_scope(sc.university_id)},
     )
 
-    existing = (
-        await db.execute(
-            select(Course).where(
-                Course.university_id == sc.university_id,
-                func.lower(Course.name) == sc.course_name.lower(),  # Bug #1
+    from app.services.scraper.extractors.uel_variants import (
+        is_uel_course_url, uel_source_url, uel_variant_key,
+    )
+    from app.services.scraper.url_identity import canonical_course_url_key
+
+    _uel_variant = is_uel_course_url(sc.course_website or "") and bool(
+        uel_variant_key(sc.course_website or "")
+    )
+    if _uel_variant:
+        # Award names can change independently of route identity. Never merge a
+        # selected route into its sibling (or a legacy undifferentiated parent)
+        # merely because the two display names happen to match.
+        candidates = (
+            await db.execute(
+                select(Course).where(Course.university_id == sc.university_id)
             )
-        )
-    ).scalar_one_or_none()
+        ).scalars().all()
+        identity = canonical_course_url_key(sc.course_website)
+        exact = [
+            candidate for candidate in candidates
+            if canonical_course_url_key(candidate.course_website) == identity
+        ]
+        if len(exact) > 1:
+            raise ValueError("Ambiguous UEL variant identity; manual review required")
+        existing = exact[0] if exact else None
+        if existing is None:
+            # Adopt a legacy parent only when BOTH the exact canonical source
+            # and normalized display name match. This preserves a standard
+            # award's live ID without folding placement/MFA siblings into it.
+            source_identity = canonical_course_url_key(uel_source_url(sc.course_website))
+            normalized_name = " ".join(sc.course_name.split()).casefold()
+            legacy = [
+                candidate for candidate in candidates
+                if canonical_course_url_key(candidate.course_website) == source_identity
+                and not uel_variant_key(candidate.course_website or "")
+                and " ".join(candidate.name.split()).casefold() == normalized_name
+            ]
+            if len(legacy) > 1:
+                raise ValueError("Ambiguous legacy UEL course identity; manual review required")
+            existing = legacy[0] if legacy else None
+    else:
+        existing = (
+            await db.execute(
+                select(Course).where(
+                    Course.university_id == sc.university_id,
+                    func.lower(Course.name) == sc.course_name.lower(),  # Bug #1
+                )
+            )
+        ).scalar_one_or_none()
 
     decision = should_auto_publish(sc)
 
     if existing:
         course = existing
+        if _uel_variant:
+            course.name = sc.course_name
         course.last_edited_at = datetime.now(timezone.utc)
         course.last_edited_by = actor
     else:
@@ -196,8 +239,9 @@ async def approve_scraped_course(
             )
         )
 
-    if sc.intake_months:
+    if _uel_variant or sc.intake_months:
         await db.execute(Intake.__table__.delete().where(Intake.course_id == course.id))
+    if sc.intake_months:
         for m in sc.intake_months or []:
             db.add(
                 Intake(
@@ -207,8 +251,9 @@ async def approve_scraped_course(
                 )
             )
 
-    if sc.international_fee is not None:
+    if _uel_variant or sc.international_fee is not None:
         await db.execute(Fee.__table__.delete().where(Fee.course_id == course.id))
+    if sc.international_fee is not None:
         db.add(
             Fee(
                 course_id=course.id,
@@ -219,12 +264,13 @@ async def approve_scraped_course(
             )
         )
 
-    if sc.academic_level or sc.academic_score is not None:
+    if _uel_variant or sc.academic_level or sc.academic_score is not None:
         await db.execute(
             AcademicRequirement.__table__.delete().where(
                 AcademicRequirement.course_id == course.id
             )
         )
+    if sc.academic_level or sc.academic_score is not None:
         db.add(
             AcademicRequirement(
                 course_id=course.id,
