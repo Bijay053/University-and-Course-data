@@ -44,7 +44,7 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
             ExtractionResult(
                 field_key="international_eligible",
                 value=False,
-                normalized={"international_eligible": False, "eligibility_status": "rejected"},
+                normalized={"international_eligible": False},
                 confidence=0.9,
                 method="eligibility.negative",
                 snippet=neg_match.group(0),
@@ -57,7 +57,7 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
             ExtractionResult(
                 field_key="international_eligible",
                 value=True,
-                normalized={"international_eligible": True, "eligibility_status": "approved"},
+                normalized={"international_eligible": True},
                 confidence=0.85,
                 method="eligibility.positive",
                 snippet=pos_match.group(0),

@@ -44,6 +44,10 @@ from app.services.scraper.guards import (
     should_stage_course,
 )
 from app.services.scraper.field_normalizers import sanitize_intake_months_payload
+from app.services.scraper.payload_contract import (
+    PERSISTABLE_STAGING_PAYLOAD_FIELDS,
+    validate_payload_keys,
+)
 from app.services.scraper.url_identity import canonical_course_url_key
 
 log = logging.getLogger(__name__)
@@ -348,6 +352,7 @@ async def stage_course(
     skip_url_block: bool = False,
     targeted_retry: bool = False,
 ) -> StageResult:
+    validate_payload_keys("stage_course payload", payload.keys())
     name = (course_name or "").strip()
     if len(name) < 3:
         return StageResult(False, "course_name too short")
@@ -957,6 +962,7 @@ async def stage_course(
     # after the initial guard.  Re-run the guard immediately before model
     # construction so the actual JSONB write is always month-only.
     payload = sanitize_intake_months_payload(payload)
+    validate_payload_keys("stage_course final payload", payload.keys())
 
     sc = ScrapedCourse(
         scrape_job_id=scrape_job_id,
@@ -968,8 +974,7 @@ async def stage_course(
         **{
             k: _clean_model_value(k, v)
             for k, v in payload.items()
-            if hasattr(ScrapedCourse, k)
-            and k not in {"course_name", "canonical_course_url"}
+            if k in PERSISTABLE_STAGING_PAYLOAD_FIELDS
         },
     )
     db.add(sc)

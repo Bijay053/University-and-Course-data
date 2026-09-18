@@ -109,7 +109,7 @@ async def test_eligibility_negative_domestic_only() -> None:
     html = "<p>This course is open to domestic students only.</p>"
     out = await eligibility.extract(html, "")
     assert out and out[0].value is False
-    assert out[0].normalized["eligibility_status"] == "rejected"
+    assert out[0].normalized == {"international_eligible": False}
 
 
 @pytest.mark.asyncio

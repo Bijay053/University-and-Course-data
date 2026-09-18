@@ -52,6 +52,7 @@ from app.services.scraper.http_fetcher import (
 )
 from app.services.scraper.provenance import build_course_page_provenance_footer
 from app.services.scraper.field_normalizers import sanitize_intake_months_payload
+from app.services.scraper.payload_contract import validate_payload_keys
 from app.services.scraper.course_deadline import (
     clamp_timeout,
     has_budget,
@@ -4548,6 +4549,10 @@ async def extract_course(
             log.warning("Extractor %s failed on %s: %s", module.__name__, url, exc)
             continue
         for r in results:
+            validate_payload_keys(
+                f"extractor {module.__name__}",
+                (r.normalized or {}).keys(),
+            )
             if r.field_key == "duration" and r.normalized:
                 _duration_unit = r.normalized.get("duration_term")
                 _duration_value = r.normalized.get("duration")
@@ -10925,6 +10930,7 @@ async def extract_course(
             "_perf": _perf_flags,
         }
 
+    validate_payload_keys("single_course.extract_course", payload.keys())
     return {
         "url": url,
         "payload": payload,
