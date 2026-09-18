@@ -15,3 +15,17 @@ complete server-rendered catalogue; JavaScript rendering added no links.
 **How to apply:** Keep generic browser discovery and Wayback disabled for UEL.
 When its catalogue count changes, verify both static listing pages before
 changing extraction logic or re-enabling expensive discovery tiers.
+
+UEL course-option rows are audience- and attendance-scoped. For duration, use
+the row that explicitly pairs International Applicant with Full time, and read
+its adjacent duration value. Normalize “Prof Doc” course-title suffixes as
+Doctorate.
+
+**Why:** Flattened UEL pages can expose unrelated one-year values before the
+international full-time option, while professional doctorate titles often omit
+the full word “Doctorate.” This produced a one-year duration and blank degree
+level for valid three-year doctoral courses.
+
+**How to apply:** Keep this rule exact-host scoped and prefer the structured
+Course options row over generic page-wide duration matching. Verify both the
+MPhil/PhD route and Prof Doc title forms when changing UEL extraction.
