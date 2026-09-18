@@ -57,28 +57,12 @@ def _release_revision_gate(
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [
-            "bash",
-            "-c",
-            """
-set -euo pipefail
-predecessor="$1"
-target="$2"
-[[ "$predecessor" =~ ^[0-9a-f]{40}$ ]]
-[[ "$target" =~ ^[0-9a-f]{40}$ ]]
-test "$(git rev-parse HEAD)" = "$predecessor"
-git fetch origin main
-test "$(git rev-parse origin/main)" = "$target"
-git cat-file -e "$predecessor^{commit}"
-git cat-file -e "$target^{commit}"
-git merge-base --is-ancestor "$predecessor" "$target"
-git merge --ff-only "$target"
-test "$(git rev-parse HEAD)" = "$target"
-""",
-            "release-revision-gate",
+            str(DEPLOY_DIR / "release_revision_fence.sh"),
+            "checkout",
+            str(repo),
             predecessor,
             target,
         ],
-        cwd=repo,
         capture_output=True,
         text=True,
         check=False,
@@ -116,15 +100,25 @@ def _release_revision_repo(tmp_path: Path) -> tuple[Path, Path, str, str]:
 def test_guarded_release_requires_exact_revision_arguments() -> None:
     entrypoint = DEPLOY_DIR / "guarded_release.sh"
     script = entrypoint.read_text(encoding="utf-8")
+    fence = DEPLOY_DIR / "release_revision_fence.sh"
+    fence_script = fence.read_text(encoding="utf-8")
 
     assert entrypoint.stat().st_mode & stat.S_IXUSR
+    assert fence.stat().st_mode & stat.S_IXUSR
     assert 'if [ "$#" -ne 3 ]' in script
-    assert '[[ ! "$predecessor" =~ ^[0-9a-f]{40}$ ]]' in script
-    assert '[[ ! "$target" =~ ^[0-9a-f]{40}$ ]]' in script
+    assert '[[ ! "$predecessor" =~ ^[0-9a-f]{40}$ ]]' in fence_script
+    assert '[[ ! "$target" =~ ^[0-9a-f]{40}$ ]]' in fence_script
     assert "__TARGET_RELEASE__" not in script
     assert "__EXPECTED_DISPOSABLE_ACCOUNT__" not in script
-    assert 'rev-parse HEAD)" = "$predecessor"' in script
+    assert "release_revision_fence.sh" in script
     assert '--expected-rehearsal-account-id "$expected_disposable_account"' in script
+
+
+def test_release_revision_fence_has_no_production_side_effects() -> None:
+    script = (DEPLOY_DIR / "release_revision_fence.sh").read_text(encoding="utf-8")
+
+    for forbidden in ("systemctl", "safe_restart_smoke", "aws ", "cleanup", "rm "):
+        assert forbidden not in script
 
 
 @pytest.mark.parametrize("bad_ref", ["HEAD", "main", "0123456789ab"])
@@ -177,12 +171,10 @@ def test_release_aborts_on_remote_advance_then_retries_exact_new_tip(
 def test_guarded_release_refetches_tip_before_checkout() -> None:
     script = (DEPLOY_DIR / "guarded_release.sh").read_text(encoding="utf-8")
     prepare = script.index('"$reconciler" prepare \\\n')
-    second_fetch = script.index("git fetch origin main", prepare)
-    second_tip_check = script.index('git rev-parse origin/main)" = "$target"', second_fetch)
-    merge = script.index('git merge --ff-only "$target"', second_tip_check)
+    checkout = script.index("release_revision_fence.sh \\\n  checkout", prepare)
     restart = script.index("systemctl restart uni-api-py.service uni-celery.service")
 
-    assert prepare < second_fetch < second_tip_check < merge < restart
+    assert prepare < checkout < restart
     assert "git pull" not in script
 
 
@@ -771,9 +763,7 @@ def test_aborted_release_restores_and_cleans_tracked_recipe_backup(
 
 def test_guarded_release_restores_recipes_before_restart_and_stops_on_cleanup_failure() -> None:
     script = (DEPLOY_DIR / "guarded_release.sh").read_text(encoding="utf-8")
-    checkout = script.index(
-        'test "$(sudo -u ubuntu git rev-parse HEAD)" = "$target"'
-    )
+    checkout = script.index("release_revision_fence.sh \\\n  checkout")
     restore = script.index("restore-tracked", checkout)
     restart = script.index(
         "systemctl restart uni-api-py.service uni-celery.service"
@@ -1017,9 +1007,7 @@ def test_production_release_reports_redundant_overlays_after_checkout() -> None:
         DEPLOY_DIR / "post_checkout_overlay_audit.py"
     ).read_text(encoding="utf-8")
 
-    checkout_verified = script.index(
-        'test "$(sudo -u ubuntu git rev-parse HEAD)" = "$target"'
-    )
+    checkout_verified = script.index("release_revision_fence.sh \\\n  checkout")
     audit = script.index("post_checkout_overlay_audit.py")
     restart = script.index(
         "systemctl restart uni-api-py.service uni-celery.service"

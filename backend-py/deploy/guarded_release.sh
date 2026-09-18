@@ -8,14 +8,6 @@ fi
 predecessor="$1"
 target="$2"
 expected_disposable_account="$3"
-if [[ ! "$predecessor" =~ ^[0-9a-f]{40}$ ]]; then
-  echo "Predecessor must be an exact lowercase 40-character Git SHA" >&2
-  exit 2
-fi
-if [[ ! "$target" =~ ^[0-9a-f]{40}$ ]]; then
-  echo "Target must be an exact lowercase 40-character Git SHA" >&2
-  exit 2
-fi
 if [[ ! "$expected_disposable_account" =~ ^[0-9]{12}$ ]]; then
   echo "Expected disposable account ID must be exactly 12 digits" >&2
   exit 2
@@ -28,7 +20,8 @@ source .release.env
 source /etc/university-portal/database.env
 set +a
 export PYTHONPATH=.
-test "$(git -c safe.directory=/opt/university-portal rev-parse HEAD)" = "$predecessor"
+sudo -u ubuntu deploy/release_revision_fence.sh \
+  verify /opt/university-portal "$predecessor" "$target"
 .venv/bin/python -B deploy/safe_restart_smoke.py \
   --expected-rehearsal-account-id "$expected_disposable_account"
 
@@ -111,11 +104,6 @@ print("Consumers paused; all workers and jobs idle")
 PY
 cd /opt/university-portal
 sudo -u ubuntu git diff --cached --quiet
-sudo -u ubuntu git fetch origin main
-test "$(sudo -u ubuntu git rev-parse origin/main)" = "$target"
-sudo -u ubuntu git cat-file -e "$predecessor^{commit}"
-sudo -u ubuntu git cat-file -e "$target^{commit}"
-sudo -u ubuntu git merge-base --is-ancestor "$predecessor" "$target"
 reconciler="$(mktemp)"
 reconciliation_manifest="$(mktemp)"
 tracked_recipe_manifest="$(mktemp)"
@@ -130,10 +118,8 @@ sudo -u ubuntu git diff --quiet
 sudo -u ubuntu /opt/university-portal/backend-py/.venv/bin/python -B "$reconciler" prepare \
   --repo-root /opt/university-portal --target "$target" \
   --manifest "$reconciliation_manifest"
-sudo -u ubuntu git fetch origin main
-test "$(sudo -u ubuntu git rev-parse origin/main)" = "$target"
-sudo -u ubuntu git merge --ff-only "$target"
-test "$(sudo -u ubuntu git rev-parse HEAD)" = "$target"
+sudo -u ubuntu backend-py/deploy/release_revision_fence.sh \
+  checkout /opt/university-portal "$predecessor" "$target"
 sudo -u ubuntu /opt/university-portal/backend-py/.venv/bin/python -B "$reconciler" restore-tracked \
   --manifest "$tracked_recipe_manifest"
 sudo -u ubuntu /opt/university-portal/backend-py/.venv/bin/python -B "$reconciler" verify-tracked \

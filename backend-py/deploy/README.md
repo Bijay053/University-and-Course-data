@@ -22,6 +22,7 @@ in `../README.md`.
 | `prove_database_refresh_alert.py` | Publishes one disposable sanitized database-refresh failure alert and proves repeat suppression |
 | `prove_database_refresh_alert_delivery.py` | Temporarily triggers and restores the fixed delivery-failure alarm |
 | `reconcile_generated_configs.py` | Preserves verified generated recipe collisions and audits or removes fully superseded runtime overlays |
+| `release_revision_fence.sh` | Verifies and fast-forwards only an exact reviewed Git revision |
 
 ## Guarded application release
 
@@ -41,7 +42,10 @@ Both revisions must be lowercase 40-character Git commit IDs. Abbreviated and
 symbolic refs are rejected. The checked-out revision must equal the predecessor,
 the predecessor must be an ancestor of the target, and fetched `origin/main`
 must equal the target. The script fetches and checks the remote tip again after
-release preparation and immediately before the fast-forward checkout. If main
+release preparation and immediately before the fast-forward checkout by calling
+the same narrowly scoped revision-fence helper used by the integration tests.
+The helper performs only Git revision verification and optional fast-forward
+checkout; it cannot run proofs, restart services, or clean release state. If main
 advanced, it exits before changing the checkout or restarting services; rerun
 with the same predecessor and the newly reviewed exact remote tip.
 
