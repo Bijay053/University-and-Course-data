@@ -47,3 +47,17 @@ values. Require explicit Home-only evidence before excluding a route as
 domestic: an unfamiliar option layout is an extraction error, not eligibility
 evidence. Check mixed IELTS skill floors against the actual labelled panel;
 “6 in writing/speaking; 5.5 in listening/reading” is not a 6 all-band floor.
+
+UEL also reuses course-option row styling for linked-course cards and
+international application-status stubs; a wrapper class alone does not prove
+that a row is an actionable attendance option.
+
+**Why:** Live Psychology HTML embeds a distance-learning course link with no
+applicant/attendance fields. Physiotherapy publishes explicit international
+application status with blank attendance. Rejecting an entire page for either
+row also loses independently valid siblings.
+
+**How to apply:** Distinguish positively identified linked cards/status stubs
+from actual options before strict validation. Keep unexplained missing
+eligibility as unknown, preserve explicit international status evidence, and
+never invent attendance or copy sibling requirements.

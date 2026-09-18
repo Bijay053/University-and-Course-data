@@ -1,6 +1,9 @@
 # UEL full-catalogue runtime verification — blocked preflight
 
-Checked on 2026-09-18. **The full-catalogue verification has not run and is not complete.**
+Original preflight on 2026-09-18. The blockers below were subsequently resolved
+by user-authorized release and an isolated full run. See
+[final results](uel-full-catalogue-result.md): verification completed with
+acceptance failures. The following preserves the original preflight evidence.
 
 ## Production observations (read-only)
 

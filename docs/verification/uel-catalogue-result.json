@@ -1,0 +1,2821 @@
+{
+  "drop_explanations": [
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/edd-professional-doctorate-education",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/edd-professional-doctorate-education",
+          "reason": "extract_exception",
+          "sequence": 1997
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/llm-fintech-law",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/llm-fintech-law",
+          "reason": "extract_exception",
+          "sequence": 2667
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/llm-legal-practice-sqe-preparation",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/llm-legal-practice-sqe-preparation",
+          "reason": "extract_exception",
+          "sequence": 2674
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/ma-architecture-and-urbanism",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/ma-architecture-and-urbanism",
+          "reason": "extract_exception",
+          "sequence": 1114
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/ma-counselling-psychotherapy",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/ma-counselling-psychotherapy",
+          "reason": "rejected: part_time_only",
+          "sequence": 1968
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/ma-creative-enterprise",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/ma-creative-enterprise",
+          "reason": "extract_exception",
+          "sequence": 2656
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/ma-data-journalism",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/ma-data-journalism",
+          "reason": "extract_exception",
+          "sequence": 2675
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/ma-early-childhood-leadership-practice",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/ma-early-childhood-leadership-practice",
+          "reason": "extract_exception",
+          "sequence": 1978
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/ma-education-distance-learning",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/ma-education-distance-learning",
+          "reason": "rejected: online_only",
+          "sequence": 1981
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/ma-education-pathway-teaching-learning",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/ma-education-pathway-teaching-learning",
+          "reason": "extract_exception",
+          "sequence": 1979
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/ma-english-language-teaching-distance-learning",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/ma-english-language-teaching-distance-learning",
+          "reason": "rejected: online_only",
+          "sequence": 1982
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/ma-fine-art",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/ma-fine-art",
+          "reason": "extract_exception",
+          "sequence": 2752
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/ma-interior-architecture-design",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/ma-interior-architecture-design",
+          "reason": "extract_exception",
+          "sequence": 1116
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/ma-international-fashion-business",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/ma-international-fashion-business",
+          "reason": "extract_exception",
+          "sequence": 2660
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/ma-leadership-education",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/ma-leadership-education",
+          "reason": "extract_exception",
+          "sequence": 1986
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/ma-media-communication-industries",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/ma-media-communication-industries",
+          "reason": "extract_exception",
+          "sequence": 2679
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/ma-post-qualifying-professional-practice",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/ma-post-qualifying-professional-practice",
+          "reason": "rejected: part_time_only",
+          "sequence": 1988
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/ma-professional-landscape-architecture",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/ma-professional-landscape-architecture",
+          "reason": "extract_exception",
+          "sequence": 1903
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/ma-special-additional-learning-needs-icep-europe",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/ma-special-additional-learning-needs-icep-europe",
+          "reason": "extract_exception",
+          "sequence": 2619
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/ma-special-educational-needs",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/ma-special-educational-needs",
+          "reason": "extract_exception",
+          "sequence": 2618
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/march-architecture-arbriba-part-2",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/march-architecture-arbriba-part-2",
+          "reason": "extract_exception",
+          "sequence": 1113
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/mba-master-business-administration-business-analytics?uel_variant=mba-with-placement-year",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/mba-master-business-administration-business-analytics?uel_variant=mba-with-placement-year",
+          "reason": "rejected: domestic_only",
+          "sequence": 1921
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/mphil-phd-architecture-computing-engineering",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/mphil-phd-architecture-computing-engineering",
+          "reason": "extract_exception",
+          "sequence": 1115
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/mphil-phd-health-wellbeing-online-harms",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/mphil-phd-health-wellbeing-online-harms",
+          "reason": "rejected: online_only",
+          "sequence": 1970
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/mphil-phd-school-arts-creative-industries",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/mphil-phd-school-arts-creative-industries",
+          "reason": "extract_exception",
+          "sequence": 2754
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/mphil-phd-school-health-sport-bioscience",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/mphil-phd-school-health-sport-bioscience",
+          "reason": "extract_exception",
+          "sequence": 1912
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/mres-bioscience",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/mres-bioscience",
+          "reason": "extract_exception",
+          "sequence": 1906
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/mres-creative-arts-social-justice",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/mres-creative-arts-social-justice",
+          "reason": "extract_exception",
+          "sequence": 2683
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/mres-social-research-social-justice",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/mres-social-research-social-justice",
+          "reason": "extract_exception",
+          "sequence": 1974
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/mres-sport-exercise-science",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/mres-sport-exercise-science",
+          "reason": "extract_exception",
+          "sequence": 2706
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-applied-sport-exercise-physiology",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/msc-applied-sport-exercise-physiology",
+          "reason": "extract_exception",
+          "sequence": 2702
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-business-psychology",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/msc-business-psychology",
+          "reason": "extract_exception",
+          "sequence": 2696
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-clinical-exercise-physiology",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/msc-clinical-exercise-physiology",
+          "reason": "extract_exception",
+          "sequence": 1110
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-cyber-diplomacy",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/msc-cyber-diplomacy",
+          "reason": "extract_exception",
+          "sequence": 1955
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-cyber-security-engineering",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/msc-cyber-security-engineering",
+          "reason": "extract_exception",
+          "sequence": 1957
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-events-hospitality-leadership",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/msc-events-hospitality-leadership",
+          "reason": "extract_exception",
+          "sequence": 2662
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-integrative-counselling-coaching",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/msc-integrative-counselling-coaching",
+          "reason": "extract_exception",
+          "sequence": 1971
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-international-relations",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/msc-international-relations",
+          "reason": "extract_exception",
+          "sequence": 1973
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-pharmaceutical-science-specialism",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/msc-pharmaceutical-science-specialism",
+          "reason": "extract_exception",
+          "sequence": 1910
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-physician-associate",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/msc-physician-associate",
+          "reason": "extract_exception",
+          "sequence": 1911
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-smart-resilient-cities",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/msc-smart-resilient-cities",
+          "reason": "extract_exception",
+          "sequence": 1965
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-sport-analytics",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/msc-sport-analytics",
+          "reason": "extract_exception",
+          "sequence": 2704
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-sport-psychology",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/msc-sport-psychology",
+          "reason": "extract_exception",
+          "sequence": 2705
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-sports-management",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/msc-sports-management",
+          "reason": "extract_exception",
+          "sequence": 2707
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgce-ipgce",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/pgce-ipgce",
+          "reason": "extract_exception",
+          "sequence": 1985
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgce-non-qualified-teacher-status-qts",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/pgce-non-qualified-teacher-status-qts",
+          "reason": "rejected: part_time_only",
+          "sequence": 1987
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgce-primary-humanities-religious-education",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/pgce-primary-humanities-religious-education",
+          "reason": "extract_exception",
+          "sequence": 1991
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgce-primary-sport-wellbeing",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/pgce-primary-sport-wellbeing",
+          "reason": "extract_exception",
+          "sequence": 1995
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgce-secondary-drama",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/pgce-secondary-drama",
+          "reason": "extract_exception",
+          "sequence": 2609
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgce-secondary-english",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/pgce-secondary-english",
+          "reason": "extract_exception",
+          "sequence": 2610
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgce-secondary-geography",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/pgce-secondary-geography",
+          "reason": "extract_exception",
+          "sequence": 2611
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgce-secondary-music",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/pgce-secondary-music",
+          "reason": "extract_exception",
+          "sequence": 2614
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgce-secondary-physical-education",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/pgce-secondary-physical-education",
+          "reason": "extract_exception",
+          "sequence": 2615
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgce-secondary-physics",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/pgce-secondary-physics",
+          "reason": "extract_exception",
+          "sequence": 2616
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgcert-independent-supplementary-prescribing",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/pgcert-independent-supplementary-prescribing",
+          "reason": "rejected: part_time_only",
+          "sequence": 1111
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgcert-understanding-supporting-behaviour",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/pgcert-understanding-supporting-behaviour",
+          "reason": "rejected: part_time_only",
+          "sequence": 2620
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgdip-counselling-psychotherapy",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/pgdip-counselling-psychotherapy",
+          "reason": "rejected: part_time_only",
+          "sequence": 1969
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgdip-integrative-counselling-coaching",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/pgdip-integrative-counselling-coaching",
+          "reason": "rejected: part_time_only",
+          "sequence": 1972
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/prof-doc-clinical-psychology",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/prof-doc-clinical-psychology",
+          "reason": "extract_exception",
+          "sequence": 2697
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/prof-doc-counselling-psychology",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/prof-doc-counselling-psychology",
+          "reason": "extract_exception",
+          "sequence": 1967
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/prof-doc-cyber-diplomacy",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/prof-doc-cyber-diplomacy",
+          "reason": "rejected: part_time_only",
+          "sequence": 1956
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/prof-doc-educational-child-psychology",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/prof-doc-educational-child-psychology",
+          "reason": "extract_exception",
+          "sequence": 2698
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/prof-doc-fine-art",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/prof-doc-fine-art",
+          "reason": "extract_exception",
+          "sequence": 2753
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/postgraduate/courses/prof-doc-information-security",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/postgraduate/courses/prof-doc-information-security",
+          "reason": "rejected: part_time_only",
+          "sequence": 1960
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/ba-hons-acting-stage-screen",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/ba-hons-acting-stage-screen",
+          "reason": "extract_exception",
+          "sequence": 1077
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/ba-hons-airline-airport-management",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/ba-hons-airline-airport-management",
+          "reason": "extract_exception",
+          "sequence": 1041
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/ba-hons-applied-education-early-years-online",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/ba-hons-applied-education-early-years-online",
+          "reason": "rejected: online_only",
+          "sequence": 646
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/ba-hons-applied-education-inclusive-practice-online",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/ba-hons-applied-education-inclusive-practice-online",
+          "reason": "rejected: online_only",
+          "sequence": 649
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/ba-hons-applied-education-online",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/ba-hons-applied-education-online",
+          "reason": "rejected: online_only",
+          "sequence": 643
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/ba-hons-criminology-psychology",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/ba-hons-criminology-psychology",
+          "reason": "extract_exception",
+          "sequence": 1055
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/ba-hons-dance",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/ba-hons-dance",
+          "reason": "extract_exception",
+          "sequence": 1078
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/ba-hons-early-childhood-montessori-pedagogy-level-6-top-up",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/ba-hons-early-childhood-montessori-pedagogy-level-6-top-up",
+          "reason": "extract_exception",
+          "sequence": 652
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/ba-hons-education-top-online",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/ba-hons-education-top-online",
+          "reason": "rejected: online_only",
+          "sequence": 654
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/ba-hons-fashion-studies-top",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/ba-hons-fashion-studies-top",
+          "reason": "extract_exception",
+          "sequence": 1040
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/ba-hons-music-performance-production",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/ba-hons-music-performance-production",
+          "reason": "extract_exception",
+          "sequence": 1079
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/ba-hons-music-technology-production",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/ba-hons-music-technology-production",
+          "reason": "extract_exception",
+          "sequence": 1080
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/ba-hons-primary-education-qts",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/ba-hons-primary-education-qts",
+          "reason": "extract_exception",
+          "sequence": 655
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/ba-hons-social-work",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/ba-hons-social-work",
+          "reason": "extract_exception",
+          "sequence": 641
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/ba-hons-sport-business-management",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/ba-hons-sport-business-management",
+          "reason": "extract_exception",
+          "sequence": 1046
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/ba-hons-sports-journalism?uel_variant=degree-with-foundation-year",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/ba-hons-sports-journalism?uel_variant=degree-with-foundation-year",
+          "reason": "rejected: domestic_only",
+          "sequence": 1070
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-applied-computing-top",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-applied-computing-top",
+          "reason": "extract_exception",
+          "sequence": 622
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-clinical-community-psychology",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-clinical-community-psychology",
+          "reason": "extract_exception",
+          "sequence": 1081
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-computer-science-education-qualified-teacher-status",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-computer-science-education-qualified-teacher-status",
+          "reason": "extract_exception",
+          "sequence": 629
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-counselling",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-counselling",
+          "reason": "extract_exception",
+          "sequence": 636
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-international-business-management-top",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-international-business-management-top",
+          "reason": "extract_exception",
+          "sequence": 619
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-midwifery",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-midwifery",
+          "reason": "extract_exception",
+          "sequence": 1071
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-nursing-adult?uel_variant=degree",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-nursing-adult?uel_variant=degree",
+          "reason": "rejected: domestic_only",
+          "sequence": 1072
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-nursing-adult?uel_variant=degree-via-foundation-year",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-nursing-adult?uel_variant=degree-via-foundation-year",
+          "reason": "rejected: domestic_only",
+          "sequence": 1073
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-nursing-childrens",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-nursing-childrens",
+          "reason": "extract_exception",
+          "sequence": 1074
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-nursing-mental-health",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-nursing-mental-health",
+          "reason": "extract_exception",
+          "sequence": 1075
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-occupational-therapy?uel_variant=degree",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-occupational-therapy?uel_variant=degree",
+          "reason": "rejected: domestic_only",
+          "sequence": 574
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-occupational-therapy?uel_variant=degree-via-foundation-year",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-occupational-therapy?uel_variant=degree-via-foundation-year",
+          "reason": "rejected: domestic_only",
+          "sequence": 573
+        }
+      ]
+    },
+    {
+      "matched_by": "source_page",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-physiotherapy?uel_variant=degree",
+      "runtime_outcomes": [
+        {
+          "detail": "UEL variant expansion failed: UEL route 'Degree' has unknown attendance",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-physiotherapy",
+          "reason": "extract_exception",
+          "sequence": 575
+        }
+      ]
+    },
+    {
+      "matched_by": "source_page",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-physiotherapy?uel_variant=degree-via-foundation-year",
+      "runtime_outcomes": [
+        {
+          "detail": "UEL variant expansion failed: UEL route 'Degree' has unknown attendance",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-physiotherapy",
+          "reason": "extract_exception",
+          "sequence": 575
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-podiatry?uel_variant=degree",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-podiatry?uel_variant=degree",
+          "reason": "rejected: domestic_only",
+          "sequence": 576
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-podiatry?uel_variant=degree-via-foundation-year",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-podiatry?uel_variant=degree-via-foundation-year",
+          "reason": "rejected: domestic_only",
+          "sequence": 577
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-policing-studies-top",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-policing-studies-top",
+          "reason": "extract_exception",
+          "sequence": 1062
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-psychology-distance-learning",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-psychology-distance-learning",
+          "reason": "rejected: online_only",
+          "sequence": 1084
+        }
+      ]
+    },
+    {
+      "matched_by": "source_page",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-psychology?uel_variant=degree",
+      "runtime_outcomes": [
+        {
+          "detail": "UEL variant expansion failed: UEL route 'Degree' has unknown applicant eligibility",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-psychology",
+          "reason": "extract_exception",
+          "sequence": 1085
+        }
+      ]
+    },
+    {
+      "matched_by": "source_page",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-psychology?uel_variant=degree-with-foundation-year",
+      "runtime_outcomes": [
+        {
+          "detail": "UEL variant expansion failed: UEL route 'Degree' has unknown applicant eligibility",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-psychology",
+          "reason": "extract_exception",
+          "sequence": 1085
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-societies-digital-innovation",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-societies-digital-innovation",
+          "reason": "extract_exception",
+          "sequence": 642
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-sports-coaching-performance-west-ham-united-foundation?uel_variant=degree",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-sports-coaching-performance-west-ham-united-foundation?uel_variant=degree",
+          "reason": "rejected: domestic_only",
+          "sequence": 1094
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-sports-coaching-performance-west-ham-united-foundation?uel_variant=degree-with-foundation-year",
+      "runtime_outcomes": [
+        {
+          "detail": null,
+          "kind": "skipped",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/bsc-hons-sports-coaching-performance-west-ham-united-foundation?uel_variant=degree-with-foundation-year",
+          "reason": "rejected: domestic_only",
+          "sequence": 1095
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/fdsc-civil-engineering-construction-management",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/fdsc-civil-engineering-construction-management",
+          "reason": "extract_exception",
+          "sequence": 665
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/fdsc-nursing-associate",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/fdsc-nursing-associate",
+          "reason": "extract_exception",
+          "sequence": 1076
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/maccfin-hons-accounting-finance",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/maccfin-hons-accounting-finance",
+          "reason": "extract_exception",
+          "sequence": 608
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/meng-civil-engineering-integrated-masters",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/meng-civil-engineering-integrated-masters",
+          "reason": "extract_exception",
+          "sequence": 660
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/meng-electrical-electronic-engineering",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/meng-electrical-electronic-engineering",
+          "reason": "extract_exception",
+          "sequence": 670
+        }
+      ]
+    },
+    {
+      "matched_by": "exact_route",
+      "route_id": "https://uel.ac.uk/undergraduate/courses/meng-mechanical-engineering-integrated-masters",
+      "runtime_outcomes": [
+        {
+          "detail": "InvalidPayloadKeyError: single_course.extract_course emitted non-persistable payload key(s): 'duration_unit', 'duration_value'",
+          "kind": "extract_error",
+          "logged_url": "https://www.uel.ac.uk/undergraduate/courses/meng-mechanical-engineering-integrated-masters",
+          "reason": "extract_exception",
+          "sequence": 1019
+        }
+      ]
+    }
+  ],
+  "ielts_and_eligibility_differences": [
+    {
+      "course_name": "Applied Theatre MA",
+      "differences": {
+        "ielts_listening": {
+          "source": 5.5,
+          "staged": 6.0
+        },
+        "ielts_reading": {
+          "source": 5.5,
+          "staged": 6.0
+        },
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/ma-applied-theatre",
+      "source_ielts_snippets": [
+        "Overall IELTS 6.0 with minimum 6.0 in writing and speaking, and 5.5 in listening and reading (or recognised equivalent)."
+      ],
+      "source_label": "MA"
+    },
+    {
+      "course_name": "Education MA",
+      "differences": {
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/ma-education",
+      "source_ielts_snippets": [
+        "Overall IELTS 7.0 with a minimum of 6.5 in Writing, Speaking, Reading and Listening.",
+        "This course does not accept English Language qualifications completed outside of the UK. Applicants who do not hold a UK English Language qualification must complete IELTS."
+      ],
+      "source_label": "MA"
+    },
+    {
+      "course_name": "English Language Teaching MA",
+      "differences": {
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/ma-english-language-teaching",
+      "source_ielts_snippets": [
+        "Overall IELTS 6.5 with a minimum of 6.0 in Writing, Speaking, Reading and Listening (or recognised equivalent). If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course."
+      ],
+      "source_label": "MA"
+    },
+    {
+      "course_name": "Global Sports Journalism MA",
+      "differences": {
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/ma-global-sports-journalism",
+      "source_ielts_snippets": [
+        "Overall IELTS 6.5 with a minimum of 6.0 in Writing, Speaking, Reading and Listening (or recognised equivalent)."
+      ],
+      "source_label": "MA"
+    },
+    {
+      "course_name": "Professional Landscape Architecture with Conversion MA",
+      "differences": {
+        "ielts_listening": {
+          "source": 5.5,
+          "staged": 6.0
+        },
+        "ielts_reading": {
+          "source": 5.5,
+          "staged": 6.0
+        },
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/ma-professional-landscape-architecture-conversion",
+      "source_ielts_snippets": [
+        "Overall IELTS 6.0 with minimum 6.0 in writing and speaking, and 5.5 in listening and reading(or recognised equivalent) If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course ."
+      ],
+      "source_label": "MA"
+    },
+    {
+      "course_name": "Social Work MA",
+      "differences": {
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/ma-social-work",
+      "source_ielts_snippets": [
+        "English at grade GCSE grade C or level 4*, (or a certified equivalent e.g., Key Skills Level 2 in Communication/ Literacy; IELTS 7.5 overall and with 7.5 in all 4 components (reading, writing, speaking and listening) etc).",
+        "Overall IELTS 7.5 with a minimum of 7.5 in Writing, Speaking, Reading and Listening (or recognised equivalent)."
+      ],
+      "source_label": "MA"
+    },
+    {
+      "course_name": "Youth and Community Work MA",
+      "differences": {
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/ma-youth-community-work",
+      "source_ielts_snippets": [
+        "Overall IELTS 6.5 with a minimum of 6.0 in Writing, Speaking, Reading and Listening (or recognised equivalent). If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course."
+      ],
+      "source_label": "MA"
+    },
+    {
+      "course_name": "MBA Fashion Entrepreneurship",
+      "differences": {
+        "ielts_listening": {
+          "source": 5.5,
+          "staged": 6.0
+        },
+        "ielts_reading": {
+          "source": 5.5,
+          "staged": 6.0
+        },
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/mba-fashion-entrepreneurship",
+      "source_ielts_snippets": [
+        "Overall IELTS 6.0 with minimum 6.0 in writing and speaking, and 5.5 in listening and reading(or recognised equivalent)"
+      ],
+      "source_label": "MBA"
+    },
+    {
+      "course_name": "School of Education and Community Mphil PhD",
+      "differences": {
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/mphil-phd-education",
+      "source_ielts_snippets": [
+        "If English is not your first language, you will have to satisfy our English language requirements for postgraduate research study. The minimum requirement for a research degree is an IELTS Academic English score of 7.0 overall (minimum of 6.5 in all components). This should normally have been gained within the past two years."
+      ],
+      "source_label": "PhD via MPhil"
+    },
+    {
+      "course_name": "Psychology Mphil PhD",
+      "differences": {
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/mphil-phd-psychology",
+      "source_ielts_snippets": [
+        "Overall Academic IELTS 7.0 with a minimum of 6.5 in Writing and Speaking; minimum 6.5 in Reading and Listening (or recognised equivalent)."
+      ],
+      "source_label": "PhD via MPhil"
+    },
+    {
+      "course_name": "School of Business and Law Mphil PhD",
+      "differences": {
+        "ielts_overall": {
+          "source": null,
+          "staged": 6.0
+        },
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/mphil-phd-school-business-law",
+      "source_ielts_snippets": [],
+      "source_label": "PhD via MPhil"
+    },
+    {
+      "course_name": "Social Sciences Mphil PhD",
+      "differences": {
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/mphil-phd-social-sciences",
+      "source_ielts_snippets": [
+        "If English is not your first language, you will have to satisfy our English language requirements for postgraduate research study. The minimum requirement for a research degree is an IELTS Academic English score of 7.0 overall (minimum of 6.5 in all components). This should normally have been gained within the past two years."
+      ],
+      "source_label": "PhD via MPhil"
+    },
+    {
+      "course_name": "Sustainability, Development, and the Environment Mphil PhD",
+      "differences": {
+        "ielts_overall": {
+          "source": null,
+          "staged": 6.0
+        },
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/mphil-phd-sustainability-development-environment",
+      "source_ielts_snippets": [],
+      "source_label": "PhD"
+    },
+    {
+      "course_name": "Bioscience and Social Justice Mres",
+      "differences": {
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/mres-bioscience-social-justice",
+      "source_ielts_snippets": [
+        "Overall IELTS 6.5 with a minimum of 6.0 in Writing, Speaking, Reading and Listening (or recognised equivalent). If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course ."
+      ],
+      "source_label": "MRes"
+    },
+    {
+      "course_name": "Business Management and Social Justice Mres",
+      "differences": {
+        "international_eligible": {
+          "source": false,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/mres-business-management-social-justice",
+      "source_ielts_snippets": [
+        "IELTS 6.5 with a minimum of 6.0 in Writing, Speaking, Listening and Reading (or recognised equivalent)."
+      ],
+      "source_label": "MRes"
+    },
+    {
+      "course_name": "Health Science Mres",
+      "differences": {
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/mres-health-science",
+      "source_ielts_snippets": [
+        "Overall IELTS 6.5 with a minimum of 6.0 in Writing, Speaking, Reading and Listening (or recognised equivalent). If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course ."
+      ],
+      "source_label": "MRes"
+    },
+    {
+      "course_name": "AI and Data Science MSc",
+      "differences": {
+        "ielts_listening": {
+          "source": 5.5,
+          "staged": null
+        },
+        "ielts_reading": {
+          "source": 5.5,
+          "staged": null
+        },
+        "ielts_speaking": {
+          "source": 6.0,
+          "staged": null
+        },
+        "ielts_writing": {
+          "source": 6.0,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-ai-data-science?uel_variant=msc",
+      "source_ielts_snippets": [
+        "IELTS 6.0 (Writing and Speaking 6.0, Listening and Reading 5.5)."
+      ],
+      "source_label": "MSc"
+    },
+    {
+      "course_name": "AI and Data Science MSc with Placement Year",
+      "differences": {
+        "ielts_listening": {
+          "source": 5.5,
+          "staged": null
+        },
+        "ielts_reading": {
+          "source": 5.5,
+          "staged": null
+        },
+        "ielts_speaking": {
+          "source": 6.0,
+          "staged": null
+        },
+        "ielts_writing": {
+          "source": 6.0,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-ai-data-science?uel_variant=msc-with-placement-year",
+      "source_ielts_snippets": [
+        "IELTS 6.0 (Writing and Speaking 6.0, Listening and Reading 5.5)."
+      ],
+      "source_label": "MSc with Placement Year"
+    },
+    {
+      "course_name": "MSc Biomedical Science",
+      "differences": {
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-biomedical-science",
+      "source_ielts_snippets": [
+        "Overall IELTS 6.5 with a minimum of 6.0 in Writing, Speaking, Reading and Listening (or recognised equivalent). If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course ."
+      ],
+      "source_label": "MSc"
+    },
+    {
+      "course_name": "MSc Data Science",
+      "differences": {
+        "ielts_listening": {
+          "source": 5.5,
+          "staged": 6.0
+        },
+        "ielts_reading": {
+          "source": 5.5,
+          "staged": 6.0
+        },
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-data-science",
+      "source_ielts_snippets": [
+        "Overall IELTS 6.0 with minimum 6.0 in writing and speaking, and 5.5 in listening and reading(or recognised equivalent) If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course."
+      ],
+      "source_label": "MSc"
+    },
+    {
+      "course_name": "MSc Finance and Risk",
+      "differences": {
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-finance-risk",
+      "source_ielts_snippets": [
+        "Overall IELTS 6.0 with a minimum of 6.0 in Writing, Speaking, Reading and Listening (or recognised equivalent)."
+      ],
+      "source_label": "MSc"
+    },
+    {
+      "course_name": "MSc Human Resource Management",
+      "differences": {
+        "ielts_listening": {
+          "source": 5.5,
+          "staged": 6.0
+        },
+        "ielts_reading": {
+          "source": 5.5,
+          "staged": 6.0
+        },
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-human-resource-management",
+      "source_ielts_snippets": [
+        "Overall Academic IELTS 6.0 with a minimum of 6.0 in Writing and Speaking; minimum 5.5 in Reading and Listening (or recognised equivalent)."
+      ],
+      "source_label": "MSc"
+    },
+    {
+      "course_name": "MSc Innovation and Sustainable Hospitality",
+      "differences": {
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-innovation-sustainable-hospitality",
+      "source_ielts_snippets": [
+        "International students for whom English is a second language require an IELTS score of 6.5 (with no component score less than 6.0). If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course ."
+      ],
+      "source_label": "Degree"
+    },
+    {
+      "course_name": "MSc Marketing",
+      "differences": {
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-marketing",
+      "source_ielts_snippets": [
+        "Overall IELTS score of 6 (or recognised equivalent). If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course ."
+      ],
+      "source_label": "MSc"
+    },
+    {
+      "course_name": "MSc Ngo and Development Management",
+      "differences": {
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-ngo-development-management",
+      "source_ielts_snippets": [
+        "Overall IELTS 6.5 with a minimum of 6.0 in Writing, Speaking, Reading and Listening (or recognised equivalent). If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course ."
+      ],
+      "source_label": "MSc"
+    },
+    {
+      "course_name": "MSc Occupational and Organisational Psychology",
+      "differences": {
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-occupational-organisational-psychology",
+      "source_ielts_snippets": [
+        "Overall Academic IELTS 6.5 with a minimum of 6.0 in Writing and Speaking; minimum 6.0 in Reading and Listening (or recognised equivalent)."
+      ],
+      "source_label": "MSc"
+    },
+    {
+      "course_name": "MSc Oil and Gas with Energy Management",
+      "differences": {
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-oil-gas-energy-management",
+      "source_ielts_snippets": [
+        "Overall IELTS 6.5 with a minimum of 6.0 in Writing, Speaking, Reading and Listening (or recognised equivalent). If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course."
+      ],
+      "source_label": "MSc"
+    },
+    {
+      "course_name": "MSc Professional Accounting",
+      "differences": {
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-professional-accounting",
+      "source_ielts_snippets": [
+        "Overall IELTS 6.0 with a minimum of 6.0 in Writing, Speaking, Reading and Listening (or recognised equivalent). If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course."
+      ],
+      "source_label": "MSc"
+    },
+    {
+      "course_name": "MSc Psychology",
+      "differences": {
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-psychology",
+      "source_ielts_snippets": [
+        "Overall IELTS 6.0 with a minimum of 6.0 in Writing, Speaking, Reading and Listening (or recognised equivalent)."
+      ],
+      "source_label": "MSc"
+    },
+    {
+      "course_name": "MSc Public Health",
+      "differences": {
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-public-health",
+      "source_ielts_snippets": [
+        "Overall IELTS 6.5 with a minimum of 6.0 in Writing, Speaking, Reading and Listening (or recognised equivalent)."
+      ],
+      "source_label": "MSc"
+    },
+    {
+      "course_name": "MSc Strength and Conditioning",
+      "differences": {
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-strength-conditioning",
+      "source_ielts_snippets": [
+        "Overall IELTS 6.5 with a minimum of 6.0 in Writing, Speaking, Reading and Listening (or recognised equivalent)."
+      ],
+      "source_label": "MSc"
+    },
+    {
+      "course_name": "MSc Sustainable Tourism Development & Management",
+      "differences": {
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/msc-sustainable-tourism-development-management",
+      "source_ielts_snippets": [
+        "International students for whom English is a second language require an IELTS score of 6.5 (with no component score less than 6.0). If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course ."
+      ],
+      "source_label": "Degree"
+    },
+    {
+      "course_name": "Further Education Pgce",
+      "differences": {
+        "ielts_overall": {
+          "source": null,
+          "staged": 6.0
+        },
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgce-further-education",
+      "source_ielts_snippets": [],
+      "source_label": "PGCE"
+    },
+    {
+      "course_name": "Primary with the Arts Pgce",
+      "differences": {
+        "ielts_overall": {
+          "source": null,
+          "staged": 6.0
+        },
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgce-primary-arts",
+      "source_ielts_snippets": [],
+      "source_label": "PGCE"
+    },
+    {
+      "course_name": "Primary with Early Years (3-7) Pgce",
+      "differences": {
+        "ielts_overall": {
+          "source": null,
+          "staged": 6.0
+        },
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgce-primary-early-years-3-7",
+      "source_ielts_snippets": [],
+      "source_label": "PGCE"
+    },
+    {
+      "course_name": "Primary with English As An Additional Language Pgce",
+      "differences": {
+        "ielts_overall": {
+          "source": null,
+          "staged": 6.0
+        },
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgce-primary-english-additional-language",
+      "source_ielts_snippets": [],
+      "source_label": "PGCE"
+    },
+    {
+      "course_name": "Primary with Sen (Inclusion) Pgce",
+      "differences": {
+        "ielts_overall": {
+          "source": null,
+          "staged": 6.0
+        },
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgce-primary-sen-inclusion",
+      "source_ielts_snippets": [],
+      "source_label": "PGCE"
+    },
+    {
+      "course_name": "Primary with Stem Pgce",
+      "differences": {
+        "ielts_overall": {
+          "source": null,
+          "staged": 6.0
+        },
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgce-primary-stem",
+      "source_ielts_snippets": [],
+      "source_label": "PGCE"
+    },
+    {
+      "course_name": "Secondary Biology Pgce",
+      "differences": {
+        "ielts_overall": {
+          "source": null,
+          "staged": 6.0
+        },
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgce-secondary-biology",
+      "source_ielts_snippets": [],
+      "source_label": "PGCE"
+    },
+    {
+      "course_name": "Secondary Chemistry Pgce",
+      "differences": {
+        "ielts_overall": {
+          "source": null,
+          "staged": 6.0
+        },
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgce-secondary-chemistry",
+      "source_ielts_snippets": [],
+      "source_label": "PGCE"
+    },
+    {
+      "course_name": "Secondary Computing Pgce",
+      "differences": {
+        "ielts_overall": {
+          "source": null,
+          "staged": 6.0
+        },
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgce-secondary-computing",
+      "source_ielts_snippets": [],
+      "source_label": "PGCE"
+    },
+    {
+      "course_name": "Secondary Design and Technology Pgce",
+      "differences": {
+        "ielts_overall": {
+          "source": null,
+          "staged": 6.0
+        },
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgce-secondary-design-technology",
+      "source_ielts_snippets": [],
+      "source_label": "PGCE"
+    },
+    {
+      "course_name": "Secondary Mathematics Pgce",
+      "differences": {
+        "ielts_overall": {
+          "source": null,
+          "staged": 6.0
+        },
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgce-secondary-mathematics",
+      "source_ielts_snippets": [],
+      "source_label": "PGCE"
+    },
+    {
+      "course_name": "Secondary Modern Languages Pgce",
+      "differences": {
+        "ielts_overall": {
+          "source": null,
+          "staged": 6.0
+        },
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgce-secondary-modern-languages",
+      "source_ielts_snippets": [],
+      "source_label": "PGCE"
+    },
+    {
+      "course_name": "Secondary Religious Education Pgce",
+      "differences": {
+        "ielts_overall": {
+          "source": null,
+          "staged": 6.0
+        },
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgce-secondary-religious-education",
+      "source_ielts_snippets": [],
+      "source_label": "PGCE"
+    },
+    {
+      "course_name": "Civil Engineering Pgdip",
+      "differences": {
+        "ielts_listening": {
+          "source": 5.5,
+          "staged": 6.0
+        },
+        "ielts_reading": {
+          "source": 5.5,
+          "staged": 6.0
+        },
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgdip-civil-engineering",
+      "source_ielts_snippets": [
+        "Overall IELTS 6.0 with minimum 6.0 in writing and speaking, and 5.5 in listening and reading (or recognised equivalent)."
+      ],
+      "source_label": "Postgraduate Diploma"
+    },
+    {
+      "course_name": "Landscape Architecture Pgdip",
+      "differences": {
+        "ielts_listening": {
+          "source": 5.5,
+          "staged": 6.0
+        },
+        "ielts_reading": {
+          "source": 5.5,
+          "staged": 6.0
+        },
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgdip-landscape-architecture",
+      "source_ielts_snippets": [
+        "Overall IELTS 6.0 with minimum 6.0 in writing and speaking, and 5.5 in listening and reading(or recognised equivalent) If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course ."
+      ],
+      "source_label": "Postgraduate Diploma"
+    },
+    {
+      "course_name": "Structural Engineering Pgdip",
+      "differences": {
+        "ielts_listening": {
+          "source": 5.5,
+          "staged": 6.0
+        },
+        "ielts_reading": {
+          "source": 5.5,
+          "staged": 6.0
+        },
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/pgdip-structural-engineering",
+      "source_ielts_snippets": [
+        "Overall IELTS 6.0 with minimum 6.0 in writing and speaking, and 5.5 in listening and reading(or recognised equivalent) If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course ."
+      ],
+      "source_label": "Postgraduate Diploma"
+    },
+    {
+      "course_name": "Business Administration Prof Doc",
+      "differences": {
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/prof-doc-business-administration",
+      "source_ielts_snippets": [
+        "IELTS 6.0 with a minimum of 6.0 in Writing, Speaking;, Listening and Reading (or recognised equivalent)."
+      ],
+      "source_label": "Professional Doctorate"
+    },
+    {
+      "course_name": "Data Science Prof Doc",
+      "differences": {
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/postgraduate/courses/prof-doc-data-science",
+      "source_ielts_snippets": [
+        "Overall IELTS 6.5 with a minimum of 6.0 in Writing, Speaking, Reading and Listening (or recognised equivalent). If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course ."
+      ],
+      "source_label": "Professional Doctorate"
+    },
+    {
+      "course_name": "Education Top Up BA (Hons)",
+      "differences": {
+        "ielts_listening": {
+          "source": 5.5,
+          "staged": 6.0
+        },
+        "ielts_reading": {
+          "source": 5.5,
+          "staged": 6.0
+        },
+        "international_eligible": {
+          "source": true,
+          "staged": null
+        }
+      },
+      "route_id": "https://uel.ac.uk/undergraduate/courses/ba-hons-education-top",
+      "source_ielts_snippets": [
+        "IELTS 6.0 with a minimum of 6.0 in Writing and Speaking; 5.5 in Listening and Reading (or recognised equivalent)."
+      ],
+      "source_label": "Degree"
+    }
+  ],
+  "ielts_source_examples": {
+    "{\"listening\": 5.5, \"overall\": 5.5, \"reading\": 5.5, \"speaking\": 5.5, \"writing\": 5.5}": [
+      {
+        "label": "Degree",
+        "route_id": "https://uel.ac.uk/undergraduate/courses/ba-hons-acting-stage-screen",
+        "snippets": [
+          "IELTS 5.5 with a minimum of 5.5 in Reading, Writing, Listening and Speaking (or recognised equivalent)."
+        ]
+      },
+      {
+        "label": "Degree",
+        "route_id": "https://uel.ac.uk/undergraduate/courses/ba-hons-airline-airport-management",
+        "snippets": [
+          "IELTS 5.5 with a minimum of 5.5 in Reading, Writing, Listening and Speaking (or recognised equivalent)."
+        ]
+      },
+      {
+        "label": "Degree",
+        "route_id": "https://uel.ac.uk/undergraduate/courses/ba-hons-animation-game-design?uel_variant=degree",
+        "snippets": [
+          "IELTS 5.5 with a minimum of 5.5 in Reading, Writing, Listening and Speaking (or recognised equivalent)."
+        ]
+      },
+      {
+        "label": "Degree",
+        "route_id": "https://uel.ac.uk/undergraduate/courses/ba-hons-applied-education?uel_variant=degree",
+        "snippets": [
+          "IELTS 5.5 with a minimum of 5.5 in Reading, Writing, Listening and Speaking (or recognised equivalent). If you do not meet the academic English language requirements for your course, you may be eligible to enrol on a Pre-sessional English course ."
+        ]
+      }
+    ],
+    "{\"listening\": 5.5, \"overall\": 6.0, \"reading\": 5.5, \"speaking\": 6.0, \"writing\": 6.0}": [
+      {
+        "label": "MA",
+        "route_id": "https://uel.ac.uk/postgraduate/courses/ma-acting-stage-screen?uel_variant=ma",
+        "snippets": [
+          "Overall IELTS 6.0 with minimum 6.0 in writing and speaking, and 5.5 in listening and reading(or recognised equivalent)"
+        ]
+      },
+      {
+        "label": "MFA",
+        "route_id": "https://uel.ac.uk/postgraduate/courses/ma-acting-stage-screen?uel_variant=mfa",
+        "snippets": [
+          "Overall IELTS 6.0 with minimum 6.0 in writing and speaking, and 5.5 in listening and reading(or recognised equivalent)"
+        ]
+      },
+      {
+        "label": "MA",
+        "route_id": "https://uel.ac.uk/postgraduate/courses/ma-applied-theatre",
+        "snippets": [
+          "Overall IELTS 6.0 with minimum 6.0 in writing and speaking, and 5.5 in listening and reading (or recognised equivalent)."
+        ]
+      },
+      {
+        "label": "MA",
+        "route_id": "https://uel.ac.uk/postgraduate/courses/ma-architecture-and-urbanism",
+        "snippets": [
+          "Overall IELTS 6.0 with minimum 6.0 in writing and speaking, and 5.5 in listening and reading(or recognised equivalent) If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course ."
+        ]
+      }
+    ],
+    "{\"listening\": 6.0, \"overall\": 6.0, \"reading\": 6.0, \"speaking\": 6.0, \"writing\": 6.0}": [
+      {
+        "label": "Degree",
+        "route_id": "https://uel.ac.uk/postgraduate/courses/llm-legal-practice-sqe-preparation",
+        "snippets": [
+          "Overall IELTS 6.0 with a minimum of 6.0 in Writing, Speaking, Reading and Listening (or recognised equivalent). If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course."
+        ]
+      },
+      {
+        "label": "MSc",
+        "route_id": "https://uel.ac.uk/postgraduate/courses/msc-finance-risk",
+        "snippets": [
+          "Overall IELTS 6.0 with a minimum of 6.0 in Writing, Speaking, Reading and Listening (or recognised equivalent)."
+        ]
+      },
+      {
+        "label": "MSc",
+        "route_id": "https://uel.ac.uk/postgraduate/courses/msc-international-business-management?uel_variant=msc",
+        "snippets": [
+          "Overall IELTS 6.0 with a minimum of 6.0 in Writing, Speaking, Reading and Listening (or recognised equivalent). If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course."
+        ]
+      },
+      {
+        "label": "MSc with Placement Year",
+        "route_id": "https://uel.ac.uk/postgraduate/courses/msc-international-business-management?uel_variant=msc-with-placement-year",
+        "snippets": [
+          "Overall IELTS 6.0 with a minimum of 6.0 in Writing, Speaking, Reading and Listening (or recognised equivalent). If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course."
+        ]
+      }
+    ],
+    "{\"listening\": 6.0, \"overall\": 6.5, \"reading\": 6.0, \"speaking\": 6.0, \"writing\": 6.0}": [
+      {
+        "label": "Degree",
+        "route_id": "https://uel.ac.uk/postgraduate/courses/llm-fintech-law",
+        "snippets": [
+          "Overall IELTS 6.5 with a minimum of 6.0 in Writing, Speaking, Reading and Listening (or recognised equivalent)."
+        ]
+      },
+      {
+        "label": "Degree",
+        "route_id": "https://uel.ac.uk/postgraduate/courses/llm-general?uel_variant=degree",
+        "snippets": [
+          "Overall IELTS 6.5 with a minimum of 6.0 in Writing, Speaking, Reading and Listening (or recognised equivalent). If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course."
+        ]
+      },
+      {
+        "label": "Degree with placement year",
+        "route_id": "https://uel.ac.uk/postgraduate/courses/llm-general?uel_variant=degree-with-placement-year",
+        "snippets": [
+          "Overall IELTS 6.5 with a minimum of 6.0 in Writing, Speaking, Reading and Listening (or recognised equivalent). If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course."
+        ]
+      },
+      {
+        "label": "Degree",
+        "route_id": "https://uel.ac.uk/postgraduate/courses/llm-human-rights-advocacy?uel_variant=degree",
+        "snippets": [
+          "Overall IELTS 6.5 with a minimum of 6.0 in Writing, Speaking, Reading and Listening (or recognised equivalent). If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course."
+        ]
+      }
+    ],
+    "{\"listening\": 6.0, \"overall\": 7.0, \"reading\": 6.5, \"speaking\": 6.0, \"writing\": 6.5}": [
+      {
+        "label": "MSc",
+        "route_id": "https://uel.ac.uk/postgraduate/courses/msc-clinical-exercise-physiology",
+        "snippets": [
+          "Overall IELTS 7.0 with a minimum of 6.5 in Writing and Reading, 6.0 in Speaking and Listening (or recognised equivalent)."
+        ]
+      }
+    ],
+    "{\"listening\": 6.0, \"reading\": 6.0, \"speaking\": 6.0, \"writing\": 6.0}": [
+      {
+        "label": "MRes",
+        "route_id": "https://uel.ac.uk/postgraduate/courses/mres-social-research-social-justice",
+        "snippets": [
+          "A minimum of IELTS Academic English, or as our University deems equivalent, score of 6.5 overall, with a minimum of 6.0 in all components."
+        ]
+      }
+    ],
+    "{\"listening\": 6.5, \"overall\": 6.5, \"reading\": 6.5, \"speaking\": 6.5, \"writing\": 6.5}": [
+      {
+        "label": "MSc",
+        "route_id": "https://uel.ac.uk/postgraduate/courses/msc-environment-sustainability-global-health?uel_variant=msc",
+        "snippets": [
+          "Overall IELTS 6.5 with a minimum of 6.5 in Writing, Speaking, Reading and Listening (or recognised equivalent)."
+        ]
+      },
+      {
+        "label": "MSc with Placement Year",
+        "route_id": "https://uel.ac.uk/postgraduate/courses/msc-environment-sustainability-global-health?uel_variant=msc-with-placement-year",
+        "snippets": [
+          "Overall IELTS 6.5 with a minimum of 6.5 in Writing, Speaking, Reading and Listening (or recognised equivalent)."
+        ]
+      }
+    ],
+    "{\"listening\": 6.5, \"overall\": 7.0, \"reading\": 6.5, \"speaking\": 6.5, \"writing\": 6.5}": [
+      {
+        "label": "MA",
+        "route_id": "https://uel.ac.uk/postgraduate/courses/ma-early-childhood-leadership-practice",
+        "snippets": [
+          "Overall IELTS 7.0 with a minimum of 6.5 in Writing, Speaking, Reading and Listening (or recognised equivalent). If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course."
+        ]
+      },
+      {
+        "label": "MA",
+        "route_id": "https://uel.ac.uk/postgraduate/courses/ma-education",
+        "snippets": [
+          "Overall IELTS 7.0 with a minimum of 6.5 in Writing, Speaking, Reading and Listening.",
+          "This course does not accept English Language qualifications completed outside of the UK. Applicants who do not hold a UK English Language qualification must complete IELTS."
+        ]
+      },
+      {
+        "label": "MA with distance learning",
+        "route_id": "https://uel.ac.uk/postgraduate/courses/ma-education-distance-learning",
+        "snippets": [
+          "Overall IELTS 7.0 with a minimum of 6.5 in Writing, Speaking, Reading and Listening.",
+          "This course does not accept English Language qualifications completed outside of the UK. Applicants who do not hold a UK English Language qualification must complete IELTS."
+        ]
+      },
+      {
+        "label": "MA",
+        "route_id": "https://uel.ac.uk/postgraduate/courses/ma-education-pathway-teaching-learning",
+        "snippets": [
+          "Overall IELTS 7.0 with a minimum of 6.5 in Writing, Speaking, Reading and Listening.",
+          "This course does not accept English Language qualifications completed outside of the UK. Applicants who do not hold a UK English Language qualification must complete IELTS."
+        ]
+      }
+    ],
+    "{\"listening\": 7.0, \"overall\": 7.0, \"reading\": 7.0, \"speaking\": 7.0, \"writing\": 7.0}": [
+      {
+        "label": "Degree",
+        "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-midwifery",
+        "snippets": [
+          "IELTS 7.0 with a minimum of 7.0 in Writing and Speaking; 7.0 in Listening and Reading (or recognised equivalent)."
+        ]
+      },
+      {
+        "label": "Degree",
+        "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-nursing-adult?uel_variant=degree",
+        "snippets": [
+          "Overall 7.0 for IELTS with a minimum requirement of 6.5 for writing, and a minimum of 7.0 for speaking, listening, and reading. If you do not meet the academic English language requirements for your course, you may be eligible to enrol on a Pre-sessional English course ."
+        ]
+      },
+      {
+        "label": "Degree via foundation year",
+        "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-nursing-adult?uel_variant=degree-via-foundation-year",
+        "snippets": [
+          "Overall 7.0 for IELTS with a minimum requirement of 6.5 for writing, and a minimum of 7.0 for speaking, listening, and reading. If you do not meet the academic English language requirements for your course, you may be eligible to enrol on a Pre-sessional English course ."
+        ]
+      },
+      {
+        "label": "Degree",
+        "route_id": "https://uel.ac.uk/undergraduate/courses/bsc-hons-nursing-childrens",
+        "snippets": [
+          "Overall 7.0 for IELTS with a minimum requirement of 6.5 for writing, and a minimum of 7.0 for speaking, listening, and reading. If you do not meet the academic English language requirements for your course, you may be eligible to enrol on a Pre-sessional English course ."
+        ]
+      }
+    ],
+    "{\"listening\": 7.0, \"overall\": 7.5, \"reading\": 7.0, \"speaking\": 7.0, \"writing\": 7.0}": [
+      {
+        "label": "MSc",
+        "route_id": "https://uel.ac.uk/postgraduate/courses/msc-physician-associate",
+        "snippets": [
+          "Overall IELTS 7.5 with a minimum of 7.0 in Writing, Speaking, Reading and Listening (or recognised equivalent). If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course ."
+        ]
+      }
+    ],
+    "{\"listening\": 7.5, \"overall\": 7.5, \"reading\": 7.5, \"speaking\": 7.5, \"writing\": 7.5}": [
+      {
+        "label": "MA",
+        "route_id": "https://uel.ac.uk/postgraduate/courses/ma-post-qualifying-professional-practice",
+        "snippets": [
+          "Overall IELTS 7.5 with a minimum of 7.5 in Writing, Speaking, Reading and Listening (or recognised equivalent). If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course."
+        ]
+      },
+      {
+        "label": "MA",
+        "route_id": "https://uel.ac.uk/postgraduate/courses/ma-social-work",
+        "snippets": [
+          "English at grade GCSE grade C or level 4*, (or a certified equivalent e.g., Key Skills Level 2 in Communication/ Literacy; IELTS 7.5 overall and with 7.5 in all 4 components (reading, writing, speaking and listening) etc).",
+          "Overall IELTS 7.5 with a minimum of 7.5 in Writing, Speaking, Reading and Listening (or recognised equivalent)."
+        ]
+      }
+    ],
+    "{\"overall\": 6.0}": [
+      {
+        "label": "MSc",
+        "route_id": "https://uel.ac.uk/postgraduate/courses/msc-marketing",
+        "snippets": [
+          "Overall IELTS score of 6 (or recognised equivalent). If you do not meet the academic English language requirements for your course, you may be eligible to enrol onto a pre-sessional English course ."
+        ]
+      }
+    ]
+  },
+  "limits": [
+    "Isolated local database, not production worker execution",
+    "Redis unavailable during this run; no fleet-lock/rate-limit certification",
+    "One recovered PGCert page has no successful-preflight raw HTML capture",
+    "No approval of actual scraped data; only synthetic DB tests exercise approval"
+  ],
+  "production_review_after": [
+    {
+      "row_digest": "dfae42188bd00eb4bd085c9de3bd3acd",
+      "rows": 253
+    }
+  ],
+  "production_review_before": [
+    {
+      "row_digest": "dfae42188bd00eb4bd085c9de3bd3acd",
+      "rows": 253
+    }
+  ],
+  "release": {
+    "git_revision": "7e0673caa3fb151694a4f22ba66aeb0356c77544",
+    "sha256": {
+      "backend-py/app/services/scraper/extractors/uel_variants.py": "11029336a3ac657d64a0aa092cdcf450fe7fd8ce03a98e1d4ebac9b1f2cacac8",
+      "backend-py/app/services/scraper/orchestrator.py": "5d546d92a454fda1899f18d84270135b781c8dc96f3ea6688436d89bfd42823e",
+      "backend-py/app/services/scraper/uel_transport.py": "5411f6b5ed38854ed58a026d04c7048d3cb776cce135749a083abf2264043e7d",
+      "backend-py/scraper_config/unis/uel.yaml": "1733f68c4ac6cac8cf57f0e36b0232f236d11612f8da29259ceb0d58afff93e3"
+    }
+  },
+  "runtime": {
+    "actual_http": true,
+    "approvals_forbidden_and_absent": true,
+    "audit_run_id": "20260918T022553Z_1910e8",
+    "autonomous_dispatch_attempts_blocked": [
+      {
+        "blocked": true,
+        "task": "scrape.repair_conflicts"
+      },
+      {
+        "blocked": true,
+        "task": "scrape.run_quality_actions"
+      },
+      {
+        "blocked": true,
+        "task": "scrape.record_job_performance"
+      }
+    ],
+    "database_guard": {
+      "database": "uel_audit_20260918_022553_3a9f6c",
+      "passed": true,
+      "port": null,
+      "server": "local-socket"
+    },
+    "degree_level_counts": {
+      "Bachelor's": 150,
+      "Doctorate": 9,
+      "Graduate Certificate": 13,
+      "Graduate Diploma": 3,
+      "Master's": 120
+    },
+    "elapsed_seconds": 1070.449,
+    "force_discovery": true,
+    "job": {
+      "approval_decision": null,
+      "completed_at": "2026-09-18 02:43:57.602121+00:00",
+      "current": 404,
+      "error_message": null,
+      "errors": 82,
+      "imported": 295,
+      "skipped": 27,
+      "started_at": "2026-09-18 02:26:10.537690+00:00",
+      "status": "completed",
+      "total_found": 404
+    },
+    "job_id": "uel_audit_20260918t022553z_1910e8",
+    "non_pending_rows": 0,
+    "run_scrape_returned": true,
+    "runtime_event_kind_counts": {
+      "ai_fallback_done": 91,
+      "ai_fallback_skipped_complete": 30,
+      "ai_fallback_start": 113,
+      "batch_info": 1,
+      "browser_http_fallback": 1,
+      "confidence_score": 143,
+      "data_quality_failure_count": 1,
+      "data_quality_issue": 10,
+      "data_quality_summary": 1,
+      "done": 1,
+      "english_default_applied": 35,
+      "extract_error": 82,
+      "extract_start": 82,
+      "fee_default_applied": 3,
+      "field_extraction_summary": 146,
+      "field_trace_study_mode": 143,
+      "gemini_cost_summary": 1,
+      "gemini_primary_done": 112,
+      "gp_debug_html": 143,
+      "gp_debug_raw": 143,
+      "gp_debug_text": 143,
+      "online_only_skip": 3,
+      "pathway_detected": 1,
+      "pdf_quality_gate": 1,
+      "pdf_quality_gate_result": 1,
+      "per_course_browser_done": 37,
+      "per_course_browser_start": 37,
+      "per_course_vision_done": 37,
+      "per_course_vision_start": 37,
+      "progress": 404,
+      "quality_action_queued": 1,
+      "scrape_warning": 1,
+      "skip_initial_http": 1,
+      "skipped": 27,
+      "staged": 295,
+      "status": 84,
+      "uel_variant_expansion": 1,
+      "uel_variant_expansion_progress": 276,
+      "vision_skip_core_found": 106
+    },
+    "scheduled_tasks_started": false,
+    "source_capture": {
+      "bytes": 93454081,
+      "fetches": 275,
+      "unique_html_documents": 275,
+      "unique_urls": 275
+    },
+    "staging": [
+      {
+        "n": 295,
+        "status": "pending",
+        "urls": 295
+      }
+    ]
+  },
+  "source_aliases": [
+    {
+      "canonical_url": "https://uel.ac.uk/postgraduate/courses/pgce-primary-sen-inclusion",
+      "input_urls": [
+        "https://uel.ac.uk/postgraduate/courses/pgce-primary-sen-inclusion",
+        "https://uel.ac.uk/postgraduate/courses/pgce-primary-sen-special-schools"
+      ],
+      "sha256": [
+        "ae25be8ca71d9a38e950b4cc67d43a8a7e9cc8ec65404caae33db05944d297f0",
+        "d3145524e2110ae97cf860d0461ac71206444222dd08af96e2bda2a79e74758f"
+      ]
+    }
+  ],
+  "source_counts": {
+    "captured_source_pages": 274,
+    "eligibility_differing_rows": 49,
+    "home_only_routes": 27,
+    "ielts_differing_rows": 26,
+    "source_missing_staged": 109,
+    "source_route_kinds": {
+      "PG:MA": 31,
+      "PG:MFA": 7,
+      "PG:placement": 40,
+      "PG:standard": 131,
+      "UG:foundation": 81,
+      "UG:standard": 114
+    },
+    "source_routes": 404,
+    "staged_missing_source": 0,
+    "staged_rows": 295
+  },
+  "source_route_identity_audit": {
+    "duplicate_source_route_ids": [],
+    "duplicate_staged_route_ids": [],
+    "identity_basis": "normalized canonical URL plus uel_variant; never name",
+    "parser_enumeration_disagreements": [
+      {
+        "independent_route_ids": [
+          "https://uel.ac.uk/undergraduate/courses/bsc-hons-physiotherapy?uel_variant=degree-via-foundation-year",
+          "https://uel.ac.uk/undergraduate/courses/bsc-hons-physiotherapy?uel_variant=degree"
+        ],
+        "parser_error": "ValueError: UEL route 'Degree' has unknown attendance",
+        "source_url": "https://uel.ac.uk/undergraduate/courses/bsc-hons-physiotherapy"
+      },
+      {
+        "independent_route_ids": [
+          "https://uel.ac.uk/undergraduate/courses/bsc-hons-psychology?uel_variant=degree",
+          "https://uel.ac.uk/undergraduate/courses/bsc-hons-psychology?uel_variant=degree-with-foundation-year"
+        ],
+        "parser_error": "ValueError: UEL route 'Degree' has unknown applicant eligibility",
+        "source_url": "https://uel.ac.uk/undergraduate/courses/bsc-hons-psychology"
+      }
+    ],
+    "source_missing_staged": [
+      "https://uel.ac.uk/postgraduate/courses/edd-professional-doctorate-education",
+      "https://uel.ac.uk/postgraduate/courses/llm-fintech-law",
+      "https://uel.ac.uk/postgraduate/courses/llm-legal-practice-sqe-preparation",
+      "https://uel.ac.uk/postgraduate/courses/ma-architecture-and-urbanism",
+      "https://uel.ac.uk/postgraduate/courses/ma-counselling-psychotherapy",
+      "https://uel.ac.uk/postgraduate/courses/ma-creative-enterprise",
+      "https://uel.ac.uk/postgraduate/courses/ma-data-journalism",
+      "https://uel.ac.uk/postgraduate/courses/ma-early-childhood-leadership-practice",
+      "https://uel.ac.uk/postgraduate/courses/ma-education-distance-learning",
+      "https://uel.ac.uk/postgraduate/courses/ma-education-pathway-teaching-learning",
+      "https://uel.ac.uk/postgraduate/courses/ma-english-language-teaching-distance-learning",
+      "https://uel.ac.uk/postgraduate/courses/ma-fine-art",
+      "https://uel.ac.uk/postgraduate/courses/ma-interior-architecture-design",
+      "https://uel.ac.uk/postgraduate/courses/ma-international-fashion-business",
+      "https://uel.ac.uk/postgraduate/courses/ma-leadership-education",
+      "https://uel.ac.uk/postgraduate/courses/ma-media-communication-industries",
+      "https://uel.ac.uk/postgraduate/courses/ma-post-qualifying-professional-practice",
+      "https://uel.ac.uk/postgraduate/courses/ma-professional-landscape-architecture",
+      "https://uel.ac.uk/postgraduate/courses/ma-special-additional-learning-needs-icep-europe",
+      "https://uel.ac.uk/postgraduate/courses/ma-special-educational-needs",
+      "https://uel.ac.uk/postgraduate/courses/march-architecture-arbriba-part-2",
+      "https://uel.ac.uk/postgraduate/courses/mba-master-business-administration-business-analytics?uel_variant=mba-with-placement-year",
+      "https://uel.ac.uk/postgraduate/courses/mphil-phd-architecture-computing-engineering",
+      "https://uel.ac.uk/postgraduate/courses/mphil-phd-health-wellbeing-online-harms",
+      "https://uel.ac.uk/postgraduate/courses/mphil-phd-school-arts-creative-industries",
+      "https://uel.ac.uk/postgraduate/courses/mphil-phd-school-health-sport-bioscience",
+      "https://uel.ac.uk/postgraduate/courses/mres-bioscience",
+      "https://uel.ac.uk/postgraduate/courses/mres-creative-arts-social-justice",
+      "https://uel.ac.uk/postgraduate/courses/mres-social-research-social-justice",
+      "https://uel.ac.uk/postgraduate/courses/mres-sport-exercise-science",
+      "https://uel.ac.uk/postgraduate/courses/msc-applied-sport-exercise-physiology",
+      "https://uel.ac.uk/postgraduate/courses/msc-business-psychology",
+      "https://uel.ac.uk/postgraduate/courses/msc-clinical-exercise-physiology",
+      "https://uel.ac.uk/postgraduate/courses/msc-cyber-diplomacy",
+      "https://uel.ac.uk/postgraduate/courses/msc-cyber-security-engineering",
+      "https://uel.ac.uk/postgraduate/courses/msc-events-hospitality-leadership",
+      "https://uel.ac.uk/postgraduate/courses/msc-integrative-counselling-coaching",
+      "https://uel.ac.uk/postgraduate/courses/msc-international-relations",
+      "https://uel.ac.uk/postgraduate/courses/msc-pharmaceutical-science-specialism",
+      "https://uel.ac.uk/postgraduate/courses/msc-physician-associate",
+      "https://uel.ac.uk/postgraduate/courses/msc-smart-resilient-cities",
+      "https://uel.ac.uk/postgraduate/courses/msc-sport-analytics",
+      "https://uel.ac.uk/postgraduate/courses/msc-sport-psychology",
+      "https://uel.ac.uk/postgraduate/courses/msc-sports-management",
+      "https://uel.ac.uk/postgraduate/courses/pgce-ipgce",
+      "https://uel.ac.uk/postgraduate/courses/pgce-non-qualified-teacher-status-qts",
+      "https://uel.ac.uk/postgraduate/courses/pgce-primary-humanities-religious-education",
+      "https://uel.ac.uk/postgraduate/courses/pgce-primary-sport-wellbeing",
+      "https://uel.ac.uk/postgraduate/courses/pgce-secondary-drama",
+      "https://uel.ac.uk/postgraduate/courses/pgce-secondary-english",
+      "https://uel.ac.uk/postgraduate/courses/pgce-secondary-geography",
+      "https://uel.ac.uk/postgraduate/courses/pgce-secondary-music",
+      "https://uel.ac.uk/postgraduate/courses/pgce-secondary-physical-education",
+      "https://uel.ac.uk/postgraduate/courses/pgce-secondary-physics",
+      "https://uel.ac.uk/postgraduate/courses/pgcert-independent-supplementary-prescribing",
+      "https://uel.ac.uk/postgraduate/courses/pgcert-understanding-supporting-behaviour",
+      "https://uel.ac.uk/postgraduate/courses/pgdip-counselling-psychotherapy",
+      "https://uel.ac.uk/postgraduate/courses/pgdip-integrative-counselling-coaching",
+      "https://uel.ac.uk/postgraduate/courses/prof-doc-clinical-psychology",
+      "https://uel.ac.uk/postgraduate/courses/prof-doc-counselling-psychology",
+      "https://uel.ac.uk/postgraduate/courses/prof-doc-cyber-diplomacy",
+      "https://uel.ac.uk/postgraduate/courses/prof-doc-educational-child-psychology",
+      "https://uel.ac.uk/postgraduate/courses/prof-doc-fine-art",
+      "https://uel.ac.uk/postgraduate/courses/prof-doc-information-security",
+      "https://uel.ac.uk/undergraduate/courses/ba-hons-acting-stage-screen",
+      "https://uel.ac.uk/undergraduate/courses/ba-hons-airline-airport-management",
+      "https://uel.ac.uk/undergraduate/courses/ba-hons-applied-education-early-years-online",
+      "https://uel.ac.uk/undergraduate/courses/ba-hons-applied-education-inclusive-practice-online",
+      "https://uel.ac.uk/undergraduate/courses/ba-hons-applied-education-online",
+      "https://uel.ac.uk/undergraduate/courses/ba-hons-criminology-psychology",
+      "https://uel.ac.uk/undergraduate/courses/ba-hons-dance",
+      "https://uel.ac.uk/undergraduate/courses/ba-hons-early-childhood-montessori-pedagogy-level-6-top-up",
+      "https://uel.ac.uk/undergraduate/courses/ba-hons-education-top-online",
+      "https://uel.ac.uk/undergraduate/courses/ba-hons-fashion-studies-top",
+      "https://uel.ac.uk/undergraduate/courses/ba-hons-music-performance-production",
+      "https://uel.ac.uk/undergraduate/courses/ba-hons-music-technology-production",
+      "https://uel.ac.uk/undergraduate/courses/ba-hons-primary-education-qts",
+      "https://uel.ac.uk/undergraduate/courses/ba-hons-social-work",
+      "https://uel.ac.uk/undergraduate/courses/ba-hons-sport-business-management",
+      "https://uel.ac.uk/undergraduate/courses/ba-hons-sports-journalism?uel_variant=degree-with-foundation-year",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-applied-computing-top",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-clinical-community-psychology",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-computer-science-education-qualified-teacher-status",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-counselling",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-international-business-management-top",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-midwifery",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-nursing-adult?uel_variant=degree",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-nursing-adult?uel_variant=degree-via-foundation-year",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-nursing-childrens",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-nursing-mental-health",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-occupational-therapy?uel_variant=degree",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-occupational-therapy?uel_variant=degree-via-foundation-year",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-physiotherapy?uel_variant=degree",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-physiotherapy?uel_variant=degree-via-foundation-year",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-podiatry?uel_variant=degree",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-podiatry?uel_variant=degree-via-foundation-year",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-policing-studies-top",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-psychology-distance-learning",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-psychology?uel_variant=degree",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-psychology?uel_variant=degree-with-foundation-year",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-societies-digital-innovation",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-sports-coaching-performance-west-ham-united-foundation?uel_variant=degree",
+      "https://uel.ac.uk/undergraduate/courses/bsc-hons-sports-coaching-performance-west-ham-united-foundation?uel_variant=degree-with-foundation-year",
+      "https://uel.ac.uk/undergraduate/courses/fdsc-civil-engineering-construction-management",
+      "https://uel.ac.uk/undergraduate/courses/fdsc-nursing-associate",
+      "https://uel.ac.uk/undergraduate/courses/maccfin-hons-accounting-finance",
+      "https://uel.ac.uk/undergraduate/courses/meng-civil-engineering-integrated-masters",
+      "https://uel.ac.uk/undergraduate/courses/meng-electrical-electronic-engineering",
+      "https://uel.ac.uk/undergraduate/courses/meng-mechanical-engineering-integrated-masters"
+    ],
+    "staged_missing_source": []
+  },
+  "uncaptured_sources": [
+    "https://uel.ac.uk/postgraduate/courses/pgcert-autism-spectrum-conditions-learning"
+  ],
+  "verification_completed": true,
+  "verification_outcome": "FAILED_ACCEPTANCE"
+}

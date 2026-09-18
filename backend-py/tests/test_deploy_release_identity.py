@@ -476,7 +476,7 @@ def test_overlay_cleanup_rejects_recipe_untracked_after_discovery(
 
 
 def test_production_release_reports_redundant_overlays_after_checkout() -> None:
-    script = (BACKEND_ROOT.parent / ".local/prod_pull_all.sh").read_text(
+    script = (DEPLOY_DIR / "guarded_release.sh").read_text(
         encoding="utf-8"
     )
     helper = (
@@ -498,7 +498,7 @@ def test_production_release_reports_redundant_overlays_after_checkout() -> None:
 
 
 def test_production_release_blocks_only_corrupt_repository_after_audit_failure() -> None:
-    script = (BACKEND_ROOT.parent / ".local/prod_pull_all.sh").read_text(
+    script = (DEPLOY_DIR / "guarded_release.sh").read_text(
         encoding="utf-8"
     )
     audit_failure = script.split("post_checkout_overlay_audit.py", maxsplit=1)[1]
@@ -671,7 +671,7 @@ def test_real_corruption_status_stops_exact_release_gate_before_restart(
     assert helper_result.returncode == post_checkout_audit.CORRUPTION_EXIT
 
     release_script = (
-        BACKEND_ROOT.parent / ".local/prod_pull_all.sh"
+        DEPLOY_DIR / "guarded_release.sh"
     ).read_text(encoding="utf-8")
     gate_start = release_script.index('if [ "$overlay_audit_status" = 42 ]')
     gate_end = release_script.index("\nfi", gate_start) + len("\nfi")

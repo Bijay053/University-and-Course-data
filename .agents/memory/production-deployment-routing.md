@@ -3,6 +3,18 @@ name: Production deployment routing
 description: Non-obvious routing constraints for deploying this project to its external AWS host.
 ---
 
+Keep supported operational entrypoints outside `.local/`; an ignore exception
+does not make that directory safe for deliverable source code.
+
+**Why:** Completion checkpoints removed the guarded release entrypoint even
+after an explicit Git commit, leaving a dirty worktree and broken deployment
+tests. Restaging or ignore exceptions did not preserve it.
+
+**How to apply:** Put supported scripts in the tracked deployment directory,
+update all documented/tested references together, and retain their safety
+checks byte-for-byte when relocating them. Reserve `.local/` for generated
+runtime evidence and disposable operation wrappers.
+
 Inspect the live production repository origin before choosing a push target, and
 use the dedicated SSM AWS identity for remote commands rather than the default
 storage identity.

@@ -27,7 +27,7 @@ in `../README.md`.
 
 Tracked university recipes override matching settings in verified generated
 runtime overlays. The supported production release flow in
-`.local/prod_pull_all.sh` automatically runs this read-only audit after it has
+`backend-py/deploy/guarded_release.sh` automatically runs this read-only audit after it has
 checked out and verified the target revision, before restarting services. Its
 output includes `REDUNDANT_CONFIG_OVERLAY_COUNT` and one
 `REDUNDANT_CONFIG_OVERLAY_PATH` line per finding.
