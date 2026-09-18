@@ -5,6 +5,43 @@ fresh full isolated run has **zero `InvalidPayloadKeyError` events**, down from
 80. **This is not an all-clear for the UEL catalogue.** Two existing template
 errors and other source-quality findings remain.
 
+## Production release
+
+Released exact revision
+`42d20762680c6260fad7e5a7b52620d9835ae03f` on **2026-09-18** through
+`backend-py/deploy/guarded_release.sh`.
+
+- The pre-pull signed smoke passed and the release paused consumers only after
+  confirming zero active, reserved, scheduled, queued, running, or
+  awaiting-approval scrape work.
+- The first attempt stopped before pull when GitHub `main` advanced after
+  preflight. The combined tree was integrated and retested; the successful
+  attempt deployed the new exact remote tip without bypassing the revision
+  fence.
+- API and Celery process environments, startup identity checks, Git HEAD, and
+  `.release.env` all matched the released full revision. Internal health,
+  systemd state, public HTML, and the current frontend asset passed.
+- The post-release history API classified a real lifecycle-`completed` job
+  with four extraction errors as `extractionQuality.status:
+  extraction_errors`, `successful: false`, while preserving lifecycle status.
+- The scrape consumer was restored and all worker task counts were zero.
+- Two pre-existing tracked operator recipe edits were preserved byte-for-byte
+  across the guarded pull. The generated-overlay audit found zero redundant
+  overlays.
+
+The post-release read-only UEL review check remained exactly:
+
+- **253 pending reviews / 253 distinct canonical URLs / 0 null canonical URLs**
+- Full-row aggregate fingerprint:
+  `dfae42188bd00eb4bd085c9de3bd3acd`
+
+No production scrape, approval, or review replacement was performed. The
+isolated full-catalogue run was not repeated: its evidence remains tied to the
+recorded duration candidate, while the deployed combined revision was covered
+by the release, UEL layout, API/history, and frontend regression suites. The
+documented source-template, canonical-alias, and field-quality findings still
+apply; this release is not a catalogue all-clear.
+
 ## Change and tests
 
 The AI fallback's `duration_value` and `duration_unit` are consumed while being

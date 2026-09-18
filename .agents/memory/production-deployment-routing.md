@@ -29,6 +29,27 @@ HEAD, working tree, and sanitized origin as the repository owner. Push to that
 verified origin, then run commands through the dedicated SSM identity. Never
 print credentials, signed URLs, or credential-bearing remotes.
 
+Tracked operator recipe edits are not generated-file collisions. Never reset
+them merely to satisfy the guarded release’s clean-tree check.
+
+**Why:** Production had two intentional tracked YAML edits while the generated
+config reconciler correctly handled only untracked generated stubs. A release
+would otherwise overwrite or strand those live settings.
+
+**How to apply:** Require an exact allowlist, back up and hash each tracked edit,
+temporarily clean only those paths for the guarded pull, and restore/byte-verify
+them in an outer failure-safe trap. Prefer a future first-class release guard
+over repeating an ad hoc wrapper.
+
+Treat the fetched remote target as authoritative at the release fence, even
+after a successful push and local preflight.
+
+**Why:** Concurrent work advanced the remote branch between preflight and the
+release transaction. The exact-target guard stopped safely before pull.
+
+**How to apply:** Never bypass the revision mismatch. Integrate the new remote
+tip, rerun affected tests on that exact tree, and render a new release target.
+
 AWS-RunShellScript starts commands under `/bin/sh` on this host. Wrap release
 transactions explicitly in Bash when they use `pipefail` or other Bash-only
 features. Under `pipefail`, do not smoke-check journals with
