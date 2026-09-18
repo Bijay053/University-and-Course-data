@@ -1,0 +1,78 @@
+{
+  "task": 514,
+  "phase": "production_before_isolated_local_uel_run",
+  "captured_at_utc": "2026-09-18T03:40:02.805345+00:00",
+  "safety": {
+    "mode": "read_only",
+    "production_deploys": 0,
+    "production_writes": 0,
+    "production_approvals": 0,
+    "scrapes_started": 0,
+    "service_actions": 0,
+    "secret_values_read_or_displayed": false,
+    "database_transaction": "SET TRANSACTION READ ONLY"
+  },
+  "access": {
+    "method": "AWS Systems Manager Run Command",
+    "document": "AWS-RunShellScript",
+    "region": "ap-south-1",
+    "instance_id": "i-03547b132b6aa4ffb",
+    "host_private_name": "ip-172-31-40-159.ap-south-1.compute.internal",
+    "dedicated_identity_account": "905043442097",
+    "dedicated_identity_arn": "arn:aws:iam::905043442097:user/replit-production-ssm",
+    "ssm_command_id": "a9726dd8-14af-4af1-98f5-c493183028ba",
+    "ssm_status": "Success"
+  },
+  "production_source": {
+    "checkout": "/opt/university-portal",
+    "release_revision": "7e0673caa3fb151694a4f22ba66aeb0356c77544",
+    "database_connection_path": "app.database.AsyncSessionLocal using the root-owned managed database environment",
+    "database_tls": true,
+    "database_name_sha256": "1f3e3fc8f6b71f89e0c30f022d60067a29d6883a1a200a1107d22140a4db7d64",
+    "database_user_sha256": "99c06e07f486fae5051df7ca4a6115858ef4952365463c4f652ce919076aee60",
+    "database_server_address_sha256": "c1a818161ec557a81e60a05412b2e9fd6018f413d0a370f2e21bb9daed18e700"
+  },
+  "university": {
+    "id": 69,
+    "name": "University of East London",
+    "website": "https://www.uel.ac.uk",
+    "scrape_url": "https://www.uel.ac.uk",
+    "config_slug": "uel"
+  },
+  "review_baseline": {
+    "scope": "scraped_courses WHERE university_id = 69 AND status = 'pending'",
+    "review_count": 253,
+    "distinct_canonical_urls": 253,
+    "null_canonical_urls": 0,
+    "full_row_aggregate_fingerprint": "dfae42188bd00eb4bd085c9de3bd3acd",
+    "fingerprint_algorithm": "PostgreSQL md5(coalesce(string_agg(md5(to_jsonb(row)::text), '' ORDER BY id), '')) over the scoped full rows",
+    "matches_prior_baseline": true,
+    "prior_baseline": {
+      "review_count": 253,
+      "distinct_canonical_urls": 253,
+      "full_row_aggregate_fingerprint": "dfae42188bd00eb4bd085c9de3bd3acd"
+    }
+  },
+  "configuration_sha256": {
+    "effective_full": "6cf8cde73e44c50795e00ed47abdd95217ed8d495dca085bd5655742e2310b8e",
+    "effective_discovery": "0dbe41e57e682ffd06410cbebeb950c287dd2cb29140eadbcfa0548eb3d0c1da",
+    "effective_extraction": "d465dd8b8567b398a8c6698c14d50caaf77b818e8b3f4ec180fef946c28a81a0",
+    "database_scrape_config": "b984136463f6434ddf0342cfcbcb8ba10edc1302e60a77675a6fc9cd5d3ed238",
+    "uel_yaml": "1733f68c4ac6cac8cf57f0e36b0232f236d11612f8da29259ceb0d58afff93e3"
+  },
+  "runtime_file_sha256": {
+    "backend-py/app/services/scraper/orchestrator.py": "5d546d92a454fda1899f18d84270135b781c8dc96f3ea6688436d89bfd42823e",
+    "backend-py/app/services/scraper/uel_transport.py": "5411f6b5ed38854ed58a026d04c7048d3cb776cce135749a083abf2264043e7d",
+    "backend-py/app/services/scraper/extractors/uel_variants.py": "11029336a3ac657d64a0aa092cdcf450fe7fd8ce03a98e1d4ebac9b1f2cacac8",
+    "backend-py/scraper_config/unis/uel.yaml": "1733f68c4ac6cac8cf57f0e36b0232f236d11612f8da29259ceb0d58afff93e3"
+  },
+  "repeat_after_run": [
+    "Use the dedicated AWS_SSM_ACCESS_KEY_ID/AWS_SSM_SECRET_ACCESS_KEY identity without printing either value.",
+    "Target the same ap-south-1 instance with AWS Systems Manager Run Command; do not deploy, restart, dispatch a scrape, or approve data.",
+    "On the host, load the application database environment without echoing it and use backend-py/.venv/bin/python with app.database.AsyncSessionLocal.",
+    "Begin a read-only transaction and resolve the University of East London row by name rather than assuming its numeric ID.",
+    "Repeat the exact pending-row count, distinct canonical_course_url count, null canonical URL count, and documented full-row fingerprint expression.",
+    "Record a fresh UTC timestamp, SSM command ID, release revision, effective discovery/extraction hashes, and runtime file hashes.",
+    "Compare the after values to review_count=253, distinct_canonical_urls=253, null_canonical_urls=0, and fingerprint=dfae42188bd00eb4bd085c9de3bd3acd. Any difference means production review state changed and must be reported, not normalized or repaired."
+  ]
+}

@@ -150,3 +150,4 @@
 - [Otago Polytechnic fee cards](otago-polytechnic-fee-cards.md) — use the International Standard card; Full tuition is full-course, while First year/Course one are annual.
 - [UEL catalogue and award routes](uel-static-catalogue-transport.md) — static proxy exposes catalogue; each award owns its options and IELTS panel, never sibling defaults.
 - [Python local-import shadowing](python-local-import-shadowing.md) — a late function-local alias shadows earlier uses across the whole function; caught lock checks can misreport the resulting error as contention.
+- [Verification revision provenance](verification-revision-provenance.md) — completion can integrate concurrent changes; live evidence certifies its recorded revision, not a later merged tree.

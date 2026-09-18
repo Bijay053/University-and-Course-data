@@ -12,6 +12,7 @@ import {
   isRequestedFixField,
   ScrapingForTest,
   type ScrapingInitialReviewState,
+  visibleScrapeStatus,
 } from "./scraping";
 
 describe("annualFeeEquivalentForDisplay", () => {
@@ -23,6 +24,16 @@ describe("annualFeeEquivalentForDisplay", () => {
   it("annualizes full-course fees lasting at least one year", () => {
     expect(annualFeeEquivalentForDisplay(48_000, 12, "Month")).toBe(48_000);
     expect(annualFeeEquivalentForDisplay(96_000, 2, "Year")).toBe(48_000);
+  });
+});
+
+describe("visibleScrapeStatus", () => {
+  it("shows completed lifecycle jobs with errors as a warning", () => {
+    expect(visibleScrapeStatus("completed", 82)).toBe("completed_with_errors");
+  });
+
+  it("keeps clean lifecycle completion successful", () => {
+    expect(visibleScrapeStatus("completed", 0)).toBe("completed");
   });
 });
 

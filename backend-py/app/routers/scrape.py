@@ -797,10 +797,31 @@ async def force_cancel_all(
 
     return {"ok": True, "cancelled": len(rows), "celery_killed": celery_killed}
 
+def _job_quality_report(status: str, errors: int | None) -> dict:
+    """Report extraction quality separately from the job lifecycle.
 
+    ``completed`` means that the worker finished its lifecycle; it does not
+    mean that every candidate extracted successfully.
+    """
+    error_count = int(errors or 0)
+    if error_count:
+        quality_status = "extraction_errors"
+        successful: bool | None = False
+    elif status in {"completed", "completed_with_errors", "completed_with_warnings"}:
+        quality_status = "no_extraction_errors"
+        successful = True
+    else:
+        quality_status = "pending" if status in {"queued", "running", "awaiting_approval"} else "not_assessed"
+        successful = None
 
-# ----- UI-COMPAT ALIASES (match Node API surface) -----
-
+    return {
+        "lifecycleStatus": status,
+        "extractionQuality": {
+            "status": quality_status,
+            "successful": successful,
+            "errorCount": error_count,
+        },
+    }
 @router.get("/status/{job_id}")
 async def get_status(
     job_id: str,
@@ -923,6 +944,7 @@ async def get_status(
         "runtimeJobId": job.runtime_job_id,
         "jobId": job.runtime_job_id,
         "status": job.status,
+        **_job_quality_report(job.status, job.errors),
         "progress": {
             "current": job.current or 0,
             "total": job.total_found or 0,
@@ -1217,6 +1239,7 @@ async def history_list(
             "universityName": r.university_name,
             "url": r.url,
             "status": r.status,
+            **_job_quality_report(r.status, r.errors),
             "totalFound": r.total_found or 0,
             "imported": r.imported or 0,
             "skipped": r.skipped or 0,
@@ -1330,6 +1353,7 @@ async def history_compare(
             "universityId": job.university_id,
             "universityName": job.university_name,
             "status": job.status,
+            **_job_quality_report(job.status, job.errors),
             "startedAt": job.started_at.isoformat() if job.started_at else None,
             "completedAt": job.completed_at.isoformat() if job.completed_at else None,
             "totalFound": job.total_found or 0,
@@ -1602,6 +1626,7 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
             "universityId": job.university_id,
             "universityName": job.university_name,
             "status": job.status,
+            **_job_quality_report(job.status, job.errors),
             "imported": job.imported or 0,
             "skipped": job.skipped or 0,
             "errors": job.errors or 0,
@@ -3249,8 +3274,6 @@ async def staged_one(
     return {c.name: getattr(sc, c.name) for c in sc.__table__.columns} | {"ok": True}
 
 
-
-
 def _row_to_camel(row: dict) -> dict:
     """Convert a scraped_courses dict to camelCase keys + ISO datetimes."""
     out: dict = {}
@@ -3864,7 +3887,6 @@ async def bulk_history(db: Annotated[AsyncSession, Depends(get_db)]) -> list[dic
         )
     ).scalars().all()
     return [await _bulk_session_payload(db, r, include_history_extras=True) for r in rows]
-
 
 
 @router.post("/staged/clear-rejected/{university_id}")

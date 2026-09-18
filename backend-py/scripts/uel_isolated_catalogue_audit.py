@@ -111,12 +111,30 @@ def verify_runtime_release(expected: str, root: Path = ROOT) -> str:
     return revision
 
 
+def revision_evidence(expected: str, *, local: bool, root: Path = ROOT) -> dict:
+    """Both modes require exact, clean runtime bytes; only one claims a release."""
+    revision = verify_runtime_release(expected, root)
+    return {
+        "verification_scope": "local_candidate" if local else "deployed_release",
+        "candidate_revision": expected,
+        "authorized_revision": None if local else expected,
+        "harness_revision": revision,
+        "deployment_verified": not local,
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--expected-release", required=True,
+    identity = parser.add_mutually_exclusive_group(required=True)
+    identity.add_argument("--expected-release",
                         help="full SHA independently verified on deployed API and worker")
+    identity.add_argument("--expected-local-revision",
+                          help="full committed candidate SHA; does not claim deployment verification")
     args = parser.parse_args()
-    revision = verify_runtime_release(args.expected_release)
+    provenance = revision_evidence(
+        args.expected_local_revision or args.expected_release,
+        local=bool(args.expected_local_revision),
+    )
     raw_url = os.environ.get("DATABASE_URL", "")
     if not raw_url:
         fail("DATABASE_URL is not configured")
@@ -141,8 +159,7 @@ def main() -> int:
                 "audit_run_id": run_id,
                 "audit_dir": str(audit_dir.relative_to(ROOT)),
                 "state": "provisioning",
-                "authorized_revision": args.expected_release,
-                "harness_revision": revision,
+                **provenance,
             },
             indent=2,
         )
@@ -300,8 +317,8 @@ def main() -> int:
                 "approvals_allowed": False,
             },
             "release": {
-                "git_revision": args.expected_release,
-                "harness_revision": revision,
+                **provenance,
+                "git_revision": provenance["candidate_revision"],
                 "runtime_paths_verified": list(RUNTIME_PATHS),
                 "sha256": hashes,
             },

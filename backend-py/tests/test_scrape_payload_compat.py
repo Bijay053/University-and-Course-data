@@ -347,3 +347,59 @@ def test_status_returns_options_needed_to_continue_after_reload(client_with_uni)
     assert body["fastMode"] is True
     assert body["feePageUrl"] == "https://test.example.edu/fees"
     assert body["requirementsPageUrl"] == "https://test.example.edu/requirements"
+
+
+def test_completed_status_reports_extraction_errors_as_failed_quality(client_with_uni):
+    client, fake = client_with_uni
+    job_id = "job_completed_with_extraction_errors"
+    fake.jobs[job_id] = ScrapeRuntimeJob(
+        runtime_job_id=job_id,
+        university_id=42,
+        university_name="Test University",
+        url="https://test.example.edu/courses",
+        job_type="single",
+        status="completed",
+        imported=295,
+        skipped=27,
+        errors=82,
+        total_found=404,
+        request_payload={},
+    )
+
+    response = client.get(f"/api/scrape/status/{job_id}")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "completed"
+    assert body["lifecycleStatus"] == "completed"
+    assert body["extractionQuality"] == {
+        "status": "extraction_errors",
+        "successful": False,
+        "errorCount": 82,
+    }
+
+
+def test_clean_completed_status_only_claims_no_extraction_errors(client_with_uni):
+    client, fake = client_with_uni
+    job_id = "job_completed_without_extraction_errors"
+    fake.jobs[job_id] = ScrapeRuntimeJob(
+        runtime_job_id=job_id,
+        university_id=42,
+        university_name="Test University",
+        url="https://test.example.edu/courses",
+        job_type="single",
+        status="completed",
+        imported=10,
+        errors=0,
+        total_found=10,
+        request_payload={},
+    )
+
+    response = client.get(f"/api/scrape/status/{job_id}")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["extractionQuality"] == {
+        "status": "no_extraction_errors",
+        "successful": True,
+        "errorCount": 0,
+    }

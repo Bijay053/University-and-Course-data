@@ -3,11 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import json
 import os
-import re
-import time
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -33,13 +30,17 @@ from app.models.scrape_runtime import ScrapeRuntimeJob
 from app.models.university import University
 from app.services.scraper.orchestrator import run_scrape
 from app.services.scraper import uel_transport
+from app.services.scraper import browser_pool
+from app.services.scraper import discovery
+from app.services.scraper import http_fetcher
+from app.services.scraper.pipelines import single_course
+from uel_source_capture import SourceCapture, is_uel_detail_source
 
 
 AUDIT_DIR = Path(os.environ["UEL_AUDIT_DIR"])
 HTML_DIR = AUDIT_DIR / "html"
 HTML_DIR.mkdir(exist_ok=True)
 dispatch_attempts: list[dict] = []
-fetch_manifest: list[dict] = []
 PROGRESS_FILE = AUDIT_DIR / "progress.json"
 
 
@@ -72,35 +73,54 @@ def blocked_dispatch(self, *args, **kwargs):
 Task.delay = blocked_dispatch
 Task.apply_async = blocked_dispatch
 
-real_fetch_uel_source = uel_transport.fetch_uel_source
-
-
-async def observational_fetch_uel_source_html(url: str) -> str:
-    """Preserve the real transport result while recording immutable raw HTML."""
-    started = time.monotonic()
-    html = await real_fetch_uel_source(url)
-    digest = hashlib.sha256(html.encode("utf-8")).hexdigest()
-    path = HTML_DIR / f"{digest}.html"
-    if not path.exists():
-        path.write_text(html, encoding="utf-8")
-    fetch_manifest.append(
-        {
-            "url": url,
-            "sha256": digest,
-            "bytes": len(html.encode("utf-8")),
-            "elapsed_seconds": round(time.monotonic() - started, 3),
-            "file": str(path.relative_to(AUDIT_DIR)),
-        }
-    )
+def capture_progress() -> None:
     write_progress(
         "running",
-        source_fetches=len(fetch_manifest),
-        unique_source_urls=len({item["url"] for item in fetch_manifest}),
+        source_fetches=len(source_capture.manifest),
+        all_source_html_fetches=len(source_capture.source_manifest),
+        source_fetch_attempts=len(source_capture.attempts),
+        source_fetch_errors=len(source_capture.errors),
+        unique_source_urls=len({item["url"] for item in source_capture.manifest}),
     )
-    return html
 
 
-uel_transport.fetch_uel_source = observational_fetch_uel_source_html
+source_capture = SourceCapture(
+    AUDIT_DIR,
+    on_record=capture_progress,
+    is_detail_source=is_uel_detail_source,
+)
+
+# Patch every extraction route that can supply the UEL source page.  The
+# single_course names are import-time aliases, while browser_pool.pool is the
+# shared object used by both initial and sparse-page browser fallbacks.
+uel_transport.fetch_uel_source = source_capture.wrap(
+    "uel_source", uel_transport.fetch_uel_source
+)
+single_course.fetch_html = source_capture.wrap(
+    "general_http", single_course.fetch_html
+)
+single_course.fetch_html_scrape_do = source_capture.wrap(
+    "general_scrape_do", single_course.fetch_html_scrape_do
+)
+discovery.fetch_html = source_capture.wrap(
+    "discovery_http", discovery.fetch_html
+)
+browser_pool.pool.fetch_html = source_capture.wrap(
+    "browser", browser_pool.pool.fetch_html
+)
+# Preserve the original callables before replacing their module attributes.
+# Modules which resolve these functions lazily (discovery and central-page
+# fetchers included) now contribute to the all-source manifest. The already
+# bound single_course wrappers above continue to call the same real originals,
+# avoiding wrapper-on-wrapper recursion.
+real_module_fetch_html = http_fetcher.fetch_html
+real_module_fetch_html_scrape_do = http_fetcher.fetch_html_scrape_do
+http_fetcher.fetch_html = source_capture.wrap(
+    "http_fetcher", real_module_fetch_html
+)
+http_fetcher.fetch_html_scrape_do = source_capture.wrap(
+    "scrape_do", real_module_fetch_html_scrape_do
+)
 
 
 async def main() -> None:
@@ -204,9 +224,7 @@ async def main() -> None:
             )
         ).all()
 
-    (AUDIT_DIR / "html-manifest.json").write_text(
-        json.dumps(fetch_manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    source_capture.flush()
     event_kinds = Counter(
         str((payload or {}).get("kind") or event) for event, payload in log_events
     )
@@ -229,11 +247,31 @@ async def main() -> None:
         "non_pending_rows": approvals,
         "approvals_forbidden_and_absent": approvals == 0 and job_row["approval_decision"] is None,
         "source_capture": {
-            "fetches": len(fetch_manifest),
-            "unique_urls": len({item["url"] for item in fetch_manifest}),
-            "unique_html_documents": len({item["sha256"] for item in fetch_manifest}),
-            "bytes": sum(item["bytes"] for item in fetch_manifest),
+            "fetches": len(source_capture.manifest),
+            "all_source_html_fetches": len(source_capture.source_manifest),
+            "supporting_html_fetches": (
+                len(source_capture.source_manifest) - len(source_capture.manifest)
+            ),
+            "attempts": len(source_capture.attempts),
+            "unique_urls": len({item["url"] for item in source_capture.manifest}),
+            "unique_html_documents": len(
+                {item["sha256"] for item in source_capture.manifest}
+            ),
+            "bytes": sum(item["bytes"] for item in source_capture.manifest),
+            "errors": source_capture.errors,
+            "no_html_results": source_capture.no_html,
         },
+        "reported_errors": {
+            "job_error_count": int(job_row["errors"] or 0),
+            "job_error_message": job_row["error_message"],
+            "transport_error_count": len(source_capture.errors),
+            "transport_no_html_count": len(source_capture.no_html),
+        },
+        "quality_success_claimed": False,
+        "completion_note": (
+            "A completed lifecycle status is not a claim that catalogue quality "
+            "checks passed; inspect reported_errors and staged evidence."
+        ),
         "runtime_event_kind_counts": dict(sorted(event_kinds.items())),
         "autonomous_dispatch_attempts_blocked": dispatch_attempts,
         "force_discovery": True,
@@ -248,7 +286,9 @@ async def main() -> None:
         "finished",
         job_id=job_id,
         job_status=job_row["status"],
-        source_fetches=len(fetch_manifest),
+        source_fetches=len(source_capture.manifest),
+        source_fetch_errors=len(source_capture.errors),
+        job_errors=int(job_row["errors"] or 0),
         staged_rows=sum(int(row["n"]) for row in staged),
     )
     print(json.dumps({"job_status": job_row["status"], "staged": [dict(r) for r in staged], "audit_dir": str(AUDIT_DIR)}))
@@ -261,6 +301,31 @@ async def entry() -> None:
 
     try:
         await main()
+    except BaseException as exc:
+        source_capture.flush()
+        failure = {
+            "audit_run_id": os.environ["UEL_AUDIT_RUN_ID"],
+            "state": "runner_error",
+            "error_type": type(exc).__name__,
+            "source_capture": {
+                "fetches": len(source_capture.manifest),
+                "all_source_html_fetches": len(source_capture.source_manifest),
+                "attempts": len(source_capture.attempts),
+                "errors": source_capture.errors,
+                "no_html_results": source_capture.no_html,
+            },
+            "quality_success_claimed": False,
+        }
+        (AUDIT_DIR / "run-summary.json").write_text(
+            json.dumps(failure, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        write_progress(
+            "runner_error",
+            error_type=type(exc).__name__,
+            source_fetches=len(source_capture.manifest),
+            source_fetch_errors=len(source_capture.errors),
+        )
+        raise
     finally:
         try:
             await pool.close()

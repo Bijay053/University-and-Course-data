@@ -128,6 +128,12 @@ export function hasReviewableCourses(
   );
 }
 
+export function hasCompletedExtractionErrors(
+  phase: string,
+  summary: { errors: number } | null,
+): boolean {
+  return phase === "done" && (summary?.errors ?? 0) > 0;
+}
 export function shouldOfferIdenticalContinuation({
   completedJobId,
   errors,
@@ -2030,6 +2036,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
     ? { event: "progress", current: progress.current, total: progress.total }
     : latestProgressLog;
   const elapsed = startTime ? fmt(now - startTime) : null;
+  const completedWithExtractionErrors = hasCompletedExtractionErrors(phase, resultSummary);
 
   // ── Render ────────────────────────────────────────────────────────────────
   const replayUniName = universities.find(u => String(u.id) === selectedUni)?.name ?? uniName;
@@ -2041,6 +2048,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
       replayPhase === "error"   ? "border-red-200" :
       phase === "running" && jobStatus === "queued" ? "border-amber-300 shadow-amber-50" :
       phase === "running" ? "border-blue-300 shadow-blue-100" :
+      completedWithExtractionErrors ? "border-amber-300 shadow-amber-50" :
       phase === "done"    ? "border-green-300 shadow-green-50" :
       phase === "error"   ? "border-red-200"  : "border-gray-200"
     }`}>
@@ -2051,6 +2059,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
         replayPhase === "error"   ? "bg-red-50 border-red-200 text-red-700" :
         phase === "running" && jobStatus === "queued" ? "bg-amber-50 border-amber-200 text-amber-800" :
         phase === "running" ? "bg-blue-50 border-blue-200 text-blue-800" :
+        completedWithExtractionErrors ? "bg-amber-50 border-amber-200 text-amber-900" :
         phase === "done"    ? "bg-green-50 border-green-200 text-green-800" :
         phase === "error"   ? "bg-red-50 border-red-200 text-red-700" : "bg-gray-50 border-gray-200 text-gray-700"
       }`}>
@@ -2060,7 +2069,11 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
           {replayPhase === "error"   && <AlertCircle className="w-3.5 h-3.5" />}
           {replayPhase === "idle" && phase === "running" && jobStatus === "queued" && <span className="text-base leading-none">⏳</span>}
           {replayPhase === "idle" && phase === "running" && jobStatus !== "queued" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-          {replayPhase === "idle" && phase === "done"  && <CheckCircle2 className="w-3.5 h-3.5" />}
+          {replayPhase === "idle" && phase === "done" && (
+            completedWithExtractionErrors
+              ? <AlertTriangle className="w-3.5 h-3.5" />
+              : <CheckCircle2 className="w-3.5 h-3.5" />
+          )}
           {replayPhase === "idle" && phase === "error" && <AlertCircle className="w-3.5 h-3.5" />}
           <span>
             {replayPhase === "running" && (replayUniName ? `${replayUniName} — Replaying` : `Slot ${slotIndex + 1} — Replaying`)}
@@ -2069,7 +2082,11 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
             {replayPhase === "idle" && phase === "idle"    && `Slot ${slotIndex + 1}`}
             {replayPhase === "idle" && phase === "running" && jobStatus === "queued" && (uniName ? `${uniName} — Queued` : `Slot ${slotIndex + 1} — Queued`)}
             {replayPhase === "idle" && phase === "running" && jobStatus !== "queued" && (uniName || `Slot ${slotIndex + 1} — Running`)}
-            {replayPhase === "idle" && phase === "done"    && (uniName || `Slot ${slotIndex + 1} — Done`)}
+            {replayPhase === "idle" && phase === "done" && (
+              completedWithExtractionErrors
+                ? `${uniName || `Slot ${slotIndex + 1}`} — Completed with errors`
+                : (uniName || `Slot ${slotIndex + 1} — Done`)
+            )}
             {replayPhase === "idle" && phase === "error"   && (uniName || `Slot ${slotIndex + 1} — Error`)}
           </span>
           {replayPhase === "running" && (
@@ -2627,6 +2644,21 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                 <div className="bg-red-50 rounded-lg p-2">
                   <div className="text-lg font-bold text-red-700">{resultSummary.errors}</div>
                   <div className="text-xs text-red-600">Errors</div>
+                </div>
+              </div>
+            )}
+
+            {completedWithExtractionErrors && resultSummary && (
+              <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+                  <div className="text-xs text-amber-900">
+                    <p className="font-semibold">Completed with extraction errors — quality is not all clear</p>
+                    <p className="mt-0.5 text-amber-800">
+                      {resultSummary.errors} candidate{resultSummary.errors === 1 ? "" : "s"} failed extraction.
+                      Review the errors and staged course quality before treating this run as successful.
+                    </p>
+                  </div>
                 </div>
               </div>
             )}

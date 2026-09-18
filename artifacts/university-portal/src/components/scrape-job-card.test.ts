@@ -1,15 +1,69 @@
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
+
+import React from "react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   activeRepairFromStartConflict,
   countSuspiciousSkipped,
+  hasCompletedExtractionErrors,
   hasReviewableCourses,
   isCategoryPageWarningStale,
   runtimeProgressFromStatus,
   shouldOfferIdenticalContinuation,
   shouldShowAutomaticUrlRepair,
   shouldShowScrapeDiagnostics,
+  ScrapeJobCard,
 } from "./scrape-job-card";
+
+afterEach(() => {
+  cleanup();
+  sessionStorage.clear();
+  vi.unstubAllGlobals();
+});
+
+function jsonResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+async function renderCompletedCard(errors: number): Promise<HTMLElement> {
+  sessionStorage.setItem("scrape_slot_1_jobId", "job-complete");
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.startsWith("/api/scrape/status/job-complete")) {
+      return jsonResponse({
+        status: "completed",
+        universityId: 7,
+        universityName: "Test University",
+        totalFound: 100,
+        imported: 100 - errors,
+        skipped: 0,
+        errors,
+        current: 100,
+        logs: [],
+      });
+    }
+    if (url === "/api/scrape/staged/job-complete") return jsonResponse([]);
+    return jsonResponse({});
+  }));
+
+  render(React.createElement(ScrapeJobCard, {
+    slotId: 1,
+    slotIndex: 0,
+    universities: [{ id: 7, name: "Test University" }],
+    onReviewReady: () => undefined,
+  }));
+
+  return waitFor(() => {
+    const card = screen.getByText("Errors").closest(".rounded-xl");
+    expect(card).not.toBeNull();
+    return card as HTMLElement;
+  });
+}
 
 describe("runtimeProgressFromStatus", () => {
   it("uses the persisted processed/total values from every status poll", () => {
@@ -88,6 +142,43 @@ describe("hasReviewableCourses", () => {
 
   it("hides review only after the chain has no pending rows", () => {
     expect(hasReviewableCourses({ imported: 101 }, 0)).toBe(false);
+  });
+});
+
+describe("hasCompletedExtractionErrors", () => {
+  it("does not treat lifecycle completion with extraction errors as an all-clear", () => {
+    expect(hasCompletedExtractionErrors("done", { errors: 82 })).toBe(true);
+  });
+
+  it("does not warn before completion or for a clean completed run", () => {
+    expect(hasCompletedExtractionErrors("running", { errors: 82 })).toBe(false);
+    expect(hasCompletedExtractionErrors("done", { errors: 0 })).toBe(false);
+  });
+});
+
+describe("completed ScrapeJobCard quality state", () => {
+  it("renders a warning rather than a green success header when extraction errors remain", async () => {
+    const card = await renderCompletedCard(82);
+
+    expect(screen.getByText("Test University — Completed with errors")).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toContain(
+      "Completed with extraction errors — quality is not all clear",
+    );
+    expect(screen.getByRole("alert").textContent).toContain("82 candidates failed extraction");
+    const header = screen.getByText("Test University — Completed with errors").closest(".border-b");
+    expect(header?.className).toContain("bg-amber-50");
+    expect(header?.className).not.toContain("bg-green-50");
+    expect(card.textContent).not.toContain("Test University — Done");
+  });
+
+  it("keeps the usual completed state when no extraction errors remain", async () => {
+    await renderCompletedCard(0);
+
+    expect(screen.getByText("Test University")).toBeTruthy();
+    expect(screen.queryByText(/quality is not all clear/i)).toBeNull();
+    const header = screen.getByText("Test University").closest(".border-b");
+    expect(header?.className).toContain("bg-green-50");
+    expect(header?.className).not.toContain("bg-amber-50");
   });
 });
 

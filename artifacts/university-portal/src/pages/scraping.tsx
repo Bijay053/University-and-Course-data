@@ -593,7 +593,14 @@ const SCRAPE_POLL_TIMEOUT_MS = 360000;
 const SCRAPE_POLL_WARNING_AFTER_FAILURES = 4;
 const SCRAPE_POLL_WARNING_AFTER_IDLE_MS = 120000;
 
-function statusBadge(status: string) {
+export function visibleScrapeStatus(status: string, errors: number | null | undefined): string {
+  return status === "completed" && (errors ?? 0) > 0
+    ? "completed_with_errors"
+    : status;
+}
+
+function statusBadge(status: string, errors?: number | null) {
+  status = visibleScrapeStatus(status, errors);
   if (status === "completed") return <Badge className="bg-green-100 text-green-700 border-green-200">Completed</Badge>;
   if (status === "completed_with_errors") return <Badge className="bg-amber-100 text-amber-700 border-amber-200">Completed (Errors)</Badge>;
   if (status === "queued") return <Badge className="bg-slate-100 text-slate-700 border-slate-200">Queued</Badge>;
@@ -1361,10 +1368,14 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     return d.toLocaleString(undefined, { month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" });
   };
 
-  const historyStatusBadge = (status: string) => {
+  const historyStatusBadge = (status: string, errors: number | null) => {
+    status = visibleScrapeStatus(status, errors);
     const map: Record<string, { label: string; cls: string }> = {
-      completed: { label: "✓", cls: "bg-green-100 text-green-700" },
-      completed_with_errors: { label: "⚠", cls: "bg-amber-100 text-amber-700" },
+      completed: { label: "Completed", cls: "bg-green-100 text-green-700" },
+      completed_with_errors: {
+        label: `Completed · ${errors ?? 0} error${errors === 1 ? "" : "s"}`,
+        cls: "bg-amber-100 text-amber-800",
+      },
       failed: { label: "✗", cls: "bg-red-100 text-red-700" },
       stopped: { label: "■", cls: "bg-gray-200 text-gray-700" },
       running: { label: "●", cls: "bg-blue-100 text-blue-700" },
@@ -4673,7 +4684,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                         title={historySelected.size >= 2 && !historySelected.has(run.runtimeJobId) ? "Clear a selection first" : "Select to compare"}
                         className="w-4 h-4 shrink-0 accent-indigo-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                       />
-                      <div className="shrink-0">{historyStatusBadge(run.status)}</div>
+                      <div className="shrink-0">{historyStatusBadge(run.status, run.errors)}</div>
                       <div className="min-w-0 flex-1">
                         <div className="font-medium text-gray-800 truncate leading-snug">
                           {run.universityName ?? "(unknown university)"}
@@ -4693,6 +4704,11 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                         <span>Staged: <span className="font-semibold text-gray-800">{run.stagedCount}</span></span>
                         <span>Approved: <span className="font-semibold text-green-700">{run.approvedCount}</span></span>
                         <span>Rejected: <span className="font-semibold text-red-700">{run.rejectedCount}</span></span>
+                        {(run.errors ?? 0) > 0 && (
+                          <span className="font-semibold text-amber-800">
+                            Extraction errors: {run.errors}
+                          </span>
+                        )}
                         {(run.requeueCount ?? 0) > 0 && (
                           <span
                             title={`Auto-recovered ${run.requeueCount} time${run.requeueCount === 1 ? "" : "s"} by the stale-job reaper`}

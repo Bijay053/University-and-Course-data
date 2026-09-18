@@ -1,0 +1,57 @@
+{
+  "task": 514,
+  "evidence_type": "local_disposable_to_production_effective_config_parity",
+  "captured_at_utc": "2026-09-18T03:43:04Z",
+  "safety": {
+    "read_only": true,
+    "runtime_or_config_paths_mutated": false,
+    "config_stub_creation_enabled": false,
+    "loader_option": "create_missing_stub=False",
+    "live_scrape_started": false,
+    "production_access_performed": false
+  },
+  "serializer": {
+    "model_conversion": "UniConfig.model_dump(mode='json')",
+    "canonical_json": "json.dumps(value, sort_keys=True, separators=(',', ':'), default=str)",
+    "digest": "SHA-256 of canonical JSON UTF-8 bytes",
+    "matches_production_proof_serializer": true
+  },
+  "local_candidate": {
+    "git_head": "5a2d80f1b27bad862b9836b953590712303a26b8",
+    "input": {
+      "university_id": 1,
+      "name": "University of East London",
+      "country": "United Kingdom",
+      "hostname": "www.uel.ac.uk",
+      "scrape_url": "https://www.uel.ac.uk/study/undergraduate/courses",
+      "scrape_config": {}
+    },
+    "resolved": {
+      "slug": "uel",
+      "base_url": "https://www.uel.ac.uk"
+    },
+    "effective_full_sha256": "36817b1caf415fee0deb4bc681a42b92b60de13e6c84f5e10ff9e40cda9d7648",
+    "effective_discovery_sha256": "0dbe41e57e682ffd06410cbebeb950c287dd2cb29140eadbcfa0548eb3d0c1da",
+    "effective_extraction_sha256": "d465dd8b8567b398a8c6698c14d50caaf77b818e8b3f4ec180fef946c28a81a0",
+    "uel_yaml_sha256": "1733f68c4ac6cac8cf57f0e36b0232f236d11612f8da29259ceb0d58afff93e3"
+  },
+  "production_before_reference": {
+    "source": "docs/verification/uel-duration-production-before.json",
+    "release_revision": "7e0673caa3fb151694a4f22ba66aeb0356c77544",
+    "university_id": 69,
+    "scrape_url": "https://www.uel.ac.uk",
+    "effective_full_sha256": "6cf8cde73e44c50795e00ed47abdd95217ed8d495dca085bd5655742e2310b8e",
+    "effective_discovery_sha256": "0dbe41e57e682ffd06410cbebeb950c287dd2cb29140eadbcfa0548eb3d0c1da",
+    "effective_extraction_sha256": "d465dd8b8567b398a8c6698c14d50caaf77b818e8b3f4ec180fef946c28a81a0",
+    "uel_yaml_sha256": "1733f68c4ac6cac8cf57f0e36b0232f236d11612f8da29259ceb0d58afff93e3"
+  },
+  "parity": {
+    "effective_discovery": true,
+    "effective_extraction": true,
+    "uel_yaml_bytes": true,
+    "effective_full": false,
+    "effective_full_difference_expected": true,
+    "effective_full_difference_reason": "The full UniConfig includes intentional identity differences: disposable university_id=1 and undergraduate listing scrape_url versus production university_id=69 and root scrape_url.",
+    "acceptance_result": "PASS"
+  }
+}

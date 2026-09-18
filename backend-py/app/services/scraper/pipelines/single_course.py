@@ -2051,9 +2051,10 @@ def _should_force_sparse_browser(
 def _apply_ai_duration_mapping(payload: dict[str, Any], ai_filled: dict[str, Any]) -> None:
     """Translate AI's `duration_value` / `duration_unit` keys into the
     canonical `duration` / `duration_term` keys used by the staged-course
-    schema. Mutates ``ai_filled`` in place. Only fills when the rule
-    extractor hasn't already populated the canonical key, so a confident
-    regex hit always beats an AI guess. See B20 root-cause notes.
+    schema. Mutates ``ai_filled`` in place and consumes the AI-only aliases
+    so they cannot leak into the strict final payload contract. Only fills
+    when the rule extractor hasn't already populated the canonical key, so a
+    confident regex hit always beats an AI guess. See B20 root-cause notes.
 
     Safety-net override: when the regex extracted a sub-year duration
     (months/weeks — typically from a placement/practicum sentence that
@@ -2105,9 +2106,9 @@ def _apply_ai_duration_mapping(payload: dict[str, Any], ai_filled: dict[str, Any
     from app.services.scraper.extractors.duration import _normalise_unit
 
     existing_term = _normalise_unit(str(payload.get("duration_term") or "")) or ""
-    ai_unit_raw = str(ai_filled.get("duration_unit") or "")
+    ai_unit_raw = str(ai_filled.pop("duration_unit", None) or "")
     ai_term = _normalise_unit(ai_unit_raw) if ai_unit_raw else None
-    ai_val_raw = ai_filled.get("duration_value")
+    ai_val_raw = ai_filled.pop("duration_value", None)
 
     # Determine whether AI is eligible to rescue a sub-year regex result.
     _sub_year_regex = existing_term in ("Month", "Week") and "duration" in payload

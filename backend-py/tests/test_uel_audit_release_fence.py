@@ -34,6 +34,30 @@ def test_accepts_original_release(released_repo):
     assert audit.verify_runtime_release(release, root) == release
 
 
+def test_local_candidate_is_not_reported_as_deployed(released_repo):
+    root, _, revision = released_repo
+    evidence = audit.revision_evidence(revision, local=True, root=root)
+    assert evidence["verification_scope"] == "local_candidate"
+    assert evidence["candidate_revision"] == revision
+    assert evidence["authorized_revision"] is None
+    assert evidence["deployment_verified"] is False
+
+
+def test_release_mode_retains_deployment_provenance(released_repo):
+    root, _, revision = released_repo
+    evidence = audit.revision_evidence(revision, local=False, root=root)
+    assert evidence["verification_scope"] == "deployed_release"
+    assert evidence["authorized_revision"] == revision
+    assert evidence["deployment_verified"] is True
+
+
+def test_local_candidate_also_rejects_dirty_runtime(released_repo):
+    root, source, revision = released_repo
+    source.write_text("UNCOMMITTED = True\n")
+    with pytest.raises(SystemExit, match="runtime source/config/dependencies differ"):
+        audit.revision_evidence(revision, local=True, root=root)
+
+
 def test_accepts_later_documentation_commit_with_identical_runtime(released_repo):
     root, _, release = released_repo
     (root / "audit.md").write_text("Verification documentation\n")

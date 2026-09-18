@@ -1,0 +1,85 @@
+{
+  "task": 514,
+  "phase": "production_after_isolated_local_uel_run",
+  "captured_at_utc": "2026-09-18T04:04:25.915922+00:00",
+  "safety": {
+    "mode": "read_only",
+    "production_deploys": 0,
+    "production_writes": 0,
+    "production_approvals": 0,
+    "scrapes_started": 0,
+    "service_actions": 0,
+    "secret_values_read_or_displayed": false,
+    "database_transaction": "SET TRANSACTION READ ONLY"
+  },
+  "access": {
+    "method": "AWS Systems Manager Run Command",
+    "document": "AWS-RunShellScript",
+    "region": "ap-south-1",
+    "instance_id": "i-03547b132b6aa4ffb",
+    "host_private_name": "ip-172-31-40-159.ap-south-1.compute.internal",
+    "dedicated_identity_account": "905043442097",
+    "dedicated_identity_arn": "arn:aws:iam::905043442097:user/replit-production-ssm",
+    "ssm_command_id": "4934e642-9b58-41e0-a0a2-9d6f5a67efb7",
+    "ssm_status": "Success"
+  },
+  "production_source": {
+    "checkout": "/opt/university-portal",
+    "release_revision": "7e0673caa3fb151694a4f22ba66aeb0356c77544",
+    "database_connection_path": "app.database.AsyncSessionLocal using the root-owned managed database environment",
+    "database_tls": true,
+    "database_name_sha256": "1f3e3fc8f6b71f89e0c30f022d60067a29d6883a1a200a1107d22140a4db7d64",
+    "database_user_sha256": "99c06e07f486fae5051df7ca4a6115858ef4952365463c4f652ce919076aee60",
+    "database_server_address_sha256": "c1a818161ec557a81e60a05412b2e9fd6018f413d0a370f2e21bb9daed18e700"
+  },
+  "university": {
+    "id": 69,
+    "name": "University of East London",
+    "website": "https://www.uel.ac.uk",
+    "scrape_url": "https://www.uel.ac.uk",
+    "config_slug": "uel"
+  },
+  "review_after": {
+    "scope": "scraped_courses WHERE university_id = 69 AND status = 'pending'",
+    "review_count": 253,
+    "distinct_canonical_urls": 253,
+    "null_canonical_urls": 0,
+    "full_row_aggregate_fingerprint": "dfae42188bd00eb4bd085c9de3bd3acd",
+    "fingerprint_algorithm": "PostgreSQL md5(coalesce(string_agg(md5(to_jsonb(row)::text), '' ORDER BY id), '')) over the scoped full rows"
+  },
+  "production_before_reference": {
+    "source": "docs/verification/uel-duration-production-before.json",
+    "captured_at_utc": "2026-09-18T03:40:02.805345+00:00",
+    "review_count": 253,
+    "distinct_canonical_urls": 253,
+    "null_canonical_urls": 0,
+    "full_row_aggregate_fingerprint": "dfae42188bd00eb4bd085c9de3bd3acd"
+  },
+  "comparison": {
+    "same_scope": true,
+    "same_fingerprint_algorithm": true,
+    "review_count_unchanged": true,
+    "review_count_delta": 0,
+    "distinct_canonical_urls_unchanged": true,
+    "distinct_canonical_urls_delta": 0,
+    "null_canonical_urls_unchanged": true,
+    "null_canonical_urls_delta": 0,
+    "full_row_aggregate_fingerprint_unchanged": true,
+    "production_review_unchanged": true,
+    "result": "PASS"
+  },
+  "configuration_sha256": {
+    "effective_full": "6cf8cde73e44c50795e00ed47abdd95217ed8d495dca085bd5655742e2310b8e",
+    "effective_discovery": "0dbe41e57e682ffd06410cbebeb950c287dd2cb29140eadbcfa0548eb3d0c1da",
+    "effective_extraction": "d465dd8b8567b398a8c6698c14d50caaf77b818e8b3f4ec180fef946c28a81a0",
+    "database_scrape_config": "b984136463f6434ddf0342cfcbcb8ba10edc1302e60a77675a6fc9cd5d3ed238",
+    "uel_yaml": "1733f68c4ac6cac8cf57f0e36b0232f236d11612f8da29259ceb0d58afff93e3"
+  },
+  "runtime_file_sha256": {
+    "backend-py/app/services/scraper/orchestrator.py": "5d546d92a454fda1899f18d84270135b781c8dc96f3ea6688436d89bfd42823e",
+    "backend-py/app/services/scraper/uel_transport.py": "5411f6b5ed38854ed58a026d04c7048d3cb776cce135749a083abf2264043e7d",
+    "backend-py/app/services/scraper/extractors/uel_variants.py": "11029336a3ac657d64a0aa092cdcf450fe7fd8ce03a98e1d4ebac9b1f2cacac8",
+    "backend-py/scraper_config/unis/uel.yaml": "1733f68c4ac6cac8cf57f0e36b0232f236d11612f8da29259ceb0d58afff93e3"
+  },
+  "conclusion": "The isolated local UEL run did not alter the scoped production UEL pending review rows."
+}
