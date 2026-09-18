@@ -51,7 +51,6 @@ Thumbs.db
 .local/
 !.local/
 .local/*
-!.local/prod_pull_all.sh
 
 # Local environment files
 .env
