@@ -19,6 +19,10 @@ def test_cccu_uses_full_sitemap_and_rejects_undergraduate_only_cache():
     assert discovery.sitemap_url == "https://www.canterbury.ac.uk/sitemap.xml"
     assert discovery.always_sitemap_supplement is True
     assert discovery.expected_min_courses == 340
+    assert discovery.allow_url_patterns == [
+        r"^https?://www\.canterbury\.ac\.uk/study-here/courses/"
+        r"(?:postgraduate/)?[^/?#]+/?(?:\?[^#]*)?$"
+    ]
     assert not discovery_cache_coverage_sufficient(
         course_count=299,
         expected_min_courses=discovery.expected_min_courses,

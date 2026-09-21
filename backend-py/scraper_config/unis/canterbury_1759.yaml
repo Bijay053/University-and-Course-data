@@ -16,6 +16,8 @@ discovery:
   sitemap_url: https://www.canterbury.ac.uk/sitemap.xml
   always_sitemap_supplement: true
   expected_min_courses: 340
+  allow_url_patterns:
+    - '^https?://www\.canterbury\.ac\.uk/study-here/courses/(?:postgraduate/)?[^/?#]+/?(?:\?[^#]*)?$'
 extraction:
   fees:
     default_currency: GBP
