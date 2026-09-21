@@ -229,14 +229,24 @@ export default function SearchPage() {
       fetchRef.current = ac;
       setLoading(true);
       setError(null);
+      let timedOut = false;
+      const timeout = window.setTimeout(() => {
+        timedOut = true;
+        ac.abort();
+      }, 15_000);
       try {
         const res = await fetch(requestUrl, { signal: ac.signal });
         if (!res.ok) throw new Error(await res.text());
         const json = (await res.json()) as SearchResponse;
         setData(json);
       } catch (err) {
-        if ((err as Error).name !== "AbortError") setError((err as Error).message);
+        if (timedOut) {
+          setError("Search timed out. Please try again.");
+        } else if ((err as Error).name !== "AbortError") {
+          setError((err as Error).message);
+        }
       } finally {
+        window.clearTimeout(timeout);
         if (fetchRef.current === ac) setLoading(false);
       }
     }, 300);

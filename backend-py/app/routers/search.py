@@ -34,6 +34,26 @@ log = logging.getLogger(__name__)
 
 router = APIRouter()
 
+_SEARCH_INDEX_DDL = (
+    "CREATE INDEX IF NOT EXISTS ix_fees_course_id ON fees (course_id)",
+    "CREATE INDEX IF NOT EXISTS ix_intakes_course_id ON intakes (course_id)",
+    (
+        "CREATE INDEX IF NOT EXISTS ix_english_requirements_course_id "
+        "ON english_requirements (course_id)"
+    ),
+    (
+        "CREATE INDEX IF NOT EXISTS ix_academic_requirements_course_id "
+        "ON academic_requirements (course_id)"
+    ),
+)
+
+
+async def ensure_search_indexes(db: AsyncSession) -> None:
+    """Ensure the live search CTE can use indexed per-course lookups."""
+    for statement in _SEARCH_INDEX_DDL:
+        await db.execute(text(statement))
+    await db.commit()
+
 
 # Keep the historical ``course_search_view`` row contract without relying on
 # the materialized view that the removed Node API used to create. Naming the

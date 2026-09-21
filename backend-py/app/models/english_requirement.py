@@ -13,7 +13,8 @@ class EnglishRequirement(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     course_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False
+        Integer, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False,
+        index=True,
     )
     test_type: Mapped[str] = mapped_column(Text, nullable=False)
     test_name: Mapped[str | None] = mapped_column(Text)

@@ -13,7 +13,8 @@ class Fee(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     course_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False
+        Integer, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False,
+        index=True,
     )
     international_fee: Mapped[float | None] = mapped_column(Float)
     fee_term: Mapped[str | None] = mapped_column(Text)

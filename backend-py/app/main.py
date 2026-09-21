@@ -89,6 +89,20 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
         log.exception("pg_trgm setup failed (fuzzy search unavailable)")
     try:
         from app.database import AsyncSessionLocal
+        from app.routers.search import ensure_search_indexes
+
+        async with AsyncSessionLocal() as _s:
+            await asyncio.wait_for(ensure_search_indexes(_s), timeout=15)
+        log.info("Course search indexes ensured")
+    except TimeoutError:
+        log.warning(
+            "Course search index setup timed out after 15s "
+            "(search may remain slow until the next restart)"
+        )
+    except Exception:  # noqa: BLE001
+        log.exception("Course search index setup failed")
+    try:
+        from app.database import AsyncSessionLocal
         from app.services.scraper.ai_repair_agent import ensure_ai_repair_audit_schema
 
         async with AsyncSessionLocal() as _s:

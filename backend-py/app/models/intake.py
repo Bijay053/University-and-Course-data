@@ -13,7 +13,8 @@ class Intake(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     course_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False
+        Integer, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False,
+        index=True,
     )
     intake_month: Mapped[str] = mapped_column(Text, nullable=False)
     intake_day: Mapped[int | None] = mapped_column(Integer)

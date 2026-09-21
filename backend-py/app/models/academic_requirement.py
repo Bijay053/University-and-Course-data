@@ -13,7 +13,8 @@ class AcademicRequirement(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     course_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False
+        Integer, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False,
+        index=True,
     )
     academic_level: Mapped[str | None] = mapped_column(Text)
     academic_score: Mapped[float | None] = mapped_column(Float)

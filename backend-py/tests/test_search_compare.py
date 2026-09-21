@@ -20,7 +20,7 @@ from sqlalchemy import text
 from app.database import AsyncSessionLocal
 from app.dependencies import get_db
 from app.main import app
-from app.routers.search import _COURSE_SEARCH_CTE
+from app.routers.search import _COURSE_SEARCH_CTE, _SEARCH_INDEX_DDL
 
 
 class _StubResult:
@@ -111,6 +111,17 @@ def test_search_row_source_is_live_base_tables_not_retired_node_view():
     assert "ORDER BY ar.created_at DESC NULLS LAST, ar.id DESC" in normalized
     assert "max(er.overall)" in normalized
     assert "upper(er.test_type) = 'IELTS'" in normalized
+
+
+def test_search_child_lookups_have_persistent_course_indexes():
+    ddl = " ".join(_SEARCH_INDEX_DDL)
+    for table in (
+        "fees",
+        "intakes",
+        "english_requirements",
+        "academic_requirements",
+    ):
+        assert f"ON {table} (course_id)" in ddl
 
 
 @pytest.mark.asyncio
