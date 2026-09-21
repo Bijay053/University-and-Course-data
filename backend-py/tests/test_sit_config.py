@@ -7,6 +7,7 @@ import pytest
 from app.services.scraper.config.loader import load_uni_config
 from app.services.scraper.orchestrator import (
     _apply_central_page_overrides,
+    _audit_sit_international_catalogue_rows,
     _extraction_failure_details,
     _filter_sit_international_catalogue_links,
     _inject_yaml_fee_page,
@@ -838,6 +839,82 @@ def test_sit_discovery_keeps_only_programmes_in_international_catalogue():
 
     assert kept == [listed]
     assert dropped == [unlisted]
+
+
+def test_sit_catalogue_audit_reports_every_row_without_synthesizing_missing_pages():
+    links = [
+        {
+            "url": "https://www.sit.ac.nz/Programme/Course/Bachelor%20of%20Testing",
+            "name": "Bachelor of Testing",
+        }
+    ]
+    records = [
+        {
+            "program_pattern": "Bachelor of Testing",
+            "international_fee": 19000.0,
+            "intake_months": ["February"],
+            "intake_text": "February",
+        },
+        {
+            "program_pattern": (
+                "General English plus Examination Preparation Training Scheme"
+            ),
+            "international_fee": 9000.0,
+            "intake_months": [],
+            "intake_text": "Starts every Monday",
+            "intake_authoritative": True,
+        },
+    ]
+
+    outcomes = _audit_sit_international_catalogue_rows(links, records, {})
+
+    assert outcomes == [
+        {
+            "program": "Bachelor of Testing",
+            "outcome": "verified_public_detail_page",
+            "reason": "exact_schedule_row_match",
+            "intake_months": ["February"],
+            "intake_text": "February",
+        },
+        {
+            "program": (
+                "General English plus Examination Preparation Training Scheme"
+            ),
+            "outcome": "schedule_only_not_staged",
+            "reason": (
+                "no_verified_public_detail_page_and_policy_forbids_synthesis"
+            ),
+            "intake_months": [],
+            "intake_text": "Starts every Monday",
+        },
+    ]
+
+
+def test_sit_catalogue_audit_uses_verified_aliases_for_public_pages():
+    records = [
+        {
+            "program_pattern": "New Zealand Diploma in Animation (Level 6)",
+            "international_fee": 19000.0,
+        }
+    ]
+    outcomes = _audit_sit_international_catalogue_rows(
+        [
+            {
+                "url": (
+                    "https://www.sit.ac.nz/Programme/Course/"
+                    "New%20Zealand%20Diploma%20in%20Animation"
+                ),
+                "name": "New Zealand Diploma in Animation",
+            }
+        ],
+        records,
+        {
+            "New Zealand Diploma in Animation":
+                "New Zealand Diploma in Animation (Level 6)"
+        },
+    )
+
+    assert outcomes[0]["outcome"] == "verified_public_detail_page"
 
 
 def test_sit_verified_aliases_preserve_exact_fee_matching():

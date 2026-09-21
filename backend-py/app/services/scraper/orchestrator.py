@@ -1693,6 +1693,70 @@ def _filter_sit_international_catalogue_links(
     return kept, dropped
 
 
+def _audit_sit_international_catalogue_rows(
+    links: list[dict],
+    central_records: list[dict],
+    course_aliases: dict[str, str],
+    *,
+    allow_schedule_only_staging: bool = False,
+) -> list[dict]:
+    """Return one explicit public-page or schedule-only outcome per SIT row."""
+    from urllib.parse import unquote, urlparse
+
+    from app.services.scraper.central_pages import match_central_fee
+
+    matched_record_ids: set[int] = set()
+    for link in links:
+        url = str(link.get("url") or "")
+        candidate_names = [
+            str(link.get("name") or "").strip(),
+            unquote(urlparse(url).path.rstrip("/").split("/")[-1]),
+        ]
+        for candidate_name in candidate_names:
+            if not candidate_name:
+                continue
+            matched, confidence = match_central_fee(
+                candidate_name,
+                central_records,
+                exact_only=True,
+                course_url=url,
+                course_aliases=course_aliases,
+            )
+            if matched is not None and confidence == "exact":
+                matched_record_ids.add(id(matched))
+                break
+
+    outcomes: list[dict] = []
+    for record in central_records:
+        represented = id(record) in matched_record_ids
+        outcomes.append(
+            {
+                "program": str(record.get("program_pattern") or "").strip(),
+                "outcome": (
+                    "verified_public_detail_page"
+                    if represented
+                    else (
+                        "schedule_only_staged"
+                        if allow_schedule_only_staging
+                        else "schedule_only_not_staged"
+                    )
+                ),
+                "reason": (
+                    "exact_schedule_row_match"
+                    if represented
+                    else (
+                        "reviewed_policy_permits_schedule_only_staging"
+                        if allow_schedule_only_staging
+                        else "no_verified_public_detail_page_and_policy_forbids_synthesis"
+                    )
+                ),
+                "intake_months": list(record.get("intake_months") or []),
+                "intake_text": record.get("intake_text"),
+            }
+        )
+    return outcomes
+
+
 def _is_targeted_retry_payload(payload: dict | None) -> bool:
     """Return whether this job must preserve its parent review rows."""
     return bool(_target_course_urls_from_payload(payload))
@@ -1956,6 +2020,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
     _safe_restart_smoke = _is_safe_restart_smoke_payload(job.request_payload)
 
     summary = {"discovered": 0, "staged": 0, "skipped": 0, "errors": 0, "fetch_failed": 0}
+    _sit_staged_links: list[dict] = []
     # Track why courses were skipped: {guard_name: count}
     skip_reasons: dict[str, int] = {}
     # Sample URLs+names per skip reason (capped at 10 per reason) for diagnostics.
@@ -6713,6 +6778,13 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                         # stage_course) so evidence rows are visible.  Soft-fail
                         # only — a verification error must never abort the scrape.
                         if res.saved and res.scraped_course_id:
+                            if _discovery_hostname in {"sit.ac.nz", "www.sit.ac.nz"}:
+                                _sit_staged_links.append(
+                                    {
+                                        "url": r.get("url"),
+                                        "name": payload.get("course_name"),
+                                    }
+                                )
                             try:
                                 from app.services.scraper.verification_engine import (
                                     run_field_verification,
@@ -7046,6 +7118,13 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                             source_url=_sweep_url,
                         )
                         if _sw_res.saved:
+                            if _discovery_hostname in {"sit.ac.nz", "www.sit.ac.nz"}:
+                                _sit_staged_links.append(
+                                    {
+                                        "url": _sweep_url,
+                                        "name": _sw_payload.get("course_name"),
+                                    }
+                                )
                             summary["staged"] += 1
                             _counter = _sweep_lk.get("counter")
                             if _counter in ("fetch_failed", "errors"):
@@ -7517,6 +7596,42 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 gate_skips=_nonzero_skips,
                 level="info",
             )
+        _sit_catalogue_outcomes = None
+        if _discovery_hostname in {"sit.ac.nz", "www.sit.ac.nz"}:
+            _sit_records_final = (
+                central_data.get("fees")
+                if isinstance(central_data, dict)
+                else None
+            ) or []
+            if _sit_records_final:
+                _sit_catalogue_outcomes = _audit_sit_international_catalogue_rows(
+                    _sit_staged_links,
+                    _sit_records_final,
+                    dict(_uni_cfg.extraction.fees.central_fee_course_aliases or {}),
+                    allow_schedule_only_staging=False,
+                )
+                _sit_schedule_only = [
+                    outcome
+                    for outcome in _sit_catalogue_outcomes
+                    if outcome["outcome"] == "schedule_only_not_staged"
+                ]
+                summary["sit_catalogue_rows"] = len(_sit_catalogue_outcomes)
+                summary["sit_schedule_only_rows"] = len(_sit_schedule_only)
+                await emit(
+                    "status",
+                    (
+                        "[COMPLETE] SIT international catalogue audit: "
+                        f"{len(_sit_catalogue_outcomes) - len(_sit_schedule_only)} "
+                        "row(s) represented by staged verified public pages; "
+                        f"{len(_sit_schedule_only)} schedule-only row(s) not staged"
+                    ),
+                    phase="complete",
+                    kind="sit_international_catalogue_audit",
+                    outcomes=_sit_catalogue_outcomes,
+                    schedule_only=_sit_schedule_only,
+                    schedule_only_staging_permitted=False,
+                    level="warning" if _sit_schedule_only else "info",
+                )
         # Build human-readable skip breakdown for the log line.
         _skip_parts = [f"{k}={v}" for k, v in sorted(skip_reasons.items(), key=lambda x: -x[1])]
         _skip_detail = f" ({', '.join(_skip_parts)})" if _skip_parts else ""
@@ -7759,6 +7874,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             phase_timings=_phase_timings,
             catalogue_guard=_catalogue_guard,
             pipeline_stats=_dc.get("pipeline_stats"),
+            sit_catalogue_outcomes=_sit_catalogue_outcomes,
             level="success" if not _catalogue_guard else _catalogue_guard["level"],
         )
         await emit(
