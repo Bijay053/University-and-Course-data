@@ -10,7 +10,12 @@
 
 discovery:
   allowed_extra_hostnames: []
+  # CCCU publishes undergraduate pages first and postgraduate pages later in
+  # this sitemap.  A deficient 299-URL cache contained only the undergraduate
+  # slice, so require coverage above that floor before reusing a cache row.
+  sitemap_url: https://www.canterbury.ac.uk/sitemap.xml
   always_sitemap_supplement: true
+  expected_min_courses: 340
 extraction:
   fees:
     default_currency: GBP
