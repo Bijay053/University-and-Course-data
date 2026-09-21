@@ -161,7 +161,18 @@ export function CourseReport({ jobId, onReview, onStarted }: {
       {report.recovery?.exhausted && <p className="text-xs text-destructive">
         Automatic delivery retries exhausted. Check the connection and submit a new report to retry.
       </p>}
-      <Button size="sm" variant="outline" onClick={() => onReview(report.job_id)} data-testid={`button-review-report-${report.job_id}`}>Review staged results</Button>
+      {report.staged > 0 ? (
+        <Button size="sm" variant="outline" onClick={() => onReview(report.job_id)} data-testid={`button-review-report-${report.job_id}`}>
+          Review {report.staged} staged {report.staged === 1 ? "course" : "courses"}
+        </Button>
+      ) : ["completed", "completed_with_errors", "stopped", "failed", "failed_degraded"].includes(report.status) ? (
+        <p className="rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900" role="status">
+          No recovered courses are available to review. This run skipped every reported page; use the exclusion reason above,
+          then report a direct eligible course page or an official catalogue source.
+        </p>
+      ) : (
+        <p className="text-xs text-muted-foreground">Review will become available if this recovery stages an eligible course.</p>
+      )}
     </article>)}
   </section>;
 }

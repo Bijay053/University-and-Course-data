@@ -52,6 +52,20 @@ describe("course report recovery", () => {
     expect(screen.getByText(/finished run does not confirm/)).toBeTruthy();
   });
 
+  it("does not offer an empty review when every reported page was skipped", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({ reports: [{
+      job_id: "child-empty", status: "completed", found: 1, staged: 0, skipped: 1, errors: 0,
+      exclusions: { category_landing_page_missing_degree_qualifier: 1 },
+      request: { kind: "missing", course_urls: ["https://uni.edu/foundation"] },
+    }], source_exclusions: {} })));
+    const review = vi.fn();
+    render(<CourseReport jobId="parent" onReview={review} />);
+
+    expect(await screen.findByText(/No recovered courses are available to review/)).toBeTruthy();
+    expect(screen.queryByTestId("button-review-report-child-empty")).toBeNull();
+    expect(review).not.toHaveBeenCalled();
+  });
+
   it("shows staging exclusion reasons separately from the coverage claim", () => {
     render(<Exclusions counts={{ domestic: 4, staging_rejections: { reasons: { non_degree: 2 } } }} />);
     expect(screen.getByText(/domestic: 4 · non degree: 2/)).toBeTruthy();
