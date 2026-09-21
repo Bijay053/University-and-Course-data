@@ -607,10 +607,18 @@ async def test_real_staging_and_approval_do_not_collapse_variants(monkeypatch):
                 assert getattr(fresh_row, field) is None
             cleared = await approve_scraped_course(db, fresh_row)
             assert cleared["course_id"] == course_id
-            for model in (Fee, Intake, AcademicRequirement):
+            for model in (Fee, Intake):
                 assert (await db.execute(
                     select(model).where(model.course_id == course_id)
                 )).scalars().all() == []
+            requirements = (await db.execute(
+                select(AcademicRequirement).where(
+                    AcademicRequirement.course_id == course_id
+                )
+            )).scalars().all()
+            assert len(requirements) == 1
+            assert requirements[0].academic_level is None
+            assert requirements[0].academic_level_option_id is not None
             course = await db.get(Course, course_id)
             assert course.duration is None
             assert course.course_location is None

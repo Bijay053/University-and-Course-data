@@ -74,7 +74,7 @@ def _routes(ids: dict[str, int]) -> list[tuple[str, str, dict[str, Any] | None]]
             f"/api/universities/{u}/bulk-academic",
             {
                 "courseIds": [c],
-                "academicLevel": "Bachelor",
+                "academicLevel": "Route Parity Level",
                 "academicScore": 80,
                 "scoreType": "Percentage",
                 "academicCountry": "Bhutan",  # unique → no dup-409
@@ -97,7 +97,7 @@ def _routes(ids: dict[str, int]) -> list[tuple[str, str, dict[str, Any] | None]]
             "POST",
             f"/api/courses/{c}/academic-requirements",
             {
-                "academicLevel": "Bachelor",
+                "academicLevel": "Route Parity Level",
                 "academicScore": 75,
                 "academicCountry": "Nepal",
             },
@@ -166,6 +166,16 @@ def _routes(ids: dict[str, int]) -> list[tuple[str, str, dict[str, Any] | None]]
 # ─── DB helpers (run inside the same loop as the test) ───────────────────
 async def _seed_setup() -> dict[str, int]:
     async with AsyncSessionLocal() as db:
+        academic_level_option_id = (
+            await db.execute(
+                text(
+                    "INSERT INTO academic_level_options (name, sort_order) "
+                    "VALUES ('Route Parity Level', 999) "
+                    "ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name "
+                    "RETURNING id"
+                )
+            )
+        ).scalar_one()
         uni_id = (
             await db.execute(
                 text(
@@ -206,10 +216,11 @@ async def _seed_setup() -> dict[str, int]:
             await db.execute(
                 text(
                     "INSERT INTO academic_requirements "
-                    "(course_id, academic_level, academic_score, academic_country) "
-                    "VALUES (:c, 'Bachelor', 75, 'India') RETURNING id"
+                    "(course_id, academic_level, academic_level_option_id, "
+                    " academic_score, academic_country) "
+                    "VALUES (:c, NULL, :option_id, 75, 'India') RETURNING id"
                 ),
-                {"c": course_id},
+                {"c": course_id, "option_id": academic_level_option_id},
             )
         ).scalar_one()
         int_id = (
@@ -397,7 +408,7 @@ async def test_routes_smoke() -> None:
                 f"/api/universities/{u}/bulk-academic",
                 json={
                     "courseIds": [c],
-                    "academicLevel": "Bachelor",
+                    "academicLevel": "Route Parity Level",
                     "academicScore": 75,
                     "academicCountry": "India",  # duplicate of seed row
                 },
