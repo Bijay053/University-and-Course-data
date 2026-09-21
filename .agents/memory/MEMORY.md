@@ -155,3 +155,4 @@
 - [Injected release resource ownership](injected-release-resource-ownership.md) — cleanup seams must distinguish borrowed test resources from production-owned temporaries.
 - [Canterbury embedded course-year facts](canterbury-embedded-course-year-facts.md) — read the selected Contensis Redux entry year; reject unpublished future-year rows instead of applying blanket fee defaults.
 - [Settings-backed academic requirements](settings-backed-academic-requirements.md) — derive requirement option IDs from stable semantic keys so setting renames propagate without changing degree mappings.
+- [AI repair live-evidence seeds](ai-repair-live-evidence-seeds.md) — rejection-storm repairs must probe staged course URLs; historical jobs may need the latest review set after their rows are replaced.
