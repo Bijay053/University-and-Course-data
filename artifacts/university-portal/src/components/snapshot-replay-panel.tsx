@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  AudienceEvidencePanel,
+  type AudienceEvidence,
+  type AudienceProposal,
+} from "@/components/audience-evidence-panel";
 
 const BASE = "";
 
@@ -28,6 +33,13 @@ interface CourseDiff {
   changes: Record<string, FieldChange>;
 }
 
+interface ReplayAudienceReview {
+  url: string;
+  new_name: string;
+  evidence: AudienceEvidence;
+  proposal: AudienceProposal;
+}
+
 interface ReplayResult {
   job_id: string;
   replayed: number;
@@ -37,6 +49,7 @@ interface ReplayResult {
   commit: boolean;
   message: string;
   diffs: CourseDiff[];
+  audience_reviews?: ReplayAudienceReview[];
 }
 
 interface SnapshotListResponse {
@@ -285,6 +298,24 @@ export function SnapshotReplayPanel({ jobId }: { jobId: string }) {
             )}
           </div>
           <p className="text-xs text-gray-600">{replayResult.message}</p>
+
+          {(replayResult.audience_reviews?.length ?? 0) > 0 && (
+            <div>
+              <h4 className="mb-2 text-xs font-semibold text-gray-700">
+                Audience and linked-source evidence ({replayResult.audience_reviews!.length})
+              </h4>
+              <div className="space-y-2">
+                {replayResult.audience_reviews!.map((review, index) => (
+                  <div key={`${review.url}-${index}`} className="rounded-lg border border-gray-200 p-2">
+                    <p className="mb-1 truncate text-[11px] font-medium text-gray-800">
+                      {review.new_name || review.url.split("/").pop()}
+                    </p>
+                    <AudienceEvidencePanel evidence={review.evidence} proposal={review.proposal} compact />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Diff cards */}
           {replayResult.diffs.length > 0 && (

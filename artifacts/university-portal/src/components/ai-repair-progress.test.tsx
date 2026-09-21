@@ -265,4 +265,33 @@ describe("AiRepairProgress", () => {
     );
     expect(screen.queryByText("Capped:")).toBeNull();
   });
+
+  it("shows exact audience options, linked English source, parsed values, and backend review reason", () => {
+    render(
+      <AiRepairProgress
+        autonomous={{ ...base, phase: "needs_review" }}
+        currentAttempt={2}
+        audienceReviews={[{
+          url: "https://official.example.edu/course",
+          evidence: {
+            status: "accepted",
+            same_panel: true,
+            linked_official: true,
+            evidence: [
+              { audience: "domestic", container: "audience", value: "home", label: "Domestic January 2027", intake_months: [1], intake_year: 2027 },
+              { audience: "international", container: "audience", value: "intl", label: "International March 2027", intake_months: [3], intake_year: 2027, source_url: "https://official.example.edu/english" },
+            ],
+          },
+          proposal: { status: "needs_review", reason: "unbalanced audience evidence", proposals: [] },
+        }]}
+      />,
+    );
+
+    expect(screen.getByText("Selected international option")).toBeTruthy();
+    expect(screen.getAllByText("Parsed values:")[0].parentElement?.textContent).toContain("Jan, 2027");
+    expect(screen.getByText("Linked official English source").closest("a")?.getAttribute("href"))
+      .toBe("https://official.example.edu/english");
+    expect(screen.getByText("Why this needs review:").parentElement?.textContent)
+      .toContain("unbalanced audience evidence");
+  });
 });

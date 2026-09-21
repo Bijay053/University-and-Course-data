@@ -452,6 +452,41 @@ async def replay_job(
             await db.close()
 
 
+def _audience_review(old_data: dict[str, Any], new_data: dict[str, Any]) -> dict[str, Any] | None:
+    """Return backend-owned audience evidence and its existing recipe verdict."""
+    audience_evidence = (
+        new_data.get("audience_evidence")
+        or old_data.get("audience_evidence")
+    )
+    if not isinstance(audience_evidence, dict):
+        return None
+    from app.services.scraper.recipe_rules import build_audience_scoped_recipe_proposal
+
+    return {
+        "evidence": audience_evidence,
+        "proposal": build_audience_scoped_recipe_proposal(audience_evidence),
+    }
+
+
+def _audience_review_from_html(
+    html: str,
+    *,
+    page_url: str,
+    seed_url: str,
+) -> dict[str, Any] | None:
+    """Rebuild typed selector evidence from the exact stored replay HTML."""
+    from app.services.scraper.ai_repair_live import extract_audience_option_evidence
+    from app.services.scraper.recipe_rules import build_audience_scoped_recipe_proposal
+
+    evidence = extract_audience_option_evidence(html, page_url, seed_url)
+    if not evidence.get("evidence") and not evidence.get("issues"):
+        return None
+    return {
+        "evidence": evidence,
+        "proposal": build_audience_scoped_recipe_proposal(evidence),
+    }
+
+
 async def _replay_job_inner(
     scrape_job_id: str,
     *,
@@ -484,6 +519,7 @@ async def _replay_job_inner(
             "errors": 0,
             "commit": commit,
             "diffs": [],
+            "audience_reviews": [],
             "message": "No HTML/JSON snapshots found for this job.",
         }
 
@@ -521,6 +557,7 @@ async def _replay_job_inner(
             "errors": 1,
             "commit": commit,
             "diffs": [],
+            "audience_reviews": [],
             "message": f"scrape_runtime_jobs row not found for {scrape_job_id}",
         }
 
@@ -558,6 +595,7 @@ async def _replay_job_inner(
     from app.services.scraper.snapshot_context import replay_mode_scope
 
     diffs: list[dict] = []
+    audience_reviews: list[dict] = []
     replayed = changed = unchanged = errors = 0
 
     # Concurrency cap: S3 download + extraction share one semaphore.
@@ -599,6 +637,11 @@ async def _replay_job_inner(
                             html=html,
                             use_ai_fallback=False,
                         )
+                        replay_audience_review = _audience_review_from_html(
+                            html,
+                            page_url=snap.course_url,
+                            seed_url=scrape_url or snap.course_url,
+                        )
 
             replayed += 1
             if emit:
@@ -621,6 +664,17 @@ async def _replay_job_inner(
                     old_data = {f: getattr(old_sc, f, None) for f in _DIFF_FIELDS}
 
             diff = _diff_course(old_data, new_data)
+            audience_review = (
+                replay_audience_review
+                if snap.snapshot_type != "json"
+                else _audience_review(old_data, new_data)
+            )
+            if audience_review:
+                audience_reviews.append({
+                    "url": snap.course_url,
+                    "new_name": new_data.get("course_name", ""),
+                    **audience_review,
+                })
             if diff:
                 changed += 1
                 diffs.append({
@@ -675,6 +729,7 @@ async def _replay_job_inner(
         "errors": errors,
         "commit": commit,
         "diffs": diffs,
+        "audience_reviews": audience_reviews,
         "message": (
             f"Replay complete: {changed} changed, {unchanged} unchanged, {errors} errors."
             + (" Changes committed." if commit and changed > 0 else "")

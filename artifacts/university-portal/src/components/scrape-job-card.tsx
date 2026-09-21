@@ -331,6 +331,14 @@ type AIRepairSession = {
   error:           string | null;
   max_attempts?:   number;
   live_probe?:     LiveProbe;
+  audience_evidence?: import("./audience-evidence-panel").AudienceEvidence[];
+  audience_proposals?: import("./audience-evidence-panel").AudienceProposal[];
+  audience_reviews?: Array<{
+    url?: string;
+    title?: string;
+    evidence: import("./audience-evidence-panel").AudienceEvidence;
+    proposal: import("./audience-evidence-panel").AudienceProposal;
+  }>;
   autonomous?:     AutonomousRepair;
   rollback_status?: "unchanged" | "restored" | "failed";
   source?: "durable_audit";
@@ -2502,6 +2510,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                     liveProbe={aiRepairSession.live_probe}
                     currentAttempt={aiRepairSession.current_attempt}
                     maxAttempts={aiRepairSession.max_attempts}
+                    audienceReviews={aiRepairSession.audience_reviews}
                     onOpenVerificationJob={jobId => onReviewReady(jobId, uniName, true)}
                   />
                 )}
@@ -2608,6 +2617,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                               liveProbe={aiRepairSession.live_probe}
                               currentAttempt={aiRepairSession.current_attempt}
                               maxAttempts={aiRepairSession.max_attempts}
+                              audienceReviews={aiRepairSession.audience_reviews}
                               onOpenVerificationJob={jobId => onReviewReady(jobId, uniName, true)}
                             />
                           )}
@@ -3809,6 +3819,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                               liveProbe={aiRepairSession.live_probe}
                               currentAttempt={aiRepairSession.current_attempt}
                               maxAttempts={aiRepairSession.max_attempts}
+                              audienceReviews={aiRepairSession.audience_reviews}
                               onOpenVerificationJob={jobId => onReviewReady(jobId, uniName, true)}
                             />
                           )}

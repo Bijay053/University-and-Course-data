@@ -178,12 +178,7 @@ async def persist_repair_audit(session: dict, db) -> None:
     }
     evidence["snapshot_refs"] = snapshot_refs
     live_probe = session.get("live_probe") or {}
-    evidence["audience_proposals"] = live_probe.get("audience_proposals") or []
-    evidence["audience_evidence"] = [
-        sample.get("audience_evidence")
-        for sample in live_probe.get("samples") or []
-        if sample.get("audience_evidence")
-    ]
+    evidence["audience_reviews"] = _repair_audience_reviews(live_probe)
     await db.execute(
         text(
             "INSERT INTO ai_repair_audits "
@@ -203,6 +198,49 @@ async def persist_repair_audit(session: dict, db) -> None:
     await db.commit()
 
 
+def _repair_audience_reviews(live_probe: dict[str, Any]) -> list[dict[str, Any]]:
+    """Pair each durable selector record with the backend recipe verdict."""
+    from app.services.scraper.recipe_rules import build_audience_scoped_recipe_proposal
+
+    reviews = []
+    for sample in live_probe.get("samples") or []:
+        audience_evidence = sample.get("audience_evidence")
+        if not isinstance(audience_evidence, dict):
+            continue
+        if not audience_evidence.get("evidence") and not audience_evidence.get("issues"):
+            continue
+        reviews.append({
+            "url": sample.get("url"),
+            "title": sample.get("title"),
+            "evidence": audience_evidence,
+            "proposal": build_audience_scoped_recipe_proposal(audience_evidence),
+        })
+    return reviews
+
+
+def _normalize_repair_audit_evidence(evidence: dict[str, Any]) -> dict[str, Any]:
+    """Hydrate the stable review model for audits saved before it existed."""
+    if evidence.get("audience_reviews"):
+        return evidence
+    reviews = _repair_audience_reviews(evidence.get("live_probe") or {})
+    if not reviews:
+        from app.services.scraper.recipe_rules import build_audience_scoped_recipe_proposal
+
+        reviews = [
+            {
+                "url": None,
+                "title": None,
+                "evidence": item,
+                "proposal": build_audience_scoped_recipe_proposal(item),
+            }
+            for item in evidence.get("audience_evidence") or []
+            if isinstance(item, dict)
+        ]
+    if reviews:
+        evidence["audience_reviews"] = reviews
+    return evidence
+
+
 async def load_repair_audit(job_id: str, db, *, session_id: str | None = None) -> dict:
     """Load the latest durable repair run for a scrape job."""
     from sqlalchemy import text
@@ -216,7 +254,7 @@ async def load_repair_audit(job_id: str, db, *, session_id: str | None = None) -
         ),
         {"job_id": job_id, "session_id": session_id},
     )).scalar_one_or_none()
-    return dict(row or {})
+    return _normalize_repair_audit_evidence(dict(row or {}))
 
 
 async def load_repair_audits(job_id: str, db) -> list[dict]:
@@ -231,7 +269,7 @@ async def load_repair_audits(job_id: str, db) -> list[dict]:
         ),
         {"job_id": job_id},
     )).scalars().all()
-    return [dict(row) for row in rows if row]
+    return [_normalize_repair_audit_evidence(dict(row)) for row in rows if row]
 
 
 async def load_active_repair_audit(university_id: int, db) -> dict:
@@ -2788,6 +2826,7 @@ async def run_ai_repair_loop(
             from app.services.scraper.config.context import current_uni_config
             uni_config_token = current_uni_config.set(live.config)
             session["live_probe"] = await live.probe()
+            session["audience_reviews"] = _repair_audience_reviews(session["live_probe"])
             ctx["live_probe"] = session["live_probe"]
             # This fresh baseline is captured before live validation and fenced
             # against the exact DB + YAML documents on apply. Do not infer a
@@ -3154,6 +3193,7 @@ async def run_ai_repair_loop(
                     reason=("Live candidate validation passed; verification scrape pending."
                             if live_validation["accepted"] else "; ".join(live_validation["reasons"])),
                 )
+                session["audience_reviews"] = _repair_audience_reviews(session["live_probe"])
                 ctx["live_probe"] = session["live_probe"]
                 current_attempt_evidence["live_validation"] = live_validation
                 proposals = live_validation.get("audience_proposals") or []

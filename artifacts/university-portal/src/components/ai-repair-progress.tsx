@@ -1,4 +1,9 @@
 import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, ShieldAlert } from "lucide-react";
+import {
+  AudienceEvidencePanel,
+  type AudienceEvidence,
+  type AudienceProposal,
+} from "./audience-evidence-panel";
 
 export type LiveProbeSample = {
   url: string;
@@ -128,12 +133,18 @@ export function AiRepairProgress({
   currentAttempt,
   maxAttempts = 5,
   onOpenVerificationJob,
+  audienceEvidence,
+  audienceProposals,
+  audienceReviews,
 }: {
   autonomous: AutonomousRepair;
   liveProbe?: LiveProbe;
   currentAttempt: number;
   maxAttempts?: number;
   onOpenVerificationJob?: (jobId: string) => void;
+  audienceEvidence?: AudienceEvidence[];
+  audienceProposals?: AudienceProposal[];
+  audienceReviews?: Array<{ url?: string; title?: string; evidence: AudienceEvidence; proposal: AudienceProposal }>;
 }) {
   const currentIndex = phaseIndex(autonomous.phase);
   const verified = autonomous.phase === "verified";
@@ -287,6 +298,19 @@ export function AiRepairProgress({
           )}
         </div>
       )}
+
+      {(audienceReviews ?? (audienceEvidence ?? []).map((evidence, index) => ({
+        url: undefined,
+        title: undefined,
+        evidence,
+        proposal: audienceProposals?.[index] ?? {},
+      }))).map((review, index) => (
+        <AudienceEvidencePanel
+          key={`${review.url ?? review.evidence.evidence?.[0]?.container ?? "audience"}-${index}`}
+          evidence={review.evidence}
+          proposal={review.proposal}
+        />
+      ))}
 
       <div className="flex flex-wrap items-center justify-between gap-1 text-[9px] text-gray-500">
         <span>

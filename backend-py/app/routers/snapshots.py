@@ -16,7 +16,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -74,6 +74,7 @@ class ReplayResponse(BaseModel):
     commit: bool
     message: str
     diffs: list[dict]
+    audience_reviews: list[dict] = Field(default_factory=list)
 
 
 class ReplayRequest(BaseModel):
