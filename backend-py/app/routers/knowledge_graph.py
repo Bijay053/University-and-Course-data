@@ -112,8 +112,16 @@ def _english_dict(e: EnglishRequirement) -> dict[str, Any]:
 
 
 def _academic_dict(a: AcademicRequirement) -> dict[str, Any]:
+    option_id = getattr(a, "academic_level_option_id", None)
+    option = getattr(a, "academic_level_option", None) if isinstance(option_id, int) else None
     return {
-        "id": a.id, "academic_level": a.academic_level,
+        "id": a.id,
+        "academic_level": (
+            option.name
+            if option is not None
+            else a.academic_level
+        ),
+        "academic_level_option_id": option_id if isinstance(option_id, int) else None,
         "academic_score": a.academic_score, "score_type": a.score_type,
         "academic_country": a.academic_country,
     }

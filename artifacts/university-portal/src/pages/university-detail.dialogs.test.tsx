@@ -59,7 +59,7 @@ function renderPage() {
     const body = url.includes("/scholarship-courses")
       ? [{ id: 42, name: "Accessible Course", degreeLevel: "Bachelor", category: "Business", scholarships: [{ id: 8, name: "Merit Award", details: "For strong applicants", eligibilityCriteria: "International students", amount: 5000, percentage: null, currency: "AUD" }] }]
       : url.includes("/academic-requirements")
-      ? [{ id: 9, courseId: 42, courseName: "Accessible Course", degreeLevel: "Bachelor", academicLevel: "Year 12", academicScore: 75, scoreType: "%", academicCountry: "Australia" }]
+      ? [{ id: 9, courseId: 42, courseName: "Accessible Course", degreeLevel: "Bachelor", academicLevelOptionId: 1, academicLevel: "Year 12", academicScore: 75, scoreType: "%", academicCountry: "Australia" }]
       : url.includes("/assessment-notes")
       ? [{ id: 10, country: "Australia", raw_text: "Representative assessment note", parsed_data: null, created_at: "2026-09-03T00:00:00Z" }]
       : url.includes("/locations")

@@ -1,5 +1,6 @@
 import { pgTable, text, serial, timestamp, integer, real, jsonb, boolean } from "drizzle-orm/pg-core";
 import { universitiesTable } from "./universities";
+import { academicLevelOptionsTable } from "./academic_requirements";
 import { coursesTable } from "./courses";
 
 export const scrapedCoursesTable = pgTable("scraped_courses", {
@@ -43,6 +44,8 @@ export const scrapedCoursesTable = pgTable("scraped_courses", {
   intakeMonths: jsonb("intake_months").$type<string[]>(),
   intakeDays: integer("intake_days"),
   academicLevel: text("academic_level"),
+  academicLevelOptionId: integer("academic_level_option_id")
+    .references(() => academicLevelOptionsTable.id, { onDelete: "restrict" }),
   academicScore: real("academic_score"),
   scoreType: text("score_type"),
   academicCountry: text("academic_country"),

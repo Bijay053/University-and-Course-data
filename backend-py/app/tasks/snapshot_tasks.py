@@ -96,9 +96,11 @@ _INSERT_SQL: dict[str, str] = {
     """,
     "academic_requirements": """
         INSERT INTO academic_requirements_backup
-            (backed_up_at, id, course_id, academic_level, academic_score, score_type,
+            (backed_up_at, id, course_id, academic_level,
+             academic_level_option_id, academic_score, score_type,
              academic_country, created_at)
-        SELECT :snap_time, id, course_id, academic_level, academic_score, score_type,
+        SELECT :snap_time, id, course_id, academic_level,
+               academic_level_option_id, academic_score, score_type,
                academic_country, created_at FROM academic_requirements
     """,
     "scholarships": """
@@ -131,6 +133,10 @@ async def _ensure_backup_tables(db) -> None:
             f"CREATE INDEX IF NOT EXISTS {backup}_backed_up_at_idx "
             f"ON {backup} (backed_up_at)"
         ))
+    await db.execute(text(
+        "ALTER TABLE academic_requirements_backup "
+        "ADD COLUMN IF NOT EXISTS academic_level_option_id integer"
+    ))
 
 
 async def _async_run_snapshot(triggered_by: str) -> dict[str, Any]:

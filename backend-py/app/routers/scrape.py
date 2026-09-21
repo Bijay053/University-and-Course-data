@@ -4541,6 +4541,10 @@ async def _apply_backup_one(
             )
         ).mappings().first()
         if ar is not None:
+            updates["academic_level_option_id"] = pick(
+                ar.get("academic_level_option_id"),
+                sc.academic_level_option_id,
+            )
             updates["academic_level"] = pick(
                 ar.get("academic_level"), sc.academic_level
             )

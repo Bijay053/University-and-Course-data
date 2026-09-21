@@ -145,7 +145,7 @@ export type StagedCourse = {
 
 export type AcadReqRow = {
   id: number; courseId: number; courseName: string; degreeLevel: string | null;
-  academicLevel: string | null; academicScore: number | null;
+  academicLevelOptionId: number | null; academicLevel: string | null; academicScore: number | null;
   scoreType: string | null; academicCountry: string | null;
 };
 
@@ -776,7 +776,7 @@ export default function UniversityDetail() {
   const [bEngTestName, setBEngTestName] = useState("");
 
   // Academic form state
-  const [bAcadLevel, setBacadLevel] = useState("");
+  const [bAcadLevelOptionId, setBacadLevelOptionId] = useState("");
   const [bAcadScore, setBacadScore] = useState("");
   const [bAcadScoreType, setBacadScoreType] = useState("%");
   const [bAcadOutOf, setBacadOutOf] = useState("");
@@ -816,7 +816,7 @@ export default function UniversityDetail() {
   const [editAcadRow, setEditAcadRow] = useState<AcadReqRow | null>(null);
   const [deleteAcadRow, setDeleteAcadRow] = useState<AcadReqRow | null>(null);
   const [acadActionLoading, setAcadActionLoading] = useState(false);
-  const [editAcadLevel, setEditAcadLevel] = useState("");
+  const [editAcadLevelOptionId, setEditAcadLevelOptionId] = useState("");
   const [editAcadScore, setEditAcadScore] = useState("");
   const [editAcadType, setEditAcadType] = useState("");
   const [editAcadOutOf, setEditAcadOutOf] = useState("");
@@ -889,7 +889,7 @@ export default function UniversityDetail() {
     setSelectedIds(new Set());
 
     // Reset ALL academic fields
-    setBacadLevel("");
+    setBacadLevelOptionId("");
     setBacadScore("");
     setBacadScoreType("%");
     setBacadOutOf("");
@@ -1081,9 +1081,6 @@ export default function UniversityDetail() {
   }, [id]);
 
   // Predefined academic level options (managed at /settings/academic-levels).
-  // Combined with values discovered from existing academic_requirements rows
-  // to populate the Level dropdown/combobox in both the bulk and individual
-  // edit dialogs. Free-text typing is always allowed too.
   type AcademicLevelOption = { id: number; name: string; sortOrder: number };
   const [academicLevelOptions, setAcademicLevelOptions] = useState<AcademicLevelOption[]>([]);
   const loadAcademicLevelOptions = useCallback(async () => {
@@ -1094,26 +1091,10 @@ export default function UniversityDetail() {
         setAcademicLevelOptions(data.options ?? []);
       }
     } catch {
-      // Non-fatal — combobox falls back to discovered values + free text.
+      // Non-fatal — an empty list leaves the required select with no options.
     }
   }, []);
   useEffect(() => { void loadAcademicLevelOptions(); }, [loadAcademicLevelOptions]);
-
-  // Merge predefined + discovered (deduped, predefined order first), used by
-  // both the bulk-edit and individual-edit dialogs.
-  const combinedAcademicLevels = useMemo(() => {
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const o of academicLevelOptions) {
-      const v = o.name.trim();
-      if (v && !seen.has(v)) { seen.add(v); out.push(v); }
-    }
-    for (const r of allAcademicReqs) {
-      const v = (r.academicLevel ?? "").trim();
-      if (v && !seen.has(v)) { seen.add(v); out.push(v); }
-    }
-    return out;
-  }, [academicLevelOptions, allAcademicReqs]);
 
   useEffect(() => {
     if (tab === "academic" || tab === "courses") loadAcademicReqs();
@@ -1827,7 +1808,7 @@ export default function UniversityDetail() {
         endpoint = `${BASE}/api/universities/${id}/bulk-academic`;
         const combinedScoreType = bAcadScoreType ? (bAcadOutOf ? `${bAcadScoreType}/${bAcadOutOf}` : bAcadScoreType) : null;
         const academicCountry = bAcadCountries.length > 0 ? bAcadCountries.join(", ") : null;
-        body = { courseIds, academicLevel: bAcadLevel || null, academicScore: bAcadScore ? Number(bAcadScore) : null, scoreType: combinedScoreType, academicCountry };
+        body = { courseIds, academicLevelOptionId: bAcadLevelOptionId ? Number(bAcadLevelOptionId) : null, academicScore: bAcadScore ? Number(bAcadScore) : null, scoreType: combinedScoreType, academicCountry };
       } else if (bulkMode === "scholarships") {
         endpoint = `${BASE}/api/universities/${id}/bulk-scholarships`;
         const isPercent = bSchAmountType === "percent";
@@ -1916,7 +1897,14 @@ export default function UniversityDetail() {
   // ── Academic handlers ─────────────────────────────────────────────────────
   const openAcadEdit = (r: AcadReqRow) => {
     setEditAcadRow(r);
-    setEditAcadLevel(r.academicLevel ?? "");
+    // Legacy rows may only have effective text; map it to the current setting
+    // option when the names match exactly (case-sensitive after trimming).
+    const legacyMatch = !r.academicLevelOptionId && r.academicLevel
+      ? academicLevelOptions.find((o) => o.name.trim() === r.academicLevel!.trim())
+      : undefined;
+    setEditAcadLevelOptionId(r.academicLevelOptionId != null
+      ? String(r.academicLevelOptionId)
+      : legacyMatch ? String(legacyMatch.id) : "");
     setEditAcadScore(r.academicScore != null ? String(r.academicScore) : "");
     // Stored scoreType is "GPA/4" (combined). Split back into base + outOf so
     // the dropdown + secondary input can re-edit it cleanly.
@@ -1942,7 +1930,7 @@ export default function UniversityDetail() {
         : null;
       const res = await fetch(`${BASE}/api/academic-requirements/${editAcadRow.id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ academicLevel: editAcadLevel || null, academicScore: editAcadScore.trim() ? Number(editAcadScore) : null, scoreType: combinedType, academicCountry: editAcadCountry || null }),
+        body: JSON.stringify({ academicLevelOptionId: editAcadLevelOptionId ? Number(editAcadLevelOptionId) : null, academicScore: editAcadScore.trim() ? Number(editAcadScore) : null, scoreType: combinedType, academicCountry: editAcadCountry || null }),
       });
       if (!res.ok) throw new Error(await res.text());
       toast({ title: "Academic requirement updated" });
@@ -4749,19 +4737,15 @@ export default function UniversityDetail() {
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">Academic Level</Label>
-                        {/* Combobox: free text + autocomplete from managed
-                            options (/settings/academic-levels) plus values
-                            already discovered in this university's reqs. */}
-                        <Input
-                          list="acad-level-options-bulk"
-                          value={bAcadLevel}
-                          onChange={(e) => setBacadLevel(e.target.value)}
-                          placeholder="Select or type level"
-                          className="h-9"
-                        />
-                        <datalist id="acad-level-options-bulk">
-                          {combinedAcademicLevels.map((l) => <option key={l} value={l} />)}
-                        </datalist>
+                        <Select value={bAcadLevelOptionId || "__none__"} onValueChange={(v) => setBacadLevelOptionId(v === "__none__" ? "" : v)}>
+                          <SelectTrigger className="h-9"><SelectValue placeholder="Select level" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">— None —</SelectItem>
+                            {academicLevelOptions.map((option) => (
+                              <SelectItem key={option.id} value={String(option.id)}>{option.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">Score</Label>
@@ -5048,19 +5032,15 @@ export default function UniversityDetail() {
               <p className="text-gray-500">{editAcadRow.courseName}</p>
               <div>
                 <Label>Academic Level</Label>
-                {/* Combobox: native <datalist> gives autocomplete suggestions
-                    from predefined + discovered levels, but the user can also
-                    type any custom value. Selected value is preserved on open. */}
-                <Input
-                  className="mt-1"
-                  list="acad-level-options"
-                  value={editAcadLevel}
-                  onChange={(e) => setEditAcadLevel(e.target.value)}
-                  placeholder="Select or type level"
-                />
-                <datalist id="acad-level-options">
-                  {combinedAcademicLevels.map((l) => <option key={l} value={l} />)}
-                </datalist>
+                <Select value={editAcadLevelOptionId || "__none__"} onValueChange={(v) => setEditAcadLevelOptionId(v === "__none__" ? "" : v)}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select level" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— None —</SelectItem>
+                    {academicLevelOptions.map((option) => (
+                      <SelectItem key={option.id} value={String(option.id)}>{option.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <p className="text-[10px] text-muted-foreground mt-1">
                   Manage the dropdown list at <Link href="/settings/academic-levels" className="underline text-blue-600">Settings → Academic Levels</Link>
                 </p>

@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
     AcademicRequirement,
+    AcademicLevelOption,
     Course,
     EnglishRequirement,
     Fee,
@@ -25,6 +26,71 @@ from app.services.scraper.taxonomy import canonical_parent
 from app.services.sub_category_matcher import resolve_sub_category
 
 import re
+
+
+_ACADEMIC_MAPPING_BY_DEGREE = {
+    "master": "bachelors_equivalent",
+    "master's": "bachelors_equivalent",
+    "graduate certificate & diploma": "bachelors_equivalent",
+    "graduate certificate": "bachelors_equivalent",
+    "graduate diploma": "bachelors_equivalent",
+    "doctor/doctorate": "masters_equivalent",
+    "doctorate": "masters_equivalent",
+    "doctor": "masters_equivalent",
+    "phd": "masters_equivalent",
+    "doctorate/phd": "masters_equivalent",
+    "doctorate / phd": "masters_equivalent",
+    "associate degree or equivalent": "grade_12_equivalent",
+    "associate degree": "grade_12_equivalent",
+    "certificate & diploma": "grade_12_equivalent",
+    "certificate": "grade_12_equivalent",
+    "diploma": "grade_12_equivalent",
+    "advanced diploma": "grade_12_equivalent",
+    "bachelor": "grade_12_equivalent",
+    "bachelor's": "grade_12_equivalent",
+}
+
+
+def _academic_mapping_key(degree: str | None) -> str | None:
+    if not degree:
+        return None
+    return _ACADEMIC_MAPPING_BY_DEGREE.get(degree.strip().lower())
+
+
+async def _academic_option_for_degree(db: AsyncSession, degree: str | None):
+    key = _academic_mapping_key(degree)
+    if not key:
+        return None
+    option = (await db.execute(
+        select(AcademicLevelOption).where(AcademicLevelOption.mapping_key == key)
+    )).scalar_one_or_none()
+    if option is None:
+        raise RuntimeError(
+            f"Settings > Academic Levels is missing the required mapping {key!r}"
+        )
+    return option
+
+
+async def _academic_option_for_staged_course(
+    db: AsyncSession,
+    sc: ScrapedCourse,
+    degree: str | None,
+) -> AcademicLevelOption | None:
+    mapped = await _academic_option_for_degree(db, degree)
+    if mapped is not None:
+        return mapped
+    if sc.academic_level_option_id is not None:
+        option = await db.get(AcademicLevelOption, sc.academic_level_option_id)
+        if option is None:
+            raise RuntimeError("Staged academic level setting no longer exists")
+        return option
+    if sc.academic_level:
+        return (await db.execute(
+            select(AcademicLevelOption).where(
+                AcademicLevelOption.name == sc.academic_level
+            )
+        )).scalar_one_or_none()
+    return None
 
 # A sub_category that is just the degree-level echo ("Doctor of Philosophy",
 # "Master of Education", "Bachelor of Arts" …). These are degrees, not fields.
@@ -264,17 +330,21 @@ async def approve_scraped_course(
             )
         )
 
-    if _uel_variant or sc.academic_level or sc.academic_score is not None:
+    academic_option = await _academic_option_for_staged_course(
+        db, sc, course.degree_level
+    )
+    if _uel_variant or sc.academic_level or sc.academic_score is not None or academic_option is not None:
         await db.execute(
             AcademicRequirement.__table__.delete().where(
                 AcademicRequirement.course_id == course.id
             )
         )
-    if sc.academic_level or sc.academic_score is not None:
+    if sc.academic_level or sc.academic_score is not None or academic_option is not None:
         db.add(
             AcademicRequirement(
                 course_id=course.id,
-                academic_level=sc.academic_level,
+                academic_level=None,
+                academic_level_option_id=academic_option.id if academic_option else None,
                 academic_score=sc.academic_score,
                 score_type=sc.score_type,
                 academic_country=sc.academic_country,

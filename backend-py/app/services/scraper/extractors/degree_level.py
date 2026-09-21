@@ -384,27 +384,9 @@ def _from_bcu_panel(html: str) -> tuple[str | None, str, str | None]:
     return None, "unknown", None
 
 
-# Mapping from canonical degree_level values to academic_level.
-# "Undergraduate" / "Postgraduate" / "Doctorate" are the three accepted values
-# in the gemini_primary.py controlled vocabulary (see _ACADEMIC_LEVEL_ALIASES).
-_DEGREE_TO_ACADEMIC_LEVEL: dict[str, str] = {
-    "Bachelor's":          "Undergraduate",
-    "Associate Degree":    "Undergraduate",
-    "Advanced Diploma":    "Undergraduate",
-    "Diploma":             "Undergraduate",
-    "Certificate":         "Undergraduate",
-    "Foundation":          "Undergraduate",
-    "Master's":            "Postgraduate",
-    "Graduate Certificate":"Postgraduate",
-    "Graduate Diploma":    "Postgraduate",
-    "Doctorate":           "Doctorate",
-}
-
-
 def _academic_level_from_degree(degree: str) -> str | None:
-    """Return the canonical academic_level for a known degree_level value,
-    or ``None`` when the mapping is undefined."""
-    return _DEGREE_TO_ACADEMIC_LEVEL.get(degree)
+    """Academic level is settings-backed and resolved at persistence time."""
+    return None
 
 
 async def extract(html: str, url: str, course_name: str | None = None) -> list[ExtractionResult]:

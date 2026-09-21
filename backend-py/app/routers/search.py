@@ -152,11 +152,13 @@ course_search_view AS MATERIALIZED (
     ) english_scores ON TRUE
     LEFT JOIN LATERAL (
         SELECT
-            ar.academic_level,
+            COALESCE(alo.name, ar.academic_level) AS academic_level,
             ar.academic_score,
             ar.score_type,
             ar.academic_country
         FROM academic_requirements ar
+        LEFT JOIN academic_level_options alo
+          ON alo.id = ar.academic_level_option_id
         WHERE ar.course_id = c.id
         ORDER BY ar.created_at DESC NULLS LAST, ar.id DESC
         LIMIT 1
@@ -325,18 +327,23 @@ async def search_courses(
         # prerequisites; unrecognised/Other requirements remain unknown.
         qualification_rank_sql = """
             CASE
+                WHEN lower(btrim({value})) IN (
+                    'grade 10th or equivalent', 'grade 10', 'year 10') THEN 0
                 WHEN lower(btrim({value})) IN ('year 12', 'secondary school',
-                    'high school') THEN 1
+                    'high school', 'grade 12th or equivalent') THEN 1
                 WHEN lower(btrim({value})) IN ('diploma',
                     'associate degree or equivalent', 'associate degree') THEN 2
                 WHEN lower(btrim({value})) IN ('undergraduate', 'bachelor',
-                    'bachelor''s degree', 'bachelors degree') THEN 3
+                    'bachelor''s degree', 'bachelors degree',
+                    'bachelor''s degree or equivalent') THEN 3
                 WHEN lower(btrim({value})) IN (
                     'graduate certificate & diploma',
                     'graduate certificate', 'graduate diploma') THEN 4
                 WHEN lower(btrim({value})) IN ('postgraduate', 'master',
-                    'master''s degree', 'masters degree') THEN 5
-                WHEN lower(btrim({value})) IN ('doctorate', 'doctoral') THEN 6
+                    'master''s degree', 'masters degree',
+                    'master''s degree or equivalent') THEN 5
+                WHEN lower(btrim({value})) IN (
+                    'doctorate', 'doctoral', 'doctorate / phd') THEN 6
                 ELSE NULL
             END
         """
@@ -692,9 +699,14 @@ async def search_compare(
         acad_rows = (
             await db.execute(
                 text(
-                    "SELECT course_id, academic_level, academic_score, "
+                    "SELECT ar.course_id, "
+                    "COALESCE(alo.name, ar.academic_level) AS academic_level, "
+                    "ar.academic_score, "
                     "score_type, academic_country "
-                    "FROM academic_requirements WHERE course_id = ANY(:ids)"
+                    "FROM academic_requirements ar "
+                    "LEFT JOIN academic_level_options alo "
+                    "ON alo.id = ar.academic_level_option_id "
+                    "WHERE ar.course_id = ANY(:ids)"
                 ),
                 {"ids": int_ids},
             )
@@ -817,9 +829,8 @@ async def search_options(db: Annotated[AsyncSession, Depends(get_db)]) -> Search
             (
                 await db.execute(
                     text(
-                        "SELECT DISTINCT academic_level FROM academic_requirements "
-                        "WHERE academic_level IS NOT NULL "
-                        "AND btrim(academic_level) <> '' ORDER BY academic_level"
+                        "SELECT name FROM academic_level_options "
+                        "ORDER BY sort_order, id"
                     )
                 )
             )

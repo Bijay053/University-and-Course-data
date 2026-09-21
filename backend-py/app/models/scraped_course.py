@@ -91,6 +91,12 @@ class ScrapedCourse(Base):
     intake_months: Mapped[list | None] = mapped_column(JSONB)
     intake_days: Mapped[int | None] = mapped_column(Integer)
     academic_level: Mapped[str | None] = mapped_column(Text)
+    academic_level_option_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("academic_level_options.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
     academic_score: Mapped[float | None] = mapped_column(Float)
     score_type: Mapped[str | None] = mapped_column(Text)
     academic_country: Mapped[str | None] = mapped_column(Text)

@@ -26,16 +26,12 @@ router = APIRouter()
 # Mirror Node's seed list verbatim so a fresh DB renders the same dropdown
 # the admin team is used to. We only insert when the table is empty so
 # deliberate deletions are not resurrected.
-_SEED_ACADEMIC_LEVELS: list[tuple[str, int]] = [
-    ("High School Certificate", 1),
-    ("Diploma / Advanced Diploma", 2),
-    ("Bachelor's degree", 3),
-    ("Bachelor's degree with Honours", 4),
-    ("Graduate Certificate / Diploma", 5),
-    ("Master's degree", 6),
-    ("Master's degree or equivalent qualification in a relevant field", 7),
-    ("Doctorate / PhD", 8),
-    ("Associate Degree or Equivalent", 9),
+_SEED_ACADEMIC_LEVELS: list[tuple[str, int, str]] = [
+    ("Grade 12th or equivalent", 1, "grade_12_equivalent"),
+    ("Bachelor's degree or equivalent", 3, "bachelors_equivalent"),
+    ("Master's degree or equivalent", 7, "masters_equivalent"),
+    ("Doctorate / PhD", 8, "doctorate_phd"),
+    ("Grade 10th or equivalent", 9, "grade_10_equivalent"),
 ]
 _seeded = False
 
@@ -48,8 +44,12 @@ async def _ensure_seeded(db: AsyncSession) -> None:
         await db.execute(select(func.count(AcademicLevelOption.id)))
     ).scalar_one() or 0
     if count == 0:
-        for name, sort_order in _SEED_ACADEMIC_LEVELS:
-            db.add(AcademicLevelOption(name=name, sort_order=sort_order))
+        for name, sort_order, mapping_key in _SEED_ACADEMIC_LEVELS:
+            db.add(AcademicLevelOption(
+                name=name,
+                sort_order=sort_order,
+                mapping_key=mapping_key,
+            ))
         try:
             await db.commit()
         except IntegrityError:
@@ -61,6 +61,7 @@ def _opt_to_dict(r: AcademicLevelOption) -> dict:
     return {
         "id": r.id,
         "name": r.name,
+        "mappingKey": r.mapping_key,
         "sortOrder": r.sort_order,
         "createdAt": r.created_at.isoformat() if r.created_at else None,
     }
@@ -162,8 +163,20 @@ async def academic_levels_delete(
     row = await db.get(AcademicLevelOption, opt_id)
     if not row:
         return {"success": True, "deleted": 0}
+    if row.mapping_key:
+        raise HTTPException(
+            status_code=409,
+            detail="This academic level is used by the course mapping. Rename it instead of deleting it.",
+        )
     await db.delete(row)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Academic level option is referenced by academic requirements and cannot be deleted",
+        ) from exc
     return {"success": True, "deleted": 1}
 
 

@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models import (
     AcademicRequirement,
+    AcademicLevelOption,
     EnglishRequirement,
     Fee,
     Intake,
@@ -362,11 +363,12 @@ async def bulk_english(
 
 
 # ─── Academic requirements ──────────────────────────────────────────────
-def _acad_dict(r: AcademicRequirement) -> dict:
+def _acad_dict(r: AcademicRequirement, option: AcademicLevelOption | None = None) -> dict:
     return {
         "id": r.id,
         "courseId": r.course_id,
-        "academicLevel": r.academic_level,
+        "academicLevel": option.name if option else r.academic_level,
+        "academicLevelOptionId": r.academic_level_option_id,
         "academicScore": r.academic_score,
         "scoreType": r.score_type,
         "academicCountry": r.academic_country,
@@ -380,12 +382,40 @@ async def list_course_academic(
 ) -> list[dict]:
     rows = (
         await db.execute(
-            select(AcademicRequirement).where(
+            select(AcademicRequirement, AcademicLevelOption).outerjoin(
+                AcademicLevelOption,
+                AcademicLevelOption.id == AcademicRequirement.academic_level_option_id,
+            ).where(
                 AcademicRequirement.course_id == course_id
             )
         )
-    ).scalars().all()
-    return [_acad_dict(r) for r in rows]
+    ).all()
+    return [_acad_dict(r, option) for r, option in rows]
+
+
+async def _academic_option(db: AsyncSession, body: dict) -> AcademicLevelOption | None:
+    option_id = body.get("academicLevelOptionId")
+    if option_id is not None:
+        parsed_id = _to_int(option_id)
+        if parsed_id is None:
+            raise HTTPException(status_code=400, detail="academicLevelOptionId must be an integer")
+        option = await db.get(AcademicLevelOption, parsed_id)
+        if option is None:
+            raise HTTPException(status_code=400, detail="academicLevelOptionId does not exist")
+        return option
+    # Compatibility is deliberately exact and never creates settings rows.
+    name = body.get("academicLevel")
+    if name is not None:
+        option = (await db.execute(
+            select(AcademicLevelOption).where(AcademicLevelOption.name == name)
+        )).scalar_one_or_none()
+        if option is None:
+            raise HTTPException(
+                status_code=400,
+                detail="academicLevel must match an existing Settings > Academic Levels option",
+            )
+        return option
+    return None
 
 
 @router.post(
@@ -397,9 +427,11 @@ async def create_course_academic(
     db: Annotated[AsyncSession, Depends(get_db)],
     body: Annotated[dict, Body(...)],
 ) -> dict:
+    option = await _academic_option(db, body)
     row = AcademicRequirement(
         course_id=course_id,
-        academic_level=body.get("academicLevel"),
+        academic_level=None,
+        academic_level_option_id=option.id if option else None,
         academic_score=_to_float(body.get("academicScore")),
         score_type=body.get("scoreType"),
         academic_country=body.get("academicCountry"),
@@ -407,7 +439,7 @@ async def create_course_academic(
     db.add(row)
     await db.commit()
     await db.refresh(row)
-    return _acad_dict(row)
+    return _acad_dict(row, option)
 
 
 @router.patch("/academic-requirements/{req_id}")
@@ -419,8 +451,15 @@ async def update_academic(
     row = await db.get(AcademicRequirement, req_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Academic requirement not found")
+    option = None
+    if "academicLevelOptionId" in body or "academicLevel" in body:
+        option = await _academic_option(db, body)
+        row.academic_level = None
     if "academicLevel" in body:
-        row.academic_level = body["academicLevel"]
+        if "academicLevelOptionId" not in body:
+            row.academic_level_option_id = option.id if option else None
+    if "academicLevelOptionId" in body:
+        row.academic_level_option_id = option.id if option else None
     if "academicScore" in body:
         row.academic_score = _to_float(body["academicScore"])
     if "scoreType" in body:
@@ -429,7 +468,7 @@ async def update_academic(
         row.academic_country = body["academicCountry"]
     await db.commit()
     await db.refresh(row)
-    return _acad_dict(row)
+    return _acad_dict(row, option or await db.get(AcademicLevelOption, row.academic_level_option_id))
 
 
 @router.delete(
@@ -458,13 +497,15 @@ async def list_university_academic(
                ar.course_id        AS "courseId",
                c.name              AS "courseName",
                c.degree_level      AS "degreeLevel",
-               ar.academic_level   AS "academicLevel",
+               COALESCE(alo.name, ar.academic_level) AS "academicLevel",
+               ar.academic_level_option_id AS "academicLevelOptionId",
                ar.academic_score   AS "academicScore",
                ar.score_type       AS "scoreType",
                ar.academic_country AS "academicCountry",
                ar.created_at       AS "createdAt"
         FROM academic_requirements ar
         JOIN courses c ON c.id = ar.course_id
+         LEFT JOIN academic_level_options alo ON alo.id = ar.academic_level_option_id
         WHERE c.university_id = :uid
         ORDER BY c.name, ar.academic_country NULLS LAST
         """
@@ -500,6 +541,7 @@ async def bulk_academic(
     else:
         countries = [None]
     force_replace: bool = bool(body.get("forceReplace", False))
+    option = await _academic_option(db, body)
 
     course_name_rows = (
         await db.execute(
@@ -555,7 +597,8 @@ async def bulk_academic(
     rows = [
         AcademicRequirement(
             course_id=cid,
-            academic_level=body.get("academicLevel"),
+            academic_level=None,
+            academic_level_option_id=option.id if option else None,
             academic_score=_to_float(body.get("academicScore")),
             score_type=body.get("scoreType"),
             academic_country=country,

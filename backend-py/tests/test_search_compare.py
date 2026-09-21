@@ -152,8 +152,12 @@ async def test_search_cte_executes_against_production_base_table_shape():
                 ) ON COMMIT DROP""",
                 """CREATE TEMP TABLE academic_requirements (
                     id integer, course_id integer, academic_level text,
+                    academic_level_option_id integer,
                     academic_score real, score_type text, academic_country text,
                     created_at timestamptz
+                ) ON COMMIT DROP""",
+                """CREATE TEMP TABLE academic_level_options (
+                    id integer, name text
                 ) ON COMMIT DROP""",
             ):
                 await db.execute(text(ddl))
@@ -182,10 +186,16 @@ async def test_search_cte_executes_against_production_base_table_shape():
                    (10, 'IELTS', 7.0)"""
             ))
             await db.execute(text(
-                """INSERT INTO academic_requirements VALUES
-                   (1, 10, 'Year 12', 70, '%', 'Australia', '2025-01-01'),
-                   (2, 10, 'Bachelor''s degree', 4, 'GPA/5', 'Australia',
-                    '2026-01-01')"""
+                """INSERT INTO academic_level_options VALUES
+                   (3, 'Bachelor''s degree')"""
+            ))
+            await db.execute(text(
+                """INSERT INTO academic_requirements
+                   (id, course_id, academic_level, academic_level_option_id,
+                    academic_score, score_type, academic_country, created_at)
+                   VALUES
+                   (1, 10, 'Year 12', NULL, 70, '%', 'Australia', '2025-01-01'),
+                   (2, 10, NULL, 3, 4, 'GPA/5', 'Australia', '2026-01-01')"""
             ))
 
             row = (
@@ -348,6 +358,10 @@ def test_search_qualification_uses_attainment_hierarchy():
     assert "'year 12'" in sql
     assert "'diploma'" in sql
     assert "'bachelor''s degree'" in sql
+    assert "'bachelor''s degree or equivalent'" in sql
+    assert "'master''s degree or equivalent'" in sql
+    assert "'grade 12th or equivalent'" in sql
+    assert "'doctorate / phd'" in sql
     assert "'doctorate'" in sql
     assert "<= (" in sql
 
