@@ -361,3 +361,15 @@ checkout because the production branch hard-coded the target-only helper path.
 overrideable variable. When bootstrapping from a predecessor without the helper,
 materialize the reviewed target guard and fence as temporary files and retain
 all ordinary smoke, idle, revision, rollback, and public-health checks.
+
+A successful backend release identity does not prove that frontend changes were
+built or published.
+
+**Why:** Production reached the target Git revision and both services passed,
+but Nginx kept serving an older hashed Vite bundle, so the repair-button fix was
+still absent.
+
+**How to apply:** For every release containing portal changes, build the
+University Portal on the production checkout and verify the public HTML points
+to a newly generated asset containing a target-specific marker before reporting
+success.
