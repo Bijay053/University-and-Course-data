@@ -13,7 +13,10 @@ import urllib.parse
 
 
 HASHED_JAVASCRIPT = re.compile(r"(?:^|/)assets/[^/?#]+-[A-Za-z0-9_-]{8,}\.js$")
-PUBLIC_FETCH_ATTEMPTS = 18
+# Production's public edge can remain unavailable for roughly two minutes
+# after a service restart even though local health and revision checks pass.
+# Keep the gate bounded while allowing a full four-minute recovery window.
+PUBLIC_FETCH_ATTEMPTS = 48
 PUBLIC_FETCH_RETRY_SECONDS = 5
 
 
