@@ -140,3 +140,4 @@
 - [Claimed-worker recovery fencing](claimed-worker-recovery-fencing.md) — heartbeat age never proves worker death; safe autonomous reclaim requires generation-fenced writes.
 - [Verification continuation safety](verification-continuation-safety.md) — continue acknowledged timeouts on exact remaining samples; aggregate every child's safety evidence.
 - [Middlesex English authority](mdx-english-authority.md) — conflicting PG categories cannot become a universal default; named exceptions retain award identity.
+- [London Met audience intakes](londonmet-audience-intakes.md) — Overseas selector options own international cohorts; keep selected-year facts atomic and use linked UG English authority.

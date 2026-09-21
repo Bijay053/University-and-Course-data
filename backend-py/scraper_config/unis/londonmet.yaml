@@ -29,6 +29,8 @@ extraction:
     - Domestic
   english:
     trust_vision_ocr: false
+    # Course pages link this official UG source; PG bands differ.
+    central_page_ug: https://www.londonmet.ac.uk/international/applying/english-language-requirements/undergraduate/
     default_ielts: 6.0
     default_pte: 60
     default_toefl: 80

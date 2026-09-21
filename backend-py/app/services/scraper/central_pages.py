@@ -666,6 +666,47 @@ _LEVEL_HEADING_RE = re.compile(
 )
 
 
+def _parse_londonmet_undergraduate_english(html: str, page_url: str) -> dict[str, Any]:
+    """Read London Met's standard UG IELTS row, not later course exceptions.
+
+    The official page contains the standard table followed by an exceptions
+    list and then separate Academic IELTS sections.  A page-wide English
+    regex therefore commonly returns the later 7.0 exception.  The first
+    IELTS heading/value pair is the authoritative standard requirement for
+    ordinary undergraduate course pages; named exceptions require separate
+    course-owned evidence and are intentionally not applied here.
+    """
+    if (urlparse(page_url).hostname or "").lower() not in {
+        "londonmet.ac.uk", "www.londonmet.ac.uk"
+    }:
+        return {}
+    if "/international/applying/english-language-requirements/undergraduate" not in (
+        urlparse(page_url).path or ""
+    ):
+        return {}
+    # Restrict to the first IELTS heading and its immediate score paragraph.
+    match = re.search(
+        r"<h[1-6][^>]*>\s*IELTS\s*</h[1-6]>(?P<section>.*?)(?=<h[1-6]\b)",
+        html or "",
+        re.IGNORECASE | re.DOTALL,
+    )
+    if not match:
+        return {}
+    text = html_to_text(match.group("section"))
+    score = re.search(
+        r"overall\s+score\s+of\s+([0-9]+(?:\.[0-9]+)?)\s+with\s+"
+        r"([0-9]+(?:\.[0-9]+)?)\s+in\s+each\s+component",
+        text,
+        re.IGNORECASE,
+    )
+    if not score:
+        return {}
+    return {
+        "ielts_overall": float(score.group(1)),
+        "ielts_minimum": float(score.group(2)),
+    }
+
+
 async def _parse_english_by_level_async(
     html: str, page_url: str
 ) -> dict[str, dict[str, Any]]:
@@ -682,6 +723,10 @@ async def _parse_english_by_level_async(
     """
     try:
         from app.services.scraper.extractors import english_test
+
+        londonmet_ug = _parse_londonmet_undergraduate_english(html, page_url)
+        if londonmet_ug:
+            return {"undergraduate": londonmet_ug}
 
         text = html_to_text(html)
         matches = list(_LEVEL_HEADING_RE.finditer(text))
@@ -1620,7 +1665,7 @@ async def _fetch_with_browser_fallback(url: str) -> str | None:
 #                             english_by_level + english_by_program
 
 _CACHE_TTL_DAYS = 30
-_ENGLISH_CACHE_SCHEMA_VERSION = 7
+_ENGLISH_CACHE_SCHEMA_VERSION = 8
 
 
 def _is_non_tuition_central_fee_pdf(
@@ -2193,7 +2238,16 @@ async def prefetch_central_pages(
                     continue
 
                 # ── Parse ────────────────────────────────────────────────────
-                _split_slots = await _parse_english_page_html_async(_split_html, _split_url)
+                # London Met's UG page includes later named exceptions and
+                # Academic IELTS sections.  The bounded standard-row parser
+                # must win over the generic page-wide matcher.
+                _split_slots = _parse_londonmet_undergraduate_english(
+                    _split_html, _split_url
+                )
+                if not _split_slots:
+                    _split_slots = await _parse_english_page_html_async(
+                        _split_html, _split_url
+                    )
 
                 # Auto browser-fallback when HTTP returned a JS shell
                 if (

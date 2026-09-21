@@ -54,6 +54,7 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import date
 from typing import Any
 from urllib.parse import urlparse
 
@@ -94,11 +95,19 @@ _BRAND_NAME_RE = re.compile(
 # £M for year 2, ..." — in both cases the first £ amount is the correct
 # Year 1 / annual fee to store (do NOT require "per year" in the string).
 _DATA_COST_TAG_RE = re.compile(
-    r'<[a-z]+\b[^>]*\bdata-cost="[^"]+"[^>]*>',
+    # Entry-point options without a fee (the current London Met markup uses
+    # these for the overseas start-date selector) are still authoritative for
+    # intakes.  Do not require data-cost before parsing the tag.
+    r'<(?:[a-z]+)\b[^>]*'
+    r"(?:\bdata-cost=['\"][^'\"]+['\"]|"
+    r"\bdata-fee-type=['\"](?:International|Overseas)['\"])"
+    r"[^>]*>",
     re.IGNORECASE,
 )
 # data-([a-z-]+) — note the hyphen so data-fee-type is captured as key "fee-type".
-_DATA_ATTR_RE = re.compile(r'data-([a-z][a-z-]*)="([^"]*)"', re.IGNORECASE)
+_DATA_ATTR_RE = re.compile(
+    r"data-([a-z][a-z-]*)=['\"]([^'\"]*)['\"]", re.IGNORECASE
+)
 _AMOUNT_RE = re.compile(r'(?:£|&pound;|&#163;)\s?([\d,]{2,12})')
 # Kept for the legacy MIN/MAX fallback path (pages without data-fee-type labels).
 _PER_YEAR_RE = re.compile(r'(?:per\s+year|/\s*yr|annual)', re.IGNORECASE)
@@ -130,19 +139,50 @@ def parse_data_cost_entries(html: str) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
     if not html:
         return entries
-    for tag_match in _DATA_COST_TAG_RE.finditer(html):
-        # data-fee-type uses a hyphen — _DATA_ATTR_RE now captures [a-z-]+ keys.
-        attrs = {k.lower(): v for k, v in _DATA_ATTR_RE.findall(tag_match.group(0))}
+    # On London Met pages, only options inside this selector carry course
+    # entry-point identity.  Parsing matching attributes from the whole page
+    # accidentally joins navigation/analytics markup to UK or Overseas rows.
+    # BeautifulSoup also handles optgroup labels, which are part of the
+    # audience identity when an option omits data-fee-type.
+    try:
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html, "html.parser")
+        selector = soup.select_one("#course-entry-point-selector")
+        tag_sources = []
+        if selector is not None:
+            for option in selector.select("option"):
+                attrs = {
+                    str(k).lower().removeprefix("data-"): str(v)
+                    for k, v in option.attrs.items()
+                }
+                group = option.find_parent("optgroup")
+                group_label = str((group or {}).get("label") or "")
+                label = " ".join(
+                    [attrs.get("fee-type", ""), group_label, option.get_text(" ", strip=True)]
+                ).lower()
+                if "international" in label or "overseas" in label:
+                    attrs.setdefault("fee-type", "International")
+                tag_sources.append(attrs)
+        else:
+            tag_sources = [
+                {k.lower(): v for k, v in _DATA_ATTR_RE.findall(m.group(0))}
+                for m in _DATA_COST_TAG_RE.finditer(html)
+            ]
+    except Exception:
+        tag_sources = [
+            {k.lower(): v for k, v in _DATA_ATTR_RE.findall(m.group(0))}
+            for m in _DATA_COST_TAG_RE.finditer(html)
+        ]
+    for attrs in tag_sources:
         cost_str = attrs.get("cost", "")
-        if not cost_str:
-            continue
-        amt_match = _AMOUNT_RE.search(cost_str)
-        if not amt_match:
-            continue
-        try:
-            amount = float(amt_match.group(1).replace(",", ""))
-        except (ValueError, TypeError):
-            continue
+        amount = None
+        if cost_str:
+            amt_match = _AMOUNT_RE.search(cost_str)
+            if amt_match:
+                try:
+                    amount = float(amt_match.group(1).replace(",", ""))
+                except (ValueError, TypeError):
+                    amount = None
         try:
             year = int(attrs.get("y", "")) if attrs.get("y") else None
         except (ValueError, TypeError):
@@ -160,7 +200,9 @@ def parse_data_cost_entries(html: str) -> list[dict[str, Any]]:
     return entries
 
 
-def extract_real_fees(entries: list[dict[str, Any]]) -> dict[str, Any]:
+def extract_real_fees(
+    entries: list[dict[str, Any]], *, current_year: int | None = None
+) -> dict[str, Any]:
     """Derive the international annual fee, intake months, location, and
     duration from parsed data-cost entries.
 
@@ -176,33 +218,54 @@ def extract_real_fees(entries: list[dict[str, Any]]) -> dict[str, Any]:
       original MIN/MAX heuristic on Full-time per-year entries.
     """
     out: dict[str, Any] = {}
+    current_year = current_year or date.today().year
 
-    # --- Preferred path: explicit data-fee-type="International" entries ---
-    intl_ft = [
+    # --- Preferred path: explicit audience entry-point options ---
+    audience_entries = [
         e for e in entries
-        if e.get("fee_type", "").lower() == "international"
-        and "full-time" in e.get("mode", "").lower()
+        if e.get("fee_type", "").lower() in {"international", "overseas"}
     ]
-    if intl_ft:
-        # Cohort isolation: use the earliest academic year to avoid mixing
-        # a 2026 and a 2027 entry.
-        years_present = {e["year"] for e in intl_ft if e["year"] is not None}
-        if years_present:
-            target_year = min(years_present)
-            intl_ft = [e for e in intl_ft if e["year"] == target_year]
-        # First entry is authoritative (same fee repeated per intake month).
-        target = intl_ft[0]
-        out["international_fee"] = target["cost"]
-        out["fee_term"] = "Annual"
-        out["currency"] = "GBP"
-        if target["location"]:
-            out["course_location"] = target["location"]
-        if target["duration"]:
-            out["duration"] = target["duration"]
-        # Intake months from ALL International entries (full + part-time).
-        all_intl = [e for e in entries if e.get("fee_type", "").lower() == "international"]
+    dated_eligible = [
+        e for e in audience_entries
+        if e.get("year") is not None and e["year"] >= current_year
+    ]
+    if dated_eligible:
+        # Select one authoritative cohort.  Do not combine January/September
+        # from 2027 with March from 2028.
+        target_year = min(e["year"] for e in dated_eligible)
+        selected = [e for e in dated_eligible if e["year"] == target_year]
+    else:
+        # Yearless options are safe only when no dated current/future cohort
+        # exists.  Past-only dated pages must not resurrect stale intakes.
+        yearless = [e for e in audience_entries if e.get("year") is None]
+        if not yearless:
+            return out
+        selected = yearless
+
+    intl_ft = [
+        e for e in selected
+        if "full-time" in e.get("mode", "").lower()
+        and e.get("cost") is not None
+    ]
+    if audience_entries:
+        # A fee must pair with the selected cohort.  If same-year entries
+        # disagree, leave it unresolved instead of attaching one arbitrarily.
+        costs = {e["cost"] for e in intl_ft if e.get("cost") is not None}
+        if len(costs) == 1:
+            out["international_fee"] = next(iter(costs))
+            out["fee_term"] = "Annual"
+            out["currency"] = "GBP"
+        if intl_ft:
+            target = intl_ft[0]
+            if target["location"]:
+                out["course_location"] = target["location"]
+            if target["duration"]:
+                out["duration"] = target["duration"]
+        # Intake months from the selected cohort only (full + part-time).
         months = sorted({
-            _MONTH_TO_NUM[e["month"]] for e in all_intl if e["month"] in _MONTH_TO_NUM
+            _MONTH_TO_NUM[e["month"]]
+            for e in selected
+            if e["month"] in _MONTH_TO_NUM
         })
         if months:
             out["intake_months"] = months
@@ -212,6 +275,8 @@ def extract_real_fees(entries: list[dict[str, Any]]) -> dict[str, Any]:
     full_year = [
         e for e in entries
         if e["per_year"] and "full-time" in e["mode"].lower()
+        and e.get("cost") is not None
+        and (e.get("year") is None or e["year"] >= current_year)
     ]
     if not full_year:
         return out
@@ -254,7 +319,29 @@ def has_international_options(html: str) -> bool:
         return True  # can't determine → don't block
     if not _SELECTOR_RE.search(html):
         return True  # no selector on this page → pass through
-    return bool(_INTL_OPTION_RE.search(html))
+    try:
+        from bs4 import BeautifulSoup
+        selector = BeautifulSoup(html, "html.parser").select_one(
+            "#course-entry-point-selector"
+        )
+        if selector is None:
+            return True
+        for option in selector.select("option"):
+            group = option.find_parent("optgroup")
+            label = " ".join(
+                [
+                    str(option.get("data-fee-type") or ""),
+                    str((group or {}).get("label") or ""),
+                    option.get_text(" ", strip=True),
+                ]
+            )
+            if re.search(r"\b(international|overseas)\b", label, re.I):
+                return True
+        return False
+    except Exception:
+        # If the DOM parser is unavailable, fail open rather than reject a
+        # legitimate course based on an unscoped regex.
+        return True
 
 
 def is_londonmet_host(url: str | None) -> bool:
@@ -262,7 +349,7 @@ def is_londonmet_host(url: str | None) -> bool:
     if not url:
         return False
     try:
-        return (urlparse(url).netloc or "").lower() in _LM_HOSTS
+        return (urlparse(url).hostname or "").lower() in _LM_HOSTS
     except Exception:  # noqa: BLE001
         return False
 
