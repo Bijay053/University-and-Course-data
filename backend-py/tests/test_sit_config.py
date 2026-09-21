@@ -1,5 +1,6 @@
 import asyncio
 import re
+from unittest.mock import Mock
 
 import pytest
 
@@ -17,6 +18,7 @@ from app.services.scraper.central_pages import (
     match_central_fee,
 )
 from app.services.scraper.guards import should_stage_course
+from app.services.scraper.stage_course import stage_course
 from app.services.scraper.extractors import (
     duration,
     english_test,
@@ -976,6 +978,84 @@ def test_sit_online_only_programme_remains_globally_rejected():
     )
     assert accepted is False
     assert reason == "online_only"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("strand", [
+    "Administration and Technology",
+    "Leadership and Management",
+    "Project Management",
+])
+async def test_sit_schedule_listed_online_only_programme_is_reported_as_intentional(
+    strand,
+):
+    course_name = (
+        f"New Zealand Diploma in Business ({strand} Strand) (Level 5)"
+    )
+    result = await stage_course(
+        Mock(),
+        scrape_job_id="sit-policy",
+        university_id=67,
+        course_name=course_name,
+        payload={
+            "course_name": course_name,
+            "international_fee": 19000.0,
+            "study_mode": "Online",
+            "online_only": True,
+        },
+        evidence=[
+            {
+                "field_key": "international_fee",
+                "value": 19000.0,
+                "method": "central_page:fees:exact",
+            }
+        ],
+        source_url=(
+            "https://www.sit.ac.nz/Programme/Course/"
+            f"New-Zealand-Diploma-in-Business-{strand.replace(' ', '-')}"
+        ),
+        skip_url_block=True,
+    )
+
+    assert result.saved is False
+    assert result.reason == "rejected: listed_but_ineligible_online_only"
+
+
+@pytest.mark.asyncio
+async def test_online_only_reporting_exception_is_narrow_to_sit_schedule_matches():
+    common = {
+        "scrape_job_id": "policy-scope",
+        "university_id": 1,
+        "course_name": "New Zealand Diploma in Business (Level 5)",
+        "payload": {
+            "course_name": "New Zealand Diploma in Business (Level 5)",
+            "international_fee": 19000.0,
+            "study_mode": "Online",
+            "online_only": True,
+        },
+        "skip_url_block": True,
+    }
+    evidence = [{
+        "field_key": "international_fee",
+        "value": 19000.0,
+        "method": "central_page:fees:exact",
+    }]
+
+    non_sit = await stage_course(
+        Mock(),
+        **common,
+        evidence=evidence,
+        source_url="https://university.example/course/business-online",
+    )
+    unlisted_sit = await stage_course(
+        Mock(),
+        **common,
+        evidence=[],
+        source_url="https://www.sit.ac.nz/Programme/Course/Business-Online",
+    )
+
+    assert non_sit.reason == "rejected: online_only"
+    assert unlisted_sit.reason == "rejected: online_only"
 
 
 def test_unlisted_sit_certificate_cannot_receive_an_exact_fee():

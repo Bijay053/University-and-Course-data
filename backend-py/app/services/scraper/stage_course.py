@@ -22,6 +22,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlsplit
 
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -63,6 +64,25 @@ class StageResult:
 
     def __bool__(self) -> bool:  # so existing `if result:` patterns still work
         return self.saved
+
+
+def _reported_gate_reason(
+    gate_reason: str,
+    *,
+    source_url: str | None,
+    evidence: list[dict[str, Any]] | None,
+) -> str:
+    """Make an authoritative catalogue-policy exclusion explicit in reports."""
+    host = (urlsplit(source_url).hostname or "").casefold() if source_url else ""
+    is_sit = host == "sit.ac.nz" or host.endswith(".sit.ac.nz")
+    is_schedule_listed = any(
+        item.get("method") == "central_page:fees:exact"
+        for item in (evidence or [])
+        if isinstance(item, dict)
+    )
+    if gate_reason == "online_only" and is_sit and is_schedule_listed:
+        return "listed_but_ineligible_online_only"
+    return gate_reason
 
 
 def _clean_model_value(field_name: str, value: Any) -> Any:
@@ -406,8 +426,13 @@ async def stage_course(
     # hitting the rejection-block query for a page we'll always reject).
     accept, gate_reason = should_stage_course(name, payload, source_url=source_url)
     if not accept:
-        log.info("staging_gate rejected %r: %s", name, gate_reason)
-        return StageResult(False, f"rejected: {gate_reason}")
+        report_reason = _reported_gate_reason(
+            gate_reason,
+            source_url=source_url,
+            evidence=evidence,
+        )
+        log.info("staging_gate rejected %r: %s", name, report_reason)
+        return StageResult(False, f"rejected: {report_reason}")
 
     # Normalize source_url before any dedup or storage.
     # 1. Strip URL fragment (#section-id) — the same page content is served

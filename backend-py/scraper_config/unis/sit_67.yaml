@@ -71,6 +71,10 @@ extraction:
       New Zealand Certificate in Business (Small Business) (Level 4): New Zealand Certificate in Business (Small Business)
       New Zealand Certificate in Study and Employment Pathways (Level 4) (Nursing and Health): New Zealand Certificate Study and Employment Pathways (Nursing and Health)
     require_central_fee_match: true
+    # Catalogue membership is necessary but does not override the global
+    # physical-or-hybrid eligibility policy. Exact schedule matches whose
+    # current pages are online-only remain excluded and are reported as
+    # listed_but_ineligible_online_only.
     force_central_fee_stage: false
     discard_domestic_fee: true
     reject_keywords:
