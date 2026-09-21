@@ -12,7 +12,7 @@ const base: AutonomousRepair = {
     max_attempts: 5,
     max_live_pages: 12,
     max_live_seconds: 180,
-    max_verification_runs: 1,
+    max_verification_runs: 2,
   },
 };
 
@@ -106,7 +106,7 @@ describe("AiRepairProgress", () => {
     expect(screen.getByText(/publishing is always manual/)).toBeTruthy();
   });
 
-  it("shows the 50-course, 10-minute verification scope without calling the Gemini ceiling a total budget", () => {
+  it("shows the two-run cumulative verification scope and observed Gemini cost", () => {
     render(
       <AiRepairProgress
         autonomous={{
@@ -116,17 +116,67 @@ describe("AiRepairProgress", () => {
             max_courses: 50,
             time_budget_seconds: 600,
             cost_cap_usd: 2,
+            max_runs: 2,
+            total_time_budget_seconds: 1200,
+            total_cost_cap_usd: 2,
             scope: "bounded fresh catalogue verification; not full catalogue coverage",
+          },
+          comparison: {
+            cumulative_counters: { gemini_cost_usd: 0.73 },
           },
         }}
         currentAttempt={2}
       />,
     );
 
-    expect(screen.getByText(/up to 50 courses · 10 minutes/)).toBeTruthy();
-    expect(screen.getByText(/Gemini extraction ceiling: \$2.00/)).toBeTruthy();
+    expect(screen.getByText(/one 50-course sample · up to 2 runs · 1,200 seconds cumulative/)).toBeTruthy();
+    expect(screen.getByText(/extraction ceiling: \$2.00 cumulative/)).toBeTruthy();
+    expect(screen.getByText(/observed: \$0.73/)).toBeTruthy();
     expect(screen.queryByText(/total budget/i)).toBeNull();
     expect(screen.getByText(/not full catalogue coverage/)).toBeTruthy();
+  });
+
+  it("shows an automatic second run with completed and remaining counts as active", () => {
+    render(
+      <AiRepairProgress
+        autonomous={{
+          ...base,
+          phase: "verification_queued",
+          verification_status: "queued",
+          reason: "Verification timed out after 31 of 50 selected courses; automatically continuing the exact remaining sample.",
+          verification_limits: {
+            max_courses: 50,
+            time_budget_seconds: 600,
+            max_runs: 2,
+            total_time_budget_seconds: 1200,
+            total_cost_cap_usd: 2,
+          },
+          continuation: {
+            status: "queued",
+            round: 2,
+            max_runs: 2,
+            completed_courses: 31,
+            remaining_courses: 19,
+            total_time_budget_seconds: 1200,
+            total_cost_cap_usd: 2,
+          },
+          comparison: {
+            stop_reason: "time_budget_exhausted",
+            verification_limits: {
+              budget_exhausted: "time_budget_exhausted",
+              time_budget_seconds: 600,
+            },
+          },
+        }}
+        currentAttempt={2}
+      />,
+    );
+
+    expect(screen.getByText("Automatic repair running")).toBeTruthy();
+    expect(screen.getByText(/Automatic verification run 2 of 2:/).parentElement?.textContent)
+      .toContain("31 completed · 19 remaining");
+    expect(screen.queryByText("Stopped:")).toBeNull();
+    expect(screen.getByText(/automatically continuing the exact remaining sample/)).toBeTruthy();
   });
 
   it("compares baseline and verification quality across the supported fields", () => {

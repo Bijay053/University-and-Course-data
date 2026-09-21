@@ -1,0 +1,21 @@
+# Middlesex University
+# Hostname: www.mdx.ac.uk
+# Country: United Kingdom  |  Currency: GBP
+# Slug: mdx
+
+hostname_guard: www.mdx.ac.uk
+
+discovery: {}
+
+extraction:
+  fees:
+    default_currency: GBP
+
+  english:
+    central_page: "https://www.mdx.ac.uk/study/english-language-requirements"
+
+  staging:
+    reject_if_missing:
+      - course_name
+    skip_degree_qualifier_check: true
+    require_international_fee: false

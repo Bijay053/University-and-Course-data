@@ -61,26 +61,13 @@
 - [Distributed semaphore lessons](distributed-semaphore-lessons.md) — acquire local semaphore BEFORE fleet-wide Redis slot; cache one redis.asyncio client per event loop (WeakKeyDictionary).
 - [block_url_patterns traversal guard](block-url-patterns-traversal.md) — block_url_patterns is now ALSO a BFS traversal-level guard (compiled early, checked pre-fetch); critical for Scrape.do-backed discovery where each blocked URL saves ~6s.
 - [UC Leeds degree-qualifier false rejection](ucleeds-degree-qualifier-false-positive.md) — H1 lacking degree word wrongly triggers category-landing-page guard on fully-extracted courses; skip_degree_qualifier_check:true YAML flag fixes it.
-- [UniSQ SSR and location drift](unisq-browser-timeout.md) — SSR beats Playwright; compare saved location evidence with fresh quick-facts before changing the parser for source drift.
-- [UniSC fee and English authority](unisc-fee-english-authority.md) — exclusive international fees; Table 1 by level; Table 2 only by exact program title.
 - [Bond ES API discovery](bond-es-discovery.md) — program finder is React SPA/AJAX; query /api/v1/elasticsearch/bond_prod_default/_search with generic_search_api; _source.url.0 dot-path extracts array fields.
-- [UniSC sitemap + config identity](unisc-sitemap-discovery.md) — XMLsitemap supplies courses; production ID-specific YAML can shadow the verified recipe, so shared name cleanup must not depend on its aliases.
-- [Bond University sitemap discovery](bond-sitemap-discovery.md) — generic_search_api gated by `if not links`; BFS fills it first; sitemap.xml index (5 child pages, 240 URLs) is the correct approach.
-- [SCU HTML-comment hidden URLs](scu-html-comment-hidden.md) — base course URLs inside an HTML comment; _LinkExtractor finds 0; force_candidate_url_patterns is useless here; fix = allow year-versioned URLs through (remove /2027/ block, prefer 2027).
-- [Adelaide degree-page traps](adelaide-degree-unit-trap.md) — dual-audience needs exclusive state to reject; `/degrees/online/` and paired mode/location metadata mean online-only.
-- [UNE Wayback CDX discovery](une-wayback-discovery.md) — listing page is React SPA (0 links even with Scrape.do render); no sitemap; Wayback CDX with /study/courses/* prefix is the only discovery mechanism.
-- [MQ Scrape.do render false fix](mq-scrape-do-render-lesson.md) — scrape_do_render+skip_fallbacks caused 41/127 timeouts; stealth browser is correct for MQ; degree_level_defaults fills fees.
-- [CSU discovery fix](csu-discovery-fix.md) — CF Enterprise; 3 YAML knobs (skip_browser_discovery+sitemap_url+use_wayback) skip 160s of dead probes; CDX→329 course URLs.
+- [Australian university discovery and extraction index](australian-university-lessons-index.md) — grouped pointers for catalogue transport, field authority, audience scope, and course-page structure.
 - [payload.get(key, default) None trap](payload-get-none-trap.md) — key present with None value → get() returns None not default; use `(payload.get(key) or "").strip()` always.
 - [Global international-audience filters](global-international-audience-filters.md) — confirmed domestic-only and online-only courses are never staged, regardless of per-university YAML or admin overrides.
 - [Global full-time eligibility](global-full-time-eligibility.md) — mixed/equivalent wording keeps the full-time route; explicit part-time-only wording wins; unresolved Part Time fails closed.
-- [UOW session-fee table](uow-session-fee.md) — UOW’s adjacent Course fee is a full-programme total; select and retain the Session fee column instead.
-- [UOW IELTS skill table](uow-ielts-skill-table.md) — course pages put band labels in the header before the IELTS row; parse DOM columns or flattened prose drops every sub-band.
-- [UOW international study load](uow-international-study-load.md) — “N years, or part-time equivalent” means the primary full-time route; part-time-only courses are ineligible.
 - [SSR courses with missing English](ssr-missing-english-browser-skip.md) — “English missing” can still trigger generic Playwright; proven SSR hosts need skip_per_course_browser and central English fallback.
 - [Evidence dedup schema drift](evidence-dedup-schema-drift.md) — long-lived DBs may lack the model-declared evidence unique constraint; verify pg_indexes before named ON CONFLICT.
-- [Griffith program API authority](griffith-program-api.md) — degree pages are Vue shells; use v3 program API, with Funnelback metadata fallback for retired 404 records.
-- [Flinders AEM page compaction](flinders-aem-compaction.md) — course pages are mostly AEM chrome; retain metadata, title shell and fast facts before generic extraction.
 - [Safe cross-site HTML compaction](safe-html-compaction.md) — preserve chrome text/order, never flatten structured descendants, and require per-university full-payload parity before opt-in.
 - [Required browser state validation](required-browser-actions-timeout.md) — pooled sessions and timeout DOM require idempotent audience-state checks before extraction.
 - [Browser rescue override parity](browser-rescue-override-parity.md) — enabling rescue must clear both browser-suppression controls; never offer a retry known to repeat the same block.
@@ -88,7 +75,6 @@
 - [Location table-header contamination](location-table-header-contamination.md) — “Location” table headers must not turn adjacent column labels into campuses or override authoritative Online delivery.
 - [Non-tuition PDF fee safety](non-tuition-pdf-fee-safety.md) — incidental, ancillary, SSAF, application, deposit, materials, and equipment PDFs must never populate international tuition.
 - [Mixed standard and alternative values](mixed-standard-alternative-values.md) — preserve standard values beside accelerated alternatives; numeric test scores need boundaries on both sides.
-- [UTS audience-state fee override](uts-audience-fee-override.md) — static UTS pages look complete but show Domestic fees; required browser actions must override amount and fee metadata together.
 - [AUT points-based fees and duration](aut-points-fee-duration.md) — 120 points is one full-time year; annualize the headline levy-inclusive fee and prefer points over conflicting duration metadata.
 - [Fleet-wide non-degree gating](non-degree-gating.md) — Degree evidence wins over CPD paths; static rejection requires visible structured main/article evidence; discovery drops are not staging skips.
 - [Scrape slot persistence identity](scrape-slot-identity.md) — Persist multi-slot jobs by stable slot ID, never current grid position; reindexing positional keys can clone another active job.
@@ -111,19 +97,14 @@
 - [Production deployment routing](production-deployment-routing.md) — trust the live Git origin and dedicated SSM identity; stale targets or default AWS credentials can fail.
 - [Autonomous config repair rollback](autonomous-config-repair-rollback.md) — validate without writes; fence both apply and compensating rollback against exact config documents.
 - [Automated repair normalization parity](automated-repair-normalization-parity.md) — quality detection, replay validation, and runtime assignment must share canonicalization and fail closed on valid-value misses.
-- [CQU sitemap-only discovery](cqu-sitemap-only-discovery.md) — rendered /courses links only to broad navigation; skip BFS and use the static-proxy sitemap directly.
-- [CQU English field drift](cqu-english-field-drift.md) — current course English may live in AIMS requisite conditions while dedicated English/schema fields are empty; TOEFL can list PBT before iBT.
 - [Snapshot canary cleanup and locking](snapshot-canary-safety.md) — delete exact S3 versions, verify absence, and use transaction-scoped advisory locks so pooled connections cannot strand monitors.
 - [Disposable AWS integration safety](disposable-aws-integration-safety.md) — validate every AWS principal’s account and require an explicit disposable-resource tag before destructive integration tests.
-- [CSU duration and offering-year authority](csu-duration-offering-year.md) — use minimum/standard full-time duration and latest-year FPOS modes; embedded maxima and mixed years can corrupt current values.
-- [CDU audience-scoped course fields](cdu-audience-scoped-fields.md) — fees and locations must come from the current course’s international DOM blocks, never domestic siblings or related-course cards.
 - [Re-extraction warning lifecycle](reextract-warning-lifecycle.md) — clear only warnings whose condition the new payload proves resolved; preserve unrelated review warnings.
 - [Re-extraction evidence promotion](reextract-evidence-promotion.md) — equal values still refresh when selected evidence replaces previously unselected provenance.
 - [Targeted Fix progress](targeted-fix-progress.md) — count only previewed issue-field updates; job identity includes courses, target fields, and source review.
 - [University onboarding locality safety](university-onboarding-locality.md) — navigation labels are never cities; invalid stored localities may be repaired by verified onboarding fallback.
 - [University onboarding name authority](university-onboarding-name-authority.md) — URL metadata is marketing copy until sanitized; clean official names may replace wrapped phrases even when both contain “University.”
 - [Category-page warning parity](category-page-warning-parity.md) — URL-shape warnings must respect degree-qualifier overrides and be discarded when their candidate count differs from the live job.
-- [WSU international catalogue authority](wsu-algolia-authority.md) — detail pages default to domestic; Algolia owns international fees/durations, while official English profiles require named exceptions.
 - [Skip reason counter conservation](skip-reason-counter-conservation.md) — every completed skipped-course increment must flow through one helper that also increments exactly one stable reason bucket.
 - [Expected-failure teardown proof](expected-failure-teardown-proof.md) — a deliberate nonzero exit can mask cleanup failure; verify resource absence independently.
 - [QUT static extraction and delivery gates](qut-static-extraction.md) — prefer the usable static payload; browser rescue is blocked, and bare “online” text is not delivery authority.
@@ -157,3 +138,5 @@
 - [Settings-backed academic requirements](settings-backed-academic-requirements.md) — derive requirement option IDs from stable semantic keys so setting renames propagate without changing degree mappings.
 - [AI repair live-evidence seeds](ai-repair-live-evidence-seeds.md) — rejection-storm repairs must probe staged course URLs; historical jobs may need the latest review set after their rows are replaced.
 - [Claimed-worker recovery fencing](claimed-worker-recovery-fencing.md) — heartbeat age never proves worker death; safe autonomous reclaim requires generation-fenced writes.
+- [Verification continuation safety](verification-continuation-safety.md) — continue acknowledged timeouts on exact remaining samples; aggregate every child's safety evidence.
+- [Middlesex English authority](mdx-english-authority.md) — conflicting PG categories cannot become a universal default; named exceptions retain award identity.

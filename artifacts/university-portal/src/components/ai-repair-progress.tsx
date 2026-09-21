@@ -25,6 +25,7 @@ export type AutonomousRepair = {
     | "validating"
     | "verification_queued"
     | "verifying"
+     | "recovering"
     | "verified"
     | "needs_review"
     | "blocked";
@@ -39,11 +40,24 @@ export type AutonomousRepair = {
     max_courses?: number;
     time_budget_seconds?: number;
     cost_cap_usd?: number;
+    max_runs?: number;
+    total_time_budget_seconds?: number;
+    total_cost_cap_usd?: number;
     scope?: string;
+    cost_scope?: string;
     selected_courses?: number;
     staged_courses?: number;
     budget_exhausted?: string;
     warning?: string;
+  };
+  continuation?: {
+    status?: string;
+    round?: number;
+    max_runs?: number;
+    remaining_courses?: number;
+    completed_courses?: number;
+    total_time_budget_seconds?: number;
+    total_cost_cap_usd?: number;
   };
   verification_job_id?: string;
   verification_status?: string;
@@ -63,6 +77,16 @@ export type AutonomousRepair = {
       imported?: number;
       skipped?: number;
       errors?: number;
+    };
+    verification_runs?: number;
+    cumulative_staged_courses?: number;
+    cumulative_counters?: {
+      total_found?: number;
+      current?: number;
+      imported?: number;
+      skipped?: number;
+      errors?: number;
+      gemini_cost_usd?: number;
     };
     [key: string]: unknown;
   };
@@ -117,7 +141,11 @@ export function AiRepairProgress({
   const running = !verified && !needsReview && !blocked;
   const effectiveMaxAttempts = autonomous.limits?.max_attempts ?? maxAttempts;
   const comparison = autonomous.comparison;
-  const verificationLimits = comparison?.verification_limits ?? autonomous.verification_limits;
+  const verificationLimits = (
+    autonomous.verification_limits || comparison?.verification_limits
+      ? { ...autonomous.verification_limits, ...comparison?.verification_limits }
+      : undefined
+  );
   const baseline = comparison?.baseline ?? comparison?.baseline_quality;
   const verification = comparison?.verification ?? comparison?.verification_quality;
   const displayComparisonItem = (key: string) => (
@@ -139,6 +167,29 @@ export function AiRepairProgress({
   const processedCourses = comparison?.counters?.current;
   const selectedCourses = verificationLimits?.selected_courses ?? comparison?.counters?.total_found;
   const stagedCourses = verificationLimits?.staged_courses ?? comparison?.counters?.imported;
+  const maxVerificationRuns = (
+    verificationLimits?.max_runs
+    ?? autonomous.continuation?.max_runs
+    ?? autonomous.limits?.max_verification_runs
+    ?? 2
+  );
+  const totalTimeBudgetSeconds = (
+    verificationLimits?.total_time_budget_seconds
+    ?? autonomous.continuation?.total_time_budget_seconds
+    ?? (verificationLimits?.time_budget_seconds != null
+      ? verificationLimits.time_budget_seconds * maxVerificationRuns
+      : 1200)
+  );
+  const totalCostCapUsd = (
+    verificationLimits?.total_cost_cap_usd
+    ?? autonomous.continuation?.total_cost_cap_usd
+    ?? verificationLimits?.cost_cap_usd
+  );
+  const observedCostUsd = comparison?.cumulative_counters?.gemini_cost_usd;
+  const continuationActive = Boolean(
+    autonomous.continuation
+    && (autonomous.phase === "verification_queued" || autonomous.phase === "verifying")
+  );
 
   return (
     <section
@@ -239,22 +290,36 @@ export function AiRepairProgress({
       <div className="flex flex-wrap items-center justify-between gap-1 text-[9px] text-gray-500">
         <span>
           Limits: {autonomous.limits?.max_live_pages ?? 12} live pages · {autonomous.limits?.max_live_seconds ?? 180}s ·{" "}
-          {autonomous.limits?.max_verification_runs ?? 1} verification run
+          {autonomous.limits?.max_verification_runs ?? 2} verification runs
         </span>
         {autonomous.verification_status && <span>Verification: {autonomous.verification_status.replace(/_/g, " ")}</span>}
       </div>
 
       {verificationLimits && (
         <div className="rounded border border-indigo-200 bg-white/80 px-2 py-1.5 text-[9px] text-indigo-900">
-          <strong>Verification limit:</strong>{" "}
-          up to {verificationLimits.max_courses ?? 50} courses ·{" "}
-          {Math.round((verificationLimits.time_budget_seconds ?? 600) / 60)} minutes
-          {verificationLimits.cost_cap_usd != null && (
-            <> · Gemini extraction ceiling: ${verificationLimits.cost_cap_usd.toFixed(2)}</>
+          <strong>Verification limits:</strong>{" "}
+          one {verificationLimits.max_courses ?? 50}-course sample · up to {maxVerificationRuns} runs ·{" "}
+          {totalTimeBudgetSeconds.toLocaleString()} seconds cumulative
+          {totalCostCapUsd != null && (
+            <> · Gemini returned-course extraction ceiling: ${totalCostCapUsd.toFixed(2)} cumulative</>
           )}
+          {observedCostUsd != null && <> · observed: ${observedCostUsd.toFixed(2)}</>}
           <p className="mt-0.5 text-indigo-700">
             {verificationLimits.scope ?? "Bounded fresh catalogue verification; not full catalogue coverage."}
           </p>
+        </div>
+      )}
+
+      {continuationActive && autonomous.continuation && (
+        <div className="rounded border border-violet-200 bg-white/80 px-2 py-1.5 text-[9px] text-violet-900">
+          <strong>Automatic verification run {autonomous.continuation.round ?? 2} of {maxVerificationRuns}:</strong>{" "}
+          continuing the same bounded sample
+          {autonomous.continuation.completed_courses != null
+            ? ` · ${autonomous.continuation.completed_courses} completed`
+            : ""}
+          {autonomous.continuation.remaining_courses != null
+            ? ` · ${autonomous.continuation.remaining_courses} remaining`
+            : ""}.
         </div>
       )}
 
@@ -273,11 +338,11 @@ export function AiRepairProgress({
         </div>
       )}
 
-      {comparison && (unresolvedFields.length > 0 || regressions.length > 0 || comparison.capped || stoppedForTime) && (
+      {comparison && (unresolvedFields.length > 0 || regressions.length > 0 || comparison.capped || (stoppedForTime && !continuationActive)) && (
         <div className="space-y-0.5 rounded border border-amber-200 bg-white/70 px-2 py-1.5 text-[9px] text-amber-900">
           {unresolvedFields.length > 0 && <p><strong>Unresolved fields:</strong> {unresolvedFields.join(", ")}</p>}
           {regressions.length > 0 && <p><strong>Regressions:</strong> {regressions.join(", ")}</p>}
-          {stoppedForTime && (
+          {stoppedForTime && !continuationActive && (
             <p>
               <strong>Stopped:</strong> Verification reached its{" "}
               {Math.round((verificationLimits?.time_budget_seconds ?? 600) / 60)}-minute time budget

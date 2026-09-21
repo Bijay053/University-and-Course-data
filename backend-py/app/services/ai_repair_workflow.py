@@ -2,8 +2,10 @@
 
 Verification uses the normal scraper's internal ``autonomousVerification``
 option: fresh extraction, isolated review rows and no resume checkpoints.
-This is a bounded 50-course run, not a full catalogue coverage claim.
-Celery delivery has a 10 minute soft / 11 minute hard limit;
+This is at most two bounded children over one 50-course sample, not a full
+catalogue coverage claim. A second child may process only the exact URLs that
+the terminal first child selected but did not stage.
+Each Celery delivery has a 10 minute soft / 11 minute hard limit;
 the monitor also requests stop after ten minutes (including recovered delivery).
 Normal scraper cost ceilings and per-course deadlines remain in force.
 """
@@ -16,18 +18,23 @@ from datetime import datetime, timezone
 from sqlalchemy import select, text
 
 from app.models.scrape_runtime import ScrapeRuntimeJob
+from app.models import ScrapedCourse
 from app.services.scraper import ai_repair_agent as agent
+from app.services.scraper.url_identity import canonical_course_url_key
 
 LIMITS = {
     "max_attempts": 5,
     "max_live_pages": 12,
     "max_live_seconds": 180,
-    "max_verification_runs": 1,
+    "max_verification_runs": 2,
 }
 ACTIVE = {"queued", "running", "starting"}
 CHILD_ACTIVE = {"queued", "running", "awaiting_approval"}
 RECOVERING = "recovering"
 VERIFY_SECONDS = 600
+MAX_VERIFICATION_RUNS = 2
+TOTAL_VERIFY_SECONDS = VERIFY_SECONDS * MAX_VERIFICATION_RUNS
+TOTAL_VERIFY_COST_USD = 2.0
 REPAIR_SECONDS = 960
 REQUEUE_SECONDS = 120
 MAX_REQUEUES = 2
@@ -49,14 +56,18 @@ def autonomous_state() -> dict:
         "enabled": True, "phase": "queued", "limits": dict(LIMITS),
         "verification_limits": {
             "max_courses": 50, "time_budget_seconds": VERIFY_SECONDS, "cost_cap_usd": 2.0,
+            "max_runs": MAX_VERIFICATION_RUNS,
+            "total_time_budget_seconds": TOTAL_VERIFY_SECONDS,
+            "total_cost_cap_usd": TOTAL_VERIFY_COST_USD,
             "scope": "bounded fresh catalogue verification; not full catalogue coverage",
             "cost_scope": "returned-course extraction Gemini costs; not a hard total provider-spend budget",
         },
     }
 
 
-def verification_id(session_id: str) -> str:
-    return "job_air_" + hashlib.sha256(session_id.encode()).hexdigest()[:24]
+def verification_id(session_id: str, round_index: int = 0) -> str:
+    seed = session_id if round_index == 0 else f"{session_id}:continuation:{round_index}"
+    return "job_air_" + hashlib.sha256(seed.encode()).hexdigest()[:24]
 
 
 def merge_live_progress(session: dict, live: dict) -> dict:
@@ -372,18 +383,30 @@ def accepted_live_probe(session: dict) -> bool:
     )
 
 
-def verification_payload(session: dict, parent: ScrapeRuntimeJob) -> dict:
-    return {
+def verification_payload(
+    session: dict,
+    parent: ScrapeRuntimeJob,
+    *,
+    round_index: int = 0,
+    course_urls: list[str] | None = None,
+    cost_cap_usd: float = TOTAL_VERIFY_COST_USD,
+    time_budget_seconds: float = VERIFY_SECONDS,
+) -> dict:
+    payload = {
         "url": parent.url, "universityId": parent.university_id,
         "universityName": parent.university_name, "university_id": parent.university_id,
         "fastMode": False, "fast_mode": False, "forceDiscovery": True,
         "autonomousVerification": {
             "parent_job_id": parent.runtime_job_id, "session_id": session["session_id"],
-            "max_courses": 50, "time_budget_seconds": VERIFY_SECONDS, "cost_cap_usd": 2.0,
+            "max_courses": 50, "time_budget_seconds": time_budget_seconds,
+            "cost_cap_usd": cost_cap_usd, "round_index": round_index,
         },
         "aiRepairSessionId": session["session_id"], "aiRepairParentJobId": session["job_id"],
-        "aiRepairIdempotencyKey": verification_id(session["session_id"]),
+        "aiRepairIdempotencyKey": verification_id(session["session_id"], round_index),
     }
+    if course_urls:
+        payload["courseUrls"] = list(course_urls)
+    return payload
 
 
 async def queue_verification(session: dict, db) -> dict:
@@ -446,6 +469,7 @@ async def queue_verification(session: dict, db) -> dict:
         )
         db.add(child)
     state.update(phase="verification_queued", verification_job_id=child_id,
+                  verification_job_ids=[child_id], verification_round=0,
                  verification_status=child.status, verification_queued_at=now(),
                  verification_requeues=0)
     session.update(status="running", completed_at=None)
@@ -533,7 +557,13 @@ async def dispatch_verification(session: dict, db) -> dict:
     return session
 
 
-def compare_quality(before: dict, after: dict, child: ScrapeRuntimeJob) -> dict:
+def compare_quality(
+    before: dict,
+    after: dict,
+    child: ScrapeRuntimeJob,
+    *,
+    combined_safety: dict | None = None,
+) -> dict:
     fields = (
         "fee_pct", "ielts_pct", "location_pct", "duration_pct", "course_name_pct",
         "intakes_pct", "mode_pct", "degree_level_pct",
@@ -548,18 +578,30 @@ def compare_quality(before: dict, after: dict, child: ScrapeRuntimeJob) -> dict:
         ("contamination_count", "non_course_count", "category_landing_page_count")
         if stats.get(key) or gates.get(key)
     }
+    safety = combined_safety or {
+        "safe": (
+            child.status == "completed" and child.errors == 0 and child.skipped == 0
+            and not child.cost_ceiling_hit and not guard and not contamination
+        ),
+        "catalogue_guards": [guard] if guard else [],
+        "contamination": contamination,
+        "unsafe_children": [],
+    }
     clean = (
         child.status == "completed" and child.imported > 0 and child.errors == 0
         and child.imported >= child.total_found and child.skipped == 0
         and after.get("total_staged", 0) > 0 and not child.cost_ceiling_hit
         and not regressions and not unresolved
         and not after.get("bad_course_names") and not after.get("bad_locations")
+        and not after.get("critical_quality_count")
         and not guard and not contamination
+        and safety.get("safe") is True
     )
     return {
         "baseline": before, "verification": after, "regressions": regressions,
         "unresolved_fields": unresolved, "sample_verified": clean,
         "catalogue_guard": guard, "contamination": contamination,
+        "combined_safety": safety,
         "full_catalogue_verified": False, "scope": "bounded fresh verification; full catalogue coverage unverified",
         "counters": {key: getattr(child, key, None)
                      for key in ("total_found", "current", "imported", "skipped", "errors", "cost_ceiling_hit")},
@@ -570,6 +612,242 @@ def verification_metadata(child: ScrapeRuntimeJob) -> dict:
     payload = (child.request_payload or {}).get("autonomousVerification") or {}
     measured = (child.discovered_config or {}).get("autonomousVerification") or {}
     return {**payload, **measured}
+
+
+def _url_key(value: str | None) -> str:
+    return canonical_course_url_key(value or "") or ""
+
+
+async def _staged_url_keys(child_id: str, university_id: int, db) -> set[str]:
+    rows = (await db.execute(
+        select(ScrapedCourse.canonical_course_url, ScrapedCourse.course_website).where(
+            ScrapedCourse.scrape_job_id == child_id,
+            ScrapedCourse.university_id == university_id,
+        )
+    )).all()
+    keys: set[str] = set()
+    for canonical, legacy_url in rows:
+        # New rows persist the exact canonical identity used by staging.
+        # Legacy/null rows fall back to deriving that same identity from the
+        # stored course URL. Never treat a null identity as completed.
+        key = _url_key(canonical) if canonical else _url_key(legacy_url)
+        if key:
+            keys.add(key)
+    return keys
+
+
+def _canonical_dedup_urls(values: object) -> list[str]:
+    if not isinstance(values, list):
+        return []
+    result: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if not isinstance(value, str):
+            continue
+        key = _url_key(value)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        result.append(value)
+    return result
+
+
+def _child_elapsed(child: ScrapeRuntimeJob) -> float:
+    if not child:
+        return 0.0
+    started = child.started_at or child.claimed_at
+    ended = child.completed_at
+    if not started or not ended:
+        return 0.0
+    return max(0.0, (ended - started).total_seconds())
+
+
+async def _combined_quality(child_ids: list[str], university_id: int, db) -> dict:
+    snapshots = [
+        await agent._quality_snapshot(child_id, university_id, db)
+        for child_id in child_ids
+    ]
+    total = sum(int(item.get("total_staged") or 0) for item in snapshots)
+    if not total:
+        return snapshots[-1] if snapshots else {}
+    result = dict(snapshots[-1])
+    result["total_staged"] = total
+    for key in (
+        "fee_pct", "ielts_pct", "location_pct", "duration_pct", "course_name_pct",
+        "intakes_pct", "mode_pct", "degree_level_pct", "academic_level_pct",
+    ):
+        result[key] = round(sum(
+            float(item.get(key) or 0) * int(item.get("total_staged") or 0)
+            for item in snapshots
+        ) / total)
+    for key in ("bad_course_names", "bad_locations", "critical_quality_count"):
+        result[key] = sum(int(item.get(key) or 0) for item in snapshots)
+    for key in (
+        "sample_locations", "sample_bad_locations", "sample_degrees",
+        "sample_modes", "sample_bad_course_names",
+    ):
+        combined: list = []
+        for item in snapshots:
+            for value in item.get(key) or []:
+                if value not in combined:
+                    combined.append(value)
+        result[key] = combined[:8]
+    critical_rows: list[dict] = []
+    for child_id, item in zip(child_ids, snapshots):
+        for row in item.get("critical_quality_rows") or []:
+            detail = {**row, "verification_job_id": child_id}
+            if detail not in critical_rows:
+                critical_rows.append(detail)
+    result["critical_quality_rows"] = critical_rows[:20]
+    result["critical_quality_issues"] = list(result["critical_quality_rows"])
+    return result
+
+
+def _combined_child_safety(children: list[ScrapeRuntimeJob]) -> dict:
+    """Aggregate every safety signal; only prior acknowledged timeout status is exempt."""
+    unsafe_children: list[dict] = []
+    catalogue_guards: list[dict] = []
+    contamination: dict[str, int] = {}
+    cumulative_elapsed = 0.0
+    for index, item in enumerate(children):
+        if not item:
+            unsafe_children.append({"reason": "missing_child"})
+            continue
+        metadata = verification_metadata(item)
+        stats = (item.discovered_config or {}).get("pipeline_stats") or {}
+        gates = item.gate_skip_counts or {}
+        guard = gates.get("catalogue_guard") or stats.get("catalogue_floor_guard")
+        if guard:
+            catalogue_guards.append({"job_id": item.runtime_job_id, "guard": guard})
+        child_contamination = {
+            key: int(stats.get(key) or gates.get(key) or 0)
+            for key in ("contamination_count", "non_course_count", "category_landing_page_count")
+            if stats.get(key) or gates.get(key)
+        }
+        for key, value in child_contamination.items():
+            contamination[key] = contamination.get(key, 0) + value
+        prior_timeout = (
+            index < len(children) - 1
+            and item.status == "failed_degraded"
+            and metadata.get("budget_exhausted") == "time_budget_exhausted"
+            and bool(getattr(item, "completed_at", None))
+        )
+        reasons: list[str] = []
+        if item.status != "completed" and not prior_timeout:
+            reasons.append(f"status:{item.status}")
+        if metadata.get("budget_exhausted") and not prior_timeout:
+            reasons.append(f"budget_exhausted:{metadata['budget_exhausted']}")
+        warning = metadata.get("warning")
+        expected_timeout_warning = (
+            prior_timeout
+            and isinstance(warning, str)
+            and warning.startswith("Autonomous verification exceeded ")
+        )
+        if warning and not expected_timeout_warning:
+            reasons.append("warning")
+        if metadata.get("capped") is True:
+            reasons.append("capped")
+        if metadata.get("limit_reached") is True:
+            reasons.append("limit_reached")
+        if int(getattr(item, "errors", 0) or 0):
+            reasons.append("errors")
+        if int(getattr(item, "skipped", 0) or 0):
+            reasons.append("skipped")
+        if bool(getattr(item, "cost_ceiling_hit", False)):
+            reasons.append("cost_ceiling_hit")
+        if guard:
+            reasons.append("catalogue_guard")
+        if child_contamination:
+            reasons.append("contamination")
+        if reasons:
+            unsafe_children.append({"job_id": item.runtime_job_id, "reasons": reasons})
+        cumulative_elapsed += _child_elapsed(item)
+    return {
+        "safe": not unsafe_children,
+        "unsafe_children": unsafe_children,
+        "catalogue_guards": catalogue_guards,
+        "contamination": contamination,
+        "cumulative_elapsed_seconds": round(cumulative_elapsed, 3),
+    }
+
+
+async def _queue_verification_continuation(
+    session: dict,
+    child: ScrapeRuntimeJob,
+    metadata: dict,
+    db,
+) -> dict | None:
+    """Queue one exact-remaining-URL child after terminal timeout acknowledgement."""
+    state = session["autonomous"]
+    round_index = int(state.get("verification_round") or 0)
+    if (
+        metadata.get("budget_exhausted") != "time_budget_exhausted"
+        or round_index + 1 >= MAX_VERIFICATION_RUNS
+        or not getattr(child, "completed_at", None)
+    ):
+        return None
+    selected = _canonical_dedup_urls(metadata.get("selected_urls"))
+    if not selected:
+        return None
+    completed = await _staged_url_keys(
+        child.runtime_job_id, int(session["university_id"]), db,
+    )
+    remaining = [url for url in selected if _url_key(url) not in completed]
+    if not remaining:
+        return None
+    ids = list(state.get("verification_job_ids") or [child.runtime_job_id])
+    prior_children = [await db.get(ScrapeRuntimeJob, jid) for jid in ids]
+    elapsed = sum(_child_elapsed(item) for item in prior_children)
+    spent = sum(
+        float(getattr(item, "total_gemini_cost_usd", 0) or 0)
+        for item in prior_children
+    )
+    remaining_cost = TOTAL_VERIFY_COST_USD - spent
+    remaining_time = TOTAL_VERIFY_SECONDS - elapsed
+    if remaining_time <= 0 or remaining_cost <= 0:
+        state["continuation_blocked_reason"] = (
+            "total_time_budget_exhausted" if remaining_time <= 0
+            else "total_gemini_primary_budget_exhausted"
+        )
+        return None
+    next_round = round_index + 1
+    next_id = verification_id(session["session_id"], next_round)
+    next_child = await db.get(ScrapeRuntimeJob, next_id)
+    if next_child is None:
+        parent = await db.get(ScrapeRuntimeJob, session["job_id"])
+        next_child = ScrapeRuntimeJob(
+            runtime_job_id=next_id, university_id=parent.university_id,
+            university_name=parent.university_name, url=parent.url, job_type="scrape",
+            status="queued", fast_mode=False,
+            request_payload=verification_payload(
+                session, parent, round_index=next_round, course_urls=remaining,
+                cost_cap_usd=min(TOTAL_VERIFY_COST_USD, remaining_cost),
+                time_budget_seconds=min(VERIFY_SECONDS, remaining_time),
+            ),
+        )
+        db.add(next_child)
+    ids.append(next_id)
+    state.update(
+        phase="verification_queued", verification_job_id=next_id,
+        verification_job_ids=ids, verification_round=next_round,
+        verification_status=next_child.status, verification_queued_at=now(),
+        verification_requeues=0,
+        continuation={
+            "status": "queued", "round": next_round + 1,
+            "max_runs": MAX_VERIFICATION_RUNS,
+            "remaining_courses": len(remaining),
+            "completed_courses": len(selected) - len(remaining),
+            "total_time_budget_seconds": TOTAL_VERIFY_SECONDS,
+            "total_cost_cap_usd": TOTAL_VERIFY_COST_USD,
+        },
+        reason=(
+            f"Verification timed out after {len(selected) - len(remaining)} of "
+            f"{len(selected)} selected courses; automatically continuing the exact remaining sample."
+        ),
+    )
+    session.update(status="running", completed_at=None)
+    await save(session, db)
+    return await dispatch_verification(session, db)
 
 
 async def run(job_id: str, university_id: int, session_id: str, claim_id: str, db) -> dict:
@@ -624,11 +902,29 @@ async def reconcile(job_id: str, session_id: str, db) -> dict:
                 "Verification requires a human decision; no approval or publication was performed.",
             )
         if child.status not in CHILD_ACTIVE:
-            after = await agent._quality_snapshot(child_id, int(session["university_id"]), db)
-            comparison = compare_quality(session.get("quality_before") or {}, after, child)
+            metadata = verification_metadata(child)
+            continuation = await _queue_verification_continuation(
+                session, child, metadata, db,
+            )
+            if continuation is not None:
+                return continuation
+            child_ids = list(state.get("verification_job_ids") or [child_id])
+            after = await _combined_quality(
+                child_ids, int(session["university_id"]), db,
+            )
+            verification_children = [
+                await db.get(ScrapeRuntimeJob, verification_child_id)
+                for verification_child_id in child_ids
+            ]
+            combined_safety = _combined_child_safety(verification_children)
+            comparison = compare_quality(
+                session.get("quality_before") or {},
+                after,
+                child,
+                combined_safety=combined_safety,
+            )
             comparison["baseline_counters"] = state.get("baseline_counters") or {}
             state["comparison"] = comparison
-            metadata = verification_metadata(child)
             cap = int(
                 metadata.get("effective_max_courses") or metadata.get("max_courses")
                 or state.get("verification_limits", {}).get("max_courses") or 50
@@ -652,6 +948,20 @@ async def reconcile(job_id: str, session_id: str, db) -> dict:
                 or ("warning" if metadata.get("warning") else None)
             )
             comparison["verification_limits"] = metadata
+            comparison["verification_runs"] = len(child_ids)
+            comparison["verification_job_ids"] = child_ids
+            comparison["cumulative_staged_courses"] = after.get("total_staged", 0)
+            comparison["cumulative_counters"] = {
+                key: sum(int(getattr(item, key, 0) or 0) for item in verification_children if item)
+                for key in ("total_found", "current", "imported", "skipped", "errors")
+            }
+            comparison["cumulative_counters"]["gemini_cost_usd"] = round(sum(
+                float(getattr(item, "total_gemini_cost_usd", 0) or 0)
+                for item in verification_children if item
+            ), 6)
+            comparison["cumulative_elapsed_seconds"] = combined_safety[
+                "cumulative_elapsed_seconds"
+            ]
             verified = (
                 comparison["sample_verified"] and not state.get("catalogue_problem") and not capped
                 and metadata.get("coverage_measured") is True

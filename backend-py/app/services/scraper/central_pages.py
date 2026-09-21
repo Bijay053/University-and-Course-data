@@ -866,9 +866,9 @@ async def _parse_english_page_html_async(html: str, page_url: str) -> dict[str, 
         return {}
 
 
-def _parse_column_keyed_english_table(
+def _parse_column_keyed_english_table_detailed(
     html: str,
-) -> tuple[dict[str, Any], dict[str, Any]]:
+) -> tuple[dict[str, Any], dict[str, Any], set[str]]:
     """Parse English requirements tables where *columns* are qualification levels.
 
     Handles institutions (e.g. KBS) that publish a single table with one column
@@ -891,14 +891,15 @@ def _parse_column_keyed_english_table(
         html: Raw HTML of the English requirements page.
 
     Returns:
-        ``(flat_vals, by_level)`` — both empty dicts when no column-keyed table
-        is detected.
+        ``(flat_vals, by_level, routed_slots)``. ``routed_slots`` remains
+        populated when conflicting columns make both value dicts empty, so the
+        caller can discard the generic parser's arbitrary first value.
     """
     try:
         from bs4 import BeautifulSoup
         import re as _re
     except ImportError:
-        return {}, {}
+        return {}, {}, set()
 
     # Column header tokens → (by_level level keys to populate, priority)
     # Higher priority = higher qualification level.
@@ -960,10 +961,11 @@ def _parse_column_keyed_english_table(
     try:
         soup = BeautifulSoup(html, "html.parser")
     except Exception:
-        return {}, {}
+        return {}, {}, set()
 
     flat_vals: dict[str, Any] = {}
     by_level: dict[str, Any] = {}
+    routed_slots: set[str] = set()
 
     for table in soup.find_all("table"):
         rows = table.find_all("tr")
@@ -988,8 +990,14 @@ def _parse_column_keyed_english_table(
         if not col_meta:
             continue
 
-        # Highest-priority column → its values become flat_vals
+        # Collect candidates before deciding whether a level has one
+        # unambiguous value.  Some official tables contain two postgraduate
+        # columns (for example Business/Law and all other postgraduate
+        # courses).  Last-column-wins silently turns one of those values into a
+        # universal PG default.
+        level_candidates: dict[str, dict[str, set[float]]] = {}
         highest_col_idx = max(col_meta, key=lambda ci: col_meta[ci][1])
+        preferred_flat: dict[str, float] = {}
 
         # Parse each data row
         for row in rows[1:]:
@@ -1051,18 +1059,53 @@ def _parse_column_keyed_english_table(
                     val = float(m.group(1))
                 except ValueError:
                     continue
+                routed_slots.add(slot_key)
 
-                # Populate by_level for each level this column represents
+                # Populate candidate sets for each level this column represents.
                 for lk in level_keys:
-                    by_level.setdefault(lk, {})[slot_key] = val
-
-                # flat_vals: value from the highest-priority column
+                    level_candidates.setdefault(lk, {}).setdefault(
+                        slot_key, set()
+                    ).add(val)
                 if col_idx == highest_col_idx:
-                    flat_vals[slot_key] = val
+                    preferred_flat[slot_key] = val
 
-        if flat_vals or by_level:
+        for level_key, slots in level_candidates.items():
+            for slot_key, values in slots.items():
+                if len(values) == 1:
+                    by_level.setdefault(level_key, {})[slot_key] = next(iter(values))
+
+        # Preserve the historical highest-level flat value when every level has
+        # one unambiguous value (for example UniSC's distinct UG/PG/Research
+        # columns).  Suppress it only when multiple columns disagree *within*
+        # the same routing bucket, because no flat value can safely represent
+        # that bucket.
+        ambiguous_slots = {
+            slot_key
+            for slots in level_candidates.values()
+            for slot_key, values in slots.items()
+            if len(values) > 1
+        }
+        flat_vals.update(
+            {
+                slot_key: value
+                for slot_key, value in preferred_flat.items()
+                if slot_key not in ambiguous_slots
+            }
+        )
+
+        if flat_vals or by_level or level_candidates:
             break  # First matching table is sufficient
 
+    return flat_vals, by_level, routed_slots
+
+
+def _parse_column_keyed_english_table(
+    html: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Backward-compatible public wrapper for column-keyed English tables."""
+    flat_vals, by_level, _routed_slots = (
+        _parse_column_keyed_english_table_detailed(html)
+    )
     return flat_vals, by_level
 
 
@@ -1211,6 +1254,113 @@ def _parse_program_keyed_english_tables(html: str) -> list[dict[str, Any]]:
                             if alias.strip()
                         ],
                         "values": values,
+                    }
+                )
+
+    # Generic "Exceptions" column + named exceptional-courses list.  Middlesex
+    # and similar institutions publish a safe level default only for courses
+    # *apart from exceptional programmes*, then list those programmes beneath
+    # the table.  Preserve the exception score as named profiles instead of
+    # flattening it across the whole level.
+    exception_values: dict[str, float] = {}
+    exception_section_id = ""
+    for table in soup.find_all("table"):
+        rows = table.find_all("tr")
+        if len(rows) < 2:
+            continue
+        headers = rows[0].find_all(["th", "td"])
+        exception_col = next(
+            (
+                idx
+                for idx, cell in enumerate(headers)
+                if _re.fullmatch(
+                    r"exceptions?",
+                    " ".join(cell.get_text(" ", strip=True).lower().split()),
+                )
+            ),
+            None,
+        )
+        if exception_col is None:
+            continue
+        exception_header = headers[exception_col]
+        exception_link = exception_header.find("a", href=True)
+        if exception_link is None:
+            table_section = table.find_parent(
+                lambda tag: bool(
+                    getattr(tag, "attrs", {}).get("class")
+                    and "general-text" in tag.attrs.get("class", [])
+                )
+            )
+            if table_section is not None:
+                exception_link = next(
+                    (
+                        link
+                        for link in table_section.find_all("a", href=True)
+                        if link.find_next("table") is table
+                        and "exceptional course"
+                        in " ".join(
+                            link.get_text(" ", strip=True).lower().split()
+                        )
+                    ),
+                    None,
+                )
+        exception_href = (
+            str(exception_link.get("href") or "") if exception_link else ""
+        )
+        if "#" not in exception_href:
+            continue
+        exception_section_id = exception_href.rsplit("#", 1)[-1].strip()
+        if not exception_section_id or soup.find(id=exception_section_id) is None:
+            continue
+        for row in rows[1:]:
+            cells = row.find_all(["th", "td"])
+            if exception_col >= len(cells) or not cells:
+                continue
+            label = cells[0].get_text(" ", strip=True).lower()
+            if not _re.search(r"\bielts\b", label):
+                continue
+            value = _score(
+                cells[exception_col].get_text(" ", strip=True), 4.0, 9.0
+            )
+            if value is not None:
+                exception_values["ielts_overall"] = value
+                break
+        if exception_values:
+            break
+
+    if exception_values and exception_section_id:
+        exception_anchor = soup.find(id=exception_section_id)
+        exceptional_heading = (
+            exception_anchor.find_next(["h2", "h3", "h4", "h5", "h6"])
+            if exception_anchor is not None
+            else None
+        )
+        if (
+            exceptional_heading is not None
+            and " ".join(
+                exceptional_heading.get_text(" ", strip=True).lower().split()
+            )
+            != "exceptional courses"
+        ):
+            exceptional_heading = None
+        exceptional_list = (
+            exceptional_heading.find_next_sibling(["ul", "ol"])
+            if exceptional_heading is not None
+            else None
+        )
+        if exceptional_list is not None:
+            exceptional_names = [
+                " ".join(item.get_text(" ", strip=True).split())
+                for item in exceptional_list.find_all("li", recursive=False)
+            ]
+            for program_name in exceptional_names:
+                if not program_name:
+                    continue
+                profiles.append(
+                    {
+                        "program_names": program_name,
+                        "program_aliases": [program_name],
+                        "values": dict(exception_values),
                     }
                 )
 
@@ -2307,9 +2457,23 @@ async def prefetch_central_pages(
                     # highest-qualification column and returns both:
                     # - flat_vals: the bachelor+PG scores (override flat extractor)
                     # - by_level: "postgraduate"/"undergraduate" → correct score
-                    _ck_flat, _ck_by_level = _parse_column_keyed_english_table(eng_html)
-                    if _ck_flat:
-                        # Override extractor's wrong-column values
+                    (
+                        _ck_flat,
+                        _ck_by_level,
+                        _ck_routed_slots,
+                    ) = _parse_column_keyed_english_table_detailed(eng_html)
+                    if _ck_routed_slots:
+                        # Replace only slots understood by the column parser.
+                        # An absent _ck_flat value is meaningful for such a
+                        # slot: conflicting category columns made a universal
+                        # value unsafe.  Preserve unrelated tests that the
+                        # generic extractor found but this table parser does
+                        # not model.
+                        english_vals = {
+                            key: value
+                            for key, value in english_vals.items()
+                            if key not in _ck_routed_slots
+                        }
                         english_vals.update(_ck_flat)
                         result["english"] = english_vals
                         log.info(

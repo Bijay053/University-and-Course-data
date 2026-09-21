@@ -15,6 +15,7 @@ from sqlalchemy import func, select
 
 from app.models import ScrapedCourse
 from app.models.scrape_runtime import ScrapeRuntimeJob
+from app.services.scraper.url_identity import canonical_course_url_key
 
 _background_tasks: ContextVar[set | None] = ContextVar(
     "autonomous_verification_background_tasks", default=None,
@@ -42,6 +43,7 @@ class VerificationLimits:
     max_courses: int = 50
     time_budget_seconds: float = 600.0
     cost_cap_usd: float = 2.0
+    round_index: int = 0
 
     def metadata(self) -> dict:
         return {
@@ -50,6 +52,7 @@ class VerificationLimits:
             "fresh_extraction": True,
             "full_catalogue_verified": False,
             "scope": "bounded_sample",
+            "round_index": self.round_index,
             # Unknown is not evidence of either coverage or truncation.
             "capped": None,
             "coverage_measured": False,
@@ -102,11 +105,15 @@ async def validate_verification(db, job) -> VerificationLimits | None:
         or state.get("phase") not in {"verification_queued", "verifying"}
     ):
         raise ValueError("Untrusted or stale autonomous verification parent/session binding")
+    round_index = raw.get("round_index", 0)
+    if isinstance(round_index, bool) or round_index not in {0, 1}:
+        raise ValueError("autonomousVerification.round_index must be 0 or 1")
     return VerificationLimits(
         parent_job_id=parent_id, session_id=session_id,
         max_courses=_bounded_number(raw, "max_courses", 50, integer=True),
         time_budget_seconds=_bounded_number(raw, "time_budget_seconds", 600),
         cost_cap_usd=_bounded_number(raw, "cost_cap_usd", 2),
+        round_index=round_index,
     )
 
 
@@ -129,9 +136,13 @@ def persist_verification_metadata(job, limits: VerificationLimits, **updates) ->
     payload = dict(job.request_payload or {})
     payload["autonomousVerification"] = dict(metadata)
     payload.update(forceDiscovery=True, fastMode=False, fast_mode=False)
-    # Internal verification is never a continuation or a targeted retry.
-    for key in ("resumeCourseIds", "resumeSourceJobIds", "courseUrls", "course_urls"):
+    # Resume checkpoints are never trusted. A continuation may carry only the
+    # exact bounded URLs selected by its acknowledged predecessor.
+    for key in ("resumeCourseIds", "resumeSourceJobIds"):
         payload.pop(key, None)
+    if limits.round_index == 0:
+        payload.pop("courseUrls", None)
+        payload.pop("course_urls", None)
     job.request_payload = payload
     job.fast_mode = False
     return metadata
@@ -140,12 +151,26 @@ def persist_verification_metadata(job, limits: VerificationLimits, **updates) ->
 def cap_verification_links(job, limits, links, max_courses):
     """Final boundary after provider/config overrides and route expansion."""
     cap = min(max_courses, limits.max_courses)
-    selected = links[:cap]
-    prior = (job.discovered_config or {}).get("autonomousVerification") or {}
-    discovered = max(len(links), int(prior.get("discovered_candidates", 0)))
+    unique_links: list[dict] = []
+    seen: set[str] = set()
+    for link in links:
+        url = link.get("url") if isinstance(link, dict) else None
+        key = canonical_course_url_key(url)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        unique_links.append(link)
+    selected = unique_links[:cap]
+    discovered = len(unique_links)
     persist_verification_metadata(
         job, limits, discovered_candidates=discovered,
+        raw_discovered_candidates=len(links),
+        duplicate_candidates_removed=len(links) - discovered,
         selected_courses=len(selected), effective_max_courses=cap,
+        selected_urls=[
+            link.get("url") for link in selected
+            if isinstance(link, dict) and isinstance(link.get("url"), str)
+        ],
         capped=discovered > len(selected), coverage_measured=True,
         # Discovery may itself stop at the bound: equality does not establish
         # complete catalogue coverage even when no final truncation was needed.

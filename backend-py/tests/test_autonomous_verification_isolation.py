@@ -64,11 +64,27 @@ async def test_limits_are_bounded_and_fresh_flags_cannot_be_overridden():
     assert child.discovered_config["autonomousVerification"]["full_catalogue_verified"] is False
 
 
+async def test_fenced_continuation_keeps_only_explicit_urls_and_never_resume_ids():
+    db, child, parent = family(round_index=1, cost_cap_usd=0.75)
+    child.request_payload.update(
+        courseUrls=["https://example.edu/course/2"],
+        resumeCourseIds=[1], resumeSourceJobIds=["old"],
+    )
+    limits = await validate_verification(db, child)
+    assert limits.round_index == 1
+    assert limits.cost_cap_usd == 0.75
+    persist_verification_metadata(child, limits)
+    assert child.request_payload["courseUrls"] == ["https://example.edu/course/2"]
+    assert "resumeCourseIds" not in child.request_payload
+    assert "resumeSourceJobIds" not in child.request_payload
+
+
 @pytest.mark.parametrize("key,value", [
     ("max_courses", 0), ("max_courses", -1), ("max_courses", 1.5),
     ("max_courses", True), ("max_courses", "50"),
     ("time_budget_seconds", float("nan")), ("time_budget_seconds", float("inf")),
     ("time_budget_seconds", 0), ("cost_cap_usd", -2), ("cost_cap_usd", None),
+    ("round_index", 2), ("round_index", -1), ("round_index", True),
 ])
 async def test_invalid_limits_fail_closed(key, value):
     db, child, _ = family(**{key: value})
@@ -131,6 +147,27 @@ def test_final_cap_survives_yaml_overrides_and_records_scope(count, cap, expecte
     assert child.request_payload["autonomousVerification"] == metadata
     assert metadata["total_cost_cap_enforced"] is False
     assert metadata["cost_scope"] == "observed_course_gemini_primary_only"
+    assert metadata["selected_urls"] == [
+        f"https://example.edu/course/{i}" for i in range(expected)
+    ]
+
+
+def test_final_cap_canonical_deduplicates_before_selected_cardinality():
+    _, child, _ = family()
+    limits = VerificationLimits("parent", "session")
+    links = [
+        {"url": "https://www.example.edu/course/a/?utm_source=x"},
+        {"url": "https://example.edu/course/a"},
+        {"url": "https://example.edu/course/b"},
+    ]
+    result = cap_verification_links(child, limits, links, 50)
+    assert result == [links[0], links[2]]
+    metadata = child.discovered_config["autonomousVerification"]
+    assert metadata["selected_courses"] == 2
+    assert metadata["discovered_candidates"] == 2
+    assert metadata["raw_discovered_candidates"] == 3
+    assert metadata["duplicate_candidates_removed"] == 1
+    assert metadata["capped"] is False
 
 
 async def test_timeout_cancels_work_and_snapshots_before_returning_degraded():

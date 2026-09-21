@@ -252,6 +252,8 @@ def child(status="completed", **overrides):
         "request_payload": {}, "gate_skip_counts": {},
         "claimed_at": None, "worker_id": None, "heartbeat_at": None,
         "started_at": datetime.now(timezone.utc),
+        "completed_at": datetime.now(timezone.utc),
+        "total_gemini_cost_usd": 0,
     }
     return SimpleNamespace(**{**values, **overrides})
 
@@ -344,6 +346,227 @@ async def test_time_budget_exhaustion_is_not_reported_as_course_cap(memory, monk
     assert comparison["stop_reason"] == "time_budget_exhausted"
     assert comparison["counters"]["current"] == 31
     assert result["autonomous"]["phase"] == "needs_review"
+
+
+@pytest.mark.asyncio
+async def test_timeout_continues_exact_unstaged_urls_once_and_preserves_first_child(memory, monkeypatch):
+    urls = [f"https://university.test/course/{i}" for i in range(4)]
+    memory.evidence = session(
+        worker_claim="delivery", phase="verifying", verification_job_id="child",
+        verification_job_ids=["child"], verification_round=0,
+    )
+    memory.evidence.update(status="running", quality_before=quality())
+    memory.jobs["child"] = child(
+        "failed_degraded", imported=2, total_found=4,
+        discovered_config={"autonomousVerification": {
+            "coverage_measured": True, "capped": False,
+            "selected_urls": urls, "selected_courses": 4,
+            "budget_exhausted": "time_budget_exhausted",
+        }},
+        total_gemini_cost_usd=0.4,
+    )
+    monkeypatch.setattr(
+        workflow, "_staged_url_keys", AsyncMock(return_value={
+            workflow._url_key(urls[0]), workflow._url_key(urls[2]),
+        }),
+    )
+    dispatch = AsyncMock(side_effect=lambda current, db: current)
+    monkeypatch.setattr(workflow, "dispatch_verification", dispatch)
+
+    first, second = await asyncio.gather(
+        workflow.reconcile("parent", "session-1", DB(memory)),
+        workflow.reconcile("parent", "session-1", DB(memory)),
+    )
+
+    continuation_id = workflow.verification_id("session-1", 1)
+    assert len(memory.added) == 1
+    continuation = memory.jobs[continuation_id]
+    assert continuation.request_payload["courseUrls"] == [urls[1], urls[3]]
+    assert continuation.request_payload["autonomousVerification"]["round_index"] == 1
+    assert continuation.request_payload["autonomousVerification"]["cost_cap_usd"] == 1.6
+    assert memory.evidence["autonomous"]["verification_job_ids"] == ["child", continuation_id]
+    assert memory.evidence["autonomous"]["continuation"]["remaining_courses"] == 2
+    assert memory.jobs["child"].status == "failed_degraded"
+    assert dispatch.await_count == 1
+    assert {first["autonomous"]["verification_job_id"], second["autonomous"]["verification_job_id"]} == {
+        continuation_id,
+    }
+
+
+@pytest.mark.asyncio
+async def test_second_timeout_is_terminal_review_and_never_creates_third_child(memory, monkeypatch):
+    first_id = workflow.verification_id("session-1")
+    second_id = workflow.verification_id("session-1", 1)
+    memory.evidence = session(
+        worker_claim="delivery", phase="verifying", verification_job_id=second_id,
+        verification_job_ids=[first_id, second_id], verification_round=1,
+    )
+    memory.evidence.update(status="running", quality_before=quality())
+    memory.jobs[first_id] = child("failed_degraded")
+    memory.jobs[second_id] = child(
+        "failed_degraded",
+        discovered_config={"autonomousVerification": {
+            "coverage_measured": True, "capped": False,
+            "selected_urls": ["https://university.test/course/4"],
+            "budget_exhausted": "time_budget_exhausted",
+        }},
+    )
+    monkeypatch.setattr(workflow.agent, "_quality_snapshot", AsyncMock(return_value=quality()))
+    result = await workflow.reconcile("parent", "session-1", DB(memory))
+    assert result["autonomous"]["phase"] == "needs_review"
+    assert result["autonomous"]["comparison"]["verification_runs"] == 2
+    assert len(memory.added) == 0
+
+
+@pytest.mark.asyncio
+async def test_total_cost_cap_prevents_continuation(memory, monkeypatch):
+    urls = ["https://university.test/course/1", "https://university.test/course/2"]
+    memory.evidence = session(
+        worker_claim="delivery", phase="verifying", verification_job_id="child",
+        verification_job_ids=["child"], verification_round=0,
+    )
+    memory.evidence.update(status="running", quality_before=quality())
+    memory.jobs["child"] = child(
+        "failed_degraded", total_gemini_cost_usd=2.1,
+        discovered_config={"autonomousVerification": {
+            "coverage_measured": True, "capped": False, "selected_urls": urls,
+            "budget_exhausted": "time_budget_exhausted",
+        }},
+    )
+    monkeypatch.setattr(workflow, "_staged_url_keys", AsyncMock(return_value=set()))
+    monkeypatch.setattr(workflow.agent, "_quality_snapshot", AsyncMock(return_value=quality()))
+    result = await workflow.reconcile("parent", "session-1", DB(memory))
+    assert result["autonomous"]["phase"] == "needs_review"
+    assert result["autonomous"]["continuation_blocked_reason"] == (
+        "total_gemini_primary_budget_exhausted"
+    )
+    assert len(memory.added) == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "first_overrides,expected_reason",
+    [
+        ({"errors": 1}, "errors"),
+        ({"skipped": 1}, "skipped"),
+        ({"cost_ceiling_hit": True}, "cost_ceiling_hit"),
+        ({"gate_skip_counts": {"catalogue_guard": {"kind": "collapse"}}}, "catalogue_guard"),
+        ({"discovered_config": {
+            "autonomousVerification": {"budget_exhausted": "time_budget_exhausted"},
+            "pipeline_stats": {"contamination_count": 1},
+        }}, "contamination"),
+        ({"discovered_config": {"autonomousVerification": {
+            "budget_exhausted": "time_budget_exhausted", "warning": "partial source",
+        }}}, "warning"),
+        ({"discovered_config": {"autonomousVerification": {
+            "budget_exhausted": "time_budget_exhausted", "capped": True,
+        }}}, "capped"),
+    ],
+)
+async def test_clean_second_child_cannot_hide_unsafe_first_child(
+    memory, monkeypatch, first_overrides, expected_reason,
+):
+    first_id = workflow.verification_id("session-1")
+    second_id = workflow.verification_id("session-1", 1)
+    memory.evidence = session(
+        worker_claim="delivery", phase="verifying", verification_job_id=second_id,
+        verification_job_ids=[first_id, second_id], verification_round=1,
+    )
+    memory.evidence.update(status="running", quality_before=quality())
+    first_values = {
+        "discovered_config": {"autonomousVerification": {
+            "budget_exhausted": "time_budget_exhausted",
+        }},
+        **first_overrides,
+    }
+    memory.jobs[first_id] = child("failed_degraded", **first_values)
+    memory.jobs[second_id] = child(
+        "completed",
+        discovered_config={"autonomousVerification": {
+            "coverage_measured": True, "capped": False, "limit_reached": False,
+        }},
+    )
+    monkeypatch.setattr(workflow.agent, "_quality_snapshot", AsyncMock(return_value=quality()))
+    result = await workflow.reconcile("parent", "session-1", DB(memory))
+    assert result["autonomous"]["phase"] == "needs_review"
+    safety = result["autonomous"]["comparison"]["combined_safety"]
+    assert safety["safe"] is False
+    assert any(
+        expected_reason in item.get("reasons", [])
+        for item in safety["unsafe_children"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_combined_quality_retains_first_child_critical_details(memory, monkeypatch):
+    first_id = workflow.verification_id("session-1")
+    second_id = workflow.verification_id("session-1", 1)
+    memory.evidence = session(
+        worker_claim="delivery", phase="verifying", verification_job_id=second_id,
+        verification_job_ids=[first_id, second_id], verification_round=1,
+    )
+    memory.evidence.update(status="running", quality_before=quality())
+    memory.jobs[first_id] = child(
+        "failed_degraded",
+        discovered_config={"autonomousVerification": {
+            "budget_exhausted": "time_budget_exhausted",
+        }},
+    )
+    memory.jobs[second_id] = child(
+        "completed",
+        discovered_config={"autonomousVerification": {
+            "coverage_measured": True, "capped": False, "limit_reached": False,
+        }},
+    )
+    critical = quality(
+        critical_quality_count=1,
+        critical_quality_rows=[{"url": "https://university.test/course/bad", "issue": "fee"}],
+    )
+    clean = quality(critical_quality_count=0, critical_quality_rows=[])
+    monkeypatch.setattr(
+        workflow.agent, "_quality_snapshot", AsyncMock(side_effect=[critical, clean]),
+    )
+    result = await workflow.reconcile("parent", "session-1", DB(memory))
+    comparison = result["autonomous"]["comparison"]
+    assert result["autonomous"]["phase"] == "needs_review"
+    assert comparison["verification"]["critical_quality_count"] == 1
+    assert comparison["verification"]["critical_quality_rows"] == [{
+        **critical["critical_quality_rows"][0], "verification_job_id": first_id,
+    }]
+    assert comparison["verification"]["critical_quality_issues"] == (
+        comparison["verification"]["critical_quality_rows"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_staged_url_identity_prefers_persisted_canonical_with_legacy_null_fallback():
+    class Rows:
+        def all(self):
+            return [
+                ("university.test/course/canonical", "https://university.test/course/redirected"),
+                (None, "https://www.university.test/course/legacy/?utm_source=test"),
+                (None, None),
+            ]
+
+    db = SimpleNamespace(execute=AsyncMock(return_value=Rows()))
+    keys = await workflow._staged_url_keys("child", 7, db)
+    assert keys == {
+        "university.test/course/canonical",
+        "university.test/course/legacy",
+    }
+
+
+def test_selected_urls_are_canonical_deduplicated_before_remaining_counts():
+    assert workflow._canonical_dedup_urls([
+        "https://www.university.test/course/a/?utm_source=x",
+        "https://university.test/course/a",
+        None,
+        "",
+        "https://university.test/course/b",
+    ]) == [
+        "https://www.university.test/course/a/?utm_source=x",
+        "https://university.test/course/b",
+    ]
 
 
 @pytest.mark.asyncio
@@ -536,11 +759,12 @@ def test_limits_and_internal_review_only_contract():
     parent.university_id, parent.university_name, parent.url = 7, "Test", "https://university.test"
     payload = workflow.verification_payload(evidence, parent)
     assert evidence["autonomous"]["limits"] == {
-        "max_attempts": 5, "max_live_pages": 12, "max_live_seconds": 180, "max_verification_runs": 1,
+        "max_attempts": 5, "max_live_pages": 12, "max_live_seconds": 180, "max_verification_runs": 2,
     }
     assert payload["autonomousVerification"] == {
         "parent_job_id": "child", "session_id": "session-1",
         "max_courses": 50, "time_budget_seconds": 600, "cost_cap_usd": 2.0,
+        "round_index": 0,
     }
     assert payload["forceDiscovery"] is True
     assert payload["fastMode"] is False

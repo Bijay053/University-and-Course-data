@@ -1611,7 +1611,10 @@ def _select_central_english_program(
 
     def _normalize(value: Any) -> str:
         normalized = _re.sub(r"[^a-z0-9]+", " ", str(value or "").lower())
-        return " ".join(normalized.split())
+        normalized = " ".join(normalized.split())
+        # "Honours" is a display suffix, not a different programme identity.
+        # This is the only relaxed equivalence used for named central profiles.
+        return _re.sub(r"\s+honours?$", "", normalized).strip()
 
     target = _normalize(course_name)
     course_code = (str(course_url or "").split("?", 1)[0].rstrip("/").rsplit("/", 1)[-1]).upper()

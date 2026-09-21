@@ -1097,7 +1097,17 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
             setSelectedAiRepairRunId(current =>
               current && runs.some(run => run.session_id === current) ? current : data.session_id
             );
-            if (data.status === "completed" || data.status === "failed") {
+            const autonomousPhase = data.autonomous?.phase;
+            const autonomousActive = data.autonomous?.enabled && (
+              autonomousPhase === "queued"
+              || autonomousPhase === "live_probe"
+              || autonomousPhase === "repairing"
+              || autonomousPhase === "validating"
+              || autonomousPhase === "verification_queued"
+              || autonomousPhase === "verifying"
+              || autonomousPhase === "recovering"
+            );
+            if (!autonomousActive && (data.status === "completed" || data.status === "failed")) {
               setAiRepairPolling(false);
             }
           }
@@ -1128,7 +1138,17 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
           );
           setAiRepairJobId(data.job_id || completedJobId);
           setShowAiRepairLog(true);
-          if (data.status === "queued" || data.status === "starting" || data.status === "running") {
+           const autonomousPhase = data.autonomous?.phase;
+           const autonomousActive = data.autonomous?.enabled && (
+             autonomousPhase === "queued"
+             || autonomousPhase === "live_probe"
+             || autonomousPhase === "repairing"
+             || autonomousPhase === "validating"
+             || autonomousPhase === "verification_queued"
+             || autonomousPhase === "verifying"
+             || autonomousPhase === "recovering"
+           );
+           if (autonomousActive || data.status === "queued" || data.status === "starting" || data.status === "running") {
             setAiRepairPolling(true);
           }
         }
