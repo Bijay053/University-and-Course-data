@@ -71,6 +71,8 @@ def _fetch(url: str) -> bytes:
         "--location",
         "--max-time",
         "30",
+        "--noproxy",
+        "*",
         "--header",
         "Cache-Control: no-cache",
         "--header",

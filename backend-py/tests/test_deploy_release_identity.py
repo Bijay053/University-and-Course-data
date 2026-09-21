@@ -509,6 +509,7 @@ def test_public_release_fetch_uses_browser_compatible_user_agent(
         "Mozilla/5.0 UniversityPortalReleaseVerifier/1.0",
         "https://portal.example/",
     ]
+    assert captured["command"][captured["command"].index("--noproxy") + 1] == "*"
     assert captured["kwargs"] == {
         "check": True,
         "capture_output": True,
