@@ -373,3 +373,18 @@ still absent.
 University Portal on the production checkout and verify the public HTML points
 to a newly generated asset containing a target-specific marker before reporting
 success.
+
+Atomic frontend directory swaps must make the staged static tree readable and
+traversable by Nginx, then gracefully reload Nginx after both publication and
+rollback restoration.
+
+**Why:** The build itself was valid, but Nginx retained file metadata for the
+old directory inode after it was moved beneath a private rollback directory.
+Every public check returned filesystem EACCES until rollback moved that inode
+back, which looked like a transient public-edge failure.
+
+**How to apply:** Before the atomic move, explicitly grant read/traverse access
+to the static tree. After the move, validate the Nginx configuration and reload
+it so workers resolve the new inode. If the release rolls back, reload again
+after restoring the prior directory; still require the exact public release
+marker before declaring success.
