@@ -26,3 +26,9 @@ SIT’s Subjects, Fees & Scholarships international programme table is the catal
 **Why:** Course pages advertise domestic Zero Fees and direct material costs, may retain conflicting local programme facts, and include many programmes not offered internationally. The table’s total combines tuition and resource costs, while fuzzy matching can map certificates to diplomas or unrelated awards.
 
 **How to apply:** Filter unlisted links before detail fetch, then re-check the exact match before staging. Reapply the matched row after AI/browser/default enrichment so short-course duration, rolling intake, and English profiles cannot be replaced. Preserve rolling intake as authoritative even when it has no calendar months. SIT's runtime config identity is `sit`, not its long institution-name slug; verify the production loader call when naming ID-specific YAML. A required YAML schedule replaces stale legacy and request-level fee-page values. Central prefetch must fall back to the orchestrator's already-loaded config when task-local context is empty. A schedule fetch failure remains retryable.
+
+The international schedule is not one-to-one with public course pages: one schedule row can map to several named majors or strands, while some current schedule rows have no usable public detail page. Count coverage by matched schedule-row identity, not staged URL count.
+
+**Why:** A fresh scrape of a 50-row schedule produced 55 eligible detail URLs and 52 staged rows but represented only 46 schedule rows. Three schedule-listed aliases were correctly rejected as online-only, and four rows had no staged public-page representative, including the rolling-Monday English programme.
+
+**How to apply:** Report both staged URL count and distinct matched schedule rows. Do not deduplicate different public awards merely to force the URL count to equal the schedule count, and do not synthesize a staged course from a schedule-only row without an explicit reviewed policy.
