@@ -79,6 +79,21 @@ def test_hidden_non_degree_and_footer_cannot_reject_degree():
     assert live.inspect_page(ONE, html, config())["classification"] == "course"
 
 
+def test_degree_title_with_owned_facts_survives_sibling_course_links():
+    html = f"""<html><main>
+    <h1>BSc (Hons) Accounting &amp; Finance</h1>
+    <a href="{ONE}-with-foundation-year">Foundation Year option</a>
+    <a href="{ONE}">In Clearing</a>
+    <div class="detail">Study Mode Full-time</div>
+    <div class="detail">Duration 3 years</div>
+    </main></html>"""
+
+    result = live.inspect_page(ONE, html, config())
+
+    assert result["classification"] == "course"
+    assert len(result["fields"]) == 2
+
+
 @pytest.mark.parametrize("extra", [
     "<p>Domestic students only</p>",
     "<p>Study mode: Online only</p>",
@@ -122,6 +137,36 @@ async def test_configured_proxy_uses_existing_provider_bounded_no_retries(monkey
     assert provider.await_args.kwargs["max_retries"] == 0
     assert provider.await_args.kwargs["request_timeout_seconds"] == 20
     assert provider.await_args.kwargs["render"] is False
+
+
+@pytest.mark.asyncio
+async def test_large_provider_html_keeps_bounded_course_evidence(monkeypatch):
+    from app.services import scraper_config_ai
+    from app.services.scraper import http_fetcher
+
+    cfg = config()
+    cfg.extraction.scrape_do_static = True
+    monkeypatch.setattr(scraper_config_ai, "_is_safe_public_url", lambda _url: (True, ""))
+    large = course() + ("x" * live._MAX_PROBE_HTML_BYTES)
+    monkeypatch.setattr(
+        http_fetcher, "fetch_html_scrape_do", AsyncMock(return_value=large)
+    )
+
+    html, failure, reason = await live._fetch_official(ONE, cfg, 20)
+
+    assert not failure and not reason
+    assert len(html.encode("utf-8")) <= live._MAX_PROBE_HTML_BYTES
+    assert live.inspect_page(ONE, html, cfg)["classification"] == "course"
+
+
+def test_bounded_html_does_not_split_multibyte_text():
+    html = course(extra="<p>" + ("é" * live._MAX_PROBE_HTML_BYTES) + "</p>")
+
+    bounded = live._bounded_html(html)
+
+    assert len(bounded.encode("utf-8")) <= live._MAX_PROBE_HTML_BYTES
+    assert "\ufffd" not in bounded
+    assert live.inspect_page(ONE, bounded, config())["classification"] == "course"
 
 
 @pytest.mark.asyncio

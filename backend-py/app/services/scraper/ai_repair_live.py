@@ -24,11 +24,22 @@ from app.services.scraper.guards import (
 from app.services.scraper.page_type import classify_page
 
 
+_MAX_PROBE_HTML_BYTES = 1_000_000
+
+
 def bounded_limit(limits: dict, key: str, maximum: int) -> int:
     try:
         return max(1, min(maximum, int(limits.get(key, maximum))))
     except (ValueError, TypeError, OverflowError):
         return maximum
+
+
+def _bounded_html(html: str, maximum: int = _MAX_PROBE_HTML_BYTES) -> str:
+    """Keep live evidence bounded without rejecting valid chrome-heavy pages."""
+    encoded = html.encode("utf-8")
+    if len(encoded) <= maximum:
+        return html
+    return encoded[:maximum].decode("utf-8", errors="ignore")
 
 
 def official_url(url: str, seed: str, extra_hosts=()) -> bool:
@@ -73,9 +84,7 @@ async def _fetch_official(url: str, config, timeout: float) -> tuple[str, str, s
             geo_code=getattr(extraction, "scrape_do_geo", None) or None,
         )
         if html:
-            if len(html.encode("utf-8")) > 1_000_000:
-                return "", "unsupported_content", "HTML exceeds bounded probe size"
-            return html, "", ""
+            return _bounded_html(html), "", ""
         failure = get_last_fetch_failure() or {}
         kind = failure.get("kind")
         classification = ("challenge" if kind == "challenge_page" else
@@ -101,10 +110,13 @@ async def _fetch_official(url: str, config, timeout: float) -> tuple[str, str, s
                 return "", "unsupported_content", "Live HTML evidence required"
             chunks, size = [], 0
             async for chunk in response.aiter_bytes():
-                size += len(chunk)
-                if size > 1_000_000:
-                    return "", "unsupported_content", "HTML exceeds bounded probe size"
-                chunks.append(chunk)
+                remaining = _MAX_PROBE_HTML_BYTES - size
+                if remaining <= 0:
+                    break
+                chunks.append(chunk[:remaining])
+                size += min(len(chunk), remaining)
+                if len(chunk) > remaining:
+                    break
             return b"".join(chunks).decode(response.encoding or "utf-8", errors="replace"), "", ""
 
 
@@ -202,9 +214,9 @@ def inspect_page(url: str, html: str, config=None) -> dict:
         return {**result, "classification": "non_degree", "reason": reason}
     # A title alone (including a degree title on a partner/legal page) is never
     # enough. Conversely a short/nonstandard title is not negative evidence.
-    positive = len(facts) >= 2 and (owned_award or (
-        candidate == "likely_degree" and page["page_type"] == "detail"
-    ))
+    positive = len(facts) >= 2 and (
+        owned_award or candidate == "likely_degree"
+    )
     if is_generic_course_category_name(title) and not owned_award:
         return {**result, "classification": "listing", "reason": "Shared category gate; no course-owned award"}
     if not positive:
