@@ -1120,7 +1120,35 @@ def should_stage_course(
     except Exception:  # noqa: BLE001
         pass
     if not _skip_dq and effective_name and not _name_has_degree_qualifier(effective_name):
-        return (False, "category_landing_page_missing_degree_qualifier")
+        # Bounded CourseReport recovery for genuine foundation/pathway
+        # programmes.  The marker is produced by the report endpoint only
+        # after fetching the exact official URL and finding page-owned
+        # programme plus admissions/international evidence.  Category pages
+        # still fail the URL/generic-title guards above, and this marker can
+        # never be set by ordinary discovery.
+        proof = payload.get("_verified_report_programme")
+        proof_kind = str(proof.get("kind", "")).lower() if isinstance(proof, dict) else ""
+        proof_title = str(proof.get("title", "")) if isinstance(proof, dict) else ""
+        _report_path = (urlparse(source_url).path if source_url else "").lower()
+        _report_category_url = bool(
+            re.search(r"/(?:programme|course|study|pathway)/?$", _report_path)
+            or re.search(r"/(?:programmes|courses|pathways)(?:/|$)", _report_path)
+        )
+        if (
+            proof_kind in {"foundation", "pathway"}
+            and not _report_category_url
+            and not re.search(rf"\b{re.escape(proof_kind)}s?\s+(?:programmes?|courses?)\b", effective_name, re.I)
+            and re.search(rf"\b{re.escape(proof_kind)}\b", proof_title, re.I)
+            and isinstance(proof.get("evidence"), str)
+            and "official page title" in proof["evidence"].lower()
+        ):
+            log.info(
+                "[REJECT CHECK] course=%r accepted by bounded official "
+                "foundation/pathway report evidence (global guards retained)",
+                effective_name,
+            )
+        else:
+            return (False, "category_landing_page_missing_degree_qualifier")
 
     # Explicit domestic-only flag: set by extractors when the page text
     # states "this course is not available to international students" etc.

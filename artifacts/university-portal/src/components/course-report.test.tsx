@@ -9,7 +9,7 @@ const response = (body: unknown, ok = true) => ({ ok, text: async () => JSON.str
 describe("course report recovery", () => {
   it("submits official missing URLs and numeric expected count, then shows durable progress", async () => {
     const report = { job_id: "child", status: "queued", found: 0, staged: 0, skipped: 0, errors: 0,
-      exclusions: {}, request: { kind: "missing", expected_count: 10 } };
+      exclusions: {}, request: { kind: "missing", eligibility_review: true, expected_count: 10 } };
     const fetcher = vi.fn().mockResolvedValue(response({ reports: [], source_exclusions: {} }))
       .mockImplementationOnce(async () => response({ reports: [], source_exclusions: {} }));
     vi.stubGlobal("fetch", fetcher);
@@ -18,6 +18,7 @@ describe("course report recovery", () => {
     fireEvent.click(screen.getByTestId("button-report-courses"));
     fireEvent.change(screen.getByTestId("input-report-urls"), { target: { value: "https://uni.edu/course" } });
     fireEvent.change(screen.getByTestId("input-report-expected"), { target: { value: "10" } });
+    fireEvent.click(screen.getByTestId("checkbox-report-eligibility"));
     fetcher.mockResolvedValue(response({ reports: [report], source_exclusions: {} }))
       .mockResolvedValueOnce(response(report));
     fireEvent.click(screen.getByTestId("button-submit-report"));
@@ -25,7 +26,9 @@ describe("course report recovery", () => {
     const request = fetcher.mock.calls.find(call => call[1]?.method === "POST");
     expect(JSON.parse(request![1].body)).toMatchObject({
       kind: "missing", course_urls: ["https://uni.edu/course"], expected_count: 10,
+      eligibility_review: true,
     });
+    expect(screen.getByText(/Eligibility review requested/)).toBeTruthy();
     expect(screen.getByText(/Catalogue coverage: not verified/)).toBeTruthy();
   });
 

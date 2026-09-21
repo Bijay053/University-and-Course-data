@@ -10,17 +10,17 @@ type Report = {
   job_id: string; status: string; found: number; staged: number; skipped: number; errors: number;
   error?: string; processed?: number; exclusions: Record<string, unknown>;
   request: {
-    kind: string; expected_count?: number; description?: string; fields?: string[];
+    kind: string; eligibility_review?: boolean; expected_count?: number; description?: string; fields?: string[];
     course_urls?: string[]; source_url?: string; catalogue_url?: string;
   };
   verification?: { capped?: boolean };
   recovery?: { phase?: string; reason?: string; next_action?: string; exhausted?: boolean };
 };
 type Values = {
-  kind: "missing" | "incorrect"; urls: string; catalogue: string;
+  kind: "missing" | "incorrect"; eligibilityReview: boolean; urls: string; catalogue: string;
   expected: string; fields: string[]; description: string; source: string;
 };
-const defaults: Values = { kind: "missing", urls: "", catalogue: "", expected: "", fields: [], description: "", source: "" };
+const defaults: Values = { kind: "missing", eligibilityReview: false, urls: "", catalogue: "", expected: "", fields: [], description: "", source: "" };
 
 export function Exclusions({ counts }: { counts: Record<string, unknown> }) {
   const staging = counts.staging_rejections as { reasons?: Record<string, number> } | undefined;
@@ -79,6 +79,7 @@ export function CourseReport({ jobId, onReview, onStarted }: {
         method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           kind: values.kind, course_urls: urls, catalogue_url: values.catalogue.trim() || null,
+          eligibility_review: values.eligibilityReview,
           expected_count: values.expected ? Number(values.expected) : null,
           fields: values.fields, description: values.description.trim(), source_url: values.source.trim() || null,
         }),
@@ -116,6 +117,10 @@ export function CourseReport({ jobId, onReview, onStarted }: {
         <Textarea {...form.register("urls")} rows={3} data-testid="input-report-urls" />
       </label>
       {kind === "missing" && <>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" {...form.register("eligibilityReview")} data-testid="checkbox-report-eligibility" />
+          <span>Request eligibility review for a foundation or pathway programme</span>
+        </label>
         <label className="block text-sm">Or official catalogue link
           <Input type="url" {...form.register("catalogue")} data-testid="input-report-catalogue" />
         </label>
@@ -135,7 +140,7 @@ export function CourseReport({ jobId, onReview, onStarted }: {
       <label className="block text-sm">Official supporting source URL (optional)
         <Input type="url" {...form.register("source")} data-testid="input-report-source" />
       </label>
-      <p className="text-xs text-muted-foreground">Recovery re-extracts official evidence, not your asserted values. Fields and supporting sources remain attached to the request for review.</p>
+      <p className="text-xs text-muted-foreground">Recovery re-extracts official evidence, not your asserted values. Eligibility review only considers direct official programme pages; category pages and global international safeguards remain rejected.</p>
       <Button type="submit" disabled={form.formState.isSubmitting} data-testid="button-submit-report">
         {form.formState.isSubmitting ? "Starting recovery…" : "Start recovery"}
       </Button>
@@ -143,6 +148,7 @@ export function CourseReport({ jobId, onReview, onStarted }: {
     {loading && <p className="text-xs">Loading report history…</p>}
     {reports.map(report => <article key={report.job_id} className="space-y-2 rounded border bg-background p-3 text-sm" data-testid={`report-${report.job_id}`}>
       <p><strong>{report.request.kind === "missing" ? "Missing course recovery" : "Incorrect field recovery"}</strong> — {report.status}</p>
+      {report.request.eligibility_review && <p className="text-xs">Eligibility review requested; only page-owned foundation/pathway evidence can recover this page.</p>}
       {report.request.description && <p>{report.request.description}</p>}
       {report.request.fields?.length ? <p>Reported fields: {report.request.fields.join(", ")}</p> : null}
       <p>{report.found} found · {report.processed ?? 0} processed · {report.staged} staged · {report.skipped} skipped · {report.errors} errors</p>

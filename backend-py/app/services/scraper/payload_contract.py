@@ -82,6 +82,7 @@ TRANSIENT_PIPELINE_PAYLOAD_FIELDS: frozenset[str] = frozenset({
     "_confidence_level",
     "_confidence_score",
     "_rejection_reason",
+    "_verified_report_programme",
     "course_name",
     *GUARD_ONLY_PIPELINE_PAYLOAD_FIELDS,
     "domestic_only",

@@ -799,3 +799,49 @@ class TestAcuDiscoveryUrlFilters:
     def test_junk_seg_includes_engagement(self) -> None:
         from app.services.scraper.discovery import _JUNK_LAST_SEG_RE
         assert _JUNK_LAST_SEG_RE.match("engagement")
+
+
+def test_report_evidence_recovers_foundation_but_not_category_page():
+    from app.services.scraper.guards import should_stage_course
+
+    proof = {
+        "kind": "foundation",
+        "title": "Foundation in Liberal Arts - Raffles University",
+        "evidence": "official page title + programme and admissions/international copy",
+    }
+    accepted, reason = should_stage_course(
+        "Foundation in Liberal Arts",
+        {
+            "course_name": "Foundation in Liberal Arts",
+            "international_fee": 1000,
+            "study_mode": "On Campus",
+            "_verified_report_programme": proof,
+        },
+        "https://raffles-university.edu.my/programme/foundation-in-liberal-arts/",
+    )
+    assert accepted is True
+    assert reason == "accepted"
+
+    rejected, reason = should_stage_course(
+        "Foundation Programmes",
+        {
+            "course_name": "Foundation Programmes",
+            "international_fee": 1000,
+            "study_mode": "On Campus",
+            "_verified_report_programme": proof,
+        },
+        "https://raffles-university.edu.my/programme/",
+    )
+    assert rejected is False
+
+    for category_url, category_name in (
+        ("https://raffles-university.edu.my/programmes/foundation", "Foundation Programmes"),
+        ("https://raffles-university.edu.my/programme/", "Foundation Programmes"),
+    ):
+        rejected, _ = should_stage_course(
+            category_name,
+            {"course_name": category_name, "international_fee": 1000,
+             "study_mode": "On Campus", "_verified_report_programme": proof},
+            category_url,
+        )
+        assert rejected is False

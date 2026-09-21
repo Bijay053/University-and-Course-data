@@ -7004,6 +7004,19 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                     # stage_course (and remove the transient payload key) so
                     # normal orchestration cannot silently drop recipe proof.
                     _stage_evidence = merge_recipe_evidence(payload, r.get("evidence"))
+                    # A direct CourseReport can carry a narrowly validated
+                    # foundation/pathway exception.  It is copied only into
+                    # this verification child and only for the exact URL that
+                    # supplied the page-owned evidence; it never mutates YAML
+                    # or weakens the global non-degree/online guards.
+                    if _verification and (job.request_payload or {}).get("courseReport"):
+                        _verified_programmes = (
+                            (job.request_payload.get("autonomousVerification") or {})
+                            .get("verified_programmes") or {}
+                        )
+                        _proof = _verified_programmes.get(r.get("url") or "")
+                        if _proof:
+                            payload["_verified_report_programme"] = _proof
 
                     async with AsyncSessionLocal() as stage_db:
                         # If the URL already matched course_detail_url_patterns during

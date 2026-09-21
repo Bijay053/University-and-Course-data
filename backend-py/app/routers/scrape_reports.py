@@ -4,6 +4,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+import re
+import ipaddress
 from datetime import datetime, timezone
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
@@ -25,6 +27,7 @@ TERMINAL = {"completed", "completed_with_errors", "stopped", "failed", "failed_d
 
 class CourseReport(BaseModel):
     kind: Literal["missing", "incorrect"]
+    eligibility_review: bool = False
     course_urls: list[str] = Field(default_factory=list, max_length=50)
     catalogue_url: str | None = Field(default=None, max_length=2048)
     expected_count: int | None = Field(default=None, ge=1, le=100000)
@@ -46,7 +49,7 @@ class CourseReport(BaseModel):
         return self
 
 
-async def validate_official_urls(report: CourseReport, university) -> None:
+async def validate_official_urls(report: CourseReport, university) -> dict:
     import httpx
     from app.services.scraper.ai_repair_live import official_url
     from app.services.scraper_config_ai import _is_safe_public_url
@@ -72,6 +75,26 @@ async def validate_official_urls(report: CourseReport, university) -> None:
     # Do not allow a user-supplied official-host open redirect to introduce an
     # unchecked target. Require canonical URLs rather than following redirects.
     semaphore = asyncio.Semaphore(5)
+    # A direct page report may be the only way to reach a legitimate
+    # foundation/pathway page.  Keep the normal global guards in place, but
+    # collect a bounded, page-owned proof package for the child job.  This is
+    # deliberately not a config edit or a user assertion.
+    verified_programmes: dict[str, dict] = {}
+    def _programme_path_is_detail(url: str) -> bool:
+        parts = [p for p in urlsplit(url).path.lower().split("/") if p]
+        if not parts or parts[-1] in {"programme", "programmes", "course", "courses", "pathway", "pathways"}:
+            return False
+        if parts[-1] in {"foundation", "foundations", "pathway", "pathways"}:
+            return False
+        return any(p in {"programme", "programmes", "course", "courses", "pathway", "pathways"} for p in parts[:-1])
+
+    def _category_title(value: str) -> bool:
+        return bool(re.search(
+            r"\b(?:options?|studies|(?:courses?|programmes?)\s+"
+            r"(?:listing|directory|search|overview)|(?:foundation|pathway)s?\s+"
+            r"(?:programmes?|courses?|options?|studies))\b",
+            value, re.I,
+        ))
     async with httpx.AsyncClient(timeout=10, follow_redirects=False, trust_env=False) as client:
         async def check_redirect(url):
             async with semaphore:
@@ -79,6 +102,90 @@ async def validate_official_urls(report: CourseReport, university) -> None:
                     async with client.stream("GET", url) as response:
                         if response.is_redirect:
                             raise HTTPException(422, "An official URL redirects. Submit its final canonical official URL instead.")
+                        content_length = response.headers.get("content-length")
+                        if content_length and (
+                            not content_length.isdigit() or int(content_length) > 500_000
+                        ):
+                            raise HTTPException(422, "Official programme page is too large to verify (maximum 500KB).")
+                        if response.status_code >= 400:
+                            return
+                        # Validate the peer that actually handled this request,
+                        # not only a prior DNS lookup.  This closes the DNS
+                        # check/connect TOCTOU window for eligibility proof.
+                        stream = response.extensions.get("network_stream")
+                        peer = stream.get_extra_info("peername") if stream else None
+                        peer_host = peer[0] if isinstance(peer, tuple) else None
+                        try:
+                            peer_public = bool(peer_host and ipaddress.ip_address(peer_host).is_global)
+                        except ValueError:
+                            peer_public = False
+                        if not peer_public:
+                            raise HTTPException(422, "Official URL connected to a non-public network peer.")
+                        if report.eligibility_review and url in report.course_urls:
+                            if not _programme_path_is_detail(url):
+                                return
+                            chunks: list[bytes] = []
+                            size = 0
+                            async for chunk in response.aiter_bytes():
+                                if size + len(chunk) > 500_000:
+                                    await response.aclose()
+                                    return
+                                chunks.append(chunk)
+                                size += len(chunk)
+                            body = b"".join(chunks).decode("utf-8", "ignore")
+                            from bs4 import BeautifulSoup
+                            soup = BeautifulSoup(body, "html.parser")
+                            text = soup.get_text(" ", strip=True)
+                            title_match = re.search(r"<title[^>]*>(.*?)</title>", body, re.I | re.S)
+                            title = re.sub(r"\s+", " ", BeautifulSoup(
+                                title_match.group(1), "html.parser"
+                            ).get_text(" ", strip=True)) if title_match else ""
+                            lower = f"{title} {text}".lower()
+                            headings = [
+                                re.sub(r"\s+", " ", node.get_text(" ", strip=True))
+                                for node in soup.find_all(["h1", "h2", "h3"])
+                            ]
+                            # Foundation/pathway evidence must be independently
+                            # present in the page title and body, and include
+                            # programme-owned admissions/international language.
+                            kind = ("foundation" if re.search(r"\bfoundation\b", title, re.I)
+                                    else "pathway" if re.search(r"\bpathway\b", title, re.I)
+                                    else None)
+                            specific_label = lambda value: bool(
+                                re.search(rf"\b{re.escape(kind or '')}\b", value, re.I)
+                                and len(re.sub(rf"\b{re.escape(kind or '')}\b", "", value, flags=re.I).strip(" -–—:")) >= 4
+                                and not _category_title(value)
+                            )
+                            singular_heading = any(
+                                specific_label(heading)
+                                and re.search(rf"\b{re.escape(kind)}\b", heading, re.I)
+                                and not re.search(rf"\b{re.escape(kind)}s\b", heading, re.I)
+                                for heading in headings
+                            ) if kind else False
+                            admissions_section = any(
+                                re.search(r"\b(?:entry requirements?|admission requirements?|how to apply)\b", heading, re.I)
+                                and re.search(r"\b(?:require|qualification|apply|student)\b", (
+                                    " ".join(str(x) for x in node.parent.stripped_strings)[:5000]
+                                ), re.I)
+                                for node in soup.find_all(["h2", "h3", "h4"])
+                            )
+                            international_section = bool(
+                                re.search(r"\binternational students?\b", lower)
+                                or re.search(r"\b(?:international|overseas)\s+(?:applicants?|admission|fees?)\b", lower)
+                            )
+                            strong = (
+                                kind
+                                and specific_label(title)
+                                and singular_heading
+                                and admissions_section
+                                and international_section
+                                and not _category_title(title)
+                            )
+                            if strong:
+                                verified_programmes[url] = {
+                                    "kind": kind, "title": title[:300],
+                                    "evidence": "official page title + programme and admissions/international copy",
+                                }
                 except httpx.HTTPError:
                     raise HTTPException(422, "Could not verify the official URL. Try again when the source is reachable.")
         try:
@@ -87,9 +194,10 @@ async def validate_official_urls(report: CourseReport, university) -> None:
             )
         except TimeoutError:
             raise HTTPException(422, "Official source validation timed out. Submit fewer links or try again when the source is reachable.")
+    return {"verified_programmes": verified_programmes}
 
 
-def report_payload(parent, report: CourseReport, report_id: str, actor_id) -> dict:
+def report_payload(parent, report: CourseReport, report_id: str, actor_id, validation: dict | None = None) -> dict:
     """Internal-only policy: clients cannot loosen review, budget or filter rules."""
     return {
         "url": report.catalogue_url or parent.url,
@@ -111,6 +219,10 @@ def report_payload(parent, report: CourseReport, report_id: str, actor_id) -> di
             "max_courses": 50, "time_budget_seconds": 600, "cost_cap_usd": 2,
             # Round zero deliberately strips targeted links; round one preserves them.
             "round_index": 1 if report.course_urls else 0,
+            "verified_programmes": (
+                validation.get("verified_programmes", {})
+                if isinstance(validation, dict) else {}
+            ),
         },
     }
 
@@ -177,7 +289,7 @@ async def submit_course_report(
     university = await db.get(University, parent.university_id)
     if not university:
         raise HTTPException(404, "University not found")
-    await validate_official_urls(body, university)
+    validation = await validate_official_urls(body, university)
     active = await _lock_and_find_active_job(db, university.id)
     await db.refresh(parent)
     if parent.university_id != university.id or parent.status not in TERMINAL:
@@ -191,7 +303,7 @@ async def submit_course_report(
     if not acquire_repair_lease(university.id, report_id):
         await db.rollback()
         raise HTTPException(409, "An automatic recovery is already active for this university.")
-    payload = report_payload(parent, body, report_id, actor.get("id"))
+    payload = report_payload(parent, body, report_id, actor.get("id"), validation)
     child = ScrapeRuntimeJob(
         runtime_job_id=workflow.verification_id(report_id),
         university_id=university.id, university_name=university.name,
