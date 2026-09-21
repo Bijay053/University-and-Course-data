@@ -204,6 +204,126 @@ def test_release_refetch_blocks_remote_advance_between_verify_and_checkout(
     assert _git(checkout, "rev-parse", "HEAD") == newly_reviewed_target
 
 
+def test_late_revision_rejection_restores_all_prepared_release_files(
+    tmp_path: Path,
+) -> None:
+    remote = tmp_path / "remote.git"
+    _git(tmp_path, "init", "--bare", "-q", str(remote))
+    source = tmp_path / "source"
+    source.mkdir()
+    _git(source, "init", "-q")
+    _git(source, "config", "user.email", "release-test@example.invalid")
+    _git(source, "config", "user.name", "Release Test")
+    recipe_relative = Path("backend-py/scraper_config/unis/portable.yaml")
+    collision_relative = Path(
+        "backend-py/scraper_config/unis/generated_11.yaml"
+    )
+    recipe = source / recipe_relative
+    recipe.parent.mkdir(parents=True)
+    recipe.write_text("discovery:\n  bfs_page_budget: 3\n", encoding="utf-8")
+    (source / ".gitignore").write_text(
+        "backend-py/scraper_config/runtime_unis/\n", encoding="utf-8"
+    )
+    _git(source, "add", ".gitignore", str(recipe_relative))
+    _git(source, "commit", "-qm", "predecessor")
+    predecessor = _git(source, "rev-parse", "HEAD")
+    _git(source, "branch", "-M", "main")
+    _git(source, "remote", "add", "origin", str(remote))
+    _git(source, "push", "-qu", "origin", "main")
+
+    recipe.write_text("discovery:\n  bfs_page_budget: 5\n", encoding="utf-8")
+    collision = source / collision_relative
+    collision.write_text("discovery:\n  bfs_page_budget: 7\n", encoding="utf-8")
+    _git(source, "add", str(recipe_relative), str(collision_relative))
+    _git(source, "commit", "-qm", "reviewed target")
+    reviewed_target = _git(source, "rev-parse", "HEAD")
+    _git(source, "push", "-q", "origin", "main")
+
+    checkout = tmp_path / "checkout"
+    subprocess.run(
+        ["git", "clone", "-q", "--branch", "main", str(remote), str(checkout)],
+        check=True,
+    )
+    _git(checkout, "checkout", "-q", predecessor)
+    checkout_recipe = checkout / recipe_relative
+    operator_recipe = b"discovery:\n  bfs_page_budget: 9\n"
+    checkout_recipe.write_bytes(operator_recipe)
+    generated_body = (
+        "# Hostname: generated.edu\n"
+        "# Auto-generated: 2026-09-21\n"
+        "# This stub was created automatically on the first scrape of this university.\n"
+        "discovery:\n  bfs_page_budget: 4\n"
+    )
+    digest = __import__("hashlib").sha256(
+        generated_body.encode("utf-8")
+    ).hexdigest()
+    checkout_collision = checkout / collision_relative
+    checkout_collision.write_text(
+        f"# Generated-stub-sha256: {digest}\n{generated_body}",
+        encoding="utf-8",
+    )
+    original_generated = checkout_collision.read_bytes()
+
+    verified = _release_revision_fence(
+        "verify", checkout, predecessor, reviewed_target
+    )
+    assert verified.returncode == 0, verified.stderr
+    tracked_manifest = tmp_path / "tracked-manifest.json"
+    generated_manifest = tmp_path / "generated-manifest.json"
+    prepare_tracked_recipe_edits(checkout, reviewed_target, tracked_manifest)
+    reconcile_generated_config_collisions(
+        checkout, reviewed_target, generated_manifest
+    )
+    tracked_manifest_data = json.loads(
+        tracked_manifest.read_text(encoding="utf-8")
+    )
+    tracked_backups = [
+        checkout / entry["backup"]
+        for entry in tracked_manifest_data["entries"]
+    ]
+    generated_manifest_data = json.loads(
+        generated_manifest.read_text(encoding="utf-8")
+    )
+    generated_backups = [
+        checkout / move["destination"]
+        for move in generated_manifest_data["moves"]
+    ]
+    assert checkout_recipe.read_text(encoding="utf-8") == (
+        "discovery:\n  bfs_page_budget: 3\n"
+    )
+    assert not checkout_collision.exists()
+    assert all(path.exists() for path in tracked_backups + generated_backups)
+
+    (source / "release.txt").write_text(
+        "advanced during preparation\n", encoding="utf-8"
+    )
+    _git(source, "add", "release.txt")
+    _git(source, "commit", "-qm", "advance after verification")
+    _git(source, "push", "-q", "origin", "main")
+
+    stale_checkout = _release_revision_fence(
+        "checkout", checkout, predecessor, reviewed_target
+    )
+    assert stale_checkout.returncode != 0
+
+    rollback_generated_config_collisions(generated_manifest)
+    restore_tracked_recipe_edits(tracked_manifest)
+    finalize_tracked_recipe_edits(tracked_manifest)
+
+    assert _git(checkout, "rev-parse", "HEAD") == predecessor
+    assert checkout_recipe.read_bytes() == operator_recipe
+    assert checkout_collision.read_bytes() == original_generated
+    assert not generated_manifest.exists()
+    assert not tracked_manifest.exists()
+    assert all(
+        not path.exists() for path in tracked_backups + generated_backups
+    )
+    assert not (
+        checkout
+        / "backend-py/scraper_config/runtime_unis/generated_11.yaml"
+    ).exists()
+
+
 def test_guarded_release_refetches_tip_before_checkout() -> None:
     script = (DEPLOY_DIR / "guarded_release.sh").read_text(encoding="utf-8")
     prepare = script.index('"$reconciler" prepare \\\n')
