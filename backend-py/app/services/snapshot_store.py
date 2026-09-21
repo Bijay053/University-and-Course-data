@@ -331,6 +331,10 @@ async def snapshot_availability(
     return result
 
 
+from app.services.worker_fencing import fenced_external_write
+
+
+@fenced_external_write
 async def upload_snapshot(
     content: str | bytes,
     *,
@@ -348,6 +352,13 @@ async def upload_snapshot(
     if not is_enabled():
         return None
     key = build_s3_key(university_id, scrape_job_id, url, snapshot_type, page_number=page_number)
+    from app.services.worker_fencing import current_owner
+    owner = current_owner.get()
+    if owner:
+        # An HTTP PUT can finish remotely even after local cancellation. Never
+        # allow such a write to replace the replacement generation's object.
+        parent, filename = key.rsplit("/", 1)
+        key = f"{parent}/generation-{owner.generation}/{filename}"
     bucket = _bucket()
     raw = content.encode("utf-8") if isinstance(content, str) else content
 

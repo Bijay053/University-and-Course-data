@@ -888,7 +888,7 @@ async def _mark_failed(runtime_job_id: str, err: str) -> None:
     from app.models import ScrapeRuntimeJob
     async with AsyncSessionLocal() as db:
         job = await db.get(ScrapeRuntimeJob, runtime_job_id)
-        if job:
+        if job and not _workflow_owned_child(job):
             job.status = "failed"
             job.completed_at = datetime.now(timezone.utc)
             job.error_message = f"Scraping failed: {err[:200]}"

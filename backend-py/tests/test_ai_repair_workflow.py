@@ -71,6 +71,12 @@ class DB:
 @pytest.fixture
 def memory(monkeypatch):
     store = Store(session())
+    from app.services import worker_fencing
+    # Lifecycle-only doubles; PostgreSQL lock races have a separate test suite.
+    monkeypatch.setattr(worker_fencing, "claim", AsyncMock(
+        return_value=worker_fencing.Ownership("repair:session-1", "generation-1"),
+    ))
+    monkeypatch.setattr(worker_fencing, "revoke_stopped", AsyncMock(return_value=False))
 
     async def lock(db, university_id):
         assert university_id == 7
@@ -868,8 +874,8 @@ async def test_hard_killed_repair_remains_fenced(memory):
     memory.evidence = session(worker_claim="original", worker_started_at=old, phase="repairing")
     memory.evidence["status"] = "running"
     result = await workflow.reconcile("parent", "session-1", DB(memory))
-    assert result["status"] == "failed"
-    assert result["autonomous"]["phase"] == "blocked"
+    assert result["status"] == "running"
+    assert result["autonomous"]["phase"] == "repairing"
     workflow.agent.claim_repair_session.assert_not_called()
     workflow.agent.acquire_repair_lease.assert_not_called()
 
@@ -881,11 +887,49 @@ async def test_stale_child_remains_fenced_without_reclaim(memory):
     memory.evidence["status"] = "running"
     memory.jobs["child"] = child("running", claimed_at=old, heartbeat_at=old, worker_id="dead")
     result = await workflow.reconcile("parent", "session-1", DB(memory))
-    assert result["status"] == "failed"
-    assert result["autonomous"]["phase"] == "blocked"
+    assert result["status"] == "running"
+    assert result["autonomous"]["phase"] == "verifying"
     assert memory.jobs["child"].status == "running"
     assert memory.jobs["child"].stop_requested is True
     assert not memory.added
+
+
+@pytest.mark.asyncio
+async def test_confirmed_dead_child_redispatches_same_id_with_remaining_budget(memory, monkeypatch):
+    from app.services import worker_fencing
+    memory.evidence = session(phase="verifying", verification_job_id="child")
+    memory.evidence["status"] = "running"
+    job = child(
+        "running", claimed_at=datetime.now(timezone.utc) - timedelta(seconds=30),
+        request_payload={"autonomousVerification": {"time_budget_seconds": 600}},
+    )
+    memory.jobs["child"] = job
+    monkeypatch.setattr(worker_fencing, "revoke_stopped", AsyncMock(return_value=True))
+    dispatch = AsyncMock(side_effect=lambda evidence, db: evidence)
+    monkeypatch.setattr(workflow, "dispatch_verification", dispatch)
+    result = await workflow.reconcile("parent", "session-1", DB(memory))
+    assert result["autonomous"]["verification_job_id"] == "child"
+    assert job.status == "queued" and job.claimed_at is None
+    assert 560 < job.request_payload["autonomousVerification"]["time_budget_seconds"] <= 570
+    assert job.imported == 3  # retained rows/counters, never delete and start over
+    dispatch.assert_awaited_once()
+    assert not memory.added
+
+
+@pytest.mark.asyncio
+async def test_confirmed_stop_respects_manual_cancellation(memory, monkeypatch):
+    from app.services import worker_fencing
+    memory.evidence = session(phase="verifying", verification_job_id="child")
+    memory.evidence["status"] = "running"
+    job = child("running", request_payload={"autonomousStopRequested": True})
+    memory.jobs["child"] = job
+    monkeypatch.setattr(worker_fencing, "revoke_stopped", AsyncMock(return_value=True))
+    dispatch = AsyncMock()
+    monkeypatch.setattr(workflow, "dispatch_verification", dispatch)
+    result = await workflow.reconcile("parent", "session-1", DB(memory))
+    assert result["autonomous"]["phase"] == "needs_review"
+    assert job.status == "stopped"
+    dispatch.assert_not_awaited()
 
 
 def test_polling_independent_recovery_is_registered_on_existing_beat():

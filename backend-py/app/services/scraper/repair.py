@@ -199,14 +199,10 @@ async def run_repair(db: AsyncSession, runtime_job_id: str) -> dict:
 
             if _lock_is_stale:
                 try:
-                    await _uni_lock_redis.delete(_uni_lock_key)
-                    _uni_lock_acquired = bool(
-                        await _uni_lock_redis.set(
-                            _uni_lock_key, runtime_job_id, nx=True, ex=14400
-                        )
+                    from app.services.scraper.fenced_redis_locks import replace_legacy_university_lock
+                    _uni_lock_acquired = await replace_legacy_university_lock(
+                        _uni_lock_redis, _uni_lock_key, _holder, runtime_job_id,
                     )
-                    if not _uni_lock_acquired:
-                        _uni_lock_acquired = True  # fail open if race
                 except Exception as _steal_err:  # noqa: BLE001
                     log.warning("Could not steal stale lock: %s", _steal_err)
                     _uni_lock_acquired = True  # fail open
@@ -570,9 +566,10 @@ async def run_repair(db: AsyncSession, runtime_job_id: str) -> dict:
         if _uni_lock_redis is not None:
             try:
                 if _uni_lock_acquired and _uni_lock_key:
-                    current_holder = await _uni_lock_redis.get(_uni_lock_key)
-                    if current_holder == runtime_job_id:
-                        await _uni_lock_redis.delete(_uni_lock_key)
+                    from app.services.scraper.fenced_redis_locks import release_legacy_university_lock
+                    await release_legacy_university_lock(
+                        _uni_lock_redis, _uni_lock_key, runtime_job_id,
+                    )
             except Exception as _rel_err:  # noqa: BLE001
                 log.warning(
                     "Failed to release uni lock %s: %s", _uni_lock_key, _rel_err

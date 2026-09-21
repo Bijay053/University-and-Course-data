@@ -76,6 +76,11 @@ def read_session(job_id: str) -> dict:
 
 
 def _write_session(job_id: str, session: dict) -> None:
+    from app.services.worker_fencing import current_owner
+    if current_owner.get() is not None:
+        # Redis is a cache, not a transactional ownership authority. Fenced
+        # workers publish progress through their guarded durable audit instead.
+        return
     try:
         _redis_client().set(_redis_key(job_id), json.dumps(session), ex=_REDIS_TTL_SEC)
     except Exception as exc:
@@ -2580,9 +2585,9 @@ async def run_ai_repair_loop(
         "session_id":      lease_token or queued_session.get("session_id") or str(uuid.uuid4())[:8],
         "job_id":          job_id,
         "status":          "running",
-        "current_attempt": 0,
+        "current_attempt": int(queued_session.get("current_attempt") or 0) if live_enabled else 0,
         "max_attempts":    max_attempts,
-        "attempts":        [],
+        "attempts":        deepcopy(queued_session.get("attempts") or []) if live_enabled else [],
         "final_verdict":   None,
         "university_id":   queued_session.get("university_id"),
         "uni_name":        None,
@@ -2648,7 +2653,8 @@ async def run_ai_repair_loop(
         )
         current_minimum = max(1, (current_sim["total"] + 1) // 2)
         if (
-            ctx.get("imported", 0) == 0
+            session["current_attempt"] == 0
+            and ctx.get("imported", 0) == 0
             and current_sim["total"] > 0
             and current_sim["after"] >= current_minimum
             and (live is None or not live.discovery_needed(current_disc))
@@ -2690,9 +2696,13 @@ async def run_ai_repair_loop(
             not live.discovery_needed(current_disc) if live else ctx["drop_rate"] <= 20
         )
 
-        for attempt_num in range(1, max_attempts + 1):
+        for attempt_num in range(session["current_attempt"] + 1, max_attempts + 1):
             current_attempt_evidence = None
             session["current_attempt"] = attempt_num
+            if live:
+                # Consume the attempt durably before billable/mutating work,
+                # so a dead process cannot reset the five-attempt budget.
+                await persist_repair_audit(session, db)
             if live:
                 autonomous["phase"] = "repairing"
             _write_session(job_id, session)
@@ -2983,6 +2993,10 @@ async def run_ai_repair_loop(
                         raise RuntimeError(
                             "Repair ownership was lost before config apply; no change was saved."
                         )
+                    # Keep the transaction's generation lock across filesystem
+                    # apply and the matching DB config commit.
+                    from app.services.worker_fencing import guard_transaction
+                    await guard_transaction(db)
                     yaml_state = _apply_to_yaml(
                         ctx.get("yaml_file"),
                         ctx["unis_dir"],
@@ -3043,6 +3057,7 @@ async def run_ai_repair_loop(
                         await db.rollback()
                     if yaml_state is not None:
                         try:
+                            await guard_transaction(db)
                             _restore_yaml(*yaml_state, expected_text=yaml_applied)
                         except Exception as rollback_exc:
                             patch_error += f"; YAML rollback failed: {rollback_exc}"

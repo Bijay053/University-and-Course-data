@@ -1863,6 +1863,31 @@ async def _discover_archive_only(
 
 
 async def run_scrape(db: AsyncSession, runtime_job_id: str) -> dict:
+    """Fence autonomous children, including all their independent DB sessions."""
+    from app.services.worker_fencing import (
+        claim, ownership_scope, acknowledge_stop, OwnershipLost,
+    )
+    job = await db.get(ScrapeRuntimeJob, runtime_job_id)
+    if not job or "autonomousVerification" not in (job.request_payload or {}):
+        return await _run_scrape_entry(db, runtime_job_id)
+    if job.status != "queued":
+        await db.rollback()
+        return {"ok": False, "reason": "already_claimed"}
+    owner = await claim(db, f"verification:{runtime_job_id}")
+    if owner is None:
+        await db.rollback()
+        return {"ok": False, "reason": "already_claimed"}
+    try:
+        with ownership_scope(owner):
+            return await _run_scrape_entry(db, runtime_job_id)
+    except OwnershipLost:
+        await db.rollback()
+        return {"ok": False, "reason": "ownership_revoked"}
+    finally:
+        await acknowledge_stop(db, owner)
+
+
+async def _run_scrape_entry(db: AsyncSession, runtime_job_id: str) -> dict:
     """Execute one scrape job.
 
     Note: ``db`` is used only for the job-lifecycle bookkeeping (running →
@@ -2050,6 +2075,9 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
     _uni_lock_redis: Any | None = None
     _uni_lock_key: str | None = None
     _uni_lock_acquired: bool = False
+    from app.services.worker_fencing import current_owner
+    from app.services.scraper import fenced_redis_locks
+    _worker_owner = current_owner.get()
 
     # Task #229: global concurrency slot state (fleet-wide cap on simultaneous
     # scrapes so the shared Scrape.do/Gemini accounts aren't overrun).  Disabled
@@ -2144,19 +2172,28 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         # the Celery soft-time-limit ceiling.  The lock value is the job_id so
         # the rightful holder can identify and release it.  If Redis is
         # unavailable we fail open (allow the scrape to proceed unlocked) so a
-        # Redis outage never blocks scraping entirely.
+        # Redis outage never blocks ordinary scraping entirely. Autonomous
+        # verification instead uses a generation sidecar and fails closed;
+        # only proven revoked lineage can refresh its same-job predecessor.
         _uni_lock_key = f"scrape:uni_lock:{job.university_id}"
         try:
             import redis.asyncio as _aioredis
             _uni_lock_redis = _aioredis.from_url(
                 settings.redis_url, decode_responses=True, socket_timeout=3
             )
-            _uni_lock_acquired = bool(
-                await _uni_lock_redis.set(
-                    _uni_lock_key, runtime_job_id, nx=True, ex=14400
+            if _worker_owner:
+                _uni_lock_acquired = await fenced_redis_locks.acquire_university_lock(
+                    db, _uni_lock_redis, _uni_lock_key, runtime_job_id,
                 )
-            )
+            else:
+                _uni_lock_acquired = bool(
+                    await _uni_lock_redis.set(
+                        _uni_lock_key, runtime_job_id, nx=True, ex=14400
+                    )
+                )
         except Exception as _lock_err:  # noqa: BLE001
+            if _worker_owner:
+                raise  # Autonomous executions must not bypass generation CAS.
             log.warning(
                 "Could not connect to Redis for uni lock (failing open): %s", _lock_err
             )
@@ -2175,7 +2212,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             # (completed, stopped, failed, etc.) the lock is stale — steal it
             # so the new scrape can proceed rather than being falsely blocked.
             _lock_is_stale = False
-            if _holder != "unknown" and _uni_lock_redis is not None:
+            if not _worker_owner and _holder != "unknown" and _uni_lock_redis is not None:
                 try:
                     _holder_row = await db.execute(
                         _sql_text(
@@ -2185,7 +2222,10 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                         {"jid": _holder},
                     )
                     _holder_status = _holder_row.scalar()
-                    if _holder_status not in (None, "running", "queued"):
+                    if (
+                        _holder_status not in (None, "running", "queued")
+                        and not await _uni_lock_redis.get(_uni_lock_key + ":generation")
+                    ):
                         _lock_is_stale = True
                         log.warning(
                             "Uni lock %s held by %s has status=%s — "
@@ -2197,14 +2237,9 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
 
             if _lock_is_stale:
                 try:
-                    await _uni_lock_redis.delete(_uni_lock_key)
-                    _uni_lock_acquired = bool(
-                        await _uni_lock_redis.set(
-                            _uni_lock_key, runtime_job_id, nx=True, ex=14400
-                        )
+                    _uni_lock_acquired = await fenced_redis_locks.replace_legacy_university_lock(
+                        _uni_lock_redis, _uni_lock_key, _holder, runtime_job_id,
                     )
-                    if not _uni_lock_acquired:
-                        _uni_lock_acquired = True  # fail open if race
                 except Exception as _steal_err:  # noqa: BLE001
                     log.warning("Could not steal stale lock: %s", _steal_err)
                     _uni_lock_acquired = True  # fail open
@@ -2260,18 +2295,20 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 # workers starting simultaneously can never both pass a stale
                 # check-then-add and exceed the cap.  Returns -1 on success, or
                 # the current active count when the cap is already reached.
-                _slot_lua = (
-                    "redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ARGV[2])\n"
-                    "local active = redis.call('ZCARD', KEYS[1])\n"
-                    "if active >= tonumber(ARGV[3]) then return active end\n"
-                    "redis.call('ZADD', KEYS[1], ARGV[1], ARGV[4])\n"
-                    "return -1"
-                )
-                _slot_res = await _global_slot_redis.eval(
-                    _slot_lua, 1, _GLOBAL_SLOT_KEY,
-                    str(_now_ts), str(_stale_before),
-                    str(_max_concurrent), runtime_job_id,
-                )
+                if _worker_owner:
+                    # A dead predecessor already occupies this deterministic
+                    # member. Adopt it before testing the cap, rather than
+                    # incorrectly counting our own recovered job against us.
+                    _owned_slot = await fenced_redis_locks.acquire_global_slot(
+                        db, _global_slot_redis, _GLOBAL_SLOT_KEY, runtime_job_id,
+                        now=_now_ts, limit=_max_concurrent,
+                    )
+                    _slot_res = -1 if _owned_slot else await _global_slot_redis.zcard(_GLOBAL_SLOT_KEY)
+                else:
+                    _slot_res = await fenced_redis_locks.acquire_legacy_global_slot(
+                        _global_slot_redis, _GLOBAL_SLOT_KEY, runtime_job_id,
+                        now=_now_ts, stale_before=_stale_before, limit=_max_concurrent,
+                    )
                 _active = int(_slot_res)
                 if _active >= 0:
                     log.warning(
@@ -2301,6 +2338,8 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 # _slot_res == -1 → the Lua script already claimed our slot.
                 _global_slot_acquired = True
             except Exception as _slot_err:  # noqa: BLE001 — fail open
+                if _worker_owner:
+                    raise
                 log.warning(
                     "Global slot check failed (failing open): %s", _slot_err
                 )
@@ -5808,6 +5847,22 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             links = cap_verification_links(job, _verification, links, max_courses)
             summary["discovered"] = len(links)
             job.total_found = len(links)
+            # Generation recovery resumes this SAME deterministic child only.
+            # Include reviewed/published/rejected rows: never duplicate or
+            # overwrite a human decision when replaying a broker delivery.
+            from app.models import ScrapedCourse as _RecoveredCourse
+            recovered_urls = (await db.execute(
+                select(_RecoveredCourse.course_website).where(
+                    _RecoveredCourse.scrape_job_id == runtime_job_id,
+                    _RecoveredCourse.university_id == job.university_id,
+                )
+            )).scalars().all()
+            recovered_keys = {canonical_course_url_key(url) for url in recovered_urls}
+            _resume_already_staged = len(recovered_keys - {"" , None})
+            links = [
+                link for link in links
+                if canonical_course_url_key(link.get("url")) not in recovered_keys
+            ]
             await db.commit()
 
         # ── Apply final hard cap so merged link sets (BFS + sitemap supplement
@@ -5963,7 +6018,9 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         #
         # Heartbeat is handled by the dedicated ``_heartbeat_pulser`` background
         # task (see top of file) — it spans both extraction and staging phases.
-        _total_gemini_cost_usd: float = 0.0
+        _total_gemini_cost_usd: float = (
+            float(job.total_gemini_cost_usd or 0) if _verification else 0.0
+        )
         _total_gemini_in_tokens: int = 0
         _total_gemini_out_tokens: int = 0
 
@@ -5981,6 +6038,8 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 else _get_budget(_uni_slug)
             ),
         )
+        if _verification and _total_gemini_cost_usd:
+            _cost_monitor.record_call(_total_gemini_cost_usd)
 
         # Accumulated across all batches — written to gemini_call_log once
         # after every batch has completed so completed-batch calls are always
@@ -8587,13 +8646,20 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         # ── Release the per-university Redis distributed lock ────────────────
         # Only release if we actually hold it (lock value must still match our
         # job_id to guard against an expired TTL being re-acquired by a newer
-        # job before our finally block runs).
+        # job before our finally block runs). Autonomous cleanup also compares
+        # the generation in the same Lua command, so delayed old cleanup cannot
+        # delete a successor's lock even though its job ID is identical.
         if _uni_lock_redis is not None:
             try:
                 if _uni_lock_acquired and _uni_lock_key:
-                    current_holder = await _uni_lock_redis.get(_uni_lock_key)
-                    if current_holder == runtime_job_id:
-                        await _uni_lock_redis.delete(_uni_lock_key)
+                    if _worker_owner:
+                        await fenced_redis_locks.release_university_lock(
+                            _uni_lock_redis, _uni_lock_key, runtime_job_id, _worker_owner.generation,
+                        )
+                    else:
+                        await fenced_redis_locks.release_legacy_university_lock(
+                            _uni_lock_redis, _uni_lock_key, runtime_job_id,
+                        )
             except Exception as _rel_err:  # noqa: BLE001
                 log.warning(
                     "Failed to release uni lock %s: %s", _uni_lock_key, _rel_err
@@ -8607,7 +8673,14 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         if _global_slot_redis is not None:
             try:
                 if _global_slot_acquired:
-                    await _global_slot_redis.zrem(_GLOBAL_SLOT_KEY, runtime_job_id)
+                    if _worker_owner:
+                        await fenced_redis_locks.release_global_slot(
+                            _global_slot_redis, _GLOBAL_SLOT_KEY, runtime_job_id, _worker_owner.generation,
+                        )
+                    else:
+                        await fenced_redis_locks.release_legacy_global_slot(
+                            _global_slot_redis, _GLOBAL_SLOT_KEY, runtime_job_id,
+                        )
             except Exception as _slot_rel_err:  # noqa: BLE001
                 log.warning(
                     "Failed to release global scrape slot for %s: %s",

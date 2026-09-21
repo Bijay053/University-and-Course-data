@@ -78,6 +78,7 @@ def merge_live_progress(session: dict, live: dict) -> dict:
         or state.get("verification_job_id") or state.get("phase") in {"blocked", "needs_review", "verified"}
         or live.get("session_id") != session.get("session_id")
         or (live.get("autonomous") or {}).get("worker_claim") != state["worker_claim"]
+        or (live.get("autonomous") or {}).get("worker_generation") != state.get("worker_generation")
         or int(live.get("current_attempt") or 0) < int(session.get("current_attempt") or 0)
     ):
         return session
@@ -150,6 +151,7 @@ def merge_audit(backup: dict, audit: dict) -> dict:
     owned = (
         audit.get("session_id") == backup.get("session_id")
         and loop_state.get("worker_claim") == state["worker_claim"]
+        and loop_state.get("worker_generation") == state.get("worker_generation")
     )
     merged = {**audit, **backup, "autonomous": state, "status": "running",
               "completed_at": None, "max_attempts": 5}
@@ -345,6 +347,12 @@ async def claim(job_id: str, university_id: int, session_id: str, claim_id: str,
     if not agent.claim_repair_session(job_id, university_id, session_id):
         await db.rollback()
         return {}
+    from app.services.worker_fencing import claim as claim_generation
+    owner = await claim_generation(db, f"repair:{session_id}", claim_id)
+    if owner is None:
+        await db.rollback()
+        return {}
+    state["worker_generation"] = owner.generation
     state.update(phase="live_probe", worker_claim=claim_id, worker_started_at=now())
     session.update(status="running", started_at=now(), autonomous=state)
     await save(session, db)
@@ -420,6 +428,7 @@ async def queue_verification(session: dict, db) -> dict:
     if (
         result_state.get("config_loop_done") is True
         and result_state.get("worker_claim") == state.get("worker_claim")
+        and result_state.get("worker_generation") == state.get("worker_generation")
     ):
         state.update(config_loop_done=True, config_loop_status=session.get("status"))
     session["autonomous"] = state
@@ -854,6 +863,21 @@ async def run(job_id: str, university_id: int, session_id: str, claim_id: str, d
     session = await claim(job_id, university_id, session_id, claim_id, db)
     if not session:
         return {"job_id": job_id, "status": "duplicate_or_unowned"}
+    from app.services.worker_fencing import (
+        Ownership, OwnershipLost, ownership_scope, acknowledge_stop,
+    )
+    owner = Ownership(f"repair:{session_id}", session["autonomous"]["worker_generation"])
+    try:
+        with ownership_scope(owner):
+            return await _run_owned(session, job_id, university_id, session_id, db)
+    except OwnershipLost:
+        await db.rollback()
+        return {"job_id": job_id, "status": "superseded"}
+    finally:
+        await acknowledge_stop(db, owner)
+
+
+async def _run_owned(session, job_id, university_id, session_id, db):
     try:
         result = await agent.run_ai_repair_loop(
             job_id, db, lease_token=session_id, durable_session=session,
@@ -892,9 +916,56 @@ async def reconcile(job_id: str, session_id: str, db) -> dict:
     merge_live_progress(session, agent.read_session(job_id))
     child_id = state.get("verification_job_id")
     if child_id:
+        from app.services.worker_fencing import revoke_stopped
+        recovered_child = await revoke_stopped(db, f"verification:{child_id}")
         child = await db.get(ScrapeRuntimeJob, child_id, populate_existing=True, with_for_update=True)
         if not child:
             return await finish(session, db, "blocked", "Durable verification job is missing.", failed=True)
+        fence_state = (await db.execute(text(
+            "SELECT state FROM autonomous_worker_claims WHERE claim_key = :key"
+        ), {"key": f"verification:{child_id}"})).scalar_one_or_none()
+        if child.status not in CHILD_ACTIVE and fence_state == "active":
+            # A lifecycle commit can precede cancellation/draining of detached
+            # tasks. Do not launch a continuation before its stop acknowledgement.
+            await db.rollback()
+            return session
+        if recovered_child and (child.request_payload or {}).get("autonomousStopRequested"):
+            child.status = "stopped"
+            child.completed_at = datetime.now(timezone.utc)
+            return await finish(
+                session, db, "needs_review", "Verification stopped at the user's request; partial sample only.",
+            )
+        if recovered_child and child.status in CHILD_ACTIVE - {"awaiting_approval"}:
+            payload = dict(child.request_payload or {})
+            policy = dict(payload.get("autonomousVerification") or {})
+            started = child.claimed_at or child.started_at
+            remaining = float(policy.get("time_budget_seconds") or VERIFY_SECONDS)
+            if started:
+                remaining -= max(0, age(started.isoformat()))
+            if remaining <= 0:
+                child.status = "failed_degraded"
+                child.completed_at = datetime.now(timezone.utc)
+                child.error_message = "Stopped execution exhausted the verification time budget; partial sample only."
+                return await finish(
+                    session, db, "needs_review", child.error_message,
+                )
+            policy["time_budget_seconds"] = remaining
+            payload["autonomousVerification"] = policy
+            child.request_payload = payload
+            config = dict(child.discovered_config or {})
+            metadata = dict(config.get("autonomousVerification") or {})
+            metadata["time_budget_seconds"] = remaining
+            config["autonomousVerification"] = metadata
+            child.discovered_config = config
+            child.status = "queued"
+            child.claimed_at = None
+            child.worker_id = None
+            child.started_at = None
+            child.completed_at = None
+            child.stop_requested = False
+            state.update(phase="verification_queued", last_dispatch_at=now())
+            await save(session, db)
+            return await dispatch_verification(session, db)
         state["verification_status"] = child.status
         if child.status == "awaiting_approval":
             return await finish(
@@ -1004,18 +1075,6 @@ async def reconcile(job_id: str, session_id: str, db) -> dict:
             if started and age(started.isoformat()) > VERIFY_SECONDS:
                 child.stop_requested = True
                 state["reason"] = "Verification time limit reached; cancellation requested."
-                heartbeat = child.heartbeat_at or started
-                if age(started.isoformat()) > VERIFY_SECONDS + 180 and age(heartbeat.isoformat()) > 180:
-                    # No distributed process-death proof exists here. Do NOT
-                    # reset/requeue a possibly live child or fabricate a failed
-                    # job status. Its active row remains the university fence
-                    # until the standard dead-worker recovery handles it.
-                    return await finish(
-                        session, db, "blocked",
-                        "Verification deadline and heartbeat expired; stop requested. "
-                        "The existing child remains fenced for dead-worker recovery; no replacement was launched.",
-                        failed=True,
-                    )
         await save(session, db)
         return session
     if (
@@ -1034,8 +1093,18 @@ async def reconcile(job_id: str, session_id: str, db) -> dict:
             # child creation. Never rerun the AI loop to recover this boundary.
             await db.commit()
             return await queue_verification(session, db)
-        if age(state.get("worker_started_at")) > REPAIR_SECONDS + 120:
-            return await finish(session, db, "blocked", "Repair worker exceeded its bounded lifetime.", failed=True)
+        from app.services.worker_fencing import revoke_stopped
+        if state.get("worker_generation") and await revoke_stopped(
+            db, f"repair:{session_id}", state["worker_generation"],
+        ):
+            state.pop("worker_claim", None)
+            state.pop("worker_generation", None)
+            session.update(status="queued", completed_at=None)
+            return await schedule_recovery(
+                session, db, "The owning repair execution has authoritatively stopped.",
+                "Redispatch the same repair session with a new generation.",
+                target="repair",
+            )
         agent.renew_repair_lease(int(session["university_id"]), session_id)
         session["status"] = "running"
         await save(session, db)

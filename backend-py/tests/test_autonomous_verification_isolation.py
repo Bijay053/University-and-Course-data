@@ -231,7 +231,8 @@ async def test_external_cancellation_is_not_relabelled_success():
     assert child.status == "running"
 
 
-async def test_real_orchestrator_timeout_skips_cleanup_and_releases_tasks_and_locks(monkeypatch):
+@pytest.mark.parametrize("fenced", [False, True])
+async def test_real_orchestrator_timeout_skips_cleanup_and_releases_tasks_and_locks(monkeypatch, fenced):
     """Exercise the actual pipeline's early setup/finally under cancellation."""
     import redis.asyncio as aioredis
     from app.services.scraper import job_claim
@@ -249,7 +250,7 @@ async def test_real_orchestrator_timeout_skips_cleanup_and_releases_tasks_and_lo
     monkeypatch.setattr(orch.settings, "max_concurrent_scrapes", 0)
     redis = SimpleNamespace(
         set=AsyncMock(return_value=True), get=AsyncMock(return_value="child"),
-        delete=AsyncMock(), aclose=AsyncMock(),
+        delete=AsyncMock(), eval=AsyncMock(return_value=1), aclose=AsyncMock(),
     )
     monkeypatch.setattr(aioredis, "from_url", lambda *a, **kw: redis)
     closed = []
@@ -277,11 +278,29 @@ async def test_real_orchestrator_timeout_skips_cleanup_and_releases_tasks_and_lo
             pass
 
     monkeypatch.setattr(orch, "AsyncSessionLocal", EmitSession)
-    result = await orch.run_scrape(db, "child")
+    from contextlib import nullcontext
+    from app.services import worker_fencing
+    from app.services.scraper import fenced_redis_locks
+    acquire_lock = AsyncMock(return_value=True)
+    release_lock = AsyncMock(return_value=True)
+    monkeypatch.setattr(fenced_redis_locks, "acquire_university_lock", acquire_lock)
+    monkeypatch.setattr(fenced_redis_locks, "release_university_lock", release_lock)
+    owner = worker_fencing.Ownership("verification:child", "replacement-generation")
+    with worker_fencing.ownership_scope(owner) if fenced else nullcontext():
+        result = await orch._run_scrape_entry(db, "child")
     assert result["reason"] == "time_budget_exhausted"
     assert child.status == "failed_degraded"
     clear.assert_not_awaited()
-    redis.delete.assert_awaited_once_with("scrape:uni_lock:42")
+    if fenced:
+        acquire_lock.assert_awaited_once_with(db, redis, "scrape:uni_lock:42", "child")
+        release_lock.assert_awaited_once_with(
+            redis, "scrape:uni_lock:42", "child", "replacement-generation",
+        )
+        redis.set.assert_not_awaited()
+    else:
+        acquire_lock.assert_not_awaited()
+        redis.eval.assert_awaited_once()
+        assert redis.eval.await_args.args[2:4] == ("scrape:uni_lock:42", "scrape:uni_lock:42:generation")
     redis.aclose.assert_awaited_once()
     assert len(closed) == 2
 
@@ -505,14 +524,12 @@ async def test_generic_max_requeue_cannot_terminalize_workflow_child(generic_rec
     session.commit.assert_not_awaited()
 
 
-async def test_worker_failure_can_still_terminalize_its_verification_child(generic_recovery):
+async def test_unfenced_worker_failure_cannot_terminalize_verification_child(generic_recovery):
     tasks, session, rows, _ = generic_recovery
     rows[1].status = "running"
     await tasks._mark_failed("verification", "Worker process exited")
-    assert rows[1].status == "failed"
-    assert rows[1].completed_at is not None
-    assert "Worker process exited" in rows[1].error_message
-    session.commit.assert_awaited_once()
+    assert rows[1].status == "running"
+    session.commit.assert_not_awaited()
 
 
 async def test_duplicate_child_delivery_retains_atomic_claim_fence(monkeypatch):
@@ -525,4 +542,4 @@ async def test_duplicate_child_delivery_retains_atomic_claim_fence(monkeypatch):
     result = await orch.run_scrape(db, "child")
     assert result == {"ok": False, "reason": "already_claimed"}
     pipeline.assert_not_awaited()
-    db.get.assert_not_awaited()
+    db.get.assert_awaited_once()

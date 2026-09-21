@@ -800,6 +800,11 @@ async def _hard_stop_job(db: AsyncSession, job: ScrapeRuntimeJob) -> None:
     """
     from datetime import datetime as _dt, timezone as _tz
     job.stop_requested = True
+    if "autonomousVerification" in (job.request_payload or {}):
+        job.request_payload = {**job.request_payload, "autonomousStopRequested": True}
+        # A stop request is not a completed stop acknowledgement. Keep the
+        # active row until the fenced worker/pool confirms it has unwound.
+        return
     if job.status not in {"completed", "stopped", "error", "failed", "done", "skipped"}:
         job.status = "stopped"
         if not job.completed_at:
@@ -1134,6 +1139,11 @@ async def list_active(db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
     rows: list[ScrapeRuntimeJob] = []
     reaped = 0
     for r in raw:
+        if any(key in (r.request_payload or {}) for key in ("autonomousVerification", "aiRepairWorkflow")):
+            # A heartbeat is not process-death evidence. Only the autonomous
+            # reconciler may recover these durable execution generations.
+            rows.append(r)
+            continue
         # Build the predicate the UPDATE must still satisfy.
         # If the worker has touched heartbeat_at OR moved status
         # between our SELECT and our UPDATE, rowcount will be 0 and

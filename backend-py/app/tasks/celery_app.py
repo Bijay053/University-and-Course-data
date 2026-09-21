@@ -42,6 +42,7 @@ log = logging.getLogger(__name__)
 
 celery_app = Celery(
     "uniportal",
+    task_cls="app.tasks.fenced_request:FencedTask",
     broker=settings.redis_url,
     backend=settings.redis_url,
     # Both the per-job scrape tasks and the daily snapshot live under
@@ -188,7 +189,9 @@ _RESET_SQL = (
     "SET status = 'failed', "
     "    completed_at = now(), "
     "    error_message = 'Worker restarted — slot freed on startup' "
-    "WHERE status = 'running' AND job_type <> 'bulk_fix'"
+    "WHERE status = 'running' AND job_type <> 'bulk_fix' "
+    "AND NOT (COALESCE(request_payload, '{}'::jsonb) ? 'autonomousVerification') "
+    "AND NOT (COALESCE(request_payload, '{}'::jsonb) ? 'aiRepairWorkflow')"
 )
 
 
@@ -236,7 +239,13 @@ async def _check_job_status_single(job_id: str) -> str | None:
         _Sess = async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
         async with _Sess() as _db:
             row = await _db.execute(
-                _text2("SELECT status FROM scrape_runtime_jobs WHERE runtime_job_id = :jid"),
+                _text2(
+                    "SELECT CASE WHEN "
+                    "COALESCE(request_payload, '{}'::jsonb) ? 'autonomousVerification' "
+                    "OR COALESCE(request_payload, '{}'::jsonb) ? 'aiRepairWorkflow' "
+                    "THEN 'running' ELSE status END "
+                    "FROM scrape_runtime_jobs WHERE runtime_job_id = :jid"
+                ),
                 {"jid": job_id},
             )
             return row.scalar()
@@ -299,19 +308,19 @@ def on_worker_ready(**kwargs) -> None:  # noqa: ANN003
     # new tasks pile up and steal-logic never fires, so the university appears
     # permanently locked until the 4-hour TTL expires.
     #
-    # Fix: on every worker restart, delete all uni_lock keys whose holder job
-    # is no longer "running" or "queued" in the DB.  This is idempotent and
-    # race-safe: the orchestrator re-acquires the lock at the start of each
-    # run_scrape call so a miss here only matters for the window between the
-    # delete and the next claim.
+    # Only remove an ordinary terminal holder if it still matches the holder
+    # read before the DB check and has no generation sidecar. A new worker can
+    # acquire/refresh a key during that check, so unconditional DELETE is unsafe.
     try:
         import redis as _redis_lib
+        from app.services.scraper.fenced_redis_locks import cleanup_legacy_university_lock
         _r = _redis_lib.from_url(settings.redis_url, decode_responses=True)
         _stale_keys: list[str] = []
         for _key in _r.keys("scrape:uni_lock:*"):
+            if _key.endswith(":generation"):
+                continue
             _holder_jid = _r.get(_key)
             if not _holder_jid:
-                _stale_keys.append(_key)
                 continue
             # Use a short-lived DB check via asyncpg
             try:
@@ -319,12 +328,14 @@ def on_worker_ready(**kwargs) -> None:  # noqa: ANN003
                 _holder_status = asyncio.run(
                     _check_job_status_single(_holder_jid)
                 )
-                if _holder_status not in (None, "running", "queued"):
+                if (
+                    _holder_status not in (None, "running", "queued")
+                    and cleanup_legacy_university_lock(_r, _key, _holder_jid)
+                ):
                     _stale_keys.append(_key)
             except Exception:
                 pass  # leave the lock if we can't check — safe default
         if _stale_keys:
-            _r.delete(*_stale_keys)
             log.warning(
                 "worker_ready: deleted %d stale uni_lock key(s): %s",
                 len(_stale_keys), _stale_keys,

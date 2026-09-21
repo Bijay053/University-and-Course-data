@@ -307,8 +307,13 @@ class LiveRepairEvidence:
         if not official_url(url, self.ctx["scrape_url"], self.extra_hosts):
             record.update(classification="unsafe_url", reason="Not an official university host")
         elif self.pages_checked < self.max_pages and remaining > 0:
-            self.pages_checked += 1
             timeout = min(self.fetch_seconds, remaining)
+            from app.services.worker_fencing import reserve_live_fetch, refund_live_fetch
+            timeout = await reserve_live_fetch(self.max_pages, self.max_seconds, timeout)
+            if timeout <= 0:
+                self.records.append(record)
+                return record
+            self.pages_checked += 1
             token = current_uni_config.set(self.config)
             fetch_started = time.monotonic()
             try:
@@ -320,10 +325,10 @@ class LiveRepairEvidence:
             except Exception as exc:
                 record.update(classification="network_failure", reason=type(exc).__name__)
             finally:
-                self.fetch_elapsed_seconds += max(
-                    0.0, time.monotonic() - fetch_started
-                )
+                elapsed = max(0.0, time.monotonic() - fetch_started)
+                self.fetch_elapsed_seconds += elapsed
                 current_uni_config.reset(token)
+                await refund_live_fetch(timeout, elapsed)
         self.records.append(record)
         return record
 

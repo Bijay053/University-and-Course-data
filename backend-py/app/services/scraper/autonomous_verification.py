@@ -151,6 +151,20 @@ def persist_verification_metadata(job, limits: VerificationLimits, **updates) ->
 def cap_verification_links(job, limits, links, max_courses):
     """Final boundary after provider/config overrides and route expansion."""
     cap = min(max_courses, limits.max_courses)
+    prior = (job.discovered_config or {}).get("autonomousVerification") or {}
+    frozen = prior.get("selected_urls") or []
+    if frozen:
+        # A recovered generation resumes this exact bounded sample. Catalogue
+        # ordering changes must not silently increase the 50-course envelope.
+        current = {
+            canonical_course_url_key(link.get("url")): link
+            for link in links if isinstance(link, dict)
+        }
+        return [
+            current.get(canonical_course_url_key(url), {"url": url, "name": ""})
+            for url in frozen[:cap]
+            if isinstance(url, str) and canonical_course_url_key(url)
+        ]
     unique_links: list[dict] = []
     seen: set[str] = set()
     for link in links:
