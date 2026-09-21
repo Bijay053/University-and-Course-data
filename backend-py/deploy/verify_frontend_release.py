@@ -61,7 +61,14 @@ def verify_local_build(dist: Path, marker: bytes) -> list[str]:
 def _fetch(url: str) -> bytes:
     request = urllib.request.Request(
         url,
-        headers={"Cache-Control": "no-cache", "Pragma": "no-cache"},
+        headers={
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
+            # The public edge rejects Python's default urllib user agent even
+            # though the same cache-busted release URL is available to normal
+            # browsers and curl.
+            "User-Agent": "Mozilla/5.0 UniversityPortalReleaseVerifier/1.0",
+        },
     )
     with urllib.request.urlopen(request, timeout=30) as response:
         assert response.status == 200, f"Unexpected HTTP {response.status} for {url}"

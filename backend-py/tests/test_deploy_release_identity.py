@@ -491,6 +491,38 @@ def test_guarded_release_builds_and_verifies_frontend_before_success() -> None:
     assert 'mv "$frontend_previous" "$frontend_dist"' in script
 
 
+def test_public_release_fetch_uses_browser_compatible_user_agent(
+    monkeypatch,
+) -> None:
+    from deploy import verify_frontend_release
+
+    captured = {}
+
+    class Response:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def read(self):
+            return b"ok"
+
+    def fake_urlopen(request, timeout):
+        captured["user_agent"] = request.get_header("User-agent")
+        captured["timeout"] = timeout
+        return Response()
+
+    monkeypatch.setattr(verify_frontend_release.urllib.request, "urlopen", fake_urlopen)
+    assert verify_frontend_release._fetch("https://portal.example/") == b"ok"
+    assert captured == {
+        "user_agent": "Mozilla/5.0 UniversityPortalReleaseVerifier/1.0",
+        "timeout": 30,
+    }
+
+
 def test_frontend_cleanup_restores_previous_dist_after_publish_move_failure(
     tmp_path: Path,
 ) -> None:
