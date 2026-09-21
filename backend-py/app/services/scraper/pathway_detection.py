@@ -106,6 +106,20 @@ def is_pathway_program(
 
     name = course_name.strip()
 
+    # A full Bachelor's degree "with Foundation Year" is not a standalone
+    # preparatory programme. It follows the degree's published international
+    # English requirement and must not be excluded from institutional English
+    # rules merely because its first year is foundational.
+    if (
+        degree_level
+        and any(
+            token in degree_level.strip().lower()
+            for token in ("bachelor", "honours", "honor")
+        )
+        and re.search(r"\bwith\s+(?:a\s+)?foundation\s+year\b", name, re.I)
+    ):
+        return False
+
     # Hard exclusions before positive patterns
     for pat in _COMPILED_EXCLUSIONS:
         if pat.search(name):

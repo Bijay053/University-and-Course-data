@@ -1355,6 +1355,27 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
     from urllib.parse import urlparse as _up
     _host = (_up(url).netloc or "").lower()
 
+    from app.services.scraper.cccu_embedded_facts import (
+        extract_cccu_embedded_facts,
+    )
+
+    cccu_facts = extract_cccu_embedded_facts(html, url)
+    cccu_english = cccu_facts.get("english") if cccu_facts else None
+    if cccu_english:
+        return [
+            ExtractionResult(
+                field_key="ielts_overall",
+                value=cccu_english["ielts_overall"],
+                normalized=cccu_english,
+                confidence=0.99,
+                snippet=(
+                    "Standard undergraduate and postgraduate programmes: "
+                    f"IELTS {cccu_english['ielts_overall']} overall"
+                ),
+                method="english.cccu_embedded_requirements",
+            )
+        ]
+
     text = compact(html_to_text(html))
     if not text:
         return []

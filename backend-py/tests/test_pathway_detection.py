@@ -16,6 +16,12 @@ class TestIsPathwayProgram:
     def test_foundation_year(self):
         assert is_pathway_program("Foundation Year")
 
+    def test_bachelors_degree_with_foundation_year_is_not_pathway(self):
+        assert not is_pathway_program(
+            "BSc (Hons) Animal Science with Foundation Year",
+            degree_level="Bachelor",
+        )
+
     def test_foundation_program(self):
         assert is_pathway_program("Foundation Program")
 

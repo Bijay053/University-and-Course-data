@@ -15,13 +15,9 @@ extraction:
   fees:
     default_currency: GBP
     prefer_international: true
-    # Canterbury CC is a React SPA — fee pages yield no static text.
-    # These defaults are used when per-course extraction fails to find a fee.
-    # Source: official CCCU website / Shiksha 2025/26 data.
-    degree_level_defaults:
-      undergraduate: 15500
-      postgraduate: 15500
-      doctorate: 15500
+    # Current-year fees are extracted from the selected course/year object in
+    # the page's embedded Contensis Redux state. Never stamp a blanket amount:
+    # foundation-year, standard UG, health and PG fee schedules can differ.
 
   english:
     # IELTS: 6.0 overall (UG); 6.5 overall (PG).

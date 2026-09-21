@@ -2648,6 +2648,32 @@ def _from_otago_polytechnic_international_fee(
 async def extract(
     html: str, url: str, *, country: str | None = None
 ) -> list[ExtractionResult]:
+    from app.services.scraper.cccu_embedded_facts import (
+        extract_cccu_embedded_facts,
+    )
+
+    cccu_facts = extract_cccu_embedded_facts(html, url)
+    cccu_fee = cccu_facts.get("fee") if cccu_facts else None
+    if cccu_fee:
+        return [
+            ExtractionResult(
+                field_key="international_fee",
+                value=cccu_fee["international_fee"],
+                normalized={
+                    key: cccu_fee.get(key)
+                    for key in (
+                        "international_fee",
+                        "currency",
+                        "fee_term",
+                        "fee_year",
+                    )
+                },
+                confidence=0.99,
+                snippet=cccu_fee["snippet"],
+                method="fee.cccu_embedded_course_year",
+            )
+        ]
+
     # Structural pre-pass FIRST — see _extract_strong_label_value for
     # the rationale. When the page publishes the international tuition
     # fee as an unambiguous `<strong>International tuition fees</strong>`
