@@ -6,6 +6,21 @@ from app.services.scraper.central_pages import (
     _parse_program_keyed_english_tables,
 )
 from app.services.scraper.config.loader import get_config_for_host
+def test_mdx_recipe_uses_current_catalogue_sitemap() -> None:
+    cfg = get_config_for_host(
+        hostname="www.mdx.ac.uk",
+        name="Middlesex University",
+        scrape_url="https://www.mdx.ac.uk",
+        university_id=83,
+        create_missing_stub=False,
+    )
+
+    assert cfg.discovery.sitemap_url == "https://www.mdx.ac.uk/sitemap.xml"
+    assert cfg.discovery.allow_url_patterns == [
+        r"/courses/(?:undergraduate|postgraduate)/[^/?#]+/?$"
+    ]
+
+
 from app.services.scraper.pipelines.single_course import (
     _select_central_english_program,
 )

@@ -8,6 +8,7 @@ hostname_guard: www.mdx.ac.uk
 discovery:
   # Preserved from the production operator recipe during migration from the
   # former ID-specific file to this hostname-owned recipe.
+  sitemap_url: "https://www.mdx.ac.uk/sitemap.xml"
   allow_url_patterns:
     - '/courses/(?:undergraduate|postgraduate)/[^/?#]+/?$'
 
