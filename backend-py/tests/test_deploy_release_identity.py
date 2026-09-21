@@ -471,6 +471,7 @@ def test_guarded_release_builds_and_verifies_frontend_before_success() -> None:
     previous_moved = script.index("frontend_previous_moved=1", move_previous)
     published = script.index("frontend_published=1", previous_moved)
     publish = script.index('mv "$frontend_stage" "$frontend_dist"', build)
+    nginx_reload = script.index("systemctl reload nginx.service", publish)
     restart = script.index("systemctl restart uni-api-py.service uni-celery.service")
     public_verify = script.index('--public-url "$public_url"', restart)
     success = script.index('echo "DEPLOYED_RELEASE=$target"')
@@ -483,6 +484,7 @@ def test_guarded_release_builds_and_verifies_frontend_before_success() -> None:
         < previous_moved
         < published
         < publish
+        < nginx_reload
         < restart
         < public_verify
         < success
@@ -569,6 +571,8 @@ def test_frontend_cleanup_restores_previous_dist_after_publish_move_failure(
     function_start = script.index("cleanup_frontend_release() {")
     function_end = script.index("\n}\ncleanup_release()", function_start) + 2
     cleanup_function = script[function_start:function_end]
+    cleanup_reload = cleanup_function.index("systemctl reload nginx.service")
+    assert cleanup_reload > cleanup_function.index('mv "$frontend_previous" "$frontend_dist"')
     frontend_dist = tmp_path / "dist" / "public"
     previous = tmp_path / "previous"
     stage = tmp_path / "stage"
@@ -591,6 +595,7 @@ def test_frontend_cleanup_restores_previous_dist_after_publish_move_failure(
                 "frontend_previous_moved=1\n"
                 "frontend_published=1\n"
                 "release_succeeded=0\n"
+                    "release_test_mode=1\n"
                 "cleanup_frontend_release\n"
             ),
         ],

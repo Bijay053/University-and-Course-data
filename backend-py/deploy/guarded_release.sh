@@ -73,6 +73,10 @@ cleanup_frontend_release() {
       mkdir -p "$(dirname "$frontend_dist")"
       mv "$frontend_previous" "$frontend_dist"
     fi
+    if [ "$release_test_mode" != 1 ]; then
+      # Clear Nginx's cached file metadata after restoring the previous inode.
+      nginx -t >/dev/null 2>&1 && systemctl reload nginx.service || true
+    fi
   fi
   rm -rf "$frontend_stage"
   if [ "$release_succeeded" = 1 ]; then
@@ -242,6 +246,10 @@ mkdir -p "$(dirname "$frontend_dist")"
 frontend_published=1
 mv "$frontend_stage" "$frontend_dist"
 frontend_stage=""
+if [ "$release_test_mode" != 1 ]; then
+  nginx -t
+  systemctl reload nginx.service
+fi
 
 release_env="$(mktemp backend-py/.release.env.XXXXXX)"
 sudo -u ubuntu /opt/university-portal/backend-py/.venv/bin/python -B "$reconciler" verify-tracked \
