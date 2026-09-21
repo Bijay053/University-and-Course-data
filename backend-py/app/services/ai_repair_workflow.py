@@ -234,7 +234,11 @@ async def owns(session: dict, db) -> bool:
 
 async def finish(session: dict, db, phase: str, reason: str, *, failed: bool = False) -> dict:
     session["autonomous"].update(phase=phase, reason=reason)
-    session.update(status="failed" if failed else "completed", completed_at=now())
+    session.update(
+        status="failed" if failed else "completed",
+        completed_at=now(),
+        final_verdict=reason,
+    )
     if failed:
         session["error"] = reason
     await save(session, db)
@@ -581,6 +585,7 @@ def compare_quality(
     unresolved = [key for key in fields if after.get(key, 0) < 100]
     stats = (child.discovered_config or {}).get("pipeline_stats") or {}
     gates = child.gate_skip_counts or {}
+    persisted_quality = gates.get("data_quality") or {}
     guard = gates.get("catalogue_guard") or stats.get("catalogue_floor_guard")
     contamination = {
         key: stats.get(key) or gates.get(key) for key in
@@ -596,19 +601,27 @@ def compare_quality(
         "contamination": contamination,
         "unsafe_children": [],
     }
+    critical_quality_count = max(
+        int(after.get("critical_quality_count") or 0),
+        int(persisted_quality.get("affected_course_count") or 0),
+        int(persisted_quality.get("critical_count") or 0),
+        int(safety.get("critical_quality_count") or 0),
+    )
     clean = (
         child.status == "completed" and child.imported > 0 and child.errors == 0
         and child.imported >= child.total_found and child.skipped == 0
         and after.get("total_staged", 0) > 0 and not child.cost_ceiling_hit
         and not regressions and not unresolved
         and not after.get("bad_course_names") and not after.get("bad_locations")
-        and not after.get("critical_quality_count")
+        and critical_quality_count == 0
         and not guard and not contamination
         and safety.get("safe") is True
     )
     return {
         "baseline": before, "verification": after, "regressions": regressions,
         "unresolved_fields": unresolved, "sample_verified": clean,
+        "critical_quality_count": critical_quality_count,
+        "critical_quality": persisted_quality,
         "catalogue_guard": guard, "contamination": contamination,
         "combined_safety": safety,
         "full_catalogue_verified": False, "scope": "bounded fresh verification; full catalogue coverage unverified",
@@ -717,6 +730,7 @@ def _combined_child_safety(children: list[ScrapeRuntimeJob]) -> dict:
     unsafe_children: list[dict] = []
     catalogue_guards: list[dict] = []
     contamination: dict[str, int] = {}
+    critical_quality_count = 0
     cumulative_elapsed = 0.0
     for index, item in enumerate(children):
         if not item:
@@ -725,6 +739,12 @@ def _combined_child_safety(children: list[ScrapeRuntimeJob]) -> dict:
         metadata = verification_metadata(item)
         stats = (item.discovered_config or {}).get("pipeline_stats") or {}
         gates = item.gate_skip_counts or {}
+        persisted_quality = gates.get("data_quality") or {}
+        child_critical_quality_count = max(
+            int(persisted_quality.get("affected_course_count") or 0),
+            int(persisted_quality.get("critical_count") or 0),
+        )
+        critical_quality_count += child_critical_quality_count
         guard = gates.get("catalogue_guard") or stats.get("catalogue_floor_guard")
         if guard:
             catalogue_guards.append({"job_id": item.runtime_job_id, "guard": guard})
@@ -768,6 +788,8 @@ def _combined_child_safety(children: list[ScrapeRuntimeJob]) -> dict:
             reasons.append("catalogue_guard")
         if child_contamination:
             reasons.append("contamination")
+        if child_critical_quality_count:
+            reasons.append("critical_data_quality")
         if reasons:
             unsafe_children.append({"job_id": item.runtime_job_id, "reasons": reasons})
         cumulative_elapsed += _child_elapsed(item)
@@ -776,6 +798,7 @@ def _combined_child_safety(children: list[ScrapeRuntimeJob]) -> dict:
         "unsafe_children": unsafe_children,
         "catalogue_guards": catalogue_guards,
         "contamination": contamination,
+        "critical_quality_count": critical_quality_count,
         "cumulative_elapsed_seconds": round(cumulative_elapsed, 3),
     }
 

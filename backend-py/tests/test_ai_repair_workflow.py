@@ -283,6 +283,11 @@ def quality(**overrides):
         (child(cost_ceiling_hit=True), quality(), "needs_review"),
         (child(gate_skip_counts={"catalogue_guard": {"kind": "catalogue_below_expected_min"}}),
          quality(), "needs_review"),
+        (child(gate_skip_counts={"data_quality": {
+            "critical_count": 2,
+            "affected_course_count": 1,
+            "critical_issues": [{"code": "international_fee_suspiciously_low"}],
+        }}), quality(), "needs_review"),
         (child(discovered_config={"pipeline_stats": {"contamination_count": 1}}), quality(), "needs_review"),
         (child(discovered_config={"autonomousVerification": {"max_courses": 3, "capped": True}}),
          quality(), "needs_review"),
@@ -305,17 +310,46 @@ async def test_child_reconciliation_is_truthful(memory, monkeypatch, job, after,
     memory.evidence = session(
         worker_claim="delivery", phase="verifying", verification_job_id="child",
     )
-    memory.evidence.update(status="running", quality_before=quality())
+    memory.evidence.update(
+        status="running",
+        quality_before=quality(),
+        final_verdict="Config saved; a verification scrape is still required.",
+    )
     memory.jobs["child"] = job
     monkeypatch.setattr(workflow.agent, "_quality_snapshot", AsyncMock(return_value=after))
     result = await workflow.reconcile("parent", "session-1", DB(memory))
     assert result["status"] == "completed"
     assert result["autonomous"]["phase"] == expected
+    expected_verdict = (
+        "Bounded fresh verification passed; full catalogue coverage is not certified."
+        if expected == "verified"
+        else "Verification failed, regressed, or left unresolved quality/coverage; manual review required."
+    )
+    assert result["final_verdict"] == expected_verdict
+    assert result["autonomous"]["reason"] == expected_verdict
     assert result["autonomous"]["comparison"]["full_catalogue_verified"] is False
     assert result["autonomous"]["verification_status"] == job.status
     workflow.agent.release_repair_lease.assert_called_once()
 
+@pytest.mark.asyncio
+async def test_awaiting_human_decision_replaces_pre_verification_verdict(memory):
+    memory.evidence = session(
+        worker_claim="delivery", phase="verifying", verification_job_id="child",
+    )
+    memory.evidence.update(
+        status="running",
+        final_verdict="Config saved; a verification scrape is still required.",
+    )
+    memory.jobs["child"] = child("awaiting_approval")
 
+    result = await workflow.reconcile("parent", "session-1", DB(memory))
+
+    verdict = "Verification requires a human decision; no approval or publication was performed."
+    assert result["status"] == "completed"
+    assert result["autonomous"]["phase"] == "needs_review"
+    assert result["autonomous"]["verification_status"] == "awaiting_approval"
+    assert result["final_verdict"] == verdict
+    assert result["autonomous"]["reason"] == verdict
 @pytest.mark.asyncio
 async def test_time_budget_exhaustion_is_not_reported_as_course_cap(memory, monkeypatch):
     memory.evidence = session(
@@ -620,6 +654,7 @@ async def test_repeated_broker_failures_exhaust_dispatch_cap_without_duplicate_c
         else:
             assert result["status"] == "failed"
             assert result["autonomous"]["recovery_exhausted"] is True
+            assert result["final_verdict"] == result["autonomous"]["reason"]
     assert dispatch.call_count == 2
     assert len(memory.added) == 0
     assert memory.evidence["autonomous"]["verification_job_id"] == "child"
@@ -866,7 +901,6 @@ async def test_monitor_persists_same_worker_live_phase_and_evidence(monkeypatch)
     evidence["autonomous"].update(phase="verifying", verification_job_id="child")
     workflow.merge_live_progress(evidence, live)
     assert evidence["autonomous"]["phase"] == "verifying"
-
 
 @pytest.mark.asyncio
 async def test_hard_killed_repair_remains_fenced(memory):
