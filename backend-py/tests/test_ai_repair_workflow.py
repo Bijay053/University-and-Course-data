@@ -432,6 +432,16 @@ def test_no_improvement_requires_independently_valid_recipe():
         attempts=[{"outcome": "no_change", "patches_proposed": [{"field": "unsafe"}]}],
     )
     assert not workflow.accepted_live_probe(evidence)
+    evidence["attempts"] = [{
+        "outcome": "no_change",
+        "patches_proposed": [],
+        "patches_applied": [],
+        "rollback_status": "unchanged",
+        "success_criteria": {"overall_ok": True, "criteria_pass": 6},
+    }]
+    assert workflow.accepted_live_probe(evidence)
+    evidence["attempts"][0]["success_criteria"]["overall_ok"] = False
+    assert not workflow.accepted_live_probe(evidence)
     evidence["attempts"] = [{"outcome": "no_change", "root_cause": "stale_job_evidence"}]
     assert workflow.accepted_live_probe(evidence)
     evidence["attempts"] = [{

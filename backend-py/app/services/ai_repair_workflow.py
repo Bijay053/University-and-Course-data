@@ -283,9 +283,16 @@ def accepted_live_probe(session: dict) -> bool:
         return last.get("patch_applied_ok") is True and (last.get("live_validation") or {}).get("accepted") is True
     # A known-valid current recipe is the sole no-improvement exception.
     # Rejected/stripped unsafe proposals must not piggyback on an initial probe.
+    criteria = last.get("success_criteria") or {}
+    unchanged_valid_recipe = (
+        criteria.get("overall_ok") is True
+        and not last.get("patches_applied")
+        and last.get("rollback_status") in {None, "unchanged"}
+    )
     return not last.get("patches_proposed") and (
         (last.get("live_validation") or {}).get("accepted") is True
         or last.get("root_cause") == "stale_job_evidence"
+        or unchanged_valid_recipe
     )
 
 
