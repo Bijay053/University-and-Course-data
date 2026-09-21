@@ -5,7 +5,11 @@
 
 hostname_guard: www.mdx.ac.uk
 
-discovery: {}
+discovery:
+  # Preserved from the production operator recipe during migration from the
+  # former ID-specific file to this hostname-owned recipe.
+  allow_url_patterns:
+    - '/courses/(?:undergraduate|postgraduate)/[^/?#]+/?$'
 
 extraction:
   fees:
