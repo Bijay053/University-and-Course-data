@@ -7,8 +7,8 @@ import argparse
 from html.parser import HTMLParser
 from pathlib import Path
 import re
+import subprocess
 import urllib.parse
-import urllib.request
 
 
 HASHED_JAVASCRIPT = re.compile(r"(?:^|/)assets/[^/?#]+-[A-Za-z0-9_-]{8,}\.js$")
@@ -59,20 +59,30 @@ def verify_local_build(dist: Path, marker: bytes) -> list[str]:
 
 
 def _fetch(url: str) -> bytes:
-    request = urllib.request.Request(
-        url,
-        headers={
-            "Cache-Control": "no-cache",
-            "Pragma": "no-cache",
-            # The public edge rejects Python's default urllib user agent even
-            # though the same cache-busted release URL is available to normal
-            # browsers and curl.
-            "User-Agent": "Mozilla/5.0 UniversityPortalReleaseVerifier/1.0",
-        },
+    # The public edge rejects Python urllib's client fingerprint with HTTP 403
+    # even when its headers match a browser. curl reaches the exact same
+    # cache-busted URL reliably from the release host.
+    result = subprocess.run(
+        [
+            "curl",
+            "--fail",
+            "--silent",
+            "--show-error",
+            "--location",
+            "--max-time",
+            "30",
+            "--header",
+            "Cache-Control: no-cache",
+            "--header",
+            "Pragma: no-cache",
+            "--user-agent",
+            "Mozilla/5.0 UniversityPortalReleaseVerifier/1.0",
+            url,
+        ],
+        check=True,
+        capture_output=True,
     )
-    with urllib.request.urlopen(request, timeout=30) as response:
-        assert response.status == 200, f"Unexpected HTTP {response.status} for {url}"
-        return response.read()
+    return result.stdout
 
 
 def verify_public_build(
