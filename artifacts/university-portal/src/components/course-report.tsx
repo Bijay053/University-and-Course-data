@@ -7,7 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { readResponseJson } from "@/lib/readResponseJson";
 
 type Report = {
-  job_id: string; status: string; found: number; staged: number; skipped: number; errors: number;
+  job_id: string; report_id?: string; original_job_id?: string;
+  status: string; found: number; staged: number; skipped: number; errors: number;
   error?: string; processed?: number; exclusions: Record<string, unknown>;
   request: {
     kind: string; eligibility_review?: boolean; expected_count?: number; description?: string; fields?: string[];
@@ -15,6 +16,14 @@ type Report = {
   };
   verification?: { capped?: boolean };
   recovery?: { phase?: string; reason?: string; next_action?: string; exhausted?: boolean };
+  continuation?: {
+    available: boolean; remaining_urls: string[]; remaining_count: number; completed_count: number;
+    selected_count: number; reason?: string; run_count: number;
+  };
+  children?: Array<{
+    job_id: string; status: string; staged: number; processed?: number; found?: number;
+    skipped?: number; errors?: number;
+  }>;
 };
 type Values = {
   kind: "missing" | "incorrect"; eligibilityReview: boolean; urls: string; catalogue: string;
@@ -42,6 +51,9 @@ export function CourseReport({ jobId, onReview, onStarted }: {
   const [historyError, setHistoryError] = useState("");
   const [loading, setLoading] = useState(true);
   const [refresh, setRefresh] = useState(0);
+  const [continuationReviewed, setContinuationReviewed] = useState<Record<string, boolean>>({});
+  const [continuationBusy, setContinuationBusy] = useState<string | null>(null);
+  const [continuationErrors, setContinuationErrors] = useState<Record<string, string>>({});
   const form = useForm<Values>({ defaultValues: defaults });
   const kind = form.watch("kind");
   useEffect(() => {
@@ -61,6 +73,47 @@ export function CourseReport({ jobId, onReview, onStarted }: {
     const interval = setInterval(load, 15000);
     return () => { disposed = true; clearInterval(interval); };
   }, [jobId, refresh]);
+
+  useEffect(() => {
+    setContinuationReviewed({});
+    setContinuationBusy(null);
+    setContinuationErrors({});
+  }, [jobId]);
+
+  const continueReport = async (report: Report) => {
+    if (!continuationReviewed[report.job_id] || continuationBusy) return;
+    setContinuationBusy(report.job_id);
+    setContinuationErrors(previous => ({ ...previous, [report.job_id]: "" }));
+    try {
+      const response = await fetch(
+        `/api/scrape/jobs/${encodeURIComponent(jobId)}/course-reports/${encodeURIComponent(report.job_id)}/continue`,
+        {
+          method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reviewed: true }),
+        },
+      );
+      const data = await readResponseJson<Report & { detail?: unknown }>(response);
+      if (!response.ok || !data) {
+        const detail = data && "detail" in data ? data.detail : undefined;
+        throw new Error(typeof detail === "string" ? detail : "Could not continue recovery");
+      }
+      if (data.job_id) {
+        setReports(previous => previous.map(item =>
+          (report.report_id && item.report_id === report.report_id) || item.job_id === report.job_id ? data : item
+        ));
+      }
+      setContinuationReviewed(previous => ({ ...previous, [report.job_id]: false }));
+      setRefresh(value => value + 1);
+      onStarted?.();
+    } catch (e) {
+      setContinuationErrors(previous => ({
+        ...previous,
+        [report.job_id]: e instanceof Error ? e.message : "Could not continue recovery",
+      }));
+    } finally {
+      setContinuationBusy(null);
+    }
+  };
 
   const submit = form.handleSubmit(async values => {
     setError("");
@@ -113,7 +166,7 @@ export function CourseReport({ jobId, onReview, onStarted }: {
           <option value="missing">Missing courses</option><option value="incorrect">Incorrect fields</option>
         </select>
       </label>
-      <label className="block text-sm">Official course URLs (one per line, maximum 50)
+        <label className="block text-sm">Official course URLs (one per line; processed in bounded batches)
         <Textarea {...form.register("urls")} rows={3} data-testid="input-report-urls" />
       </label>
       {kind === "missing" && <>
@@ -146,12 +199,29 @@ export function CourseReport({ jobId, onReview, onStarted }: {
       </Button>
     </form></Form>}
     {loading && <p className="text-xs">Loading report history…</p>}
-    {reports.map(report => <article key={report.job_id} className="space-y-2 rounded border bg-background p-3 text-sm" data-testid={`report-${report.job_id}`}>
+    {reports.map(report => <article key={report.report_id ?? report.job_id} className="space-y-2 rounded border bg-background p-3 text-sm" data-testid={`report-${report.job_id}`}>
       <p><strong>{report.request.kind === "missing" ? "Missing course recovery" : "Incorrect field recovery"}</strong> — {report.status}</p>
       {report.request.eligibility_review && <p className="text-xs">Eligibility review requested; only page-owned foundation/pathway evidence can recover this page.</p>}
       {report.request.description && <p>{report.request.description}</p>}
       {report.request.fields?.length ? <p>Reported fields: {report.request.fields.join(", ")}</p> : null}
-      <p>{report.found} found · {report.processed ?? 0} processed · {report.staged} staged · {report.skipped} skipped · {report.errors} errors</p>
+      <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label="Recovery counts">
+        <div className="rounded border p-2" data-testid={`report-processed-${report.job_id}`}>
+          <dt className="text-xs text-muted-foreground">Processed</dt>
+          <dd className="font-semibold">{report.continuation?.completed_count ?? report.processed ?? 0}</dd>
+        </div>
+        <div className="rounded border p-2" data-testid={`report-staged-${report.job_id}`}>
+          <dt className="text-xs text-muted-foreground">Staged for review</dt>
+          <dd className="font-semibold">{report.staged}</dd>
+        </div>
+        <div className="rounded border p-2" data-testid={`report-remaining-${report.job_id}`}>
+          <dt className="text-xs text-muted-foreground">Remaining</dt>
+          <dd className="font-semibold">{report.continuation?.remaining_count ?? 0}</dd>
+        </div>
+      </dl>
+      <p className="text-xs text-muted-foreground">
+        {report.found} found · {report.skipped} skipped · {report.errors} errors
+        {report.continuation ? ` · ${report.continuation.selected_count} selected · ${report.continuation.run_count} bounded ${report.continuation.run_count === 1 ? "run" : "runs"}` : ""}
+      </p>
       <details className="text-xs">
         <summary className="cursor-pointer" data-testid={`button-report-sources-${report.job_id}`}>Reported official sources</summary>
         {[...(report.request.course_urls ?? []), report.request.catalogue_url, report.request.source_url]
@@ -167,6 +237,74 @@ export function CourseReport({ jobId, onReview, onStarted }: {
       {report.recovery?.exhausted && <p className="text-xs text-destructive">
         Automatic delivery retries exhausted. Check the connection and submit a new report to retry.
       </p>}
+      {report.continuation && report.continuation.remaining_count > 0 && <div
+        className="space-y-2 rounded border border-amber-200 bg-amber-50 p-3 text-amber-950"
+        data-testid={`continuation-${report.job_id}`}
+      >
+        <p className="font-medium">More reported URLs remain</p>
+        <p className="text-xs">
+          Continuing starts another bounded run of up to 50 courses, 600 seconds, and $2.
+          It does not verify the full catalogue, and any newly staged courses will still require review.
+        </p>
+        <details className="text-xs">
+          <summary className="cursor-pointer" data-testid={`button-remaining-urls-${report.job_id}`}>
+            Review {report.continuation.remaining_count} remaining {report.continuation.remaining_count === 1 ? "URL" : "URLs"}
+          </summary>
+          {report.continuation.remaining_urls.map((url, index) => <a
+            key={`${url}-${index}`} className="block break-all underline" href={url} target="_blank" rel="noreferrer"
+            data-testid={`link-remaining-url-${report.job_id}-${index}`}
+          >{url}</a>)}
+        </details>
+        {report.continuation.reason && <p className="text-xs">{report.continuation.reason}</p>}
+        {report.continuation.available ? <>
+          <label className="flex items-start gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={Boolean(continuationReviewed[report.job_id])}
+              disabled={Boolean(continuationBusy)}
+              onChange={event => setContinuationReviewed(previous => ({
+                ...previous, [report.job_id]: event.target.checked,
+              }))}
+              data-testid={`checkbox-continuation-review-${report.job_id}`}
+            />
+            <span>
+              I reviewed the remaining URL list and understand the next run is limited to 50 courses,
+              600 seconds, and $2.
+            </span>
+          </label>
+          <Button
+            size="sm"
+            type="button"
+            disabled={!continuationReviewed[report.job_id] || Boolean(continuationBusy)}
+            onClick={() => void continueReport(report)}
+            data-testid={`button-continue-report-${report.job_id}`}
+          >
+            {continuationBusy === report.job_id ? "Starting next run…" : "Continue bounded recovery"}
+          </Button>
+        </> : <p className="text-xs" role="status">
+          Continuation is not available for this report{report.continuation.reason ? `: ${report.continuation.reason}` : "."}
+        </p>}
+        {continuationErrors[report.job_id] && <p
+          className="text-xs text-destructive" role="alert" data-testid={`continuation-error-${report.job_id}`}
+        >{continuationErrors[report.job_id]}</p>}
+      </div>}
+      {report.children?.some(child => child.job_id !== report.job_id) && <div className="space-y-2" data-testid={`report-run-history-${report.report_id ?? report.job_id}`}>
+        <p className="text-xs font-medium">Prior bounded runs</p>
+        {report.children.filter(child => child.job_id !== report.job_id).map((child, index) => <div
+          key={child.job_id} className="flex flex-wrap items-center justify-between gap-2 rounded border p-2 text-xs"
+          data-testid={`report-child-${child.job_id}`}
+        >
+          <span>
+            Run {index + 1} — {child.status} · {child.processed ?? child.found ?? 0} processed · {child.staged} staged
+          </span>
+          {child.staged > 0 && <Button
+            size="sm" variant="outline" onClick={() => onReview(child.job_id)}
+            data-testid={`button-review-report-${child.job_id}`}
+          >
+            Review {child.staged} staged {child.staged === 1 ? "course" : "courses"}
+          </Button>}
+        </div>)}
+      </div>}
       {report.staged > 0 ? (
         <Button size="sm" variant="outline" onClick={() => onReview(report.job_id)} data-testid={`button-review-report-${report.job_id}`}>
           Review {report.staged} staged {report.staged === 1 ? "course" : "courses"}

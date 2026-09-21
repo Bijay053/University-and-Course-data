@@ -835,6 +835,9 @@ async def _queue_verification_continuation(
     db,
 ) -> dict | None:
     """Queue one exact-remaining-URL child after terminal timeout acknowledgement."""
+    if session.get("course_report"):
+        # Report continuation always requires a fresh explicit operator review.
+        return None
     state = session["autonomous"]
     round_index = int(state.get("verification_round") or 0)
     if (

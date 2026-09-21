@@ -148,6 +148,70 @@ def persist_verification_metadata(job, limits: VerificationLimits, **updates) ->
     return metadata
 
 
+async def checkpoint_report_urls(db, job, limits, urls, *, candidate_urls=()):
+    """Durably acknowledge settled outcomes before any cancellable follow-up.
+
+    This is NOT a fetch checkpoint: callers must have staged, rejected or
+    exhausted the attempt. Finish the commit even if the outer time budget
+    cancels us, then propagate cancellation. The lifecycle session must not
+    roll back/reload until this commit has settled.
+    """
+    if not limits or not (job.request_payload or {}).get("courseReport"):
+        return
+    urls = list(dict.fromkeys(url for url in urls if isinstance(url, str) and url))
+    candidate_urls = list(candidate_urls)
+    if not urls and not candidate_urls:
+        return
+    metadata = (job.discovered_config or {}).get("autonomousVerification") or {}
+    payload = job.request_payload or {}
+    candidates = list(dict.fromkeys([
+        *metadata.get("candidate_urls", []),
+        *metadata.get("selected_urls", []),
+        *payload.get("courseReportRemainingUrls", []),
+        *payload.get("course_urls", []),
+        *candidate_urls, *urls,
+    ]))
+    if (set(urls).issubset(metadata.get("completed_urls", []))
+            and candidates == metadata.get("candidate_urls")):
+        return
+    previous_config, previous_payload = job.discovered_config, job.request_payload
+    persist_verification_metadata(
+        job, limits,
+        candidate_urls=candidates,
+        completed_urls=list(dict.fromkeys([*metadata.get("completed_urls", []), *urls])),
+        completed_scope="settled attempts and eligibility exclusions; not successful recovery",
+    )
+    commit = asyncio.create_task(db.commit())
+    cancelled = False
+    try:
+        while not commit.done():
+            try:
+                await asyncio.shield(commit)
+            except asyncio.CancelledError:
+                # Also tolerate repeated stop requests while the database commits.
+                cancelled = True
+        # Surface failures rather than pretending an outcome is durable.
+        commit.result()
+    except BaseException:
+        # A later retry must not mistake an uncommitted ORM mutation for a
+        # durable acknowledgement (including after a database commit failure).
+        job.discovered_config, job.request_payload = previous_config, previous_payload
+        raise
+    if cancelled:
+        raise asyncio.CancelledError
+
+
+async def checkpoint_report_exclusions(db, job, limits, before, after):
+    """Acknowledge real exclusions, not URL aliases that remain in the work set."""
+    if not limits or not (job.request_payload or {}).get("courseReport"):
+        return
+    retained = {canonical_course_url_key(link.get("url")) for link in after}
+    await checkpoint_report_urls(db, job, limits, [
+        link.get("url") for link in before
+        if canonical_course_url_key(link.get("url")) not in retained
+    ], candidate_urls=[link["url"] for link in before if link.get("url")])
+
+
 def cap_verification_links(job, limits, links, max_courses):
     """Final boundary after provider/config overrides and route expansion."""
     cap = min(max_courses, limits.max_courses)
@@ -176,8 +240,17 @@ def cap_verification_links(job, limits, links, max_courses):
         unique_links.append(link)
     selected = unique_links[:cap]
     discovered = len(unique_links)
+    candidates = prior.get("candidate_urls") or []
+    if (job.request_payload or {}).get("courseReport"):
+        # Keep exact URLs, including query identity, BEFORE the execution cap.
+        # Never rediscover or silently enlarge this report on continuation.
+        candidates = list(dict.fromkeys([
+            *candidates,
+            *(link["url"] for link in unique_links),
+        ]))
     persist_verification_metadata(
         job, limits, discovered_candidates=discovered,
+        **({"candidate_urls": candidates} if candidates else {}),
         raw_discovered_candidates=len(links),
         duplicate_candidates_removed=len(links) - discovered,
         selected_courses=len(selected), effective_max_courses=cap,

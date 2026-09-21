@@ -36,6 +36,8 @@ from app.services.scraper.stage_course import stage_course
 from app.services.scraper.autonomous_verification import (
     VerificationBudgetExceeded,
     cap_verification_links,
+    checkpoint_report_urls,
+    checkpoint_report_exclusions,
     persist_verification_metadata,
     run_bounded_verification,
     schedule_snapshot,
@@ -1036,6 +1038,7 @@ async def _settle_course_with_retries(
     sleep=asyncio.sleep,
     max_retries: int = 2,
     max_elapsed_seconds: float | None = None,
+    record_settled=None,
 ):
     """Run bounded cooldown retries and advance progress once after settlement."""
     started_at = time.monotonic()
@@ -1060,12 +1063,31 @@ async def _settle_course_with_retries(
                 and time.monotonic() - started_at + retry_delay
                 >= max(0.0, float(max_elapsed_seconds))
             ):
+                if record_settled is not None:
+                    await record_settled(link, result)
                 await record_complete(link)
                 return result
             retry_count += 1
             continue
+        if record_settled is not None:
+            await record_settled(link, result)
         await record_complete(link)
         return result
+
+
+async def _checkpoint_extraction_outcome(db, job, limits, link, result):
+    # Success has not reached staging yet and must remain resumable. Failures
+    # and skips are settled once retry handling above is exhausted.
+    if isinstance(result, Exception) or (
+        isinstance(result, dict) and (result.get("error") or result.get("_retry_after"))
+    ):
+        await checkpoint_report_urls(db, job, limits, [link.get("url")])
+
+
+async def _filter_report_non_degree_candidates(db, job, limits, links, **kwargs):
+    retained, dropped = filter_non_degree_candidates(links, **kwargs)
+    await checkpoint_report_exclusions(db, job, limits, links, retained)
+    return retained, dropped
 
 
 async def _stop_poller(runtime_job_id: str, stop_flag: list[bool]) -> None:
@@ -4751,6 +4773,10 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 _gate_detail_pats.append(re.compile(_gdp))
             except Exception:  # noqa: BLE001 — skip invalid regex
                 pass
+        await checkpoint_report_urls(
+            db, job, _verification, [],
+            candidate_urls=[link["url"] for link in links if link.get("url")],
+        )
         if is_blocked_page is not None and links:
             kept: list[dict] = []
             block_counts: dict[str, int] = {}
@@ -4769,6 +4795,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                     _b, _r = (False, "")
                 if _b:
                     block_counts[_r] = block_counts.get(_r, 0) + 1
+                    await checkpoint_report_urls(db, job, _verification, [_u])
                     await emit(
                         "status",
                         f"[EXTRACT] gate dropped ({_r}): {_n or _u}",
@@ -4795,6 +4822,14 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         # Accumulate dropped URL samples across all filter passes so we can
         # persist them in pipeline_stats for the repair-candidates endpoint.
         _filter_dropped_sample: list[str] = []
+        _report_filter_links = list(links)
+
+        async def _checkpoint_filtered_report_links(retained):
+            nonlocal _report_filter_links
+            await checkpoint_report_exclusions(
+                db, job, _verification, _report_filter_links, retained,
+            )
+            _report_filter_links = list(retained)
 
         # ── Domain Safety Guard ───────────────────────────────────────────────
         # Reject any discovered link whose apex domain differs from the scrape
@@ -4847,6 +4882,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                     _dom_bad_links.append(_lnk)
 
             if _dom_bad_links:
+                await _checkpoint_filtered_report_links(_dom_ok_links)
                 _bad_sample = [
                     (_b if isinstance(_b, str) else _b.get("url", ""))
                     for _b in _dom_bad_links[:5]
@@ -5031,6 +5067,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 links = _kept_links
                 _allow_dropped = _pre_allow - len(links)
                 if _allow_dropped:
+                    await _checkpoint_filtered_report_links(links)
                     _drop_pct = (_allow_dropped / _pre_allow * 100) if _pre_allow else 0
                     _dropped_sample_urls = [
                         _lk.get("url", "") for _lk in _dropped_links[:10] if _lk.get("url")
@@ -5089,6 +5126,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             ]
             _mc_dropped = _pre_mc - len(links)
             if _mc_dropped:
+                await _checkpoint_filtered_report_links(links)
                 log.info(
                     "[EXTRACT] must_contain=%s: kept %d / %d (dropped %d URLs)",
                     _mc_lower, len(links), _pre_mc, _mc_dropped,
@@ -5165,10 +5203,12 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                             "[DISCOVER] YAML course detail filter: dropped listing URL %s",
                             _lk_url,
                         )
+                        await checkpoint_report_urls(db, job, _verification, [_lk_url])
                         _cdp_dropped.append(_lk)
                 links = _cdp_kept
                 _cdp_n_dropped = _pre_cdp - len(links)
                 if _cdp_n_dropped:
+                    await _checkpoint_filtered_report_links(links)
                     _filter_dropped_sample.extend(
                         d.get("url", "") for d in _cdp_dropped[:10] if d.get("url")
                     )
@@ -5209,6 +5249,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                     dict(_sit_fee_cfg.central_fee_course_aliases or {}),
                 )
                 if _sit_unlisted:
+                    await _checkpoint_filtered_report_links(links)
                     _filter_dropped_sample.extend(
                         item.get("url", "") for item in _sit_unlisted[:10]
                     )
@@ -5235,6 +5276,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         if links and _discovery_hostname in {"sit.ac.nz", "www.sit.ac.nz"}:
             links, _sit_duplicates = deduplicate_sit_course_urls(links)
             if _sit_duplicates:
+                await _checkpoint_filtered_report_links(links)
                 summary["discovery_duplicates"] = (
                     int(summary.get("discovery_duplicates", 0) or 0)
                     + _sit_duplicates
@@ -5263,6 +5305,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             links, _uwa_rewritten, _uwa_duplicates = (
                 canonicalize_uwa_sitecore_course_urls(links)
             )
+            _report_filter_links = list(links)
             if _uwa_rewritten or _uwa_duplicates:
                 log.info(
                     "[EXTRACT] UWA Sitecore canonicalization: rewrote %d URLs; "
@@ -5302,6 +5345,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                     _strip_query_params,
                 )
             )
+            _report_filter_links = list(links)
             if _query_rewritten or _query_duplicates:
                 log.info(
                     "[YAML] stripped query parameters %s from %d URLs; "
@@ -5331,6 +5375,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         if links:
             links, _query_year_duplicates = deduplicate_latest_course_year_queries(links)
             if _query_year_duplicates:
+                await _checkpoint_filtered_report_links(links)
                 log.info(
                     "[EXTRACT] latest-year query dedup: dropped %d older variants",
                     _query_year_duplicates,
@@ -5396,6 +5441,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             ]
             _rbp_dropped_r = _pre_rbp_r - len(links)
             if _rbp_dropped_r:
+                await _checkpoint_filtered_report_links(links)
                 log.info(
                     "[RECIPE] block_url_patterns=%s: dropped %d URLs (%d remain)",
                     _recipe_block_pats_r, _rbp_dropped_r, len(links),
@@ -5418,6 +5464,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             ]
             _iym_dropped_r = _pre_iym_r - len(links)
             if _iym_dropped_r:
+                await _checkpoint_filtered_report_links(links)
                 log.info(
                     "[RECIPE] ignore_urls_matching: dropped %d URLs (%d remain)",
                     _iym_dropped_r, len(links),
@@ -5440,6 +5487,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             ]
             _ign_yr_dropped_r = _pre_ign_r - len(links)
             if _ign_yr_dropped_r:
+                await _checkpoint_filtered_report_links(links)
                 log.info(
                     "[RECIPE] course_year.ignore_years=%s: dropped %d URLs (%d remain)",
                     _cy_ignore_yrs_r, _ign_yr_dropped_r, len(links),
@@ -5502,6 +5550,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 _dedup_dropped_r += len(_versions_r) - 1
 
             if _dedup_dropped_r:
+                await _checkpoint_filtered_report_links(_kept_r)
                 log.info(
                     "[RECIPE] year dedup (mode=%s preferred=%s): dropped %d duplicate-year URLs, kept %d / %d",
                     _cy_mode_r, _cy_preferred_r, _dedup_dropped_r, len(_kept_r), len(links),
@@ -5621,6 +5670,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 _dedup_dropped_y += len(_versions_y) - 1
 
             if _dedup_dropped_y or _dedup_kept_single_y:
+                await _checkpoint_filtered_report_links(_kept_y)
                 log.info(
                     "[YAML] year dedup (mode=%s preferred=%s): dropped %d year-duplicate URLs, "
                     "kept %d unique (%d single-year courses kept unconditionally)",
@@ -5654,8 +5704,8 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             None,
         )
         if links and _ng_cfg is not None and getattr(_ng_cfg, "enabled", True):
-            links, _ng_dropped = filter_non_degree_candidates(
-                links,
+            links, _ng_dropped = await _filter_report_non_degree_candidates(
+                db, job, _verification, links,
                 enabled=True,
                 allow_url_patterns=list(getattr(_ng_cfg, "allow_url_patterns", []) or []),
                 allow_title_patterns=list(getattr(_ng_cfg, "allow_title_patterns", []) or []),
@@ -5663,6 +5713,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 force_title_patterns=list(getattr(_ng_cfg, "force_title_patterns", []) or []),
             )
             _non_degree_prefetch_count = len(_ng_dropped)
+            await _checkpoint_filtered_report_links(links)
             if _non_degree_prefetch_count:
                 summary["non_degree_prefetch_skipped"] = (
                     summary.get("non_degree_prefetch_skipped", 0)
@@ -5978,6 +6029,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                             _sd_url,
                         )
                         scrape_do_dead_flag[0] = True
+                        await checkpoint_report_urls(db, job, _verification, [link.get("url")])
                         await emit(
                             "status",
                             "[SCRAPE.DO DEAD] Scrape.do returned HTTP 401 (token invalid or"
@@ -6019,6 +6071,9 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 _record_extraction_complete,
                 sleep=_cooldown_sleep,
                 max_elapsed_seconds=_effective_course_timeout,
+                record_settled=lambda link, result: _checkpoint_extraction_outcome(
+                    db, job, _verification, link, result,
+                ),
             )
 
         # UEL source pages contain independently reviewable awards/routes.
@@ -6030,7 +6085,16 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         if _verification:
             persist_verification_metadata(
                 job, _verification, discovered_candidates=len(links),
+                **({"candidate_urls": list(dict.fromkeys([
+                    *(((job.discovered_config or {}).get("autonomousVerification") or {}).get("candidate_urls") or []),
+                    *(link["url"] for link in links if link.get("url")),
+                ]))} if (job.request_payload or {}).get("courseReport") else {}),
             )
+            # Freeze the complete known set before the expansion helper's
+            # source-fetch cap can drop the unattempted tail.
+            await db.commit()
+            if (job.request_payload or {}).get("courseReport"):
+                links = links[:min(max_courses, _verification.max_courses)]
         try:
             links = await _expand_uel_course_links_for_run(
                 links, max_courses=max_courses, targeted_retry=_targeted_retry,
@@ -6058,6 +6122,11 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 )
             )).scalars().all()
             recovered_keys = {canonical_course_url_key(url) for url in recovered_urls}
+            if (job.request_payload or {}).get("courseReport"):
+                recovered_keys.update(
+                    canonical_course_url_key(url)
+                    for url in ((job.discovered_config or {}).get("autonomousVerification") or {}).get("completed_urls", [])
+                )
             _resume_already_staged = len(recovered_keys - {"" , None})
             links = [
                 link for link in links
@@ -6655,6 +6724,11 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                     and _r.get("error") == "rejected: duplicate_name_deduplicated"
                 )
                 if _dedup_count:
+                    await checkpoint_report_urls(db, job, _verification, [
+                        result.get("url") for result in results
+                        if isinstance(result, dict)
+                        and result.get("error") == "rejected: duplicate_name_deduplicated"
+                    ])
                     log.info(
                         "[STAGE] dedup: suppressed %d duplicate-name result(s)",
                         _dedup_count,
@@ -6698,6 +6772,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 if isinstance(r, Exception):
                     summary["errors"] += 1
                     log.warning("worker raised: %s", r)
+                    await checkpoint_report_urls(db, job, _verification, [link["url"] for link in _batch_links])
                     await emit(
                         "status",
                         f"[STAGE] worker exception: {r}",
@@ -6710,6 +6785,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                     # Skip quickly without calling stage_course (empty payload would
                     # just be rejected at the staging gate anyway, wasting a DB call).
                     summary["fetch_failed"] += 1
+                    await checkpoint_report_urls(db, job, _verification, [r.get("url")])
                     # Queue for T04 sweep so the URL gets a second chance after
                     # all batches have run and the account rate-limit has cleared.
                     _queue_recovery_sweep(
@@ -6734,6 +6810,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                     )
                     continue
                 if r.get("error"):
+                    await checkpoint_report_urls(db, job, _verification, [r.get("url")])
                     _error_details = _extraction_failure_details(
                         r["error"],
                         result=r,
@@ -6901,6 +6978,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                         )
                     else:
                         _record_skip(summary, skip_reasons, "parser_error")
+                        await checkpoint_report_urls(db, job, _verification, [r.get("url")])
                         log.warning(
                             "[PARSER ERROR] %s — skipped staging; critical fields missing "
                             "after browser render: %s",
@@ -7045,6 +7123,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                             targeted_retry=_targeted_retry,
                             preserve_existing=bool(_verification),
                         )
+                        await checkpoint_report_urls(db, job, _verification, [r.get("url")])
                         _record_staged_quality_payload(
                             _all_staged_dicts,
                             payload,
@@ -7125,6 +7204,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 except Exception as exc:  # noqa: BLE001
                     summary["errors"] += 1
                     log.warning("stage_course failed for %s: %s", r.get("url"), exc)
+                    await checkpoint_report_urls(db, job, _verification, [r.get("url")])
                     await emit(
                         "status",
                         f"[STAGE] error on {r.get('name','?')}: {exc}",
@@ -7139,6 +7219,11 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 # purely cosmetic for any future code path that reads the
                 # local ``job`` instance before the next commit.
                 job.heartbeat_at = datetime.now(timezone.utc)
+            if _verification and (job.request_payload or {}).get("courseReport"):
+                # Verification batches contain one course. Acknowledge only
+                # after staging/skip/error handling settles, not after fetch:
+                # cancellation between extraction and staging must remain work.
+                await checkpoint_report_urls(db, job, _verification, [link["url"] for link in _batch_links])
             # Explicitly free the batch result list so GC can reclaim the
             # memory before the next batch's extraction begins.
             del results
@@ -8449,9 +8534,23 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         if _verification:
             # Stop before ALL mutation/dispatch hooks: conflict repair,
             # certification, CASCADE, P7 quality actions, and recovery.
+            _report_completed = {}
+            if (job.request_payload or {}).get("courseReport"):
+                metadata = (job.discovered_config or {}).get("autonomousVerification") or {}
+                _report_completed = {
+                    # Normal exhaustion also acknowledges requested URLs that
+                    # the eligibility gates excluded before extraction. This
+                    # block is never reached by timeout/cancellation.
+                    "completed_urls": list(dict.fromkeys([
+                        *metadata.get("completed_urls", []),
+                        *(job.request_payload.get("course_urls") or []),
+                    ])),
+                    "completed_scope": "settled attempts and eligibility exclusions; not successful recovery",
+                }
             persist_verification_metadata(
                 job, _verification, outcome=job.status,
                 staged_courses=summary["staged"], errors=summary["errors"],
+                **_report_completed,
             )
             await db.commit()
             return {"ok": job.status == "completed", **summary}
