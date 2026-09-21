@@ -238,6 +238,25 @@ async def test_validation_reuses_live_pages_across_repair_attempts(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_audience_repair_rejects_when_every_course_lacks_typed_evidence(
+    monkeypatch,
+):
+    fetch = AsyncMock(return_value=(course(), "", ""))
+    monkeypatch.setattr(live, "_fetch_official", fetch)
+    evidence = live.LiveRepairEvidence(context(effective_discovery={}))
+    evidence.initial = {
+        ONE: live.inspect_page(ONE, course(), config()),
+        TWO: live.inspect_page(TWO, course(), config()),
+    }
+
+    result = await evidence.validate({}, {}, {"audience_repair": True})
+
+    assert result["accepted"] is False
+    assert result["audience_proposals"] == []
+    assert any("Audience evidence missing" in reason for reason in result["reasons"])
+
+
+@pytest.mark.asyncio
 async def test_invalid_filter_attempt_does_not_spend_validation_page_budget(monkeypatch):
     fetch = AsyncMock(return_value=(course(), "", ""))
     monkeypatch.setattr(live, "_fetch_official", fetch)
@@ -311,6 +330,56 @@ def test_main_region_is_not_sufficient_field_authority(field, html):
 def test_field_authority_keeps_explicit_international_tuition_and_test():
     assert "24000" in live.field_authority_html("international_fee", course())
     assert "6.5" in live.field_authority_html("ielts_overall", course())
+
+
+def test_selector_evidence_preserves_same_panel_and_official_link():
+    html = """<main><select id="audience">
+      <option data-audience="Domestic" value="d">Domestic January 2027</option>
+      <option data-audience="International" value="i"
+              data-source="/requirements">International March 2027</option>
+    </select></main>"""
+    result = live.extract_audience_option_evidence(html, ONE, SEED)
+    assert result["status"] == "accepted"
+    assert result["same_panel"] and result["linked_official"]
+    assert {row["audience"] for row in result["evidence"]} == {"domestic", "international"}
+
+
+def test_selector_evidence_fails_closed_for_ambiguous_or_image_only_options():
+    html = """<main><select>
+      <option data-audience="Domestic International"></option>
+    </select></main>"""
+    result = live.extract_audience_option_evidence(html, ONE, SEED)
+    assert result["status"] == "needs_review"
+    assert result["evidence"] == []
+
+
+def test_custom_listbox_identity_and_background_control_fail_closed():
+    html = """<main>
+      <div role="listbox" id="audience">
+        <div role="option" data-audience="International">International</div>
+        <div role="option"><span style="background-image:url(flag.png)"></span></div>
+      </div>
+      <div role="listbox" class="audience-background" style="background:url(flag.png)"></div>
+    </main>"""
+    result = live.extract_audience_option_evidence(html, ONE, SEED)
+    assert result["status"] == "needs_review"
+
+
+def test_linked_recipe_requires_official_source_and_balanced_audiences():
+    from app.services.scraper.recipe_rules import build_audience_scoped_recipe_proposal
+    evidence = {
+        "status": "accepted", "same_panel": True, "linked_official": True,
+        "evidence": [
+            {"audience": "domestic", "intake_months": [1]},
+            {"audience": "international", "intake_months": [3],
+             "source_url": ONE, "source_official": True},
+        ],
+    }
+    result = build_audience_scoped_recipe_proposal(evidence)
+    assert result["status"] == "accepted"
+    assert result["proposals"][0]["english"]["central_page"] == ONE
+    evidence["evidence"].pop(0)
+    assert build_audience_scoped_recipe_proposal(evidence)["status"] == "needs_review"
 
 
 @pytest.mark.asyncio

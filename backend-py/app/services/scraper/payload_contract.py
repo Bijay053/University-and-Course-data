@@ -98,6 +98,13 @@ TRANSIENT_PIPELINE_PAYLOAD_FIELDS: frozenset[str] = frozenset({
     "online_only_adelaide",
     "online_only_audited_host",
     "online_only_authoritative",
+    # Typed selector provenance is consumed by recipe rules and evidence
+    # persistence; it is not a ScrapedCourse column.
+    "audience_identity",
+    "audience_provenance",
+    "intake_provenance",
+    "english_source_url",
+    "english_provenance",
     "online_only_deakin",
     "online_only_segi",
     "online_only_unisq",

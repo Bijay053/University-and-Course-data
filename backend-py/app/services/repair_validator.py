@@ -88,6 +88,30 @@ def _aggregate(samples: list[dict]) -> dict[str, Any]:
     }
 
 
+def balanced_validation_samples(samples: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    """Deterministically retain both typed audiences for isolated replay."""
+    groups = {"domestic": [], "international": [], "unknown": []}
+    for sample in samples:
+        # The caller may provide the normalized classification, or the
+        # persisted typed classification.  Never derive this from labels or
+        # arbitrary HTML: doing so is how a domestic row got attached to an
+        # international recipe in the first place.
+        value = str(
+            sample.get("audience_classification")
+            or sample.get("audience")
+            or ""
+        ).casefold()
+        key = value if value in ("domestic", "international") else "unknown"
+        groups[key].append(sample)
+    chosen: list[dict[str, Any]] = []
+    if groups["domestic"] and groups["international"]:
+        chosen.extend([groups["domestic"][0], groups["international"][0]])
+    chosen.extend(
+        item for item in samples if item not in chosen
+    )
+    return chosen[:max(0, limit)]
+
+
 async def _run_extraction(url: str, html: str, cfg) -> dict[str, Any] | None:
     """Run extract_course on the given URL+HTML with the given UniConfig."""
     try:
@@ -108,6 +132,7 @@ async def validate_proposed_fix(
     patched_cfg,
     db: AsyncSession,
     sample_count: int = 3,
+    audience_evidence: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Compare before/after extraction on sample URLs.
 
@@ -123,12 +148,12 @@ async def validate_proposed_fix(
     """
     # Get sample URLs
     urls_res = await db.execute(text("""
-        SELECT course_website FROM scraped_courses
+        SELECT DISTINCT ON (course_website) course_website FROM scraped_courses
         WHERE university_id = :uid
           AND course_website IS NOT NULL
           AND length(course_website) > 10
           AND status IN ('pending', 'review', 'approved')
-        ORDER BY completeness ASC NULLS FIRST
+        ORDER BY course_website, completeness ASC NULLS FIRST
         LIMIT :n
     """), {"uid": university_id, "n": sample_count + 2})
     sample_urls = [r[0] for r in urls_res if r[0]]
@@ -152,10 +177,86 @@ async def validate_proposed_fix(
             "skip_reason": "no sample URLs found",
         }
 
+    if audience_evidence is not None:
+        # Bind by the exact URL fetched by this validator.  A URL-normalized
+        # or name-based join is unsafe here: redirects/query variants can
+        # select a different audience panel while looking like the same
+        # course.  Reject duplicates that disagree rather than choosing one.
+        by_url: dict[str, dict[str, Any]] = {}
+        for item in audience_evidence:
+            url = item.get("url")
+            classification = str(
+                item.get("audience_classification") or item.get("audience") or ""
+            ).casefold()
+            if (
+                not isinstance(url, str)
+                or url not in sample_urls
+                or classification not in {"domestic", "international"}
+                or (url in by_url and str(
+                    by_url[url].get("audience_classification")
+                    or by_url[url].get("audience") or ""
+                ).casefold() != classification)
+            ):
+                by_url[url or ""] = {"_invalid": True}
+                continue
+            by_url[url] = item
+        bound = [
+            by_url[url] for url in sample_urls
+            if url in by_url and not by_url[url].get("_invalid")
+        ]
+        if len(bound) != len(audience_evidence):
+            return {
+                "before": {"completeness": 0, "fee_coverage": 0, "english_coverage": 0, "intake_coverage": 0, "sample_count": 0},
+                "after": {"completeness": 0, "fee_coverage": 0, "english_coverage": 0, "intake_coverage": 0, "sample_count": 0},
+                "production_completeness": production_completeness,
+                "confidence": "low", "method": "skipped",
+                "skip_reason": "audience evidence is not bound to fetched sample URLs",
+            }
+        classifications = {
+            str(item.get("audience_classification") or item.get("audience") or "").casefold()
+            for item in bound
+        }
+        if not {"domestic", "international"} <= classifications:
+            return {
+                "before": {"completeness": 0, "fee_coverage": 0, "english_coverage": 0, "intake_coverage": 0, "sample_count": 0},
+                "after": {"completeness": 0, "fee_coverage": 0, "english_coverage": 0, "intake_coverage": 0, "sample_count": 0},
+                "production_completeness": production_completeness,
+                "confidence": "low", "method": "skipped",
+                "skip_reason": "unbalanced typed domestic/international evidence; fresh live probe required",
+            }
+
     before_samples: list[dict] = []
     after_samples:  list[dict] = []
 
-    for url in sample_urls[:sample_count]:
+    replay_rows = balanced_validation_samples(
+        [
+            {
+                "url": url,
+                **(
+                    {
+                        "audience_classification": str(
+                            by_url[url].get("audience_classification")
+                            or by_url[url].get("audience")
+                        ).casefold()
+                    }
+                    if audience_evidence is not None and url in by_url
+                    else {}
+                ),
+            }
+            for url in (
+                [
+                    url for url in by_url
+                    if not by_url[url].get("_invalid")
+                    and url in sample_urls
+                ]
+                if audience_evidence is not None
+                else sample_urls
+            )
+        ],
+        sample_count,
+    )
+    for row in replay_rows:
+        url = row["url"]
         html = await _fetch_html(url)
         if html is None:
             continue

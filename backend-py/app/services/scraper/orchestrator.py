@@ -83,6 +83,62 @@ def _link_matches_post_discovery_allow(
 
 log = logging.getLogger(__name__)
 
+
+def merge_recipe_evidence(payload: dict, extraction_evidence: list[dict] | None) -> list[dict]:
+    """Move transient recipe provenance into the stage evidence stream."""
+    merged = list(extraction_evidence or [])
+    for item in payload.pop("evidence", []) or []:
+        if not any(
+            item == existing
+            or (
+                item.get("field_key") == existing.get("field_key")
+                and item.get("source_url") == existing.get("source_url")
+                and item.get("method") == existing.get("method")
+            )
+            for existing in merged
+        ):
+            merged.append(item)
+    return merged
+
+
+def apply_runtime_recipe(payload: dict, recipe: dict, extraction_evidence: list[dict] | None) -> list[dict]:
+    """Production recipe boundary used immediately before stage_course."""
+    from app.services.scraper.recipe_rules import apply_recipe_rules
+    apply_recipe_rules(payload, recipe)
+    return merge_recipe_evidence(payload, extraction_evidence)
+
+
+def recipe_central_prefetch_config(effective_config: dict, scrape_config: dict | None, scrape_url: str, allowed_hosts=()) -> dict:
+    """Add a validated recipe English source to central-page config."""
+    config = dict(effective_config or {})
+    pages = dict(config.get("uniPages") or {})
+    recipe = (scrape_config or {}).get("recipe") or {}
+    url = ((recipe.get("audience_recipe") or {}).get("english") or {}).get("central_page")
+    if url:
+        from app.services.scraper.ai_repair_live import official_url
+        if official_url(url, scrape_url, allowed_hosts):
+            pages.setdefault("requirementsPage", url)
+    if pages:
+        config["uniPages"] = pages
+    return config
+
+
+async def stage_runtime_extraction(db, *, scrape_job_id: str, university_id: int,
+                                   course_name: str, source_url: str,
+                                   extracted: dict, recipe: dict,
+                                   targeted_retry: bool = False,
+                                   preserve_existing: bool = False):
+    """Single production boundary for normal and recovery staging."""
+    payload = dict(extracted.get("payload") or {})
+    evidence = apply_runtime_recipe(payload, recipe, extracted.get("evidence"))
+    from app.services.scraper.stage_course import stage_course
+    return await stage_course(
+        db, scrape_job_id=scrape_job_id, university_id=university_id,
+        course_name=course_name, source_url=source_url, payload=payload,
+        evidence=evidence, targeted_retry=targeted_retry,
+        preserve_existing=preserve_existing,
+    )
+
 _PER_COURSE_EXTRACTION_TIMEOUT_SECONDS = float(
     getattr(settings, "per_course_extraction_timeout_s", 90.0)
 )
@@ -4510,6 +4566,17 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 if discovered:
                     effective_config.setdefault("uniPages", {})["feePage"] = discovered
 
+            # A validated audience recipe may point at the official English
+            # requirements page without an admin_config uniPages entry. Feed
+            # that URL through the same bounded central prefetch path; never
+            # fetch an unvalidated arbitrary recipe URL.
+            effective_config = recipe_central_prefetch_config(
+                effective_config,
+                uni_scrape_config,
+                scrape_url,
+                getattr(_uni_cfg.discovery, "allowed_extra_hostnames", ()),
+            )
+
             central_data = await prefetch_central_pages(
                 effective_config, emit=emit, university_id=uni.id
             )
@@ -6799,6 +6866,12 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                                 _rr_exc,
                             )
 
+                    # Recipe transforms append deterministic provenance to the
+                    # payload. Merge it into the exact evidence list passed to
+                    # stage_course (and remove the transient payload key) so
+                    # normal orchestration cannot silently drop recipe proof.
+                    _stage_evidence = merge_recipe_evidence(payload, r.get("evidence"))
+
                     async with AsyncSessionLocal() as stage_db:
                         # If the URL already matched course_detail_url_patterns during
                         # the pre-extraction link gate (lines ~2154), skip the global
@@ -6820,7 +6893,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                             # Bug D: pass per-field evidence so it lands in
                             # scraped_field_evidence and the review modal can
                             # render it instead of a blank body.
-                            evidence=r.get("evidence") or [],
+                            evidence=_stage_evidence,
                             source_url=r.get("url"),
                             skip_url_block=_skip_url_block,
                             targeted_retry=_targeted_retry,
@@ -7134,6 +7207,13 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                         )
                     else:
                         _sw_payload = dict(_sw_r.get("payload") or {})
+                        # Recovery/sweep staging must have identical recipe
+                        # semantics and provenance to the normal path.
+                        _sw_evidence = apply_runtime_recipe(
+                            _sw_payload,
+                            _recipe_rules_cfg,
+                            _sw_r.get("evidence"),
+                        )
                         _remaining_stage_budget = _recovery_time_remaining(
                             _sweep_started_at,
                             _sweep_budget_seconds,
@@ -7163,7 +7243,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                                     university_id=uni_id,
                                     course_name=_sw_r["name"],
                                     payload=_sw_payload,
-                                    evidence=_sw_r.get("evidence") or [],
+                                    evidence=_sw_evidence,
                                     source_url=_sweep_url,
                                     targeted_retry=_targeted_retry,
                                     preserve_existing=bool(_verification),

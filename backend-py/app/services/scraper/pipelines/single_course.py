@@ -3720,6 +3720,82 @@ async def extract_course(
 
     payload: dict[str, Any] = {"course_website": url}
     evidence: list[dict[str, Any]] = []
+    # Preserve the selected audience option as typed DOM identity.  This is
+    # intentionally derived from the selector/listbox itself, never from
+    # page-wide "international" prose; recipe application can therefore not
+    # copy an international intake or English value onto a domestic row.
+    try:
+        from app.services.scraper.recipe_rules import audience_identity_from_html
+        _audience_identity = audience_identity_from_html(html, url)
+        # Linked central English is an identity-bound enrichment, never a
+        # page-wide default.  Unknown/ambiguous controls and persisted-recipe
+        # mismatches fail closed before any central fallback can run.
+        _central_identity = (
+            central_data.get("audience_identity")
+            if isinstance(central_data, dict) else None
+        )
+        if _central_identity is None and isinstance(central_data, dict):
+            _recipe_selectors = (
+                (central_data.get("audience_recipe") or {}).get("selectors") or []
+            )
+            _central_identity = next((
+                row for row in _recipe_selectors
+                if row.get("audience") == "international"
+                and row.get("container") == (_audience_identity or {}).get("container")
+                and row.get("option") == (_audience_identity or {}).get("option")
+            ), None)
+        if (
+            _central_identity is None
+            and isinstance(_audience_identity, dict)
+            and _audience_identity.get("audience") == "international"
+            and _audience_identity.get("source_url")
+            and _audience_identity.get("source_url") == central_data.get("english_page_url")
+        ):
+            _central_identity = _audience_identity
+        _central_identity_ok = bool(
+            isinstance(_audience_identity, dict)
+            and _audience_identity.get("audience") == "international"
+            and isinstance(_central_identity, dict)
+            and _central_identity.get("audience") == "international"
+            and _central_identity.get("container") == _audience_identity.get("container")
+            and _central_identity.get("option") == _audience_identity.get("option")
+        )
+        if isinstance(central_data, dict) and not _central_identity_ok:
+            central_data = {
+                **central_data,
+                "english": {}, "english_by_level": {}, "english_by_program": [],
+                "english_page_url": None, "english_page_url_ug": None,
+                "english_page_url_pg": None,
+            }
+        if _audience_identity:
+            payload["audience_identity"] = _audience_identity
+            # Central English pages are not page-wide evidence when a course
+            # exposes audience selectors.  Keep linked English data available
+            # only for the exact international option; domestic rows must
+            # never inherit it.
+            if (
+                _audience_identity.get("audience") == "domestic"
+                and isinstance(central_data, dict)
+            ):
+                central_data = {
+                    **central_data,
+                    "english": {},
+                    "english_by_level": {},
+                    "english_by_program": [],
+                    "english_page_url": None,
+                    "english_page_url_ug": None,
+                    "english_page_url_pg": None,
+                }
+            evidence.append({
+                "field_key": "audience_identity",
+                "value": _audience_identity,
+                "source_url": url,
+                "method": "audience_selector",
+                "snippet": f"{_audience_identity['container']}:{_audience_identity['option']}",
+                "decision_status": "selected",
+            })
+    except Exception as _audience_exc:  # selector ambiguity must not break scrape
+        log.debug("audience selector identity unavailable for %s: %s", url, _audience_exc)
     _gemini_primary_cost: float = 0.0
     _is_csu_page: bool = False  # set True by the CSU pre-seed; gates Gemini Primary
 

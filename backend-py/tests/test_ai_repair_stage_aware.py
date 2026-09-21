@@ -18,6 +18,7 @@ from app.services.scraper.ai_repair_agent import (
     _build_user_message,
     _evaluate_success,
     PatchValidationError,
+    _validated_ai_patches,
 )
 
 
@@ -89,6 +90,21 @@ class TestValidateAndBuildConfigPatch:
         assert errors == []
         assert extr["fees"]["central_page"] == "https://uni.example.com/fees"
         assert extr["english"]["default_ielts"] == 6.0
+
+    def test_generated_response_rejects_universal_defaults_and_flat_regex(self):
+        with pytest.raises(PatchValidationError):
+            _validated_ai_patches({
+                "confidence": 95,
+                "patches": [{"section": "recipe", "field": "english.default_ielts", "value": 6.5}],
+            })
+        with pytest.raises(PatchValidationError):
+            _validated_ai_patches({
+                "confidence": 95,
+                "patches": [{
+                    "section": "recipe", "field": "extraction_rules.intake_months",
+                    "value": {"regex": r"\bMarch\b", "confidence": .95},
+                }],
+            })
 
 
 class TestDiscoverySuccessEvidence:

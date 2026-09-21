@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import re
 import time
+from dataclasses import dataclass, asdict
 from urllib.parse import urldefrag, urljoin, urlsplit
 
 import httpx
@@ -129,6 +130,208 @@ _FAILURES = {"network_failure", "challenge", "unsafe_url", "budget_exhausted", "
 _REJECTED = {"listing", "non_course", "non_degree", "ineligible", "not_published"}
 
 
+@dataclass(frozen=True)
+class AudienceOptionEvidence:
+    """Typed evidence for one audience selector option.
+
+    ``container`` is deliberately retained: values extracted from a selector
+    are only authoritative for the panel that owns that selector.  Callers
+    must not flatten these records into page-wide text.
+    """
+
+    audience: str
+    label: str
+    value: str
+    container: str
+    source_url: str | None = None
+    source_official: bool = False
+    intake_months: tuple[int, ...] = ()
+    intake_year: int | None = None
+
+
+_AUDIENCE_RE = re.compile(r"\b(international|overseas|domestic|home|uk)\b", re.I)
+_MONTH_NUM = {m.lower(): i for i, m in enumerate(
+    ("January", "February", "March", "April", "May", "June",
+     "July", "August", "September", "October", "November", "December"), 1
+)}
+
+
+def extract_audience_option_evidence(
+    html: str, page_url: str, seed_url: str, extra_hosts=()
+) -> dict:
+    """Extract typed selector evidence, preserving panel ownership.
+
+    This intentionally does not search arbitrary page text.  A selector is
+    usable only when every relevant option has one unambiguous audience
+    identity.  Linked sources must remain on the configured official host.
+    Image-only selectors and conflicting labels return ``needs_review``.
+    """
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html or "", "html.parser")
+    selectors = soup.select("select, [role='listbox']")
+    records: list[AudienceOptionEvidence] = []
+    issues: list[str] = []
+    for index, selector in enumerate(selectors):
+        options = selector.select("option, [role='option']")
+        # CSS-background custom controls have no trustworthy textual option
+        # identity; record them for review instead of borrowing page text.
+        if not options and (
+            selector.get("style") and "background" in selector.get("style", "").lower()
+            or any("audience" in str(cls).lower() for cls in selector.get("class", []))
+        ):
+            issues.append("custom image/CSS-background audience control needs review")
+        relevant = []
+        for option in options:
+            group = option.find_parent("optgroup")
+            label = " ".join(filter(None, [
+                str(option.get("data-audience") or ""),
+                str(option.get("data-fee-type") or ""),
+                str(option.get("aria-label") or ""),
+                str(option.get("title") or ""),
+                " ".join(img.get("alt", "") for img in option.select("img")),
+                str(group.get("label") if group else ""),
+                option.get_text(" ", strip=True),
+            ])).strip()
+            matches = {m.casefold() for m in _AUDIENCE_RE.findall(label)}
+            if not matches:
+                continue
+            if len(matches) > 1 or ("home" in matches and "domestic" in matches):
+                issues.append("conflicting audience labels in one selector")
+                continue
+            audience = "international" if matches & {"international", "overseas"} else "domestic"
+            text = option.get_text(" ", strip=True)
+            # An image-only option has no textual identity and cannot be used.
+            image_identity = bool(option.select("img")) and not text
+            if image_identity or not text:
+                issues.append("image-only audience option")
+                continue
+            source = option.get("data-source") or option.get("data-url") or option.get("href")
+            source_url = urljoin(page_url, source) if source else None
+            official = bool(source_url and official_url(source_url, seed_url, extra_hosts))
+            if source_url and not official:
+                issues.append("linked audience source is not official")
+                continue
+            months = tuple(sorted({
+                number for name, number in _MONTH_NUM.items()
+                if re.search(rf"\b{name}\b", text, re.I)
+            }))
+            year_match = re.search(r"\b20\d{2}\b", text)
+            # Keep a real DOM identity.  nth-of-type is not stable for
+            # custom listboxes (and can point at a sibling element after a
+            # render); id/name/data-panel are stable ownership anchors.
+            selector_id = (
+                selector.get("id")
+                or selector.get("name")
+                or selector.get("data-panel")
+                or selector.get("aria-controls")
+                or f"audience-selector-{index}"
+            )
+            option_id = (
+                option.get("value")
+                or option.get("id")
+                or option.get("data-value")
+                or label
+            )
+            relevant.append(AudienceOptionEvidence(
+                audience=audience, label=label, value=str(option_id),
+                container=str(selector_id),
+                source_url=source_url, source_official=official,
+                intake_months=months,
+                intake_year=int(year_match.group()) if year_match else None,
+            ))
+        records.extend(relevant)
+    audiences = {r.audience for r in records}
+    if issues:
+        status = "needs_review"
+    elif not records:
+        status = "unconfirmed"
+    elif len(audiences) > 1:
+        status = "accepted"
+    else:
+        status = "accepted"
+    return {
+        "status": status,
+        "evidence": [asdict(record) for record in records],
+        "issues": issues,
+        "same_panel": len({r.container for r in records}) <= 1,
+        "linked_official": all(r.source_official or not r.source_url for r in records),
+    }
+
+
+def audience_scoped_recipe_proposals(evidence: dict) -> dict:
+    """Build typed intake/English proposals only from linked selector evidence."""
+    # Callers may provide all independently fetched page evidence under
+    # ``course_evidence``. A single first-page proposal is never a safe
+    # university-wide recipe.
+    course_evidence = evidence.get("course_evidence")
+    if course_evidence:
+        if any(
+            str(row.get("container") or "").startswith("audience-selector-")
+            for item in course_evidence
+            for row in item.get("evidence", [])
+            if isinstance(row, dict)
+        ):
+            return {"status": "needs_review", "proposals": [], "reason": "unstable positional selector identity"}
+        proposals = [
+            audience_scoped_recipe_proposals(item).get("proposals", [])
+            for item in course_evidence
+        ]
+        flat = [rows[0] for rows in proposals if rows]
+        if len(flat) != len(course_evidence):
+            return {"status": "needs_review", "proposals": [], "reason": "course audience evidence unresolved"}
+        def signature(item):
+            if any(
+                str(r.get("container") or "").startswith("audience-selector-")
+                for r in item.get("selectors", [])
+            ):
+                return None
+            return (
+                tuple(sorted((r.get("container"), r.get("option"), r.get("audience"),
+                              tuple(r.get("intake_months") or ()), r.get("intake_year"),
+                              r.get("source_url")) for r in item.get("selectors", []))),
+                tuple(item.get("intake_months") or ()),
+                tuple(item.get("source_urls") or ()),
+                (item.get("english") or {}).get("central_page"),
+            )
+        if len({signature(item) for item in flat}) != 1:
+            return {"status": "needs_review", "proposals": [], "reason": "conflicting course audience proposals"}
+        return {"status": "accepted", "proposals": [flat[0]]}
+    if evidence.get("status") != "accepted" or evidence.get("issues"):
+        return {"status": "needs_review", "proposals": [], "reason": "audience evidence is unresolved"}
+    rows = [r for r in evidence.get("evidence", []) if r.get("audience") == "international"]
+    if not rows or not evidence.get("same_panel") or not evidence.get("linked_official"):
+        return {"status": "needs_review", "proposals": [], "reason": "no same-panel official international source"}
+    years = {r.get("intake_year") for r in rows if r.get("intake_year")}
+    if len(years) > 1:
+        return {"status": "needs_review", "proposals": [], "reason": "conflicting institutional intake years"}
+    months = sorted({m for r in rows for m in (r.get("intake_months") or [])})
+    source_urls = sorted({r["source_url"] for r in rows if r.get("source_url")})
+    proposal = {
+        "audience": "international",
+        "intake_months": months,
+        "source_urls": source_urls,
+        "source_relationship": "selector_option",
+        "selectors": [
+            {
+                "container": row.get("container"),
+                "option": row.get("value"),
+                "audience": row.get("audience"),
+                "source_url": row.get("source_url"),
+                "intake_months": row.get("intake_months") or [],
+                "intake_year": row.get("intake_year"),
+            }
+            for row in rows
+        ],
+    }
+    if source_urls:
+        proposal["english"] = {
+            "central_page": source_urls[0],
+            "relationship": "linked_official_source",
+        }
+    return {"status": "accepted", "proposals": [proposal]}
+
+
 def inspect_page(url: str, html: str, config=None) -> dict:
     """Classify using shared gates and visible, course-owned positive evidence."""
     from app.services.scraper.challenge_shell import is_challenge_shell
@@ -179,8 +382,12 @@ def inspect_page(url: str, html: str, config=None) -> dict:
             fields.append({"selector": selector, "text": text[:400]})
     owned_html = str(region)
     page = classify_page(owned_html, url)
+    audience_evidence = extract_audience_option_evidence(
+        owned_html, url, url, extra_hosts
+    )
     result.update(title=title, snippet=region.get_text(" ", strip=True)[:1400],
-                  fields=fields[:12], owned_html=owned_html, links=page["course_links"])
+                  fields=fields[:12], owned_html=owned_html, links=page["course_links"],
+                  audience_evidence=audience_evidence)
     blocked, reason = is_blocked_page(url, title)
     if blocked:
         return {**result, "classification": "listing" if page["page_type"] == "listing" else "non_course",
@@ -370,7 +577,7 @@ class LiveRepairEvidence:
             "failures": failures,
             "reason": ("Bounded live evidence; full scrape verification still required" if courses
                        else "No positive live course evidence; no automatic apply is safe"),
-            "samples": [{k: r.get(k) for k in ("url", "classification", "reason", "title", "snippet", "fields")}
+            "samples": [{k: r.get(k) for k in ("url", "classification", "reason", "title", "snippet", "fields", "audience_evidence")}
                         for r in self.records],
         }
 
@@ -441,6 +648,72 @@ class LiveRepairEvidence:
                     self.validation_pages[url] = checked[url]
                 if checked[url]["classification"] != "course":
                     reasons.append(f"Live verification failed for {url}: {checked[url]['classification']}")
+        # Audience-aware recipes are eligible only when live evidence contains
+        # both audiences and each selector keeps its own panel ownership.
+        audience_pages = [
+            page.get("audience_evidence") for page in checked.values()
+            if (page.get("audience_evidence") or {}).get("evidence")
+        ]
+        relevant_course_pages = [
+            page for page in checked.values() if page.get("classification") == "course"
+        ]
+        audience_required = bool(
+            extraction.get("audience_repair") or extraction.get("audience_recipe")
+        )
+        if (
+            audience_required
+            and relevant_course_pages
+            and len(audience_pages) != len(relevant_course_pages)
+        ):
+            reasons.append(
+                "Audience evidence missing for one or more checked course pages; needs review"
+            )
+            audience_proposals = []
+        audience_proposals = []
+        if audience_pages:
+            from app.services.scraper.recipe_rules import build_audience_scoped_recipe_proposal
+            for evidence in audience_pages:
+                proposal = build_audience_scoped_recipe_proposal(evidence)
+                audience_proposals.extend(proposal.get("proposals") or [])
+                if proposal["status"] != "accepted":
+                    reasons.append(f"Audience evidence needs review: {proposal.get('reason')}")
+            # A recipe is university-wide, so every checked course must agree
+            # on the same typed selector relationship.  Never let the first
+            # proposal win when later pages publish a different intake year,
+            # source, or selector semantics.
+            if audience_proposals:
+                def _audience_signature(item):
+                    selectors = []
+                    for row in item.get("selectors") or []:
+                        container = str(row.get("container") or "")
+                        if container.startswith("audience-selector-"):
+                            # Positional fallback identities are not stable
+                            # across independently rendered course pages.
+                            return None
+                        selectors.append((
+                            container, str(row.get("option") or ""),
+                            row.get("audience"),
+                            tuple(row.get("intake_months") or ()),
+                            row.get("intake_year"), row.get("source_url"),
+                        ))
+                    return (
+                        tuple(sorted(selectors)),
+                        tuple(item.get("intake_months") or ()),
+                        tuple(item.get("source_urls") or ()),
+                        (item.get("english") or {}).get("central_page"),
+                    )
+                signatures = {_audience_signature(item) for item in audience_proposals}
+                if None in signatures or len(signatures) != 1:
+                    reasons.append(
+                        "Conflicting audience proposals across checked courses; needs review"
+                    )
+                    audience_proposals = []
+            seen = {
+                row.get("audience") for evidence in audience_pages
+                for row in evidence.get("evidence", [])
+            }
+            if not {"domestic", "international"} <= seen:
+                reasons.append("Unbalanced domestic/international live audience evidence")
         if extraction:
             from app.services.scraper.ai_extractor_run import apply_extraction_rules
             from app.services.scraper.ai_repair_agent import _normalise_repair_value
@@ -469,6 +742,7 @@ class LiveRepairEvidence:
                 if outputs < 2:
                     reasons.append(f"{field}: at least two positive live course outputs required")
         report["accepted"] = not reasons
+        report["audience_proposals"] = audience_proposals
         report["status"] = (
             "accepted" if report["accepted"] else
             "blocked" if checked and all(page["classification"] in _FAILURES for page in checked.values())

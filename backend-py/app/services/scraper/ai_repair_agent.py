@@ -177,6 +177,13 @@ async def persist_repair_audit(session: dict, db) -> None:
         )
     }
     evidence["snapshot_refs"] = snapshot_refs
+    live_probe = session.get("live_probe") or {}
+    evidence["audience_proposals"] = live_probe.get("audience_proposals") or []
+    evidence["audience_evidence"] = [
+        sample.get("audience_evidence")
+        for sample in live_probe.get("samples") or []
+        if sample.get("audience_evidence")
+    ]
     await db.execute(
         text(
             "INSERT INTO ai_repair_audits "
@@ -642,9 +649,69 @@ _ALLOWED_RECIPE_FIELDS: dict[str, type | tuple] = {
     "location_allowed_values":    list,
     "study_mode_online_keywords": list,
     "course_name_remove_after":   list,
+    "audience_recipe":            dict,
 }
 
 _ALLOWED_SECTIONS = {"discovery", "recipe"}
+
+
+def balanced_repair_samples(samples: list[dict[str, Any]], limit: int = 12) -> list[dict[str, Any]]:
+    """Choose a deterministic, audience-balanced replay set.
+
+    Audience is read from typed snapshot metadata only; no page-wide regex is
+    used to infer it.  When both audiences are represented, each receives a
+    slot before remaining slots are filled in original order.  An unresolved
+    audience is retained but never allowed to stand in for the missing side.
+    """
+    if limit < 1:
+        return []
+    groups: dict[str, list[dict[str, Any]]] = {"domestic": [], "international": [], "unknown": []}
+    unique: list[dict[str, Any]] = []
+    seen_ids: set[tuple] = set()
+    for sample in samples:
+        identity = (
+            sample.get("snapshot_id")
+            or sample.get("id")
+            or (
+                sample.get("url") or sample.get("course_url"),
+                sample.get("scrape_job_id") or sample.get("job_id"),
+                sample.get("course_id"),
+            )
+        )
+        if not isinstance(identity, tuple):
+            identity = (identity,)
+        if identity in seen_ids:
+            continue
+        seen_ids.add(identity)
+        metadata = sample.get("audience_evidence") or sample.get("audience")
+        if isinstance(metadata, dict):
+            value = str(metadata.get("audience") or metadata.get("selected_audience") or "").casefold()
+            if not value:
+                rows = metadata.get("evidence") or []
+                values = {
+                    str(row.get("audience") or "").casefold()
+                    for row in rows if isinstance(row, dict)
+                }
+                value = "international" if "international" in values else (
+                    "domestic" if "domestic" in values else ""
+                )
+        else:
+            value = str(metadata or "").casefold()
+        key = "international" if value in {"international", "overseas"} else (
+            "domestic" if value in {"domestic", "home", "uk"} else "unknown"
+        )
+        enriched = dict(sample)
+        enriched["audience_classification"] = key
+        enriched["_sample_identity"] = identity
+        groups[key].append(enriched)
+        unique.append(enriched)
+    chosen: list[dict[str, Any]] = []
+    if groups["domestic"] and groups["international"]:
+        chosen.extend([groups["domestic"][0], groups["international"][0]])
+    chosen_ids = {s["_sample_identity"] for s in chosen}
+    remaining = [s for s in unique if s["_sample_identity"] not in chosen_ids]
+    chosen.extend(remaining[: max(0, limit - len(chosen))])
+    return chosen[:limit]
 
 
 class PatchValidationError(ValueError):
@@ -902,7 +969,52 @@ async def _validate_extraction_patch_on_snapshots(
             snapshots,
             key=lambda snap: (snap.original_extraction or {}).get(field) is not None,
         )
-        for snap in ordered:
+        snapshot_rows = [{
+            "url": snap.course_url,
+            "audience": (snap.original_extraction or {}).get("audience"),
+            "audience_evidence": (snap.original_extraction or {}).get("audience_evidence"),
+            "_snapshot": snap,
+        } for snap in ordered]
+        selected_rows = balanced_repair_samples(snapshot_rows, max_samples)
+        # If typed metadata proves both audiences exist, an unbalanced replay
+        # is unsafe and must fail closed rather than fabricate a comparison.
+        typed = [
+            str(row.get("audience") or "").casefold()
+            or str(row.get("audience_evidence", {}).get("audience") or "").casefold()
+            for row in snapshot_rows
+        ]
+        typed = [
+            value if value in {"domestic", "international"} else (
+                "international" if any(
+                    str(item.get("audience") or "").casefold() == "international"
+                    for item in (row.get("audience_evidence", {}).get("evidence") or [])
+                    if isinstance(item, dict)
+                ) else "domestic" if any(
+                    str(item.get("audience") or "").casefold() == "domestic"
+                    for item in (row.get("audience_evidence", {}).get("evidence") or [])
+                    if isinstance(item, dict)
+                ) else value
+            )
+            for row, value in zip(snapshot_rows, typed)
+        ]
+        if {"domestic", "international"} <= set(typed):
+            selected_audiences = {
+                str(
+                    row.get("audience_classification")
+                    or row.get("audience")
+                    or ""
+                ).casefold()
+                for row in selected_rows
+            }
+            if not {"domestic", "international"} <= selected_audiences:
+                reports.append({
+                    "field": field, "accepted": False,
+                    "rejection_reasons": ["unbalanced domestic/international replay samples"],
+                    "samples": [],
+                })
+                continue
+        for row in selected_rows:
+            snap = row["_snapshot"]
             raw = await download_snapshot(snap.storage_path)
             if not raw:
                 continue
@@ -910,6 +1022,8 @@ async def _validate_extraction_patch_on_snapshots(
                 "url": snap.course_url,
                 "html": raw.decode("utf-8", errors="replace"),
                 "before": (snap.original_extraction or {}).get(field),
+                "audience_classification": row.get("audience_classification"),
+                "audience_evidence": row.get("audience_evidence"),
             })
         report = validate_extraction_rule_on_samples(field, rule, samples)
         reports.append(report)
@@ -1005,6 +1119,11 @@ def _validate_patch(patch: dict) -> dict:
             raise PatchValidationError(
                 f"'fee_term' must be one of Annual | Per Unit | Full Course, got {value!r}."
             )
+        if field == "audience_recipe":
+            if not value.get("selectors"):
+                raise PatchValidationError("audience_recipe requires live-validated selectors.")
+            if not value.get("english", {}).get("central_page"):
+                raise PatchValidationError("audience_recipe requires a linked English source.")
     return patch
 
 
@@ -1069,6 +1188,27 @@ def _validated_ai_patches(ai_data: Any) -> list[dict]:
         raise PatchValidationError("OpenAI response contains more than 3 patches.")
     if any(not isinstance(patch, dict) for patch in patches):
         raise PatchValidationError("Every OpenAI patch must be a JSON object.")
+    # AI proposals may not manufacture universal English/date defaults.  Those
+    # values are valid only when an operator supplies an explicit, linked
+    # institutional source through the normal config workflow.
+    forbidden_defaults = {
+        "english.default_ielts", "english.default_pte", "english.default_toefl",
+        "intake.default_date", "intake.default_month", "intake.default_year",
+    }
+    for patch in patches:
+        if patch.get("section") == "recipe" and patch.get("field") in forbidden_defaults:
+            raise PatchValidationError(
+                f"Universal default {patch.get('field')} is not eligible for generated repair."
+            )
+        if patch.get("field", "").startswith("extraction_rules."):
+            rule = patch.get("value")
+            if isinstance(rule, dict) and rule.get("regex") and not any(
+                rule.get(key) for key in ("css", "xpath", "quoted_text")
+            ):
+                raise PatchValidationError(
+                    "Generated extraction rules require an owned CSS/XPath/quoted selector; "
+                    "flat page-wide regex is forbidden."
+                )
     confidence = ai_data.get("confidence", 0)
     if not isinstance(confidence, int) or not 0 <= confidence <= 100:
         raise PatchValidationError("OpenAI confidence must be an integer from 0 to 100.")
@@ -2187,6 +2327,14 @@ async def _apply_recipe_to_db(
     auto_config["_extraction_rules_source"] = "openai_validated_snapshot_replay"
     auto_config["_extraction_rules_repaired_at"] = datetime.now(timezone.utc).isoformat()
     updated_sc["auto_config"] = auto_config
+    # Runtime extraction reads uni_scrape_config.recipe (not auto_config).
+    # Keep the tested typed recipe in that exact document key atomically.
+    runtime_recipe = dict(updated_sc.get("recipe") or {})
+    if recipe_patch.get("audience_recipe"):
+        runtime_recipe["audience_recipe"] = recipe_patch["audience_recipe"]
+    if recipe_patch.get("audience_evidence"):
+        runtime_recipe["audience_evidence"] = recipe_patch["audience_evidence"]
+    updated_sc["recipe"] = runtime_recipe
     result = await db.execute(
         text(
             "UPDATE universities SET scrape_config = CAST(:after AS jsonb) "
@@ -2819,6 +2967,26 @@ async def run_ai_repair_loop(
                     log.info("ai_repair: blocked discovery patches in extraction phase: %s", blocked)
 
             disc_patch, extr_patch, validation_errors = _validate_and_build_config_patch(patches_raw)
+            # A model may diagnose an audience-scoped intake/English defect
+            # without proposing a recipe (the recipe is live-derived). Force
+            # the bounded live validator onto this path even when AI emitted
+            # no applicable patch.
+            _audience_diagnosis = " ".join(
+                str(ai_data.get(key) or "") for key in
+                ("diagnosis", "root_cause", "explanation")
+            ).casefold()
+            if (
+                live
+                and any(token in _audience_diagnosis for token in
+                        ("audience", "international intake", "linked english",
+                         "english source", "ielts"))
+                and not extr_patch
+            ):
+                extr_patch = {"audience_repair": True}
+                patches_raw.append({
+                    "section": "recipe", "field": "audience_repair",
+                    "value": True,
+                })
             if dup_skipped:
                 validation_errors.append(f"Duplicate patches skipped: {', '.join(dup_skipped)}")
             if disc_only_blocked:
@@ -2827,28 +2995,35 @@ async def run_ai_repair_loop(
                 )
             extraction_validation: dict[str, Any] | None = None
             extraction_config_before: dict[str, Any] | None = None
+            candidate_audience_recipe = (extr_patch.get("audience_recipe")
+                                         if isinstance(extr_patch, dict) else None)
             if extr_patch:
-                unsupported = set(extr_patch) - {"extraction_rules"}
+                unsupported = set(extr_patch) - {"extraction_rules", "audience_recipe", "audience_repair"}
                 if unsupported:
                     validation_errors.append(
                         "Extraction patch rejected: automatic repair supports only tested "
                         f"Stage-0 extraction_rules, not {', '.join(sorted(unsupported))}."
                     )
                     extr_patch = {}
-                elif int(ai_data.get("confidence") or 0) < 85:
+                elif candidate_audience_recipe is None and "audience_repair" not in extr_patch and int(ai_data.get("confidence") or 0) < 85:
                     validation_errors.append(
                         "Extraction patch rejected: OpenAI confidence was below 85%."
                     )
                     extr_patch = {}
                 else:
+                    # Audience intake/English defects have a deterministic
+                    # live path. It must not depend on the model emitting an
+                    # otherwise unsupported recipe patch.
                     # Capture before replay starts. The eventual write must CAS
                     # against this exact document so operator edits made during
                     # snapshot validation can never be overwritten.
                     extraction_config_before = await _read_scrape_config(
                         ctx["university_id"], db
                     )
-                    extraction_validation = await _validate_extraction_patch_on_snapshots(
-                        job_id, extr_patch, db
+                    extraction_validation = (
+                        await _validate_extraction_patch_on_snapshots(job_id, extr_patch, db)
+                        if extr_patch.get("extraction_rules")
+                        else {"accepted": True, "reports": [], "rules": {}}
                     )
                     if not extraction_validation["accepted"]:
                         for report in extraction_validation["reports"]:
@@ -2965,6 +3140,20 @@ async def run_ai_repair_loop(
                 )
                 ctx["live_probe"] = session["live_probe"]
                 current_attempt_evidence["live_validation"] = live_validation
+                proposals = live_validation.get("audience_proposals") or []
+                canonical = proposals[0] if proposals else None
+                if canonical is not None and extr_patch.get("audience_repair"):
+                    extr_patch["audience_recipe"] = canonical
+                    extr_patch.pop("audience_repair", None)
+                    candidate_audience_recipe = canonical
+                if candidate_audience_recipe is not None:
+                    if canonical is None or candidate_audience_recipe != canonical:
+                        validation_errors.append(
+                            "Audience recipe rejected: candidate does not exactly match live canonical proposal."
+                        )
+                        disc_patch, extr_patch = {}, {}
+                elif canonical is not None:
+                    extr_patch["audience_recipe"] = canonical
                 if not live_validation["accepted"]:
                     validation_errors.extend(live_validation["reasons"])
                     disc_patch, extr_patch = {}, {}
@@ -3174,6 +3363,18 @@ async def run_ai_repair_loop(
                 "patch_applied_ok":     patch_applied_ok,
                 "patch_error":          patch_error if patch_error else None,
                 "recipe_patch_applied": extr_patch_applied_keys,
+                # Exact applied documents make the audit and CAS rollback
+                # independently verifiable; changed-key lists do not.
+                "applied_recipe": (
+                    (pending_extraction_rollback or {}).get("applied", {}).get("recipe")
+                    if patch_applied_ok and pending_extraction_rollback
+                    else None
+                ),
+                "applied_config": (
+                    (pending_extraction_rollback or {}).get("applied")
+                    if patch_applied_ok and pending_extraction_rollback
+                    else None
+                ),
                 "quality_before":       quality_before,
                 "quality_after":        quality_after,
                 "quality_delta":        quality_delta,

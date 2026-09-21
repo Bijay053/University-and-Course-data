@@ -16,8 +16,158 @@ from __future__ import annotations
 import logging
 import re
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
 
 log = logging.getLogger(__name__)
+
+
+def audience_identity_from_html(html: str, url: str) -> dict[str, str] | None:
+    """Return the selected audience option's real DOM identity.
+
+    This is intentionally selector-only.  Page-wide words such as
+    "international students" are not an audience classification.
+    """
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html or "", "html.parser")
+    query = parse_qs(urlsplit(url).query)
+    for index, selector in enumerate(soup.select("select, [role='listbox']")):
+        options = selector.select("option, [role='option']")
+        if not options:
+            continue
+        selected = [o for o in options if o.has_attr("selected") or o.get("aria-selected") == "true"]
+        if not selected:
+            selected = [
+                o for o in options
+                if any(str(v).casefold() in {str(o.get("value") or "").casefold(), str(o.get("data-value") or "").casefold()}
+                       for values in query.values() for v in values)
+            ]
+        if len(selected) != 1:
+            continue
+        option = selected[0]
+        label = " ".join(filter(None, [
+            option.get("data-audience"), option.get("data-fee-type"),
+            option.get("aria-label"), option.get("title"),
+            option.get_text(" ", strip=True),
+        ])).casefold()
+        if "international" in label or "overseas" in label:
+            audience = "international"
+        elif "domestic" in label or "home" in label or re.search(r"\buk\b", label):
+            audience = "domestic"
+        else:
+            continue
+        container = (
+            selector.get("id") or selector.get("name") or selector.get("data-panel")
+            or selector.get("aria-controls") or f"audience-selector-{index}"
+        )
+        identity = option.get("value") or option.get("id") or option.get("data-value") or option.get_text(" ", strip=True)
+        if not identity:
+            continue
+        linked = option.get("data-url") or option.get("data-english-url") or option.get("href")
+        result = {"audience": audience, "container": str(container), "option": str(identity)}
+        if linked:
+            result["source_url"] = str(linked)
+        return result
+    return None
+
+
+def build_audience_scoped_recipe_proposal(audience_evidence: dict) -> dict:
+    """Return a linked, typed proposal; never infer values from flat text.
+
+    The live probe owns evidence collection.  This small pure helper keeps
+    recipe generation auditable and prevents domestic values or universal
+    defaults from leaking into an international course payload.
+    """
+    if audience_evidence.get("status") != "accepted" or audience_evidence.get("issues"):
+        return {"status": "needs_review", "proposals": [], "reason": "unresolved audience evidence"}
+    rows = [
+        row for row in audience_evidence.get("evidence", [])
+        if row.get("audience") == "international"
+    ]
+    observed = {
+        row.get("audience") for row in audience_evidence.get("evidence", [])
+    }
+    if not {"domestic", "international"} <= observed:
+        return {"status": "needs_review", "proposals": [], "reason": "unbalanced audience evidence"}
+    if not rows or not audience_evidence.get("same_panel") or not audience_evidence.get("linked_official"):
+        return {"status": "needs_review", "proposals": [], "reason": "missing same-panel official relationship"}
+    years = {row.get("intake_year") for row in rows if row.get("intake_year")}
+    if len(years) > 1:
+        return {"status": "needs_review", "proposals": [], "reason": "conflicting intake requirements"}
+    source_urls = sorted({row["source_url"] for row in rows if row.get("source_url")})
+    if not source_urls:
+        return {"status": "needs_review", "proposals": [], "reason": "English source is not linked"}
+    months = sorted({month for row in rows for month in (row.get("intake_months") or [])})
+    return {
+        "status": "accepted",
+        "proposals": [{
+            "audience": "international",
+            "intake_months": months,
+            "source_urls": source_urls,
+            "selectors": [{
+                "container": row.get("container"),
+                "option": row.get("value"),
+                "audience": row.get("audience"),
+                "source_url": row.get("source_url"),
+                "intake_months": row.get("intake_months") or [],
+                "intake_year": row.get("intake_year"),
+            } for row in rows],
+            "english": {"central_page": source_urls[0], "relationship": "linked_official_source"},
+        }],
+    }
+
+
+def apply_audience_scoped_intake(payload: dict, evidence: dict) -> dict:
+    """Fill intake only when typed evidence belongs to this payload audience."""
+    # Runtime extractors must provide the selected option identity.  A recipe
+    # is global configuration, so applying it without this binding would copy
+    # international values onto domestic rows.
+    identity = payload.get("audience_identity")
+    if not isinstance(identity, dict):
+        return payload
+    if str(identity.get("audience") or "").casefold() != "international":
+        return payload
+    if not identity.get("container") or not identity.get("option"):
+        return payload
+    proposal = build_audience_scoped_recipe_proposal(evidence)
+    if proposal["status"] != "accepted":
+        return payload
+    item = proposal["proposals"][0]
+    if not any(
+        selector.get("container") == identity.get("container")
+        and selector.get("option") == identity.get("option")
+        for selector in item.get("selectors", [])
+    ):
+        return payload
+    if item["intake_months"]:
+        payload["intake_months"] = item["intake_months"]
+        payload.setdefault("intake_provenance", {
+            "source": "audience_selector",
+            "audience": "international",
+            "selectors": item["selectors"],
+        })
+        payload.setdefault("evidence", []).extend([
+            {"field_key": "intake_months", "value": item["intake_months"],
+             "source_url": row.get("source_url"), "method": "audience_selector",
+             "snippet": row.get("label"), "decision_status": "selected"}
+            for row in item.get("selectors", []) if row.get("intake_months")
+        ])
+    english = item.get("english") or {}
+    if english.get("central_page"):
+        payload.setdefault("english_source_url", english["central_page"])
+        payload.setdefault("english_provenance", {
+            "source": "linked_official_audience_selector",
+            "audience": "international",
+            "relationship": english["relationship"],
+        })
+        payload.setdefault("evidence", []).append({
+            "field_key": "english_source", "value": english["central_page"],
+            "source_url": english["central_page"],
+            "method": "linked_official_audience_selector",
+            "snippet": "Official linked English requirements source",
+            "decision_status": "selected",
+        })
+    return payload
 
 # ── Public entry point ────────────────────────────────────────────────────────
 
@@ -37,6 +187,52 @@ def apply_recipe_rules(payload: dict[str, Any], recipe: dict) -> dict[str, Any]:
     _apply_location_rules(payload, recipe)
     _apply_study_mode_from_location(payload, recipe)
     _apply_degree_mapping(payload, recipe)
+    # Audience evidence is optional for legacy recipes, but when present it
+    # must be consumed through the typed selector relationship.
+    if recipe.get("audience_evidence"):
+        apply_audience_scoped_intake(payload, recipe["audience_evidence"])
+    elif recipe.get("audience_recipe"):
+        # Persisted recipes carry the already-validated typed relationship.
+        identity = payload.get("audience_identity")
+        rows = recipe["audience_recipe"].get("selectors") or []
+        if (
+            isinstance(identity, dict)
+            and str(identity.get("audience") or "").casefold() == "international"
+            and any(
+                row.get("container") == identity.get("container")
+                and row.get("option") == identity.get("option")
+                for row in rows
+            )
+        ):
+            months = sorted({m for row in rows for m in row.get("intake_months") or []})
+            if months:
+                payload["intake_months"] = months
+                payload["intake_provenance"] = {
+                    "source": "audience_selector", "audience": "international",
+                    "selectors": rows,
+                }
+            payload.setdefault("evidence", []).extend([
+                {"field_key": "intake_months", "value": months,
+                 "source_url": row.get("source_url"), "method": "audience_selector",
+                 "snippet": f"{row.get('container')}:{row.get('label')}",
+                 "decision_status": "selected"}
+                for row in rows if row.get("intake_months")
+            ])
+            english = (recipe["audience_recipe"].get("english") or {}).get("central_page")
+            if english:
+                payload["english_source_url"] = english
+                payload["english_provenance"] = {
+                    "source": "linked_official_audience_selector",
+                    "audience": "international",
+                    "relationship": "linked_official_source",
+                }
+                payload.setdefault("evidence", []).append({
+                    "field_key": "english_source", "value": english,
+                    "source_url": english,
+                    "method": "linked_official_audience_selector",
+                    "snippet": "Official linked English requirements source",
+                    "decision_status": "selected",
+                })
     return payload
 
 

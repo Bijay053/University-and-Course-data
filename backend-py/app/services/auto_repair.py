@@ -658,7 +658,8 @@ async def run_auto_repair_pipeline(
 
         # ── Step 4: Validate extraction quality ──────────────────────────────
         validation_result = await validate_proposed_fix(
-            university_id, current_cfg, patched_cfg, db
+            university_id, current_cfg, patched_cfg, db,
+            audience_evidence=diagnosis.get("audience_evidence"),
         )
         confidence = validation_result.get("confidence", diagnosis.get("confidence", "medium"))
 

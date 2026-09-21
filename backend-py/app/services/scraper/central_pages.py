@@ -905,6 +905,16 @@ async def _parse_english_page_html_async(html: str, page_url: str) -> dict[str, 
                 for k, v in r.normalized.items():
                     if k in _ENGLISH_SLOTS and v not in (None, "", 0):
                         out.setdefault(k, v)
+        # Some official pages publish component bands as prose rather than a
+        # table. Keep these values typed and course-source-bound.
+        text = re.sub(r"<[^>]+>", " ", html or "")
+        for label, slot in (
+            ("listening", "ielts_listening"), ("reading", "ielts_reading"),
+            ("writing", "ielts_writing"), ("speaking", "ielts_speaking"),
+        ):
+            match = re.search(rf"\b{label}\b\s*(?:score\s*)?(?:of\s*)?([4-9](?:\.\d)?)\b", text, re.I)
+            if match:
+                out.setdefault(slot, float(match.group(1)))
         return out
     except Exception as exc:
         log.warning("central_pages: english_test extractor failed on %s: %s", page_url, exc)

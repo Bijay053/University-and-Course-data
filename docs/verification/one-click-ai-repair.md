@@ -39,6 +39,20 @@ Automatic application currently covers evidence-backed URL filtering changes
 and supported extraction selectors that pass preservation and authority checks.
 It is not arbitrary AI-generated scraper code.
 
+Audience-scoped repairs may also use a typed international intake recipe and a
+linked official English-requirements source. These rules are derived from live
+DOM evidence rather than trusted from the AI proposal: the international and
+domestic options must be balanced, their values must belong to the same
+selector panel, and the linked source must stay on an approved official host.
+The same typed rule is replayed from saved evidence and used during isolated
+verification. It cannot create universal English-score or intake-date defaults.
+
+Ambiguous audience labels, image-only controls, conflicting institutional
+requirements, unbalanced samples, cross-audience writes, or a rule that neither
+fills nor safely corrects a value result in **Needs review**. Applied recipes,
+their live evidence, linked-source provenance and rollback configuration are
+retained in the durable audit. Course publication remains manual.
+
 Catalogue-provider, sitemap, browser strategy and crawl-budget changes still
 need a safe provider-replay validator before automatic application. Missing
 snapshot baselines, unsupported page templates, unverified redirects/hosts,
