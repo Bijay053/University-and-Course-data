@@ -211,6 +211,14 @@ describe("hasCompletedExtractionErrors", () => {
 });
 
 describe("completed ScrapeJobCard quality state", () => {
+  it("always offers self-service recovery after a scrape completes", async () => {
+    await renderCompletedCard(0);
+
+    expect(
+      screen.getByRole("button", { name: "Report missing or incorrect courses" }),
+    ).toBeTruthy();
+  });
+
   it("renders a warning rather than a green success header when extraction errors remain", async () => {
     const card = await renderCompletedCard(82);
 

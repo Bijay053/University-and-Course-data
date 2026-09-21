@@ -2174,7 +2174,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
         </div>
       </div>
 
-      {completedJobId && (phase === "done" || phase === "error") && (
+      {completedJobId && (
         <CourseReport jobId={completedJobId} onReview={id => onReviewReady(id, uniName, true)} onStarted={onReportStarted} />
       )}
       <div className="flex flex-col flex-1 p-4 gap-3">
