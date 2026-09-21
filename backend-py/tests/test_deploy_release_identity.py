@@ -264,64 +264,125 @@ def test_late_revision_rejection_restores_all_prepared_release_files(
     )
     original_generated = checkout_collision.read_bytes()
 
-    verified = _release_revision_fence(
-        "verify", checkout, predecessor, reviewed_target
-    )
-    assert verified.returncode == 0, verified.stderr
-    tracked_manifest = tmp_path / "tracked-manifest.json"
+    resume_marker = tmp_path / "resume.log"
     generated_manifest = tmp_path / "generated-manifest.json"
-    prepare_tracked_recipe_edits(checkout, reviewed_target, tracked_manifest)
-    reconcile_generated_config_collisions(
-        checkout, reviewed_target, generated_manifest
+    tracked_manifest = tmp_path / "tracked-manifest.json"
+    advance_hook = tmp_path / "advance-remote.sh"
+    advance_hook.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        f"cd {source}\n"
+        "printf 'advanced during preparation\\n' > release.txt\n"
+        "git add release.txt\n"
+        "git commit -qm 'advance after verification'\n"
+        "git push -q origin main\n",
+        encoding="utf-8",
     )
-    tracked_manifest_data = json.loads(
-        tracked_manifest.read_text(encoding="utf-8")
+    advance_hook.chmod(0o755)
+    env = os.environ.copy()
+    env.update(
+        {
+            "GUARDED_RELEASE_TEST_MODE": "1",
+            "GUARDED_RELEASE_REPO_ROOT": str(checkout),
+            "GUARDED_RELEASE_PYTHON": sys.executable,
+            "GUARDED_RELEASE_REVISION_FENCE": str(
+                DEPLOY_DIR / "release_revision_fence.sh"
+            ),
+            "GUARDED_RELEASE_RECONCILER": str(
+                DEPLOY_DIR / "reconcile_generated_configs.py"
+            ),
+            "GUARDED_RELEASE_RESUME_MARKER": str(resume_marker),
+            "GUARDED_RELEASE_BEFORE_CHECKOUT_HOOK": str(advance_hook),
+            "GUARDED_RELEASE_RECONCILIATION_MANIFEST": str(generated_manifest),
+            "GUARDED_RELEASE_TRACKED_MANIFEST": str(tracked_manifest),
+        }
     )
-    tracked_backups = [
-        checkout / entry["backup"]
-        for entry in tracked_manifest_data["entries"]
-    ]
-    generated_manifest_data = json.loads(
-        generated_manifest.read_text(encoding="utf-8")
-    )
-    generated_backups = [
-        checkout / move["destination"]
-        for move in generated_manifest_data["moves"]
-    ]
-    assert checkout_recipe.read_text(encoding="utf-8") == (
-        "discovery:\n  bfs_page_budget: 3\n"
-    )
-    assert not checkout_collision.exists()
-    assert all(path.exists() for path in tracked_backups + generated_backups)
-
-    (source / "release.txt").write_text(
-        "advanced during preparation\n", encoding="utf-8"
-    )
-    _git(source, "add", "release.txt")
-    _git(source, "commit", "-qm", "advance after verification")
-    _git(source, "push", "-q", "origin", "main")
-
-    stale_checkout = _release_revision_fence(
-        "checkout", checkout, predecessor, reviewed_target
+    stale_checkout = subprocess.run(
+        [
+            str(DEPLOY_DIR / "guarded_release.sh"),
+            predecessor,
+            reviewed_target,
+            "123456789012",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
     )
     assert stale_checkout.returncode != 0
-
-    rollback_generated_config_collisions(generated_manifest)
-    restore_tracked_recipe_edits(tracked_manifest)
-    finalize_tracked_recipe_edits(tracked_manifest)
 
     assert _git(checkout, "rev-parse", "HEAD") == predecessor
     assert checkout_recipe.read_bytes() == operator_recipe
     assert checkout_collision.read_bytes() == original_generated
+    assert resume_marker.read_text(encoding="utf-8") == "resume-attempted\n"
     assert not generated_manifest.exists()
     assert not tracked_manifest.exists()
-    assert all(
-        not path.exists() for path in tracked_backups + generated_backups
-    )
+    assert not list(checkout.rglob("*.release-backup-*"))
     assert not (
         checkout
         / "backend-py/scraper_config/runtime_unis/generated_11.yaml"
     ).exists()
+
+
+def test_guarded_release_does_not_resume_after_cleanup_failure(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "checkout"
+    (repo / "backend-py").mkdir(parents=True)
+    resume_marker = tmp_path / "resume.log"
+    generated_manifest = tmp_path / "generated-manifest.json"
+    tracked_manifest = tmp_path / "tracked-manifest.json"
+    fake_fence = tmp_path / "revision-fence.sh"
+    fake_fence.write_text(
+        "#!/usr/bin/env bash\n"
+        'if [ "$1" = verify ]; then exit 0; fi\n'
+        "exit 1\n",
+        encoding="utf-8",
+    )
+    fake_fence.chmod(0o755)
+    fake_reconciler = tmp_path / "reconciler.py"
+    fake_reconciler.write_text(
+        "import pathlib, sys\n"
+        "command = sys.argv[1]\n"
+        "manifest = pathlib.Path(sys.argv[sys.argv.index('--manifest') + 1])\n"
+        "if command in {'prepare', 'prepare-tracked'}:\n"
+        "    manifest.write_text('{}')\n"
+        "elif command == 'rollback':\n"
+        "    raise SystemExit(1)\n",
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    env.update(
+        {
+            "GUARDED_RELEASE_TEST_MODE": "1",
+            "GUARDED_RELEASE_REPO_ROOT": str(repo),
+            "GUARDED_RELEASE_PYTHON": sys.executable,
+            "GUARDED_RELEASE_REVISION_FENCE": str(fake_fence),
+            "GUARDED_RELEASE_RECONCILER": str(fake_reconciler),
+            "GUARDED_RELEASE_RESUME_MARKER": str(resume_marker),
+            "GUARDED_RELEASE_RECONCILIATION_MANIFEST": str(generated_manifest),
+            "GUARDED_RELEASE_TRACKED_MANIFEST": str(tracked_manifest),
+        }
+    )
+
+    result = subprocess.run(
+        [
+            str(DEPLOY_DIR / "guarded_release.sh"),
+            "1" * 40,
+            "2" * 40,
+            "123456789012",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+
+    assert result.returncode != 0
+    assert "consumers remain paused and manifests are retained" in result.stderr
+    assert generated_manifest.exists()
+    assert tracked_manifest.exists()
+    assert not resume_marker.exists()
 
 
 def test_guarded_release_refetches_tip_before_checkout() -> None:

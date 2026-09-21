@@ -13,44 +13,72 @@ if [[ ! "$expected_disposable_account" =~ ^[0-9]{12}$ ]]; then
   exit 2
 fi
 
-cd /opt/university-portal/backend-py
-set -a
-source .env
-source .release.env
-source /etc/university-portal/database.env
-set +a
-export PYTHONPATH=.
-sudo -u ubuntu deploy/release_revision_fence.sh \
-  verify /opt/university-portal "$predecessor" "$target"
-.venv/bin/python -B deploy/safe_restart_smoke.py \
-  --expected-rehearsal-account-id "$expected_disposable_account"
+release_test_mode="${GUARDED_RELEASE_TEST_MODE:-0}"
+repo_root="${GUARDED_RELEASE_REPO_ROOT:-/opt/university-portal}"
+backend_root="$repo_root/backend-py"
+python_bin="${GUARDED_RELEASE_PYTHON:-$backend_root/.venv/bin/python}"
+revision_fence="${GUARDED_RELEASE_REVISION_FENCE:-$backend_root/deploy/release_revision_fence.sh}"
+resume_marker="${GUARDED_RELEASE_RESUME_MARKER:-}"
+
+run_release_user() {
+  if [ "$release_test_mode" = 1 ]; then
+    "$@"
+  else
+    sudo -u ubuntu "$@"
+  fi
+}
+
+resume_consumers() {
+  if [ "$release_test_mode" = 1 ]; then
+    printf 'resume-attempted\n' >> "$resume_marker"
+  else
+    "$backend_root/.venv/bin/celery" -A app.tasks.celery_app control add_consumer scrape >/dev/null 2>&1 || true
+  fi
+}
+
+if [ "$release_test_mode" != 1 ]; then
+  cd "$backend_root"
+  set -a
+  source .env
+  source .release.env
+  source /etc/university-portal/database.env
+  set +a
+  export PYTHONPATH=.
+  run_release_user "$revision_fence" verify "$repo_root" "$predecessor" "$target"
+  "$python_bin" -B deploy/safe_restart_smoke.py \
+    --expected-rehearsal-account-id "$expected_disposable_account"
+fi
 
 # Pause consumption, then inspect every task state before changing code.
 reconciler=""
+reconciler_is_temporary=0
 reconciliation_manifest=""
 reconciliation_committed=0
 tracked_recipe_manifest=""
 overlay_audit_evidence=""
 cleanup_release() {
-  cd /opt/university-portal
+  cd "$repo_root"
   rollback_failed=0
   if [ "$reconciliation_committed" != 1 ] && [ -n "$reconciler" ] && [ -s "$reconciliation_manifest" ]; then
-    if ! sudo -u ubuntu /opt/university-portal/backend-py/.venv/bin/python -B "$reconciler" rollback \
+    if ! run_release_user "$python_bin" -B "$reconciler" rollback \
       --manifest "$reconciliation_manifest"; then
       rollback_failed=1
     fi
   fi
   if [ -n "$reconciler" ] && [ -s "$tracked_recipe_manifest" ]; then
-    if ! sudo -u ubuntu /opt/university-portal/backend-py/.venv/bin/python -B "$reconciler" restore-tracked \
+    if ! run_release_user "$python_bin" -B "$reconciler" restore-tracked \
       --manifest "$tracked_recipe_manifest" ||
-      ! sudo -u ubuntu /opt/university-portal/backend-py/.venv/bin/python -B "$reconciler" finalize-tracked \
+      ! run_release_user "$python_bin" -B "$reconciler" finalize-tracked \
       --manifest "$tracked_recipe_manifest"; then
       rollback_failed=1
     fi
   fi
   if [ "$rollback_failed" = 1 ]; then
     echo "Release config rollback failed; consumers remain paused and manifests are retained" >&2
-    cd /opt/university-portal/backend-py
+    cd "$backend_root"
+    if [ "$release_test_mode" = 1 ]; then
+      return 1
+    fi
     if ! .venv/bin/python -B - <<'PY'
 from app.tasks.celery_app import celery_app
 reply = celery_app.control.cancel_consumer("scrape", reply=True, timeout=10)
@@ -69,14 +97,38 @@ PY
     fi
     return 1
   fi
-  rm -f "$reconciler"
+  if [ "$reconciler_is_temporary" = 1 ]; then
+    rm -f "$reconciler"
+  fi
   rm -f "$overlay_audit_evidence"
   rm -f "$reconciliation_manifest"
   rm -f "$tracked_recipe_manifest"
-  cd backend-py
-  /opt/university-portal/backend-py/.venv/bin/celery -A app.tasks.celery_app control add_consumer scrape >/dev/null 2>&1 || true
+  cd "$backend_root"
+  resume_consumers
 }
 trap cleanup_release EXIT
+
+if [ "$release_test_mode" = 1 ]; then
+  test -n "$resume_marker"
+  reconciler="${GUARDED_RELEASE_RECONCILER:?GUARDED_RELEASE_RECONCILER is required in test mode}"
+  reconciliation_manifest="${GUARDED_RELEASE_RECONCILIATION_MANIFEST:-$(mktemp)}"
+  tracked_recipe_manifest="${GUARDED_RELEASE_TRACKED_MANIFEST:-$(mktemp)}"
+  : > "$reconciliation_manifest"
+  : > "$tracked_recipe_manifest"
+  run_release_user "$revision_fence" verify "$repo_root" "$predecessor" "$target"
+  run_release_user "$python_bin" -B "$reconciler" prepare-tracked \
+    --repo-root "$repo_root" --target "$target" \
+    --manifest "$tracked_recipe_manifest"
+  run_release_user "$python_bin" -B "$reconciler" prepare \
+    --repo-root "$repo_root" --target "$target" \
+    --manifest "$reconciliation_manifest"
+  if [ -n "${GUARDED_RELEASE_BEFORE_CHECKOUT_HOOK:-}" ]; then
+    "$GUARDED_RELEASE_BEFORE_CHECKOUT_HOOK"
+  fi
+  run_release_user "$revision_fence" checkout "$repo_root" "$predecessor" "$target"
+  exit 0
+fi
+
 .venv/bin/python -B - <<'PY'
 import asyncio
 from app.tasks.celery_app import celery_app
@@ -105,6 +157,7 @@ PY
 cd /opt/university-portal
 sudo -u ubuntu git diff --cached --quiet
 reconciler="$(mktemp)"
+reconciler_is_temporary=1
 reconciliation_manifest="$(mktemp)"
 tracked_recipe_manifest="$(mktemp)"
 sudo -u ubuntu git show "$target":backend-py/deploy/reconcile_generated_configs.py > "$reconciler"
