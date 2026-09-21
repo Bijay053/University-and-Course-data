@@ -194,8 +194,64 @@ async def test_page_and_elapsed_time_caps_are_hard_clamped(monkeypatch):
     assert fetch.await_count == 12 and evidence.pages_checked == 12
     assert evidence.max_seconds == 180 and evidence.fetch_seconds == 20
     evidence = live.LiveRepairEvidence(context())
-    clock[0] = 181
+    evidence.fetch_elapsed_seconds = 181
     assert (await evidence.fetch(ONE))["classification"] == "budget_exhausted"
+    assert evidence.pages_checked == 0
+
+
+@pytest.mark.asyncio
+async def test_ai_deliberation_does_not_consume_live_fetch_budget(monkeypatch):
+    clock = [0.0]
+    monkeypatch.setattr(live.time, "monotonic", lambda: clock[0])
+
+    async def fetch(*_args):
+        clock[0] += 13
+        return course(), "", ""
+
+    monkeypatch.setattr(live, "_fetch_official", fetch)
+    evidence = live.LiveRepairEvidence(context(), {"max_live_seconds": 180})
+    await evidence.fetch(ONE)
+    clock[0] += 120  # Simulated AI proposal time between live phases.
+
+    result = await evidence.fetch(TWO)
+
+    assert result["classification"] == "course"
+    assert evidence.fetch_elapsed_seconds == 26
+
+
+@pytest.mark.asyncio
+async def test_validation_reuses_live_pages_across_repair_attempts(monkeypatch):
+    fetch = AsyncMock(return_value=(course(), "", ""))
+    monkeypatch.setattr(live, "_fetch_official", fetch)
+    evidence = live.LiveRepairEvidence(context(effective_discovery={}))
+    evidence.initial = {
+        ONE: live.inspect_page(ONE, course(), config()),
+        TWO: live.inspect_page(TWO, course(), config()),
+    }
+
+    first = await evidence.validate({}, {}, {})
+    second = await evidence.validate({}, {}, {})
+
+    assert first["accepted"] and second["accepted"]
+    assert fetch.await_count == 2
+    assert evidence.pages_checked == 2
+
+
+@pytest.mark.asyncio
+async def test_invalid_filter_attempt_does_not_spend_validation_page_budget(monkeypatch):
+    fetch = AsyncMock(return_value=(course(), "", ""))
+    monkeypatch.setattr(live, "_fetch_official", fetch)
+    evidence = live.LiveRepairEvidence(context(effective_discovery={}))
+    evidence.initial = {ONE: live.inspect_page(ONE, course(), config())}
+
+    result = await evidence.validate(
+        {"allow_url_patterns": ["/courses/"]},
+        {"allow_url_patterns": ["/does-not-match/"]},
+        {},
+    )
+
+    assert not result["accepted"]
+    fetch.assert_not_awaited()
     assert evidence.pages_checked == 0
 
 

@@ -281,10 +281,11 @@ class LiveRepairEvidence:
         self.max_pages = bounded_limit(limits, "max_live_pages", 12)
         self.max_seconds = bounded_limit(limits, "max_live_seconds", 180)
         self.fetch_seconds = bounded_limit(limits, "fetch_timeout_seconds", 20)
-        self.started = time.monotonic()
+        self.fetch_elapsed_seconds = 0.0
         self.pages_checked = 0
         self.records: list[dict] = []
         self.initial: dict[str, dict] = {}
+        self.validation_pages: dict[str, dict] = {}
         self.config = ctx.get("effective_config")
         if self.config is None:
             from app.services.scraper.config.loader import get_config_for_host
@@ -298,7 +299,10 @@ class LiveRepairEvidence:
         self.extra_hosts = getattr(self.config.discovery, "allowed_extra_hostnames", ())
 
     async def fetch(self, url: str) -> dict:
-        remaining = self.max_seconds - (time.monotonic() - self.started)
+        # The live-evidence time budget covers network activity only. AI
+        # deliberation and deterministic rule replay must not consume the
+        # remaining fetch allowance between probe and validation.
+        remaining = self.max_seconds - self.fetch_elapsed_seconds
         record = {"url": url, "classification": "budget_exhausted", "reason": "Live page/time budget exhausted"}
         if not official_url(url, self.ctx["scrape_url"], self.extra_hosts):
             record.update(classification="unsafe_url", reason="Not an official university host")
@@ -306,6 +310,7 @@ class LiveRepairEvidence:
             self.pages_checked += 1
             timeout = min(self.fetch_seconds, remaining)
             token = current_uni_config.set(self.config)
+            fetch_started = time.monotonic()
             try:
                 html, failure, reason = await asyncio.wait_for(
                     _fetch_official(url, self.config, timeout), timeout=timeout
@@ -315,6 +320,9 @@ class LiveRepairEvidence:
             except Exception as exc:
                 record.update(classification="network_failure", reason=type(exc).__name__)
             finally:
+                self.fetch_elapsed_seconds += max(
+                    0.0, time.monotonic() - fetch_started
+                )
                 current_uni_config.reset(token)
         self.records.append(record)
         return record
@@ -418,10 +426,16 @@ class LiveRepairEvidence:
         if not required:
             reasons.append("No live validation targets")
         checked = {}
-        for url in sorted(required):
-            checked[url] = await self.fetch(url)
-            if checked[url]["classification"] != "course":
-                reasons.append(f"Live verification failed for {url}: {checked[url]['classification']}")
+        # Do not spend live-page budget on a proposal already rejected by pure
+        # filter replay. This leaves the reserved validation slots available
+        # for a later attempt that is actually eligible to be applied.
+        if not reasons:
+            for url in sorted(required):
+                checked[url] = self.validation_pages.get(url) or await self.fetch(url)
+                if checked[url]["classification"] not in _FAILURES:
+                    self.validation_pages[url] = checked[url]
+                if checked[url]["classification"] != "course":
+                    reasons.append(f"Live verification failed for {url}: {checked[url]['classification']}")
         if extraction:
             from app.services.scraper.ai_extractor_run import apply_extraction_rules
             from app.services.scraper.ai_repair_agent import _normalise_repair_value
