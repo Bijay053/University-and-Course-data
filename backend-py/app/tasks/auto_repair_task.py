@@ -134,10 +134,10 @@ async def _recover_ai_repair_workflows() -> dict:
             "WHERE (j.request_payload->'aiRepairWorkflow'->>'session_id' = a.session_id "
             "AND j.request_payload->'aiRepairWorkflow'->'autonomous'->>'enabled' = 'true' "
             "AND j.request_payload->'aiRepairWorkflow'->'autonomous'->>'phase' "
-            "IN ('queued', 'live_probe', 'repairing', 'validating', 'verification_queued', 'verifying')) "
+            "IN ('queued', 'live_probe', 'repairing', 'validating', 'verification_queued', 'verifying', 'recovering')) "
             "OR (a.evidence->'autonomous'->>'enabled' = 'true' "
             "AND a.evidence->'autonomous'->>'phase' "
-            "IN ('queued', 'live_probe', 'repairing', 'validating', 'verification_queued', 'verifying') "
+            "IN ('queued', 'live_probe', 'repairing', 'validating', 'verification_queued', 'verifying', 'recovering') "
             "AND j.request_payload->'aiRepairWorkflow' IS NULL) "
             "ORDER BY a.updated_at ASC LIMIT 100"
         ))).mappings().all()

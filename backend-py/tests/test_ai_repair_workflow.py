@@ -155,16 +155,80 @@ async def test_duplicate_final_delivery_creates_exactly_one_child(memory, monkey
 
 @pytest.mark.asyncio
 async def test_lost_lease_never_launches_child(memory):
-    evidence = session(worker_claim="delivery")
+    evidence = session(worker_claim="delivery", config_loop_done=True)
     evidence.update(status="completed", live_probe={"accepted": True, "status": "accepted"},
                     attempts=[{"outcome": "no_change", "root_cause": "stale_job_evidence"}])
     memory.evidence = evidence
     workflow.agent.renew_repair_lease.return_value = False
+    workflow.agent.acquire_repair_lease.return_value = False
     result = await workflow.queue_verification(evidence, DB(memory))
     assert result["autonomous"]["phase"] == "blocked"
     assert result["status"] == "failed"
     assert not memory.added
-    workflow.agent.acquire_repair_lease.assert_not_called()
+    workflow.agent.acquire_repair_lease.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_missing_completion_signal_stays_terminal_on_second_reconcile(memory):
+    evidence = session(worker_claim="delivery")
+    evidence.update(status="completed")
+    memory.evidence = copy.deepcopy(evidence)
+    result = await workflow.queue_verification(evidence, DB(memory))
+    assert result["autonomous"]["phase"] == "blocked"
+    assert result["status"] == "completed"
+    again = await workflow.reconcile("parent", "session-1", DB(memory))
+    assert again["autonomous"]["phase"] == "blocked"
+    assert again["status"] == "completed"
+    assert not memory.added
+
+
+@pytest.mark.asyncio
+async def test_completed_loop_reacquires_available_lease_before_verification(memory, monkeypatch):
+    evidence = session(worker_claim="delivery", config_loop_done=True)
+    evidence.update(
+        status="completed",
+        live_probe={"accepted": True, "status": "accepted"},
+        attempts=[{"outcome": "no_change", "root_cause": "stale_job_evidence"}],
+    )
+    memory.evidence = copy.deepcopy(evidence)
+    workflow.agent.renew_repair_lease.return_value = False
+    workflow.agent.acquire_repair_lease.return_value = True
+    dispatch = AsyncMock(side_effect=lambda current, db: current)
+    monkeypatch.setattr(workflow, "dispatch_verification", dispatch)
+    result = await workflow.queue_verification(evidence, DB(memory))
+    assert workflow.agent.acquire_repair_lease.called
+    assert result["autonomous"]["verification_job_id"] == workflow.verification_id("session-1")
+    assert len(memory.added) == 1
+    assert dispatch.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_active_scrape_collision_recovers_without_duplicate_child(memory, monkeypatch):
+    evidence = session(worker_claim="delivery", config_loop_done=True)
+    evidence.update(
+        status="completed",
+        live_probe={"accepted": True, "status": "accepted"},
+        attempts=[{"outcome": "no_change", "root_cause": "stale_job_evidence"}],
+    )
+    memory.evidence = copy.deepcopy(evidence)
+    memory.jobs["active"] = child("running")
+    result = await workflow.queue_verification(evidence, DB(memory))
+    assert result["autonomous"]["phase"] == "recovering"
+    assert result["autonomous"]["recovery_target"] == "verification"
+    assert result["status"] == "completed"
+    assert result["autonomous"]["recovery"]["wait_attempts"] == 1
+    assert not memory.added
+
+    memory.jobs["active"].status = "completed"
+    memory.evidence["autonomous"]["last_dispatch_at"] = (
+        datetime.now(timezone.utc) - timedelta(minutes=3)
+    ).isoformat()
+    dispatch = AsyncMock(side_effect=lambda current, db: current)
+    monkeypatch.setattr(workflow, "dispatch_verification", dispatch)
+    result = await workflow.reconcile("parent", "session-1", DB(memory))
+    assert result["autonomous"]["verification_job_id"] == workflow.verification_id("session-1")
+    assert len(memory.added) == 1
+    assert dispatch.await_count == 1
 
 
 @pytest.mark.asyncio
@@ -283,7 +347,7 @@ async def test_time_budget_exhaustion_is_not_reported_as_course_cap(memory, monk
 
 
 @pytest.mark.asyncio
-async def test_child_queue_failure_is_terminal(memory, monkeypatch):
+async def test_child_queue_failure_is_recoverable_and_idempotent(memory, monkeypatch):
     from app.tasks import scrape_tasks
 
     memory.evidence = session(
@@ -294,9 +358,105 @@ async def test_child_queue_failure_is_terminal(memory, monkeypatch):
     monkeypatch.setattr(scrape_tasks, "set_initial_dispatch_lock", Mock())
     monkeypatch.setattr(scrape_tasks.scrape_university, "apply_async", Mock(side_effect=RuntimeError("broker down")))
     result = await workflow.dispatch_verification(memory.evidence, DB(memory))
-    assert result["status"] == "failed"
-    assert memory.jobs["child"].status == "failed"
-    assert result["autonomous"]["phase"] == "blocked"
+    assert result["status"] == "queued"
+    assert memory.jobs["child"].status == "queued"
+    assert result["autonomous"]["phase"] == "recovering"
+    assert result["autonomous"]["recovery"]["dispatch_attempts"] == 1
+    assert result["autonomous"]["verification_job_id"] == "child"
+
+
+@pytest.mark.asyncio
+async def test_repeated_broker_failures_exhaust_dispatch_cap_without_duplicate_child(memory, monkeypatch):
+    from app.tasks import scrape_tasks
+
+    memory.evidence = session(
+        phase="verification_queued", verification_job_id="child", verification_requeues=0,
+    )
+    memory.evidence["status"] = "running"
+    memory.jobs["child"] = child("queued")
+    monkeypatch.setattr(scrape_tasks, "set_initial_dispatch_lock", Mock())
+    dispatch = Mock(side_effect=RuntimeError("broker down"))
+    monkeypatch.setattr(scrape_tasks.scrape_university, "apply_async", dispatch)
+
+    result = await workflow.dispatch_verification(memory.evidence, DB(memory))
+    assert result["autonomous"]["verification_requeues"] == 1
+    for attempt in (2, 3):
+        memory.evidence["autonomous"]["verification_last_dispatch_at"] = (
+            datetime.now(timezone.utc) - timedelta(minutes=3)
+        ).isoformat()
+        result = await workflow.reconcile("parent", "session-1", DB(memory))
+        if attempt == 2:
+            assert result["autonomous"]["verification_requeues"] == 2
+            assert result["status"] == "queued"
+        else:
+            assert result["status"] == "failed"
+            assert result["autonomous"]["recovery_exhausted"] is True
+    assert dispatch.call_count == 2
+    assert len(memory.added) == 0
+    assert memory.evidence["autonomous"]["verification_job_id"] == "child"
+
+
+@pytest.mark.asyncio
+async def test_crashed_dispatch_round_is_retried_after_stale_generation(memory, monkeypatch):
+    from app.tasks import scrape_tasks
+
+    old = (datetime.now(timezone.utc) - timedelta(minutes=3)).isoformat()
+    memory.evidence = session(
+        phase="verification_queued", verification_job_id="child",
+        verification_requeues=1, verification_dispatch_round=1,
+        verification_dispatch_started_at=old, verification_last_dispatch_at=old,
+    )
+    memory.evidence["status"] = "running"
+    memory.jobs["child"] = child("queued")
+    monkeypatch.setattr(scrape_tasks, "set_initial_dispatch_lock", Mock())
+    dispatch = Mock()
+    monkeypatch.setattr(scrape_tasks.scrape_university, "apply_async", dispatch)
+    result = await workflow.reconcile("parent", "session-1", DB(memory))
+    assert result["autonomous"]["verification_requeues"] == 2
+    assert dispatch.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_successful_lost_dispatch_retries_from_expired_publish_timestamp(memory, monkeypatch):
+    from app.tasks import scrape_tasks
+
+    old = (datetime.now(timezone.utc) - timedelta(minutes=3)).isoformat()
+    memory.evidence = session(
+        phase="verification_queued", verification_job_id="child",
+        verification_requeues=1, verification_dispatch_round=1,
+        verification_last_dispatch_at=old,
+    )
+    memory.evidence["status"] = "running"
+    memory.jobs["child"] = child("queued")
+    monkeypatch.setattr(scrape_tasks, "set_initial_dispatch_lock", Mock())
+    dispatch = Mock()
+    monkeypatch.setattr(scrape_tasks.scrape_university, "apply_async", dispatch)
+
+    result = await workflow.reconcile("parent", "session-1", DB(memory))
+    assert dispatch.call_count == 1
+    assert result["autonomous"]["verification_requeues"] == 2
+
+
+@pytest.mark.asyncio
+async def test_repeated_collision_wait_does_not_consume_repair_dispatch_cap(memory, monkeypatch):
+    from app.tasks import auto_repair_task
+
+    old = (datetime.now(timezone.utc) - timedelta(minutes=3)).isoformat()
+    memory.evidence = session(phase="recovering", recovery_target="repair",
+                               last_dispatch_at=old, requeues=0)
+    memory.jobs["active"] = child("running")
+    dispatch = Mock()
+    monkeypatch.setattr(auto_repair_task.run_ai_scrape_repair, "apply_async", dispatch)
+    result = await workflow.reconcile("parent", "session-1", DB(memory))
+    assert result["autonomous"]["recovery_wait_attempts"] == 1
+    assert result["autonomous"]["requeues"] == 0
+    dispatch.assert_not_called()
+
+    memory.jobs["active"].status = "completed"
+    memory.evidence["autonomous"]["last_dispatch_at"] = old
+    result = await workflow.reconcile("parent", "session-1", DB(memory))
+    assert result["autonomous"]["requeues"] == 1
+    dispatch.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -326,7 +486,8 @@ async def test_delivery_recovery_exhausts_at_two_without_running_again(memory, m
     memory.evidence = session(requeues=2, last_dispatch_at=old)
     result = await workflow.reconcile("parent", "session-1", DB(memory))
     assert result["status"] == "failed"
-    assert "2 requeues" in result["autonomous"]["reason"]
+    assert result["autonomous"]["recovery_exhausted"] is True
+    assert "Automatic recovery exhausted after 2 broker dispatch attempts" in result["autonomous"]["reason"]
     assert not memory.added
 
 
@@ -478,7 +639,7 @@ async def test_monitor_persists_same_worker_live_phase_and_evidence(monkeypatch)
 
 
 @pytest.mark.asyncio
-async def test_hard_killed_repair_is_blocked_not_reclaimed(memory):
+async def test_hard_killed_repair_remains_fenced(memory):
     old = (datetime.now(timezone.utc) - timedelta(minutes=25)).isoformat()
     memory.evidence = session(worker_claim="original", worker_started_at=old, phase="repairing")
     memory.evidence["status"] = "running"
@@ -490,7 +651,7 @@ async def test_hard_killed_repair_is_blocked_not_reclaimed(memory):
 
 
 @pytest.mark.asyncio
-async def test_stale_child_blocks_parent_without_reclaim_or_false_child_failure(memory):
+async def test_stale_child_remains_fenced_without_reclaim(memory):
     old = datetime.now(timezone.utc) - timedelta(minutes=20)
     memory.evidence = session(phase="verifying", verification_job_id="child")
     memory.evidence["status"] = "running"
@@ -498,7 +659,7 @@ async def test_stale_child_blocks_parent_without_reclaim_or_false_child_failure(
     result = await workflow.reconcile("parent", "session-1", DB(memory))
     assert result["status"] == "failed"
     assert result["autonomous"]["phase"] == "blocked"
-    assert memory.jobs["child"].status == "running"  # keep fence; do not overwrite a late owner
+    assert memory.jobs["child"].status == "running"
     assert memory.jobs["child"].stop_requested is True
     assert not memory.added
 

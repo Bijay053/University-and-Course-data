@@ -26,6 +26,7 @@ LIMITS = {
 }
 ACTIVE = {"queued", "running", "starting"}
 CHILD_ACTIVE = {"queued", "running", "awaiting_approval"}
+RECOVERING = "recovering"
 VERIFY_SECONDS = 600
 REPAIR_SECONDS = 960
 REQUEUE_SECONDS = 120
@@ -166,7 +167,7 @@ async def active_audit(university_id: int, db) -> dict:
         "OR (j.request_payload->'aiRepairWorkflow'->>'session_id' = a.session_id "
         "AND j.request_payload->'aiRepairWorkflow'->'autonomous'->>'enabled' = 'true' "
         "AND j.request_payload->'aiRepairWorkflow'->'autonomous'->>'phase' "
-        "IN ('queued', 'live_probe', 'repairing', 'validating', 'verification_queued', 'verifying'))) "
+        "IN ('queued', 'live_probe', 'repairing', 'validating', 'verification_queued', 'verifying', 'recovering'))) "
         "ORDER BY a.created_at DESC LIMIT 1"
     ), {"uid": university_id})).scalar_one_or_none()
     return dict(row or {})
@@ -228,6 +229,79 @@ async def finish(session: dict, db, phase: str, reason: str, *, failed: bool = F
     return session
 
 
+async def schedule_recovery(
+    session: dict,
+    db,
+    reason: str,
+    next_action: str,
+    *,
+    target: str = "repair",
+    wait_for_collision: bool = False,
+    dispatch_exhausted: bool = False,
+) -> dict:
+    """Persist a bounded, idempotent retry instead of stranding infrastructure failures."""
+    state = session["autonomous"]
+    wait_attempts = int(state.get("recovery_wait_attempts") or 0)
+    if wait_for_collision:
+        wait_attempts += 1
+        state["recovery_wait_attempts"] = wait_attempts
+    recovery = dict(state.get("recovery") or {})
+    dispatch_attempts = int(
+        state.get("verification_requeues" if target == "verification" else "requeues") or 0
+    )
+    if dispatch_exhausted or wait_attempts > MAX_REQUEUES:
+        recovery.update(
+            wait_attempts=wait_attempts,
+            dispatch_attempts=dispatch_attempts,
+            cap=MAX_REQUEUES,
+            exhausted=True,
+            last_reason=reason,
+            next_action=next_action,
+        )
+        state.update(
+            recovery=recovery,
+            recovery_exhausted=True,
+            next_action=next_action,
+        )
+        return await finish(
+            session,
+            db,
+            "blocked",
+            f"Automatic recovery exhausted after "
+            f"{dispatch_attempts if dispatch_exhausted else wait_attempts} "
+            f"{'broker dispatch attempts' if dispatch_exhausted else 'wait attempts'}. "
+            f"{next_action}",
+            failed=True,
+        )
+
+    recovery.update(
+        wait_attempts=wait_attempts,
+        dispatch_attempts=dispatch_attempts,
+        cap=MAX_REQUEUES,
+        exhausted=False,
+        last_reason=reason,
+        next_action=next_action,
+        target=target,
+    )
+    state.update(
+        phase=RECOVERING,
+        recovery=recovery,
+        recovery_exhausted=False,
+        next_action=next_action,
+        recovery_target=target,
+        last_dispatch_at=now(),
+    )
+    # A claimed repair worker remains fenced. Verification recovery after a
+    # completed config loop deliberately remains completed so the next
+    # queue_verification call can reacquire its lease.
+    session.update(
+        status="completed" if target == "verification" and state.get("config_loop_done") else "queued",
+        completed_at=None,
+    )
+    await save(session, db)
+    return session
+
+
 async def claim(job_id: str, university_id: int, session_id: str, claim_id: str, db) -> dict:
     await lock(db, university_id)
     session = await load(job_id, db, session_id)
@@ -244,10 +318,12 @@ async def claim(job_id: str, university_id: int, session_id: str, claim_id: str,
         ScrapeRuntimeJob.status.in_(CHILD_ACTIVE),
     ).limit(1))).scalar_one_or_none()
     if active:
-        await finish(
-            session, db, "blocked",
+        await schedule_recovery(
+            session, db,
             "A university scrape became active before the repair worker claimed; no configuration changed.",
-            failed=True,
+            "The active scrape will finish automatically, then the repair will retry.",
+            target="repair",
+            wait_for_collision=True,
         )
         return {}
     if not (agent.renew_repair_lease(university_id, session_id)
@@ -327,18 +403,21 @@ async def queue_verification(session: dict, db) -> dict:
     if state.get("verification_job_id") or state.get("phase") in {"blocked", "needs_review", "verified"}:
         await db.rollback()
         return durable
+    if state.get("config_loop_done") is not True:
+        return await finish(
+            session, db, "blocked",
+            "The claimed repair worker has no durable loop-completion signal.",
+        )
     lease_owned = agent.renew_repair_lease(int(session["university_id"]), session["session_id"])
     if (
         not lease_owned and state.get("config_loop_done") is True
-        and durable.get("status") == "completed"
+        and durable.get("status") in {"completed", "queued"}
     ):
         # Redis was flushed after the durable final config audit. Only a
         # finished loop may restore its own missing key, never an active worker.
         lease_owned = agent.acquire_repair_lease(int(session["university_id"]), session["session_id"])
     if not lease_owned:
         return await finish(session, db, "blocked", "Repair lease lost before verification.", failed=True)
-    if state.get("config_loop_done") is not True:
-        return await finish(session, db, "blocked", "The claimed repair worker has no durable loop-completion signal.")
     if not accepted_live_probe(session):
         return await finish(
             session, db, "blocked", "Accepted live validation is required; no scrape launched.",
@@ -350,7 +429,13 @@ async def queue_verification(session: dict, db) -> dict:
         ScrapeRuntimeJob.status.in_(CHILD_ACTIVE),
     ).limit(1))).scalar_one_or_none()
     if active:
-        return await finish(session, db, "blocked", "Another university scrape is active; no verification launched.")
+        return await schedule_recovery(
+            session, db,
+            "Another university scrape is active; verification was not launched.",
+            "The active scrape will finish automatically, then verification will retry.",
+            target="verification",
+            wait_for_collision=True,
+        )
     child_id = verification_id(session["session_id"])
     child = await db.get(ScrapeRuntimeJob, child_id)
     if child is None:
@@ -378,10 +463,36 @@ async def dispatch_verification(session: dict, db) -> dict:
         return session
     session = await load(session["job_id"], db, session["session_id"])
     state = session["autonomous"]
-    dispatch_round = int(state.get("verification_requeues") or 0)
-    if int(state.get("verification_dispatch_round", -1)) >= dispatch_round:
+    dispatch_attempts = int(state.get("verification_requeues") or 0)
+    dispatch_timestamp = (
+        state.get("verification_dispatch_started_at")
+        or state.get("verification_last_dispatch_at")
+    )
+    if (
+        int(state.get("verification_dispatch_round", -1)) == dispatch_attempts
+        and age(dispatch_timestamp) < REQUEUE_SECONDS
+    ):
         await db.rollback()
         return session
+    if dispatch_attempts >= MAX_REQUEUES:
+        state.update(
+            recovery_exhausted=True,
+            next_action="Retry the repair from the job card after checking the university connection.",
+        )
+        recovery = dict(state.get("recovery") or {})
+        recovery.update(
+            dispatch_attempts=dispatch_attempts,
+            cap=MAX_REQUEUES,
+            exhausted=True,
+            next_action=state["next_action"],
+        )
+        state["recovery"] = recovery
+        return await finish(
+            session, db, "blocked",
+            f"Automatic recovery exhausted after {dispatch_attempts} broker dispatch attempts. "
+            f"{state['next_action']}",
+            failed=True,
+        )
     child = await db.get(
         ScrapeRuntimeJob, state["verification_job_id"],
         populate_existing=True, with_for_update=True,
@@ -389,6 +500,14 @@ async def dispatch_verification(session: dict, db) -> dict:
     if not child or child.status != "queued" or child.claimed_at or child.worker_id:
         await db.rollback()
         return session
+    dispatch_attempts += 1
+    state["verification_requeues"] = dispatch_attempts
+    state["verification_dispatch_round"] = dispatch_attempts
+    state["verification_dispatch_started_at"] = now()
+    recovery = dict(state.get("recovery") or {})
+    recovery.update(dispatch_attempts=dispatch_attempts, cap=MAX_REQUEUES)
+    state["recovery"] = recovery
+    await save(session, db)
     try:
         set_initial_dispatch_lock(child.runtime_job_id)
         scrape_university.apply_async(
@@ -396,13 +515,20 @@ async def dispatch_verification(session: dict, db) -> dict:
             soft_time_limit=VERIFY_SECONDS, time_limit=VERIFY_SECONDS + 60,
         )
     except Exception as exc:
-        child.status = "failed"
-        child.error_message = f"Verification queue delivery failed: {exc}"
-        child.completed_at = datetime.now(timezone.utc)
-        state["verification_status"] = "failed"
-        return await finish(session, db, "blocked", child.error_message, failed=True)
+        child.error_message = f"Verification queue delivery deferred: {exc}"
+        state["verification_status"] = "queued"
+        # A failed attempt is retryable after the recovery delay.
+        state["verification_dispatch_round"] = dispatch_attempts - 1
+        state.pop("verification_dispatch_started_at", None)
+        return await schedule_recovery(
+            session,
+            db,
+            "Verification queue delivery failed.",
+            "Verification will be redispatched automatically; no second verification job will be created.",
+            target="verification",
+        )
+    state.pop("verification_dispatch_started_at", None)
     state["verification_last_dispatch_at"] = now()
-    state["verification_dispatch_round"] = dispatch_round
     await save(session, db)
     return session
 
@@ -552,12 +678,15 @@ async def reconcile(job_id: str, session_id: str, db) -> dict:
             if age(since) > REQUEUE_SECONDS:
                 count = int(state.get("verification_requeues") or 0)
                 if count >= MAX_REQUEUES:
-                    child.status = "failed"
-                    child.error_message = "Verification delivery recovery exhausted (2 requeues)."
-                    state["verification_status"] = "failed"
-                    return await finish(session, db, "blocked", child.error_message, failed=True)
-                state["verification_requeues"] = count + 1
-                await save(session, db)
+                    return await schedule_recovery(
+                        session, db,
+                        "Verification delivery did not reach a worker.",
+                        "Retry the repair from the job card after checking the university connection.",
+                        target="verification",
+                        dispatch_exhausted=True,
+                    )
+                # dispatch_verification is the only place that increments
+                # this counter: one count equals one broker attempt.
                 return await dispatch_verification(session, db)
         else:
             state["phase"] = "verifying"
@@ -579,6 +708,16 @@ async def reconcile(job_id: str, session_id: str, db) -> dict:
                     )
         await save(session, db)
         return session
+    if (
+        state.get("phase") == RECOVERING
+        and state.get("recovery_target") == "verification"
+        and state.get("config_loop_done") is True
+        and age(state.get("last_dispatch_at")) > REQUEUE_SECONDS
+    ):
+        # Active-scrape collisions happen before the deterministic child exists.
+        # Re-enter the normal child-creation path after the collision clears;
+        # verification_id() keeps this idempotent.
+        return await queue_verification(session, db)
     if state.get("worker_claim"):
         if session.get("status") in {"completed", "failed"}:
             # Worker died after the agent's final durable audit but before
@@ -594,9 +733,27 @@ async def reconcile(job_id: str, session_id: str, db) -> dict:
             return await queue_verification(session, db)
         return session
     if age(state.get("last_dispatch_at") or session.get("queued_at")) > REQUEUE_SECONDS:
+        active = (await db.execute(select(ScrapeRuntimeJob).where(
+            ScrapeRuntimeJob.university_id == session["university_id"],
+            ScrapeRuntimeJob.status.in_(CHILD_ACTIVE),
+        ).limit(1))).scalar_one_or_none()
+        if active:
+            return await schedule_recovery(
+                session, db,
+                "A university scrape became active before repair redispatch.",
+                "The active scrape will finish automatically, then the repair will retry.",
+                target="repair",
+                wait_for_collision=True,
+            )
         count = int(state.get("requeues") or 0)
         if count >= MAX_REQUEUES:
-            return await finish(session, db, "blocked", "Repair delivery recovery exhausted (2 requeues).", failed=True)
+            return await schedule_recovery(
+                session, db,
+                "Repair delivery did not reach a worker.",
+                "Retry the repair from the job card after checking the university connection.",
+                target="repair",
+                dispatch_exhausted=True,
+            )
         if not (agent.renew_repair_lease(int(session["university_id"]), session_id)
                 or agent.acquire_repair_lease(int(session["university_id"]), session_id)):
             return await finish(session, db, "blocked", "Queued repair no longer owns the lease.", failed=True)
@@ -612,7 +769,12 @@ async def reconcile(job_id: str, session_id: str, db) -> dict:
                 if current.get("autonomous", {}).get("worker_claim"):
                     await db.rollback()
                     return current
-                return await finish(current, db, "blocked", f"Repair queue delivery failed: {exc}", failed=True)
+                return await schedule_recovery(
+                    current, db,
+                    f"Repair queue delivery failed: {exc}",
+                    "The repair will be redispatched automatically; no duplicate repair session will be created.",
+                    target="repair",
+                )
     else:
         await db.rollback()
     return session
