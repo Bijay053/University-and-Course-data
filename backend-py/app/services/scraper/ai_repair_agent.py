@@ -1076,6 +1076,8 @@ def _extraction_quality_ok(quality: dict) -> bool:
     """True when average key-field fill rate is acceptable."""
     if not quality or quality.get("total_staged", 0) == 0:
         return True  # No staged courses yet - don't block on extraction
+    if int(quality.get("critical_quality_count") or 0) > 0:
+        return False
     if quality.get("bad_course_names", 0) or quality.get("bad_locations", 0):
         return False
     key_pcts = [
@@ -1134,6 +1136,26 @@ async def _quality_snapshot(job_id: str, uni_id: int, db) -> dict:
                          OR course_name ~* '\\|\\s*(university|unisc)'
                    )                                             AS bad_course_names,
                    COUNT(academic_level)                         AS has_academic_level,
+                   COUNT(*) FILTER (
+                     WHERE auto_publish_status = 'data_quality_failure'
+                   )                                             AS critical_quality_count,
+                   COALESCE(
+                     jsonb_agg(
+                       jsonb_build_object(
+                         'url', course_website,
+                         'course_name', course_name,
+                         'international_fee', international_fee,
+                         'fee_term', fee_term,
+                         'currency', currency,
+                         'ielts_overall', ielts_overall,
+                         'course_location', course_location
+                       )
+                       ORDER BY id
+                     ) FILTER (
+                       WHERE auto_publish_status = 'data_quality_failure'
+                     ),
+                     '[]'::jsonb
+                   )                                             AS critical_quality_rows,
                    array_agg(DISTINCT course_location)
                      FILTER (WHERE course_location IS NOT NULL)  AS sample_locations,
                    array_agg(DISTINCT course_location)
@@ -1164,6 +1186,7 @@ async def _quality_snapshot(job_id: str, uni_id: int, db) -> dict:
             "duration_pct": 0, "academic_level_pct": 0,
             "course_name_pct": 0, "bad_course_names": 0,
             "bad_locations": 0,
+            "critical_quality_count": 0, "critical_quality_rows": [],
             "sample_locations": [], "sample_degrees": [], "sample_modes": [],
             "sample_bad_course_names": [], "sample_bad_locations": [],
         }
@@ -1181,6 +1204,8 @@ async def _quality_snapshot(job_id: str, uni_id: int, db) -> dict:
         "course_name_pct":    pct((q["has_course_name"] or 0) - (q["bad_course_names"] or 0)),
         "bad_course_names":   int(q["bad_course_names"] or 0),
         "bad_locations":      int(q["bad_locations"] or 0),
+        "critical_quality_count": int(q["critical_quality_count"] or 0),
+        "critical_quality_rows": list((q["critical_quality_rows"] or [])[:20]),
         "academic_level_pct": pct(q["has_academic_level"]),
         "sample_locations":   list((q["sample_locations"]  or [])[:8]),
         "sample_bad_locations": list((q["sample_bad_locations"] or [])[:8]),
@@ -1505,10 +1530,21 @@ def _evaluate_success(
             or ctx["drop_rate"] < _DISC_DROP_RATE_OK
         )
     )
+    critical_quality = ctx.get("critical_quality") or {}
+    critical_issues = critical_quality.get("critical_issues") or []
+    critical_quality_count = max(
+        int(quality_after.get("critical_quality_count") or 0),
+        int(critical_quality.get("affected_course_count") or 0),
+    )
+    critical_fee_failure = any(
+        "fee" in str(issue.get("code") or "").lower()
+        for issue in critical_issues
+        if isinstance(issue, dict)
+    )
     fee_ok = (
         quality_after.get("fee_pct", 0) >= _FEE_PCT_OK
         or predicted_fills.get("fees_central_page_set", False)
-    )
+    ) and not critical_fee_failure
     ielts_ok  = quality_after.get("ielts_pct",        0) >= _IELTS_PCT_OK
     loc_ok    = quality_after.get("location_pct",     0) >= _LOCATION_PCT_OK
     mode_ok   = (
@@ -1521,7 +1557,12 @@ def _evaluate_success(
     pass_count = sum(1 for f in all_flags if f)
     # Discovery is mandatory: five healthy extraction metrics cannot compensate
     # for a filter that prevents every course page from reaching extraction.
-    overall_ok = pass_count >= _CRITERIA_PASS_MIN and disc_ok
+    critical_quality_ok = critical_quality_count == 0
+    overall_ok = (
+        pass_count >= _CRITERIA_PASS_MIN
+        and disc_ok
+        and critical_quality_ok
+    )
 
     return {
         "discovery_ok":    disc_ok,
@@ -1530,6 +1571,8 @@ def _evaluate_success(
         "location_ok":     loc_ok,
         "mode_ok":         mode_ok,
         "degree_level_ok": degree_ok,
+        "critical_quality_ok": critical_quality_ok,
+        "critical_quality_count": critical_quality_count,
         "criteria_pass":   pass_count,
         "overall_ok":      overall_ok,
     }
@@ -1547,6 +1590,7 @@ async def _gather_context(job_id: str, db, *, probe_sitemap: bool = True) -> dic
                    srj.imported,
                    srj.errors          AS total_errors,
                    srj.discovered_config,
+                   srj.gate_skip_counts,
                    u.name          AS uni_name,
                    u.scrape_url    AS scrape_url,
                    u.scrape_config AS scrape_config_raw
@@ -1563,9 +1607,13 @@ async def _gather_context(job_id: str, db, *, probe_sitemap: bool = True) -> dic
     uni_id: int   = row["university_id"]
     disc_cfg: dict = row["discovered_config"] or {}
     pipeline: dict = disc_cfg.get("pipeline_stats", {})
+    gate_skip_counts: dict = row["gate_skip_counts"] or {}
 
     raw_discovered: int = pipeline.get("raw_discovered", row["total_found"] or 0)
-    after_filter:   int = pipeline.get("after_filter",   row["imported"]   or 0)
+    # Legacy jobs have no pipeline_stats. In those rows total_found is the only
+    # URL-stage count we have; imported is a post-extraction/staging count and
+    # must never be reinterpreted as the URL-filter output.
+    after_filter:   int = pipeline.get("after_filter",   row["total_found"] or 0)
     dropped_sample      = pipeline.get("dropped_sample", [])[:15]
     passed_sample       = pipeline.get("passed_sample",  [])[:5]
 
@@ -1674,6 +1722,26 @@ async def _gather_context(job_id: str, db, *, probe_sitemap: bool = True) -> dic
                    COUNT(study_mode)                                 AS has_mode,
                    COUNT(duration)                                   AS has_duration,
                    COUNT(academic_level)                             AS has_academic_level,
+                   COUNT(*) FILTER (
+                     WHERE auto_publish_status = 'data_quality_failure'
+                   )                                                  AS critical_quality_count,
+                   COALESCE(
+                     jsonb_agg(
+                       jsonb_build_object(
+                         'url', course_website,
+                         'course_name', course_name,
+                         'international_fee', international_fee,
+                         'fee_term', fee_term,
+                         'currency', currency,
+                         'ielts_overall', ielts_overall,
+                         'course_location', course_location
+                       )
+                       ORDER BY id
+                     ) FILTER (
+                       WHERE auto_publish_status = 'data_quality_failure'
+                     ),
+                     '[]'::jsonb
+                   )                                                  AS critical_quality_rows,
                    array_agg(DISTINCT course_location)
                      FILTER (WHERE course_location IS NOT NULL)      AS sample_locations,
                    array_agg(DISTINCT degree_level)
@@ -1710,6 +1778,23 @@ async def _gather_context(job_id: str, db, *, probe_sitemap: bool = True) -> dic
 
     quality: dict = {}
     total = (q["total"] or 0) if q else 0
+    persisted_quality = gate_skip_counts.get("data_quality") or {}
+    critical_quality_rows = list(
+        (q["critical_quality_rows"] or []) if q else []
+    )[:20]
+    critical_quality = {
+        "critical_count": max(
+            int(persisted_quality.get("critical_count") or 0),
+            int((q["critical_quality_count"] or 0) if q else 0),
+        ),
+        "affected_course_count": max(
+            int(persisted_quality.get("affected_course_count") or 0),
+            int((q["critical_quality_count"] or 0) if q else 0),
+        ),
+        "critical_urls": list(persisted_quality.get("critical_urls") or [])[:50],
+        "critical_issues": list(persisted_quality.get("critical_issues") or [])[:50],
+        "affected_rows": critical_quality_rows,
+    }
     staged_course_urls = list(dict.fromkeys(
         str(url) for url in ((q["staged_course_urls"] or []) if q else []) if url
     ))
@@ -1735,6 +1820,8 @@ async def _gather_context(job_id: str, db, *, probe_sitemap: bool = True) -> dic
             "mode_pct":           round(100 * (q["has_mode"]          or 0) / total),
             "duration_pct":       round(100 * (q["has_duration"]      or 0) / total),
             "academic_level_pct": round(100 * (q["has_academic_level"] or 0) / total),
+            "critical_quality_count": critical_quality["affected_course_count"],
+            "critical_quality_rows": critical_quality_rows,
             "sample_locations":   list((q["sample_locations"]    or [])[:8]),
             "sample_degrees":     list((q["sample_degree_levels"] or [])[:8]),
             "sample_modes":       list((q["sample_modes"]         or [])[:8]),
@@ -1756,6 +1843,17 @@ async def _gather_context(job_id: str, db, *, probe_sitemap: bool = True) -> dic
         "repair_course_url_sample": repair_course_url_sample,
         "repair_url_sample": list(dict.fromkeys(repair_course_url_sample + dropped_sample)),
         "passed_sample":   passed_sample,
+        "gate_skip_counts": gate_skip_counts,
+        "staging_rejections": gate_skip_counts.get("staging_rejections") or {
+            "reasons": {
+                key: int(value)
+                for key, value in gate_skip_counts.items()
+                if key.startswith("category_landing_page_")
+                and isinstance(value, (int, float))
+            },
+            "samples": {},
+        },
+        "critical_quality": critical_quality,
         "admin_config":    admin_config,
         "scrape_config_snapshot": dict(sc),
         "filter_config_snapshot": filter_config_snapshot,
@@ -2287,6 +2385,22 @@ def _build_user_message(ctx: dict, previous_attempts: list[dict], phase: str = "
             f"location ({bad_locations} template-contaminated values; examples: "
             f"{q.get('sample_bad_locations', [])[:3]})"
         )
+    critical_quality = ctx.get("critical_quality") or {}
+    critical_quality_count = int(
+        critical_quality.get("affected_course_count")
+        or q.get("critical_quality_count")
+        or 0
+    )
+    if critical_quality_count:
+        critical_codes = sorted({
+            str(issue.get("code"))
+            for issue in (critical_quality.get("critical_issues") or [])
+            if isinstance(issue, dict) and issue.get("code")
+        })
+        _failing_hints.append(
+            f"critical data quality ({critical_quality_count} affected course(s); "
+            f"codes: {critical_codes or ['persisted data_quality_failure']})"
+        )
     failing_str = ", ".join(_failing_hints) if _failing_hints else "all fields meeting targets"
 
     if phase == "extraction":
@@ -2370,6 +2484,20 @@ EXTRACTION QUALITY (fill rates for staged courses):
   sample_locations:     {json.dumps(q.get('sample_locations', []))}
   sample_degree_levels: {json.dumps(q.get('sample_degrees', []))}
   sample_study_modes:   {json.dumps(q.get('sample_modes', []))}
+
+STAGING REJECTIONS (these happen after URL filtering; do not blame the URL
+allow-list unless the filter evidence above shows a material URL drop):
+{json.dumps(ctx.get('staging_rejections') or {}, ensure_ascii=False, indent=2)}
+Degree/non-degree/category safety gates must not be disabled automatically.
+Use affected samples to decide whether extraction selected the wrong course
+title/award evidence; otherwise return no patch and explain the source limitation.
+
+CRITICAL DATA QUALITY (populated does not mean valid):
+{json.dumps(critical_quality, ensure_ascii=False, indent=2)}
+Any affected course means extraction is not healthy, even when fill rates are
+100%. For fee issues, repair only an evidence-backed course-owned international
+fee selector/regex. Never invent fee defaults, substitute domestic fees, or
+weaken international, category, degree/non-degree, or delivery gates.
 
 ADMIN_CONFIG discovery overrides (DB, highest priority):
 {json.dumps(admin_disc, indent=2) if admin_disc else "(none)"}

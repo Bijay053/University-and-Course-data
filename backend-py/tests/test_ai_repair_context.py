@@ -30,6 +30,7 @@ def _make_db(job_row_data, quality_row_data: dict | None = None):
         "imported":          5,
         "total_errors":      None,
         "discovered_config": None,
+        "gate_skip_counts":  None,
         "uni_name":          "Test University",
         "scrape_url":        "https://example.com/courses",
         "scrape_config_raw": None,
@@ -41,6 +42,7 @@ def _make_db(job_row_data, quality_row_data: dict | None = None):
         "total": 0, "has_fee": 0, "has_ielts": 0, "has_intakes": 0,
         "has_location": 0, "has_degree_level": 0, "has_mode": 0,
         "has_duration": 0, "has_academic_level": 0,
+        "critical_quality_count": 0, "critical_quality_rows": None,
         "sample_locations": None, "sample_degree_levels": None, "sample_modes": None,
         "staged_course_urls": None,
     }
@@ -143,6 +145,27 @@ async def test_gather_context_zero_raw_discovered_no_divzero():
 
 
 @pytest.mark.asyncio
+async def test_legacy_job_does_not_treat_staged_count_as_after_filter_count():
+    """Legacy 159-found/20-staged evidence has unknown, not 87%, filter loss."""
+    from app.services.scraper.ai_repair_agent import _gather_context
+
+    with patch("pathlib.Path.glob", return_value=[]):
+        ctx = await _gather_context(
+            "legacy_159_found_20_staged",
+            _make_db({
+                "total_found": 159,
+                "imported": 20,
+                "discovered_config": None,
+            }),
+        )
+
+    assert ctx["raw_discovered"] == 159
+    assert ctx["after_filter"] == 159
+    assert ctx["imported"] == 20
+    assert ctx["drop_rate"] == 0
+
+
+@pytest.mark.asyncio
 async def test_gather_context_always_seeds_live_probe_from_latest_staged_course_urls():
     """Even a historical rejection-storm job must probe the latest known staged courses."""
     from app.services.scraper.ai_repair_agent import _gather_context
@@ -179,3 +202,72 @@ async def test_gather_context_always_seeds_live_probe_from_latest_staged_course_
         "https://example.com/study/course/bachelor-of-business",
     }
     assert ctx["repair_url_sample"][:2] == ctx["repair_course_url_sample"]
+
+
+@pytest.mark.asyncio
+async def test_rejection_storm_context_preserves_stage_and_critical_quality_evidence():
+    """159 extractable pages / 20 staged must not look like an allow-list failure."""
+    from app.services.scraper.ai_repair_agent import _gather_context
+
+    critical_rows = [{
+        "url": "https://example.com/study/course/master-applied-science",
+        "course_name": "Master of Applied Science",
+        "international_fee": 12991,
+        "fee_term": "Annual",
+        "currency": "NZD",
+        "ielts_overall": 6.5,
+        "course_location": "Rotorua",
+    }]
+    db = _make_db(
+        {
+            "total_found": 159,
+            "imported": 20,
+            "discovered_config": {
+                "pipeline_stats": {
+                    "raw_discovered": 162,
+                    "after_filter": 159,
+                    "filter_drop_count": 3,
+                    "filter_drop_pct": 1.9,
+                },
+            },
+            "gate_skip_counts": {
+                "category_landing_page_missing_degree_qua": 129,
+                "data_quality": {
+                    "critical_count": 16,
+                    "affected_course_count": 16,
+                    "critical_urls": [critical_rows[0]["url"]],
+                    "critical_issues": [{
+                        "severity": "critical",
+                        "code": "annual_fee_too_low_critical",
+                        "message": "Likely domestic or partial fee",
+                        "url": critical_rows[0]["url"],
+                    }],
+                },
+            },
+        },
+        {
+            "total": 20,
+            "has_fee": 20,
+            "has_ielts": 19,
+            "has_intakes": 20,
+            "has_location": 20,
+            "has_degree_level": 20,
+            "has_mode": 20,
+            "has_duration": 20,
+            "has_academic_level": 20,
+            "critical_quality_count": 16,
+            "critical_quality_rows": critical_rows,
+        },
+    )
+
+    with patch("pathlib.Path.glob", return_value=[]):
+        ctx = await _gather_context("job_rejection_storm", db)
+
+    assert ctx["drop_rate"] == 2
+    assert ctx["staging_rejections"]["reasons"] == {
+        "category_landing_page_missing_degree_qua": 129,
+    }
+    assert ctx["critical_quality"]["affected_course_count"] == 16
+    assert ctx["critical_quality"]["critical_issues"][0]["code"] == "annual_fee_too_low_critical"
+    assert ctx["quality"]["fee_pct"] == 100
+    assert ctx["quality"]["critical_quality_count"] == 16

@@ -7316,6 +7316,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         # Run after the staging loop so every staged payload is inspected.
         # Issues are streamed to the live log via emit and summarised in the
         # server log. Never blocks the scrape — catches errors internally.
+        _dq_summary = None
         try:
             from app.services.scraper.data_quality import run_quality_checks
             from app.services.scraper.config.context import get_uni_config as _get_uc_dq
@@ -7328,10 +7329,23 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             _dq_report = await run_quality_checks(
                 _staged_dicts, emit=emit, uni_config=_dq_uni_cfg
             )
+            _dq_critical_issues = [
+                issue
+                for issue in (_dq_report.get("issues") or [])
+                if issue.get("severity") == "critical"
+            ]
+            _dq_critical_urls = _dq_report.get("critical_urls") or set()
+            _dq_summary = {
+                "critical_count": int(_dq_report.get("critical") or 0),
+                "warning_count": int(_dq_report.get("warning") or 0),
+                "total_issues": int(_dq_report.get("total_issues") or 0),
+                "affected_course_count": len(_dq_critical_urls),
+                "critical_urls": sorted(str(url) for url in _dq_critical_urls)[:50],
+                "critical_issues": _dq_critical_issues[:50],
+            }
 
             # Mark courses with critical data-quality issues so operators see
             # DATA QUALITY FAILURE in the Review UI instead of generic review.
-            _dq_critical_urls = _dq_report.get("critical_urls") or set()
             if _dq_critical_urls and not _verification:
                 from sqlalchemy import update as _dq_upd, text as _dq_txt
                 from app.models import ScrapedCourse as _DqSC
@@ -8036,6 +8050,23 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         job.scrape_do_render_calls = _sd_job_ctrs["render"]
         job.scrape_do_static_calls = _sd_job_ctrs["static"]
         job.gate_skip_counts = _gate_skips if _nonzero_skips else None
+        if skip_reasons:
+            job.gate_skip_counts = dict(job.gate_skip_counts or {})
+            job.gate_skip_counts["staging_rejections"] = {
+                "reasons": {
+                    str(reason): int(count)
+                    for reason, count in skip_reasons.items()
+                    if int(count) > 0
+                },
+                "samples": {
+                    str(reason): list(samples[:10])
+                    for reason, samples in skip_reason_samples.items()
+                    if samples
+                },
+            }
+        if _dq_summary:
+            job.gate_skip_counts = dict(job.gate_skip_counts or {})
+            job.gate_skip_counts["data_quality"] = _dq_summary
         if _catalogue_guard:
             job.gate_skip_counts = dict(job.gate_skip_counts or {})
             job.gate_skip_counts["catalogue_guard"] = _catalogue_guard

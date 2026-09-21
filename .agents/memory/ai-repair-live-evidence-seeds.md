@@ -8,3 +8,9 @@ One-click repair must include known staged course URLs in its bounded live-evide
 **Why:** A rejection storm can discover many navigation pages while staging a small valid subset. Historical job rows can then disappear when a newer scrape replaces the review set. Sampling only the homepage and pipeline pass/drop lists can produce zero course evidence and block every safe repair attempt.
 
 **How to apply:** Keep config mutation fenced to the requested repair session, but seed its read-only live probe from exact-job staged URLs first and the newest same-university review set when those rows no longer exist. Acceptance still requires fresh course classification and normal validation.
+
+Repair diagnosis must distinguish URL-filter loss from later staging rejection, and completeness from validity.
+
+**Why:** A high field fill rate concealed critically invalid tuition values, while a low staged count was incorrectly blamed on URL filtering even though nearly all URLs passed that filter.
+
+**How to apply:** Never substitute imported/staged counts for post-filter counts in legacy evidence. Include critical-quality issues and affected URLs in repair assessment; populated invalid values cannot justify a healthy no-change result. Keep safe filter-tightening proposals subject to validation rather than suppressing all URL changes.

@@ -8,7 +8,11 @@ from app.database import AsyncSessionLocal, engine
 from app.dependencies import get_current_user
 from app.main import app
 from app.models.scrape_runtime import ScrapeRuntimeJob
-from app.routers.scrape import _job_quality_report
+from app.routers.scrape import (
+    _job_quality_report,
+    _material_url_filter_drop,
+    _strip_unjustified_filter_relaxations,
+)
 
 
 def test_lifecycle_completion_is_independent_of_extraction_quality() -> None:
@@ -18,6 +22,58 @@ def test_lifecycle_completion_is_independent_of_extraction_quality() -> None:
     assert report["extractionQuality"]["status"] == "extraction_errors"
     assert report["extractionQuality"]["successful"] is False
     assert report["extractionQuality"]["errorCount"] == 82
+
+
+def test_low_staged_ratio_is_not_url_filter_evidence() -> None:
+    """162 raw -> 159 extractable -> 20 staged is a staging failure, not allow-list loss."""
+    assert _material_url_filter_drop(162, 3, 1.9) is False
+
+
+def test_material_measured_url_filter_drop_is_diagnosable() -> None:
+    assert _material_url_filter_drop(162, 80, 49.4) is True
+
+
+def test_low_drop_suppresses_relaxation_but_preserves_filter_tightening() -> None:
+    suggested = {
+        "discovery": {
+            "allow_url_patterns": [],
+            "block_url_patterns": [r"/short-courses/"],
+            "course_detail_url_patterns": [r"/study/course/[^/]+$"],
+        },
+        "_min_expected_courses": 100,
+    }
+    current = {
+        "allow_url_patterns": [r"/study/course/"],
+        "block_url_patterns": [],
+        "course_detail_url_patterns": [],
+    }
+
+    sanitized = _strip_unjustified_filter_relaxations(
+        suggested,
+        current,
+        low_filter_drop=True,
+    )
+
+    discovery = sanitized["discovery"]
+    assert "allow_url_patterns" not in discovery
+    assert discovery["block_url_patterns"] == [r"/short-courses/"]
+    assert discovery["course_detail_url_patterns"] == [r"/study/course/[^/]+$"]
+    assert sanitized["_min_expected_courses"] == 100
+
+
+def test_material_drop_does_not_preempt_existing_filter_validator() -> None:
+    suggested = {
+        "discovery": {
+            "allow_url_patterns": [],
+            "block_url_patterns": [r"/short-courses/"],
+        },
+    }
+
+    assert _strip_unjustified_filter_relaxations(
+        suggested,
+        {"allow_url_patterns": [r"/study/course/"]},
+        low_filter_drop=False,
+    ) == suggested
 
 
 def test_in_progress_job_does_not_claim_quality_success() -> None:

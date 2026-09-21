@@ -132,6 +132,41 @@ class TestDiscoverySuccessEvidence:
 
         assert result["discovery_ok"] is True
 
+    def test_populated_but_critically_invalid_fees_cannot_pass(self):
+        quality = {
+            "total_staged": 20,
+            "drop_rate": 2,
+            "fee_pct": 100,
+            "ielts_pct": 95,
+            "location_pct": 100,
+            "mode_pct": 100,
+            "degree_level_pct": 100,
+            "critical_quality_count": 16,
+        }
+        ctx = {
+            "drop_rate": 2,
+            "critical_quality": {
+                "affected_course_count": 16,
+                "critical_issues": [{
+                    "code": "annual_fee_too_low_critical",
+                    "url": "https://example.com/study/course/master-applied-science",
+                }],
+            },
+        }
+
+        result = _evaluate_success(
+            quality,
+            {"before": 159, "after": 159, "total": 159, "rescued": []},
+            {},
+            ctx,
+        )
+
+        assert result["discovery_ok"] is True
+        assert result["fee_ok"] is False
+        assert result["critical_quality_ok"] is False
+        assert result["critical_quality_count"] == 16
+        assert result["overall_ok"] is False
+
     def test_unknown_recipe_field_rejected(self):
         patches = [
             {"section": "recipe", "field": "totally_unknown_field", "value": "x"}
@@ -287,6 +322,8 @@ class TestBuildUserMessagePhase:
                 "sample_degrees": ["Bachelor"],
                 "sample_modes": ["On-campus"],
             },
+            "staging_rejections": {},
+            "critical_quality": {},
         }
 
     def test_extraction_phase_contains_do_not_suggest_discovery(self):
@@ -329,6 +366,48 @@ class TestBuildUserMessagePhase:
     def test_empty_previous_attempts_no_prev_block(self):
         msg = _build_user_message(self._minimal_ctx(), [], phase="discovery")
         assert "PREVIOUS ATTEMPTS" not in msg
+
+    def test_rejection_storm_prompt_names_stage_gates_and_invalid_populated_fee(self):
+        ctx = self._minimal_ctx(drop_rate=2)
+        ctx.update({
+            "raw_discovered": 162,
+            "after_filter": 159,
+            "imported": 20,
+            "staging_rejections": {
+                "reasons": {
+                    "category_landing_page_missing_degree_qualifier": 129,
+                    "no_international_fee": 6,
+                    "online_only": 4,
+                },
+                "samples": {},
+            },
+            "critical_quality": {
+                "affected_course_count": 16,
+                "critical_issues": [{
+                    "code": "annual_fee_too_low_critical",
+                    "url": "https://example.com/study/course/master-applied-science",
+                }],
+                "affected_rows": [{
+                    "international_fee": 12991,
+                    "currency": "NZD",
+                }],
+            },
+        })
+        ctx["quality"].update({
+            "fee_pct": 100,
+            "ielts_pct": 95,
+            "location_pct": 100,
+            "mode_pct": 100,
+            "degree_level_pct": 100,
+            "critical_quality_count": 16,
+        })
+
+        msg = _build_user_message(ctx, [], phase="extraction")
+
+        assert "category_landing_page_missing_degree_qualifier" in msg
+        assert "annual_fee_too_low_critical" in msg
+        assert "populated does not mean valid" in msg
+        assert "Never invent fee defaults" in msg
 
 
 # ── Discovery phase initialisation ────────────────────────────────────────────

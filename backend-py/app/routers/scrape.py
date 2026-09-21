@@ -65,6 +65,77 @@ def _nan_to_none(v):
     return v
 
 
+def _material_url_filter_drop(
+    raw_discovered: int,
+    filter_drop_count: int,
+    filter_drop_pct: float,
+) -> bool:
+    """Require measured URL-filter rejection, not a low staged/raw ratio."""
+    return (
+        raw_discovered > 10
+        and filter_drop_count > 0
+        and filter_drop_pct >= 20
+    )
+
+
+def _strip_unjustified_filter_relaxations(
+    suggested_config: dict,
+    current_discovery: dict,
+    *,
+    low_filter_drop: bool,
+) -> dict:
+    """Drop only obvious filter relaxations when URL filtering was healthy.
+
+    Tightening proposals remain available to the existing apply-time URL
+    validator. In particular, adding block/detail gates must not be discarded
+    merely because the preceding run had a low filter-drop rate.
+    """
+    if not low_filter_drop or not isinstance(suggested_config, dict):
+        return suggested_config
+    discovery = suggested_config.get("discovery")
+    if not isinstance(discovery, dict):
+        return suggested_config
+
+    sanitized_discovery = dict(discovery)
+    for key in (
+        "allow_url_patterns",
+        "must_contain",
+        "block_url_patterns",
+        "course_detail_url_patterns",
+    ):
+        proposed = discovery.get(key)
+        if not isinstance(proposed, list):
+            continue
+        current = current_discovery.get(key) or []
+        if not isinstance(current, list):
+            current = []
+        proposed_set = {str(value) for value in proposed if value}
+        current_set = {str(value) for value in current if value}
+
+        if key == "block_url_patterns":
+            # Removing current blockers relaxes the gate. Adding blockers is a
+            # tightening change and must proceed to deterministic validation.
+            is_relaxation = bool(current_set - proposed_set)
+        else:
+            # These are positive/allow gates. Clearing them, or adding OR
+            # alternatives while retaining every current value, is an obvious
+            # relaxation. New gates and strict subsets are tightening changes.
+            is_relaxation = bool(current_set) and (
+                not proposed_set
+                or (current_set < proposed_set)
+            )
+
+        if is_relaxation:
+            sanitized_discovery.pop(key, None)
+
+    sanitized = dict(suggested_config)
+    if sanitized_discovery:
+        sanitized["discovery"] = sanitized_discovery
+    else:
+        sanitized.pop("discovery", None)
+    return sanitized
+
+
 def _unresolved_history_entries(logs: list[dict]) -> list[dict]:
     """Extract every retryable URL that remained unresolved at run completion.
 
@@ -5479,6 +5550,12 @@ async def diagnose_scrape_job(
         .where(ScrapedCourse.scrape_job_id == job_id)
         .limit(8)
     )).scalars().all()
+    critical_quality_count = int((await db.execute(
+        _sel(_func.count(ScrapedCourse.id)).where(
+            ScrapedCourse.scrape_job_id == job_id,
+            ScrapedCourse.auto_publish_status == "data_quality_failure",
+        )
+    )).scalar_one() or 0)
 
     staged_count = len(staged_rows)
     avg_completeness = (
@@ -5552,8 +5629,27 @@ async def diagnose_scrape_job(
     _pipeline_stats: dict = (job.discovered_config or {}).get("pipeline_stats") or {}
     _raw_discovered: int = _pipeline_stats.get("raw_discovered", job.total_found or 0)
     _after_filter: int = _pipeline_stats.get("after_filter", job.total_found or 0)
-    _filter_drop_count: int = _pipeline_stats.get("filter_drop_count", 0)
-    _filter_drop_pct: float = _pipeline_stats.get("filter_drop_pct", 0.0)
+    _filter_drop_count: int = int(
+        _pipeline_stats.get(
+            "filter_drop_count",
+            max(0, _raw_discovered - _after_filter),
+        ) or 0
+    )
+    _filter_drop_pct: float = float(
+        _pipeline_stats.get(
+            "filter_drop_pct",
+            round(100 * _filter_drop_count / _raw_discovered, 1)
+            if _raw_discovered > 0 else 0.0,
+        ) or 0.0
+    )
+    _gate_counts: dict = job.gate_skip_counts or {}
+    _staging_rejections: dict = _gate_counts.get("staging_rejections") or {}
+    _staging_reasons: dict = _staging_rejections.get("reasons") or {
+        key: int(value)
+        for key, value in _gate_counts.items()
+        if key.startswith("category_landing_page_")
+        and isinstance(value, (int, float))
+    }
     _has_pipeline_stats: bool = bool(_pipeline_stats)
     # The worker stores the exact URL-filter config used at run start.  The
     # university's live admin/YAML config may have changed by the time an
@@ -5685,24 +5781,25 @@ async def diagnose_scrape_job(
         and not any(i["check"] == "all_filtered" for i in deterministic_issues)
     ):
         deterministic_issues.append({
-            "issue": "All discovered URLs dropped by filter",
+            "issue": "All extractable pages rejected during extraction or staging",
             "severity": "critical",
-            "check": "all_filtered",
+            "check": "all_staging_rejected",
             "detail": (
                 f"{_raw_discovered} URLs were discovered, {_after_filter} passed URL filters, "
                 "but 0 courses were staged. "
-                "A gate (must_contain or block_url_patterns) may be too strict."
+                "URL filtering succeeded, so an extraction or staging safety gate "
+                "rejected every page."
             ),
             "potential_causes": [
-                "must_contain pattern doesn't match actual course URL structure",
-                "block_url_patterns accidentally blocking all course pages",
+                "Course title/award extraction selected listing or navigation text",
+                "International eligibility, delivery, fee, or degree-qualifier safety gate rejected the page",
             ],
         })
 
     # ── allow_url_patterns over-restriction check ─────────────────────────────
-    # Uses raw_discovered (pre-filter) so the ratio reflects actual filter aggressiveness.
-    # If allow_url_patterns is configured AND the staged/raw ratio is low (< 20%),
-    # flag it — the regex is likely too strict and is eating course pages.
+    # Diagnose an allow-list only from actual URL-filter rejection evidence.
+    # A low staged/raw ratio can instead be caused by extraction or safety gates;
+    # confusing those stages caused the repair agent to clear valid allow-lists.
     try:
         _effective_disc_tmp = {}
         if "allow_url_patterns" in _job_filter_config:
@@ -5728,11 +5825,13 @@ async def diagnose_scrape_job(
         pass
 
     _allow_pats_configured = bool(_effective_disc_tmp.get("allow_url_patterns"))
-    _imported = job.imported or 0
     if (
         _allow_pats_configured
-        and _raw_discovered > 10
-        and _imported < _raw_discovered * 0.2
+        and _material_url_filter_drop(
+            _raw_discovered,
+            _filter_drop_count,
+            _filter_drop_pct,
+        )
         and not any(i["check"] in ("all_filtered", "zero_courses_discovered") for i in deterministic_issues)
     ):
         deterministic_issues.append({
@@ -5740,9 +5839,9 @@ async def diagnose_scrape_job(
             "severity": "critical",
             "check": "allow_url_patterns_drop_high",
             "detail": (
-                f"Discovery found {_raw_discovered} raw URLs but only {_imported} courses were staged "
-                f"({100 * _imported // max(_raw_discovered, 1)}% pass rate). "
-                "allow_url_patterns is configured and is likely too restrictive. "
+                f"Discovery found {_raw_discovered} raw URLs and URL filters rejected "
+                f"{_filter_drop_count} ({_filter_drop_pct:.1f}%). "
+                "allow_url_patterns is configured and the measured URL-filter drop is material. "
                 "Check the live log for '⚠ URL filter dropped' lines and review the sample dropped URLs."
             ),
             "potential_causes": [
@@ -5751,6 +5850,72 @@ async def diagnose_scrape_job(
                 "Missing alternatives in the regex (e.g. 'bachelor' but not 'master' or 'doctor')",
                 "URL structure changed on the university site since the pattern was written",
             ],
+        })
+
+    _category_gate_count = sum(
+        int(count)
+        for reason, count in _staging_reasons.items()
+        if str(reason).startswith("category_landing_page_")
+    )
+    if _category_gate_count:
+        _category_samples = [
+            sample
+            for reason, samples in (_staging_rejections.get("samples") or {}).items()
+            if str(reason).startswith("category_landing_page_")
+            for sample in (samples or [])
+        ][:10]
+        deterministic_issues.append({
+            "issue": "Course pages rejected by the category/degree safety gate",
+            "severity": "critical" if _category_gate_count >= 10 else "high",
+            "check": "category_landing_page_rejections",
+            "detail": (
+                f"{_category_gate_count} extractable page(s) passed URL filters but were "
+                "rejected during staging because course-owned award/degree evidence was "
+                "missing or the page looked like a category landing page. This is not "
+                "evidence that allow_url_patterns is too restrictive."
+            ),
+            "examples": _category_samples,
+            "potential_causes": [
+                "The course title/H1 extractor selected generic listing or navigation text",
+                "The source publishes a real award using wording not recognised by the degree qualifier",
+                "The discovered URLs are category/short-course pages that should remain blocked",
+            ],
+            "fix": {
+                "type": "assessment",
+                "action": "Repair course-owned title/award extraction from affected samples",
+                "note": (
+                    "Do not automatically disable the category or degree/non-degree safety "
+                    "gate. Only a sample-proven per-university extraction repair is safe."
+                ),
+            },
+        })
+
+    if critical_quality_count:
+        persisted_quality = _gate_counts.get("data_quality") or {}
+        critical_issues = list(persisted_quality.get("critical_issues") or [])[:20]
+        deterministic_issues.append({
+            "issue": "Populated course values failed critical data-quality checks",
+            "severity": "critical",
+            "check": "critical_data_quality",
+            "detail": (
+                f"{critical_quality_count} staged course(s) contain populated but invalid "
+                "values and are marked DATA QUALITY FAILURE. Fill-rate completeness must "
+                "not treat these values as healthy."
+            ),
+            "examples": critical_issues,
+            "potential_causes": [
+                "A domestic, partial, or ancillary fee was extracted as international tuition",
+                "A postgraduate course is missing verifiable English requirements",
+                "Location or other course-owned values came from shared page chrome",
+            ],
+            "fix": {
+                "type": "assessment",
+                "action": "Repair the affected extraction field using course-owned evidence",
+                "note": (
+                    "Do not invent fee defaults or automatically weaken international, "
+                    "category, degree/non-degree, or delivery gates."
+                ),
+            },
         })
 
     # ── Duplicate year version detection ─────────────────────────────────────────
@@ -6108,6 +6273,9 @@ Postgraduate courses staged:  {level_breakdown['postgraduate']}
 Research courses staged:      {level_breakdown['research']}
 Other/unknown level:          {level_breakdown['other'] + level_breakdown['unknown']}
 Deterministic issues already detected: {[i['issue'] for i in deterministic_issues] if deterministic_issues else 'None'}
+Staging rejection reasons (after URL filtering): {json.dumps(_staging_rejections or _staging_reasons, ensure_ascii=False)}
+Critical data-quality failures: {critical_quality_count}
+Critical issue evidence: {json.dumps((_gate_counts.get('data_quality') or {}).get('critical_issues', [])[:20], ensure_ascii=False)}
 
 Blank fields across sample ({staged_count} courses):
 {json.dumps(blank_fields, indent=2)}
@@ -6144,6 +6312,19 @@ If "Raw URLs discovered" > 10 AND "URLs after URL filters" == 0 AND "Courses sta
 If "Raw URLs discovered" == 0 AND "Courses staged" == 0:
   - Discovery genuinely returned nothing. THEN it may be a JS rendering / seed URL / Cloudflare issue.
   - Only in this case suggest always_browser_discover or seed_urls changes.
+
+If URL filters rejected less than 20% of raw URLs:
+  - Do NOT blame allow_url_patterns merely because few courses were staged.
+  - The loss happened after URL filtering. Use the staging rejection reasons and
+    critical data-quality evidence to identify extraction/safety-gate failures.
+  - Never automatically disable category, degree/non-degree, international,
+    fee, or delivery safety gates.
+
+If critical data-quality failures are nonzero:
+  - Populated fields are NOT healthy merely because completeness/fill-rate is high.
+  - Treat evidence-backed invalid fees, locations, names, or English requirements
+    as extraction failures and propose only a course-owned recipe repair.
+  - Never invent a fee default or substitute domestic/partial/ancillary fees.
 
 CRITICAL FIX-TYPE RULES — apply BEFORE choosing fix_type:
 1. "recipe_fix" = operator can fix using the Recipe Editor UI (no developer needed).
@@ -6293,6 +6474,14 @@ Return only valid JSON, no markdown fences."""
     suggested_config = strip_stale_filter_suggestions(
         suggested_config,
         _filter_config_drift_reason,
+    )
+    suggested_config = _strip_unjustified_filter_relaxations(
+        suggested_config,
+        _effective_disc,
+        low_filter_drop=(
+            _raw_discovered > 0
+            and (_filter_drop_count == 0 or _filter_drop_pct < 20)
+        ),
     )
 
     # ── Diff suggested_config against what's already in admin_config ──────────
