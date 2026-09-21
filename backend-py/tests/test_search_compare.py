@@ -11,13 +11,14 @@ columns left-to-right.
 """
 from __future__ import annotations
 
+import time
 from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
-from app.database import AsyncSessionLocal
+from app.database import AsyncSessionLocal, engine
 from app.dependencies import get_db
 from app.main import app
 from app.routers.search import _COURSE_SEARCH_CTE, _SEARCH_INDEX_DDL
@@ -122,6 +123,252 @@ def test_search_child_lookups_have_persistent_course_indexes():
         "academic_requirements",
     ):
         assert f"ON {table} (course_id)" in ddl
+
+
+@pytest.mark.asyncio
+async def test_search_stays_fast_and_uses_child_indexes_at_catalogue_scale():
+    """Guard the production failure mode: repeated child-table full scans."""
+    course_count = 5_000
+    max_query_seconds = 2.0
+    child_tables = {
+        "fees",
+        "intakes",
+        "english_requirements",
+        "academic_requirements",
+    }
+
+    async with AsyncSessionLocal() as db:
+        try:
+            for ddl in (
+                """CREATE TEMP TABLE universities (
+                    id integer, name text, logo_url text, city text, country text,
+                    website text, featured boolean, featured_priority integer
+                ) ON COMMIT DROP""",
+                """CREATE TEMP TABLE courses (
+                    id integer, name text, category text, sub_category text,
+                    degree_level text, duration numeric, duration_term text,
+                    study_mode text, course_website text, course_location text,
+                    university_id integer, status text, approval_status text
+                ) ON COMMIT DROP""",
+                """CREATE TEMP TABLE fees (
+                    id integer, course_id integer, international_fee real,
+                    currency text, fee_term text
+                ) ON COMMIT DROP""",
+                """CREATE TEMP TABLE intakes (
+                    course_id integer, intake_month text
+                ) ON COMMIT DROP""",
+                """CREATE TEMP TABLE english_requirements (
+                    id integer, course_id integer, test_type text, overall real,
+                    listening real, writing real
+                ) ON COMMIT DROP""",
+                """CREATE TEMP TABLE academic_requirements (
+                    id integer, course_id integer, academic_level text,
+                    academic_level_option_id integer,
+                    academic_score real, score_type text, academic_country text,
+                    created_at timestamptz
+                ) ON COMMIT DROP""",
+                """CREATE TEMP TABLE academic_level_options (
+                    id integer, name text
+                ) ON COMMIT DROP""",
+            ):
+                await db.execute(text(ddl))
+
+            await db.execute(text(
+                """INSERT INTO universities
+                   SELECT id,
+                          'Performance University ' || id,
+                          NULL,
+                          CASE WHEN id % 2 = 0 THEN 'Sydney' ELSE 'Melbourne' END,
+                          'Australia',
+                          'https://university.test/' || id,
+                          id <= 5,
+                          100 - id
+                   FROM generate_series(1, 50) id"""
+            ))
+            await db.execute(
+                text(
+                    """INSERT INTO courses
+                       SELECT id,
+                              CASE WHEN id % 4 = 0
+                                   THEN 'Master of Engineering ' || id
+                                   ELSE 'Bachelor of Science ' || id END,
+                              CASE WHEN id % 4 = 0
+                                   THEN 'Engineering' ELSE 'Science' END,
+                              'Performance fixture',
+                              CASE WHEN id % 4 = 0 THEN 'Master' ELSE 'Bachelor' END,
+                              CASE WHEN id % 4 = 0 THEN 2 ELSE 3 END,
+                              'Years',
+                              'On Campus',
+                              'https://course.test/' || id,
+                              CASE WHEN id % 2 = 0
+                                   THEN 'Sydney Campus' ELSE 'Melbourne Campus' END,
+                              1 + ((id - 1) % 50),
+                              'active',
+                              'approved'
+                       FROM generate_series(1, :course_count) id"""
+                ),
+                {"course_count": course_count},
+            )
+            await db.execute(
+                text(
+                    """INSERT INTO fees
+                       SELECT (course_id * 2) + fee_number,
+                              course_id,
+                              30000 + course_id + fee_number,
+                              'AUD',
+                              'Year'
+                       FROM generate_series(1, :course_count) course_id
+                       CROSS JOIN generate_series(0, 1) fee_number"""
+                ),
+                {"course_count": course_count},
+            )
+            await db.execute(
+                text(
+                    """INSERT INTO intakes
+                       SELECT course_id, intake_month
+                       FROM generate_series(1, :course_count) course_id
+                       CROSS JOIN (VALUES ('February'), ('July')) months(intake_month)"""
+                ),
+                {"course_count": course_count},
+            )
+            await db.execute(
+                text(
+                    """INSERT INTO english_requirements
+                       SELECT (course_id * 5) + test_number,
+                              course_id,
+                              test_type,
+                              required_score,
+                              required_score,
+                              required_score
+                       FROM generate_series(1, :course_count) course_id
+                       CROSS JOIN (VALUES
+                           (1, 'IELTS', 6.5::real),
+                           (2, 'PTE', 58::real),
+                           (3, 'TOEFL', 80::real),
+                           (4, 'CAE', 169::real),
+                           (5, 'DUOLINGO', 110::real)
+                       ) tests(test_number, test_type, required_score)"""
+                ),
+                {"course_count": course_count},
+            )
+            await db.execute(
+                text(
+                    """INSERT INTO academic_requirements
+                       SELECT course_id,
+                              course_id,
+                              'Year 12',
+                              NULL,
+                              70,
+                              'Percentage',
+                              'Australia',
+                              now() - (course_id || ' seconds')::interval
+                       FROM generate_series(1, :course_count) course_id"""
+                ),
+                {"course_count": course_count},
+            )
+
+            for ddl in _SEARCH_INDEX_DDL:
+                await db.execute(text(ddl))
+            for table in ("universities", "courses", *sorted(child_tables)):
+                await db.execute(text(f"ANALYZE {table}"))
+            await db.execute(text("SET LOCAL statement_timeout = '2s'"))
+
+            query_cases = {
+                "unfiltered first page": ("TRUE", {}),
+                "typical filtered search": (
+                    "c.university_country = :country "
+                    "AND c.degree_level = :degree_level "
+                    "AND :intake = ANY(c.intakes) "
+                    "AND c.international_fee <= :max_fee "
+                    "AND c.ielts_overall <= :max_ielts",
+                    {
+                        "country": "Australia",
+                        "degree_level": "Master",
+                        "intake": "February",
+                        "max_fee": 40000,
+                        "max_ielts": 7.0,
+                    },
+                ),
+            }
+
+            for label, (where_sql, params) in query_cases.items():
+                statements = (
+                    text(
+                        f"""EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
+                            WITH {_COURSE_SEARCH_CTE}
+                            SELECT c.id, c.course_name,
+                                   pte_er.listening, pte_er.writing
+                            FROM course_search_view c
+                            LEFT JOIN LATERAL (
+                                SELECT er.listening, er.writing
+                                FROM english_requirements er
+                                WHERE er.course_id = c.id
+                                  AND upper(er.test_type) = 'PTE'
+                                ORDER BY er.id DESC
+                                LIMIT 1
+                            ) pte_er ON TRUE
+                            WHERE {where_sql}
+                            ORDER BY c.course_name
+                            LIMIT 20 OFFSET 0"""
+                    ),
+                    text(
+                        f"""EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
+                            WITH {_COURSE_SEARCH_CTE}
+                            SELECT COUNT(*)
+                            FROM course_search_view c
+                            WHERE {where_sql}"""
+                    ),
+                )
+                started = time.perf_counter()
+                explains = [
+                    (await db.execute(statement, params)).scalar_one()[0]
+                    for statement in statements
+                ]
+                elapsed = time.perf_counter() - started
+
+                assert elapsed < max_query_seconds, (
+                    f"{label} page and count took {elapsed:.3f}s; "
+                    f"limit is {max_query_seconds:.1f}s"
+                )
+                database_ms = sum(
+                    explain["Execution Time"] for explain in explains
+                )
+                assert database_ms < max_query_seconds * 1000, (
+                    f"{label} page and count database execution took "
+                    f"{database_ms:.1f}ms"
+                )
+
+                plan_nodes = []
+                pending = [explain["Plan"] for explain in explains]
+                while pending:
+                    node = pending.pop()
+                    plan_nodes.append(node)
+                    pending.extend(node.get("Plans", []))
+
+                indexed_children = {
+                    node.get("Relation Name")
+                    for node in plan_nodes
+                    if node.get("Relation Name") in child_tables
+                    and node.get("Node Type") in {"Index Scan", "Index Only Scan"}
+                }
+                assert indexed_children == child_tables, (
+                    f"{label} did not use every child course_id index: "
+                    f"missing {sorted(child_tables - indexed_children)}"
+                )
+                repeated_full_scans = [
+                    (node.get("Relation Name"), node.get("Actual Loops"))
+                    for node in plan_nodes
+                    if node.get("Relation Name") in child_tables
+                    and node.get("Node Type") == "Seq Scan"
+                    and node.get("Actual Loops", 0) > 1
+                ]
+                assert repeated_full_scans == [], (
+                    f"{label} repeatedly full-scanned child tables: "
+                    f"{repeated_full_scans}"
+                )
+        finally:
+            await db.rollback()
+            await engine.dispose()
 
 
 @pytest.mark.asyncio
