@@ -6,6 +6,16 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowDown, ArrowUp, Plus, Trash2, RefreshCw } from "lucide-react";
 import { readResponseJson } from "@/lib/readResponseJson";
 import { SettingsTabs } from "@/components/settings-tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -24,6 +34,8 @@ export default function SettingsAcademicLevels() {
   const [newName, setNewName] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<LevelOption | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchOptions = useCallback(async () => {
     setLoading(true);
@@ -63,14 +75,23 @@ export default function SettingsAcademicLevels() {
     }
   };
 
-  const handleDelete = async (id: number, name: string) => {
-    if (!confirm(`Delete "${name}"?`)) return;
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      const res = await fetch(`${BASE}/api/settings/academic-levels/${id}`, { method: "DELETE" });
+      const res = await fetch(
+        `${BASE}/api/settings/academic-levels/${deleteTarget.id}`,
+        { method: "DELETE" },
+      );
       if (!res.ok) throw new Error(await res.text());
+      const deletedName = deleteTarget.name;
+      setDeleteTarget(null);
       await fetchOptions();
+      toast({ title: "Academic level deleted", description: deletedName });
     } catch (err) {
       toast({ title: "Failed to delete", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -187,7 +208,13 @@ export default function SettingsAcademicLevels() {
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => void move(idx, 1)} disabled={idx === options.length - 1}>
                   <ArrowDown className="w-3.5 h-3.5" />
                 </Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-red-600 hover:bg-red-50" onClick={() => void handleDelete(opt.id, opt.name)}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-red-600 hover:bg-red-50"
+                  aria-label={`Delete ${opt.name}`}
+                  onClick={() => setDeleteTarget(opt)}
+                >
                   <Trash2 className="w-3.5 h-3.5" />
                 </Button>
               </li>
@@ -195,6 +222,47 @@ export default function SettingsAcademicLevels() {
           </ul>
         )}
       </div>
+
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-full bg-red-50 text-red-600">
+              <Trash2 className="h-5 w-5" />
+            </div>
+            <AlertDialogTitle>Delete academic level?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <span className="block">
+                You are about to delete{" "}
+                <strong className="font-medium text-foreground">
+                  {deleteTarget?.name}
+                </strong>
+                .
+              </span>
+              <span className="block">
+                This removes it from academic-level dropdowns and cannot be undone.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              className="bg-red-600 text-white hover:bg-red-700 focus:ring-red-600"
+              onClick={(event) => {
+                event.preventDefault();
+                void handleDelete();
+              }}
+            >
+              {deleting ? "Deleting…" : "Delete level"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
