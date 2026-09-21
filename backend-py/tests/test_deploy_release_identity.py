@@ -461,6 +461,7 @@ def test_guarded_release_builds_and_verifies_frontend_before_success() -> None:
     stage = script.index('frontend_stage="$(mktemp -d')
     ownership = script.index('chown ubuntu:ubuntu "$frontend_stage"', stage)
     build = script.index("VITE_RELEASE_MARKER=")
+    assert 'run_release_user env \\\n  VITE_RELEASE_MARKER=' in script
     assert 'run build \\\n    --outDir "$frontend_stage"' in script
     assert "run build -- \\" not in script
     assert stage < ownership < build

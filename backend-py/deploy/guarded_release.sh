@@ -221,8 +221,9 @@ fi
 
 frontend_stage="$(mktemp -d "$repo_root/artifacts/university-portal/dist.release.XXXXXX")"
 chown ubuntu:ubuntu "$frontend_stage"
-VITE_RELEASE_MARKER="UNIVERSITY_PORTAL_RELEASE:$target" \
-  run_release_user pnpm --filter @workspace/university-portal run build \
+run_release_user env \
+  VITE_RELEASE_MARKER="UNIVERSITY_PORTAL_RELEASE:$target" \
+  pnpm --filter @workspace/university-portal run build \
     --outDir "$frontend_stage"
 run_release_user "$python_bin" -B backend-py/deploy/verify_frontend_release.py \
   --dist "$frontend_stage" --target "$target"
