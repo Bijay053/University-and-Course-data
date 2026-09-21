@@ -54,3 +54,15 @@ every later attempt reported `budget_exhausted` without making a request.
 **How to apply:** Keep one cumulative network-time counter and one unique-page
 budget for the session. A final accepted proposal must still have current,
 course-classified live evidence before any config write.
+
+Verification metadata distinguishes the selected-course ceiling from elapsed
+time exhaustion. Never turn a generic `limit_reached` value into “course cap
+reached”; use `budget_exhausted`, processed/current count, and staged count to
+report the actual stop condition.
+
+**Why:** A Canterbury verification selected 50 courses but timed out after
+processing 31 and staging 30. The UI incorrectly said it had stopped at the
+50-course limit, hiding the real 10-minute deadline.
+
+**How to apply:** Prefer explicit measured stop reasons over inferred caps.
+Display readable field labels by removing metric suffixes such as `_pct`.
