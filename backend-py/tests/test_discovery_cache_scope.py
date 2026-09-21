@@ -1,4 +1,5 @@
 from app.services.scraper.discovery_cache_scope import (
+    DISCOVERY_CACHE_SCOPE_VERSION,
     discovery_cache_coverage_sufficient,
     discovery_cache_metadata,
     discovery_cache_scope_key,
@@ -73,10 +74,14 @@ def test_metadata_marks_scope_and_normalized_start_url():
     )
     assert metadata == {
         "cache_meta": True,
-        "scope_version": 1,
+        "scope_version": DISCOVERY_CACHE_SCOPE_VERSION,
         "scope_key": "abc123",
         "scrape_url": "https://www.deakin.edu.au/",
     }
+
+
+def test_cache_scope_version_invalidates_pre_supplement_results():
+    assert DISCOVERY_CACHE_SCOPE_VERSION == 2
 
 
 def test_cache_coverage_uses_expected_minimum_when_configured():

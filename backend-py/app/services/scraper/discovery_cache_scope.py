@@ -12,6 +12,8 @@ import json
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
+DISCOVERY_CACHE_SCOPE_VERSION = 2
+
 
 def normalize_discovery_start_url(url: str) -> str:
     """Return a stable identity for the operator-supplied discovery start URL."""
@@ -63,7 +65,7 @@ def discovery_cache_scope_key(
 ) -> str:
     """Hash every input that can materially change discovery coverage."""
     payload = {
-        "version": 1,
+        "version": DISCOVERY_CACHE_SCOPE_VERSION,
         "scrape_url": normalize_discovery_start_url(scrape_url),
         "discovery": _jsonable(discovery_config),
         # Recipe seeds and strategy are merged after the cache gate in the
@@ -86,7 +88,7 @@ def discovery_cache_metadata(
 ) -> dict[str, Any]:
     return {
         "cache_meta": True,
-        "scope_version": 1,
+        "scope_version": DISCOVERY_CACHE_SCOPE_VERSION,
         "scope_key": scope_key,
         "scrape_url": normalize_discovery_start_url(scrape_url),
     }

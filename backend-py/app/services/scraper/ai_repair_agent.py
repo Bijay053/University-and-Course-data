@@ -541,6 +541,8 @@ def validate_url_repair_target(status: str, discovered_config: dict) -> tuple[bo
     has_filter_failure = raw > 0 and (after == 0 or after < raw * 0.5)
     has_block_failure = pre_block > 0 and block_dropped > pre_block * 0.8
     dropped_sample = pipeline.get("dropped_sample") or []
+    from app.services.scraper.auto_repair_candidates import is_intentionally_excluded_course_url
+    dropped_sample = [url for url in dropped_sample if not is_intentionally_excluded_course_url(url)]
     if not (has_filter_failure or has_block_failure) or not dropped_sample:
         return (
             False,
@@ -1760,6 +1762,11 @@ async def _gather_context(job_id: str, db, *, probe_sitemap: bool = True) -> dic
     # must never be reinterpreted as the URL-filter output.
     after_filter:   int = pipeline.get("after_filter",   row["total_found"] or 0)
     dropped_sample      = pipeline.get("dropped_sample", [])[:15]
+    from app.services.scraper.auto_repair_candidates import is_intentionally_excluded_course_url
+    intentional_excluded_sample = [
+        url for url in dropped_sample if is_intentionally_excluded_course_url(url)
+    ]
+    dropped_sample = [url for url in dropped_sample if not is_intentionally_excluded_course_url(url)]
     passed_sample       = pipeline.get("passed_sample",  [])[:5]
 
     sc           = row["scrape_config_raw"] or {}
@@ -1954,6 +1961,9 @@ async def _gather_context(job_id: str, db, *, probe_sitemap: bool = True) -> dic
     repair_course_url_sample = _rank_repair_course_urls(
         repair_course_url_sample + staged_course_urls
     )
+    repair_course_url_sample = [
+        url for url in repair_course_url_sample if not is_intentionally_excluded_course_url(url)
+    ]
     if total > 0:
         quality = {
             "total_staged":       total,
@@ -1985,6 +1995,7 @@ async def _gather_context(job_id: str, db, *, probe_sitemap: bool = True) -> dic
         "total_errors":    row["total_errors"] or 0,
         "drop_rate":       drop_rate,
         "dropped_sample":  dropped_sample,
+        "intentional_excluded_sample": intentional_excluded_sample,
         "repair_course_url_sample": repair_course_url_sample,
         "repair_url_sample": list(dict.fromkeys(repair_course_url_sample + dropped_sample)),
         "passed_sample":   passed_sample,
@@ -2619,6 +2630,11 @@ SITEMAP COURSE CANDIDATES (preferred evidence for low-depth repairs):
 
 DROPPED URLs (untrusted: may be course pages OR navigation pages):
 {json.dumps(ctx['dropped_sample'], indent=2)}
+
+KNOWN INTENTIONAL EXCLUSIONS (separate online variants, never missing campus courses):
+{json.dumps(ctx.get('intentional_excluded_sample', []), indent=2)}
+Raw drop counts include intentional exclusions. Do not infer that unsampled
+drops are valid missing courses or relax URL gates to recover online variants.
 
 PASSED URLs (currently making it through the filter):
 {json.dumps(ctx['passed_sample'], indent=2)}

@@ -1,3 +1,5 @@
+- [Repair pre-claim schema readiness](repair-preclaim-schema.md) — missing claims can mean delivered tasks crashed; require schema readiness, not only service health.
+- [Catalogue recovery evidence](catalogue-recovery-evidence.md) — reported counts are investigation inputs; sitemap counts alone do not prove discovery coverage.
 - [UC Canberra SPA + hidden-input fees](uc-canberra-fix.md) — Listing=SPA shell (0 links); sitemap at /services/wcm/site-map/course.xml has 184 courses; fees in id="N-eftsl-international" hidden inputs matched via id="current-year".
 - [MQ coursehandbook resolver](mq-coursehandbook-resolver.md) — Sitemap needs patchright (CF-guarded); resolver needs httpx (127→223/383); BFS seeds return 0 in dev (expected).
 - [MQ Funnelback authority + CF bypass](mq-search-page-tier.md) — rendered Funnelback discovery must retain page-data fees; bare links fall into domestic HTML, so incomplete enrichment fails closed.

@@ -28,6 +28,22 @@ run_release_user() {
   fi
 }
 
+verify_target_worker_schema() {
+  # Run the reviewed target's read-only checker with the deployed connection,
+  # before checkout, consumer cancellation, smoke writes, or service restarts.
+  # Older targets without autonomous fencing have no such prerequisite.
+  if run_release_user git -C "$repo_root" cat-file -e \
+      "$target:backend-py/app/services/worker_fencing.py" 2>/dev/null; then
+    local checker="backend-py/app/services/worker_fencing_schema.py"
+    if ! run_release_user git -C "$repo_root" cat-file -e "$target:$checker" 2>/dev/null; then
+      echo "Release refused: fencing target lacks a read-only schema prerequisite checker; review its migration requirements before release." >&2
+      return 1
+    fi
+    run_release_user git -C "$repo_root" show "$target:$checker" |
+      "$python_bin" -B -
+  fi
+}
+
 resume_consumers() {
   if [ "$release_test_mode" = 1 ]; then
     printf 'resume-attempted\n' >> "$resume_marker"
@@ -45,6 +61,7 @@ if [ "$release_test_mode" != 1 ]; then
   set +a
   export PYTHONPATH=.
   run_release_user "$revision_fence" verify "$repo_root" "$predecessor" "$target"
+  verify_target_worker_schema
   "$python_bin" -B deploy/safe_restart_smoke.py \
     --expected-rehearsal-account-id "$expected_disposable_account"
 fi
@@ -144,6 +161,7 @@ if [ "$release_test_mode" = 1 ]; then
   : > "$reconciliation_manifest"
   : > "$tracked_recipe_manifest"
   run_release_user "$revision_fence" verify "$repo_root" "$predecessor" "$target"
+  verify_target_worker_schema
   run_release_user "$python_bin" -B "$reconciler" prepare-tracked \
     --repo-root "$repo_root" --target "$target" \
     --manifest "$tracked_recipe_manifest"

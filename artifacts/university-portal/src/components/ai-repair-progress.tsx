@@ -117,7 +117,8 @@ const PHASES: Array<{ phase: AutonomousRepair["phase"]; label: string }> = [
 
 function phaseIndex(phase: AutonomousRepair["phase"]) {
   if (phase === "queued") return -1;
-  if (phase === "needs_review" || phase === "blocked") return 5;
+  // A terminal outcome is not evidence that any preceding stage ran.
+  if (phase === "needs_review" || phase === "blocked") return -1;
   return PHASES.findIndex(item => item.phase === phase);
 }
 

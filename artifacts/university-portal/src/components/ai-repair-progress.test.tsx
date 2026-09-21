@@ -19,6 +19,15 @@ const base: AutonomousRepair = {
 afterEach(cleanup);
 
 describe("AiRepairProgress", () => {
+  it("does not show completed stages when delivery was blocked before attempt one", () => {
+    const { container } = render(
+      <AiRepairProgress autonomous={{ ...base, phase: "blocked" }} currentAttempt={0} />,
+    );
+    expect(screen.getByText("Attempt 0/5")).toBeTruthy();
+    expect(container.querySelectorAll("li.bg-emerald-100")).toHaveLength(0);
+    expect(container.querySelector('[aria-current="step"]')).toBeNull();
+  });
+
   it("shows the bounded live-probe stage and official-source evidence", () => {
     render(
       <AiRepairProgress
@@ -103,6 +112,7 @@ describe("AiRepairProgress", () => {
     expect(screen.getByText("Repair blocked")).toBeTruthy();
     expect(screen.queryByText("Repair verified")).toBeNull();
     expect(container.querySelector("section")?.className).toContain("border-red-200");
+    expect(container.querySelectorAll("li.bg-emerald-100")).toHaveLength(0);
     expect(screen.getByText(/publishing is always manual/)).toBeTruthy();
   });
 

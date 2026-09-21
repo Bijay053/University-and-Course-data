@@ -12,6 +12,28 @@ import pytest
 from app.services import ai_repair_workflow as workflow
 
 
+def test_initial_dispatch_monitor_failure_does_not_block_repair(monkeypatch):
+    from app.tasks import auto_repair_task as tasks
+    publish = Mock()
+    monitor = Mock(side_effect=RuntimeError("monitor unavailable"))
+    monkeypatch.setattr(tasks.run_ai_scrape_repair, "apply_async", publish)
+    monkeypatch.setattr(tasks.monitor_ai_scrape_repair, "apply_async", monitor)
+    tasks.dispatch_ai_repair("parent", 7, "session-1")
+    publish.assert_called_once_with(args=["parent", 7, "session-1"], queue="scrape")
+    monitor.assert_called_once()
+
+
+def test_initial_dispatch_preserves_worker_error_and_still_schedules_monitor(monkeypatch):
+    from app.tasks import auto_repair_task as tasks
+    publish = Mock(side_effect=RuntimeError("worker publish failed"))
+    monitor = Mock()
+    monkeypatch.setattr(tasks.run_ai_scrape_repair, "apply_async", publish)
+    monkeypatch.setattr(tasks.monitor_ai_scrape_repair, "apply_async", monitor)
+    with pytest.raises(RuntimeError, match="worker publish failed"):
+        tasks.dispatch_ai_repair("parent", 7, "session-1")
+    monitor.assert_called_once_with(args=["parent", "session-1"], queue="beat", countdown=30)
+
+
 def session(**state):
     return {
         "session_id": "session-1", "job_id": "parent", "university_id": 7,
@@ -106,6 +128,36 @@ def memory(monkeypatch):
     monkeypatch.setattr(workflow.agent, "read_session", Mock(return_value={}))
     monkeypatch.setattr(workflow.agent, "release_repair_lease", Mock())
     return store
+
+
+@pytest.mark.asyncio
+async def test_preclaim_schema_failure_is_durable_and_not_broker_recovery(memory):
+    result = await workflow.block_unclaimed_initialization(
+        "parent", 7, "session-1", DB(memory),
+        code="worker_fencing_schema_missing", reason="Required worker schema is missing.",
+    )
+    assert result["status"] == "failed"
+    assert result["autonomous"]["phase"] == "blocked"
+    assert result["autonomous"]["initialization_failure"]["stage"] == "pre_claim"
+    assert "requeues" not in result["autonomous"]
+    assert memory.evidence["error"] == "Required worker schema is missing."
+    workflow.agent.release_repair_lease.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_preclaim_failure_cannot_block_a_claimed_or_superseding_worker(memory):
+    memory.evidence["status"] = "running"
+    memory.evidence["autonomous"]["worker_claim"] = "delivery"
+    before = copy.deepcopy(memory.evidence)
+    await workflow.block_unclaimed_initialization(
+        "parent", 7, "session-1", DB(memory), code="missing", reason="missing",
+    )
+    assert memory.evidence == before
+    memory.evidence["session_id"] = "replacement"
+    assert not await workflow.block_unclaimed_initialization(
+        "parent", 7, "session-1", DB(memory), code="missing", reason="missing",
+    )
+    workflow.agent.release_repair_lease.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -330,6 +382,20 @@ async def test_child_reconciliation_is_truthful(memory, monkeypatch, job, after,
     assert result["autonomous"]["comparison"]["full_catalogue_verified"] is False
     assert result["autonomous"]["verification_status"] == job.status
     workflow.agent.release_repair_lease.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_user_report_finishes_for_review_never_claims_report_fixed(memory, monkeypatch):
+    memory.evidence = session(phase="verifying", verification_job_id="child")
+    memory.evidence.update(status="running", course_report={"kind": "incorrect", "fields": ["fee"]})
+    memory.jobs["child"] = SimpleNamespace(status="completed", runtime_job_id="child")
+    compare = AsyncMock()
+    monkeypatch.setattr(workflow, "_combined_quality", compare)
+    result = await workflow.reconcile("parent", "session-1", DB(memory))
+    assert result["autonomous"]["phase"] == "needs_review"
+    assert "neither resolution" in result["final_verdict"]
+    compare.assert_not_awaited()
+    workflow.agent.release_repair_lease.assert_called_once()
+
 
 @pytest.mark.asyncio
 async def test_awaiting_human_decision_replaces_pre_verification_verdict(memory):
@@ -751,7 +817,8 @@ async def test_delivery_recovery_exhausts_at_two_without_running_again(memory, m
     result = await workflow.reconcile("parent", "session-1", DB(memory))
     assert result["status"] == "failed"
     assert result["autonomous"]["recovery_exhausted"] is True
-    assert "Automatic recovery exhausted after 2 broker dispatch attempts" in result["autonomous"]["reason"]
+    assert "Automatic recovery exhausted after 2 worker redispatch attempts" in result["autonomous"]["reason"]
+    assert "university website failure" in result["autonomous"]["reason"]
     assert not memory.added
 
 

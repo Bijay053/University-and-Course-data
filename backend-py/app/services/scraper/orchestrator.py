@@ -54,6 +54,48 @@ from app.services.scraper.course_deadline import (
 )
 
 
+class BrowserDiscoveryDeadlineExceeded(RuntimeError):
+    """Terminal live-discovery phase timeout."""
+
+
+async def _run_browser_discovery_with_deadline(
+    browser_discover,
+    *,
+    scrape_url: str,
+    max_courses: int,
+    emit,
+    deadline: float,
+    timeout_s: int,
+) -> list[dict]:
+    """Run browser discovery inside the shared live-discovery deadline.
+
+    A timeout is terminal, matching the BFS timeout contract: raising prevents
+    sitemap, Wayback, and every later live fallback from starting after the
+    phase budget has already expired.
+    """
+    remaining = deadline - time.monotonic()
+    try:
+        return await asyncio.wait_for(
+            browser_discover(scrape_url, max_courses=max_courses, emit=emit),
+            timeout=max(remaining, 0.001),
+        )
+    except asyncio.TimeoutError as exc:
+        timeout_msg = (
+            f"Discovery phase exceeded {timeout_s}s deadline during browser "
+            "discovery. Job marked failed so the worker slot is freed; no later "
+            "discovery fallback will run after the deadline."
+        )
+        log.error("%s", timeout_msg)
+        if emit:
+            await emit(
+                "error",
+                f"[DISCOVER] {timeout_msg}",
+                phase="discover",
+                kind="discovery_timeout",
+            )
+        raise BrowserDiscoveryDeadlineExceeded(timeout_msg) from exc
+
+
 def _link_has_authoritative_course_provenance(link: dict) -> bool:
     """Return whether this exact link was emitted by a course-record provider."""
     payload = link.get("payload")
@@ -2648,6 +2690,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         _c1_rp = job.request_payload or {}
         _c1_force = bool(_c1_rp.get("forceDiscovery") or _c1_rp.get("force_discovery"))
         from app.services.scraper.discovery_cache_scope import (
+            DISCOVERY_CACHE_SCOPE_VERSION as _DISCOVERY_CACHE_SCOPE_VERSION,
             discovery_cache_coverage_sufficient as _discovery_cache_coverage_sufficient,
             discovery_cache_scope_key as _discovery_cache_scope_key,
         )
@@ -2715,7 +2758,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                     ]
                     _c1_scope_matches = bool(
                         _c1_meta
-                        and _c1_meta.get("scope_version") == 1
+                        and _c1_meta.get("scope_version") == _DISCOVERY_CACHE_SCOPE_VERSION
                         and _c1_meta.get("scope_key") == _c1_scope_key
                     )
                     _c1_coverage_ok = _discovery_cache_coverage_sufficient(
@@ -3654,6 +3697,16 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 _filter_funnel_stats["after_block"] = int(kwargs.get("kept", 0))
             await _emit_for_discover(type_, message, **kwargs)
 
+        # One deadline covers whichever live HTML discovery path is active.
+        # In browser-first mode this also bounds the configured sitemap
+        # supplement below; it must not start a fresh full timeout after the
+        # browser has already consumed most of the discovery budget.
+        _disc_timeout = int(
+            getattr(_uni_cfg.discovery, "discovery_phase_timeout_s", None)
+            or settings.discovery_phase_timeout_s
+        )
+        _disc_deadline = time.monotonic() + _disc_timeout
+
         if (
             not _targeted_retry
             and not _archive_only
@@ -3661,15 +3714,6 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             and not _always_browser
         ):
             _pre_bfs_links = list(links)
-            # Per-uni YAML can override the global discovery_phase_timeout_s
-            # (default 300 s) via discovery.discovery_phase_timeout_s.
-            # Use case: La Trobe has 40 Funnelback seeds at ~30 s each via
-            # Scrape.do render=true / 4 concurrent = ~300 s, right at the
-            # global cap; setting 600 gives a safe 250 s headroom.
-            _disc_timeout = int(
-                getattr(_uni_cfg.discovery, "discovery_phase_timeout_s", None)
-                or settings.discovery_phase_timeout_s
-            )
             try:
                 links = await asyncio.wait_for(
                     discover_course_links(
@@ -3786,8 +3830,13 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                         "(handles Cloudflare / JS-heavy sites)...",
                         phase="discover",
                     )
-                _browser_links = await browser_discover_generic(
-                    scrape_url, max_courses=max_courses, emit=emit
+                _browser_links = await _run_browser_discovery_with_deadline(
+                    browser_discover_generic,
+                    scrape_url=scrape_url,
+                    max_courses=max_courses,
+                    emit=emit,
+                    deadline=_disc_deadline,
+                    timeout_s=_disc_timeout,
                 )
                 if _browser_links:
                     log.info(
@@ -3809,10 +3858,94 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                     )
                 elif _browser_links:
                     links = _browser_links
+            except BrowserDiscoveryDeadlineExceeded:
+                # Terminal phase deadline: do not continue to sitemap,
+                # Wayback, or any later live fallback.
+                raise
             except Exception as _br_exc:  # noqa: BLE001
                 log.warning(
                     "browser_discover_generic failed for %s: %s — trying Wayback CDX",
                     uni_name, _br_exc,
+                )
+
+        # Browser-first discovery bypasses discover_course_links(), where an
+        # explicit sitemap is normally merged. Preserve the same contract here:
+        # configured sitemap_url supplements partial browser results without
+        # requiring always_sitemap_supplement. Restrict this branch to
+        # _always_browser so a normal BFS run cannot fetch the sitemap twice.
+        _browser_sitemap_url = getattr(_uni_cfg.discovery, "sitemap_url", None)
+        if (
+            not _targeted_retry
+            and not _archive_only
+            and _always_browser
+            and _browser_sitemap_url
+            and not getattr(_uni_cfg.discovery, "skip_sitemap_fallback", False)
+            and not _disc_cache_hit
+        ):
+            _browser_sm_remaining = _disc_deadline - time.monotonic()
+            if _browser_sm_remaining >= 5:
+                try:
+                    from app.services.scraper.sitemap import discover_from_sitemap
+
+                    _browser_sm_allow: list[re.Pattern[str]] = []
+                    for _pattern in list(
+                        getattr(_uni_cfg.discovery, "allow_url_patterns", None) or []
+                    ):
+                        try:
+                            _browser_sm_allow.append(re.compile(_pattern, re.IGNORECASE))
+                        except re.error:
+                            log.warning(
+                                "discovery.allow_url_patterns: invalid regex skipped "
+                                "(browser sitemap supplement): %s",
+                                _pattern,
+                            )
+                    _browser_sm_links = await asyncio.wait_for(
+                        discover_from_sitemap(
+                            scrape_url,
+                            emit=emit,
+                            sitemap_url=_browser_sitemap_url,
+                            offset=int(
+                                getattr(_uni_cfg.discovery, "sitemap_offset", None) or 0
+                            ),
+                            allow_url_patterns=_browser_sm_allow or None,
+                        ),
+                        timeout=max(_browser_sm_remaining, 1.0),
+                    )
+                    _known_browser_urls = {
+                        str(_item.get("url") or "") for _item in links
+                    }
+                    _browser_sm_added = 0
+                    for _item in _browser_sm_links:
+                        _url = str(_item.get("url") or "")
+                        if _url and _url not in _known_browser_urls:
+                            links.append(_item)
+                            _known_browser_urls.add(_url)
+                            _browser_sm_added += 1
+                    log.info(
+                        "browser sitemap supplement: +%d new URLs (total now %d) "
+                        "for %s",
+                        _browser_sm_added,
+                        len(links),
+                        uni_name,
+                    )
+                except asyncio.TimeoutError:
+                    log.warning(
+                        "browser sitemap supplement timed out within remaining "
+                        "discovery budget for %s",
+                        uni_name,
+                    )
+                except Exception as _browser_sm_exc:  # noqa: BLE001
+                    log.warning(
+                        "browser sitemap supplement failed for %s: %s",
+                        uni_name,
+                        _browser_sm_exc,
+                    )
+            else:
+                log.warning(
+                    "browser sitemap supplement skipped for %s — only %.1fs "
+                    "remain in discovery budget",
+                    uni_name,
+                    _browser_sm_remaining,
                 )
 
         # ── Fallback 2: Wayback Machine CDX API ──────────────────────────────

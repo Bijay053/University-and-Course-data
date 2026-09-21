@@ -246,6 +246,30 @@ async def finish(session: dict, db, phase: str, reason: str, *, failed: bool = F
     return session
 
 
+async def block_unclaimed_initialization(
+    job_id: str, university_id: int, session_id: str, db, *, code: str, reason: str,
+) -> dict:
+    """Record a known pre-claim failure without revoking or replacing ownership."""
+    await lock(db, university_id)
+    session = await load(job_id, db, session_id)
+    if not session or not await owns(session, db):
+        await db.rollback()
+        return {}
+    state = session.get("autonomous") or {}
+    if (
+        session.get("status") != "queued" or state.get("worker_claim") or state.get("worker_generation")
+        or state.get("verification_job_id")
+        or state.get("phase") in {"blocked", "needs_review", "verified"}
+    ):
+        await db.rollback()
+        return session
+    state["initialization_failure"] = {
+        "code": code, "stage": "pre_claim", "observed_at": now(),
+        "message": reason,
+    }
+    return await finish(session, db, "blocked", reason, failed=True)
+
+
 async def schedule_recovery(
     session: dict,
     db,
@@ -286,7 +310,8 @@ async def schedule_recovery(
             "blocked",
             f"Automatic recovery exhausted after "
             f"{dispatch_attempts if dispatch_exhausted else wait_attempts} "
-            f"{'broker dispatch attempts' if dispatch_exhausted else 'wait attempts'}. "
+            f"{'worker redispatch attempts (in addition to initial delivery)' if dispatch_exhausted and target == 'repair' else 'worker dispatch attempts' if dispatch_exhausted else 'wait attempts'}. "
+            f"{reason} "
             f"{next_action}",
             failed=True,
         )
@@ -514,7 +539,7 @@ async def dispatch_verification(session: dict, db) -> dict:
     if dispatch_attempts >= MAX_REQUEUES:
         state.update(
             recovery_exhausted=True,
-            next_action="Retry the repair from the job card after checking the university connection.",
+            next_action="Check the application's repair worker, task queue, and broker connection before retrying; this is not evidence of a university website failure.",
         )
         recovery = dict(state.get("recovery") or {})
         recovery.update(
@@ -526,7 +551,7 @@ async def dispatch_verification(session: dict, db) -> dict:
         state["recovery"] = recovery
         return await finish(
             session, db, "blocked",
-            f"Automatic recovery exhausted after {dispatch_attempts} broker dispatch attempts. "
+            f"Automatic recovery exhausted after {dispatch_attempts} worker dispatch attempts without a durable worker claim. "
             f"{state['next_action']}",
             failed=True,
         )
@@ -996,6 +1021,14 @@ async def reconcile(job_id: str, session_id: str, db) -> dict:
                 "Verification requires a human decision; no approval or publication was performed.",
             )
         if child.status not in CHILD_ACTIVE:
+            if session.get("course_report"):
+                state["verification_status"] = child.status
+                return await finish(
+                    session, db, "needs_review",
+                    f"Reported-course recovery ended ({child.status}) in a bounded, review-only run. "
+                    "Review the staged evidence; neither resolution of the reported "
+                    "fields nor complete catalogue coverage is automatically certified.",
+                )
             metadata = verification_metadata(child)
             continuation = await _queue_verification_continuation(
                 session, child, metadata, db,
@@ -1084,8 +1117,8 @@ async def reconcile(job_id: str, session_id: str, db) -> dict:
                 if count >= MAX_REQUEUES:
                     return await schedule_recovery(
                         session, db,
-                        "Verification delivery did not reach a worker.",
-                        "Retry the repair from the job card after checking the university connection.",
+                        "No durable verification worker claim was recorded; delivery or pre-claim initialization may have failed.",
+                        "Check the application's repair worker, task queue, and broker connection before retrying; this is not evidence of a university website failure.",
                         target="verification",
                         dispatch_exhausted=True,
                     )
@@ -1151,8 +1184,8 @@ async def reconcile(job_id: str, session_id: str, db) -> dict:
         if count >= MAX_REQUEUES:
             return await schedule_recovery(
                 session, db,
-                "Repair delivery did not reach a worker.",
-                "Retry the repair from the job card after checking the university connection.",
+                "No durable repair worker claim was recorded; delivery or pre-claim initialization may have failed.",
+                "Check the application's repair worker, task queue, and broker connection before retrying; this is not evidence of a university website failure.",
                 target="repair",
                 dispatch_exhausted=True,
             )

@@ -1606,18 +1606,35 @@ async def discover_course_links(
                 total=len(found),
             )
 
-    # Sitemap fallback when the homepage crawl yields too few candidates.
-    # Many universities (e.g. those with JS-driven catalogues) link only
-    # a handful of "featured" courses from the homepage but publish the
-    # full catalogue in sitemap.xml.
+    # Sitemap fallback/supplement. An explicit discovery.sitemap_url is an
+    # operator-declared catalogue source, so it supplements BFS even when BFS
+    # crossed the generic fallback threshold. This is deliberately independent
+    # of always_sitemap_supplement: requiring both flags caused healthy-looking
+    # partial BFS results to silently omit sitemap-only courses.
     _skip_sitemap = bool(
         discovery_config is not None
         and getattr(discovery_config, "skip_sitemap_fallback", False)
     )
-    if _skip_sitemap and len(found) < _SITEMAP_FALLBACK_THRESHOLD:
+    _explicit_sm = _resolved_sitemap_url or None
+    _yaml_always_sitemap = bool(
+        discovery_config is not None
+        and getattr(discovery_config, "always_sitemap_supplement", False)
+    )
+    _host_always_sitemap = parsed.netloc in _ALWAYS_SITEMAP_SUPPLEMENT_HOSTS
+    _sitemap_is_supplement = bool(
+        _explicit_sm or _yaml_always_sitemap or _host_always_sitemap
+    )
+    _should_fetch_sitemap = bool(
+        origin
+        and (
+            len(found) < _SITEMAP_FALLBACK_THRESHOLD
+            or _sitemap_is_supplement
+        )
+    )
+    if _skip_sitemap and _should_fetch_sitemap:
         log.info(
-            "[DISCOVER] skip_sitemap_fallback=True — skipping sitemap probe for %s "
-            "(orchestrator wayback_discover will run CDX bulk lookup instead)",
+            "[DISCOVER] skip_sitemap_fallback=True — skipping sitemap "
+            "fallback/supplement for %s",
             origin,
         )
         if emit:
@@ -1629,7 +1646,7 @@ async def discover_course_links(
                 kind="sitemap_skipped_config",
                 crawl_total=len(found),
             )
-    elif len(found) < _SITEMAP_FALLBACK_THRESHOLD and origin and _remaining_budget_s() < 5:
+    elif _should_fetch_sitemap and _remaining_budget_s() < 5:
         # Budget guard (Cardiff job_72d3725aea12): if the BFS crawl alone has
         # already exhausted (almost) the entire discovery deadline, don't
         # even start the sitemap fallback — it would get silently cancelled
@@ -1654,22 +1671,27 @@ async def discover_course_links(
                 kind="sitemap_skipped_budget",
                 crawl_total=len(found),
             )
-    elif len(found) < _SITEMAP_FALLBACK_THRESHOLD and origin:
+    elif _should_fetch_sitemap:
         if emit:
-            await emit(
-                "status",
-                f"[DISCOVER] Crawl yielded only {len(found)} candidate(s) "
-                f"(< {_SITEMAP_FALLBACK_THRESHOLD}); trying sitemap fallback",
-                phase="discover",
-                kind="sitemap_trigger",
-                crawl_total=len(found),
-            )
+            if len(found) < _SITEMAP_FALLBACK_THRESHOLD:
+                await emit(
+                    "status",
+                    f"[DISCOVER] Crawl yielded only {len(found)} candidate(s) "
+                    f"(< {_SITEMAP_FALLBACK_THRESHOLD}); trying sitemap fallback",
+                    phase="discover",
+                    kind="sitemap_trigger",
+                    crawl_total=len(found),
+                )
+            else:
+                await emit(
+                    "status",
+                    f"[DISCOVER] supplementing {len(found)} BFS candidate(s) "
+                    "with configured sitemap",
+                    phase="discover",
+                    kind="sitemap_supplement",
+                    crawl_total=len(found),
+                )
         try:
-            _explicit_sm = (
-                discovery_config.sitemap_url
-                if discovery_config is not None
-                else None
-            )
             _sm_offset = int(getattr(discovery_config, "sitemap_offset", None) or 0)
             _fb_allow_pats: list[re.Pattern[str]] = []
             if discovery_config is not None:
@@ -1702,12 +1724,14 @@ async def discover_course_links(
         except Exception as exc:
             log.warning("sitemap fallback failed for %s: %s", origin, exc)
             sitemap_courses = []
+        _sm_added = 0
         for c in sitemap_courses:
             u = c.get("url")
             n = c.get("name") or ""
             if not u or u in found:
                 continue
             found[u] = n
+            _sm_added += 1
             # NOTE: no max_courses cap here.  The sitemap is a pre-enumerated
             # finite list (e.g. Federation: 239 URLs).  Capping here prevents
             # the per-uni block_url_patterns filter (below, line ~1404) from
@@ -1717,6 +1741,16 @@ async def discover_course_links(
             # browser+vision budget.  The final [:max_courses] slice at the
             # very end of this function enforces the output limit AFTER the
             # block filter has had a chance to clean the full candidate set.
+        if emit and _sitemap_is_supplement:
+            await emit(
+                "status",
+                f"[DISCOVER] sitemap supplement added {_sm_added} new candidate(s) "
+                f"(total now {len(found)})",
+                phase="discover",
+                kind="sitemap_supplement_done",
+                added=_sm_added,
+                total=len(found),
+            )
 
     # ── Alternative listing path probe ───────────────────────────────────────
     # When the seed URL failed (e.g. /courses 404s) and the sitemap is
@@ -1804,94 +1838,6 @@ async def discover_course_links(
                     _alt_url,
                     _alt_exc,
                 )
-
-    # ── Unconditional sitemap supplement for JS-heavy catalogues ────────────
-    # For universities whose category listing pages are React/Vue SPAs the BFS
-    # HTTP pass can only find courses that appear in static HTML (e.g. featured
-    # picks or courses linked from nav).  The sitemap exposes the full
-    # catalogue; merge it here so we don't silently miss entire disciplines.
-    # Per-uni YAML knob (`discovery.always_sitemap_supplement`) — honour
-    # alongside the hardcoded host frozenset so newly-onboarded unis can
-    # opt in via YAML without a code change. La Trobe regression
-    # 2026-05-12: YAML knob was set but never read here, so the 392-URL
-    # sitemap never merged and BFS only surfaced ~29 candidates (mostly
-    # category landing pages).
-    _yaml_always_sitemap = bool(
-        discovery_config is not None
-        and getattr(discovery_config, "always_sitemap_supplement", False)
-    )
-    if not _skip_sitemap and (parsed.netloc in _ALWAYS_SITEMAP_SUPPLEMENT_HOSTS or _yaml_always_sitemap) and origin:
-        if emit:
-            await emit(
-                "status",
-                f"[DISCOVER] JS-heavy site — supplementing {len(found)} BFS candidate(s) "
-                f"with sitemap to catch discipline courses missing from static HTML",
-                phase="discover",
-                kind="sitemap_supplement",
-            )
-        # Per-uni allow_url_patterns pre-filter (CQU regression 2026-05-11):
-        # CQU's sitemap returns 726 URLs in raw order — /study/* category
-        # landings appear at indices 0..30 and the first HE-style /courses/c<x>NN
-        # URL doesn't appear until index 364.  Without this pre-filter the
-        # supplement loop fills the 200-slot cap with /study/* + alphabetic
-        # PDC/TAFE codes long before any HE degree URL is seen, and the
-        # orchestrator's Phase A.5b allow filter then drops 100% of survivors
-        # → 0 staged.  Applying the per-uni allow_url_patterns here means
-        # non-matching URLs simply don't consume cap slots, so the 194 HE
-        # URLs CQU publishes all get a chance to be added.
-        # NOTE: compiled before the discover_from_sitemap() call so they can
-        # also be passed into the sitemap module to bypass the generic
-        # _COURSE_URL_HINTS check for universities with non-standard URL shapes
-        # (e.g. Westminster's /{subject}-courses/{year}/... format).
-        _supp_allow_pats: list[re.Pattern[str]] = []
-        if discovery_config is not None:
-            _ap_raw = list(getattr(discovery_config, "allow_url_patterns", None) or [])
-            for _ap_str in _ap_raw:
-                try:
-                    _supp_allow_pats.append(re.compile(_ap_str, re.IGNORECASE))
-                except re.error:
-                    log.warning(
-                        "discovery.allow_url_patterns: invalid regex skipped (sitemap supplement): %s",
-                        _ap_str,
-                    )
-        try:
-            _explicit_sm2 = (
-                discovery_config.sitemap_url
-                if discovery_config is not None
-                else None
-            )
-            _sm_offset2 = int(getattr(discovery_config, "sitemap_offset", None) or 0)
-            _supp_courses = await discover_from_sitemap(
-                origin, emit=emit, sitemap_url=_explicit_sm2, offset=_sm_offset2,
-                allow_url_patterns=_supp_allow_pats or None,
-            )
-        except Exception as _supp_exc:
-            log.warning("sitemap supplement failed for %s: %s", origin, _supp_exc)
-            _supp_courses = []
-        _supp_added = 0
-        for _sc in _supp_courses:
-            _su = _sc.get("url")
-            _sn = _sc.get("name") or ""
-            if not _su or _su in found:
-                continue
-            if _supp_allow_pats and not any(_p.search(_su) for _p in _supp_allow_pats):
-                continue
-            found[_su] = _sn
-            _supp_added += 1
-            # NOTE: no max_courses cap here — same reasoning as the sitemap
-            # fallback loop above.  allow_url_patterns already filters non-HE
-            # URLs (CQU regression fix), and block_url_patterns below removes
-            # junk; [:max_courses] at line 1476 limits the final output.
-        if emit and _supp_added:
-            await emit(
-                "status",
-                f"[DISCOVER] sitemap supplement added {_supp_added} new candidate(s) "
-                f"(total now {len(found)})",
-                phase="discover",
-                kind="sitemap_supplement_done",
-                added=_supp_added,
-                total=len(found),
-            )
 
     # ── Category-filter expansion (T004) ────────────────────────────────
     # VIT-style course-list pages expose category filters (?course_categories

@@ -28,6 +28,7 @@ import {
   type ReviewEvidenceItem,
 } from "@/components/review-scraped-courses-table";
 import { ScrapeJobCard } from "@/components/scrape-job-card";
+import { CourseReport } from "@/components/course-report";
 import { DEGREE_LEVELS, FEE_TERM_OPTIONS, STUDY_LOADS, STUDY_MODES } from "@/lib/course-constants";
 
 function optionsIncludingCurrent(options: string[], current: string | null): string[] {
@@ -1451,7 +1452,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     });
   }, []);
 
-  const loadStagedCourses = useCallback(async (jobId: string): Promise<boolean> => {
+  const loadStagedCourses = useCallback(async (jobId: string, allowLatestFallback = true): Promise<boolean> => {
     try {
       const res = await fetch(`/api/scrape/staged/${jobId}`, {
         credentials: "include",
@@ -1473,7 +1474,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
 
         // If this job has been cleared by a newer scrape, auto-load the latest instead.
         const _latestJobId = latestAvailableJobIdRef.current;
-        if (pending.length === 0 && _latestJobId && _latestJobId !== jobId) {
+        if (allowLatestFallback && pending.length === 0 && _latestJobId && _latestJobId !== jobId) {
           return loadStagedCourses(_latestJobId);
         }
 
@@ -1582,7 +1583,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       console.debug("[SCRAPE_UI] ignored background staged-course load because review panel is open for another job", { backgroundJobId: jobId, openJobId: reviewJobIdRef.current });
       return;
     }
-    loadStagedCourses(jobId);
+    loadStagedCourses(jobId, !force);
   }, [loadStagedCourses]);
 
   const resetActiveScrapeState = useCallback((message?: string) => {
@@ -2945,6 +2946,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
               slotIndex={index}
               universities={uniData?.data || []}
               onReviewReady={handleReviewReady}
+              onReportStarted={() => void fetchHistory()}
               onRemove={() => removeSlot(id)}
               canRemove={slotIds.length > 1}
               forceResetKey={forceResetKey}
@@ -4883,6 +4885,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                     </div>
                   </div>
 
+                  {["completed", "completed_with_errors", "stopped", "failed", "failed_degraded"].includes(run.status) && (
+                    <CourseReport jobId={run.runtimeJobId} onReview={id => handleReviewReady(id, run.universityName ?? "University", true)} onStarted={() => void fetchHistory()} />
+                  )}
                   {isExpanded && (
                     <div className="border-t bg-gray-50 p-3 sm:p-4">
                       {/* ── Unresolved recovery URLs ─────────────────────────── */}

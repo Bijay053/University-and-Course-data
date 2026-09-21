@@ -6,7 +6,28 @@ from app.services.scraper.auto_repair_candidates import (
     filter_config_drifted,
     filter_repair_safety_issue,
     strip_stale_filter_suggestions,
+    is_intentionally_excluded_course_url,
 )
+
+
+def test_law_online_variants_are_not_missing_course_evidence():
+    online = "https://www.law.ac.uk/study/postgraduate/law/llm/online/"
+    campus = "https://www.law.ac.uk/study/postgraduate/law/llm/"
+    assert is_intentionally_excluded_course_url(online)
+    assert not is_intentionally_excluded_course_url(campus)
+    assert not is_intentionally_excluded_course_url(online.replace("www.law.ac.uk", "example.edu"))
+    engine = AutoRepairEngine(
+        uni_id=1, uni_name="Law", scrape_url="https://www.law.ac.uk",
+        current_allow_pats=[r"/study/postgraduate/[^/]+/[^/]+/$"],
+        current_must_contain=[], current_block_pats=[r"/news/"],
+        raw_discovered=180, after_filter=94, imported=94,
+        historical_urls=[campus, online], pipeline_stats={}, dropped_sample=[online],
+    )
+    assert engine.historical_urls == [campus]
+    assert engine.dropped_sample == []
+    assert engine._url_filter_candidates() == []
+    assert engine._smart_replace_allow_patterns() == []
+    assert engine.block_pats == [r"/news/"]
 
 
 def test_filter_snapshot_drift_is_detected_and_missing_snapshot_is_safe():

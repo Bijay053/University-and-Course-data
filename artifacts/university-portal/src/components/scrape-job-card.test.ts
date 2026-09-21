@@ -10,6 +10,7 @@ import {
   hasCompletedExtractionErrors,
   hasReviewableCourses,
   isCategoryPageWarningStale,
+  onlyKnownExcludedUrls,
   repairJobIdForTerminalState,
   runtimeProgressFromStatus,
   shouldOfferIdenticalContinuation,
@@ -22,6 +23,14 @@ afterEach(() => {
   cleanup();
   sessionStorage.clear();
   vi.unstubAllGlobals();
+});
+
+it("does not treat known Law online variants as campus course losses", () => {
+  const online = "https://www.law.ac.uk/study/postgraduate/law/llm/online/";
+  expect(onlyKnownExcludedUrls([online])).toBe(true);
+  expect(onlyKnownExcludedUrls([online, online.replace("/online/", "/")])).toBe(false);
+  expect(onlyKnownExcludedUrls([online.replace("www.law.ac.uk", "example.edu")])).toBe(false);
+  expect(onlyKnownExcludedUrls([])).toBe(false);
 });
 
 function jsonResponse(body: unknown): Response {

@@ -144,6 +144,224 @@ async def test_sitemap_fallback_threshold_boundary(monkeypatch):
     assert len(out) == n
 
 
+@pytest.mark.asyncio
+async def test_configured_sitemap_supplements_partial_bfs_above_threshold(
+    monkeypatch,
+):
+    """A configured sitemap is authoritative supplemental discovery.
+
+    Exercise the real sitemap parser boundary: BFS is already above the
+    fallback threshold, while the sitemap contains one duplicate, one URL
+    removed by the configured block filter, and one genuinely new course.
+    Filtering must happen before the final cap so the blocked URL cannot crowd
+    the later valid URL out.
+    """
+    from app.services.scraper import sitemap as sitemap_mod
+    from app.services.scraper.config.schema import DiscoveryConfig
+
+    bfs_links = "\n".join(
+        f'<a href="/courses/bachelor-{i}">Bachelor of Subject {i}</a>'
+        for i in range(discovery._SITEMAP_FALLBACK_THRESHOLD + 1)
+    )
+
+    async def fake_bfs_fetch(url, **kwargs):
+        if url == "https://example.edu/catalogue":
+            return f"<html><body>{bfs_links}</body></html>"
+        return ""
+
+    sitemap_url = "https://example.edu/catalogue-sitemap.xml"
+    sitemap_xml = """<urlset>
+      <url><loc>https://example.edu/courses/bachelor-0</loc></url>
+      <url><loc>https://example.edu/courses/blocked-course</loc></url>
+      <url><loc>https://example.edu/courses/master-of-new-subject</loc></url>
+    </urlset>"""
+    sitemap_calls: list[str] = []
+
+    async def fake_sitemap_fetch(url, **kwargs):
+        sitemap_calls.append(url)
+        return sitemap_xml if url == sitemap_url else ""
+
+    monkeypatch.setattr(discovery, "fetch_html", fake_bfs_fetch)
+    monkeypatch.setattr(sitemap_mod, "fetch_html", fake_sitemap_fetch)
+
+    cfg = DiscoveryConfig(
+        sitemap_url=sitemap_url,
+        allow_url_patterns=[r"^https://example\.edu/courses/"],
+        block_url_patterns=[r"/blocked-course$"],
+    )
+    out = await discovery.discover_course_links(
+        "https://example.edu/catalogue",
+        max_pages=1,
+        max_courses=discovery._SITEMAP_FALLBACK_THRESHOLD + 2,
+        discovery_config=cfg,
+    )
+    urls = [item["url"] for item in out]
+
+    assert sitemap_calls == [sitemap_url]
+    assert len(urls) == discovery._SITEMAP_FALLBACK_THRESHOLD + 2
+    assert urls.count("https://example.edu/courses/bachelor-0") == 1
+    assert "https://example.edu/courses/blocked-course" not in urls
+    assert "https://example.edu/courses/master-of-new-subject" in urls
+
+
+@pytest.mark.asyncio
+async def test_configured_sitemap_honours_skip_optout_above_threshold(monkeypatch):
+    from app.services.scraper import sitemap as sitemap_mod
+    from app.services.scraper.config.schema import DiscoveryConfig
+
+    links = "".join(
+        f'<a href="/courses/bachelor-{i}">Bachelor of Subject {i}</a>'
+        for i in range(discovery._SITEMAP_FALLBACK_THRESHOLD + 1)
+    )
+
+    async def fake_fetch(url, **kwargs):
+        return f"<html><body>{links}</body></html>"
+
+    sitemap_calls: list[str] = []
+
+    async def fake_sitemap(origin, **kwargs):
+        sitemap_calls.append(origin)
+        return []
+
+    monkeypatch.setattr(discovery, "fetch_html", fake_fetch)
+    monkeypatch.setattr(sitemap_mod, "discover_from_sitemap", fake_sitemap)
+    cfg = DiscoveryConfig(
+        sitemap_url="https://example.edu/catalogue-sitemap.xml",
+        skip_sitemap_fallback=True,
+    )
+
+    out = await discovery.discover_course_links(
+        "https://example.edu/catalogue",
+        max_pages=1,
+        max_courses=20,
+        discovery_config=cfg,
+    )
+
+    assert len(out) == discovery._SITEMAP_FALLBACK_THRESHOLD + 1
+    assert sitemap_calls == []
+
+
+@pytest.mark.asyncio
+async def test_configured_sitemap_uses_remaining_discovery_budget(monkeypatch):
+    from app.services.scraper import sitemap as sitemap_mod
+    from app.services.scraper.config.schema import DiscoveryConfig
+
+    links = "".join(
+        f'<a href="/courses/bachelor-{i}">Bachelor of Subject {i}</a>'
+        for i in range(discovery._SITEMAP_FALLBACK_THRESHOLD + 1)
+    )
+
+    async def fake_fetch(url, **kwargs):
+        return f"<html><body>{links}</body></html>"
+
+    sitemap_calls: list[str] = []
+
+    async def hanging_sitemap(origin, **kwargs):
+        sitemap_calls.append(origin)
+        await asyncio.sleep(10)
+        return []
+
+    monkeypatch.setattr(discovery, "fetch_html", fake_fetch)
+    monkeypatch.setattr(sitemap_mod, "discover_from_sitemap", hanging_sitemap)
+    cfg = DiscoveryConfig(
+        sitemap_url="https://example.edu/catalogue-sitemap.xml",
+        discovery_phase_timeout_s=1,
+    )
+
+    started = asyncio.get_running_loop().time()
+    out = await discovery.discover_course_links(
+        "https://example.edu/catalogue",
+        max_pages=1,
+        max_courses=20,
+        discovery_config=cfg,
+    )
+    elapsed = asyncio.get_running_loop().time() - started
+
+    assert len(out) == discovery._SITEMAP_FALLBACK_THRESHOLD + 1
+    assert sitemap_calls == []
+    assert elapsed < 1
+
+
+@pytest.mark.asyncio
+async def test_low_bfs_with_configured_always_sitemap_fetches_once(monkeypatch):
+    from app.services.scraper import sitemap as sitemap_mod
+    from app.services.scraper.config.schema import DiscoveryConfig
+
+    async def fake_fetch(url, **kwargs):
+        return '<html><a href="/courses/bachelor-one">Bachelor One</a></html>'
+
+    calls: list[str] = []
+
+    async def fake_sitemap(origin, **kwargs):
+        calls.append(origin)
+        return [{"url": "https://example.edu/courses/master-two", "name": "Master Two"}]
+
+    monkeypatch.setattr(discovery, "fetch_html", fake_fetch)
+    monkeypatch.setattr(sitemap_mod, "discover_from_sitemap", fake_sitemap)
+    cfg = DiscoveryConfig(
+        sitemap_url="https://example.edu/catalogue-sitemap.xml",
+        always_sitemap_supplement=True,
+    )
+
+    out = await discovery.discover_course_links(
+        "https://example.edu/catalogue",
+        max_pages=1,
+        max_courses=20,
+        discovery_config=cfg,
+    )
+
+    assert calls == ["https://example.edu"]
+    assert {item["url"] for item in out} == {
+        "https://example.edu/courses/bachelor-one",
+        "https://example.edu/courses/master-two",
+    }
+
+
+@pytest.mark.asyncio
+async def test_hanging_browser_terminates_discovery_before_later_fetch():
+    """Browser-first discovery shares the phase deadline with BFS/sitemap."""
+    import time
+
+    from app.services.scraper.orchestrator import (
+        _run_browser_discovery_with_deadline,
+    )
+
+    emitted: list[tuple[str, dict]] = []
+    later_fetch_called = False
+
+    async def emit(event, message, **kwargs):
+        emitted.append((event, kwargs))
+
+    async def hanging_browser(url, **kwargs):
+        await asyncio.sleep(10)
+        return []
+
+    async def run_phase():
+        nonlocal later_fetch_called
+        await _run_browser_discovery_with_deadline(
+            hanging_browser,
+            scrape_url="https://example.edu/catalogue",
+            max_courses=20,
+            emit=emit,
+            deadline=time.monotonic() + 0.03,
+            timeout_s=1,
+        )
+        # Models sitemap/later fallback statements following the browser call
+        # in orchestrator. The terminal timeout must make this unreachable.
+        later_fetch_called = True
+
+    started = time.monotonic()
+    with pytest.raises(RuntimeError, match="during browser discovery"):
+        await run_phase()
+
+    assert time.monotonic() - started < 1
+    assert later_fetch_called is False
+    assert any(
+        event == "error" and data.get("kind") == "discovery_timeout"
+        for event, data in emitted
+    )
+
+
 # ── AIT fix: detail pages classified from content must add self as candidate ─
 
 # Simulates AIT's /courses/2d-animation — URL looks like a category landing

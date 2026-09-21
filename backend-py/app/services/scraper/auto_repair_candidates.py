@@ -133,12 +133,32 @@ def strip_stale_filter_suggestions(
     return sanitized
 
 
+def is_intentionally_excluded_course_url(url: str) -> bool:
+    """Recognize proven delivery variants, not generic 'online' keywords.
+
+    Law's catalogue publishes a separate /online/ child of a campus course.
+    Its verified recipe deliberately excludes those children. Do not extrapolate
+    this evidence to unrelated hosts, campus parent URLs, or unsampled drops.
+    This is diagnostic classification only; no runtime filter is relaxed.
+    """
+    parsed = urlparse(url)
+    return (
+        parsed.hostname in {"law.ac.uk", "www.law.ac.uk"}
+        and re.fullmatch(
+            r"/study/(?:undergraduate|postgraduate)/[^/]+/[^/]+/online/?",
+            parsed.path, re.IGNORECASE,
+        ) is not None
+    )
+
+
 def _is_course_url(url: str) -> bool:
     """Return False for URLs that are clearly media, asset, or static-file paths."""
     path = urlparse(url).path
     if _MEDIA_EXT_RE.search(path):
         return False
     if _ASSET_PATH_RE.search(path):
+        return False
+    if is_intentionally_excluded_course_url(url):
         return False
     return True
 
@@ -339,9 +359,12 @@ class AutoRepairEngine:
         self.raw_discovered = raw_discovered
         self.after_filter = after_filter
         self.imported = imported
-        self.historical_urls = historical_urls
+        self.historical_urls = [url for url in historical_urls if _is_course_url(url)]
         self.pipeline_stats = pipeline_stats
-        self.dropped_sample: list[str] = dropped_sample or []
+        self.dropped_sample: list[str] = [url for url in (dropped_sample or []) if _is_course_url(url)]
+        self.only_intentional_drop_evidence = bool(dropped_sample) and all(
+            is_intentionally_excluded_course_url(url) for url in dropped_sample
+        )
         # Block-filter stats captured from inside discover_course_links.
         # pre_block_discovered = raw count BEFORE block_url_patterns ran.
         # block_dropped_count   = how many URLs were removed by block patterns.
@@ -507,6 +530,10 @@ class AutoRepairEngine:
     # ── Candidate generators ───────────────────────────────────────────────────
 
     def _url_filter_candidates(self) -> list[RepairCandidate]:
+        if self.only_intentional_drop_evidence:
+            # A truncated sample cannot certify the unsampled URLs as missing
+            # courses. Never turn its raw drop count into an estimated rescue.
+            return []
         candidates: list[RepairCandidate] = []
         total_raw = self.raw_discovered
         has_hist = len(self.historical_urls) >= 5

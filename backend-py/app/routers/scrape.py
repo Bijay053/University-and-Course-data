@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies import get_current_user, get_db
 from app.models import ScrapeRuntimeJob, University
 from app.permissions import require_permission
+from app.routers.scrape_reports import router as course_reports_router
 from app.schemas.scrape import (
     BulkScrapeBody,
     BulkScrapeResponse,
@@ -36,6 +37,7 @@ from app.services.scraper.auto_repair_candidates import (
 )
 
 router = APIRouter()
+router.include_router(course_reports_router)
 
 log = logging.getLogger(__name__)
 
@@ -5637,6 +5639,11 @@ async def diagnose_scrape_job(
     # distinguish "0 links found by discovery" from "links found but filtered out".
     # Falls back to total_found for jobs that ran before this field was added.
     _pipeline_stats: dict = (job.discovered_config or {}).get("pipeline_stats") or {}
+    from app.services.scraper.auto_repair_candidates import is_intentionally_excluded_course_url
+    _drop_samples = _pipeline_stats.get("dropped_sample") or []
+    _only_intentional_drop_evidence = bool(_drop_samples) and all(
+        is_intentionally_excluded_course_url(url) for url in _drop_samples
+    )
     _raw_discovered: int = _pipeline_stats.get("raw_discovered", job.total_found or 0)
     _after_filter: int = _pipeline_stats.get("after_filter", job.total_found or 0)
     _filter_drop_count: int = int(
@@ -5837,6 +5844,7 @@ async def diagnose_scrape_job(
     _allow_pats_configured = bool(_effective_disc_tmp.get("allow_url_patterns"))
     if (
         _allow_pats_configured
+        and not _only_intentional_drop_evidence
         and _material_url_filter_drop(
             _raw_discovered,
             _filter_drop_count,
@@ -6248,6 +6256,13 @@ async def diagnose_scrape_job(
             f"URLs discovered / after filters: {job.total_found or 0} (pipeline stats not available for this job)\n"
             f"Courses staged: {job.imported or 0}"
         )
+    if _only_intentional_drop_evidence:
+        _pipeline_summary += (
+            "\nEvery recorded dropped sample is a known separate online variant intentionally "
+            "excluded from campus courses. Do not label these as missing valid courses or "
+            "recommend relaxing filters. Unsampled drops are unclassified; the total drop "
+            "count is not a recoverable-course count."
+        )
     if _filter_snapshot_present:
         _filter_config_note = (
             "The discovery filter config below is the run-start snapshot."
@@ -6490,7 +6505,7 @@ Return only valid JSON, no markdown fences."""
         _effective_disc,
         low_filter_drop=(
             _raw_discovered > 0
-            and (_filter_drop_count == 0 or _filter_drop_pct < 20)
+            and (_filter_drop_count == 0 or _filter_drop_pct < 20 or _only_intentional_drop_evidence)
         ),
     )
 
@@ -7632,7 +7647,8 @@ async def apply_scrape_fix(
                 .limit(200)
             )).scalars().all()
 
-            known_urls = [u for u in url_rows if u]
+            from app.services.scraper.auto_repair_candidates import is_intentionally_excluded_course_url
+            known_urls = [u for u in url_rows if u and not is_intentionally_excluded_course_url(u)]
 
             if known_urls:
                 compiled_allow = []
@@ -7845,6 +7861,14 @@ async def start_ai_repair(
     from datetime import datetime, timezone
     import uuid
 
+    from app.services.worker_fencing_schema import (
+        WorkerFencingPrerequisiteError, require_worker_fencing_schema,
+    )
+    try:
+        await require_worker_fencing_schema(db)
+    except WorkerFencingPrerequisiteError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
     # Require a terminal job with concrete URL-filter failure evidence.
     row = (await db.execute(
         _text(
@@ -7979,18 +8003,10 @@ async def start_ai_repair(
 
     # Enqueue Celery task
     try:
-        from app.tasks.auto_repair_task import run_ai_scrape_repair, monitor_ai_scrape_repair
-        # Schedule recovery first: loss of the worker delivery is reconciled
-        # even when the user never opens the status endpoint again.
-        monitor_ai_scrape_repair.apply_async(
-            args=[job_id, session_id], queue="scrape", countdown=30,
-        )
-        run_ai_scrape_repair.apply_async(
-            args=[job_id, university_id, session_id],
-            queue="scrape",
-        )
+        from app.tasks.auto_repair_task import dispatch_ai_repair
+        dispatch_ai_repair(job_id, university_id, session_id)
     except Exception as exc:
-        message = "The OpenAI repair worker could not be queued. Try again shortly."
+        message = "Repair task publication failed; automatic queue recovery is pending."
         log.warning("start_ai_repair: Celery enqueue failed for job=%s: %s", job_id, exc)
         await workflow.lock(db, university_id)
         failed_session = await workflow.load(job_id, db, session_id)
@@ -7998,7 +8014,10 @@ async def start_ai_repair(
             if failed_session.get("autonomous", {}).get("worker_claim"):
                 await db.rollback()
                 return failed_session  # Broker accepted delivery before raising.
-            await workflow.finish(failed_session, db, "blocked", message, failed=True)
+            return await workflow.schedule_recovery(
+                failed_session, db, message,
+                "The same repair session will be retried automatically. If recovery fails, check the application's worker and broker.",
+            )
         raise HTTPException(status_code=503, detail=message) from exc
 
     return queued_session
@@ -8954,7 +8973,8 @@ async def preview_scrape_fix(
                     .where(_SC.course_website.isnot(None))
                     .limit(200)
                 )).scalars().all()
-                known_pv = [u for u in url_rows_pv if u]
+                from app.services.scraper.auto_repair_candidates import is_intentionally_excluded_course_url
+                known_pv = [u for u in url_rows_pv if u and not is_intentionally_excluded_course_url(u)]
 
                 if known_pv:
                     c_allow_pv = []

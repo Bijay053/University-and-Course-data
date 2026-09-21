@@ -66,6 +66,25 @@ def generate_repair_suggestion(
 
 # ── AI-powered repair loop ────────────────────────────────────────────────────
 
+def dispatch_ai_repair(job_id: str, university_id: int, session_id: str) -> None:
+    """Publish work independently of its optional countdown monitor.
+
+    The durable Beat scan is the recovery fallback. A monitor publish failure
+    must not prevent the actual worker message from being published.
+    """
+    try:
+        run_ai_scrape_repair.apply_async(
+            args=[job_id, university_id, session_id], queue="scrape",
+        )
+    finally:
+        try:
+            monitor_ai_scrape_repair.apply_async(
+                args=[job_id, session_id], queue="beat", countdown=30,
+            )
+        except Exception:
+            log.exception("Repair monitor publish failed for %s; durable scan remains available", job_id)
+
+
 async def _run_ai_repair(job_id: str, lease_token: str | None = None) -> dict:
     from app.database import AsyncSessionLocal
     from app.services.scraper.ai_repair_agent import run_ai_repair_loop
@@ -78,14 +97,24 @@ async def _run_autonomous_repair(
     job_id: str, university_id: int, session_id: str, claim_id: str,
 ) -> dict | None:
     from app.database import AsyncSessionLocal
-    from app.services.ai_repair_workflow import load, run
+    from app.services.ai_repair_workflow import block_unclaimed_initialization, load, run
     from app.services.scraper.ai_repair_agent import ensure_ai_repair_audit_schema
+    from app.services.worker_fencing_schema import (
+        WorkerFencingPrerequisiteError, require_worker_fencing_schema,
+    )
 
     async with AsyncSessionLocal() as db:
         await ensure_ai_repair_audit_schema(db)
         existing = await load(job_id, db, session_id)
         if not existing.get("autonomous", {}).get("enabled"):
             return None  # Delivery from before the autonomous session contract.
+        try:
+            await require_worker_fencing_schema(db)
+        except WorkerFencingPrerequisiteError as exc:
+            await db.rollback()
+            return await block_unclaimed_initialization(
+                job_id, university_id, session_id, db, code=exc.code, reason=str(exc),
+            )
         return await run(job_id, university_id, session_id, claim_id, db)
 
 

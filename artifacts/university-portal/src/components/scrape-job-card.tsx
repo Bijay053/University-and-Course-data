@@ -12,6 +12,7 @@ import { getFetchErrorMessage, readResponseJson } from "@/lib/readResponseJson";
 import { CountrySelect } from "@/components/country-select";
 import { useToast } from "@/hooks/use-toast";
 import { countPendingReviewCourses } from "@/utils/pending-review-count";
+import { CourseReport } from "@/components/course-report";
 import {
   AiRepairProgress,
   type AutonomousRepair,
@@ -157,6 +158,18 @@ export function shouldOfferIdenticalContinuation({
     && !browserRescueAttempted
     && !browserRescueWasBlocked
   );
+}
+
+export function onlyKnownExcludedUrls(urls?: string[]): boolean {
+  return Boolean(urls?.length) && urls!.every(value => {
+    try {
+      const url = new URL(value);
+      return ["law.ac.uk", "www.law.ac.uk"].includes(url.hostname)
+        && /^\/study\/(?:undergraduate|postgraduate)\/[^/]+\/[^/]+\/online\/?$/i.test(url.pathname);
+    } catch {
+      return false;
+    }
+  });
 }
 
 export function shouldShowAutomaticUrlRepair(
@@ -417,6 +430,7 @@ export type ScrapeJobCardProps = {
   slotIndex: number;
   universities: UniOption[];
   onReviewReady: (jobId: string, uniName: string, force?: boolean) => void;
+  onReportStarted?: () => void;
   onRemove?: () => void;
   canRemove?: boolean;
   /** Incremented by the parent's "Cancel All" action to force-reset this card. */
@@ -522,7 +536,7 @@ function UniPicker({ value, onChange, universities, disabled }: {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, onRemove, canRemove, forceResetKey }: ScrapeJobCardProps) {
+export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, onReportStarted, onRemove, canRemove, forceResetKey }: ScrapeJobCardProps) {
   const { toast } = useToast();
   const slotKey = `scrape_slot_${slotId}_jobId`;
   const startTimeKey = `scrape_slot_${slotId}_startTime`;
@@ -1579,6 +1593,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
               pipeline
               && (pipeline.raw_discovered ?? 0) > 0
               && (pipeline.after_filter ?? 0) === 0
+              && !onlyKnownExcludedUrls(pipeline.dropped_sample)
             ) {
               setUrlFilterWarning((previous) => previous ?? {
                 kind: "high_drop_rate",
@@ -1593,6 +1608,9 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
 
           // Detect URL filter warnings in live log stream
           for (const l of data.logs) {
+            // These are known separate online offerings, not evidence that
+            // the campus-course whitelist needs to be relaxed.
+            if (onlyKnownExcludedUrls(l.dropped_sample)) continue;
             if (l.kind === "category_pages_detected") {
               setUrlFilterWarning({
                 kind: "category_pages",
@@ -2148,6 +2166,9 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
         </div>
       </div>
 
+      {completedJobId && (phase === "done" || phase === "error") && (
+        <CourseReport jobId={completedJobId} onReview={id => onReviewReady(id, uniName, true)} onStarted={onReportStarted} />
+      )}
       <div className="flex flex-col flex-1 p-4 gap-3">
 
         {/* ── IDLE: Configuration form ─────────────────────────────── */}

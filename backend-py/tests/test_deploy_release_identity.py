@@ -108,6 +108,57 @@ def _release_revision_repo(tmp_path: Path) -> tuple[Path, Path, str, str]:
     return checkout, source, predecessor, target
 
 
+@pytest.mark.parametrize("schema_state", ["ready", "missing", "checker_absent"])
+def test_release_checks_target_fencing_schema_before_checkout(
+    tmp_path: Path, schema_state: str,
+) -> None:
+    checkout, source, predecessor, _ = _release_revision_repo(tmp_path)
+    services = source / "backend-py/app/services"
+    services.mkdir(parents=True)
+    (services / "worker_fencing.py").write_text("# target requires generation fencing\n")
+    if schema_state != "checker_absent":
+        (services / "worker_fencing_schema.py").write_text(
+            "raise SystemExit(0)\n" if schema_state == "ready" else
+            "raise SystemExit('Release refused: required schema missing')\n"
+        )
+    _git(source, "add", "backend-py")
+    _git(source, "commit", "-qm", "fencing target")
+    _git(source, "push", "-q", "origin", "main")
+    target = _git(source, "rev-parse", "HEAD")
+    (checkout / "backend-py").mkdir()
+    env = {
+        **os.environ,
+        "GUARDED_RELEASE_TEST_MODE": "1",
+        "GUARDED_RELEASE_REPO_ROOT": str(checkout),
+        "GUARDED_RELEASE_PYTHON": sys.executable,
+        "GUARDED_RELEASE_REVISION_FENCE": str(DEPLOY_DIR / "release_revision_fence.sh"),
+        "GUARDED_RELEASE_RECONCILER": str(DEPLOY_DIR / "reconcile_generated_configs.py"),
+        "GUARDED_RELEASE_RESUME_MARKER": str(tmp_path / "resume"),
+    }
+    result = subprocess.run(
+        [str(DEPLOY_DIR / "guarded_release.sh"), predecessor, target, "123456789012"],
+        capture_output=True, text=True, env=env,
+    )
+    if schema_state == "ready":
+        assert result.returncode == 0, result.stderr
+        assert _git(checkout, "rev-parse", "HEAD") == target
+    else:
+        assert result.returncode != 0
+        assert "Release refused:" in result.stderr
+        assert _git(checkout, "rev-parse", "HEAD") == predecessor
+        assert not (checkout / "backend-py/app/services/worker_fencing.py").exists()
+
+
+def test_schema_preflight_precedes_smoke_and_service_mutations():
+    script = (DEPLOY_DIR / "guarded_release.sh").read_text()
+    production = script[script.index('if [ "$release_test_mode" != 1 ]; then'):]
+    assert production.index("verify_target_worker_schema") < production.index("deploy/safe_restart_smoke.py")
+    assert production.index("verify_target_worker_schema") < production.index("cancel_consumer")
+    assert production.index("verify_target_worker_schema") < production.index("systemctl restart")
+    assert "alembic upgrade" not in script
+    assert "alembic stamp" not in script
+
+
 def test_guarded_release_requires_exact_revision_arguments() -> None:
     entrypoint = DEPLOY_DIR / "guarded_release.sh"
     script = entrypoint.read_text(encoding="utf-8")

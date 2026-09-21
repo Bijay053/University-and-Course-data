@@ -9,7 +9,6 @@ discovery:
   # Preserved from the production operator recipe during migration from the
   # former ID-specific file to this hostname-owned recipe.
   sitemap_url: "https://www.mdx.ac.uk/sitemap.xml"
-  always_sitemap_supplement: true
   allow_url_patterns:
     - '/courses/(?:undergraduate|postgraduate)/[^/?#]+/?$'
 
