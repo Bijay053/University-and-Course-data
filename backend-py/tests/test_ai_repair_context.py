@@ -143,8 +143,8 @@ async def test_gather_context_zero_raw_discovered_no_divzero():
 
 
 @pytest.mark.asyncio
-async def test_gather_context_always_seeds_live_probe_from_staged_course_urls():
-    """A rejection storm must probe known staged courses even when raw discovery is high."""
+async def test_gather_context_always_seeds_live_probe_from_latest_staged_course_urls():
+    """Even a historical rejection-storm job must probe the latest known staged courses."""
     from app.services.scraper.ai_repair_agent import _gather_context
 
     db = _make_db(

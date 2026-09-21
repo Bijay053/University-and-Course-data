@@ -1680,8 +1680,26 @@ async def _gather_context(job_id: str, db, *, probe_sitemap: bool = True) -> dic
                      FILTER (WHERE degree_level IS NOT NULL)         AS sample_degree_levels,
                    array_agg(DISTINCT study_mode)
                      FILTER (WHERE study_mode IS NOT NULL)           AS sample_modes,
-                   array_agg(course_website ORDER BY id)
-                     FILTER (WHERE course_website IS NOT NULL)       AS staged_course_urls
+                   COALESCE(
+                     array_agg(course_website ORDER BY id)
+                       FILTER (WHERE course_website IS NOT NULL),
+                     (
+                       SELECT array_agg(latest.course_website ORDER BY latest.id)
+                       FROM scraped_courses latest
+                       WHERE latest.university_id = :uid
+                         AND latest.status IN ('pending', 'review', 'approved')
+                         AND latest.course_website IS NOT NULL
+                         AND latest.scrape_job_id = (
+                           SELECT newest.scrape_job_id
+                           FROM scraped_courses newest
+                           WHERE newest.university_id = :uid
+                             AND newest.status IN ('pending', 'review', 'approved')
+                             AND newest.course_website IS NOT NULL
+                           ORDER BY newest.id DESC
+                           LIMIT 1
+                         )
+                     )
+                   )                                                  AS staged_course_urls
             FROM   scraped_courses
             WHERE  university_id = :uid
               AND  scrape_job_id = :jid
@@ -1695,12 +1713,14 @@ async def _gather_context(job_id: str, db, *, probe_sitemap: bool = True) -> dic
     staged_course_urls = list(dict.fromkeys(
         str(url) for url in ((q["staged_course_urls"] or []) if q else []) if url
     ))
-    # A high raw discovery count can still hide a rejection storm. The rows
-    # that actually staged are our strongest known course-page candidates and
-    # must always be available to the bounded live probe. Previously sitemap
-    # candidates were added only when raw_discovered < 10, so jobs such as
-    # 159 discovered / 20 staged could probe only navigation pages and block
-    # one-click repair before it tested a single real course.
+    # A high raw discovery count can still hide a rejection storm. Rows that
+    # actually staged are our strongest known course-page candidates and must
+    # always be available to the bounded live probe. If a newer scrape replaced
+    # this job's review rows, the query uses the newest review set for the same
+    # university as live-evidence seeds only. Previously sitemap candidates
+    # were added only when raw_discovered < 10, so jobs such as 159 discovered
+    # / 20 staged could probe only navigation pages and block one-click repair
+    # before it tested a single real course.
     repair_course_url_sample = _rank_repair_course_urls(
         repair_course_url_sample + staged_course_urls
     )
