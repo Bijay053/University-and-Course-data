@@ -117,6 +117,8 @@ def test_guarded_release_requires_exact_revision_arguments() -> None:
     assert "__TARGET_RELEASE__" not in script
     assert "__EXPECTED_DISPOSABLE_ACCOUNT__" not in script
     assert "release_revision_fence.sh" in script
+    assert script.count('run_release_user "$revision_fence"') == 4
+    assert "sudo -u ubuntu backend-py/deploy/release_revision_fence.sh" not in script
     assert '--expected-rehearsal-account-id "$expected_disposable_account"' in script
 
 
@@ -388,7 +390,7 @@ def test_guarded_release_does_not_resume_after_cleanup_failure(
 def test_guarded_release_refetches_tip_before_checkout() -> None:
     script = (DEPLOY_DIR / "guarded_release.sh").read_text(encoding="utf-8")
     prepare = script.index('"$reconciler" prepare \\\n')
-    checkout = script.index("release_revision_fence.sh \\\n  checkout", prepare)
+    checkout = script.index('"$revision_fence" \\\n  checkout', prepare)
     restart = script.index("systemctl restart uni-api-py.service uni-celery.service")
 
     assert prepare < checkout < restart
@@ -980,7 +982,7 @@ def test_aborted_release_restores_and_cleans_tracked_recipe_backup(
 
 def test_guarded_release_restores_recipes_before_restart_and_stops_on_cleanup_failure() -> None:
     script = (DEPLOY_DIR / "guarded_release.sh").read_text(encoding="utf-8")
-    checkout = script.index("release_revision_fence.sh \\\n  checkout")
+    checkout = script.index('"$revision_fence" \\\n  checkout')
     restore = script.index("restore-tracked", checkout)
     restart = script.index(
         "systemctl restart uni-api-py.service uni-celery.service"
@@ -1224,7 +1226,7 @@ def test_production_release_reports_redundant_overlays_after_checkout() -> None:
         DEPLOY_DIR / "post_checkout_overlay_audit.py"
     ).read_text(encoding="utf-8")
 
-    checkout_verified = script.index("release_revision_fence.sh \\\n  checkout")
+    checkout_verified = script.index('"$revision_fence" \\\n  checkout')
     audit = script.index("post_checkout_overlay_audit.py")
     restart = script.index(
         "systemctl restart uni-api-py.service uni-celery.service"

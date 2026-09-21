@@ -171,8 +171,8 @@ sudo -u ubuntu git diff --quiet
 sudo -u ubuntu /opt/university-portal/backend-py/.venv/bin/python -B "$reconciler" prepare \
   --repo-root /opt/university-portal --target "$target" \
   --manifest "$reconciliation_manifest"
-sudo -u ubuntu backend-py/deploy/release_revision_fence.sh \
-  checkout /opt/university-portal "$predecessor" "$target"
+run_release_user "$revision_fence" \
+  checkout "$repo_root" "$predecessor" "$target"
 sudo -u ubuntu /opt/university-portal/backend-py/.venv/bin/python -B "$reconciler" restore-tracked \
   --manifest "$tracked_recipe_manifest"
 sudo -u ubuntu /opt/university-portal/backend-py/.venv/bin/python -B "$reconciler" verify-tracked \
