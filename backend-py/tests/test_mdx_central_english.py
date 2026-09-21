@@ -16,6 +16,7 @@ def test_mdx_recipe_uses_current_catalogue_sitemap() -> None:
     )
 
     assert cfg.discovery.sitemap_url == "https://www.mdx.ac.uk/sitemap.xml"
+    assert cfg.discovery.always_sitemap_supplement is True
     assert cfg.discovery.allow_url_patterns == [
         r"/courses/(?:undergraduate|postgraduate)/[^/?#]+/?$"
     ]
