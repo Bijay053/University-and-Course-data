@@ -515,6 +515,27 @@ def test_public_release_fetch_uses_browser_compatible_user_agent(
     }
 
 
+def test_public_release_fetch_retries_transient_edge_failure(monkeypatch) -> None:
+    from deploy import verify_frontend_release
+
+    attempts = 0
+
+    def fake_run(command, **kwargs):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise subprocess.CalledProcessError(22, command)
+        return subprocess.CompletedProcess(command, 0, stdout=b"ready")
+
+    sleeps = []
+    monkeypatch.setattr(verify_frontend_release.subprocess, "run", fake_run)
+    monkeypatch.setattr(verify_frontend_release.time, "sleep", sleeps.append)
+
+    assert verify_frontend_release._fetch("https://portal.example/") == b"ready"
+    assert attempts == 2
+    assert sleeps == [5]
+
+
 def test_frontend_cleanup_restores_previous_dist_after_publish_move_failure(
     tmp_path: Path,
 ) -> None:

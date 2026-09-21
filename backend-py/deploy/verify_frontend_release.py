@@ -8,6 +8,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 import re
 import subprocess
+import time
 import urllib.parse
 
 
@@ -62,27 +63,36 @@ def _fetch(url: str) -> bytes:
     # The public edge rejects Python urllib's client fingerprint with HTTP 403
     # even when its headers match a browser. curl reaches the exact same
     # cache-busted URL reliably from the release host.
-    result = subprocess.run(
-        [
-            "curl",
-            "--fail",
-            "--silent",
-            "--show-error",
-            "--location",
-            "--max-time",
-            "30",
-            "--header",
-            "Cache-Control: no-cache",
-            "--header",
-            "Pragma: no-cache",
-            "--user-agent",
-            "Mozilla/5.0 UniversityPortalReleaseVerifier/1.0",
-            url,
-        ],
-        check=True,
-        capture_output=True,
-    )
-    return result.stdout
+    command = [
+        "curl",
+        "--fail",
+        "--silent",
+        "--show-error",
+        "--location",
+        "--max-time",
+        "30",
+        "--header",
+        "Cache-Control: no-cache",
+        "--header",
+        "Pragma: no-cache",
+        "--user-agent",
+        "Mozilla/5.0 UniversityPortalReleaseVerifier/1.0",
+        url,
+    ]
+    for attempt in range(6):
+        try:
+            return subprocess.run(
+                command,
+                check=True,
+                capture_output=True,
+            ).stdout
+        except subprocess.CalledProcessError:
+            if attempt == 5:
+                raise
+            # The public edge can return a transient 403 immediately after the
+            # API/frontend restart, then serve the same URL moments later.
+            time.sleep(5)
+    raise AssertionError("unreachable")
 
 
 def verify_public_build(
