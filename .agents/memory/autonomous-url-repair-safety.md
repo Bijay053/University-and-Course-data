@@ -41,3 +41,16 @@ response at 1 MB blocked every automatic repair probe.
 **How to apply:** Preserve the first bounded byte window with UTF-8-safe
 truncation, then run the ordinary challenge, ownership, field, and eligibility
 checks. Never increase or remove the evidence cap merely to accept a large page.
+
+Live-evidence time limits must count fetch elapsed time, not wall-clock time
+spent waiting for the AI proposal. Reserve page slots for validation, skip
+network validation for proposals already rejected by deterministic replay, and
+reuse successful validation pages across attempts in the same repair session.
+
+**Why:** On slow Canterbury pages, the initial probe plus AI deliberation
+exhausted the 180-second wall-clock allowance before the required recheck, so
+every later attempt reported `budget_exhausted` without making a request.
+
+**How to apply:** Keep one cumulative network-time counter and one unique-page
+budget for the session. A final accepted proposal must still have current,
+course-classified live evidence before any config write.
