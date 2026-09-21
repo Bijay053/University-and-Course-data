@@ -64,3 +64,45 @@ ownership, duplicate deliveries, budgets, isolated staging, and UI outcomes.
 A fresh paid, end-to-end university scrape is a separate operational validation;
 the implementation tests do not assert that every live university site can be
 repaired automatically.
+
+## Live audience validation: Southern Cross University
+
+Verified on 2026-09-21 against Southern Cross University, not London
+Metropolitan. The check used the existing `LiveRepairEvidence` probe and
+validation path with the production limits (12 requests, 180 seconds total and
+20 seconds per request). It made two live requests in 1.56 seconds, did not run
+AI extraction, did not save configuration, did not start a verification scrape,
+and did not publish or alter course rows.
+
+Two current 2027 course pages were sampled. The supported page exposed
+`Domestic` and `International` options in the same stable `course-location`
+selector. The official course-owned requirements panel published an actual
+IELTS overall score of 6.0. However, the selector option did not own a link to
+that requirements source, and the second live fetch did not expose supported
+course-owned audience evidence. The one-click flow therefore returned **Needs
+review**, with no audience proposal, instead of treating the page-wide
+requirements link as an international selector relationship.
+
+This is the expected safe outcome for the current SCU template:
+
+- balanced same-panel evidence was observed where the template was supported;
+- the official requirements source contained a real English value;
+- no recipe was applied, so isolated verification could not copy that value
+  into a domestic row;
+- no config write occurred, so rollback remained `unchanged`/not required;
+- the live samples, status, reasons, request counts and empty proposal set
+  remain available to the repair audit;
+- generic matching was not widened to accommodate the unsupported relationship.
+
+The audience repair regression suite and runtime lifecycle proof passed after
+the live check:
+
+```text
+52 passed in 27.16s
+```
+
+The lifecycle proof covers linked-source English extraction, domestic isolation,
+staged evidence provenance, exact-document rollback and rollback fencing. The
+live SCU result does not claim **Bounded sample verified**; supporting this
+template requires a separate, template-specific ownership rule and a new live
+validation.
