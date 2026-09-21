@@ -349,3 +349,15 @@ already restarted, making a healthy release report failure at its final step.
 **How to apply:** Do not rely on the release transaction's current directory
 for reconciliation or cleanup helpers. Use absolute repository and interpreter
 paths throughout the remote script.
+
+Bootstrap releases must use the injected revision-fence path for both the
+initial verification and the final checkout fence.
+
+**Why:** An older production revision did not contain the new fence helper. A
+temporary target guard passed its first injected-fence check, then failed before
+checkout because the production branch hard-coded the target-only helper path.
+
+**How to apply:** Route every revision-fence invocation through the same
+overrideable variable. When bootstrapping from a predecessor without the helper,
+materialize the reviewed target guard and fence as temporary files and retain
+all ordinary smoke, idle, revision, rollback, and public-health checks.
