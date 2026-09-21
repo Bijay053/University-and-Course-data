@@ -42,6 +42,7 @@ def _make_db(job_row_data, quality_row_data: dict | None = None):
         "has_location": 0, "has_degree_level": 0, "has_mode": 0,
         "has_duration": 0, "has_academic_level": 0,
         "sample_locations": None, "sample_degree_levels": None, "sample_modes": None,
+        "staged_course_urls": None,
     }
     if quality_row_data is not None:
         quality_defaults.update(quality_row_data)
@@ -139,3 +140,42 @@ async def test_gather_context_zero_raw_discovered_no_divzero():
         ctx = await _gather_context("job_zero_found", _make_db({"total_found": 0, "imported": 0}))
 
     assert ctx.get("drop_rate") == 0
+
+
+@pytest.mark.asyncio
+async def test_gather_context_always_seeds_live_probe_from_staged_course_urls():
+    """A rejection storm must probe known staged courses even when raw discovery is high."""
+    from app.services.scraper.ai_repair_agent import _gather_context
+
+    db = _make_db(
+        {
+            "total_found": 159,
+            "imported": 20,
+            "discovered_config": {
+                "pipeline_stats": {
+                    "raw_discovered": 159,
+                    "after_filter": 20,
+                    "passed_sample": [
+                        "https://example.com/study/subject/business",
+                    ],
+                },
+            },
+        },
+        {
+            "total": 20,
+            "staged_course_urls": [
+                "https://example.com/study/course/master-of-teaching",
+                "https://example.com/study/course/bachelor-of-business",
+                "https://example.com/study/course/master-of-teaching",
+            ],
+        },
+    )
+
+    with patch("pathlib.Path.glob", return_value=[]):
+        ctx = await _gather_context("job_rejection_storm", db)
+
+    assert set(ctx["repair_course_url_sample"]) == {
+        "https://example.com/study/course/master-of-teaching",
+        "https://example.com/study/course/bachelor-of-business",
+    }
+    assert ctx["repair_url_sample"][:2] == ctx["repair_course_url_sample"]
