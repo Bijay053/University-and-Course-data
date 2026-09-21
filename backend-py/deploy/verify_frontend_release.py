@@ -13,6 +13,8 @@ import urllib.parse
 
 
 HASHED_JAVASCRIPT = re.compile(r"(?:^|/)assets/[^/?#]+-[A-Za-z0-9_-]{8,}\.js$")
+PUBLIC_FETCH_ATTEMPTS = 18
+PUBLIC_FETCH_RETRY_SECONDS = 5
 
 
 class _ScriptParser(HTMLParser):
@@ -81,7 +83,7 @@ def _fetch(url: str) -> bytes:
         "Mozilla/5.0 UniversityPortalReleaseVerifier/1.0",
         url,
     ]
-    for attempt in range(6):
+    for attempt in range(PUBLIC_FETCH_ATTEMPTS):
         try:
             return subprocess.run(
                 command,
@@ -89,11 +91,11 @@ def _fetch(url: str) -> bytes:
                 capture_output=True,
             ).stdout
         except subprocess.CalledProcessError:
-            if attempt == 5:
+            if attempt == PUBLIC_FETCH_ATTEMPTS - 1:
                 raise
-            # The public edge can return a transient 403 immediately after the
-            # API/frontend restart, then serve the same URL moments later.
-            time.sleep(5)
+            # The public edge can reject requests throughout the service
+            # restart window, then serve the exact same URL moments later.
+            time.sleep(PUBLIC_FETCH_RETRY_SECONDS)
     raise AssertionError("unreachable")
 
 
