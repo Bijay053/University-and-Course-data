@@ -7,6 +7,7 @@ from app.services.scraper.config.loader import load_uni_config
 from app.services.scraper.orchestrator import (
     _apply_central_page_overrides,
     _extraction_failure_details,
+    _filter_sit_international_catalogue_links,
     _inject_yaml_fee_page,
     _select_yaml_config,
 )
@@ -31,6 +32,8 @@ from app.services.scraper.extractors.sit_html import (
     merge_current_course_panels,
 )
 from app.services.scraper.pipelines.single_course import (
+    _apply_sit_central_fee_before_remote_enrichment,
+    _attach_extraction_method_map,
     _central_fee_match_has_usable_tuition,
     _restore_matching_static_duration_term,
 )
@@ -356,7 +359,7 @@ async def test_sit_schedule_listed_shell_recovers_before_extraction(monkeypatch)
                 }
             ],
             "fee_page_url": (
-                "https://www.sit.ac.nz/Fees-Enrolments/International-Fees"
+                "https://www.sit.ac.nz/International/Subjects-Fees-Scholarships"
             ),
         },
     )
@@ -375,7 +378,7 @@ async def test_sit_schedule_listed_shell_recovers_before_extraction(monkeypatch)
     ]
     assert len(fee_evidence) == 1
     assert fee_evidence[0]["source_url"] == (
-        "https://www.sit.ac.nz/Fees-Enrolments/International-Fees"
+        "https://www.sit.ac.nz/International/Subjects-Fees-Scholarships"
     )
 
 
@@ -432,7 +435,7 @@ async def test_sit_exact_fee_does_not_hide_missing_required_location(monkeypatch
                 }
             ],
             "fee_page_url": (
-                "https://www.sit.ac.nz/Fees-Enrolments/International-Fees"
+                "https://www.sit.ac.nz/International/Subjects-Fees-Scholarships"
             ),
         },
     )
@@ -611,6 +614,9 @@ def test_sit_yaml_uses_international_schedule_and_static_extraction():
         "/Programme/Course/[^/?#]+"
     ]
     assert cfg.extraction.fees.central_fee_priority is True
+    assert cfg.extraction.fees.central_page == (
+        "https://www.sit.ac.nz/International/Subjects-Fees-Scholarships"
+    )
     assert cfg.extraction.fees.central_fee_exact_match_only is True
     assert cfg.extraction.staging.skip_degree_qualifier_check is True
     assert cfg.extraction.fees.require_central_fee_match is True
@@ -646,7 +652,7 @@ def test_sit_central_schedule_uses_tuition_not_total_and_exact_award_matching():
     </table>
     """
     records = _parse_fee_page_html(
-        html, "https://www.sit.ac.nz/Fees-Enrolments/International-Fees"
+        html, "https://www.sit.ac.nz/International/Subjects-Fees-Scholarships"
     )
     bit, kind = match_central_fee(
         "Bachelor of Information Technology", records, exact_only=True
@@ -662,6 +668,174 @@ def test_sit_central_schedule_uses_tuition_not_total_and_exact_award_matching():
     )
     assert wrong_award is None
     assert kind == "none"
+
+
+def test_sit_international_catalogue_row_owns_fee_duration_intake_and_english():
+    source_url = (
+        "https://www.sit.ac.nz/International/Subjects-Fees-Scholarships"
+    )
+    html = """
+    <table>
+      <tr><th>Programmes</th><th>NZQA Level</th><th>Duration</th>
+        <th>Intakes</th><th>English Requirement</th>
+        <th>Additional Requirements</th>
+        <th>Tuition Fee (Scholarship incl.)</th><th>Resource Fee</th>
+        <th>Total Fee (whole course)</th></tr>
+      <tr><td>Master of Information Technology</td><td>9</td>
+        <td>1 1/2 years (18 academic months)</td><td>Feb &amp; Jul</td>
+        <td>IELTS Test - Academic score of 6.5 with no brand score lower than 6
+          Pearson Test of English - PTE (Academic) score of 58 with no band
+          score lower than 50</td><td>None</td>
+        <td>$31,500</td><td>$2,200</td><td>$33,700</td></tr>
+    </table>
+    """
+
+    records = _parse_fee_page_html(html, source_url)
+
+    assert records == [
+        {
+            "program_pattern": "Master of Information Technology",
+            "international_fee": 31500.0,
+            "domestic_fee": None,
+            # The raw parser is currency-neutral and defaults to AUD; central
+            # prefetch applies SIT's configured NZD before course processing.
+            "currency": "AUD",
+            "per": "Full Course",
+            "bucket": "postgraduate",
+            "source_url": source_url,
+            "duration": 1.5,
+            "duration_term": "Year",
+            "intake_months": ["February", "July"],
+            "intake_text": "Feb & Jul",
+            "intake_authoritative": True,
+            "english": {
+                "ielts_overall": 6.5,
+                "ielts_listening": 6.0,
+                "ielts_reading": 6.0,
+                "ielts_writing": 6.0,
+                "ielts_speaking": 6.0,
+                "pte_overall": 58.0,
+                "pte_listening": 50.0,
+                "pte_reading": 50.0,
+                "pte_writing": 50.0,
+                "pte_speaking": 50.0,
+            },
+        }
+    ]
+
+    payload = {
+        "course_name": "Master of Information Technology",
+        "duration": 3.0,
+        "duration_term": "Year",
+        "intake_months": ["September"],
+        "ielts_overall": 5.5,
+    }
+    evidence: list[dict] = []
+    result = _apply_sit_central_fee_before_remote_enrichment(
+        "https://www.sit.ac.nz/Programme/Course/Master of Information Technology",
+        payload,
+        evidence,
+        {"fees": records, "fee_page_url": source_url},
+    )
+
+    assert result == "applied"
+    assert payload["international_fee"] == 31500.0
+    assert payload["duration"] == 1.5
+    assert payload["duration_term"] == "Year"
+    assert payload["intake_months"] == ["February", "July"]
+    assert payload["ielts_overall"] == 6.5
+    assert payload["pte_overall"] == 58.0
+    _attach_extraction_method_map(payload, evidence)
+    assert payload["extraction_method"]["duration"] == (
+        "central_page:sit_international_catalogue:exact"
+    )
+    assert payload["extraction_method"]["intake_months"] == (
+        "central_page:sit_international_catalogue:exact"
+    )
+    assert payload["extraction_method"]["ielts_overall"] == (
+        "central_page:sit_international_catalogue:exact"
+    )
+    assert {
+        item["source_url"]
+        for item in evidence
+        if item["field_key"] in {
+            "international_fee", "duration", "intake_months", "ielts_overall"
+        }
+    } == {source_url}
+
+
+def test_sit_catalogue_rolling_intake_clears_conflicting_detail_months():
+    source_url = (
+        "https://www.sit.ac.nz/International/Subjects-Fees-Scholarships"
+    )
+    record = {
+        "program_pattern": "General English plus Examination Preparation Training Scheme",
+        "international_fee": 9000.0,
+        "currency": "NZD",
+        "per": "Full Course",
+        "duration": 26.0,
+        "duration_term": "Week",
+        "intake_months": [],
+        "intake_text": "Starts every Monday",
+        "intake_authoritative": True,
+    }
+    payload = {
+        "course_name": record["program_pattern"],
+        "duration": 1.0,
+        "duration_term": "Year",
+        "intake_months": ["February"],
+    }
+    evidence: list[dict] = []
+
+    assert _apply_sit_central_fee_before_remote_enrichment(
+        "https://www.sit.ac.nz/Programme/Course/General English",
+        payload,
+        evidence,
+        {"fees": [record], "fee_page_url": source_url},
+    ) == "applied"
+
+    assert payload["duration"] == 26.0
+    assert payload["duration_term"] == "Week"
+    assert payload["intake_months"] == []
+    intake_evidence = [
+        item for item in evidence if item["field_key"] == "intake_months"
+    ]
+    assert len(intake_evidence) == 1
+    assert "Starts every Monday" in intake_evidence[0]["snippet"]
+
+
+def test_sit_discovery_keeps_only_programmes_in_international_catalogue():
+    listed = {
+        "url": (
+            "https://www.sit.ac.nz/Programme/Course/"
+            "New%20Zealand%20Diploma%20in%20Audio%20Engineering%20and%20Production"
+            "%20(Level%205)"
+        ),
+        "name": "",
+    }
+    unlisted = {
+        "url": "https://www.sit.ac.nz/Programme/Course/Domestic Only Certificate",
+        "name": "Domestic Only Certificate",
+    }
+    records = [
+        {
+            "program_pattern": "New Zealand Diploma in Audio Engineering (Level 5)",
+            "international_fee": 19000.0,
+        }
+    ]
+    aliases = {
+        "New Zealand Diploma in Audio Engineering and Production (Level 5)":
+            "New Zealand Diploma in Audio Engineering (Level 5)"
+    }
+
+    kept, dropped = _filter_sit_international_catalogue_links(
+        [listed, unlisted],
+        records,
+        aliases,
+    )
+
+    assert kept == [listed]
+    assert dropped == [unlisted]
 
 
 def test_sit_verified_aliases_preserve_exact_fee_matching():
@@ -727,7 +901,7 @@ def test_every_loaded_sit_fee_alias_resolves_exactly_without_crossing_awards():
     """
     records = _parse_fee_page_html(
         schedule_html,
-        "https://www.sit.ac.nz/Fees-Enrolments/International-Fees",
+        "https://www.sit.ac.nz/International/Subjects-Fees-Scholarships",
     )
     expected_fees = {
         record["program_pattern"]: record["international_fee"]
@@ -852,7 +1026,7 @@ def test_sit_required_schedule_replaces_stale_legacy_fee_page():
 
     assert _inject_yaml_fee_page(effective, cfg.extraction.fees) is True
     assert effective["uniPages"]["feePage"] == (
-        "https://www.sit.ac.nz/Fees-Enrolments/International-Fees"
+        "https://www.sit.ac.nz/International/Subjects-Fees-Scholarships"
     )
 
 
@@ -873,7 +1047,7 @@ def test_central_prefetch_uses_loaded_yaml_when_context_is_empty():
     )
     assert applied == []
     assert effective["uniPages"]["feePage"] == (
-        "https://www.sit.ac.nz/Fees-Enrolments/International-Fees"
+        "https://www.sit.ac.nz/International/Subjects-Fees-Scholarships"
     )
 
 
@@ -890,7 +1064,7 @@ def test_sit_name_only_schedule_row_does_not_satisfy_fee_gate():
 
 
 def test_sit_stale_central_cache_source_is_rejected():
-    authoritative = "https://www.sit.ac.nz/Fees-Enrolments/International-Fees"
+    authoritative = "https://www.sit.ac.nz/International/Subjects-Fees-Scholarships"
     assert _cache_source_matches(authoritative + "/", authoritative) is True
     assert _cache_source_matches(
         "https://www.sit.ac.nz/International/How-to-Apply",

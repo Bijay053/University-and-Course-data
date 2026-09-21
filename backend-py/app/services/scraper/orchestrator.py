@@ -1658,6 +1658,41 @@ def _browser_discovery_policy(discovery_config: object) -> tuple[bool, bool]:
     return browser_is_primary, browser_is_disabled
 
 
+def _filter_sit_international_catalogue_links(
+    links: list[dict],
+    central_records: list[dict],
+    course_aliases: dict[str, str],
+) -> tuple[list[dict], list[dict]]:
+    """Keep only SIT links with an exact row in the international catalogue."""
+    from urllib.parse import unquote, urlparse
+
+    from app.services.scraper.central_pages import match_central_fee
+
+    kept: list[dict] = []
+    dropped: list[dict] = []
+    for link in links:
+        url = str(link.get("url") or "")
+        url_name = unquote(urlparse(url).path.rstrip("/").split("/")[-1])
+        candidate_name = str(link.get("name") or "").strip() or url_name
+        matched, confidence = match_central_fee(
+            candidate_name,
+            central_records,
+            exact_only=True,
+            course_url=url,
+            course_aliases=course_aliases,
+        )
+        if matched is None and candidate_name != url_name:
+            matched, confidence = match_central_fee(
+                url_name,
+                central_records,
+                exact_only=True,
+                course_url=url,
+                course_aliases=course_aliases,
+            )
+        (kept if matched is not None and confidence == "exact" else dropped).append(link)
+    return kept, dropped
+
+
 def _is_targeted_retry_payload(payload: dict | None) -> bool:
     """Return whether this job must preserve its parent review rows."""
     return bool(_target_course_urls_from_payload(payload))
@@ -4851,6 +4886,42 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                         drop_pct=round(_cdp_drop_pct, 1),
                         dropped_sample=[d.get("url", "") for d in _cdp_dropped[:5]],
                         patterns=_cdp_raw,
+                    )
+
+        # SIT's international catalogue is the eligibility authority. Drop
+        # unlisted programmes before detail fetching rather than paying to
+        # extract them and rejecting them only at the fee gate.
+        if links and _discovery_hostname in {"sit.ac.nz", "www.sit.ac.nz"}:
+            _sit_records = (
+                central_data.get("fees")
+                if isinstance(central_data, dict)
+                else None
+            ) or []
+            if _sit_records:
+                _sit_fee_cfg = _uni_cfg.extraction.fees
+                links, _sit_unlisted = _filter_sit_international_catalogue_links(
+                    links,
+                    _sit_records,
+                    dict(_sit_fee_cfg.central_fee_course_aliases or {}),
+                )
+                if _sit_unlisted:
+                    _filter_dropped_sample.extend(
+                        item.get("url", "") for item in _sit_unlisted[:10]
+                    )
+                    await emit(
+                        "status",
+                        (
+                            "[EXTRACT] SIT international catalogue: kept "
+                            f"{len(links)} listed programme(s), dropped "
+                            f"{len(_sit_unlisted)} unlisted programme(s)"
+                        ),
+                        phase="extract",
+                        kind="sit_international_catalogue_filter",
+                        kept=len(links),
+                        dropped=len(_sit_unlisted),
+                        dropped_sample=[
+                            item.get("url", "") for item in _sit_unlisted[:5]
+                        ],
                     )
 
         # Phase A.5c — Known canonical course-path aliases before extraction ─────

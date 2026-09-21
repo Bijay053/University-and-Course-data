@@ -76,6 +76,109 @@ _PER_YEAR_RE = re.compile(r"\b(per\s*year|per\s*annum|p\.?a\.?|annual)\b", re.IG
 _FEE_MIN = 2_000
 _FEE_MAX = 200_000
 
+
+def _parse_sit_catalogue_fields(
+    headers: list[str],
+    cells: list[str],
+) -> dict[str, Any]:
+    """Parse course-owned fields from SIT's international programme table."""
+    header_map = {header.strip().lower(): idx for idx, header in enumerate(headers)}
+
+    def _cell(prefix: str) -> str:
+        idx = next(
+            (i for header, i in header_map.items() if header.startswith(prefix)),
+            -1,
+        )
+        return cells[idx].strip() if 0 <= idx < len(cells) else ""
+
+    parsed: dict[str, Any] = {}
+    duration_match = re.search(
+        r"\b(\d+(?:\.\d+)?)(?:\s+(\d+)\s*/\s*(\d+))?\s*"
+        r"(years?|months?|weeks?)\b",
+        _cell("duration"),
+        re.IGNORECASE,
+    )
+    if duration_match:
+        value = float(duration_match.group(1))
+        if duration_match.group(2) and duration_match.group(3):
+            value += float(duration_match.group(2)) / float(duration_match.group(3))
+        unit = duration_match.group(4).lower()
+        parsed["duration"] = value
+        parsed["duration_term"] = (
+            "Year" if unit.startswith("year")
+            else "Month" if unit.startswith("month")
+            else "Week"
+        )
+
+    intake_text = _cell("intakes")
+    month_names = (
+        ("Jan", "January"), ("Feb", "February"), ("Mar", "March"),
+        ("Apr", "April"), ("May", "May"), ("Jun", "June"),
+        ("Jul", "July"), ("Aug", "August"), ("Sep", "September"),
+        ("Oct", "October"), ("Nov", "November"), ("Dec", "December"),
+    )
+    intake_months = [
+        full
+        for short, full in month_names
+        if re.search(rf"\b{short}(?:{full[len(short):]})?\b", intake_text, re.I)
+    ]
+    parsed["intake_months"] = intake_months
+    parsed["intake_text"] = intake_text
+    parsed["intake_authoritative"] = bool(intake_text)
+
+    english_text = _cell("english requirement")
+    english: dict[str, float] = {}
+    ielts = re.search(
+        r"IELTS\s+Test.*?(?:score\s+of\s+)?(\d+(?:\.\d+)?)",
+        english_text,
+        re.IGNORECASE,
+    )
+    if ielts:
+        english["ielts_overall"] = float(ielts.group(1))
+        band = re.search(
+            r"no\s+(?:band|brand)\s+score\s+lower\s+than\s+(\d+(?:\.\d+)?)",
+            english_text,
+            re.IGNORECASE,
+        )
+        floor = (
+            float(band.group(1))
+            if band
+            else float(ielts.group(1))
+            if re.search(r"\bin\s+all\s+bands\b", english_text, re.IGNORECASE)
+            else None
+        )
+        if floor is not None:
+            for skill in ("listening", "reading", "writing", "speaking"):
+                english[f"ielts_{skill}"] = floor
+
+    pte = re.search(
+        r"(?:Pearson\s+Test\s+of\s+English|PTE).*?"
+        r"(?:score\s+of\s+)?(\d+(?:\.\d+)?)",
+        english_text,
+        re.IGNORECASE,
+    )
+    if pte:
+        english["pte_overall"] = float(pte.group(1))
+        pte_band = re.search(
+            r"PTE.*?no\s+(?:band|brand)\s+score\s+lower\s+than\s+"
+            r"(\d+(?:\.\d+)?)",
+            english_text,
+            re.IGNORECASE,
+        )
+        floor = (
+            float(pte_band.group(1))
+            if pte_band
+            else float(pte.group(1))
+            if re.search(r"PTE.*?\bin\s+all\s+bands\b", english_text, re.IGNORECASE)
+            else None
+        )
+        if floor is not None:
+            for skill in ("listening", "reading", "writing", "speaking"):
+                english[f"pte_{skill}"] = floor
+    if english:
+        parsed["english"] = english
+    return parsed
+
 # Degree-level keyword hints used to build a fallback bucket when per-program
 # matching fails.  Order matters — postgrad checked before undergrad so a
 # "Graduate Certificate" row doesn't accidentally land in undergrad bucket.
@@ -479,7 +582,7 @@ def _parse_fee_page_html(html: str, page_url: str) -> list[CentralFeeRecord]:
             row_text = " ".join(cell_texts)
             row_per = _infer_per_term(row_text) or per_term
 
-            records.append({
+            record = {
                 "program_pattern": prog_name,
                 "international_fee": intl_fee,
                 "domestic_fee": dom_fee,
@@ -487,7 +590,15 @@ def _parse_fee_page_html(html: str, page_url: str) -> list[CentralFeeRecord]:
                 "per": row_per,
                 "bucket": _programme_bucket(prog_name),
                 "source_url": page_url,
-            })
+            }
+            if is_sit_fee_schedule:
+                record.update(
+                    _parse_sit_catalogue_fields(
+                        effective_header_cells,
+                        cell_texts,
+                    )
+                )
+            records.append(record)
 
     if records:
         return records

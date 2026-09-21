@@ -2415,6 +2415,44 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                 </>
               )}
             </div>
+            {phase === "error" && urlFilterWarning?.kind === "high_drop_rate" && completedJobId && (
+              <div className="rounded-lg border border-violet-200 bg-violet-50 p-2.5 space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <Bot className="w-3.5 h-3.5 text-violet-700" />
+                  <span className="text-[11px] font-semibold text-violet-900">Automatic repair</span>
+                </div>
+                <p className="text-[10px] leading-relaxed text-violet-800">
+                  Tests official live sources, applies only a validated URL-filter fix, and runs one verification scrape.
+                </p>
+                <Button
+                  type="button"
+                  onClick={handleAiRepair}
+                  disabled={aiRepairLoading || aiRepairPolling}
+                  size="sm"
+                  className="w-full bg-violet-600 hover:bg-violet-700"
+                >
+                  {(aiRepairLoading || aiRepairPolling)
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                    : <Bot className="w-3.5 h-3.5 mr-1.5" />
+                  }
+                  {aiRepairPolling
+                    ? `Repairing… attempt ${aiRepairSession?.current_attempt ?? 0}/${aiRepairSession?.max_attempts ?? aiRepairSession?.autonomous?.limits?.max_attempts ?? 5}`
+                    : aiRepairSession?.status === "failed"
+                    ? "Try automatic repair again"
+                    : "Run automatic repair"
+                  }
+                </Button>
+                {aiRepairSession?.autonomous && (
+                  <AiRepairProgress
+                    autonomous={aiRepairSession.autonomous}
+                    liveProbe={aiRepairSession.live_probe}
+                    currentAttempt={aiRepairSession.current_attempt}
+                    maxAttempts={aiRepairSession.max_attempts}
+                    onOpenVerificationJob={jobId => onReviewReady(jobId, uniName, true)}
+                  />
+                )}
+              </div>
+            )}
             {phase === "error" && activeJobId && (
               <p className="text-[11px] text-gray-500 text-center">
                 Continue keeps saved courses and resumes the remaining URLs.

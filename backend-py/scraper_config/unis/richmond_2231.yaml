@@ -54,6 +54,14 @@ extraction:
   browser_wait_strategy: domcontentloaded
   browser_dcl_settle_ms: 1000
 
+  study_mode:
+    # Programme pages contain site-wide "Online Learning Resources", "Apply
+    # online", module references to online distribution, and guided "online
+    # discussion boards". None describes the programme's delivery mode.
+    # Keep explicit labelled/structured Online evidence authoritative, but do
+    # not let the low-confidence bare-word fallback reject campus programmes.
+    online_only_requires_strong_evidence: true
+
   filters:
     domestic_only:
       enabled: false

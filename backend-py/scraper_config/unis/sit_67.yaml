@@ -39,7 +39,7 @@ extraction:
     skip_degree_qualifier_check: true
 
   fees:
-    central_page: https://www.sit.ac.nz/Fees-Enrolments/International-Fees
+    central_page: https://www.sit.ac.nz/International/Subjects-Fees-Scholarships
     default_currency: NZD
     currency_override: NZD
     prefer_international: true

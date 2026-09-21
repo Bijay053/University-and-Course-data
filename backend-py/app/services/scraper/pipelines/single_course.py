@@ -118,6 +118,17 @@ def _attach_extraction_method_map(
                 extraction_method[field_key] = f"{otago_method}:null"
             elif winner.get("value") == payload.get(field_key):
                 extraction_method[field_key] = otago_method
+    # SIT's matched international-catalogue row is authoritative over earlier
+    # detail-page evidence. Attribute the final value to that row whenever its
+    # evidence value is the one that survived, including a rolling intake
+    # represented by an intentionally empty month list.
+    sit_method = "central_page:sit_international_catalogue:exact"
+    for winner in (
+        row for row in evidence if row.get("method") == sit_method
+    ):
+        field_key = winner.get("field_key", "")
+        if field_key and winner.get("value") == payload.get(field_key):
+            extraction_method[field_key] = sit_method
     if extraction_method:
         payload["extraction_method"] = extraction_method
 
@@ -1850,6 +1861,8 @@ def _apply_sit_central_fee_before_remote_enrichment(
     payload: dict[str, Any],
     evidence: list[dict[str, Any]],
     central_data: dict[str, Any] | None,
+    *,
+    record_evidence: bool = True,
 ) -> str:
     """Apply SIT's required exact schedule row before any remote AI gate."""
     from app.services.scraper.extractors import sit_html
@@ -1892,7 +1905,8 @@ def _apply_sit_central_fee_before_remote_enrichment(
         if value in (None, "", 0):
             continue
         payload[key] = value
-        evidence.append(
+        if record_evidence:
+            evidence.append(
             {
                 "field_key": key,
                 "value": value,
@@ -1901,7 +1915,48 @@ def _apply_sit_central_fee_before_remote_enrichment(
                 "source_url": source_url,
                 "snippet": f"central_page fee: {key}={value}",
             }
+            )
+    for key in ("duration", "duration_term", "intake_months"):
+        value = matched.get(key)
+        is_authoritative_empty_intake = (
+            key == "intake_months"
+            and matched.get("intake_authoritative") is True
+            and value == []
         )
+        if value in (None, "", 0, []) and not is_authoritative_empty_intake:
+            continue
+        payload[key] = value
+        if record_evidence:
+            evidence.append(
+            {
+                "field_key": key,
+                "value": value,
+                "confidence": 0.95,
+                "method": "central_page:sit_international_catalogue:exact",
+                "source_url": source_url,
+                "snippet": (
+                    f"SIT international catalogue: {key}={value}; "
+                    f"published intake={matched.get('intake_text')!r}"
+                    if key == "intake_months"
+                    else f"SIT international catalogue: {key}={value}"
+                ),
+            }
+            )
+    for key, value in (matched.get("english") or {}).items():
+        if value in (None, "", 0):
+            continue
+        payload[key] = value
+        if record_evidence:
+            evidence.append(
+            {
+                "field_key": key,
+                "value": value,
+                "confidence": 0.95,
+                "method": "central_page:sit_international_catalogue:exact",
+                "source_url": source_url,
+                "snippet": f"SIT international catalogue: {key}={value}",
+            }
+            )
     return "applied"
 
 
@@ -10816,6 +10871,17 @@ async def extract_course(
                     _dl_tier,
                     _src_note,
                 )
+
+    # SIT's table is the final authority for all fields it publishes. Reapply
+    # after AI/browser/default enrichment so no later fallback can replace a
+    # listed row's short duration, rolling intake, or English score.
+    _apply_sit_central_fee_before_remote_enrichment(
+        url,
+        payload,
+        evidence,
+        central_data,
+        record_evidence=False,
+    )
 
     # YAML defaults are another producer of this field. Re-apply the shared
     # guard after all fallback logic and before warning generation so a bad
