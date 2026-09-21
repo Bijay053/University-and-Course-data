@@ -234,6 +234,15 @@ _HOSTNAME_FALLBACK_LOCATIONS: dict[
         "latitude": 3.150150354886943,
         "longitude": 101.5811306094481,
     }],
+    "unikl.edu.my": [{
+        "display_name": "Universiti Kuala Lumpur",
+        "full_address": "1016, Jalan Sultan Ismail, 50250 Kuala Lumpur, Malaysia",
+        "city": "Kuala Lumpur",
+        "state_region": "Kuala Lumpur",
+        "country": "Malaysia",
+        "latitude": None,
+        "longitude": None,
+    }],
 }
 
 
@@ -1750,6 +1759,7 @@ async def add_university_by_url(
         "open.ac.uk":        "Milton Keynes",
         # ── Malaysia ─────────────────────────────────────────────────────────
         "segi.edu.my":       "Kota Damansara",
+        "unikl.edu.my":      "Kuala Lumpur",
     }
 
     # Generic page-title values that are not institution names and must be

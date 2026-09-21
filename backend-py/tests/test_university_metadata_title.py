@@ -446,6 +446,62 @@ def test_csu_has_source_verified_protected_site_fallbacks() -> None:
     ]
 
 
+def test_unikl_has_source_verified_location_fallback() -> None:
+    assert _HOSTNAME_FALLBACK_LOCATIONS["unikl.edu.my"] == [{
+        "display_name": "Universiti Kuala Lumpur",
+        "full_address": "1016, Jalan Sultan Ismail, 50250 Kuala Lumpur, Malaysia",
+        "city": "Kuala Lumpur",
+        "state_region": "Kuala Lumpur",
+        "country": "Malaysia",
+        "latitude": None,
+        "longitude": None,
+    }]
+
+
+@pytest.mark.asyncio
+async def test_unikl_url_repairs_unknown_city_when_homepage_has_no_locality(monkeypatch):
+    from unittest.mock import AsyncMock
+    from app.routers import universities as routes
+
+    existing = SimpleNamespace(
+        id=55,
+        name="Universiti Kuala Lumpur",
+        country="Malaysia",
+        city="Unknown",
+    )
+    db = SimpleNamespace(commit=AsyncMock())
+    monkeypatch.setattr(
+        routes,
+        "_fetch_onboarding_homepage",
+        AsyncMock(return_value="<title>Universiti Kuala Lumpur</title>"),
+    )
+    monkeypatch.setattr(
+        routes,
+        "_resolve_university_identity_openai",
+        AsyncMock(return_value={}),
+    )
+    monkeypatch.setattr(
+        routes,
+        "_find_existing_university_by_domain",
+        AsyncMock(return_value=existing),
+    )
+    monkeypatch.setattr(
+        routes,
+        "_upsert_discovered_locations",
+        AsyncMock(return_value=True),
+    )
+
+    result = await routes.add_university_by_url(
+        {"url": "https://www.unikl.edu.my"},
+        db,
+        {},
+    )
+
+    assert result["city"] == "Kuala Lumpur"
+    assert existing.city == "Kuala Lumpur"
+    db.commit.assert_awaited_once()
+
+
 def test_normalizes_compound_malaysian_locality_for_header() -> None:
     assert _normalise_metadata_locality(
         "Kota Damansara PJU 5, Petaling Jaya,"
