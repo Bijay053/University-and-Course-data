@@ -15,6 +15,11 @@ import pytest
 
 import deploy.reconcile_generated_configs as generated_configs
 import deploy.post_checkout_overlay_audit as post_checkout_audit
+from deploy.verify_frontend_release import (
+    hashed_script_sources,
+    verify_local_build,
+    verify_public_build,
+)
 from deploy.safe_restart_smoke import (
     MAX_OVERLAY_AUDIT_EVIDENCE_BYTES,
     SmokeFailure,
@@ -395,6 +400,137 @@ def test_guarded_release_refetches_tip_before_checkout() -> None:
 
     assert prepare < checkout < restart
     assert "git pull" not in script
+
+
+def test_frontend_release_verifier_requires_hashed_asset_with_target_marker(
+    tmp_path: Path,
+) -> None:
+    dist = tmp_path / "dist"
+    assets = dist / "assets"
+    assets.mkdir(parents=True)
+    source = "/assets/index-AbCd1234.js"
+    (dist / "index.html").write_text(
+        f'<script type="module" src="{source}"></script>', encoding="utf-8"
+    )
+    marker = b"UNIVERSITY_PORTAL_RELEASE:" + b"1" * 40
+    (assets / "index-AbCd1234.js").write_bytes(b"code;" + marker)
+
+    assert hashed_script_sources((dist / "index.html").read_text()) == [source]
+    assert verify_local_build(dist, marker) == [source]
+
+    (assets / "index-AbCd1234.js").write_bytes(b"stale code")
+    with pytest.raises(AssertionError, match="marker is absent"):
+        verify_local_build(dist, marker)
+
+
+def test_frontend_release_verifier_requires_public_html_and_asset_to_match(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    dist = tmp_path / "dist"
+    assets = dist / "assets"
+    assets.mkdir(parents=True)
+    source = "/assets/index-AbCd1234.js"
+    (dist / "index.html").write_text(
+        f'<script type="module" src="{source}"></script>', encoding="utf-8"
+    )
+    marker = b"UNIVERSITY_PORTAL_RELEASE:" + b"2" * 40
+    (assets / "index-AbCd1234.js").write_bytes(marker)
+    responses = {
+        "https://portal.example/": (
+            f'<script type="module" src="{source}"></script>'.encode()
+        ),
+        f"https://portal.example{source}": b"public code;" + marker,
+    }
+
+    def fake_fetch(url: str) -> bytes:
+        return responses[url.split("?", 1)[0]]
+
+    monkeypatch.setattr("deploy.verify_frontend_release._fetch", fake_fetch)
+    assert verify_public_build(dist, "https://portal.example/", marker) == [source]
+
+    responses["https://portal.example/"] = (
+        b'<script type="module" src="/assets/index-Stale999.js"></script>'
+    )
+    with pytest.raises(AssertionError, match="does not reference"):
+        verify_public_build(dist, "https://portal.example/", marker)
+
+
+def test_guarded_release_builds_and_verifies_frontend_before_success() -> None:
+    script = (DEPLOY_DIR / "guarded_release.sh").read_text(encoding="utf-8")
+
+    stage = script.index('frontend_stage="$(mktemp -d')
+    ownership = script.index('chown ubuntu:ubuntu "$frontend_stage"', stage)
+    build = script.index("VITE_RELEASE_MARKER=")
+    assert 'run build \\\n    --outDir "$frontend_stage"' in script
+    assert "run build -- \\" not in script
+    assert stage < ownership < build
+    publish_started = script.index("frontend_publish_started=1", build)
+    move_previous = script.index('mv "$frontend_dist" "$frontend_previous"', build)
+    previous_moved = script.index("frontend_previous_moved=1", move_previous)
+    published = script.index("frontend_published=1", previous_moved)
+    publish = script.index('mv "$frontend_stage" "$frontend_dist"', build)
+    restart = script.index("systemctl restart uni-api-py.service uni-celery.service")
+    public_verify = script.index('--public-url "$public_url"', restart)
+    success = script.index('echo "DEPLOYED_RELEASE=$target"')
+
+    assert (
+        build
+        < publish_started
+        < move_previous
+        < previous_moved
+        < published
+        < publish
+        < restart
+        < public_verify
+        < success
+    )
+    assert 'if [ "$frontend_publish_started" = 1 ]' in script
+    assert 'if [ "$frontend_published" = 1 ]' in script
+    assert '[ "$frontend_previous_moved" = 1 ]' in script
+    assert 'mv "$frontend_previous" "$frontend_dist"' in script
+
+
+def test_frontend_cleanup_restores_previous_dist_after_publish_move_failure(
+    tmp_path: Path,
+) -> None:
+    script = (DEPLOY_DIR / "guarded_release.sh").read_text(encoding="utf-8")
+    function_start = script.index("cleanup_frontend_release() {")
+    function_end = script.index("\n}\ncleanup_release()", function_start) + 2
+    cleanup_function = script[function_start:function_end]
+    frontend_dist = tmp_path / "dist" / "public"
+    previous = tmp_path / "previous"
+    stage = tmp_path / "stage"
+    previous.mkdir()
+    stage.mkdir()
+    (previous / "index.html").write_text("previous release", encoding="utf-8")
+    (stage / "index.html").write_text("new release", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            (
+                "set -euo pipefail\n"
+                f"{cleanup_function}\n"
+                f"frontend_dist={frontend_dist!s}\n"
+                f"frontend_previous={previous!s}\n"
+                f"frontend_stage={stage!s}\n"
+                "frontend_publish_started=1\n"
+                "frontend_previous_moved=1\n"
+                "frontend_published=1\n"
+                "release_succeeded=0\n"
+                "cleanup_frontend_release\n"
+            ),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (frontend_dist / "index.html").read_text() == "previous release"
+    assert not previous.exists()
+    assert not stage.exists()
 
 
 def _collision_repo(

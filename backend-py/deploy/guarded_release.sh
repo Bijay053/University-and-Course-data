@@ -56,9 +56,33 @@ reconciliation_manifest=""
 reconciliation_committed=0
 tracked_recipe_manifest=""
 overlay_audit_evidence=""
+frontend_dist="$repo_root/artifacts/university-portal/dist/public"
+frontend_stage=""
+frontend_previous=""
+frontend_publish_started=0
+frontend_previous_moved=0
+frontend_published=0
+release_succeeded=0
+cleanup_frontend_release() {
+  if [ "$frontend_publish_started" = 1 ] && [ "$release_succeeded" != 1 ]; then
+    if [ "$frontend_published" = 1 ]; then
+      rm -rf "$frontend_dist"
+    fi
+    if [ "$frontend_previous_moved" = 1 ] &&
+       [ -n "$frontend_previous" ] && [ -d "$frontend_previous" ]; then
+      mkdir -p "$(dirname "$frontend_dist")"
+      mv "$frontend_previous" "$frontend_dist"
+    fi
+  fi
+  rm -rf "$frontend_stage"
+  if [ "$release_succeeded" = 1 ]; then
+    rm -rf "$frontend_previous"
+  fi
+}
 cleanup_release() {
   cd "$repo_root"
   rollback_failed=0
+  cleanup_frontend_release
   if [ "$reconciliation_committed" != 1 ] && [ -n "$reconciler" ] && [ -s "$reconciliation_manifest" ]; then
     if ! run_release_user "$python_bin" -B "$reconciler" rollback \
       --manifest "$reconciliation_manifest"; then
@@ -195,6 +219,25 @@ elif [ "$overlay_audit_status" != 0 ]; then
   echo "REDUNDANT_CONFIG_OVERLAY_AUDIT_WARNING=failed_non_blocking" >&2
 fi
 
+frontend_stage="$(mktemp -d "$repo_root/artifacts/university-portal/dist.release.XXXXXX")"
+chown ubuntu:ubuntu "$frontend_stage"
+VITE_RELEASE_MARKER="UNIVERSITY_PORTAL_RELEASE:$target" \
+  run_release_user pnpm --filter @workspace/university-portal run build \
+    --outDir "$frontend_stage"
+run_release_user "$python_bin" -B backend-py/deploy/verify_frontend_release.py \
+  --dist "$frontend_stage" --target "$target"
+frontend_publish_started=1
+if [ -e "$frontend_dist" ]; then
+  frontend_previous="$(mktemp -d "$repo_root/artifacts/university-portal/dist.previous.XXXXXX")"
+  rmdir "$frontend_previous"
+  mv "$frontend_dist" "$frontend_previous"
+  frontend_previous_moved=1
+fi
+mkdir -p "$(dirname "$frontend_dist")"
+frontend_published=1
+mv "$frontend_stage" "$frontend_dist"
+frontend_stage=""
+
 release_env="$(mktemp backend-py/.release.env.XXXXXX)"
 sudo -u ubuntu /opt/university-portal/backend-py/.venv/bin/python -B "$reconciler" verify-tracked \
   --manifest "$tracked_recipe_manifest"
@@ -211,24 +254,20 @@ systemctl restart uni-api-py.service uni-celery.service
   --overlay-audit-evidence-path "$overlay_audit_evidence"
 curl --fail --silent http://127.0.0.1:8000/api/health
 systemctl is-active uni-api-py uni-celery
-.venv/bin/python -B - <<'PY'
-import re,subprocess,urllib.request,urllib.parse
+public_url="$(.venv/bin/python -B - <<'PY'
+import re,subprocess
 nginx = subprocess.check_output(["nginx","-T"],stderr=subprocess.DEVNULL,text=True)
 hosts = re.findall(r"^\s*server_name\s+([^;]+);",nginx,re.M)
 host = next(h for entry in hosts for h in entry.split() if "." in h and h not in {"localhost","_"} and not h.startswith("*"))
-url="https://"+host+"/"
-with urllib.request.urlopen(url,timeout=30) as r:
-    assert r.status==200
-    page=r.read().decode()
-assets=re.findall(r'<script[^>]+src=["\']([^"\']+)',page)
-assert assets, "No frontend bundle found"
-with urllib.request.urlopen(urllib.parse.urljoin(url,assets[0]),timeout=30) as r:
-    assert r.status==200 and len(r.read())>100
-print("PUBLIC_HTML_AND_ASSET_OK",url,assets[0])
+print("https://"+host+"/")
 PY
+)"
+.venv/bin/python -B deploy/verify_frontend_release.py \
+  --dist "$frontend_dist" --target "$target" --public-url "$public_url"
 sudo -u ubuntu /opt/university-portal/backend-py/.venv/bin/python -B "$reconciler" finalize \
   --manifest "$reconciliation_manifest"
 sudo -u ubuntu /opt/university-portal/backend-py/.venv/bin/python -B "$reconciler" finalize-tracked \
   --manifest "$tracked_recipe_manifest"
 reconciliation_committed=1
+release_succeeded=1
 echo "DEPLOYED_RELEASE=$target"

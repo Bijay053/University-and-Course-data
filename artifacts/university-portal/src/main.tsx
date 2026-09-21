@@ -2,6 +2,13 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
 
+// Embedded in the production bundle so guarded releases can prove that the
+// public asset came from the target Git revision.
+const releaseMarker = import.meta.env.VITE_RELEASE_MARKER;
+if (releaseMarker) {
+  document.documentElement.dataset.releaseMarker = releaseMarker;
+}
+
 // Prevent the browser's default behaviour of changing a focused
 // number input's value when the user scrolls the mouse wheel over it.
 // Without this, scrolling down the page after typing a value silently
