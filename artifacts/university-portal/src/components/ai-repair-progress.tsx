@@ -40,6 +40,10 @@ export type AutonomousRepair = {
     time_budget_seconds?: number;
     cost_cap_usd?: number;
     scope?: string;
+    selected_courses?: number;
+    staged_courses?: number;
+    budget_exhausted?: string;
+    warning?: string;
   };
   verification_job_id?: string;
   verification_status?: string;
@@ -51,6 +55,15 @@ export type AutonomousRepair = {
     unresolved_fields?: string[] | Record<string, unknown>;
     regressions?: string[] | Record<string, unknown>;
     capped?: boolean;
+    stop_reason?: string | null;
+    verification_limits?: AutonomousRepair["verification_limits"];
+    counters?: {
+      total_found?: number;
+      current?: number;
+      imported?: number;
+      skipped?: number;
+      errors?: number;
+    };
     [key: string]: unknown;
   };
   reason?: string;
@@ -103,19 +116,29 @@ export function AiRepairProgress({
   const blocked = autonomous.phase === "blocked";
   const running = !verified && !needsReview && !blocked;
   const effectiveMaxAttempts = autonomous.limits?.max_attempts ?? maxAttempts;
-  const verificationLimits = autonomous.verification_limits;
   const comparison = autonomous.comparison;
+  const verificationLimits = comparison?.verification_limits ?? autonomous.verification_limits;
   const baseline = comparison?.baseline ?? comparison?.baseline_quality;
   const verification = comparison?.verification ?? comparison?.verification_quality;
+  const displayComparisonItem = (key: string) => (
+    key.replace(/_pct$/, "").replace(/_/g, " ")
+  );
   const comparisonItems = (value: string[] | Record<string, unknown> | undefined) => {
-    if (Array.isArray(value)) return value;
+    if (Array.isArray(value)) return value.map(displayComparisonItem);
     if (!value) return [];
     return Object.entries(value)
       .filter(([, item]) => Boolean(item))
-      .map(([key]) => key.replace(/_/g, " "));
+      .map(([key]) => displayComparisonItem(key));
   };
   const unresolvedFields = comparisonItems(comparison?.unresolved_fields);
   const regressions = comparisonItems(comparison?.regressions);
+  const stoppedForTime = (
+    comparison?.stop_reason === "time_budget_exhausted"
+    || verificationLimits?.budget_exhausted === "time_budget_exhausted"
+  );
+  const processedCourses = comparison?.counters?.current;
+  const selectedCourses = verificationLimits?.selected_courses ?? comparison?.counters?.total_found;
+  const stagedCourses = verificationLimits?.staged_courses ?? comparison?.counters?.imported;
 
   return (
     <section
@@ -250,11 +273,21 @@ export function AiRepairProgress({
         </div>
       )}
 
-      {comparison && (unresolvedFields.length > 0 || regressions.length > 0 || comparison.capped) && (
+      {comparison && (unresolvedFields.length > 0 || regressions.length > 0 || comparison.capped || stoppedForTime) && (
         <div className="space-y-0.5 rounded border border-amber-200 bg-white/70 px-2 py-1.5 text-[9px] text-amber-900">
           {unresolvedFields.length > 0 && <p><strong>Unresolved fields:</strong> {unresolvedFields.join(", ")}</p>}
           {regressions.length > 0 && <p><strong>Regressions:</strong> {regressions.join(", ")}</p>}
-          {comparison.capped && (
+          {stoppedForTime && (
+            <p>
+              <strong>Stopped:</strong> Verification reached its{" "}
+              {Math.round((verificationLimits?.time_budget_seconds ?? 600) / 60)}-minute time budget
+              {processedCourses != null && selectedCourses != null
+                ? ` after processing ${processedCourses} of ${selectedCourses} selected courses`
+                : ""}
+              {stagedCourses != null ? ` and staging ${stagedCourses}` : ""}.
+            </p>
+          )}
+          {comparison.capped && !stoppedForTime && (
             <p><strong>Capped:</strong> Verification stopped at its {verificationLimits?.max_courses ?? 50}-course limit.</p>
           )}
         </div>

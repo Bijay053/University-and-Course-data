@@ -181,7 +181,7 @@ async def test_simulation_or_unaccepted_live_evidence_never_verifies(memory, pro
 def child(status="completed", **overrides):
     values = {
         "runtime_job_id": "child", "status": status, "total_found": 3, "imported": 3,
-        "skipped": 0, "errors": 0, "cost_ceiling_hit": False,
+        "current": 3, "skipped": 0, "errors": 0, "cost_ceiling_hit": False,
         "discovered_config": {"autonomousVerification": {
             "coverage_measured": True, "capped": False, "limit_reached": False, "max_courses": 50,
         }},
@@ -242,6 +242,44 @@ async def test_child_reconciliation_is_truthful(memory, monkeypatch, job, after,
     assert result["autonomous"]["comparison"]["full_catalogue_verified"] is False
     assert result["autonomous"]["verification_status"] == job.status
     workflow.agent.release_repair_lease.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_time_budget_exhaustion_is_not_reported_as_course_cap(memory, monkeypatch):
+    memory.evidence = session(
+        worker_claim="delivery", phase="verifying", verification_job_id="child",
+    )
+    memory.evidence.update(status="running", quality_before=quality())
+    metadata = {
+        "coverage_measured": True,
+        "capped": False,
+        "limit_reached": True,
+        "max_courses": 50,
+        "selected_courses": 50,
+        "staged_courses": 30,
+        "budget_exhausted": "time_budget_exhausted",
+        "time_budget_seconds": 600,
+    }
+    memory.jobs["child"] = child(
+        "failed_degraded",
+        total_found=50,
+        current=31,
+        imported=30,
+        discovered_config={"autonomousVerification": metadata},
+    )
+    monkeypatch.setattr(
+        workflow.agent,
+        "_quality_snapshot",
+        AsyncMock(return_value=quality(ielts_pct=70, duration_pct=97, mode_pct=30)),
+    )
+
+    result = await workflow.reconcile("parent", "session-1", DB(memory))
+    comparison = result["autonomous"]["comparison"]
+
+    assert comparison["capped"] is False
+    assert comparison["stop_reason"] == "time_budget_exhausted"
+    assert comparison["counters"]["current"] == 31
+    assert result["autonomous"]["phase"] == "needs_review"
 
 
 @pytest.mark.asyncio

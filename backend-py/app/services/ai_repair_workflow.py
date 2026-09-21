@@ -429,7 +429,7 @@ def compare_quality(before: dict, after: dict, child: ScrapeRuntimeJob) -> dict:
         "catalogue_guard": guard, "contamination": contamination,
         "full_catalogue_verified": False, "scope": "bounded fresh verification; full catalogue coverage unverified",
         "counters": {key: getattr(child, key, None)
-                     for key in ("total_found", "imported", "skipped", "errors", "cost_ceiling_hit")},
+                     for key in ("total_found", "current", "imported", "skipped", "errors", "cost_ceiling_hit")},
     }
 
 
@@ -500,8 +500,24 @@ async def reconcile(job_id: str, session_id: str, db) -> dict:
                 metadata.get("effective_max_courses") or metadata.get("max_courses")
                 or state.get("verification_limits", {}).get("max_courses") or 50
             )
-            capped = bool(metadata.get("capped") or metadata.get("limit_reached")) or child.total_found >= cap
+            stop_reason = metadata.get("budget_exhausted")
+            capped = bool(metadata.get("capped")) or bool(
+                not stop_reason
+                and not metadata.get("warning")
+                and (
+                    getattr(child, "current", 0) >= cap
+                    or (
+                        child.total_found >= cap
+                        and child.imported >= cap
+                    )
+                )
+            )
             comparison["capped"] = capped
+            comparison["stop_reason"] = (
+                stop_reason
+                or ("course_limit_reached" if capped else None)
+                or ("warning" if metadata.get("warning") else None)
+            )
             comparison["verification_limits"] = metadata
             verified = (
                 comparison["sample_verified"] and not state.get("catalogue_problem") and not capped

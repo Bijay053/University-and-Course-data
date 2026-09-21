@@ -173,4 +173,36 @@ describe("AiRepairProgress", () => {
     expect(screen.getByText("Regressions:").parentElement?.textContent).toContain("fee coverage");
     expect(screen.getByText("Capped:").parentElement?.textContent).toContain("50-course limit");
   });
+
+  it("reports a time-budget stop with actual progress instead of a course cap", () => {
+    render(
+      <AiRepairProgress
+        autonomous={{
+          ...base,
+          phase: "needs_review",
+          comparison: {
+            unresolved_fields: ["ielts_pct", "duration_pct", "mode_pct"],
+            capped: true,
+            verification_limits: {
+              max_courses: 50,
+              time_budget_seconds: 600,
+              selected_courses: 50,
+              staged_courses: 30,
+              budget_exhausted: "time_budget_exhausted",
+            },
+            counters: { total_found: 50, current: 31, imported: 30 },
+          },
+        }}
+        currentAttempt={1}
+      />,
+    );
+
+    expect(screen.getByText("Unresolved fields:").parentElement?.textContent).toContain(
+      "ielts, duration, mode",
+    );
+    expect(screen.getByText("Stopped:").parentElement?.textContent).toContain(
+      "10-minute time budget after processing 31 of 50 selected courses and staging 30",
+    );
+    expect(screen.queryByText("Capped:")).toBeNull();
+  });
 });
