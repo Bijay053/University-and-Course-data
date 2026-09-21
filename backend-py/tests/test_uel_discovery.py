@@ -3,7 +3,10 @@ from __future__ import annotations
 import pytest
 
 from app.services.scraper.config.loader import load_uni_config
-from app.services.scraper.orchestrator import _apply_render_listing_pages
+from app.services.scraper.orchestrator import (
+    _apply_render_listing_pages,
+    _browser_discovery_policy,
+)
 
 
 def _uel_config():
@@ -29,6 +32,15 @@ def test_uel_uses_static_proxy_catalogues_instead_of_dead_discovery_tiers():
     assert discovery.allow_url_patterns == [
         r"^https://www\.uel\.ac\.uk/(undergraduate|postgraduate)/courses/[^/?#]+/?$"
     ]
+
+
+def test_browser_suppression_keeps_bfs_enabled_when_always_browser_is_stale():
+    discovery = _uel_config().discovery
+
+    browser_is_primary, browser_is_disabled = _browser_discovery_policy(discovery)
+
+    assert browser_is_disabled is True
+    assert browser_is_primary is False
 
 
 def test_uel_browser_extraction_overrides_stale_auto_config_suppression():

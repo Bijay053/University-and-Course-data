@@ -1643,6 +1643,21 @@ def _target_course_urls_from_payload(payload: dict | None) -> list[str]:
     return urls
 
 
+def _browser_discovery_policy(discovery_config: object) -> tuple[bool, bool]:
+    """Return whether browser discovery is primary and whether it is disabled.
+
+    Browser suppression is absolute. If both controls are true, BFS must still
+    run instead of skipping BFS and then skipping browser discovery as well.
+    """
+    browser_is_disabled = bool(
+        getattr(discovery_config, "skip_browser_discovery", False)
+    )
+    browser_is_primary = bool(
+        getattr(discovery_config, "always_browser_discover", False)
+    ) and not browser_is_disabled
+    return browser_is_primary, browser_is_disabled
+
+
 def _is_targeted_retry_payload(payload: dict | None) -> bool:
     """Return whether this job must preserve its parent review rows."""
     return bool(_target_course_urls_from_payload(payload))
@@ -2405,10 +2420,11 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         # time, triggers sitemap + 7 alt-path probes that all fail, and may
         # extend the Cloudflare rate-limit window — all for zero gain since
         # browser discovery subsumes the BFS result set.
-        _always_browser = (
-            False if _targeted_retry
-            else getattr(_uni_cfg.discovery, "always_browser_discover", False)
+        _always_browser, _skip_browser_discovery = _browser_discovery_policy(
+            _uni_cfg.discovery
         )
+        if _targeted_retry:
+            _always_browser = False
         try:
             from urllib.parse import urlparse as _urlparse
             _discovery_hostname = (_urlparse(scrape_url).hostname or "").lower()
@@ -3541,7 +3557,6 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         # match MQ's /study/find-a-course/<level>/<slug> URL shape, so the
         # tier would only re-harvest junk nav pages (the original symptom
         # of Task #85 before this fix).
-        _skip_browser_discovery = getattr(_uni_cfg.discovery, "skip_browser_discovery", False)
         if (
             not _targeted_retry
             and not _archive_only
