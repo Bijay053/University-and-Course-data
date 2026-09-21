@@ -227,6 +227,10 @@ run_release_user env \
     --outDir "$frontend_stage"
 run_release_user "$python_bin" -B backend-py/deploy/verify_frontend_release.py \
   --dist "$frontend_stage" --target "$target"
+# mktemp creates the staging directory as 0700. Nginx serves the published
+# directory as a different user, so make only the built static tree readable
+# and traversable before the atomic move into place.
+chmod -R a+rX "$frontend_stage"
 frontend_publish_started=1
 if [ -e "$frontend_dist" ]; then
   frontend_previous="$(mktemp -d "$repo_root/artifacts/university-portal/dist.previous.XXXXXX")"

@@ -465,6 +465,7 @@ def test_guarded_release_builds_and_verifies_frontend_before_success() -> None:
     assert 'run build \\\n    --outDir "$frontend_stage"' in script
     assert "run build -- \\" not in script
     assert stage < ownership < build
+    readable = script.index('chmod -R a+rX "$frontend_stage"', build)
     publish_started = script.index("frontend_publish_started=1", build)
     move_previous = script.index('mv "$frontend_dist" "$frontend_previous"', build)
     previous_moved = script.index("frontend_previous_moved=1", move_previous)
@@ -476,6 +477,7 @@ def test_guarded_release_builds_and_verifies_frontend_before_success() -> None:
 
     assert (
         build
+        < readable
         < publish_started
         < move_previous
         < previous_moved
