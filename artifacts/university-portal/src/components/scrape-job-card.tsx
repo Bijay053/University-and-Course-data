@@ -160,10 +160,18 @@ export function shouldOfferIdenticalContinuation({
 }
 
 export function shouldShowAutomaticUrlRepair(
-  completedJobId: string | null,
+  repairJobId: string | null,
   warningKind: "high_drop_rate" | "category_pages" | null,
 ): boolean {
-  return Boolean(completedJobId && warningKind === "high_drop_rate");
+  return Boolean(repairJobId && warningKind === "high_drop_rate");
+}
+
+export function repairJobIdForTerminalState(
+  completedJobId: string | null,
+  activeJobId: string | null,
+  phase: string,
+): string | null {
+  return completedJobId ?? (phase === "error" ? activeJobId : null);
 }
 
 export function shouldShowScrapeDiagnostics(
@@ -727,6 +735,11 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
   const [showAiRepairLog, setShowAiRepairLog] = useState(false);
   const aiRepairRequestRef = useRef(0);
   const aiRepairAutoRetryArmedRef = useRef(false);
+  const repairJobId = repairJobIdForTerminalState(
+    completedJobId,
+    activeJobId,
+    phase,
+  );
 
   const pollRef = useRef<number | null>(null);
   const logIndexRef = useRef(0);
@@ -1230,12 +1243,12 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
   }, []);
 
   const handleAiRepair = useCallback(async () => {
-    if (!completedJobId) return;
+    if (!repairJobId) return;
     ++aiRepairRequestRef.current;
     setAiRepairLoading(true);
     setShowAiRepairLog(true);
     try {
-      const res = await fetch(`/api/scrape/jobs/${completedJobId}/ai-repair`, {
+      const res = await fetch(`/api/scrape/jobs/${repairJobId}/ai-repair`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -1272,7 +1285,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
         // Retain the legacy manual repair follow-up. The autonomous contract
         // supersedes this and owns its single verification scrape.
         aiRepairAutoRetryArmedRef.current = !data.autonomous?.enabled;
-        setAiRepairJobId(data.job_id || completedJobId);
+        setAiRepairJobId(data.job_id || repairJobId);
         const queuedSession: AIRepairSession = {
           current_attempt: 0,
           attempts: [],
@@ -1283,7 +1296,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
           error: null,
           ...data,
           session_id: data.session_id,
-          job_id: data.job_id || completedJobId,
+          job_id: data.job_id || repairJobId,
           status: data.status ?? "queued",
         };
         setAiRepairRuns(prev => [...prev.filter(run => run.session_id !== data.session_id), queuedSession]);
@@ -1296,7 +1309,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
     } finally {
       setAiRepairLoading(false);
     }
-  }, [completedJobId, toast]);
+  }, [repairJobId, toast]);
 
   const applyFix = useCallback(async (
     jobId: string,
@@ -2415,7 +2428,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                 </>
               )}
             </div>
-            {phase === "error" && urlFilterWarning?.kind === "high_drop_rate" && completedJobId && (
+            {phase === "error" && urlFilterWarning?.kind === "high_drop_rate" && repairJobId && (
               <div className="rounded-lg border border-violet-200 bg-violet-50 p-2.5 space-y-2">
                 <div className="flex items-center gap-1.5">
                   <Bot className="w-3.5 h-3.5 text-violet-700" />
@@ -2521,7 +2534,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                         Preparing URL evidence…
                       </div>
                     )}
-                    {shouldShowAutomaticUrlRepair(completedJobId, urlFilterWarning.kind) && (
+                    {shouldShowAutomaticUrlRepair(repairJobId, urlFilterWarning.kind) && (
                         <div className="space-y-2 pt-1.5 border-t border-amber-200 mt-1.5">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-[9px] font-bold px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded-full border border-violet-200 shrink-0">Automatic repair</span>

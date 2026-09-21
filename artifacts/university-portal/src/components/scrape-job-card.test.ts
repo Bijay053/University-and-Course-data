@@ -10,6 +10,7 @@ import {
   hasCompletedExtractionErrors,
   hasReviewableCourses,
   isCategoryPageWarningStale,
+  repairJobIdForTerminalState,
   runtimeProgressFromStatus,
   shouldOfferIdenticalContinuation,
   shouldShowAutomaticUrlRepair,
@@ -62,6 +63,50 @@ async function renderCompletedCard(errors: number): Promise<HTMLElement> {
     const card = screen.getByText("Errors").closest(".rounded-xl");
     expect(card).not.toBeNull();
     return card as HTMLElement;
+  });
+}
+
+async function renderFailedFilterCollapseCard(): Promise<void> {
+  sessionStorage.setItem("scrape_slot_1_jobId", "job-filter-collapse");
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.startsWith("/api/scrape/status/job-filter-collapse")) {
+      return jsonResponse({
+        status: "failed",
+        universityId: 75,
+        universityName: "Canterbury Christ Church University (CCCU)",
+        totalFound: 55,
+        imported: 0,
+        skipped: 0,
+        errors: 0,
+        current: 0,
+        total: 55,
+        logs: [{
+          event: "warning",
+          kind: "extract_allow_url_filter",
+          message: "URL filter dropped 55 / 55 URLs (100%)",
+          drop_pct: 100,
+          dropped: 55,
+          kept: 0,
+          dropped_sample: ["/study-here/courses/accounting-and-finance"],
+        }],
+      });
+    }
+    if (url === "/api/scrape/staged/job-filter-collapse") return jsonResponse([]);
+    if (url.includes("/auto-repair-candidates")) return jsonResponse({ ok: true, candidates: [] });
+    if (url.includes("/ai-repair-status")) return jsonResponse({ status: "not_started" });
+    return jsonResponse({});
+  }));
+
+  render(React.createElement(ScrapeJobCard, {
+    slotId: 1,
+    slotIndex: 0,
+    universities: [{ id: 75, name: "Canterbury Christ Church University (CCCU)" }],
+    onReviewReady: () => undefined,
+  }));
+
+  await waitFor(() => {
+    expect(screen.getByRole("button", { name: "Run automatic repair" })).toBeTruthy();
   });
 }
 
@@ -182,6 +227,12 @@ describe("completed ScrapeJobCard quality state", () => {
   });
 });
 
+describe("failed URL-filter repair action", () => {
+  it("renders after reload when only the active job identity is restored", async () => {
+    await renderFailedFilterCollapseCard();
+  });
+});
+
 describe("shouldOfferIdenticalContinuation", () => {
   const base = {
     completedJobId: "job_child",
@@ -219,6 +270,17 @@ describe("shouldShowAutomaticUrlRepair", () => {
   it("does not offer URL-filter repair without a completed job or for category-page diagnosis", () => {
     expect(shouldShowAutomaticUrlRepair(null, "high_drop_rate")).toBe(false);
     expect(shouldShowAutomaticUrlRepair("job_123", "category_pages")).toBe(false);
+  });
+});
+
+describe("repairJobIdForTerminalState", () => {
+  it("uses the persisted active job after a failed card reload", () => {
+    expect(repairJobIdForTerminalState(null, "job_failed", "error")).toBe("job_failed");
+  });
+
+  it("prefers the completed job identity and does not expose running jobs", () => {
+    expect(repairJobIdForTerminalState("job_complete", "job_old", "done")).toBe("job_complete");
+    expect(repairJobIdForTerminalState(null, "job_running", "running")).toBeNull();
   });
 });
 
