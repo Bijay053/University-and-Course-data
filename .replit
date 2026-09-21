@@ -52,6 +52,10 @@ args = "task237-flaky-tests"
 task = "workflow.run"
 args = "full-scraper-regression"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "academic-level-migration"
+
 [[workflows.workflow]]
 name = "backend-py: FastAPI"
 author = "agent"
@@ -151,6 +155,17 @@ isValidation = true
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd backend-py && scripts/run_full_scraper_regression.sh"
+
+[[workflows.workflow]]
+name = "academic-level-migration"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend-py && ALLOW_ISOLATED_SCHEMA_MIGRATION_TESTS=1 PYTHONPATH=. python -m pytest tests/test_academic_level_migration_roundtrip.py -q -c /dev/null -p no:cacheprovider"
+
+[workflows.workflow.metadata]
+isValidation = true
 
 [agent]
 stack = "PNPM_WORKSPACE"
