@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { MultiSelect } from "@/components/multi-select";
+import { SearchableSelect } from "@/components/searchable-select";
 import { appendAcademicCredentialParams } from "./search-query";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -422,13 +423,19 @@ export default function SearchPage() {
                 Highest Qualification Studied <span className="text-red-500 ml-0.5">*</span>
               </AccordionTrigger>
               <AccordionContent className="pt-2">
-                <Select value={qualification || "any"} onValueChange={(v) => { setQualification(v === "any" ? "" : v); setScheme(""); setOutOf(""); setGradingScore(""); resetPage(); }}>
-                  <SelectTrigger className="h-9"><SelectValue placeholder="Any" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="any">— Any —</SelectItem>
-                    {(options?.qualifications ?? []).map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={qualification}
+                  options={options?.qualifications ?? []}
+                  placeholder="Any qualification"
+                  searchPlaceholder="Search qualifications…"
+                  onChange={(value) => {
+                    setQualification(value);
+                    setScheme("");
+                    setOutOf("");
+                    setGradingScore("");
+                    resetPage();
+                  }}
+                />
               </AccordionContent>
             </AccordionItem>
 
