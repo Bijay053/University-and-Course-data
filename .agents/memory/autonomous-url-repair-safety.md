@@ -27,3 +27,17 @@ Keep extraction-field proposals advisory until they have a non-mutating,
 field-specific validation path. Treat a current non-empty simulation as
 authoritative over stale job counters, and fail closed when the verification
 scrape stages nothing.
+
+Large valid course pages must be truncated to the bounded evidence budget, not
+rejected solely because the full HTML exceeds that budget. A degree-qualified
+course title plus multiple course-owned facts remains positive evidence even
+when foundation-year or status links make a generic page classifier say
+“listing.”
+
+**Why:** Canterbury course pages are roughly 2–2.5 MB, but their title, study
+mode, duration, and location appear within the first 60 KB. Rejecting the whole
+response at 1 MB blocked every automatic repair probe.
+
+**How to apply:** Preserve the first bounded byte window with UTF-8-safe
+truncation, then run the ordinary challenge, ownership, field, and eligibility
+checks. Never increase or remove the evidence cap merely to accept a large page.
