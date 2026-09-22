@@ -48,8 +48,8 @@ export function Exclusions({ counts }: { counts: Record<string, unknown> }) {
   </div>;
 }
 
-export function CourseReport({ jobId, onReview, onStarted }: {
-  jobId: string; onReview: (id: string) => void; onStarted?: () => void;
+export function CourseReport({ jobId, onReview, onStarted, openRequest = 0 }: {
+  jobId: string; onReview: (id: string) => void; onStarted?: () => void; openRequest?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [reports, setReports] = useState<Report[]>([]);
@@ -65,6 +65,12 @@ export function CourseReport({ jobId, onReview, onStarted }: {
   const [retryErrors, setRetryErrors] = useState<Record<string, string>>({});
   const form = useForm<Values>({ defaultValues: defaults });
   const kind = form.watch("kind");
+  useEffect(() => {
+    if (!openRequest) return;
+    form.reset(defaults);
+    setError("");
+    setOpen(true);
+  }, [form, openRequest]);
   useEffect(() => {
     let disposed = false;
     const load = async () => {

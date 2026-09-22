@@ -101,18 +101,21 @@ describe("AiRepairProgress", () => {
     expect(openVerificationJob).toHaveBeenCalledWith("job_verify_42");
   });
 
-  it("presents blocked repairs as failures rather than successful fixes", () => {
+  it("turns a zero-course dead end into a user-facing official URL action", () => {
     const { container } = render(
       <AiRepairProgress
-        autonomous={{ ...base, phase: "blocked", reason: "Live pages could not be classified safely." }}
+        autonomous={{ ...base, phase: "blocked", reason: "Accepted live validation is required; no scrape launched." }}
+        liveProbe={{ status: "needs_review", pages_checked: 6, course_pages: 0 }}
         currentAttempt={5}
       />,
     );
 
-    expect(screen.getByText("Repair blocked")).toBeTruthy();
+    expect(screen.getByText("Official course page needed")).toBeTruthy();
     expect(screen.queryByText("Repair verified")).toBeNull();
     expect(container.querySelector("section")?.className).toContain("border-red-200");
     expect(container.querySelectorAll("li.bg-emerald-100")).toHaveLength(0);
+    expect(screen.getByText(/Use Report official course URL/)).toBeTruthy();
+    expect(screen.queryByText(/Manual investigation/)).toBeNull();
     expect(screen.getByText(/publishing is always manual/)).toBeTruthy();
   });
 

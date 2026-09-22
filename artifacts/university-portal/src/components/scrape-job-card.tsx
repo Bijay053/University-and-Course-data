@@ -753,6 +753,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
   const [selectedAiRepairRunId, setSelectedAiRepairRunId] = useState<string | null>(null);
   const [aiRepairLoading, setAiRepairLoading] = useState(false);
   const [aiRepairPolling, setAiRepairPolling] = useState(false);
+  const [courseReportOpenRequest, setCourseReportOpenRequest] = useState(0);
   const [aiRepairJobId, setAiRepairJobId] = useState<string | null>(null);
   const [showAiRepairLog, setShowAiRepairLog] = useState(false);
   const aiRepairRequestRef = useRef(0);
@@ -2175,7 +2176,14 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
       </div>
 
       {completedJobId && (
-        <CourseReport jobId={completedJobId} onReview={id => onReviewReady(id, uniName, true)} onStarted={onReportStarted} />
+        <div id={`course-report-${slotIndex}`}>
+          <CourseReport
+            jobId={completedJobId}
+            onReview={id => onReviewReady(id, uniName, true)}
+            onStarted={onReportStarted}
+            openRequest={courseReportOpenRequest}
+          />
+        </div>
       )}
       <div className="flex flex-col flex-1 p-4 gap-3">
 
@@ -2484,11 +2492,25 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                   <span className="text-[11px] font-semibold text-violet-900">Automatic repair</span>
                 </div>
                 <p className="text-[10px] leading-relaxed text-violet-800">
-                  Tests official live sources, applies only a validated URL-filter fix, and runs one verification scrape.
+                  Checks official pages and retries only changes it can verify. You do not need to edit scraper settings.
                 </p>
                 <Button
                   type="button"
-                  onClick={handleAiRepair}
+                  onClick={() => {
+                    const needsCoursePage = (
+                      aiRepairSession?.autonomous?.phase === "blocked"
+                      && (aiRepairSession.live_probe?.course_pages ?? 0) === 0
+                    );
+                    if (!needsCoursePage) {
+                      void handleAiRepair();
+                      return;
+                    }
+                    setCourseReportOpenRequest(value => value + 1);
+                    requestAnimationFrame(() => {
+                      document.getElementById(`course-report-${slotIndex}`)
+                        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    });
+                  }}
                   disabled={aiRepairLoading || aiRepairPolling}
                   size="sm"
                   className="w-full bg-violet-600 hover:bg-violet-700"
@@ -2497,7 +2519,10 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                     ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
                     : <Bot className="w-3.5 h-3.5 mr-1.5" />
                   }
-                  {aiRepairPolling
+                  {aiRepairSession?.autonomous?.phase === "blocked"
+                    && (aiRepairSession.live_probe?.course_pages ?? 0) === 0
+                    ? "Report official course URL"
+                    : aiRepairPolling
                     ? `Repairing… attempt ${aiRepairSession?.current_attempt ?? 0}/${aiRepairSession?.max_attempts ?? aiRepairSession?.autonomous?.limits?.max_attempts ?? 5}`
                     : aiRepairSession?.status === "failed"
                     ? "Try automatic repair again"

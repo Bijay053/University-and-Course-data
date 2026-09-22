@@ -150,6 +150,7 @@ export function AiRepairProgress({
   const verified = autonomous.phase === "verified";
   const needsReview = autonomous.phase === "needs_review";
   const blocked = autonomous.phase === "blocked";
+  const needsCoursePage = blocked && (liveProbe?.course_pages ?? 0) === 0;
   const running = !verified && !needsReview && !blocked;
   const effectiveMaxAttempts = autonomous.limits?.max_attempts ?? maxAttempts;
   const comparison = autonomous.comparison;
@@ -228,15 +229,25 @@ export function AiRepairProgress({
             ) : (
               <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-600" />
             )}
-            {verified ? "Bounded sample verified" : needsReview ? "Repair needs review" : blocked ? "Repair blocked" : "Automatic repair running"}
+            {verified
+              ? "Bounded sample verified"
+              : needsReview
+                ? "Repair needs review"
+                : needsCoursePage
+                  ? "Official course page needed"
+                  : blocked
+                    ? "Automatic repair stopped safely"
+                    : "Automatic repair running"}
           </div>
           <p className="mt-0.5 text-[9px] text-gray-600">
             {verified
               ? "The saved config passed a bounded verification sample; full catalogue coverage is not certified."
               : needsReview
                 ? "The result was not verified automatically. Review the evidence and staged courses."
+                : needsCoursePage
+                  ? "The pages checked were not recognized as individual course pages. Paste the exact official course URL in the course report; the system will verify it and retry automatically."
                 : blocked
-                  ? "No config was marked as verified. Manual investigation is required."
+                  ? "The automatic checks could not prove a safe correction. Existing courses and settings were left unchanged."
                   : "Testing bounded changes against live official sources."}
           </p>
         </div>
@@ -245,7 +256,7 @@ export function AiRepairProgress({
         </span>
       </div>
 
-      <ol className="grid grid-cols-3 gap-1 sm:grid-cols-6" aria-label="Repair stages">
+      {!needsCoursePage && <ol className="grid grid-cols-3 gap-1 sm:grid-cols-6" aria-label="Repair stages">
         {PHASES.map((item, index) => {
           const complete = currentIndex > index || verified;
           const active = currentIndex === index && running;
@@ -265,7 +276,7 @@ export function AiRepairProgress({
             </li>
           );
         })}
-      </ol>
+      </ol>}
 
       {liveProbe && (
         <div className="rounded border border-blue-200 bg-white/80 p-2 text-[9px] text-gray-700">
@@ -290,8 +301,14 @@ export function AiRepairProgress({
                   >
                     Official source <ExternalLink className="h-2.5 w-2.5 shrink-0" />
                   </a>
-                  <span className="shrink-0">· {sample.classification}</span>
-                  {sample.reason && <span className="truncate text-gray-500">· {sample.reason}</span>}
+                  <span className="shrink-0">
+                    · {sample.classification === "unconfirmed"
+                      ? "not recognized as a course page"
+                      : sample.classification}
+                  </span>
+                  {sample.reason && !needsCoursePage && (
+                    <span className="truncate text-gray-500">· {sample.reason}</span>
+                  )}
                 </li>
               ))}
             </ul>
@@ -385,7 +402,9 @@ export function AiRepairProgress({
 
       {(autonomous.reason || (autonomous.phase === "verification_queued" && !autonomous.verification_job_id)) && (
         <p className={`rounded border bg-white/70 px-2 py-1 text-[9px] ${blocked ? "border-red-200 text-red-800" : "border-amber-200 text-amber-800"}`}>
-          {autonomous.reason ?? "Config saved. Waiting for the automatic verification scrape; this is not verified yet."}
+          {needsCoursePage
+            ? "No course was changed. Use Report official course URL so the system can verify and retry the exact page."
+            : autonomous.reason ?? "Config saved. Waiting for the automatic verification scrape; this is not verified yet."}
         </p>
       )}
 
