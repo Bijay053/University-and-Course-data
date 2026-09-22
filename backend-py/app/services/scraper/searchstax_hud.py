@@ -618,6 +618,17 @@ def _resolve_token(cfg: SearchStaxConfig) -> Optional[str]:
     return os.environ.get("SEARCHSTAX_TOKEN") or None
 
 
+async def _resolve_discovery_token(cfg: SearchStaxConfig) -> Optional[str]:
+    token = _resolve_token(cfg)
+    if token:
+        return token
+    from app.services.scraper.wlv_search_auth import WLV_ENDPOINT, fetch_public_search_auth
+    # Never send WLV's public credential to another university's endpoint.
+    if cfg.endpoints == [WLV_ENDPOINT]:
+        return await fetch_public_search_auth()
+    return None
+
+
 _MONTH_NAMES = {
     "january", "february", "march", "april", "may", "june",
     "july", "august", "september", "october", "november", "december",
@@ -1165,7 +1176,7 @@ async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> tuple[list[dict
     The name is reformatted as "{award_s} {title_t}" when award_s is not
     already the first token of title_t (avoids "MSc MSc Engineering…").
     """
-    token = _resolve_token(cfg)
+    token = await _resolve_discovery_token(cfg)
     headers: dict = {"Accept": "application/json"}
     if token:
         headers["Authorization"] = f"Token {token}"
@@ -1455,7 +1466,7 @@ async def fetch_searchstax_links(
     # normal per-course extraction runs (fees / IELTS fetched from live pages).
     if cfg.links_only:
         return await _fetch_links_only(cfg, emit=emit)  # returns (links, filter_stats)
-    token = _resolve_token(cfg)
+    token = await _resolve_discovery_token(cfg)
     headers = {"Accept": "application/json"}
     if token:
         headers["Authorization"] = f"Token {token}"
