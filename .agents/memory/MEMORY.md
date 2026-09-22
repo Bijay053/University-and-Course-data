@@ -144,3 +144,4 @@
 - [Verification continuation safety](verification-continuation-safety.md) — continue acknowledged timeouts on exact remaining samples; aggregate every child's safety evidence.
 - [Middlesex English authority](mdx-english-authority.md) — conflicting PG categories cannot become a universal default; named exceptions retain award identity.
 - [London Met audience intakes](londonmet-audience-intakes.md) — Overseas selector options own international cohorts; keep selected-year facts atomic and use linked UG English authority.
+- [HTTPX connected-peer metadata](httpx-connected-peer-metadata.md) — verify remote peers using peername with server_addr fallback; AnyIO streams may expose only the latter.
