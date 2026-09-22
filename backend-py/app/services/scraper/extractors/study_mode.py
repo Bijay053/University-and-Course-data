@@ -210,6 +210,7 @@ def has_authoritative_online_location_evidence(
 # "online and on campus" appearing in unrelated marketing copy.
 _MODE_TOKEN = (
     r"on[\s\-]?campus|online|blended|hybrid|mixed[\s\-]?mode|flexible|"
+    r"conventional|open\s+distance\s+learning|odl|"
     r"distance(?:\s+(?:learning|education))?|in[\s\-]?person|"
     r"face[\s\-]?to[\s\-]?face|onshore|remote"
 )
@@ -252,9 +253,13 @@ _VALUE_TO_LABEL: tuple[tuple[re.Pattern[str], str], ...] = (
     # between on-campus and online — semantically identical to Blended.
     (re.compile(r"blended|hybrid|mixed|flexible", re.I), "Blended"),
     (re.compile(r"on[\s\-]?campus\s*(?:and|or|&|/|,)\s*online|online\s*(?:and|or|&|/|,)\s*on[\s\-]?campus", re.I), "Blended"),
-    (re.compile(r"on[\s\-]?campus|in[\s\-]?person|face[\s\-]?to[\s\-]?face|onshore", re.I), "On Campus"),
+    # Raffles and similar providers label their campus route "Conventional"
+    # and remote route "Open Distance Learning". An explicit combined value
+    # means the programme offers both routes, not that it is online-only.
+    (re.compile(r"conventional\s*(?:and|or|&|/|,)\s*(?:open\s+distance\s+learning|odl)|(?:open\s+distance\s+learning|odl)\s*(?:and|or|&|/|,)\s*conventional", re.I), "Blended"),
+    (re.compile(r"on[\s\-]?campus|in[\s\-]?person|face[\s\-]?to[\s\-]?face|onshore|conventional", re.I), "On Campus"),
     # Distance → Online per user spec: "distance learning" is fully remote.
-    (re.compile(r"online|distance|remote", re.I), "Online"),
+    (re.compile(r"online|distance|remote|\bodl\b", re.I), "Online"),
 )
 
 

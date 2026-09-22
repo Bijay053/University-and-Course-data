@@ -5,6 +5,7 @@ import pytest
 from app.services.scraper.config import set_uni_config
 from app.services.scraper.config.loader import load_uni_config
 from app.services.scraper.extractors.study_mode import (
+    extract as extract_study_mode,
     has_authoritative_online_location_evidence,
 )
 from app.services.scraper.guards import should_stage_course
@@ -61,6 +62,28 @@ def test_title_owned_online_mode_blocks_default_campus() -> None:
     ]
 
     assert has_authoritative_online_location_evidence("Online", evidence)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("delivery", "expected"),
+    [
+        ("Conventional", "On Campus"),
+        ("Conventional or Open Distance Learning", "Blended"),
+        ("Open Distance Learning", "Online"),
+    ],
+)
+async def test_raffles_labelled_delivery_modes_are_not_page_noise(
+    delivery: str,
+    expected: str,
+) -> None:
+    result = await extract_study_mode(
+        f"<main><p>Programme Delivery Mode: {delivery}</p></main>",
+        "https://raffles-university.edu.my/programme/example/",
+    )
+
+    assert result[0].value == expected
+    assert result[0].method == "study_mode:label"
 
 
 @pytest.mark.parametrize(
