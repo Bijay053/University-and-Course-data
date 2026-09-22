@@ -707,6 +707,95 @@ def _parse_londonmet_undergraduate_english(html: str, page_url: str) -> dict[str
     }
 
 
+def _parse_londonmet_undergraduate_english_programs(
+    html: str,
+    page_url: str,
+) -> list[dict[str, Any]]:
+    """Return only explicitly scored named exceptions from London Met's UG page.
+
+    The ``Higher requirements`` accordion first gives course-owned IELTS
+    scores in parentheses, then gives a contradictory 6.5/6.0 group default.
+    Keep the former attached to each linked course so it can override the
+    standard 6.0/5.5 profile without ever becoming a university-wide value.
+    """
+    parsed_url = urlparse(page_url)
+    if (parsed_url.hostname or "").lower() not in {
+        "londonmet.ac.uk",
+        "www.londonmet.ac.uk",
+    }:
+        return []
+    if "/international/applying/english-language-requirements/undergraduate" not in (
+        parsed_url.path or ""
+    ):
+        return []
+
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:
+        return []
+
+    try:
+        soup = BeautifulSoup(html or "", "html.parser")
+    except Exception:
+        return []
+
+    heading = next(
+        (
+            button
+            for button in soup.find_all("button")
+            if " ".join(button.get_text(" ", strip=True).lower().split())
+            == "higher requirements"
+        ),
+        None,
+    )
+    section_id = str(heading.get("aria-controls") or "").strip() if heading else ""
+    section = soup.find(id=section_id) if section_id else None
+    if section is None:
+        return []
+    named_list = section.find("ul")
+    if named_list is None:
+        return []
+
+    profiles: list[dict[str, Any]] = []
+    for item in named_list.find_all("li", recursive=False):
+        item_text = " ".join(item.get_text(" ", strip=True).split())
+        overall_match = re.search(
+            r"(?:\boverall\s+|\bmust\s+not\s+be\s+less\s+than\s+)"
+            r"([4-9](?:\.[0-9]+)?)\b",
+            item_text,
+            re.IGNORECASE,
+        )
+        minimum_match = re.search(
+            r"\b(?:no\s+less\s+than|no\s+individual\s+section\s+less\s+than)"
+            r"\s+([4-9](?:\.[0-9]+)?)\b",
+            item_text,
+            re.IGNORECASE,
+        )
+        # Both values must be stated on the named-course list item.  Do not
+        # borrow the generic 6.5/6.0 paragraph later in this accordion.
+        if not overall_match or not minimum_match:
+            continue
+        values = {
+            "ielts_overall": float(overall_match.group(1)),
+            "ielts_minimum": float(minimum_match.group(1)),
+        }
+        for link in item.find_all("a", href=True):
+            program_name = " ".join(link.get_text(" ", strip=True).split())
+            href = urlparse(str(link.get("href") or ""))
+            course_code = (href.path or "").rstrip("/").rsplit("/", 1)[-1]
+            if not program_name or not course_code:
+                continue
+            profiles.append(
+                {
+                    "program_names": program_name,
+                    "program_aliases": [program_name],
+                    "course_codes": [course_code],
+                    "values": dict(values),
+                }
+            )
+    return profiles
+
+
 async def _parse_english_by_level_async(
     html: str, page_url: str
 ) -> dict[str, dict[str, Any]]:
@@ -1675,7 +1764,7 @@ async def _fetch_with_browser_fallback(url: str) -> str | None:
 #                             english_by_level + english_by_program
 
 _CACHE_TTL_DAYS = 30
-_ENGLISH_CACHE_SCHEMA_VERSION = 8
+_ENGLISH_CACHE_SCHEMA_VERSION = 9
 
 
 def _is_non_tuition_central_fee_pdf(
@@ -1781,7 +1870,8 @@ def _is_empty_central_result(page_type: str, parsed_data: dict[str, Any]) -> boo
         _has_flat = bool(parsed_data.get("english"))
         _by_level = parsed_data.get("english_by_level") or {}
         _has_level = any(bool(v) for v in _by_level.values())
-        return not (_has_flat or _has_level)
+        _has_program = bool(parsed_data.get("english_by_program"))
+        return not (_has_flat or _has_level or _has_program)
     return False
 
 
@@ -2203,6 +2293,7 @@ async def prefetch_central_pages(
 
     if english_ug_url or english_pg_url:
         _split_by_level: dict[str, Any] = {}
+        _split_by_program: list[dict[str, Any]] = []
         for _split_url, _split_bucket, _split_cache_key in (
             (english_ug_url, "undergraduate", "english_requirements_ug"),
             (english_pg_url, "postgraduate", "english_requirements_pg"),
@@ -2214,10 +2305,23 @@ async def prefetch_central_pages(
                 _sc = None
                 if university_id is not None:
                     _sc = await _cache_get(university_id, _split_cache_key)
+                    if (
+                        _sc is not None
+                        and not _english_cache_is_current(_sc)
+                    ):
+                        log.info(
+                            "[CACHE] %s parser version stale for uni %s — re-fetching",
+                            _split_cache_key,
+                            university_id,
+                        )
+                        _sc = None
                     if _sc is not None:
                         _slots = _sc.get("slots") or {}
                         if _slots:
                             _split_by_level[_split_bucket] = _slots
+                        _split_by_program.extend(
+                            _sc.get("english_by_program") or []
+                        )
                         if emit:
                             _cs = ", ".join(f"{k}={v}" for k, v in sorted(_slots.items())) or "no values"
                             await emit(
@@ -2254,6 +2358,11 @@ async def prefetch_central_pages(
                 _split_slots = _parse_londonmet_undergraduate_english(
                     _split_html, _split_url
                 )
+                _split_profiles = (
+                    _parse_londonmet_undergraduate_english_programs(
+                        _split_html, _split_url
+                    )
+                )
                 if not _split_slots:
                     _split_slots = await _parse_english_page_html_async(
                         _split_html, _split_url
@@ -2276,7 +2385,18 @@ async def prefetch_central_pages(
                             timeout=75,
                         )
                         if _br_html:
-                            _split_slots = await _parse_english_page_html_async(_br_html, _split_url)
+                            _split_slots = _parse_londonmet_undergraduate_english(
+                                _br_html, _split_url
+                            )
+                            _split_profiles = (
+                                _parse_londonmet_undergraduate_english_programs(
+                                    _br_html, _split_url
+                                )
+                            )
+                            if not _split_slots:
+                                _split_slots = await _parse_english_page_html_async(
+                                    _br_html, _split_url
+                                )
                     except Exception as _br_exc:
                         log.warning(
                             "central_pages: browser fallback for %s english page failed (%s): %s",
@@ -2285,12 +2405,25 @@ async def prefetch_central_pages(
 
                 if _split_slots:
                     _split_by_level[_split_bucket] = _split_slots
+                    _split_by_program.extend(_split_profiles)
                     if university_id is not None:
+                        _split_cache_payload: dict[str, Any] = {
+                            "_parser_version": _ENGLISH_CACHE_SCHEMA_VERSION,
+                            "slots": _split_slots,
+                            "bucket": _split_bucket,
+                            "english_by_level": {
+                                _split_bucket: _split_slots
+                            },
+                        }
+                        if _split_profiles:
+                            _split_cache_payload["english_by_program"] = (
+                                _split_profiles
+                            )
                         await _cache_set(
                             university_id,
                             _split_cache_key,
                             _split_url,
-                            {"slots": _split_slots, "bucket": _split_bucket, "english_by_level": {_split_bucket: _split_slots}},
+                            _split_cache_payload,
                         )
                     log.info(
                         "central_pages: %s english page parsed → %s from %s",
@@ -2321,6 +2454,8 @@ async def prefetch_central_pages(
 
         if _split_by_level:
             result["english_by_level"] = _split_by_level
+            if _split_by_program:
+                result["english_by_program"] = _split_by_program
             # Track per-level source URLs so evidence snippets reference the
             # correct authoritative page (not a mix).
             if english_ug_url:
@@ -2569,7 +2704,14 @@ async def prefetch_central_pages(
                                 url=english_url,
                             )
 
-                    _program_profiles = _parse_program_keyed_english_tables(eng_html)
+                    _program_profiles = (
+                        _parse_londonmet_undergraduate_english_programs(
+                            eng_html, english_url
+                        )
+                    )
+                    _program_profiles.extend(
+                        _parse_program_keyed_english_tables(eng_html)
+                    )
                     if _program_profiles:
                         result["english_by_program"] = _program_profiles
                         log.info(

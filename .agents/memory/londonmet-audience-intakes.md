@@ -17,4 +17,8 @@ Do not invent a numeric academic score to make postgraduate completeness reach 1
 
 **Why:** A degree classification is not a numeric UCAS score or percentage. Preserve the classification in the entry-requirement text; only explicitly labelled UCAS values belong in numeric UCAS fields.
 
+Named English exceptions override the general undergraduate profile, including for integrated foundation degrees.
+
+**Why:** The official page explicitly assigns Social Work (including foundation year) IELTS 7.0 with 6.5 in every component, agreeing with the course page, while a later grouped sentence gives conflicting lower values. Use the named requirement, not the later generic sentence.
+
 **How to apply:** Require audience identity from the same option/optgroup, exclude unrelated international markup, reject past-only dated cohorts, and use yearless options only when no eligible dated cohort exists. Resolve undergraduate IELTS from the bounded official standard-requirements section while excluding later exception/academic-IELTS sections.

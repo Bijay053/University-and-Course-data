@@ -39,6 +39,7 @@ from app.services.scraper.extractors import (
     fee,
     intake,
     location,
+    londonmet_academic,
     study_mode,
 )
 from app.services.scraper.extractors.base import ExtractionResult
@@ -2515,6 +2516,7 @@ _EXTRACTORS = (
     (english_test, ()),
     (intake, ()),
     (duration, ()),
+    (londonmet_academic, ()),
     (degree_level, ()),
     (study_mode, ()),
 )

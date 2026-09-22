@@ -1,14 +1,21 @@
+import pytest
+
+from app.services.scraper import central_pages
 from app.services.scraper.extractors.londonmet_chrome_scrub import (
     extract_real_fees,
     has_international_options,
     is_londonmet_host,
     parse_data_cost_entries,
 )
-from app.services.scraper.central_pages import _parse_londonmet_undergraduate_english
+from app.services.scraper.central_pages import (
+    _parse_londonmet_undergraduate_english,
+    _parse_londonmet_undergraduate_english_programs,
+)
 from app.services.scraper.config.loader import get_config_for_host
 from app.services.scraper.pipelines.single_course import (
     _central_english_audience_mismatch,
     _normalise_central_english_fields,
+    _select_central_english_program,
 )
 
 
@@ -57,6 +64,166 @@ def test_londonmet_english_uses_standard_ug_row_not_exception_section():
         html,
         "https://www.londonmet.ac.uk/international/applying/english-language-requirements/undergraduate/",
     ) == {"ielts_overall": 6.0, "ielts_minimum": 5.5}
+
+
+def test_londonmet_named_ug_scores_override_only_exact_linked_courses():
+    html = """
+    <button aria-controls="higher-panel">Higher requirements</button>
+    <div id="higher-panel">
+      <ul>
+        <li>
+          <a href="/courses/undergraduate/human-nutrition---bsc-hons/">
+            Human Nutrition BSc
+          </a>
+          (English language which must not be less than 6.5, with no individual
+          section less than 6.0)
+        </li>
+        <li>
+          <a href="/courses/undergraduate/physiotherapy---bsc-hons/">
+            Physiotherapy BSc
+          </a>
+          (Overall 7 with no less than 6.5 in each component)
+        </li>
+        <li>
+          <a href="/courses/undergraduate/social-work---bsc-hons/">
+            Social Work BSc
+          </a>
+          and
+          <a href="/courses/undergraduate/social-work-including-foundation-year---bsc-hons/">
+            Social Work (including foundation year) BSc
+          </a>
+          (Overall 7 with no less than 6.5 in each component)
+        </li>
+        <li>
+          <a href="/courses/undergraduate/dietetics---bsc-hons/">
+            Dietetics BSc
+          </a>
+          and
+          <a href="/courses/undergraduate/dietetics-and-nutrition---bsc-hons/">
+            Dietetics and Nutrition BSc
+          </a>
+          (Overall 7 with no less than 6.5 in each component)
+        </li>
+        <li>
+          <a href="/courses/undergraduate/biomedical-science---bsc-hons/">
+            Biomedical Science BSc
+          </a>
+          (Overall 6 is accepted for IELTS)
+        </li>
+      </ul>
+      <h3>Academic IELTS</h3>
+      <p>Overall score of 6.5 with 6.0 in each component</p>
+    </div>
+    """
+    source_url = (
+        "https://www.londonmet.ac.uk/international/applying/"
+        "english-language-requirements/undergraduate/"
+    )
+    profiles = _parse_londonmet_undergraduate_english_programs(html, source_url)
+
+    assert len(profiles) == 6
+    selected = _select_central_english_program(
+        profiles,
+        "Social Work - BSc (Hons)",
+        "https://www.londonmet.ac.uk/courses/undergraduate/"
+        "social-work---bsc-hons/",
+    )
+    assert _normalise_central_english_fields(selected) == {
+        "ielts_overall": 7.0,
+        "ielts_listening": 6.5,
+        "ielts_reading": 6.5,
+        "ielts_writing": 6.5,
+        "ielts_speaking": 6.5,
+    }
+    assert _normalise_central_english_fields(
+        _select_central_english_program(
+            profiles,
+            "Human Nutrition - BSc (Hons)",
+            "https://www.londonmet.ac.uk/courses/undergraduate/"
+            "human-nutrition---bsc-hons/",
+        )
+    ) == {
+        "ielts_overall": 6.5,
+        "ielts_listening": 6.0,
+        "ielts_reading": 6.0,
+        "ielts_writing": 6.0,
+        "ielts_speaking": 6.0,
+    }
+    assert _select_central_english_program(
+        profiles,
+        "Biomedical Science - BSc (Hons)",
+        "https://www.londonmet.ac.uk/courses/undergraduate/"
+        "biomedical-science---bsc-hons/",
+    ) == {}
+    assert _select_central_english_program(
+        profiles,
+        "International Business - BA (Hons)",
+        "https://www.londonmet.ac.uk/courses/undergraduate/"
+        "international-business---ba-hons/",
+    ) == {}
+
+
+def test_londonmet_named_profiles_require_official_ug_scope():
+    html = """
+    <button aria-controls="higher-panel">Higher requirements</button>
+    <div id="higher-panel"><ul><li>
+      <a href="/courses/undergraduate/social-work---bsc-hons/">Social Work BSc</a>
+      (Overall 7 with no less than 6.5 in each component)
+    </li></ul></div>
+    """
+    assert _parse_londonmet_undergraduate_english_programs(
+        html, "https://example.edu/undergraduate/"
+    ) == []
+
+
+@pytest.mark.asyncio
+async def test_londonmet_split_ug_prefetch_returns_default_and_named_profiles(
+    monkeypatch,
+):
+    html = """
+    <h3>IELTS</h3>
+    <p>Overall score of 6.0 with 5.5 in each component</p>
+    <button aria-controls="higher-panel">Higher requirements</button>
+    <div id="higher-panel">
+      <ul><li>
+        <a href="/courses/undergraduate/social-work---bsc-hons/">
+          Social Work BSc
+        </a>
+        (Overall 7 with no less than 6.5 in each component)
+      </li></ul>
+      <h3>Academic IELTS</h3>
+      <p>Overall score of 6.5 with 6.0 in each component</p>
+    </div>
+    """
+
+    async def fake_fetch_html(_url):
+        return html
+
+    monkeypatch.setattr(central_pages, "fetch_html", fake_fetch_html)
+    result = await central_pages.prefetch_central_pages(
+        {
+            "uniPages": {
+                "entryPageUG": (
+                    "https://www.londonmet.ac.uk/international/applying/"
+                    "english-language-requirements/undergraduate/"
+                )
+            }
+        }
+    )
+
+    assert result["english"] == {}
+    assert result["english_by_level"]["undergraduate"] == {
+        "ielts_overall": 6.0,
+        "ielts_minimum": 5.5,
+    }
+    assert result["english_by_program"] == [
+        {
+            "program_names": "Social Work BSc",
+            "program_aliases": ["Social Work BSc"],
+            "course_codes": ["social-work---bsc-hons"],
+            "values": {"ielts_overall": 7.0, "ielts_minimum": 6.5},
+        }
+    ]
 
 
 def test_generic_central_english_survives_without_audience_identity_and_expands_bands():

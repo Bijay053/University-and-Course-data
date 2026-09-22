@@ -9,6 +9,18 @@ FIXTURES = Path(__file__).parent / "fixtures"
 BASE = "https://www.londonmet.ac.uk/courses"
 
 
+def test_uk_lower_second_degree_is_qualification_not_numeric_score():
+    html = '<section id="entry-requirements"><ul><li>a lower second class (2:2) UK degree (or equivalent) in Computing</li></ul></section>'
+    result = extract_fields(html, BASE + "/postgraduate/computer-networking/")
+    assert result["academic_level"] == "Bachelor's degree"
+    assert "academic_score" not in result
+
+
+def test_academics_run_with_deterministic_extractors_before_ai():
+    from app.services.scraper.pipelines.single_course import _EXTRACTORS
+    assert any(module.__name__.endswith(".londonmet_academic") for module, _ in _EXTRACTORS)
+
+
 def _fixture(name: str) -> str:
     return (FIXTURES / name).read_text(encoding="utf-8")
 

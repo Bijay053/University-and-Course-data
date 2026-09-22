@@ -40,7 +40,8 @@ _YEAR_12_RE = re.compile(
 )
 _BACHELOR_RE = re.compile(
     r"\b(?:honours?\s+degree|bachelor(?:'s|\u2019s)?\s+degree|"
-    r"undergraduate\s+degree|first\s+degree)\b",
+    r"undergraduate\s+degree|first\s+degree|"
+    r"(?:lower|upper)\s+second\s+class(?:\s*\(2:[12]\))?\s+(?:UK\s+)?degree)\b",
     re.IGNORECASE,
 )
 _MASTER_RE = re.compile(
@@ -219,6 +220,8 @@ def apply_fill_only(
 async def extract(html: str, url: str) -> list[ExtractionResult]:
     """Extractor-protocol wrapper around :func:`extract_fields`."""
     fields = extract_fields(html, url)
+    if not fields:
+        return []
     panel = _entry_panel(html)
     snippet = (
         " ".join(panel.get_text(" ", strip=True).split())[:500]
