@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import { Loader2 } from "lucide-react";
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,7 @@ type Values = {
   expected: string; fields: string[]; description: string; source: string;
 };
 const defaults: Values = { kind: "missing", eligibilityReview: false, urls: "", catalogue: "", expected: "", fields: [], description: "", source: "" };
+const activeStatuses = new Set(["queued", "running", "recovering", "verification_queued", "verifying"]);
 
 export function Exclusions({ counts }: { counts: Record<string, unknown> }) {
   const staging = counts.staging_rejections as { reasons?: Record<string, number> } | undefined;
@@ -231,8 +233,43 @@ export function CourseReport({ jobId, onReview, onStarted }: {
       </Button>
     </form></Form>}
     {loading && <p className="text-xs">Loading report history…</p>}
-    {reports.map(report => <article key={report.report_id ?? report.job_id} className="space-y-2 rounded border bg-background p-3 text-sm" data-testid={`report-${report.job_id}`}>
-      <p><strong>{report.request.kind === "missing" ? "Missing course recovery" : "Incorrect field recovery"}</strong> — {report.status}</p>
+    {reports.map(report => {
+      const active = activeStatuses.has(report.status);
+      const processed = report.processed ?? report.continuation?.completed_count ?? 0;
+      const total = Math.max(report.continuation?.selected_count ?? report.found ?? 0, processed);
+      const progress = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
+      return <article key={report.report_id ?? report.job_id} className="space-y-2 rounded border bg-background p-3 text-sm" data-testid={`report-${report.job_id}`}>
+      <p className="flex items-center gap-2">
+        {active && <Loader2 className="h-4 w-4 animate-spin text-primary" aria-hidden="true" />}
+        <strong>{report.request.kind === "missing" ? "Missing course recovery" : "Incorrect field recovery"}</strong> — {report.status}
+      </p>
+      {active && <div
+        className="space-y-1 rounded border border-blue-200 bg-blue-50 p-2 text-blue-950"
+        role="status"
+        aria-live="polite"
+        data-testid={`report-progress-${report.job_id}`}
+      >
+        <p className="flex items-center gap-2 text-xs font-medium">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+          {total > 0
+            ? `Processing reported pages… ${processed} of ${total} complete`
+            : "Starting recovery… waiting for the first page"}
+        </p>
+        <div
+          className="h-2 overflow-hidden rounded-full bg-blue-100"
+          role="progressbar"
+          aria-label="Recovery progress"
+          aria-valuemin={0}
+          aria-valuemax={total || undefined}
+          aria-valuenow={total > 0 ? processed : undefined}
+        >
+          <div
+            className={`h-full rounded-full bg-blue-600 transition-[width] duration-500 ${total > 0 ? "" : "w-1/3 animate-pulse"}`}
+            style={total > 0 ? { width: `${progress}%` } : undefined}
+          />
+        </div>
+        <p className="text-[11px] text-blue-800">This updates automatically about every 15 seconds.</p>
+      </div>}
       {report.request.eligibility_review && <p className="text-xs">Eligibility review requested; only page-owned foundation/pathway evidence can recover this page.</p>}
       {report.request.description && <p>{report.request.description}</p>}
       {report.request.fields?.length ? <p>Reported fields: {report.request.fields.join(", ")}</p> : null}
@@ -372,6 +409,7 @@ export function CourseReport({ jobId, onReview, onStarted }: {
           className="text-destructive" role="alert" data-testid={`retry-error-${report.job_id}`}
         >{retryErrors[report.job_id]}</p>}
       </div>}
-    </article>)}
+    </article>;
+    })}
   </section>;
 }

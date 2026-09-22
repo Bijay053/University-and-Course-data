@@ -55,6 +55,22 @@ describe("course report recovery", () => {
     expect(screen.getByText(/finished run does not confirm/)).toBeTruthy();
   });
 
+  it("shows animated progress while a recovery is running", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({ reports: [{
+      job_id: "child-running", status: "running", found: 2, processed: 1,
+      staged: 0, skipped: 0, errors: 0, exclusions: {},
+      request: { kind: "missing", course_urls: ["https://uni.edu/foundation"] },
+    }], source_exclusions: {} })));
+    render(<CourseReport jobId="parent" onReview={vi.fn()} />);
+
+    const progress = await screen.findByTestId("report-progress-child-running");
+    expect(progress.textContent).toContain("Processing reported pages… 1 of 2 complete");
+    const bar = screen.getByRole("progressbar", { name: "Recovery progress" });
+    expect(bar.getAttribute("aria-valuenow")).toBe("1");
+    expect(bar.getAttribute("aria-valuemax")).toBe("2");
+    expect(screen.getByText(/updates automatically about every 15 seconds/)).toBeTruthy();
+  });
+
   it("offers a self-service retry instead of an empty review when every reported page was skipped", async () => {
     const report = {
       job_id: "child-empty", status: "completed", found: 1, staged: 0, skipped: 1, errors: 0,
