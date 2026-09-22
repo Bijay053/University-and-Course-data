@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from app.routers.scrape_reports import CourseReport, report_payload, report_result, validate_official_urls
 from app.services.scraper.autonomous_verification import validate_verification
+from app.services.scraper.url_identity import canonical_course_url_key
 
 
 def test_missing_requires_official_targets():
@@ -319,8 +320,10 @@ async def test_retry_revalidates_original_report_through_fresh_submission(monkey
     from app.routers import scrape_reports as routes
 
     previous = SimpleNamespace(
+        runtime_job_id="old-child",
+        university_id=7,
         status="completed",
-        imported=0,
+        imported=28,
         request_payload={"courseReport": {
             "id": "report_old",
             "source_job_id": "parent",
@@ -330,9 +333,19 @@ async def test_retry_revalidates_original_report_through_fresh_submission(monkey
             "eligibility_review": True,
         }},
     )
-    db = SimpleNamespace(get=AsyncMock(return_value=previous))
+    rows = SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [previous]))
+    db = SimpleNamespace(
+        get=AsyncMock(return_value=previous),
+        execute=AsyncMock(return_value=rows),
+    )
     submit = AsyncMock(return_value={"job_id": "fresh-child", "status": "queued"})
     monkeypatch.setattr(routes, "submit_course_report", submit)
+    monkeypatch.setattr(
+        "app.services.ai_repair_workflow._staged_url_keys",
+        AsyncMock(return_value={
+            canonical_course_url_key("https://uni.edu/programme/unrelated/")
+        }),
+    )
 
     result = await routes.retry_course_report(
         "parent", "old-child", db, {"id": 12}
@@ -340,9 +353,10 @@ async def test_retry_revalidates_original_report_through_fresh_submission(monkey
 
     assert result["job_id"] == "fresh-child"
     retried = submit.await_args.args[1]
-    assert retried.catalogue_url == (
+    assert retried.course_urls == [
         "https://uni.edu/programme/foundation-in-liberal-arts/"
-    )
+    ]
+    assert retried.catalogue_url is None
     assert retried.eligibility_review is True
     submit.assert_awaited_once_with("parent", retried, db, {"id": 12})
 

@@ -379,6 +379,10 @@ def report_result(job, workflow: dict | None = None, children=None, completed_ke
     acknowledged = job.status in TERMINAL and bool(getattr(job, "completed_at", None))
     available = bool(remaining) and acknowledged and state.get("phase") == "needs_review"
     request = (job.request_payload or {}).get("courseReport") or {}
+    retry_urls = [
+        url for url in _reported_retry_urls(request)
+        if canonical_course_url_key(url) not in completed
+    ]
     return {
         "job_id": job.runtime_job_id,
         "report_id": request.get("id"),
@@ -398,6 +402,11 @@ def report_result(job, workflow: dict | None = None, children=None, completed_ke
             "reason": ("review_required" if available else "run_not_reviewable" if not acknowledged
                        else "no_remaining_urls" if not remaining else "awaiting_workflow"),
         },
+        "retry": {
+            "available": acknowledged and bool(retry_urls),
+            "remaining_urls": retry_urls,
+            "remaining_count": len(retry_urls),
+        },
         "status": state["phase"] if state.get("phase") in {"blocked", "recovering"} else job.status,
         "request": (job.request_payload or {}).get("courseReport"),
         "found": job.total_found or 0, "staged": job.imported or 0,
@@ -414,6 +423,21 @@ def report_result(job, workflow: dict | None = None, children=None, completed_ke
             "exhausted": bool(state.get("recovery_exhausted")),
         },
     }
+
+
+def _reported_retry_urls(request: dict) -> list[str]:
+    urls = [
+        url for url in (request.get("course_urls") or [])
+        if isinstance(url, str) and url.strip()
+    ]
+    catalogue_url = request.get("catalogue_url")
+    if (
+        request.get("eligibility_review") is True
+        and isinstance(catalogue_url, str)
+        and catalogue_url.strip()
+    ):
+        urls.append(catalogue_url)
+    return list(dict.fromkeys(urls))
 
 
 @router.get("/jobs/{job_id}/course-reports")
@@ -479,13 +503,34 @@ async def retry_course_report(
         raise HTTPException(404, "Course report not found")
     if previous.status not in TERMINAL:
         raise HTTPException(409, "Wait until the current recovery finishes")
-    if (previous.imported or 0) > 0:
-        raise HTTPException(409, "This recovery already has staged courses to review")
+    from app.services.ai_repair_workflow import _staged_url_keys
+    from app.services.scraper.url_identity import canonical_course_url_key
 
-    # Build a fresh report and workflow identity. The normal submission path
-    # revalidates every official URL, checks active-job/lease fences and applies
-    # the current bounded recovery policy before dispatching.
-    report = CourseReport.model_validate(request)
+    report_id = request["id"]
+    children = (await db.execute(select(ScrapeRuntimeJob).where(
+        ScrapeRuntimeJob.university_id == previous.university_id,
+        ScrapeRuntimeJob.request_payload["courseReport"]["id"].astext == report_id,
+    ))).scalars().all()
+    staged_keys = set()
+    for child in children:
+        staged_keys.update(
+            await _staged_url_keys(child.runtime_job_id, child.university_id, db)
+        )
+    unresolved = [
+        url for url in _reported_retry_urls(request)
+        if canonical_course_url_key(url) not in staged_keys
+    ]
+    if not unresolved:
+        raise HTTPException(409, "Every directly reported course URL is already staged")
+
+    # Retry only exact unresolved report URLs, never the broad catalogue result
+    # that may have staged unrelated courses. The normal submission path then
+    # revalidates every URL and applies active-job, lease and budget fences.
+    report = CourseReport.model_validate({
+        **request,
+        "course_urls": unresolved,
+        "catalogue_url": None,
+    })
     return await submit_course_report(job_id, report, db, actor)
 
 

@@ -20,6 +20,7 @@ type Report = {
     available: boolean; remaining_urls: string[]; remaining_count: number; completed_count: number;
     selected_count: number; reason?: string; run_count: number;
   };
+  retry?: { available: boolean; remaining_urls: string[]; remaining_count: number };
   children?: Array<{
     job_id: string; status: string; staged: number; processed?: number; found?: number;
     skipped?: number; errors?: number;
@@ -341,28 +342,36 @@ export function CourseReport({ jobId, onReview, onStarted }: {
           Review {report.staged} staged {report.staged === 1 ? "course" : "courses"}
         </Button>
       ) : ["completed", "completed_with_errors", "stopped", "failed", "failed_degraded"].includes(report.status) ? (
-        <div className="space-y-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900" role="status">
+        <div className="rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900" role="status">
           <p>
-            No recovered courses are available to review. Retry revalidates the original official sources and runs them
-            again with the current recovery rules.
+            No recovered courses are available to review.
           </p>
-          <Button
-            size="sm"
-            variant="outline"
-            type="button"
-            disabled={Boolean(retryBusy)}
-            onClick={() => void retryReport(report)}
-            data-testid={`button-retry-report-${report.job_id}`}
-          >
-            {retryBusy === report.job_id ? "Retrying recovery…" : "Retry recovery"}
-          </Button>
-          {retryErrors[report.job_id] && <p
-            className="text-destructive" role="alert" data-testid={`retry-error-${report.job_id}`}
-          >{retryErrors[report.job_id]}</p>}
         </div>
       ) : (
         <p className="text-xs text-muted-foreground">Review will become available if this recovery stages an eligible course.</p>
       )}
+      {report.retry?.available && <div
+        className="space-y-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900"
+        data-testid={`retry-${report.job_id}`}
+      >
+        <p>
+          {report.retry.remaining_count} directly reported {report.retry.remaining_count === 1 ? "URL has" : "URLs have"} not
+          produced a staged course. Retry revalidates only {report.retry.remaining_count === 1 ? "that source" : "those sources"}.
+        </p>
+        <Button
+          size="sm"
+          variant="outline"
+          type="button"
+          disabled={Boolean(retryBusy)}
+          onClick={() => void retryReport(report)}
+          data-testid={`button-retry-report-${report.job_id}`}
+        >
+          {retryBusy === report.job_id ? "Retrying recovery…" : "Retry recovery"}
+        </Button>
+        {retryErrors[report.job_id] && <p
+          className="text-destructive" role="alert" data-testid={`retry-error-${report.job_id}`}
+        >{retryErrors[report.job_id]}</p>}
+      </div>}
     </article>)}
   </section>;
 }

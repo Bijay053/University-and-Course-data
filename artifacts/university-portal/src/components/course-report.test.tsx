@@ -60,6 +60,7 @@ describe("course report recovery", () => {
       job_id: "child-empty", status: "completed", found: 1, staged: 0, skipped: 1, errors: 0,
       exclusions: { category_landing_page_missing_degree_qualifier: 1 },
       request: { kind: "missing", course_urls: ["https://uni.edu/foundation"] },
+      retry: { available: true, remaining_urls: ["https://uni.edu/foundation"], remaining_count: 1 },
     };
     const fetcher = vi.fn().mockResolvedValue(response({ reports: [report], source_exclusions: {} }));
     vi.stubGlobal("fetch", fetcher);
