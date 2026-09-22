@@ -326,6 +326,15 @@ The refresh client resolves the default SSM document once, invokes that exact
 numeric version, and verifies the same content after the host command succeeds;
 an infrastructure update cannot silently switch the command mid-invocation.
 
+Store sanitized production refresh evidence under `backend-py/runtime-proofs/`
+when an out-of-band infrastructure repair is required. Evidence may include the
+fixed document name/version and content hashes, principal and instance ARNs,
+sanitized success markers, TLS smoke outcome, and read-only schema-preflight
+outcome. It must never contain the secret ARN, database URL, password, command
+stdout/stderr, or environment-file contents. Mark direct IAM repairs as
+requiring CloudFormation reconciliation so a later stack update cannot silently
+restore stale policy.
+
 The document also maintains a lexically-last systemd drop-in for both services
 so older environment drop-ins cannot override the managed database credential
 file.

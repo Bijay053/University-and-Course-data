@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "verified_at": "2026-09-22T04:19:59Z",
+  "aws_account_id": "905043442097",
+  "region": "ap-south-1",
+  "routine_principal_arn": "arn:aws:iam::905043442097:user/replit-production-ssm",
+  "production_instance_id": "i-03547b132b6aa4ffb",
+  "fixed_document": {
+    "name": "university-portal-database-credential-refresh",
+    "default_version": "11",
+    "content_sha256": "12c9037c0da1b51878bd07cec57b55881fa7e3633204554cf654cb06c30fc9d8",
+    "main_steps_sha256": "1fc966905320ed0d95dce3caf4f7fce00ed72afbc36ed8a9f773d8f5a9e34f78",
+    "get_document_allowed": true,
+    "describe_document_allowed": true,
+    "version_pinned_for_invocation": true,
+    "content_unchanged_after_invocation": true
+  },
+  "credential_refresh": {
+    "status": "success",
+    "sanitized_success_marker_verified": true,
+    "password_accepted_by_client": false,
+    "password_exposed_to_client": false,
+    "database_environment_replaced_atomically": true,
+    "api_and_celery_restart_verified": true,
+    "tls_select_1_verified": true
+  },
+  "guarded_release_schema_preflight": {
+    "status": "success",
+    "read_only": true,
+    "result": "Worker-fencing schema prerequisites verified (read-only)."
+  },
+  "cloudformation": {
+    "reconciliation_required": true,
+    "reason": "The account administrator applied the checked-in fixed-document read statement directly because no workspace identity could update the revision-fenced stack.",
+    "safety": "The applied statement is scoped to GetDocument and DescribeDocument on the exact fixed document ARN; no arbitrary RunShellScript or secret-read permission was added."
+  }
+}
