@@ -26,7 +26,12 @@
 #  6. IELTS missing on all courses — WLV does not publish per-course IELTS scores;
 #     English requirements page lists 6.0 overall as the general UG minimum.
 
+locked_config_paths:
+  - discovery.allow_url_patterns
+
 discovery:
+  allow_url_patterns:
+    - '^https?://(?:www\.)?wlv\.ac\.uk/courses/[^/?#]+/?(?:\?[^#]*)?$'
   # ── SearchStax Solr provider (replaces browser BFS discovery) ─────────────
   # WLV's search page (https://www.wlv.ac.uk/search/) is powered by a
   # SearchStax-hosted Solr core that indexes all 433 courses.  The browser BFS

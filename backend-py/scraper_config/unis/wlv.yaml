@@ -8,7 +8,14 @@
 # Review and expand it to improve discovery and extraction quality.
 # See scraper_config/defaults.yaml for all available options.
 
+locked_config_paths:
+  - discovery.allow_url_patterns
+
 discovery:
+  # SearchStax returns the official apex host; targeted retries must accept
+  # both forms even when old generated/operator rules require www.
+  allow_url_patterns:
+    - '^https?://(?:www\.)?wlv\.ac\.uk/courses/[^/?#]+/?(?:\?[^#]*)?$'
   # WLV's listing navigation exposes only a small, noisy subset of the
   # catalogue. SearchStax owns the current course URL and title set.
   searchstax:

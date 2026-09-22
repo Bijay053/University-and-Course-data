@@ -43,6 +43,16 @@ provider's document type and URL ownership before emitting links, then do not
 apply BFS/sitemap allow, block, must-contain, or detail patterns to that trusted
 set. Provider-side title/type exclusions remain valid.
 
+Targeted retries do not inherit provider-link trust; WLV's verified course
+allowlist must accept both its apex and www hosts.
+
+**Why:** The public catalogue supplied apex URLs, but a stale www-only operator
+rule dropped every selected retry and reported a completed zero-course job.
+
+**How to apply:** Keep both host forms in the locked recipe and verify nonzero
+processed courses after retrying; a completed status with zero errors is not
+proof that any selected course was attempted.
+
 ## WLV Solr field map (verified 2026-06-04)
 Standard defaults match WLV for `url` (url_t), `name` (title_t), `degree_type` (award_s).
 Override required for:

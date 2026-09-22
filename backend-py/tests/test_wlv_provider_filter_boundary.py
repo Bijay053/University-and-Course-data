@@ -1,7 +1,28 @@
 """WLV SearchStax course documents must not be re-filtered by stale URL rules."""
 from pathlib import Path
+import re
+import pytest
 
-from app.services.scraper.config.loader import load_uni_config
+from app.services.scraper.config.loader import load_uni_config, get_config_for_host
+
+
+@pytest.mark.parametrize("university_id", [74, 1761])
+def test_wlv_targeted_retry_accepts_both_official_hosts_despite_stale_rules(university_id):
+    cfg = get_config_for_host(
+        hostname="www.wlv.ac.uk", name="University of Wolverhampton",
+        scrape_url="https://www.wlv.ac.uk", university_id=university_id,
+        db_scrape_config={
+            "admin_config": {"discovery": {"allow_url_patterns": [r"^https?://www\.wlv\.ac\.uk/courses/[^/?#]+/$"]}},
+            "auto_config": {"discovery": {"allow_url_patterns": [r"^/undergraduate/"]}},
+        },
+        create_missing_stub=False,
+    )
+    matches = lambda url: any(re.search(p, url) for p in cfg.discovery.allow_url_patterns)
+    assert matches("https://wlv.ac.uk/courses/bsc-hons-computer-science-with-foundation-year/")
+    assert matches("https://www.wlv.ac.uk/courses/bsc-hons-economics-and-finance/")
+    assert not matches("https://wlv.ac.uk.evil.test/courses/bsc-hons-economics/")
+    assert not matches("https://wlv.ac.uk/about/")
+    assert not matches("https://wlv.ac.uk/courses/")
 
 
 def test_wlv_links_only_provider_owns_its_course_url_set():
