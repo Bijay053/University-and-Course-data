@@ -375,6 +375,55 @@ _GENERIC_DOCTORATE_RE = re.compile(
 )
 
 
+# Generated/admin CSS rules occasionally drift from a course-owned subject
+# element to a site-wide navigation container.  Do not use a length cap here:
+# universities can publish legitimate, very detailed interdisciplinary labels.
+# Instead, identify navigation by the combination of independent menu labels.
+_NAVIGATION_CATEGORY_MARKERS: tuple[str, ...] = (
+    "our courses overview",
+    "types of courses overview",
+    "undergraduate courses",
+    "postgraduate courses",
+    "research phd",
+    "online distance learning",
+    "degree apprenticeships",
+    "career guides overview",
+    "courses a z",
+    "order a prospectus",
+    "how to apply",
+    "ask about a course",
+    "popular undergraduate courses",
+    "popular postgraduate courses",
+)
+
+
+def is_navigation_category(value: str | None) -> bool:
+    """Return whether a purported category is clearly site navigation.
+
+    This deliberately uses menu semantics rather than character count.  A long
+    but genuine source taxonomy remains valid, while a short responsive menu
+    containing several course-navigation actions is rejected.
+    """
+    if not value or not value.strip():
+        return False
+    clean = canonical_parent(value)
+    if clean in CATEGORIES:
+        return False
+
+    normalized = re.sub(r"[^a-z0-9]+", " ", value.casefold()).strip()
+    if re.search(
+        r"\bour courses\s+our courses overview\b|"
+        r"\btypes of courses\s+types of courses overview\b",
+        normalized,
+    ):
+        return True
+
+    marker_hits = sum(
+        marker in normalized for marker in _NAVIGATION_CATEGORY_MARKERS
+    )
+    return marker_hits >= 4
+
+
 def map_course_to_category(course_name: str) -> dict | None:
     """Return ``{"category": str, "sub_category": str}`` if a confident
     keyword pre-map fires, otherwise ``None``.
@@ -476,15 +525,19 @@ def infer_course_taxonomy(
 ) -> dict[str, str | None]:
     """Fill missing taxonomy fields from the shared deterministic mapper.
 
-    Non-blank caller values always win.  A deterministic sub-category is used
-    only when its parent agrees with the existing/inferred parent category, so
-    a broad title keyword cannot silently cross category boundaries.
+    Non-blank caller values normally win.  Values that are recognisably a
+    captured navigation menu are treated as missing and reclassified from the
+    course title.  A deterministic sub-category is used only when its parent
+    agrees with the existing/inferred parent category, so a broad title keyword
+    cannot silently cross category boundaries.
 
     This is the single pure helper used by extraction, staging, approval, and
     the historical backfill.  Keeping the decision here prevents those paths
     from drifting and makes the backfill idempotent.
     """
-    clean_category = canonical_parent(category)
+    clean_category = (
+        None if is_navigation_category(category) else canonical_parent(category)
+    )
     clean_sub = sub_category.strip() if sub_category and sub_category.strip() else None
 
     # A bare research-degree title contains no discipline signal. Preserve a

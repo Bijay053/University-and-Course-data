@@ -206,6 +206,7 @@ extraction:
     #     (confirmed on course page: "at least to the level of an IELTS score of 7.0")
     # Tier-based defaults applied by degree_level (doctorate) / academic_level.
     # Solr level_s: "Research" → academic_level: "Postgraduate", degree_level: "Doctor/Doctorate"
+    apply_defaults_before_remote_enrichment: true
     degree_level_defaults:
       undergraduate:
         ielts: 6.0

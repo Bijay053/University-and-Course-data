@@ -12,6 +12,7 @@ from app.services.scraper.category import (
     CATEGORIES,
     classify_category,
     infer_course_taxonomy,
+    is_navigation_category,
     map_course_to_category,
 )
 
@@ -206,3 +207,36 @@ def test_unmatched_course_uses_honest_complete_fallback():
         "category": "Other",
         "sub_category": "General / Unclassified",
     }
+
+
+WLV_NAVIGATION_CATEGORY = (
+    "Our Courses Our Courses Overview Types of Courses Types of Courses Overview "
+    "Undergraduate Courses Postgraduate Courses Research (PhD) Online Distance "
+    "Learning Degree Apprenticeships CPD Short Courses Career Guides Career Guides "
+    "Overview Courses A-Z Order a Prospectus How to apply Ask about a course "
+    "Popular Undergraduate Courses Popular Undergraduate Courses Overview"
+)
+
+
+def test_wlv_navigation_capture_is_reclassified_from_course_title():
+    assert is_navigation_category(WLV_NAVIGATION_CATEGORY)
+    assert infer_course_taxonomy(
+        "BSc (Hons) Architectural Design Technology",
+        category=WLV_NAVIGATION_CATEGORY,
+    ) == {
+        "category": "Architecture, Building & Design",
+        "sub_category": "General Architecture, Building & Design",
+    }
+
+
+def test_legitimate_long_unknown_category_is_preserved():
+    category = (
+        "Interdisciplinary studies in heritage, language, community practice, "
+        "cultural policy, material culture, and public scholarship; "
+    ) * 12
+    assert len(category) > 1000
+    assert not is_navigation_category(category)
+    assert infer_course_taxonomy(
+        "Bachelor of Architectural Design",
+        category=category,
+    )["category"] == category.strip()

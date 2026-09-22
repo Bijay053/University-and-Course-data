@@ -196,6 +196,34 @@ class TestApplyExtractionRulesCSS:
         )
         assert result["international_fee"] == ("MYR 42,000", "ai_rule:css")
 
+    def test_stale_category_selector_rejects_navigation_container(self):
+        """Navigation text must not count as generated-rule field coverage."""
+        html = (
+            '<nav class="course-menu">'
+            "Our Courses Our Courses Overview Types of Courses Types of Courses "
+            "Overview Undergraduate Courses Postgraduate Courses Research (PhD) "
+            "Online Distance Learning Degree Apprenticeships Career Guides Overview "
+            "Courses A-Z Order a Prospectus How to apply Ask about a course"
+            "</nav>"
+        )
+        result = self._run(
+            html,
+            {"category": {"css": "nav.course-menu", "attribute": "text"}},
+        )
+        assert result["category"] == (None, "ai_rule:invalid_navigation")
+
+    def test_long_generated_category_is_not_rejected_for_length(self):
+        category = (
+            "Interdisciplinary heritage, language, community practice, cultural "
+            "policy, material culture, and public scholarship; "
+        ) * 12
+        html = f'<div class="subject">{category}</div>'
+        result = self._run(
+            html,
+            {"category": {"css": "div.subject", "attribute": "text"}},
+        )
+        assert result["category"] == (category.strip(), "ai_rule:css")
+
 
 class TestApplyExtractionRulesRegex:
     """apply_extraction_rules() with regex selectors."""

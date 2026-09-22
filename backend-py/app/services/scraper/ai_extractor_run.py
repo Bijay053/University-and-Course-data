@@ -313,6 +313,21 @@ def apply_extraction_rules(
 
         if raw is not None:
             raw = _apply_transform(raw, transform)
+            # A stale generated/admin category selector can match the site's
+            # navigation wrapper instead of a course-owned subject element.
+            # Reject it here so it neither enters the payload nor counts toward
+            # the 85% generated-rule coverage used to skip Gemini.
+            if field == "category":
+                from app.services.scraper.category import is_navigation_category
+
+                if is_navigation_category(raw):
+                    log.warning(
+                        "[EXTRACTOR_RUN] rejected navigation category from %s: %r",
+                        method,
+                        raw[:160],
+                    )
+                    raw = None
+                    method = "ai_rule:invalid_navigation"
 
         results[field] = (raw or None, method)
 

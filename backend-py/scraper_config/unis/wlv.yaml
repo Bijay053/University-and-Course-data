@@ -89,6 +89,7 @@ extraction:
   english:
     # WLV publishes these central minimums rather than repeating them on each
     # course page.
+    apply_defaults_before_remote_enrichment: true
     degree_level_defaults:
       undergraduate:
         ielts: 6.0

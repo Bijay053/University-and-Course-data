@@ -2364,7 +2364,10 @@ def _resolve_configured_english_defaults(
         or any(k in degree for k in ("phd", "dphil", "doctor"))
     ):
         tier = "research"
-    elif any(k in degree for k in ("bachelor", "honours", "honor")):
+    elif (
+        degree.startswith("undergraduate")
+        or any(k in degree for k in ("bachelor", "honours", "honor"))
+    ):
         tier = "undergraduate"
     elif "master" in degree:
         tier = "postgraduate"
@@ -2393,6 +2396,64 @@ def _resolve_configured_english_defaults(
         "toefl_overall": pick("toefl", "default_toefl"),
     }
     return {key: value for key, value in defaults.items() if value is not None}
+
+
+def _apply_english_defaults_before_remote_enrichment(
+    payload: dict[str, Any],
+    evidence: list[dict[str, Any]],
+    *,
+    url: str,
+    english_config: Any,
+) -> list[str]:
+    """Apply opted-in defaults while preserving course and pathway values."""
+    if not bool(
+        getattr(
+            english_config,
+            "apply_defaults_before_remote_enrichment",
+            False,
+        )
+    ):
+        return []
+
+    is_pathway = bool(payload.get("is_pathway"))
+    if not is_pathway:
+        try:
+            from app.services.scraper.pathway_detection import is_pathway_program
+
+            is_pathway = is_pathway_program(
+                payload.get("course_name"),
+                degree_level=payload.get("degree_level"),
+            )
+        except Exception:  # noqa: BLE001 — pathway detection must not abort a course
+            is_pathway = bool(payload.get("is_pathway"))
+    if is_pathway:
+        # Carry the early classification into every later English fallback.
+        payload["is_pathway"] = True
+        return []
+
+    filled: list[str] = []
+    for slot, value in _resolve_configured_english_defaults(
+        payload,
+        english_config,
+    ).items():
+        if payload.get(slot) not in (None, "", 0):
+            continue
+        payload[slot] = value
+        evidence.append(
+            {
+                "field_key": slot,
+                "value": value,
+                "confidence": 0.40,
+                "method": "uni_config:english_default",
+                "source_url": url,
+                "snippet": (
+                    "authoritative institutional default applied before "
+                    f"remote enrichment: {slot}={value}"
+                ),
+            }
+        )
+        filled.append(slot)
+    return filled
 
 
 # Each entry: (module, kwargs the extractor accepts beyond html/url).
@@ -5517,40 +5578,13 @@ async def extract_course(
             "english",
             None,
         )
-        if (
-            _eng_cfg_early is not None
-            and bool(
-                getattr(
-                    _eng_cfg_early,
-                    "apply_defaults_before_remote_enrichment",
-                    False,
-                )
-            )
-            and not bool(payload.get("is_pathway"))
-        ):
-            _early_defaults = _resolve_configured_english_defaults(
+        if _eng_cfg_early is not None:
+            _early_filled = _apply_english_defaults_before_remote_enrichment(
                 payload,
-                _eng_cfg_early,
+                evidence,
+                url=url,
+                english_config=_eng_cfg_early,
             )
-            _early_filled: list[str] = []
-            for _slot, _value in _early_defaults.items():
-                if payload.get(_slot) not in (None, "", 0):
-                    continue
-                payload[_slot] = _value
-                evidence.append(
-                    {
-                        "field_key": _slot,
-                        "value": _value,
-                        "confidence": 0.40,
-                        "method": "uni_config:english_default",
-                        "source_url": url,
-                        "snippet": (
-                            "authoritative institutional default applied before "
-                            f"remote enrichment: {_slot}={_value}"
-                        ),
-                    }
-                )
-                _early_filled.append(_slot)
             if emit and _early_filled:
                 _scores = " ".join(
                     f"{key.replace('_overall', '')}={payload.get(key)}"
