@@ -145,3 +145,4 @@
 - [Middlesex English authority](mdx-english-authority.md) — conflicting PG categories cannot become a universal default; named exceptions retain award identity.
 - [London Met audience intakes](londonmet-audience-intakes.md) — Overseas selector options own international cohorts; keep selected-year facts atomic and use linked UG English authority.
 - [HTTPX connected-peer metadata](httpx-connected-peer-metadata.md) — verify remote peers using peername with server_addr fallback; AnyIO streams may expose only the latter.
+- [Course-report URL field parity](course-report-url-field-parity.md) — a verified programme URL may arrive as catalogue_url; preserve proof and target semantics across report URL fields.
