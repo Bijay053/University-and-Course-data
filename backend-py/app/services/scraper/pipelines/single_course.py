@@ -1613,7 +1613,9 @@ def _normalise_central_english_fields(values: Any) -> dict[str, Any]:
     if not isinstance(values, dict):
         return {}
     normalised = {
-        key: value for key, value in values.items() if key != "ielts_minimum"
+        key: value
+        for key, value in values.items()
+        if key != "ielts_minimum" and not key.startswith("_")
     }
     minimum = values.get("ielts_minimum")
     if minimum not in (None, "", 0):
@@ -9477,8 +9479,12 @@ async def extract_course(
             from app.services.scraper.central_pages import match_central_fee
 
             _central_fees: list = central_data.get("fees") or []
+            _central_english_raw: dict = central_data.get("english") or {}
+            _central_english_proof = _central_english_raw.get(
+                "_requirement_evidence"
+            )
             _central_english: dict = _normalise_central_english_fields(
-                central_data.get("english") or {}
+                _central_english_raw
             )
             _central_fee_url: str | None = central_data.get("fee_page_url")
             _central_eng_url: str | None = central_data.get("english_page_url")
@@ -9993,13 +9999,27 @@ async def extract_course(
                                 ev for ev in evidence if ev.get("field_key") != _k
                             ]
                         payload[_k] = _v
+                        _english_proof = (
+                            _central_english_proof
+                            if _k.startswith("ielts_")
+                            and isinstance(_central_english_proof, dict)
+                            else None
+                        )
                         evidence.append({
                             "field_key": _k,
                             "value": _v,
                             "confidence": 0.50,
-                            "method": "central_page:english",
+                            "method": (
+                                _english_proof.get("method")
+                                if _english_proof
+                                else "central_page:english"
+                            ),
                             "source_url": _central_eng_url or url,
-                            "snippet": f"central_page english: {_k}={_v}",
+                            "snippet": (
+                                _english_proof.get("snippet")
+                                if _english_proof
+                                else f"central_page english: {_k}={_v}"
+                            ),
                         })
                         _eng_filled.append(_k)
                     if emit and _eng_filled:

@@ -26,6 +26,7 @@ def _full_course() -> ScrapedCourse:
         academic_level="Year 12",
         academic_score=85,
         ielts_overall=6.5,
+        pte_overall=65,
         other_requirement="Personal statement",
     )
 

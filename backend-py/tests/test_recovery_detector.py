@@ -20,6 +20,9 @@ from app.services.scraper.recovery.detector import (
     _uni_pages_has_central,
     detect_missing_fields,
 )
+from app.services.scraper.recovery.extractor import _CATEGORY_FIELDS
+from app.services.scraper.recovery.searcher import FIELD_TO_CATEGORY
+from app.routers.recovery import _FIELD_TO_COLUMN, _parse_recovered_value
 
 
 # ---------------------------------------------------------------------------
@@ -187,6 +190,10 @@ class TestDetectMissingFields:
             "id": 1,
             "international_fee": 32000,
             "ielts_overall": 6.5,
+            "ielts_listening": 6.0,
+            "ielts_speaking": 6.0,
+            "ielts_writing": 6.0,
+            "ielts_reading": 6.0,
             "intake_months": [3, 7],
             "course_location": "Sydney",
             "other_requirement": "Bachelor's degree",
@@ -199,7 +206,13 @@ class TestDetectMissingFields:
     def test_all_fields_missing_returns_all_five(self):
         course = {"id": 1}
         result = detect_missing_fields(course, [])
-        assert result == list(RECOVERY_FIELDS)
+        assert result == [
+            "international_fee",
+            "ielts_overall",
+            "intake_months",
+            "course_location",
+            "other_requirement",
+        ]
 
     def test_single_missing_field_returned(self):
         course = self._full_course()
@@ -243,6 +256,10 @@ class TestDetectMissingFields:
             "id": 1,
             "internationalFee": 32000,
             "ieltsOverall": 6.5,
+            "ieltsListening": 6.0,
+            "ieltsSpeaking": 6.0,
+            "ieltsWriting": 6.0,
+            "ieltsReading": 6.0,
             "intakeMonths": [3, 7],
             "courseLocation": "Sydney",
             "otherRequirement": "Bachelor's degree",
@@ -263,9 +280,9 @@ class TestDetectMissingFields:
         assert "course_location" in result
 
     def test_order_matches_recovery_fields_constant(self):
-        course = {"id": 1}
+        course = {"id": 1, "ielts_overall": 6.5}
         result = detect_missing_fields(course, [])
-        assert result == list(RECOVERY_FIELDS)
+        assert result == [field for field in RECOVERY_FIELDS if field != "ielts_overall"]
 
     def test_evidence_for_different_field_does_not_skip(self):
         course = {"id": 1}
@@ -273,3 +290,33 @@ class TestDetectMissingFields:
         result = detect_missing_fields(course, ev)
         assert "international_fee" in result
         assert "ielts_overall" not in result
+
+    def test_partial_ielts_components_recover_even_with_central_page(self):
+        course = {
+            **self._full_course(),
+            "ielts_listening": None,
+            "ielts_speaking": 6.0,
+            "ielts_writing": None,
+            "ielts_reading": 6.0,
+        }
+        cfg = {"uniPages": {"entryPage": "https://uni.edu.au/entry"}}
+        evidence = [
+            {"field_key": "ielts_listening", "confidence": 0.95},
+        ]
+        result = detect_missing_fields(course, evidence, uni_scrape_config=cfg)
+        assert "ielts_listening" in result
+        assert "ielts_writing" in result
+        assert "ielts_speaking" not in result
+        assert "ielts_reading" not in result
+
+
+def test_ielts_component_registry_is_wired_end_to_end():
+    component_fields = {
+        "ielts_listening", "ielts_speaking", "ielts_writing", "ielts_reading",
+    }
+    assert component_fields.issubset(RECOVERY_FIELDS)
+    assert component_fields.issubset(FIELD_TO_CATEGORY)
+    assert component_fields.issubset(_CATEGORY_FIELDS["english"])
+    assert component_fields.issubset(_FIELD_TO_COLUMN)
+    assert all(FIELD_TO_CATEGORY[field] == "english" for field in component_fields)
+    assert _parse_recovered_value("ielts_listening", "6") == 6.0

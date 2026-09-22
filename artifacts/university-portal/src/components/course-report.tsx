@@ -39,6 +39,25 @@ type Values = {
 const defaults: Values = { kind: "missing", eligibilityReview: false, urls: "", catalogue: "", expected: "", fields: [], description: "", source: "" };
 const activeStatuses = new Set(["queued", "running", "recovering", "verification_queued", "verifying"]);
 
+export type CourseReportPrefillCourse = {
+  courseName: string;
+  courseUrl?: string | null;
+  fields: Array<"english" | "other">;
+  description: string;
+};
+const NO_PREFILL_COURSES: CourseReportPrefillCourse[] = [];
+
+function valuesForPrefill(course?: CourseReportPrefillCourse): Values {
+  if (!course) return defaults;
+  return {
+    ...defaults,
+    kind: "incorrect",
+    urls: course.courseUrl ?? "",
+    fields: course.fields,
+    description: course.description,
+  };
+}
+
 export function Exclusions({ counts }: { counts: Record<string, unknown> }) {
   const staging = counts.staging_rejections as { reasons?: Record<string, number> } | undefined;
   const entries = Object.entries({ ...counts, ...staging?.reasons }).filter(([, value]) => typeof value === "number" && value > 0);
@@ -49,8 +68,9 @@ export function Exclusions({ counts }: { counts: Record<string, unknown> }) {
   </div>;
 }
 
-export function CourseReport({ jobId, onReview, onStarted, openRequest = 0 }: {
+export function CourseReport({ jobId, onReview, onStarted, openRequest = 0, prefillCourses = NO_PREFILL_COURSES }: {
   jobId: string; onReview: (id: string) => void; onStarted?: () => void; openRequest?: number;
+  prefillCourses?: CourseReportPrefillCourse[];
 }) {
   const [open, setOpen] = useState(false);
   const [reports, setReports] = useState<Report[]>([]);
@@ -64,14 +84,16 @@ export function CourseReport({ jobId, onReview, onStarted, openRequest = 0 }: {
   const [continuationErrors, setContinuationErrors] = useState<Record<string, string>>({});
   const [retryBusy, setRetryBusy] = useState<string | null>(null);
   const [retryErrors, setRetryErrors] = useState<Record<string, string>>({});
+  const [prefillIndex, setPrefillIndex] = useState(0);
   const form = useForm<Values>({ defaultValues: defaults });
   const kind = form.watch("kind");
   useEffect(() => {
     if (!openRequest) return;
-    form.reset(defaults);
+    setPrefillIndex(0);
+    form.reset(valuesForPrefill(prefillCourses[0]));
     setError("");
     setOpen(true);
-  }, [form, openRequest]);
+  }, [form, openRequest, prefillCourses]);
   useEffect(() => {
     let disposed = false;
     const load = async () => {
@@ -204,6 +226,32 @@ export function CourseReport({ jobId, onReview, onStarted, openRequest = 0 }: {
     {historyError && <p role="status" className="text-xs text-destructive">{historyError}</p>}
     {error && <p role={open ? "alert" : "status"} className="text-sm text-destructive" data-testid="report-error">{error}</p>}
     {open && <Form {...form}><form onSubmit={submit} className="space-y-3">
+      {prefillCourses.length > 0 && <div className="rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950">
+        <p className="font-medium">Recover official requirements for a staged course</p>
+        {prefillCourses.length > 1 ? (
+          <label className="mt-2 block">
+            Selected course
+            <select
+              className="ml-2 max-w-full rounded border bg-white p-2"
+              value={prefillIndex}
+              data-testid="select-report-prefill-course"
+              onChange={(event) => {
+                const index = Number(event.target.value);
+                setPrefillIndex(index);
+                form.reset(valuesForPrefill(prefillCourses[index]));
+                setError("");
+              }}
+            >
+              {prefillCourses.map((course, index) => (
+                <option key={`${course.courseUrl ?? "no-url"}-${index}`} value={index}>{course.courseName}</option>
+              ))}
+            </select>
+          </label>
+        ) : <p className="mt-1" data-testid="report-prefill-course">{prefillCourses[0].courseName}</p>}
+        <p className="mt-1 text-xs">
+          The course page and affected fields are prefilled. Add a separate official requirements URL only when it provides the missing evidence.
+        </p>
+      </div>}
       <label className="block text-sm">Problem
         <select {...form.register("kind", { onChange: () => {
           form.setValue("catalogue", ""); form.setValue("expected", ""); form.setValue("fields", []);

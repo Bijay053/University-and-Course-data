@@ -26,6 +26,7 @@ from dataclasses import dataclass
 
 from app.config import settings
 from app.models import ScrapedCourse
+from app.services.scraper.requirement_status import effective_requirement_status
 
 
 # (field_attr, human_label_for_warnings)
@@ -50,15 +51,22 @@ REVIEW_FIELDS: tuple[tuple[str, str], ...] = (
 
 def _has_value(sc: ScrapedCourse, attr: str) -> bool:
     if attr == "__english__":
-        return any(
+        alternatives = any(
             getattr(sc, k, None) is not None and (getattr(sc, k) or 0) > 0
-            for k in (
-                "ielts_overall",
-                "pte_overall",
-                "toefl_overall",
-                "cambridge_overall",
-                "duolingo_overall",
-            )
+            for k in ("pte_overall", "toefl_overall", "cambridge_overall", "duolingo_overall")
+        )
+        if alternatives:
+            return True
+        if getattr(sc, "ielts_overall", None) is None:
+            return False
+        return (
+            effective_requirement_status(sc)["englishComponents"]["state"]
+            in {"verified", "not_required"}
+        )
+    if attr == "academic_score":
+        return (
+            effective_requirement_status(sc)["academic"]["state"]
+            in {"numeric", "qualification_based"}
         )
     val = getattr(sc, attr, None)
     if val is None:

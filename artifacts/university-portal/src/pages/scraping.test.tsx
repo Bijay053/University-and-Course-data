@@ -10,6 +10,8 @@ import {
   formatRecoveryDiagnosticMessage,
   getFixResultHeading,
   isRequestedFixField,
+  normalizeRequirementStatus,
+  requirementRepairFields,
   ScrapingForTest,
   type ScrapingInitialReviewState,
   visibleScrapeStatus,
@@ -117,6 +119,142 @@ function initialReview(): ScrapingInitialReviewState {
 }
 
 describe("Scraping repair reviewer", () => {
+  it("normalizes snake-case requirement status without inventing a numeric score", () => {
+    const status = normalizeRequirementStatus({
+      academic: {
+        state: "qualification_based",
+        requirement_text: "A recognised bachelor degree in a related discipline",
+        source_url: "https://uni.test/entry",
+      },
+      english_components: {
+        state: "missing",
+        missing_fields: ["ielts_listening", "ielts_writing"],
+      },
+    });
+    expect(status?.academic.requirementText).toBe("A recognised bachelor degree in a related discipline");
+    expect(status?.academic.sourceUrl).toBe("https://uni.test/entry");
+    expect(status?.englishComponents.missingFields).toEqual(["ielts_listening", "ielts_writing"]);
+    expect(requirementRepairFields({ requirementStatus: status })).toEqual(["english_requirements"]);
+  });
+
+  it("renders qualification evidence and IELTS component gaps even with an overall score", async () => {
+    const review = initialReview();
+    review.courses = [{
+      ...review.courses[0],
+      courseName: "Master of Evidence",
+      academicScore: null,
+      ieltsOverall: 6.5,
+      completeness: 100,
+      requirementStatus: {
+        academic: {
+          state: "qualification_based",
+          requirementText: "A recognised bachelor degree in a related discipline",
+          sourceUrl: "https://uni.test/entry",
+        },
+        englishComponents: {
+          state: "missing",
+          missingFields: ["ielts_listening", "ielts_writing"],
+          sourceUrl: "https://uni.test/english",
+        },
+      },
+    }] as ScrapingInitialReviewState["courses"];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      return jsonResponse({});
+    }));
+
+    render(<ScrapingForTest initialReviewState={review} />);
+    expect(screen.getByText("Verified qualification requirement")).toBeTruthy();
+    expect(screen.getByText(/A recognised bachelor degree/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Official requirement source" }).getAttribute("href"))
+      .toBe("https://uni.test/entry");
+    expect(screen.getByText("Missing: Listening, Writing")).toBeTruthy();
+    expect(screen.queryByText("100%")).toBeNull();
+  });
+
+  it("sends every unresolved requirement group through the durable Fix request", async () => {
+    const review = initialReview();
+    review.courses = [{
+      ...review.courses[0],
+      requirementStatus: {
+        academic: { state: "missing" },
+        englishComponents: { state: "missing", missingFields: ["ielts_reading"] },
+      },
+    }] as ScrapingInitialReviewState["courses"];
+    let requestBody: Record<string, unknown> | null = null;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      if (url === "/api/scrape/staged/analyze") {
+        return jsonResponse({ total: 1, courses_with_url: 1, issues: [] });
+      }
+      if (url === "/api/scrape/staged/fix-jobs") {
+        requestBody = JSON.parse(String(init?.body));
+        return jsonResponse({
+          jobId: "requirements-fix", sourceJobId: "repair-job", targetFields: [],
+          status: "queued", total: 1, queued: 1, running: 0, completed: 0,
+          noProgress: 0, failed: 0, processed: 0, results: [], errorMessage: null,
+        });
+      }
+      return jsonResponse({});
+    }));
+
+    const user = userEvent.setup();
+    render(<ScrapingForTest initialReviewState={review} />);
+    await user.click(screen.getByRole("button", { name: "Fix (1)" }));
+    const dialog = await screen.findByRole("dialog", { name: "Review Before Fixing" });
+    await user.click(within(dialog).getByRole("button", { name: "Confirm Fix (1)" }));
+    await waitFor(() => expect(requestBody).not.toBeNull());
+    expect(requestBody).toMatchObject({
+      ids: [1],
+      targetFields: [
+        "academic_level", "academic_score", "score_type", "other_requirement",
+        "english_requirements",
+      ],
+    });
+    expect(requestBody).toEqual(expect.objectContaining({
+      targetFields: expect.not.arrayContaining(["requirement_status"]),
+    }));
+    expect(localStorage.getItem("activeBulkFixJob")).toBe("requirements-fix");
+  });
+
+  it("opens the official-source recovery form for unresolved requirements", async () => {
+    const review = initialReview();
+    review.courses = [{
+      ...review.courses[0],
+      requirementStatus: {
+        academic: { state: "unverified" },
+        englishComponents: { state: "unknown" },
+      },
+    }] as ScrapingInitialReviewState["courses"];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      if (url.endsWith("/course-reports")) return jsonResponse({ reports: [], source_exclusions: {} });
+      return jsonResponse({});
+    }));
+    const user = userEvent.setup();
+    render(<ScrapingForTest initialReviewState={review} />);
+    await user.click(screen.getByRole("button", { name: "Add an official source for recovery" }));
+    expect(await screen.findByText("Official course URLs (one per line; processed in bounded batches)")).toBeTruthy();
+    expect(screen.getByTestId("input-report-urls")).toBeTruthy();
+    expect((screen.getByTestId("select-report-kind") as HTMLSelectElement).value).toBe("incorrect");
+    expect((screen.getByTestId("input-report-urls") as HTMLTextAreaElement).value)
+      .toBe("https://example.test/courses/1");
+    expect((screen.getByTestId("checkbox-report-english") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByTestId("checkbox-report-other") as HTMLInputElement).checked).toBe(true);
+  });
+
   it("does not call an all-no-progress Fix successful", () => {
     expect(getFixResultHeading({
       total: 3,
@@ -170,6 +308,7 @@ describe("Scraping repair reviewer", () => {
 
   it("maps component updates to their requested Fix field groups", () => {
     expect(isRequestedFixField("pte_overall", ["english_requirements"])).toBe(true);
+    expect(isRequestedFixField("requirement_status", ["academic_score"])).toBe(true);
     expect(isRequestedFixField("fee_term", ["international_fee"])).toBe(true);
     expect(isRequestedFixField("duration", ["international_fee"])).toBe(false);
   });

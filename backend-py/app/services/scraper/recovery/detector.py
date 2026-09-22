@@ -3,8 +3,8 @@
 Given a staged course dict and its evidence rows, returns the list of field
 names that are missing AND could benefit from a recovery search.
 
-Phase 1 scope: international_fee, ielts_overall, intake_months, course_location,
-               other_requirement.
+Supported scope: international_fee, IELTS overall/components, intake_months,
+                 course_location, other_requirement.
 
 Rules:
 - Only include a field if the course value is NULL/empty.
@@ -20,10 +20,15 @@ from typing import Any
 
 log = logging.getLogger(__name__)
 
-# Phase 1 target fields in priority order.
+# Supported target fields in priority order. Component recovery is conditional:
+# it is planned only when an IELTS overall exists and that component is blank.
 RECOVERY_FIELDS: tuple[str, ...] = (
     "international_fee",
     "ielts_overall",
+    "ielts_listening",
+    "ielts_speaking",
+    "ielts_writing",
+    "ielts_reading",
     "intake_months",
     "course_location",
     "other_requirement",
@@ -33,6 +38,10 @@ RECOVERY_FIELDS: tuple[str, ...] = (
 _CAMEL_TO_SNAKE: dict[str, str] = {
     "internationalFee": "international_fee",
     "ieltsOverall": "ielts_overall",
+    "ieltsListening": "ielts_listening",
+    "ieltsSpeaking": "ielts_speaking",
+    "ieltsWriting": "ielts_writing",
+    "ieltsReading": "ielts_reading",
     "intakeMonths": "intake_months",
     "courseLocation": "course_location",
     "otherRequirement": "other_requirement",
@@ -131,6 +140,28 @@ def detect_missing_fields(
                 "[RECOVERY:detect] course=%s field=%s — already filled (%r), skipping",
                 course_id, field, val,
             )
+            continue
+
+        is_ielts_component = field in {
+            "ielts_listening", "ielts_speaking", "ielts_writing", "ielts_reading",
+        }
+        if is_ielts_component and _is_empty(
+            _get_field_value(course, "ielts_overall")
+        ):
+            # Recover overall first. Without a published overall, a component
+            # search is not yet applicable and would multiply identical work.
+            continue
+
+        if is_ielts_component:
+            # A configured central page merely says where the value might live;
+            # it is not proof that the staged component was populated. Likewise,
+            # evidence without a persisted value cannot close a component gap.
+            log.info(
+                "[RECOVERY:detect] course=%s field=%s — PARTIAL IELTS GAP, "
+                "queued despite central-page configuration",
+                course_id, field,
+            )
+            needed.append(field)
             continue
 
         if _has_high_confidence_evidence(evidence, field):

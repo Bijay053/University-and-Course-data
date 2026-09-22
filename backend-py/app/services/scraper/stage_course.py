@@ -1026,6 +1026,13 @@ async def stage_course(
             if k in PERSISTABLE_STAGING_PAYLOAD_FIELDS
         },
     )
+    from app.services.scraper.requirement_status import build_requirement_status
+
+    sc.requirement_status = build_requirement_status(
+        sc,
+        evidence=evidence,
+        source_url=source_url,
+    )
     if preserve_existing:
         sc.status = "pending"
         sc.auto_publish_status = "review"

@@ -28,7 +28,7 @@ import {
   type ReviewEvidenceItem,
 } from "@/components/review-scraped-courses-table";
 import { ScrapeJobCard } from "@/components/scrape-job-card";
-import { CourseReport } from "@/components/course-report";
+import { CourseReport, type CourseReportPrefillCourse } from "@/components/course-report";
 import { DEGREE_LEVELS, FEE_TERM_OPTIONS, STUDY_LOADS, STUDY_MODES } from "@/lib/course-constants";
 
 function optionsIncludingCurrent(options: string[], current: string | null): string[] {
@@ -192,6 +192,7 @@ type StagedCourse = {
   academicScore: number | null;
   scoreType: string | null;
   academicCountry: string | null;
+  requirementStatus?: CourseRequirementStatus | null;
   scholarship: string | null;
   studentMarket: string | null;
   deliveryMode: string | null;
@@ -208,6 +209,100 @@ type StagedCourse = {
   scrapeWarnings: string[] | null;
   createdAt: string;
 };
+
+type RequirementState = "numeric" | "qualification_based" | "missing" | "unverified";
+type EnglishRequirementState = "verified" | "missing" | "not_required" | "unknown";
+type CourseRequirementStatus = {
+  academic: {
+    state: RequirementState;
+    sourceUrl?: string;
+    requirementText?: string;
+  };
+  englishComponents: {
+    state: EnglishRequirementState;
+    missingFields?: string[];
+    sourceUrl?: string;
+  };
+};
+
+function stringOrUndefined(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+export function normalizeRequirementStatus(value: unknown): CourseRequirementStatus | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const academicRaw = raw.academic && typeof raw.academic === "object"
+    ? raw.academic as Record<string, unknown>
+    : {};
+  const englishValue = raw.englishComponents ?? raw.english_components;
+  const englishRaw = englishValue && typeof englishValue === "object"
+    ? englishValue as Record<string, unknown>
+    : {};
+  const missingFieldsValue = englishRaw.missingFields ?? englishRaw.missing_fields;
+  const academicStates = new Set<RequirementState>(["numeric", "qualification_based", "missing", "unverified"]);
+  const englishStates = new Set<EnglishRequirementState>(["verified", "missing", "not_required", "unknown"]);
+  const academicState = academicRaw.state;
+  const englishState = englishRaw.state;
+  if (!academicStates.has(academicState as RequirementState)
+    || !englishStates.has(englishState as EnglishRequirementState)) return null;
+  return {
+    academic: {
+      state: academicState as RequirementState,
+      sourceUrl: stringOrUndefined(academicRaw.sourceUrl ?? academicRaw.source_url),
+      requirementText: stringOrUndefined(academicRaw.requirementText ?? academicRaw.requirement_text),
+    },
+    englishComponents: {
+      state: englishState as EnglishRequirementState,
+      sourceUrl: stringOrUndefined(englishRaw.sourceUrl ?? englishRaw.source_url),
+      missingFields: Array.isArray(missingFieldsValue)
+        ? missingFieldsValue
+            .filter((field): field is string => typeof field === "string" && Boolean(field.trim()))
+            .map((field) => field.trim())
+        : undefined,
+    },
+  };
+}
+
+function normalizeStagedCourse(course: StagedCourse & {
+  requirement_status?: unknown;
+  requirementStatus?: unknown;
+}): StagedCourse {
+  return {
+    ...course,
+    requirementStatus: normalizeRequirementStatus(
+      course.requirementStatus ?? course.requirement_status,
+    ),
+  };
+}
+
+export function requirementRepairFields(course: Pick<StagedCourse, "requirementStatus">): string[] {
+  const status = course.requirementStatus;
+  if (!status) return [];
+  const fields: string[] = [];
+  if (status.academic.state === "missing" || status.academic.state === "unverified") {
+    fields.push("academic_level", "academic_score", "score_type", "other_requirement");
+  }
+  if (status.englishComponents.state === "missing" || status.englishComponents.state === "unknown") {
+    fields.push("english_requirements");
+  }
+  return fields;
+}
+
+function readableRequirementField(field: string): string {
+  return field.replace(/^ielts[_ ]?/i, "").replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function requirementStatusNeedsSource(status: CourseRequirementStatus | null | undefined): boolean {
+  if (!status) return false;
+  return (
+    (["missing", "unverified"] as RequirementState[]).includes(status.academic.state)
+    && !status.academic.sourceUrl
+  ) || (
+    (["missing", "unknown"] as EnglishRequirementState[]).includes(status.englishComponents.state)
+    && !status.englishComponents.sourceUrl
+  );
+}
 
 export type ScrapingInitialReviewState = {
   courses: StagedCourse[];
@@ -469,7 +564,10 @@ const FIX_FIELD_LABELS: Record<string, string> = {
   duration: "Duration",
   intake_months: "Intakes",
   academic_level: "Academic Level",
+  academic_score: "Academic Score",
+  score_type: "Academic Score Type",
   other_requirement: "Entry Requirements",
+  requirement_status: "Requirement Verification",
   course_name: "University Name in Title",
 };
 
@@ -497,6 +595,12 @@ const FIX_FIELD_GROUPS: Record<string, string> = {
 };
 
 export function isRequestedFixField(field: string, requestedFields: string[]): boolean {
+  if (field === "requirement_status") {
+    return requestedFields.some((requested) =>
+      ["academic_level", "academic_score", "score_type", "other_requirement", "english_requirements"]
+        .includes(requested),
+    );
+  }
   return requestedFields.includes(field)
     || requestedFields.includes(FIX_FIELD_GROUPS[field]);
 }
@@ -848,7 +952,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   }, []);
 
   const [stagedCourses, setStagedCourses] = useState<StagedCourse[]>(
-    initialReviewState?.courses ?? [],
+    () => (initialReviewState?.courses ?? []).map((course) => normalizeStagedCourse(course)),
   );
   const [courseQualityMap, setCourseQualityMap] = useState<Record<number, CourseQualityData>>({});
   const [qualityExpanded, setQualityExpanded] = useState<Set<number>>(new Set());
@@ -1463,9 +1567,10 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       }
       const payload = await readResponseJson<unknown>(res);
       if (!payload) return false;
-        const data: StagedCourse[] = Array.isArray(payload)
+        const data: StagedCourse[] = (Array.isArray(payload)
           ? (payload as StagedCourse[])
-          : ((payload as { courses?: StagedCourse[] }).courses ?? []);
+          : ((payload as { courses?: StagedCourse[] }).courses ?? []))
+          .map((course) => normalizeStagedCourse(course));
         const lastScrape = Array.isArray(payload)
           ? null
           : ((payload as { lastScrape?: typeof lastScrapeInfo }).lastScrape ?? null);
@@ -1482,7 +1587,11 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         setReviewJobId(jobId);
         setShowReview(true);
         if (pending.length > 0) setLatestAvailableJobId(null);
-        setSelectedIds(new Set(pending.map((c: StagedCourse) => c.id)));
+        setSelectedIds((current) => {
+          if (current.size === 0) return new Set(pending.map((course) => course.id));
+          const pendingIds = new Set(pending.map((course) => course.id));
+          return new Set(Array.from(current).filter((id) => pendingIds.has(id)));
+        });
         fetch(`/api/scrape/jobs/${jobId}/removal-reconciliation`, { credentials: "include", cache: "no-store" })
           .then((r) => r.ok ? r.json() : null)
           .then((reconciliation: RemovalReconciliation | null) => setRemovalReconciliation(reconciliation))
@@ -2258,6 +2367,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   const [forceFields, setForceFields] = useState<string[]>([]);
   const [forceReasons, setForceReasons] = useState<Record<string, string>>({});
   const [cleaningNames, setCleaningNames] = useState(false);
+  const [requirementRecoveryRequest, setRequirementRecoveryRequest] = useState(0);
+  const [requirementRecoveryCourses, setRequirementRecoveryCourses] = useState<CourseReportPrefillCourse[]>([]);
 
   const resetForcedFixFields = () => {
     setForceFields([]);
@@ -2446,6 +2557,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       return;
     }
     const ids = Array.from(selectedIds);
+    const requirementTargets = stagedCourses
+      .filter((course) => selectedIds.has(course.id))
+      .flatMap(requirementRepairFields);
     setFixingSelected(true);
     setFixProgress({ completed: 0, total: ids.length });
     try {
@@ -2459,6 +2573,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
           sourceJobId: reviewJobId,
           targetFields: Array.from(new Set([
             ...fixAnalysis.issues.map((issue) => issue.field),
+            ...requirementTargets,
             ...forceFields,
           ])),
           forceFields,
@@ -3302,24 +3417,37 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
               </div>
             </div>
             <p className="text-sm text-muted-foreground">
-              Tick courses, then use <strong>Approve</strong> to publish or <strong>Reject</strong> to discard. Use the ✓ icon on a row to approve one course, or ✗ to reject it.
+              Tick courses, then use <strong>Fix</strong> once to recover all detected missing requirements, <strong>Approve</strong> to publish, or <strong>Reject</strong> to discard.
             </p>
           </CardHeader>
           <CardContent>
+            {reviewJobId && requirementRecoveryRequest > 0 && (
+              <CourseReport
+                jobId={reviewJobId}
+                openRequest={requirementRecoveryRequest}
+                prefillCourses={requirementRecoveryCourses}
+                onReview={(id) => handleReviewReady(id, selectedUniversityName || "University", true)}
+                onStarted={() => void fetchHistory()}
+              />
+            )}
             {bulkFixJob && (
               <div className={`mb-3 rounded-lg border p-3 ${
                 ["queued", "running"].includes(bulkFixJob.status)
                   ? "border-blue-200 bg-blue-50"
-                  : bulkFixJob.failed > 0
+                  : bulkFixJob.failed > 0 || bulkFixJob.noProgress > 0
                     ? "border-orange-200 bg-orange-50"
-                    : "border-green-200 bg-green-50"
+                    : "border-slate-200 bg-slate-50"
               }`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2 text-sm font-medium">
                     {["queued", "running"].includes(bulkFixJob.status)
                       ? <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                      : <CheckCircle2 className="h-4 w-4 text-green-600" />}
-                    Background Fix {bulkFixJob.status.replaceAll("_", " ")}
+                      : bulkFixJob.failed > 0 || bulkFixJob.noProgress > 0
+                        ? <AlertTriangle className="h-4 w-4 text-orange-600" />
+                        : <Info className="h-4 w-4 text-slate-600" />}
+                    {["queued", "running"].includes(bulkFixJob.status)
+                      ? `Background Fix ${bulkFixJob.status.replaceAll("_", " ")}`
+                      : "Background Fix finished — review results"}
                   </div>
                   <span className="text-xs text-muted-foreground">{bulkFixJob.processed}/{bulkFixJob.total} processed</span>
                 </div>
@@ -3493,6 +3621,101 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                           {course.notes && (
                             <div className="text-xs text-amber-600 truncate mt-0.5" title={course.notes}>⚠ {course.notes}</div>
                           )}
+                          {course.requirementStatus && (
+                            <div className="mt-1.5 space-y-1 text-xs" data-testid={`requirement-status-${course.id}`}>
+                              {course.requirementStatus.academic.state === "qualification_based" ? (
+                                <div className="rounded border border-emerald-200 bg-emerald-50 p-1.5 text-emerald-900">
+                                  <span className="font-semibold">Verified qualification requirement</span>
+                                  {course.requirementStatus.academic.requirementText && (
+                                    <span> — {course.requirementStatus.academic.requirementText}</span>
+                                  )}
+                                  {course.requirementStatus.academic.sourceUrl && (
+                                    <a
+                                      href={course.requirementStatus.academic.sourceUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="ml-1 font-medium underline"
+                                    >
+                                      Official requirement source
+                                    </a>
+                                  )}
+                                </div>
+                              ) : course.requirementStatus.academic.state === "numeric" ? (
+                                <div className="text-slate-600">
+                                  Academic entry: {course.academicScore != null
+                                    ? `${course.academicScore}${course.scoreType ? ` ${course.scoreType}` : ""}`
+                                    : "verified numeric requirement"}
+                                  {course.requirementStatus.academic.sourceUrl && (
+                                    <a
+                                      href={course.requirementStatus.academic.sourceUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="ml-1 font-medium text-blue-700 underline"
+                                    >
+                                      Official source
+                                    </a>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="rounded border border-amber-200 bg-amber-50 p-1.5 text-amber-900">
+                                  <span className="font-semibold">
+                                    Academic requirement {course.requirementStatus.academic.state === "missing" ? "missing" : "unverified"}
+                                  </span>
+                                  {course.requirementStatus.academic.sourceUrl && (
+                                    <a
+                                      href={course.requirementStatus.academic.sourceUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="ml-1 font-medium underline"
+                                    >
+                                      Check official source
+                                    </a>
+                                  )}
+                                </div>
+                              )}
+                              {requirementStatusNeedsSource(course.requirementStatus) && (
+                                <Button
+                                  type="button"
+                                  variant="link"
+                                  size="sm"
+                                  className="h-auto p-0 text-xs"
+                                  onClick={() => {
+                                    const candidates = stagedCourses
+                                      .filter((candidate) =>
+                                        (candidate.id === course.id || selectedIds.has(candidate.id))
+                                        && requirementStatusNeedsSource(candidate.requirementStatus),
+                                      )
+                                      .sort((a, b) =>
+                                        a.id === course.id ? -1 : b.id === course.id ? 1 : 0,
+                                      );
+                                    setRequirementRecoveryCourses(candidates.map((candidate) => {
+                                      const academicUnresolved = candidate.requirementStatus?.academic.state === "missing"
+                                        || candidate.requirementStatus?.academic.state === "unverified";
+                                      const englishUnresolved = candidate.requirementStatus?.englishComponents.state === "missing"
+                                        || candidate.requirementStatus?.englishComponents.state === "unknown";
+                                      const fields: CourseReportPrefillCourse["fields"] = [
+                                        ...(englishUnresolved ? ["english" as const] : []),
+                                        ...(academicUnresolved ? ["other" as const] : []),
+                                      ];
+                                      const missing = [
+                                        ...(academicUnresolved ? ["academic entry requirement"] : []),
+                                        ...(englishUnresolved ? ["English requirement components"] : []),
+                                      ];
+                                      return {
+                                        courseName: candidate.courseName,
+                                        courseUrl: candidate.courseWebsite,
+                                        fields,
+                                        description: `Source verification needed for ${candidate.courseName}: ${missing.join(" and ")}.`,
+                                      };
+                                    }));
+                                    setRequirementRecoveryRequest((request) => request + 1);
+                                  }}
+                                >
+                                  Add an official source for recovery
+                                </Button>
+                              )}
+                            </div>
+                          )}
                           {/* Quality issue chips */}
                           {qData?.issues && qData.issues.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1">
@@ -3510,12 +3733,16 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                           )}
                         </td>
                         <td className="p-2 text-center">
-                          {course.completeness != null ? (
+                          {course.completeness != null && !requirementRepairFields(course).length ? (
                             <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-semibold ${
                               course.completeness >= 80 ? "bg-green-100 text-green-700" :
                               course.completeness >= 50 ? "bg-yellow-100 text-yellow-700" :
                               "bg-red-100 text-red-700"
                             }`}>{course.completeness}%</span>
+                          ) : course.requirementStatus && requirementRepairFields(course).length ? (
+                            <span className="inline-block rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">
+                              Unverified
+                            </span>
                           ) : <span className="text-gray-300">-</span>}
                         </td>
                         {/* Data Quality cell */}
@@ -3585,11 +3812,50 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                           )}
                         </td>
                         <td className="p-2 text-center">
-                          {course.ieltsOverall ? (
-                            <span className="text-purple-700 font-medium">{course.ieltsOverall}</span>
+                          {course.requirementStatus?.englishComponents.state === "not_required" ? (
+                            <span className="text-xs font-medium text-slate-600">Not required</span>
+                          ) : course.requirementStatus?.englishComponents.state === "unknown" ? (
+                            <span className="text-xs font-medium text-amber-700">Unverified</span>
+                          ) : course.ieltsOverall ? (
+                            <span className="inline-flex flex-col text-purple-700 font-medium">
+                              <span>{course.ieltsOverall}</span>
+                              {course.requirementStatus?.englishComponents.missingFields?.length ? (
+                                <span className="mt-0.5 max-w-[130px] text-[10px] font-medium leading-tight text-amber-700">
+                                  Missing: {course.requirementStatus.englishComponents.missingFields
+                                    .map(readableRequirementField).join(", ")}
+                                </span>
+                              ) : null}
+                              {course.requirementStatus?.englishComponents.sourceUrl && (
+                                <a
+                                  href={course.requirementStatus.englishComponents.sourceUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[10px] font-medium text-blue-700 underline"
+                                >
+                                  Official source
+                                </a>
+                              )}
+                            </span>
                           ) : (
-                            <span className="inline-flex items-center gap-0.5 text-amber-600 text-xs font-medium" title="Missing IELTS Overall">
+                            <span className="inline-flex flex-col items-center gap-0.5 text-amber-600 text-xs font-medium" title="Missing IELTS Overall">
                               <AlertTriangle className="w-3 h-3" />
+                              {course.requirementStatus?.englishComponents.state === "missing"
+                                ? <span>
+                                    Missing{course.requirementStatus.englishComponents.missingFields?.length
+                                      ? `: ${course.requirementStatus.englishComponents.missingFields.map(readableRequirementField).join(", ")}`
+                                      : ""}
+                                  </span>
+                                : null}
+                              {course.requirementStatus?.englishComponents.sourceUrl && (
+                                <a
+                                  href={course.requirementStatus.englishComponents.sourceUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[10px] font-medium text-blue-700 underline"
+                                >
+                                  Official source
+                                </a>
+                              )}
                             </span>
                           )}
                         </td>
@@ -3897,7 +4163,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Detected Issues</p>
                 {fixAnalysis.issues.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No missing fields detected — courses look complete.</p>
+                  <p className="text-sm text-muted-foreground">
+                    No additional legacy-field gaps were detected. Any unresolved requirement statuses shown below are still included.
+                  </p>
                 ) : (
                   <div className="space-y-1.5">
                     {fixAnalysis.issues.map(issue => (
@@ -3910,6 +4178,26 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                     ))}
                   </div>
                 )}
+                {(() => {
+                  const requirementFields = Array.from(new Set(
+                    stagedCourses
+                      .filter((course) => selectedIds.has(course.id))
+                      .flatMap(requirementRepairFields),
+                  ));
+                  if (!requirementFields.length) return null;
+                  const labels: Record<string, string> = {
+                    academic_level: "academic level",
+                    academic_score: "academic score",
+                    score_type: "score type",
+                    other_requirement: "qualification text",
+                    english_requirements: "English test components",
+                  };
+                  return (
+                    <p className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+                      The repair will verify all unresolved requirements: {requirementFields.map((field) => labels[field] ?? field).join(", ")}.
+                    </p>
+                  );
+                })()}
               </div>
 
               <div className="text-sm text-muted-foreground border-t pt-3">

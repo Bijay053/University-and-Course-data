@@ -264,6 +264,12 @@ def _staged_row_to_dict(r) -> dict:
     d["studyMode"] = r.study_mode
     d["feeTerm"] = r.fee_term
     d["feeYear"] = r.fee_year
+    from app.services.scraper.requirement_status import public_requirement_status
+
+    # Additive API contract. Internal proof fingerprints stay server-side.
+    public_status = public_requirement_status(r)
+    d["requirementStatus"] = public_status
+    d["requirement_status"] = public_status
     # Issue 5: recompute completeness + eligibility live from the ORM row
     # so the UI always reflects the current field state, not the stale
     # value computed at staging time (e.g. description was NULL when staged
@@ -2277,6 +2283,12 @@ _REEXTRACT_FIELD_COMPANIONS: dict[str, set[str]] = {
     },
     "intake_months": {"intake_days"},
     "academic_level": {"academic_score", "score_type", "academic_country"},
+    "academic_score": {
+        "academic_level", "score_type", "academic_country", "other_requirement",
+    },
+    "other_requirement": {
+        "academic_level", "academic_score", "score_type", "academic_country",
+    },
 }
 
 
@@ -2799,6 +2811,36 @@ async def re_extract_staged(
             field_keys=evidence_refreshed_fields,
         )
 
+        # Requirement applicability is a first-class staged value. Rebuild it
+        # from the fresh official citations; unchanged persisted proof remains
+        # valid only while its fingerprint still matches the relevant fields.
+        from app.services.scraper.requirement_status import build_requirement_status
+
+        previous_requirement_status = row.requirement_status
+        requirement_fields = {
+            "academic_level", "academic_score", "score_type", "academic_country",
+            "other_requirement", *_ENGLISH_REEXTRACT_FIELDS,
+        }
+        requirement_status_relevant = (
+            targeted_fields is None
+            or bool(targeted_fields & requirement_fields)
+        )
+        refreshed_requirement_status = previous_requirement_status
+        if requirement_status_relevant:
+            refreshed_requirement_status = build_requirement_status(
+                row,
+                evidence=incoming_evidence,
+                source_url=out.get("url") or payload.get("course_website") or url,
+                previous=previous_requirement_status,
+            )
+        requirement_status_changed = (
+            requirement_status_relevant
+            and refreshed_requirement_status != previous_requirement_status
+        )
+        if requirement_status_changed:
+            row.requirement_status = refreshed_requirement_status
+            changed_fields.append("requirement_status")
+
         # Always refresh completeness and publish decision.
         try:
             comp = compute_completeness(row)
@@ -2826,6 +2868,20 @@ async def re_extract_staged(
         progress_fields = (
             set(changed_fields) | provenance_changed_fields
         )
+        if requirement_status_changed:
+            old_academic_state = (
+                (previous_requirement_status or {}).get("academic") or {}
+            ).get("state")
+            new_academic_state = (
+                (refreshed_requirement_status or {}).get("academic") or {}
+            ).get("state")
+            if (
+                new_academic_state == "qualification_based"
+                and old_academic_state != new_academic_state
+            ):
+                # Semantic resolution of the requested score applicability is
+                # real progress even though no numeric score was invented.
+                progress_fields.add("academic_score")
         if targeted_fields is not None:
             progress_fields &= targeted_fields
         made_progress = bool(progress_fields)
@@ -3172,6 +3228,68 @@ async def analyze_staged(
             "expected_fill_pct": min(99, expected_pct),
         })
 
+    from app.services.scraper.requirement_status import effective_requirement_status
+
+    academic_unresolved = sum(
+        1
+        for row in rows
+        if effective_requirement_status(row)["academic"]["state"]
+        in {"missing", "unverified"}
+    )
+    if academic_unresolved:
+        current_pct = round((total - academic_unresolved) / total * 100) if total else 0
+        fillable = round(
+            academic_unresolved
+            * (courses_with_url / total if total else 1)
+            * 0.60
+        )
+        issues.append({
+            "field": "academic_score",
+            "label": "Missing or Unverified Academic Requirement",
+            "missing": academic_unresolved,
+            "total": total,
+            "pct_missing": 100 - current_pct,
+            "current_pct": current_pct,
+            "expected_fill_pct": min(
+                99,
+                round((total - academic_unresolved + fillable) / total * 100)
+                if total else current_pct,
+            ),
+        })
+
+    english_components_unresolved = sum(
+        1
+        for row in rows
+        if row.ielts_overall is not None
+        and effective_requirement_status(row)["englishComponents"]["state"]
+        not in {"verified", "not_required"}
+    )
+    if english_components_unresolved:
+        current_pct = (
+            round((total - english_components_unresolved) / total * 100)
+            if total else 0
+        )
+        fillable = round(
+            english_components_unresolved
+            * (courses_with_url / total if total else 1)
+            * 0.60
+        )
+        issues.append({
+            "field": "english_requirements",
+            "label": "Missing or Unverified IELTS Components",
+            "missing": english_components_unresolved,
+            "total": total,
+            "pct_missing": 100 - current_pct,
+            "current_pct": current_pct,
+            "expected_fill_pct": min(
+                99,
+                round(
+                    (total - english_components_unresolved + fillable)
+                    / total * 100
+                ) if total else current_pct,
+            ),
+        })
+
     # Check university name embedded in course title
     if uni and uni.name:
         uni_lower = uni.name.lower()
@@ -3376,7 +3494,7 @@ async def staged_one(
     sc = await db.get(ScrapedCourse, sc_id)
     if not sc:
         raise HTTPException(status_code=404, detail="Not found")
-    return {c.name: getattr(sc, c.name) for c in sc.__table__.columns} | {"ok": True}
+    return _staged_row_to_dict(sc) | {"ok": True}
 
 
 def _row_to_camel(row: dict) -> dict:
@@ -3412,6 +3530,17 @@ async def staged_review(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)]
         raise HTTPException(status_code=404, detail="Staged course not found")
 
     row_dict = dict(row)
+    from app.models import ScrapedCourse
+    from app.services.scraper.requirement_status import public_requirement_status
+
+    status_row = await db.get(ScrapedCourse, sc_id)
+    requirement_status = (
+        public_requirement_status(status_row) if status_row is not None else {
+            "academic": {"state": "missing"},
+            "englishComponents": {"state": "unknown"},
+        }
+    )
+    row_dict["requirement_status"] = requirement_status
     out = {}
     for k, v in row_dict.items():
         if hasattr(v, "isoformat"):
@@ -3424,6 +3553,7 @@ async def staged_review(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)]
     # attach it as `course` (and `stagedCourse` for legacy callers) without
     # leaking snake_case keys into the same object.
     course_obj = _row_to_camel(row_dict)
+    course_obj["requirementStatus"] = requirement_status
 
     # UI may expect nested shape similar to live courses
     out["fees"] = {
@@ -4434,9 +4564,15 @@ async def staged_update(
         # Recompute completeness so the UI badge updates after save.
         try:
             from app.services.scraper.completeness import compute_completeness
+            from app.services.scraper.requirement_status import (
+                build_requirement_status,
+            )
 
-            score, _missing = compute_completeness(sc)
-            sc.completeness = score
+            sc.requirement_status = build_requirement_status(
+                sc,
+                previous=sc.requirement_status,
+            )
+            sc.completeness = compute_completeness(sc).score
         except Exception:  # pragma: no cover — best-effort
             pass
 
@@ -6623,6 +6759,7 @@ async def extraction_quality_report(
     from sqlalchemy import select as _sel
     from app.models import ScrapeRuntimeJob, University, ScrapedCourse
     from app.services.scraper.course_name_cleaner import clean_course_name
+    from app.services.scraper.requirement_status import effective_requirement_status
 
     # ── Load job & university ──────────────────────────────────────────────
     job = (await db.execute(
@@ -6654,7 +6791,14 @@ async def extraction_quality_report(
 
     # ── Field fill rates (mirror the 13 auto-publish completeness fields) ──
     def _has_english(r: ScrapedCourse) -> bool:
-        return bool(r.ielts_overall or r.pte_overall or r.toefl_overall or r.cambridge_overall)
+        if r.pte_overall or r.toefl_overall or r.cambridge_overall or r.duolingo_overall:
+            return True
+        if not r.ielts_overall:
+            return False
+        return (
+            effective_requirement_status(r)["englishComponents"]["state"]
+            in {"verified", "not_required"}
+        )
 
     _FIELDS: list[tuple[str, str]] = [
         ("course_name",       "Course Name"),
@@ -6678,6 +6822,11 @@ async def extraction_quality_report(
         if field == "intake_months":
             v = r.intake_months
             return bool(v) and len(v) > 0
+        if field == "academic_score":
+            return (
+                effective_requirement_status(r)["academic"]["state"]
+                in {"numeric", "qualification_based"}
+            )
         v = getattr(r, field, None)
         if isinstance(v, str):
             return bool(v.strip())
@@ -7075,11 +7224,12 @@ async def extraction_quality_report(
             ),
         })
 
-    # 8b. IELTS overall set but no component scores (Reading/Writing/Listening/Speaking)
+    # 8b. IELTS overall set but one or more component requirements are missing.
     _ielts_no_components = [
         r for r in rows
         if r.ielts_overall is not None
-        and not any([r.ielts_reading, r.ielts_writing, r.ielts_listening, r.ielts_speaking])
+        and effective_requirement_status(r)["englishComponents"]["state"]
+        not in {"verified", "not_required"}
     ]
     if _ielts_no_components:
         cnt = len(_ielts_no_components)
@@ -7087,21 +7237,22 @@ async def extraction_quality_report(
         # Collect unique IELTS overall values for the example
         _ielts_ex = list({r.ielts_overall for r in _ielts_no_components if r.ielts_overall})
         issues.append({
-            "field": "ielts_overall",
+            "field": "english_requirements",
             "issue_type": "ielts_components_missing",
             "severity": "high",
             "count": cnt,
             "pct": round(pct, 1),
-            "label": "IELTS overall score found — component scores missing",
+            "label": "IELTS overall score found — component requirements incomplete or unverified",
             "detail": (
                 f"{cnt} of {n} courses ({pct:.0f}%) have an IELTS overall band score "
-                f"(e.g. IELTS {_ielts_ex[0] if _ielts_ex else '?'}) but no component scores "
-                "(Reading, Writing, Listening, Speaking). "
+                f"(e.g. IELTS {_ielts_ex[0] if _ielts_ex else '?'}) but one or more component "
+                "requirements are missing or lack source verification. "
                 "Many universities require students to meet a minimum in each component, "
                 "not just the overall band — so missing components means incomplete eligibility data."
             ),
             "examples": [
-                f"{r.course_name}: IELTS {r.ielts_overall} overall (no components)"
+                f"{r.course_name}: IELTS {r.ielts_overall} overall "
+                f"({', '.join(effective_requirement_status(r)['englishComponents'].get('missingFields') or ['components unverified'])})"
                 for r in _ielts_no_components[:3]
                 if r.course_name
             ],
@@ -7119,6 +7270,43 @@ async def extraction_quality_report(
                     "7.5": 7.0,
                 },
             },
+            "missing_fields": sorted({
+                field
+                for r in _ielts_no_components
+                for field in (
+                    effective_requirement_status(r)["englishComponents"].get("missingFields")
+                    or []
+                )
+            }),
+        })
+
+    # 8c. A missing numeric score is not a defect when official, bounded entry
+    # evidence proves that the requirement is qualification/classification based.
+    _academic_unresolved = [
+        r for r in rows
+        if effective_requirement_status(r)["academic"]["state"] in {"missing", "unverified"}
+    ]
+    if _academic_unresolved:
+        cnt = len(_academic_unresolved)
+        pct = cnt / n * 100
+        issues.append({
+            "field": "academic_score",
+            "issue_type": "academic_requirement_unverified",
+            "severity": "high" if pct > 20 else "medium",
+            "count": cnt,
+            "pct": round(pct, 1),
+            "label": "Academic requirement missing or not source-verified",
+            "detail": (
+                f"{cnt} of {n} courses ({pct:.0f}%) have neither a numeric academic "
+                "score nor evidence-backed qualification/classification requirements. "
+                "A score must not be guessed from prose."
+            ),
+            "examples": [r.course_name for r in _academic_unresolved[:3] if r.course_name],
+            "fix_type": "reextract",
+            "suggested_fix": (
+                "Re-check the bounded official entry-requirements section. The Fix may "
+                "record qualification-based applicability, but will not invent a score."
+            ),
         })
 
     # 9. IELTS value out of plausible range

@@ -6,14 +6,14 @@ auto-publishes. The fix:
 
 * International fee is OPTIONAL. (Some unis publish fee on a separate page that
   scrapers can't read; should not gate publication.)
-* English requirement: any one of IELTS overall, PTE overall, TOEFL overall,
-  Cambridge overall, or Duolingo overall counts.
+* English requirement: PTE/TOEFL/Cambridge/Duolingo overall counts; IELTS also
+  requires source-verified component applicability.
 * Decision threshold (completeness %) lives in settings.
 
 Hard-required field gates (in addition to the completeness floor):
 * course_name  — must be present and ≥ 3 chars
 * degree_level — must be present
-* English test — at least one of IELTS/PTE/TOEFL/Cambridge/Duolingo overall
+* English test — a supported alternative overall, or verified IELTS components
 * duration     — must be non-null (every legitimate course has a duration)
 * intake_months — must be non-empty, UNLESS the course is online-only
   (online-only courses sometimes don't publish intake windows)
@@ -26,6 +26,7 @@ from typing import Any
 
 from app.config import settings
 from app.models import ScrapedCourse
+from app.services.scraper.requirement_status import effective_requirement_status
 
 
 @dataclass
@@ -36,15 +37,22 @@ class AutoPublishDecision:
 
 
 def _has_english(sc: ScrapedCourse) -> bool:
-    return any(
+    alternatives = any(
         getattr(sc, attr) is not None and getattr(sc, attr) > 0
         for attr in (
-            "ielts_overall",
             "pte_overall",
             "toefl_overall",
             "cambridge_overall",
             "duolingo_overall",
         )
+    )
+    if alternatives:
+        return True
+    if sc.ielts_overall is None:
+        return False
+    return (
+        effective_requirement_status(sc)["englishComponents"]["state"]
+        in {"verified", "not_required"}
     )
 
 

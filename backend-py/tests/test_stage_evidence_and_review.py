@@ -404,6 +404,22 @@ async def test_stage_course_persists_completeness_and_evidence():
                 "source_url": "https://example.edu/cs",
                 "snippet": "IELTS overall: 6.5",
             },
+                *[
+                    {
+                        "field_key": field,
+                        "value": 6.0,
+                        "method": "english:table",
+                        "confidence": 0.9,
+                        "source_url": "https://example.edu/cs",
+                        "snippet": "Minimum 6.0 in each IELTS component",
+                    }
+                    for field in (
+                        "ielts_listening",
+                        "ielts_speaking",
+                        "ielts_writing",
+                        "ielts_reading",
+                    )
+                ],
         ]
         payload = {
             "course_name": "Bachelor of Computer Science",
@@ -418,6 +434,10 @@ async def test_stage_course_persists_completeness_and_evidence():
             "academic_level": "Year 12",
             "academic_score": 85,
             "ielts_overall": 6.5,
+                "ielts_listening": 6.0,
+                "ielts_speaking": 6.0,
+                "ielts_writing": 6.0,
+                "ielts_reading": 6.0,
             "other_requirement": "Personal statement",
             "course_website": "https://example.edu/cs",
         }
@@ -467,7 +487,7 @@ async def test_stage_course_persists_completeness_and_evidence():
                     )
                 )
             ).scalars().all()
-            assert len(ev_rows) == 6
+            assert len(ev_rows) == 10
             keys = {r.field_key for r in ev_rows}
             assert keys == {
                 "course_name",
@@ -475,6 +495,10 @@ async def test_stage_course_persists_completeness_and_evidence():
                 "study_mode",
                 "international_fee",
                 "ielts_overall",
+                "ielts_listening",
+                "ielts_speaking",
+                "ielts_writing",
+                "ielts_reading",
                 "sub_category",
             }
             for r in ev_rows:
@@ -496,7 +520,7 @@ async def test_stage_course_persists_completeness_and_evidence():
         assert body["eligibilityStatus"] == "ready"
         assert body["autoPublishStatus"] == "ready"
         assert isinstance(body["evidence"], list)
-        assert len(body["evidence"]) == 6
+        assert len(body["evidence"]) == 10
         # Per-field grouping must include each key we wrote.
         assert set(body["evidenceByField"].keys()) == {
             "course_name",
@@ -504,6 +528,10 @@ async def test_stage_course_persists_completeness_and_evidence():
             "study_mode",
             "international_fee",
             "ielts_overall",
+            "ielts_listening",
+            "ielts_speaking",
+            "ielts_writing",
+            "ielts_reading",
             "sub_category",
         }
         # camelCase aliases the React UI expects.

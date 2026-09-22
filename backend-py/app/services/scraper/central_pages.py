@@ -989,11 +989,34 @@ async def _parse_english_page_html_async(html: str, page_url: str) -> dict[str, 
 
         results = await english_test.extract(html, page_url)
         out: dict[str, Any] = {}
+        requirement_evidence: dict[str, str] | None = None
         for r in results:
             if r.normalized:
                 for k, v in r.normalized.items():
                     if k in _ENGLISH_SLOTS and v not in (None, "", 0):
                         out.setdefault(k, v)
+                # english_test emits one grouped IELTS result whose normalized
+                # map carries the component values. Preserve its official-page
+                # excerpt at this trusted parser boundary so staging evidence
+                # can prove the all-band semantics instead of fabricating a
+                # "central_page ... field=value" sentence later.
+                if (
+                    r.field_key == "ielts_overall"
+                    and all(
+                        r.normalized.get(field) not in (None, "", 0)
+                        for field in (
+                            "ielts_listening", "ielts_speaking",
+                            "ielts_writing", "ielts_reading",
+                        )
+                    )
+                    and r.snippet
+                ):
+                    requirement_evidence = {
+                        "snippet": str(r.snippet),
+                        "method": str(r.method or "regex"),
+                    }
+        if requirement_evidence:
+            out["_requirement_evidence"] = requirement_evidence
         # Some official pages publish component bands as prose rather than a
         # table. Keep these values typed and course-source-bound.
         text = re.sub(r"<[^>]+>", " ", html or "")
@@ -1764,7 +1787,7 @@ async def _fetch_with_browser_fallback(url: str) -> str | None:
 #                             english_by_level + english_by_program
 
 _CACHE_TTL_DAYS = 30
-_ENGLISH_CACHE_SCHEMA_VERSION = 9
+_ENGLISH_CACHE_SCHEMA_VERSION = 10
 
 
 def _is_non_tuition_central_fee_pdf(

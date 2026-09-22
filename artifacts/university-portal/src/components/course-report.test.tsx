@@ -8,6 +8,106 @@ afterEach(() => { cleanup(); setAuthToken(null); vi.unstubAllGlobals(); });
 const response = (body: unknown, ok = true) => ({ ok, text: async () => JSON.stringify(body) });
 
 describe("course report recovery", () => {
+  it("submits the affected staged course context and human-supplied official source", async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(response({ reports: [], source_exclusions: {} }))
+      .mockResolvedValueOnce(response({
+        job_id: "requirement-recovery", status: "queued", found: 0, staged: 0,
+        skipped: 0, errors: 0, exclusions: {},
+        request: { kind: "incorrect", fields: ["english", "other"] },
+      }));
+    vi.stubGlobal("fetch", fetcher);
+    render(<CourseReport
+      jobId="source-job"
+      onReview={vi.fn()}
+      openRequest={1}
+      prefillCourses={[{
+        courseName: "Master of Evidence",
+        courseUrl: "https://uni.edu/courses/evidence",
+        fields: ["english", "other"],
+        description: "Source verification needed for Master of Evidence: academic and English requirements.",
+      }]}
+    />);
+
+    expect((await screen.findByTestId("report-prefill-course")).textContent).toContain("Master of Evidence");
+    expect((screen.getByTestId("select-report-kind") as HTMLSelectElement).value).toBe("incorrect");
+    expect((screen.getByTestId("input-report-urls") as HTMLTextAreaElement).value)
+      .toBe("https://uni.edu/courses/evidence");
+    expect((screen.getByTestId("input-report-source") as HTMLInputElement).value).toBe("");
+    expect((screen.getByTestId("checkbox-report-english") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByTestId("checkbox-report-other") as HTMLInputElement).checked).toBe(true);
+
+    fireEvent.change(screen.getByTestId("input-report-source"), {
+      target: { value: "https://uni.edu/admissions/requirements" },
+    });
+    fireEvent.click(screen.getByTestId("button-submit-report"));
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+    const [, init] = fetcher.mock.calls[1];
+    expect(fetcher.mock.calls[1][0]).toBe("/api/scrape/jobs/source-job/course-reports");
+    expect(JSON.parse(init.body)).toEqual(expect.objectContaining({
+      kind: "incorrect",
+      course_urls: ["https://uni.edu/courses/evidence"],
+      fields: ["english", "other"],
+      source_url: "https://uni.edu/admissions/requirements",
+    }));
+    expect(JSON.parse(init.body)).not.toHaveProperty("course_id");
+    expect(JSON.parse(init.body)).not.toHaveProperty("staged_id");
+  });
+
+  it("shows pending state and preserves the prefilled form when recovery submission fails", async () => {
+    let resolvePost: ((value: ReturnType<typeof response>) => void) | undefined;
+    const pendingPost = new Promise<ReturnType<typeof response>>((resolve) => { resolvePost = resolve; });
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(response({ reports: [], source_exclusions: {} }))
+      .mockImplementationOnce(() => pendingPost);
+    vi.stubGlobal("fetch", fetcher);
+    render(<CourseReport
+      jobId="source-job"
+      onReview={vi.fn()}
+      openRequest={1}
+      prefillCourses={[{
+        courseName: "Master of Evidence",
+        courseUrl: "https://uni.edu/courses/evidence",
+        fields: ["other"],
+        description: "Academic requirement needs an official source.",
+      }]}
+    />);
+    await screen.findByTestId("report-prefill-course");
+    fireEvent.click(screen.getByTestId("button-submit-report"));
+    expect((await screen.findByRole("button", { name: "Starting recovery…" }) as HTMLButtonElement).disabled).toBe(true);
+
+    resolvePost?.(response({ detail: "Official source could not be verified" }, false));
+    expect((await screen.findByRole("alert")).textContent).toContain("Official source could not be verified");
+    expect((screen.getByTestId("button-submit-report") as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByTestId("input-report-urls") as HTMLTextAreaElement).value)
+      .toBe("https://uni.edu/courses/evidence");
+  });
+
+  it("provides a course picker for multi-row requirement recovery", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({ reports: [], source_exclusions: {} })));
+    render(<CourseReport
+      jobId="source-job"
+      onReview={vi.fn()}
+      openRequest={1}
+      prefillCourses={[
+        {
+          courseName: "Course One", courseUrl: "https://uni.edu/one",
+          fields: ["english"], description: "English requirement is unverified.",
+        },
+        {
+          courseName: "Course Two", courseUrl: "https://uni.edu/two",
+          fields: ["other"], description: "Academic requirement is unverified.",
+        },
+      ]}
+    />);
+    const picker = await screen.findByTestId("select-report-prefill-course");
+    expect((screen.getByTestId("input-report-urls") as HTMLTextAreaElement).value).toBe("https://uni.edu/one");
+    fireEvent.change(picker, { target: { value: "1" } });
+    expect((screen.getByTestId("input-report-urls") as HTMLTextAreaElement).value).toBe("https://uni.edu/two");
+    expect((screen.getByTestId("checkbox-report-other") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByTestId("input-report-source") as HTMLInputElement).value).toBe("");
+  });
+
   it("uses the saved bearer token when the session cookie is unavailable", async () => {
     setAuthToken("saved-session-token");
     const fetcher = vi.fn().mockResolvedValue(response({

@@ -75,6 +75,10 @@ _PATH_SEGMENT_SCORES: dict[str, list[str]] = {
 FIELD_TO_CATEGORY: dict[str, str] = {
     "international_fee": "fees",
     "ielts_overall": "english",
+    "ielts_listening": "english",
+    "ielts_speaking": "english",
+    "ielts_writing": "english",
+    "ielts_reading": "english",
     "intake_months": "intakes",
     "course_location": "location",
     "other_requirement": "requirements",

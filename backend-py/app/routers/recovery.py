@@ -90,6 +90,10 @@ async def get_recovery_summary(
 _FIELD_TO_COLUMN: dict[str, str] = {
     "international_fee": "international_fee",
     "ielts_overall": "ielts_overall",
+    "ielts_listening": "ielts_listening",
+    "ielts_speaking": "ielts_speaking",
+    "ielts_writing": "ielts_writing",
+    "ielts_reading": "ielts_reading",
     "intake_months": "intake_months",
     "course_location": "course_location",
     "other_requirement": "other_requirement",
@@ -105,7 +109,10 @@ def _parse_recovered_value(field: str, raw: str | None) -> object:
             return float(raw)
         except (ValueError, TypeError):
             return None
-    if field == "ielts_overall":
+    if field in {
+        "ielts_overall", "ielts_listening", "ielts_speaking",
+        "ielts_writing", "ielts_reading",
+    }:
         try:
             return float(raw)
         except (ValueError, TypeError):
@@ -246,7 +253,10 @@ async def act_on_recovery_result(
             text(f"UPDATE scraped_courses SET {col} = CAST(:v AS jsonb) WHERE id=:id"),
             {"v": json.dumps(value), "id": sc_id},
         )
-    elif field in ("international_fee", "ielts_overall"):
+    elif field in {
+        "international_fee", "ielts_overall", "ielts_listening",
+        "ielts_speaking", "ielts_writing", "ielts_reading",
+    }:
         await db.execute(
             text(f"UPDATE scraped_courses SET {col} = :v WHERE id=:id"),
             {"v": float(value), "id": sc_id},
@@ -303,22 +313,43 @@ async def act_on_recovery_result(
     try:
         from app.models import ScrapedCourse
         from app.services.scraper.completeness import compute_completeness, decide_eligibility
+        from app.services.scraper.requirement_status import build_requirement_status
         sc = await db.get(ScrapedCourse, sc_id)
         if sc:
+            evidence_rows = (
+                await db.execute(
+                    text(
+                        "SELECT field_key, source_url, extraction_method, snippet, "
+                        "decision_status FROM scraped_field_evidence "
+                        "WHERE scraped_course_id=:id AND selected=true "
+                        "AND field_key IN ('other_requirement', 'ielts_overall', "
+                        "'ielts_listening', 'ielts_speaking', 'ielts_writing', "
+                        "'ielts_reading')"
+                    ),
+                    {"id": sc_id},
+                )
+            ).mappings().all()
+            requirement_evidence = [
+                {
+                    "field_key": item["field_key"],
+                    "source_url": item["source_url"],
+                    "method": item["extraction_method"],
+                    "snippet": item["snippet"],
+                    "decision_status": item["decision_status"],
+                }
+                for item in evidence_rows
+            ]
+            sc.requirement_status = build_requirement_status(
+                sc,
+                evidence=requirement_evidence,
+                source_url=sc.course_website,
+                previous=sc.requirement_status,
+            )
             comp = compute_completeness(sc)
             dec = decide_eligibility(sc, comp)
-            await db.execute(
-                text(
-                    "UPDATE scraped_courses SET completeness=:c, "
-                    "eligibility_status=:es, eligibility_reason=:er WHERE id=:id"
-                ),
-                {
-                    "c": comp.score,
-                    "es": dec.status,
-                    "er": dec.reason,
-                    "id": sc_id,
-                },
-            )
+            sc.completeness = comp.score
+            sc.eligibility_status = dec.status
+            sc.eligibility_reason = dec.reason
             await db.commit()
     except Exception as exc:
         log.warning("[RECOVERY:api] completeness recompute failed for course=%s: %s", sc_id, exc)
