@@ -1,0 +1,59 @@
+{
+  "passed": true,
+  "observed_at_utc": "2026-09-22",
+  "command": "python backend-py/tests/task568_acceptance.py --output /tmp/task568-evidence",
+  "fixture": {
+    "host": "task564.example.test",
+    "synthetic": true,
+    "submitted_urls": 60,
+    "real_components": [
+      "authenticated FastAPI endpoints",
+      "PostgreSQL transaction locks",
+      "Redis broker and repair lease",
+      "prefork Celery worker",
+      "scrape extraction and staging",
+      "durable checkpoint commits",
+      "workflow monitor"
+    ]
+  },
+  "first_child": {
+    "status": "failed_degraded",
+    "time_budget_seconds": 2,
+    "budget_exhausted": "time_budget_exhausted",
+    "settled_urls": [0, 1, 2, 3, 4],
+    "remaining_after_reload": {"first": 5, "last": 59, "count": 55}
+  },
+  "continuation_submission": {
+    "simultaneous_statuses": [202, 409],
+    "later_stale_status": 409,
+    "children_created": 1,
+    "retry_source_is_first_child": true,
+    "first_worker_stopped_before_continuation": true,
+    "distinct_worker_processes": true
+  },
+  "second_child": {
+    "status": "completed",
+    "selected_urls": {"first": 5, "last": 54, "count": 50},
+    "staged_rows": 50,
+    "max_courses": 50,
+    "time_budget_seconds": 600,
+    "cost_cap_usd": 2,
+    "remaining_after_reload": {"first": 55, "last": 59, "count": 5}
+  },
+  "integrity": {
+    "source_rows_preserved": true,
+    "prior_child_rows_preserved": true,
+    "duplicate_settled_extractions": 0,
+    "published_courses": 0
+  },
+  "cleanup": {
+    "private_directory_removed": true,
+    "all_subprocesses_exited": true,
+    "production_recipe_tree_unchanged": true
+  },
+  "not_proven": [
+    "live university catalogue behavior",
+    "paid-provider cost exhaustion",
+    "production infrastructure behavior"
+  ]
+}

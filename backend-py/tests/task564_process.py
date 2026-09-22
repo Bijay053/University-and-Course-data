@@ -23,7 +23,7 @@ def isolate_recipe_files():
     from app.services.scraper import yaml_cascade
 
     root = Path(os.environ["TASK564_RECIPE_ROOT"]).resolve()
-    assert root.parent.name.startswith("task564-private-")
+    assert root.parent.name.startswith(("task564-private-", "task568-private-"))
     root.mkdir(parents=True, exist_ok=True)
     (root / "unis").mkdir(exist_ok=True)
     (root / "runtime_unis").mkdir(exist_ok=True)
@@ -72,14 +72,20 @@ def install_http_fixture():
         return original_safe(url)
 
     async def send(client, request, **kwargs):
-        if request.url.host == HOST:
+        fixture_request = request.url.host == HOST
+        if fixture_request:
             request.url = request.url.copy_with(
                 scheme="http", host="127.0.0.1",
                 port=int(os.environ["TASK564_HTTP_PORT"]),
             )
         elif request.url.host not in {"127.0.0.1", "localhost", "::1"}:
             raise RuntimeError(f"Task564 forbids external HTTP: {request.url.host}")
-        return await original_send(client, request, **kwargs)
+        response = await original_send(client, request, **kwargs)
+        if fixture_request:
+            response.extensions["network_stream"] = SimpleNamespace(
+                get_extra_info=lambda key: ("8.8.8.8", 443) if key == "peername" else None
+            )
+        return response
 
     scraper_config_ai._is_safe_public_url = safe
     httpx.AsyncClient.send = send
@@ -161,6 +167,25 @@ async def seed():
     await engine.dispose()
 
 
+async def set_report_budget():
+    """Shorten one disposable queued report so timeout acceptance runs quickly."""
+    from app.database import AsyncSessionLocal, engine
+    from app.models import ScrapeRuntimeJob
+
+    job_id = os.environ["TASK568_REPORT_JOB_ID"]
+    seconds = float(os.environ.get("TASK568_TIME_BUDGET_SECONDS", "2"))
+    async with AsyncSessionLocal() as db:
+        job = await db.get(ScrapeRuntimeJob, job_id, populate_existing=True)
+        assert job is not None and job.status == "queued"
+        payload = dict(job.request_payload or {})
+        policy = dict(payload.get("autonomousVerification") or {})
+        policy["time_budget_seconds"] = seconds
+        payload["autonomousVerification"] = policy
+        job.request_payload = payload
+        await db.commit()
+    await engine.dispose()
+
+
 if __name__ == "__main__":
     # Refuse accidental direct execution against inherited/shared infrastructure.
     assert os.environ.get("TASK564_ISOLATED") == "yes"
@@ -170,6 +195,8 @@ if __name__ == "__main__":
     install_http_fixture()
     if sys.argv[1] == "seed":
         asyncio.run(seed())
+    elif sys.argv[1] == "set-report-budget":
+        asyncio.run(set_report_budget())
     elif sys.argv[1] == "api":
         import uvicorn
         uvicorn.run("app.main:app", host="127.0.0.1",

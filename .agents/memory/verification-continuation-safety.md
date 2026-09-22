@@ -20,3 +20,9 @@ Checkpoint settled outcomes before emitting progress or starting other cancellab
 **Why:** Batch-end checkpoints miss already-settled skips and errors when a deadline interrupts event emission. Shielding a commit alone is insufficient if timeout rollback can run before that commit finishes.
 
 **How to apply:** Wait for in-flight checkpoint persistence before propagating cancellation; test cancellation at the outcome boundary and during persistence, not merely statement ordering.
+
+Cross-worker acceptance must prove distinct worker identities; queue delivery alone is not evidence of a process handoff.
+
+**Why:** A persistent worker can execute both children and hide serialization, stale resource, or process-boundary defects.
+
+**How to apply:** Stop the first worker after its durable terminal checkpoint, start a replacement, and assert different recorded worker identities plus exact remaining work.
