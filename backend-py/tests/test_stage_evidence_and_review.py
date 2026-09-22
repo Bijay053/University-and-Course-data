@@ -190,6 +190,7 @@ def test_reextract_warning_cleanup_is_condition_specific():
             "fee_section_detected_fee_blank",
             "suspicious_duration",
             "confidence_low:55",
+            "confidence_warn:75",
             "manual_operator_review",
         ],
         fresh_payload={

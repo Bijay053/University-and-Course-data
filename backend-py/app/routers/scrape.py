@@ -2239,6 +2239,8 @@ def _filter_resolved_reextract_warnings(
 
     if score_payload(current_payload)["score"] >= CONFIDENCE_WARN:
         resolved_codes.add("confidence_low")
+        # Older staging runs persisted the same score warning under this key.
+        resolved_codes.add("confidence_warn")
 
     return [
         str(warning)
