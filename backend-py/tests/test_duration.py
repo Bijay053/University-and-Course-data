@@ -189,6 +189,31 @@ def test_uel_duration_override_is_host_scoped():
     assert out[0].method == "duration.structural"
 
 
+def test_londonmet_uses_current_overseas_fulltime_entry_point_duration():
+    html = """
+    <main><div><strong>Typical duration</strong><span>0 years</span></div></main>
+    <select id="course-entry-point-selector">
+      <optgroup label="UK">
+        <option data-mode="Full-time" data-duration="3 years"
+                data-m="September" data-y="2026">September 2026</option>
+      </optgroup>
+      <optgroup label="Overseas">
+        <option data-mode="Part-time" data-duration="6 years"
+                data-m="September" data-y="2027">September 2027</option>
+        <option data-mode="Full-time" data-duration="4 years"
+                data-m="September" data-y="2027">September 2027</option>
+      </optgroup>
+    </select>
+    """
+    out = _run(duration.extract(
+        html,
+        "https://www.londonmet.ac.uk/courses/undergraduate/"
+        "graphic-design-including-foundation-year---ba-hons/",
+    ))
+    assert out[0].normalized == {"duration": 4.0, "duration_term": "Year"}
+    assert out[0].method == "duration.londonmet_overseas_fulltime_option"
+
+
 def test_inti_ignores_sibling_compare_card_durations():
     """INTI's recommendation cards must not beat the current programme badge."""
     html = """

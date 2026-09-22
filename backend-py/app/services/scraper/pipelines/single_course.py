@@ -1600,6 +1600,52 @@ def _select_central_english_level(
     return bucket, values
 
 
+def _normalise_central_english_fields(values: Any) -> dict[str, Any]:
+    """Convert parser-only central English keys into persistable payload slots.
+
+    Some central pages state one IELTS component minimum rather than repeating
+    it for listening, reading, writing and speaking.  The central parser keeps
+    that compact fact as ``ielts_minimum``; course payloads have no such field,
+    so copying it verbatim both loses the bands and violates the payload
+    contract.  Expand it here at the central/course boundary.
+    """
+    if not isinstance(values, dict):
+        return {}
+    normalised = {
+        key: value for key, value in values.items() if key != "ielts_minimum"
+    }
+    minimum = values.get("ielts_minimum")
+    if minimum not in (None, "", 0):
+        for slot in (
+            "ielts_listening",
+            "ielts_reading",
+            "ielts_writing",
+            "ielts_speaking",
+        ):
+            normalised.setdefault(slot, minimum)
+    return normalised
+
+
+def _central_english_audience_mismatch(
+    central_data: Any,
+    course_audience_identity: Any,
+    *,
+    identity_matches: bool,
+) -> bool:
+    """Return whether central English must fail closed for audience identity."""
+    if not isinstance(central_data, dict):
+        return False
+    has_central_scope = bool(
+        central_data.get("audience_identity")
+        or central_data.get("audience_recipe")
+    )
+    has_course_scope = isinstance(course_audience_identity, dict)
+    return bool(
+        (has_central_scope or has_course_scope)
+        and not identity_matches
+    )
+
+
 def _select_central_english_program(
     profiles: Any,
     course_name: str,
@@ -3810,6 +3856,7 @@ async def extract_course(
             and isinstance(_audience_identity, dict)
             and _audience_identity.get("audience") == "international"
             and _audience_identity.get("source_url")
+            and isinstance(central_data, dict)
             and _audience_identity.get("source_url") == central_data.get("english_page_url")
         ):
             _central_identity = _audience_identity
@@ -3821,7 +3868,18 @@ async def extract_course(
             and _central_identity.get("container") == _audience_identity.get("container")
             and _central_identity.get("option") == _audience_identity.get("option")
         )
-        if isinstance(central_data, dict) and not _central_identity_ok:
+        # Only audience-scoped enrichment needs an identity match.  Ordinary
+        # configured central English pages are institution-wide and carry no
+        # audience identity at all.  Treating that absence as a mismatch used
+        # to erase english_by_level for every normal course before the central
+        # fallback ran (for example London Met's UG IELTS 6.0 / bands 5.5).
+        # A real course audience selector still fails closed unless it matches
+        # the central identity, so domestic/international values cannot leak.
+        if _central_english_audience_mismatch(
+            central_data,
+            _audience_identity,
+            identity_matches=_central_identity_ok,
+        ):
             central_data = {
                 **central_data,
                 "english": {}, "english_by_level": {}, "english_by_program": [],
@@ -8736,6 +8794,16 @@ async def extract_course(
                 }
             )
 
+    # London Met's entry accordion publishes explicit UCAS tariff values and
+    # qualification requirements. Fill only absent fields, with source evidence,
+    # independently of whether optional AI enrichment ran.
+    from app.services.scraper.extractors import londonmet_academic as _lm_academic
+    if _lm_academic.is_londonmet_url(url):
+        try:
+            _lm_academic.apply_fill_only(payload, html, url=url, evidence=evidence)
+        except Exception as _lm_academic_exc:
+            log.warning("London Met academic extraction failed for %s: %s", url, _lm_academic_exc)
+
     # CQU authority must run after the optional AI branch. The older pass above
     # is nested inside ``if use_ai_fallback`` and therefore does not run for
     # CQU's deterministic fast path, where remote AI is intentionally disabled.
@@ -9407,7 +9475,9 @@ async def extract_course(
             from app.services.scraper.central_pages import match_central_fee
 
             _central_fees: list = central_data.get("fees") or []
-            _central_english: dict = central_data.get("english") or {}
+            _central_english: dict = _normalise_central_english_fields(
+                central_data.get("english") or {}
+            )
             _central_fee_url: str | None = central_data.get("fee_page_url")
             _central_eng_url: str | None = central_data.get("english_page_url")
             # Per-level source URLs (populated when separate UG/PG pages are configured).
@@ -9724,6 +9794,7 @@ async def extract_course(
                 _english_by_level,
                 _course_dl,
             )
+            _level_english = _normalise_central_english_fields(_level_english)
             _program_profiles: list[dict[str, Any]] = (
                 central_data.get("english_by_program") or []
             )
@@ -9734,7 +9805,9 @@ async def extract_course(
             )
             if _program_english:
                 _level_bucket = "program"
-                _level_english = _program_english
+                _level_english = _normalise_central_english_fields(
+                    _program_english
+                )
 
             # Pathway guard: pathway programs (Foundation Studies, ELICOS,
             # UniPrep, bridging courses) must not inherit the university-wide
@@ -10039,7 +10112,24 @@ async def extract_course(
                 log.warning("[BAND] band_mapping correction failed on %s: %s", url, _band_exc)
 
         except Exception as exc:  # noqa: BLE001 — never abort extraction
-            log.warning("central_pages fallback errored on %s: %s", url, exc)
+            log.warning(
+                "central_pages fallback errored on %s: %s: %s",
+                url,
+                type(exc).__name__,
+                exc,
+                exc_info=True,
+            )
+            if emit:
+                await emit(
+                    "error",
+                    f"[CENTRAL ✗] central fallback failed: "
+                    f"{type(exc).__name__}: {exc}",
+                    phase="fallback",
+                    kind="central_fallback_error",
+                    url=url,
+                    error_type=type(exc).__name__,
+                    error_reason=str(exc) or type(exc).__name__,
+                )
 
         if _require_central_fee_match and (
             not _central_fee_match_found

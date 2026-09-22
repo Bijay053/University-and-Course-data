@@ -22,6 +22,26 @@ class TestIsPathwayProgram:
             degree_level="Bachelor",
         )
 
+    def test_integrated_foundation_degree_title_is_enough_without_degree_level(self):
+        assert not is_pathway_program(
+            "Graphic Design (Including Foundation Year) BA (Hons)"
+        )
+
+    def test_integrated_foundation_degree_beats_misclassified_degree_level(self):
+        assert not is_pathway_program(
+            "Digital Media (Including Foundation Year) BA (Hons)",
+            degree_level="Foundation",
+        )
+
+    def test_integrated_exception_course_is_still_a_degree(self):
+        assert not is_pathway_program(
+            "Social Work (Including Foundation Year) BSc (Hons)",
+            degree_level="Year 12",
+        )
+
+    def test_standalone_foundation_year_remains_pathway_with_foundation_level(self):
+        assert is_pathway_program("Foundation Year", degree_level="Foundation")
+
     def test_foundation_program(self):
         assert is_pathway_program("Foundation Program")
 

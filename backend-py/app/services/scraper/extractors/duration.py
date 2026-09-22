@@ -1087,6 +1087,28 @@ def _from_uel_international_fulltime_option(
     return None
 
 
+def _from_londonmet_overseas_fulltime_option(
+    html: str,
+    url: str,
+) -> tuple[tuple[float, str], str] | None:
+    """Read the current Overseas full-time London Met entry-point duration."""
+    from app.services.scraper.extractors.londonmet_chrome_scrub import (
+        extract_real_fees,
+        is_londonmet_host,
+        parse_data_cost_entries,
+    )
+
+    if not is_londonmet_host(url):
+        return None
+    value = extract_real_fees(parse_data_cost_entries(html)).get("duration")
+    if not value:
+        return None
+    parsed = _classify_duration_value(value)
+    if parsed is None:
+        return None
+    return parsed, f"London Met current Overseas full-time option: {value}"
+
+
 async def extract(html: str, url: str) -> list[ExtractionResult]:
     # Per-uni: load reject_sentence_patterns from the contextvar set by
     # set_uni_config() before extraction runs.  These are compiled once
@@ -1167,6 +1189,21 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
                 confidence=0.99,
                 snippet=snippet,
                 method="duration.uel_international_fulltime_option",
+            )
+        ]
+
+    londonmet_option = _from_londonmet_overseas_fulltime_option(html, url)
+    if londonmet_option is not None:
+        (amount, unit), snippet = londonmet_option
+        amount, unit = _convert_weeks(amount, unit)
+        return [
+            ExtractionResult(
+                field_key="duration",
+                value=amount,
+                normalized={"duration": amount, "duration_term": unit},
+                confidence=0.99,
+                snippet=snippet,
+                method="duration.londonmet_overseas_fulltime_option",
             )
         ]
 

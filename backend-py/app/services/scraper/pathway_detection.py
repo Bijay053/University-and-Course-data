@@ -77,6 +77,15 @@ _PATHWAY_DEGREE_LEVELS: frozenset[str] = frozenset({
 
 _COMPILED_PATHWAY = [re.compile(p, re.I) for p in PATHWAY_NAME_PATTERNS]
 _COMPILED_EXCLUSIONS = [re.compile(p, re.I) for p in PATHWAY_EXCLUSION_PATTERNS]
+_INTEGRATED_FOUNDATION_YEAR_RE = re.compile(
+    r"\b(?:including|with)\s+(?:a\s+)?foundation\s+year\b",
+    re.I,
+)
+_DEGREE_AWARD_RE = re.compile(
+    r"\b(?:bachelor(?:'?s)?|"
+    r"ba|bsc|beng|bed|bba|bfa|bmus|barch|llb|meng|msci)\b",
+    re.I,
+)
 
 
 def is_pathway_program(
@@ -97,28 +106,39 @@ def is_pathway_program(
         Optional degree-level string from the degree_level extractor
         (e.g. "Bachelor's", "Foundation", "Certificate IV").
     """
-    # Degree-level hint — cheapest check first
-    if degree_level and degree_level.strip().lower() in _PATHWAY_DEGREE_LEVELS:
-        return True
-
     if not course_name:
-        return False
+        return bool(
+            degree_level
+            and degree_level.strip().lower() in _PATHWAY_DEGREE_LEVELS
+        )
 
     name = course_name.strip()
 
-    # A full Bachelor's degree "with Foundation Year" is not a standalone
-    # preparatory programme. It follows the degree's published international
-    # English requirement and must not be excluded from institutional English
-    # rules merely because its first year is foundational.
+    # An integrated degree with a foundation year is still a bachelor's
+    # degree, not a standalone preparatory programme.  Check the award in the
+    # title before the degree-level hint: some extractors classify these pages
+    # as "Foundation" or "Year 12", while London Met titles identify the real
+    # award explicitly (for example "... (Including Foundation Year) BA
+    # (Hons)").  Requiring both the integrated phrase and a degree award keeps
+    # standalone "Foundation Year" / "Foundation Studies" pathways unchanged.
     if (
-        degree_level
-        and any(
-            token in degree_level.strip().lower()
-            for token in ("bachelor", "honours", "honor")
+        _INTEGRATED_FOUNDATION_YEAR_RE.search(name)
+        and (
+            _DEGREE_AWARD_RE.search(name)
+            or (
+                degree_level
+                and any(
+                    token in degree_level.strip().lower()
+                    for token in ("bachelor", "honours", "honor")
+                )
+            )
         )
-        and re.search(r"\bwith\s+(?:a\s+)?foundation\s+year\b", name, re.I)
     ):
         return False
+
+    # Degree-level hint after the integrated-degree exclusion above.
+    if degree_level and degree_level.strip().lower() in _PATHWAY_DEGREE_LEVELS:
+        return True
 
     # Hard exclusions before positive patterns
     for pat in _COMPILED_EXCLUSIONS:

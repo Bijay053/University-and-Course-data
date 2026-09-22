@@ -6,6 +6,10 @@ from app.services.scraper.extractors.londonmet_chrome_scrub import (
 )
 from app.services.scraper.central_pages import _parse_londonmet_undergraduate_english
 from app.services.scraper.config.loader import get_config_for_host
+from app.services.scraper.pipelines.single_course import (
+    _central_english_audience_mismatch,
+    _normalise_central_english_fields,
+)
 
 
 def test_overseas_entry_points_keep_all_overseas_months_not_uk_months():
@@ -53,6 +57,45 @@ def test_londonmet_english_uses_standard_ug_row_not_exception_section():
         html,
         "https://www.londonmet.ac.uk/international/applying/english-language-requirements/undergraduate/",
     ) == {"ielts_overall": 6.0, "ielts_minimum": 5.5}
+
+
+def test_generic_central_english_survives_without_audience_identity_and_expands_bands():
+    central = {
+        "english_by_level": {
+            "undergraduate": {
+                "ielts_overall": 6.0,
+                "ielts_minimum": 5.5,
+            }
+        }
+    }
+
+    assert not _central_english_audience_mismatch(
+        central,
+        None,
+        identity_matches=False,
+    )
+    assert _normalise_central_english_fields(
+        central["english_by_level"]["undergraduate"]
+    ) == {
+        "ielts_overall": 6.0,
+        "ielts_listening": 5.5,
+        "ielts_reading": 5.5,
+        "ielts_writing": 5.5,
+        "ielts_speaking": 5.5,
+    }
+
+
+def test_audience_scoped_central_english_still_fails_closed_on_mismatch():
+    central = {
+        "english": {"ielts_overall": 6.0},
+        "audience_recipe": {"selectors": [{"audience": "international"}]},
+    }
+
+    assert _central_english_audience_mismatch(
+        central,
+        {"audience": "domestic"},
+        identity_matches=False,
+    )
 
 
 def test_entry_points_are_selector_scoped_and_exclude_past_cohorts():
@@ -141,6 +184,49 @@ def test_selected_cohort_does_not_mix_future_year_months():
     ) == {"intake_months": [1, 9]}
 
 
+def test_duration_uses_current_overseas_fulltime_option_without_requiring_fee():
+    html = """
+    <select id="course-entry-point-selector">
+      <optgroup label="UK">
+        <option data-mode="Full-time" data-duration="3 years"
+                data-m="September" data-y="2026">September 2026</option>
+      </optgroup>
+      <optgroup label="Overseas">
+        <option data-mode="Full-time" data-duration="2 years"
+                data-m="September" data-y="2025">September 2025</option>
+        <option data-mode="Part-time" data-duration="6 years"
+                data-m="September" data-y="2027">September 2027</option>
+        <option data-mode="Full-time" data-duration="4 years"
+                data-m="September" data-y="2027">September 2027</option>
+        <option data-mode="Full-time" data-duration="5 years"
+                data-m="September" data-y="2028">September 2028</option>
+      </optgroup>
+    </select>
+    """
+    result = extract_real_fees(
+        parse_data_cost_entries(html), current_year=2026
+    )
+    assert result["duration"] == "4 years"
+    assert result["intake_months"] == [9]
+
+
+def test_conflicting_current_overseas_fulltime_durations_fail_closed():
+    html = """
+    <select id="course-entry-point-selector">
+      <optgroup label="Overseas">
+        <option data-mode="Full-time" data-duration="3 years"
+                data-m="January" data-y="2027">January 2027</option>
+        <option data-mode="Full-time" data-duration="4 years"
+                data-m="September" data-y="2027">September 2027</option>
+      </optgroup>
+    </select>
+    """
+    result = extract_real_fees(
+        parse_data_cost_entries(html), current_year=2026
+    )
+    assert "duration" not in result
+
+
 def test_past_only_dated_international_cohort_is_unresolved():
     html = """
     <select id="course-entry-point-selector">
@@ -188,3 +274,8 @@ def test_londonmet_recipe_retains_modeled_ug_central_source():
     assert config.extraction.english.central_page_ug.endswith(
         "/international/applying/english-language-requirements/undergraduate/"
     )
+    # London Met publishes course-specific exceptions.  Unverified blanket
+    # defaults (especially alternative-test scores) must not fill blank slots.
+    assert config.extraction.english.default_ielts is None
+    assert config.extraction.english.default_pte is None
+    assert config.extraction.english.default_toefl is None

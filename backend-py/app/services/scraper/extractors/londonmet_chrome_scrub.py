@@ -242,11 +242,11 @@ def extract_real_fees(
             return out
         selected = yearless
 
-    intl_ft = [
+    selected_ft = [
         e for e in selected
         if "full-time" in e.get("mode", "").lower()
-        and e.get("cost") is not None
     ]
+    intl_ft = [e for e in selected_ft if e.get("cost") is not None]
     if audience_entries:
         # A fee must pair with the selected cohort.  If same-year entries
         # disagree, leave it unresolved instead of attaching one arbitrarily.
@@ -255,12 +255,17 @@ def extract_real_fees(
             out["international_fee"] = next(iter(costs))
             out["fee_term"] = "Annual"
             out["currency"] = "GBP"
-        if intl_ft:
-            target = intl_ft[0]
-            if target["location"]:
-                out["course_location"] = target["location"]
-            if target["duration"]:
-                out["duration"] = target["duration"]
+        if selected_ft:
+            locations = {
+                e["location"] for e in selected_ft if e.get("location")
+            }
+            if len(locations) == 1:
+                out["course_location"] = next(iter(locations))
+            durations = {
+                e["duration"] for e in selected_ft if e.get("duration")
+            }
+            if len(durations) == 1:
+                out["duration"] = next(iter(durations))
         # Intake months from the selected cohort only (full + part-time).
         months = sorted({
             _MONTH_TO_NUM[e["month"]]
