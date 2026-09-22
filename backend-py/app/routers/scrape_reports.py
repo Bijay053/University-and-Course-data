@@ -367,6 +367,9 @@ def report_payload(parent, report: CourseReport, report_id: str, actor_id, valid
         + verified_catalogue_programme
         + [url for url in related_urls if isinstance(url, str)]
     ))
+    submitted_urls = list(dict.fromkeys(
+        report.course_urls + verified_catalogue_programme
+    ))
     return {
         "url": report.catalogue_url or parent.url,
         "universityId": parent.university_id,
@@ -390,11 +393,18 @@ def report_payload(parent, report: CourseReport, report_id: str, actor_id, valid
             "round_index": 1 if expanded_urls else 0,
             "verified_programmes": verified_programmes,
             "verified_delivery_modes": verified_delivery_modes,
+            "submitted_urls": submitted_urls,
+            "related_urls": [
+                url for url in expanded_urls if url not in submitted_urls
+            ],
         },
     }
 
 
-def report_result(job, workflow: dict | None = None, children=None, completed_keys=None) -> dict:
+def report_result(
+    job, workflow: dict | None = None, children=None, completed_keys=None,
+    staged_keys=None,
+) -> dict:
     from app.services.scraper.url_identity import canonical_course_url_key
 
     config = job.discovered_config or {}
@@ -402,6 +412,11 @@ def report_result(job, workflow: dict | None = None, children=None, completed_ke
     children = children or [job]
     candidates = []
     completed = set(completed_keys or [])
+    staged = set(staged_keys or completed_keys or [])
+    submitted: set[str] = set()
+    related: set[str] = set()
+    outcomes: dict[str, str] = {}
+    active_selected: set[str] = set()
     for child in children:
         payload = child.request_payload or {}
         metadata = (child.discovered_config or {}).get("autonomousVerification") or {}
@@ -409,12 +424,39 @@ def report_result(job, workflow: dict | None = None, children=None, completed_ke
         candidates.extend(metadata.get("candidate_urls") or metadata.get("selected_urls") or
                           payload.get("course_urls") or [])
         completed.update(canonical_course_url_key(u) for u in metadata.get("completed_urls", []))
+        submitted.update(
+            canonical_course_url_key(u)
+            for u in metadata.get("submitted_urls", [])
+        )
+        related.update(
+            canonical_course_url_key(u)
+            for u in metadata.get("related_urls", [])
+        )
+        for url, outcome in (metadata.get("url_outcomes") or {}).items():
+            key = canonical_course_url_key(url)
+            if key and outcome in {"skipped", "error"}:
+                outcomes[key] = outcome
+        if child.status not in TERMINAL:
+            active_selected.update(
+                canonical_course_url_key(u)
+                for u in metadata.get("selected_urls", [])
+            )
     unique = {}
     for url in candidates:
         key = canonical_course_url_key(url)
         if key:
             unique.setdefault(key, url)
     remaining = [url for key, url in unique.items() if key not in completed]
+    programme_urls = [{
+        "url": url,
+        "origin": "submitted" if key in submitted else "related" if key in related else "discovered",
+        "status": (
+            "staged" if key in staged
+            else outcomes.get(key, "skipped") if key in completed
+            else "processing" if key in active_selected
+            else "queued"
+        ),
+    } for key, url in unique.items()]
     acknowledged = job.status in TERMINAL and bool(getattr(job, "completed_at", None))
     available = bool(remaining) and acknowledged and state.get("phase") == "needs_review"
     request = (job.request_payload or {}).get("courseReport") or {}
@@ -441,6 +483,7 @@ def report_result(job, workflow: dict | None = None, children=None, completed_ke
             "reason": ("review_required" if available else "run_not_reviewable" if not acknowledged
                        else "no_remaining_urls" if not remaining else "awaiting_workflow"),
         },
+        "programme_urls": programme_urls,
         "retry": {
             "available": acknowledged and bool(retry_urls),
             "remaining_urls": retry_urls,
@@ -511,7 +554,7 @@ async def _report_summary(job, session, children, db):
     completed = set()
     for child in children:
         completed.update(await _staged_url_keys(child.runtime_job_id, child.university_id, db))
-    return report_result(job, session, children, completed)
+    return report_result(job, session, children, completed, completed)
 
 
 class ReviewedContinuation(BaseModel):

@@ -53,6 +53,14 @@ def remaining(durable):
     )["continuation"]["remaining_urls"]
 
 
+def url_status(durable, url=URL):
+    result = report_result(
+        SimpleNamespace(**deepcopy(durable)),
+        {"autonomous": {"phase": "needs_review"}},
+    )
+    return next(item["status"] for item in result["programme_urls"] if item["url"] == url)
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("outcome", [
     {"url": URL, "error": "skipped:cpd_short_course"},
@@ -189,6 +197,27 @@ async def test_checkpoint_commit_failure_is_explicit_not_success():
     assert "completed_urls" not in job.discovered_config.get("autonomousVerification", {})
     await db.rollback()
     assert remaining(durable) == [URL, NEXT]
+
+
+@pytest.mark.asyncio
+async def test_extraction_error_is_not_downgraded_by_batch_checkpoint():
+    db, job, policy, durable = memory()
+    await orch._checkpoint_extraction_outcome(
+        db, job, policy, {"url": URL}, {"url": URL, "error": "fetch_failed"},
+    )
+    await checkpoint_report_urls(db, job, policy, [URL])
+    assert durable["discovered_config"]["autonomousVerification"]["url_outcomes"][URL] == "error"
+    assert url_status(durable) == "error"
+
+
+@pytest.mark.asyncio
+async def test_stage_error_upgrades_prior_skip_and_survives_batch_checkpoint():
+    db, job, policy, durable = memory()
+    await checkpoint_report_urls(db, job, policy, [URL])
+    await checkpoint_report_urls(db, job, policy, [URL], outcome="error")
+    await checkpoint_report_urls(db, job, policy, [URL])
+    assert durable["discovered_config"]["autonomousVerification"]["url_outcomes"][URL] == "error"
+    assert url_status(durable) == "error"
 
 
 @pytest.mark.asyncio

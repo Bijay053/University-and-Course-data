@@ -1081,7 +1081,9 @@ async def _checkpoint_extraction_outcome(db, job, limits, link, result):
     if isinstance(result, Exception) or (
         isinstance(result, dict) and (result.get("error") or result.get("_retry_after"))
     ):
-        await checkpoint_report_urls(db, job, limits, [link.get("url")])
+        await checkpoint_report_urls(
+            db, job, limits, [link.get("url")], outcome="error",
+        )
 
 
 async def _filter_report_non_degree_candidates(db, job, limits, links, **kwargs):
@@ -6029,7 +6031,10 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                             _sd_url,
                         )
                         scrape_do_dead_flag[0] = True
-                        await checkpoint_report_urls(db, job, _verification, [link.get("url")])
+                        await checkpoint_report_urls(
+                            db, job, _verification, [link.get("url")],
+                            outcome="error",
+                        )
                         await emit(
                             "status",
                             "[SCRAPE.DO DEAD] Scrape.do returned HTTP 401 (token invalid or"
@@ -6772,7 +6777,11 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 if isinstance(r, Exception):
                     summary["errors"] += 1
                     log.warning("worker raised: %s", r)
-                    await checkpoint_report_urls(db, job, _verification, [link["url"] for link in _batch_links])
+                    await checkpoint_report_urls(
+                        db, job, _verification,
+                        [link["url"] for link in _batch_links],
+                        outcome="error",
+                    )
                     await emit(
                         "status",
                         f"[STAGE] worker exception: {r}",
@@ -6785,7 +6794,10 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                     # Skip quickly without calling stage_course (empty payload would
                     # just be rejected at the staging gate anyway, wasting a DB call).
                     summary["fetch_failed"] += 1
-                    await checkpoint_report_urls(db, job, _verification, [r.get("url")])
+                    await checkpoint_report_urls(
+                        db, job, _verification, [r.get("url")],
+                        outcome="error",
+                    )
                     # Queue for T04 sweep so the URL gets a second chance after
                     # all batches have run and the account rate-limit has cleared.
                     _queue_recovery_sweep(
@@ -6810,7 +6822,15 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                     )
                     continue
                 if r.get("error"):
-                    await checkpoint_report_urls(db, job, _verification, [r.get("url")])
+                    _settled_outcome = (
+                        "skipped"
+                        if r["error"].startswith(("rejected:", "skipped:"))
+                        else "error"
+                    )
+                    await checkpoint_report_urls(
+                        db, job, _verification, [r.get("url")],
+                        outcome=_settled_outcome,
+                    )
                     _error_details = _extraction_failure_details(
                         r["error"],
                         result=r,
@@ -7236,7 +7256,10 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 except Exception as exc:  # noqa: BLE001
                     summary["errors"] += 1
                     log.warning("stage_course failed for %s: %s", r.get("url"), exc)
-                    await checkpoint_report_urls(db, job, _verification, [r.get("url")])
+                    await checkpoint_report_urls(
+                        db, job, _verification, [r.get("url")],
+                        outcome="error",
+                    )
                     await emit(
                         "status",
                         f"[STAGE] error on {r.get('name','?')}: {exc}",

@@ -152,7 +152,9 @@ def persist_verification_metadata(job, limits: VerificationLimits, **updates) ->
     return metadata
 
 
-async def checkpoint_report_urls(db, job, limits, urls, *, candidate_urls=()):
+async def checkpoint_report_urls(
+    db, job, limits, urls, *, candidate_urls=(), outcome="skipped",
+):
     """Durably acknowledge settled outcomes before any cancellable follow-up.
 
     This is NOT a fetch checkpoint: callers must have staged, rejected or
@@ -168,6 +170,15 @@ async def checkpoint_report_urls(db, job, limits, urls, *, candidate_urls=()):
         return
     metadata = (job.discovered_config or {}).get("autonomousVerification") or {}
     payload = job.request_payload or {}
+    url_outcomes = dict(metadata.get("url_outcomes") or {})
+    next_outcomes: dict[str, str] = {}
+    for url in urls:
+        if outcome == "error":
+            next_outcomes[url] = "error"
+        elif outcome == "skipped" and url_outcomes.get(url) != "error":
+            # Error is terminal and must not be downgraded by the generic
+            # end-of-batch acknowledgement that follows per-row handling.
+            next_outcomes[url] = "skipped"
     candidates = list(dict.fromkeys([
         *metadata.get("candidate_urls", []),
         *metadata.get("selected_urls", []),
@@ -176,13 +187,16 @@ async def checkpoint_report_urls(db, job, limits, urls, *, candidate_urls=()):
         *candidate_urls, *urls,
     ]))
     if (set(urls).issubset(metadata.get("completed_urls", []))
-            and candidates == metadata.get("candidate_urls")):
+            and candidates == metadata.get("candidate_urls")
+            and all(url_outcomes.get(url) == value for url, value in next_outcomes.items())):
         return
+    url_outcomes.update(next_outcomes)
     previous_config, previous_payload = job.discovered_config, job.request_payload
     persist_verification_metadata(
         job, limits,
         candidate_urls=candidates,
         completed_urls=list(dict.fromkeys([*metadata.get("completed_urls", []), *urls])),
+        url_outcomes=url_outcomes,
         completed_scope="settled attempts and eligibility exclusions; not successful recovery",
     )
     commit = asyncio.create_task(db.commit())

@@ -206,6 +206,8 @@ async def test_verifies_elementor_foundation_page_with_sibling_admissions_copy(m
     )
     assert payload["courseUrls"] == [url, sibling, unavailable_sibling]
     assert payload["courseReportRemainingUrls"] == [url, sibling, unavailable_sibling]
+    assert payload["autonomousVerification"]["submitted_urls"] == [url]
+    assert payload["autonomousVerification"]["related_urls"] == [sibling, unavailable_sibling]
 
     catalogue_report = CourseReport(
         kind="missing",

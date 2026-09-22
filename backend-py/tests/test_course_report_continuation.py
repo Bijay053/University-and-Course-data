@@ -12,7 +12,7 @@ from app.routers import scrape_reports as reports
 from app.services import ai_repair_workflow as workflow
 from app.services.scraper.url_identity import canonical_course_url_key
 from app.services.scraper.autonomous_verification import (
-    VerificationLimits, cap_verification_links,
+    VerificationLimits, cap_verification_links, persist_verification_metadata,
 )
 
 
@@ -83,6 +83,45 @@ def test_history_preserves_identity_and_counts_staged_and_failed_attempts():
     assert result["continuation"]["remaining_urls"] == urls[57:]
     assert result["continuation"]["completed_count"] == 57
     assert result["continuation"]["run_count"] == 2
+
+
+def test_programme_url_statuses_preserve_origin_and_settled_outcome():
+    submitted, related, queued = (
+        "https://uni.edu/course/submitted",
+        "https://uni.edu/course/related",
+        "https://uni.edu/course/queued",
+    )
+    job = child(urls=[submitted, related, queued], status="running", completed_at=None)
+    job.discovered_config = {"autonomousVerification": {
+        "candidate_urls": [submitted, related, queued],
+        "selected_urls": [queued],
+        "completed_urls": [submitted, related],
+        "submitted_urls": [submitted],
+        "related_urls": [related],
+        "url_outcomes": {submitted: "skipped", related: "error"},
+    }}
+    result = reports.report_result(
+        job, {"autonomous": {"phase": "recovering"}}, staged_keys={
+            canonical_course_url_key(submitted),
+        },
+    )
+    assert result["programme_urls"] == [
+        {"url": submitted, "origin": "submitted", "status": "staged"},
+        {"url": related, "origin": "related", "status": "error"},
+        {"url": queued, "origin": "discovered", "status": "processing"},
+    ]
+
+
+def test_programme_url_origins_survive_first_verification_metadata_write():
+    job = child()
+    job.request_payload["autonomousVerification"] = {
+        "submitted_urls": ["https://uni.edu/course/submitted"],
+        "related_urls": ["https://uni.edu/course/related"],
+    }
+    limits = VerificationLimits("source", "report_1", 50, 600, 2, 1)
+    metadata = persist_verification_metadata(job, limits, candidate_urls=[])
+    assert metadata["submitted_urls"] == ["https://uni.edu/course/submitted"]
+    assert metadata["related_urls"] == ["https://uni.edu/course/related"]
 
 
 @pytest.mark.parametrize("value", [False, "true", 1, None])

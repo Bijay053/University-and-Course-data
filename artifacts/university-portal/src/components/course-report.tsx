@@ -22,6 +22,10 @@ type Report = {
     selected_count: number; reason?: string; run_count: number;
   };
   retry?: { available: boolean; remaining_urls: string[]; remaining_count: number };
+  programme_urls?: Array<{
+    url: string; status: "queued" | "processing" | "staged" | "skipped" | "error";
+    origin: "submitted" | "related" | "discovered";
+  }>;
   children?: Array<{
     job_id: string; status: string; staged: number; processed?: number; found?: number;
     skipped?: number; errors?: number;
@@ -291,6 +295,30 @@ export function CourseReport({ jobId, onReview, onStarted }: {
         {report.found} found · {report.skipped} skipped · {report.errors} errors
         {report.continuation ? ` · ${report.continuation.selected_count} selected · ${report.continuation.run_count} bounded ${report.continuation.run_count === 1 ? "run" : "runs"}` : ""}
       </p>
+      {report.programme_urls?.length ? <details className="rounded border p-2 text-xs">
+        <summary className="cursor-pointer font-medium" data-testid={`button-programme-urls-${report.job_id}`}>
+          Programme pages checked ({report.programme_urls.length})
+        </summary>
+        <ul className="mt-2 space-y-2">
+          {report.programme_urls.map((item, index) => <li
+            key={item.url}
+            className="flex flex-col gap-1 rounded border p-2 sm:flex-row sm:items-center sm:justify-between"
+            data-testid={`programme-url-${report.job_id}-${index}`}
+          >
+            <a className="break-all underline" href={item.url} target="_blank" rel="noreferrer">{item.url}</a>
+            <span className="flex shrink-0 gap-2">
+              <span className={item.origin === "submitted" ? "font-medium" : "text-muted-foreground"}>
+                {item.origin === "submitted" ? "Submitted" : item.origin === "related" ? "Related" : "Discovered"}
+              </span>
+              <span className={
+                item.status === "error" ? "font-medium text-destructive"
+                  : item.status === "staged" ? "font-medium text-green-700"
+                    : "font-medium"
+              }>{item.status}</span>
+            </span>
+          </li>)}
+        </ul>
+      </details> : null}
       <details className="text-xs">
         <summary className="cursor-pointer" data-testid={`button-report-sources-${report.job_id}`}>Reported official sources</summary>
         {[...(report.request.course_urls ?? []), report.request.catalogue_url, report.request.source_url]
