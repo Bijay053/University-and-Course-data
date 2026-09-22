@@ -144,7 +144,9 @@ async def validate_official_urls(report: CourseReport, university) -> dict:
                                 raise HTTPException(422, "Official URL connected to a non-public network peer.")
                             return
                         if report.eligibility_review and (
-                            url in report.course_urls or url in related_programme_urls
+                            url in report.course_urls
+                            or url == report.catalogue_url
+                            or url in related_programme_urls
                         ):
                             if not _programme_path_is_detail(url):
                                 return
@@ -273,7 +275,10 @@ async def validate_official_urls(report: CourseReport, university) -> dict:
             await asyncio.wait_for(
                 asyncio.gather(*(check_redirect(
                     url,
-                    collect_related=bool(report.eligibility_review and url in report.course_urls),
+                    collect_related=bool(
+                        report.eligibility_review
+                        and (url in report.course_urls or url == report.catalogue_url)
+                    ),
                 ) for url in dict.fromkeys(
                     report.course_urls[:50] + [u for u in (report.catalogue_url, report.source_url) if u]
                 ))), timeout=25,
@@ -298,13 +303,32 @@ async def validate_official_urls(report: CourseReport, university) -> dict:
 
 def report_payload(parent, report: CourseReport, report_id: str, actor_id, validation: dict | None = None) -> dict:
     """Internal-only policy: clients cannot loosen review, budget or filter rules."""
+    verified_programmes = (
+        validation.get("verified_programmes", {})
+        if isinstance(validation, dict) else {}
+    )
     related_urls = (
         validation.get("related_programme_urls", [])
         if isinstance(validation, dict) else []
     )
-    expanded_urls = list(dict.fromkeys(report.course_urls + [
-        url for url in related_urls if isinstance(url, str)
-    ]))
+    # The missing-course form historically stores its single URL in
+    # ``catalogue_url``.  When eligibility review has independently verified
+    # that exact URL as a programme page, target it like an explicit course URL
+    # instead of treating it as a catalogue root and running broad discovery.
+    verified_catalogue_programme = (
+        [report.catalogue_url]
+        if (
+            report.eligibility_review
+            and report.catalogue_url
+            and report.catalogue_url in verified_programmes
+        )
+        else []
+    )
+    expanded_urls = list(dict.fromkeys(
+        report.course_urls
+        + verified_catalogue_programme
+        + [url for url in related_urls if isinstance(url, str)]
+    ))
     return {
         "url": report.catalogue_url or parent.url,
         "universityId": parent.university_id,
@@ -325,11 +349,8 @@ def report_payload(parent, report: CourseReport, report_id: str, actor_id, valid
             "parent_job_id": parent.runtime_job_id, "session_id": report_id,
             "max_courses": 50, "time_budget_seconds": 600, "cost_cap_usd": 2,
             # Round zero deliberately strips targeted links; round one preserves them.
-            "round_index": 1 if report.course_urls else 0,
-            "verified_programmes": (
-                validation.get("verified_programmes", {})
-                if isinstance(validation, dict) else {}
-            ),
+            "round_index": 1 if expanded_urls else 0,
+            "verified_programmes": verified_programmes,
         },
     }
 

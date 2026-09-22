@@ -202,6 +202,53 @@ async def test_verifies_elementor_foundation_page_with_sibling_admissions_copy(m
     assert payload["courseUrls"] == [url, sibling, unavailable_sibling]
     assert payload["courseReportRemainingUrls"] == [url, sibling, unavailable_sibling]
 
+    catalogue_report = CourseReport(
+        kind="missing",
+        catalogue_url=url,
+        eligibility_review=True,
+    )
+    catalogue_result = await validate_official_urls(
+        catalogue_report,
+        SimpleNamespace(website="https://uni.edu", scrape_url=None),
+    )
+    assert catalogue_result["verified_programmes"][url]["kind"] == "foundation"
+    catalogue_payload = report_payload(
+        SimpleNamespace(url="https://uni.edu", university_id=7, runtime_job_id="parent"),
+        catalogue_report,
+        "report_2",
+        12,
+        catalogue_result,
+    )
+    assert catalogue_payload["courseUrls"] == [url, sibling, unavailable_sibling]
+    assert catalogue_payload["course_urls"] == [url, sibling, unavailable_sibling]
+    assert catalogue_payload["autonomousVerification"]["round_index"] == 1
+
+
+def test_verified_foundation_catalogue_url_becomes_targeted_course_url():
+    url = "https://uni.edu/programme/foundation-in-liberal-arts/"
+    proof = {
+        "kind": "foundation",
+        "title": "Foundation in Liberal Arts",
+        "evidence": "Official page title and page-owned admissions evidence",
+    }
+    payload = report_payload(
+        SimpleNamespace(url="https://uni.edu", university_id=7, runtime_job_id="parent"),
+        CourseReport(
+            kind="missing",
+            catalogue_url=url,
+            eligibility_review=True,
+        ),
+        "report_1",
+        12,
+        {"verified_programmes": {url: proof}, "related_programme_urls": []},
+    )
+
+    assert payload["courseUrls"] == [url]
+    assert payload["course_urls"] == [url]
+    assert payload["courseReportRemainingUrls"] == [url]
+    assert payload["autonomousVerification"]["round_index"] == 1
+    assert payload["autonomousVerification"]["verified_programmes"] == {url: proof}
+
 
 def test_result_does_not_equate_staging_with_catalogue_coverage():
     job = SimpleNamespace(runtime_job_id="child", status="completed", request_payload={"courseReport": {}},
