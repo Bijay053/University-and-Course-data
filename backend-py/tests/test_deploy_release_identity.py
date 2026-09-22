@@ -481,28 +481,108 @@ def test_frontend_release_verifier_requires_public_html_and_asset_to_match(
     assets = dist / "assets"
     assets.mkdir(parents=True)
     source = "/assets/index-AbCd1234.js"
+    stylesheet = "/assets/index-ZyXw9876.css"
     (dist / "index.html").write_text(
-        f'<script type="module" src="{source}"></script>', encoding="utf-8"
+        f'<link rel="stylesheet" href="{stylesheet}">'
+        f'<script type="module" src="{source}"></script>',
+        encoding="utf-8",
     )
     marker = b"UNIVERSITY_PORTAL_RELEASE:" + b"2" * 40
     (assets / "index-AbCd1234.js").write_bytes(marker)
+    (assets / "index-ZyXw9876.css").write_bytes(b"body{}")
+    from deploy.verify_frontend_release import FetchResponse
+
+    html_headers = {"cache-control": "no-store, no-cache, must-revalidate"}
+    asset_headers = {"cache-control": "public, max-age=31536000, immutable"}
     responses = {
         "https://portal.example/": (
-            f'<script type="module" src="{source}"></script>'.encode()
+            f'<link rel="stylesheet" href="{stylesheet}">'
+            f'<script type="module" src="{source}"></script>'.encode(),
+            html_headers,
         ),
-        f"https://portal.example{source}": b"public code;" + marker,
+        "https://portal.example/__frontend_release_verify__/"
+        + marker.decode().rsplit(":", 1)[-1]: (
+            f'<link rel="stylesheet" href="{stylesheet}">'
+            f'<script type="module" src="{source}"></script>'.encode(),
+            html_headers,
+        ),
+        f"https://portal.example{source}": (
+            b"public code;" + marker,
+            asset_headers,
+        ),
+        f"https://portal.example{stylesheet}": (b"body{}", asset_headers),
     }
 
-    def fake_fetch(url: str) -> bytes:
-        return responses[url.split("?", 1)[0]]
+    def fake_fetch(url: str) -> FetchResponse:
+        body, headers = responses[url.split("?", 1)[0]]
+        return FetchResponse(body, headers)
 
-    monkeypatch.setattr("deploy.verify_frontend_release._fetch", fake_fetch)
+    monkeypatch.setattr("deploy.verify_frontend_release._fetch_response", fake_fetch)
     assert verify_public_build(dist, "https://portal.example/", marker) == [source]
 
     responses["https://portal.example/"] = (
-        b'<script type="module" src="/assets/index-Stale999.js"></script>'
+        b'<script type="module" src="/assets/index-Stale999.js"></script>',
+        html_headers,
     )
     with pytest.raises(AssertionError, match="does not reference"):
+        verify_public_build(dist, "https://portal.example/", marker)
+
+
+@pytest.mark.parametrize(
+    ("response_key", "headers", "message"),
+    [
+        (
+            "https://portal.example/",
+            {"cache-control": "max-age=60"},
+            "no-store and no-cache",
+        ),
+        (
+            "fallback",
+            {"cache-control": "max-age=60"},
+            "no-store and no-cache",
+        ),
+        (
+            "asset",
+            {"cache-control": "public, max-age=60"},
+            "long-lived immutable",
+        ),
+    ],
+)
+def test_frontend_release_verifier_rejects_cache_policy_regressions(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    response_key: str,
+    headers: dict[str, str],
+    message: str,
+) -> None:
+    from deploy.verify_frontend_release import FetchResponse
+
+    dist = tmp_path / "dist"
+    assets = dist / "assets"
+    assets.mkdir(parents=True)
+    source = "/assets/index-AbCd1234.js"
+    marker = b"UNIVERSITY_PORTAL_RELEASE:" + b"3" * 40
+    html = f'<script type="module" src="{source}"></script>'.encode()
+    (dist / "index.html").write_bytes(html)
+    (assets / "index-AbCd1234.js").write_bytes(marker)
+    good_html = {"cache-control": "no-store, no-cache, must-revalidate"}
+    good_asset = {"cache-control": "public, max-age=31536000, immutable"}
+
+    def fake_fetch(url: str) -> FetchResponse:
+        if "/assets/" in url:
+            return FetchResponse(marker, headers if response_key == "asset" else good_asset)
+        if "__frontend_release_verify__" in url:
+            return FetchResponse(
+                html,
+                headers if response_key == "fallback" else good_html,
+            )
+        return FetchResponse(
+            html,
+            headers if url.split("?", 1)[0] == response_key else good_html,
+        )
+
+    monkeypatch.setattr("deploy.verify_frontend_release._fetch_response", fake_fetch)
+    with pytest.raises(AssertionError, match=message):
         verify_public_build(dist, "https://portal.example/", marker)
 
 
@@ -556,6 +636,9 @@ def test_public_release_fetch_uses_browser_compatible_user_agent(
     def fake_run(command, **kwargs):
         captured["command"] = command
         captured["kwargs"] = kwargs
+        Path(command[command.index("--dump-header") + 1]).write_bytes(
+            b"HTTP/1.1 200 OK\r\nCache-Control: no-store\r\n\r\n"
+        )
         return subprocess.CompletedProcess(command, 0, stdout=b"ok")
 
     monkeypatch.setattr(verify_frontend_release.subprocess, "run", fake_run)
@@ -581,6 +664,9 @@ def test_public_release_fetch_retries_transient_edge_failure(monkeypatch) -> Non
         attempts += 1
         if attempts == 1:
             raise subprocess.CalledProcessError(22, command)
+        Path(command[command.index("--dump-header") + 1]).write_bytes(
+            b"HTTP/1.1 200 OK\r\nCache-Control: no-store\r\n\r\n"
+        )
         return subprocess.CompletedProcess(command, 0, stdout=b"ready")
 
     sleeps = []
