@@ -79,6 +79,24 @@ async def test_fenced_continuation_keeps_only_explicit_urls_and_never_resume_ids
     assert "resumeSourceJobIds" not in child.request_payload
 
 
+async def test_persistence_keeps_parent_bound_report_programme_proof():
+    proof = {
+        "https://example.edu/programme/foundation/": {
+            "kind": "foundation",
+            "title": "Foundation in Liberal Arts",
+            "evidence": "official page title + programme and admissions/international copy",
+        },
+    }
+    db, child, _ = family(round_index=1, verified_programmes=proof)
+    limits = await validate_verification(db, child)
+
+    persist_verification_metadata(child, limits, discovered_candidates=1)
+    persist_verification_metadata(child, limits, staged_courses=1)
+
+    assert child.request_payload["autonomousVerification"]["verified_programmes"] == proof
+    assert child.discovered_config["autonomousVerification"]["verified_programmes"] == proof
+
+
 @pytest.mark.parametrize("key,value", [
     ("max_courses", 0), ("max_courses", -1), ("max_courses", 1.5),
     ("max_courses", True), ("max_courses", "50"),

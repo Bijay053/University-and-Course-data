@@ -120,8 +120,13 @@ async def validate_verification(db, job) -> VerificationLimits | None:
 def persist_verification_metadata(job, limits: VerificationLimits, **updates) -> dict:
     """Assign fresh JSON objects so SQLAlchemy persists nested policy updates."""
     config = dict(job.discovered_config or {})
+    payload = dict(job.request_payload or {})
     metadata = {
         **limits.metadata(),
+        # Preserve endpoint-generated, parent-bound proof such as an exact
+        # official foundation/pathway page. The first persistence checkpoint
+        # previously replaced the request policy before staging could read it.
+        **(payload.get("autonomousVerification") or {}),
         **(config.get("autonomousVerification") or {}),
         **updates,
         "full_catalogue_verified": False,
@@ -133,7 +138,6 @@ def persist_verification_metadata(job, limits: VerificationLimits, **updates) ->
     stats["full_catalogue_verified"] = False
     config["pipeline_stats"] = stats
     job.discovered_config = config
-    payload = dict(job.request_payload or {})
     payload["autonomousVerification"] = dict(metadata)
     payload.update(forceDiscovery=True, fastMode=False, fast_mode=False)
     # Resume checkpoints are never trusted. A continuation may carry only the
