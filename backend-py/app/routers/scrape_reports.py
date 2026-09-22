@@ -464,7 +464,7 @@ def report_result(
     request = (job.request_payload or {}).get("courseReport") or {}
     retry_urls = [
         url for url in _reported_retry_urls(request)
-        if canonical_course_url_key(url) not in completed
+        if canonical_course_url_key(url) not in staged
     ]
     return {
         "job_id": job.runtime_job_id,

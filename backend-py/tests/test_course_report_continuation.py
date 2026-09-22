@@ -136,6 +136,11 @@ def test_staged_count_uses_persisted_rows_not_stale_import_counter():
         "origin": "submitted",
         "status": "skipped",
     }]
+    assert result["retry"] == {
+        "available": True,
+        "remaining_urls": [submitted],
+        "remaining_count": 1,
+    }
 
 
 def test_programme_url_origins_survive_first_verification_metadata_write():
