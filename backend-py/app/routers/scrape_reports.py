@@ -113,7 +113,15 @@ async def validate_official_urls(report: CourseReport, university) -> dict:
                         # not only a prior DNS lookup.  This closes the DNS
                         # check/connect TOCTOU window for eligibility proof.
                         stream = response.extensions.get("network_stream")
-                        peer = stream.get_extra_info("peername") if stream else None
+                        peer = None
+                        if stream:
+                            # asyncio transports expose ``peername`` while
+                            # httpcore's AnyIO backend exposes the connected
+                            # remote endpoint as ``server_addr``.
+                            peer = (
+                                stream.get_extra_info("peername")
+                                or stream.get_extra_info("server_addr")
+                            )
                         peer_host = peer[0] if isinstance(peer, tuple) else None
                         try:
                             peer_public = bool(peer_host and ipaddress.ip_address(peer_host).is_global)
@@ -162,11 +170,42 @@ async def validate_official_urls(report: CourseReport, university) -> dict:
                                 and not re.search(rf"\b{re.escape(kind)}s\b", heading, re.I)
                                 for heading in headings
                             ) if kind else False
+
+                            def _has_owned_admissions_copy(node) -> bool:
+                                heading_text = re.sub(
+                                    r"\s+", " ", node.get_text(" ", strip=True)
+                                )
+                                if not re.search(
+                                    r"\b(?:entry requirements?|admission requirements?|how to apply)\b",
+                                    heading_text,
+                                    re.I,
+                                ):
+                                    return False
+                                # Page builders commonly put the heading in its
+                                # own widget and the requirement copy in sibling
+                                # widgets. Inspect only the nearest bounded
+                                # ancestors, never the whole body.
+                                ancestor = node.parent
+                                for _ in range(6):
+                                    if ancestor is None or ancestor.name in {"body", "html"}:
+                                        break
+                                    section_text = " ".join(
+                                        str(value) for value in ancestor.stripped_strings
+                                    )[:5000]
+                                    if (
+                                        len(section_text) > len(heading_text) + 10
+                                        and re.search(
+                                            r"\b(?:require|qualification|apply|student)\b",
+                                            section_text,
+                                            re.I,
+                                        )
+                                    ):
+                                        return True
+                                    ancestor = ancestor.parent
+                                return False
+
                             admissions_section = any(
-                                re.search(r"\b(?:entry requirements?|admission requirements?|how to apply)\b", heading, re.I)
-                                and re.search(r"\b(?:require|qualification|apply|student)\b", (
-                                    " ".join(str(x) for x in node.parent.stripped_strings)[:5000]
-                                ), re.I)
+                                _has_owned_admissions_copy(node)
                                 for node in soup.find_all(["h2", "h3", "h4"])
                             )
                             international_section = bool(

@@ -89,6 +89,87 @@ async def test_redirects_are_not_followed(monkeypatch):
     assert requests == ["https://uni.edu/course"]
 
 
+@pytest.mark.asyncio
+async def test_accepts_public_connected_server_addr_when_peername_is_unavailable(monkeypatch):
+    monkeypatch.setattr("app.services.scraper_config_ai._is_safe_public_url", lambda url: (True, ""))
+    real_client = httpx.AsyncClient
+    stream = SimpleNamespace(get_extra_info=lambda key: {
+        "peername": None,
+        "server_addr": ("52.76.147.18", 443),
+    }.get(key))
+
+    def handler(request):
+        return httpx.Response(200, text="<html>Official course</html>",
+                              extensions={"network_stream": stream})
+
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: real_client(
+        transport=httpx.MockTransport(handler), **kwargs))
+    result = await validate_official_urls(
+        CourseReport(kind="missing", course_urls=["https://uni.edu/course"]),
+        SimpleNamespace(website="https://uni.edu", scrape_url=None),
+    )
+    assert result == {"verified_programmes": {}}
+
+
+@pytest.mark.asyncio
+async def test_rejects_private_connected_server_addr_when_peername_is_unavailable(monkeypatch):
+    monkeypatch.setattr("app.services.scraper_config_ai._is_safe_public_url", lambda url: (True, ""))
+    real_client = httpx.AsyncClient
+    stream = SimpleNamespace(get_extra_info=lambda key: {
+        "peername": None,
+        "server_addr": ("127.0.0.1", 443),
+    }.get(key))
+
+    def handler(request):
+        return httpx.Response(200, text="<html>Official course</html>",
+                              extensions={"network_stream": stream})
+
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: real_client(
+        transport=httpx.MockTransport(handler), **kwargs))
+    with pytest.raises(HTTPException) as error:
+        await validate_official_urls(
+            CourseReport(kind="missing", course_urls=["https://uni.edu/course"]),
+            SimpleNamespace(website="https://uni.edu", scrape_url=None),
+        )
+    assert error.value.status_code == 422
+    assert "non-public network peer" in str(error.value.detail)
+
+
+@pytest.mark.asyncio
+async def test_verifies_elementor_foundation_page_with_sibling_admissions_copy(monkeypatch):
+    monkeypatch.setattr("app.services.scraper_config_ai._is_safe_public_url", lambda url: (True, ""))
+    real_client = httpx.AsyncClient
+    stream = SimpleNamespace(get_extra_info=lambda key: {
+        "peername": None,
+        "server_addr": ("52.76.147.18", 443),
+    }.get(key))
+    html = """
+      <html><head><title>Foundation in Liberal Arts - Raffles University</title></head>
+      <body>
+        <main>
+          <h3>FOUNDATION IN LIBERAL ARTS</h3>
+          <section>
+            <div><div><h2>Entry Requirements</h2></div></div>
+            <div>Applicants require five credits or an equivalent qualification.</div>
+            <div>International Student English Requirement</div>
+          </section>
+        </main>
+      </body></html>
+    """
+
+    def handler(request):
+        return httpx.Response(200, text=html, extensions={"network_stream": stream})
+
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: real_client(
+        transport=httpx.MockTransport(handler), **kwargs))
+    url = "https://uni.edu/programme/foundation-in-liberal-arts/"
+    result = await validate_official_urls(
+        CourseReport(kind="missing", course_urls=[url], eligibility_review=True),
+        SimpleNamespace(website="https://uni.edu", scrape_url=None),
+    )
+    assert result["verified_programmes"][url]["kind"] == "foundation"
+
+
 def test_result_does_not_equate_staging_with_catalogue_coverage():
     job = SimpleNamespace(runtime_job_id="child", status="completed", request_payload={"courseReport": {}},
                           discovered_config={}, total_found=2, imported=2, skipped=0, errors=0,
