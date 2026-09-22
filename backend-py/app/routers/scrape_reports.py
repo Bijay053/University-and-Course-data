@@ -403,7 +403,7 @@ def report_payload(parent, report: CourseReport, report_id: str, actor_id, valid
 
 def report_result(
     job, workflow: dict | None = None, children=None, completed_keys=None,
-    staged_keys=None,
+    staged_keys=None, staged_counts=None,
 ) -> dict:
     from app.services.scraper.url_identity import canonical_course_url_key
 
@@ -412,7 +412,9 @@ def report_result(
     children = children or [job]
     candidates = []
     completed = set(completed_keys or [])
+    has_staged_evidence = staged_keys is not None
     staged = set(staged_keys or completed_keys or [])
+    staged_counts = staged_counts or {}
     submitted: set[str] = set()
     related: set[str] = set()
     outcomes: dict[str, str] = {}
@@ -470,7 +472,8 @@ def report_result(
         "original_job_id": children[0].runtime_job_id,
         "children": [{
             "job_id": child.runtime_job_id, "status": child.status,
-            "staged": child.imported or 0, "errors": child.errors or 0,
+            "staged": staged_counts.get(child.runtime_job_id, child.imported or 0),
+            "errors": child.errors or 0,
             "processed": getattr(child, "current", 0) or 0,
             "found": child.total_found or 0, "skipped": child.skipped or 0,
             "verification": ((child.discovered_config or {}).get("autonomousVerification")
@@ -491,7 +494,8 @@ def report_result(
         },
         "status": state["phase"] if state.get("phase") in {"blocked", "recovering"} else job.status,
         "request": (job.request_payload or {}).get("courseReport"),
-        "found": job.total_found or 0, "staged": job.imported or 0,
+        "found": job.total_found or 0,
+        "staged": len(staged) if has_staged_evidence else job.imported or 0,
         "processed": getattr(job, "current", 0) or 0,
         "skipped": job.skipped or 0, "errors": job.errors or 0,
         "error": job.error_message,
@@ -552,9 +556,17 @@ async def _report_summary(job, session, children, db):
     from app.services.ai_repair_workflow import _staged_url_keys
 
     completed = set()
+    staged_counts = {}
     for child in children:
-        completed.update(await _staged_url_keys(child.runtime_job_id, child.university_id, db))
-    return report_result(job, session, children, completed, completed)
+        child_staged = await _staged_url_keys(
+            child.runtime_job_id, child.university_id, db
+        )
+        completed.update(child_staged)
+        staged_counts[child.runtime_job_id] = len(child_staged)
+    return report_result(
+        job, session, children, completed, completed,
+        staged_counts=staged_counts,
+    )
 
 
 class ReviewedContinuation(BaseModel):

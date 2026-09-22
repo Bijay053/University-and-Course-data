@@ -125,6 +125,26 @@ def _link_matches_post_discovery_allow(
     url = link.get("url") or ""
     return any(pattern.search(url) for pattern in patterns)
 
+
+def _restore_submitted_report_links(
+    links: list[dict],
+    submitted_links: dict[str, dict],
+) -> list[dict]:
+    """Restore exact validated report targets removed by discovery recipes."""
+    existing = {
+        canonical_course_url_key(link.get("url"))
+        for link in links
+        if isinstance(link, dict)
+    }
+    return [
+        *links,
+        *(
+            link for key, link in submitted_links.items()
+            if key and key not in existing
+        ),
+    ]
+
+
 log = logging.getLogger(__name__)
 
 
@@ -4825,6 +4845,27 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         # persist them in pipeline_stats for the repair-candidates endpoint.
         _filter_dropped_sample: list[str] = []
         _report_filter_links = list(links)
+        _submitted_report_keys = {
+            canonical_course_url_key(url)
+            for url in (
+                ((job.request_payload or {}).get("autonomousVerification") or {})
+                .get("submitted_urls", [])
+            )
+            if isinstance(url, str) and canonical_course_url_key(url)
+        }
+        # Submission-time validation already limits these to exact detail-shaped
+        # URLs on the configured official host. Preserve the links that passed
+        # the shared pre-extraction gate so stale discovery recipes cannot
+        # discard the course before extraction gets a chance to verify it.
+        _direct_report_links = {
+            canonical_course_url_key(link.get("url")): link
+            for link in links
+            if (
+                isinstance(link, dict)
+                and canonical_course_url_key(link.get("url"))
+                in _submitted_report_keys
+            )
+        }
 
         async def _checkpoint_filtered_report_links(retained):
             nonlocal _report_filter_links
@@ -5693,6 +5734,30 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                     kept_single_year=_dedup_kept_single_y,
                 )
             links = _kept_y
+
+        # Discovery recipes describe catalogue-wide URL shapes and can become
+        # stale. They must not discard an exact official course page reported
+        # by a user after that URL passed the shared safety gate above. Restore
+        # only those exact links, then run the global non-degree and staging
+        # guards normally.
+        if _direct_report_links:
+            _before_report_restore = len(links)
+            links = _restore_submitted_report_links(
+                links, _direct_report_links
+            )
+            _restored_report_links = links[_before_report_restore:]
+            if _restored_report_links:
+                await emit(
+                    "status",
+                    (
+                        "[REPORT] restored "
+                        f"{len(_restored_report_links)} exact submitted course "
+                        "URL(s) after catalogue discovery filters"
+                    ),
+                    phase="extract",
+                    kind="course_report_target_restored",
+                    restored=len(_restored_report_links),
+                )
 
         # Phase A.5f — shared non-degree candidate gate ─────────────────────────
         # Apply once after every discovery provider and URL/year filter has

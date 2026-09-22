@@ -110,6 +110,32 @@ def test_programme_url_statuses_preserve_origin_and_settled_outcome():
         {"url": related, "origin": "related", "status": "error"},
         {"url": queued, "origin": "discovered", "status": "processing"},
     ]
+    assert result["staged"] == 1
+
+
+def test_staged_count_uses_persisted_rows_not_stale_import_counter():
+    submitted = "https://uni.edu/course/submitted"
+    job = child(urls=[submitted])
+    job.imported = 1
+    job.discovered_config = {"autonomousVerification": {
+        "candidate_urls": [submitted],
+        "completed_urls": [submitted],
+        "submitted_urls": [submitted],
+        "url_outcomes": {submitted: "skipped"},
+    }}
+
+    result = reports.report_result(
+        job,
+        {"autonomous": {"phase": "needs_review"}},
+        staged_keys=set(),
+    )
+
+    assert result["staged"] == 0
+    assert result["programme_urls"] == [{
+        "url": submitted,
+        "origin": "submitted",
+        "status": "skipped",
+    }]
 
 
 def test_programme_url_origins_survive_first_verification_metadata_write():
