@@ -268,3 +268,88 @@ async def test_parent_review_keeps_continuation_rows_visible():
         assert body["lastScrape"]["jobId"] == parent_job_id
     finally:
         await _cleanup(job_ids)
+
+
+@pytest.mark.asyncio
+async def test_review_chain_shows_newest_row_once_per_canonical_course_url():
+    uni_id = await _pick_university()
+    parent_job_id = f"test_review_dedup_parent_{uuid.uuid4().hex[:8]}"
+    child_job_id = f"test_review_dedup_child_{uuid.uuid4().hex[:8]}"
+    job_ids = [parent_job_id, child_job_id]
+    now = datetime.now(timezone.utc)
+    try:
+        async with AsyncSessionLocal() as db:
+            db.add_all([
+                ScrapeRuntimeJob(
+                    runtime_job_id=parent_job_id,
+                    university_id=uni_id,
+                    university_name="Test Uni",
+                    url="https://example.edu",
+                    job_type="single",
+                    status="completed",
+                    total_found=2,
+                    imported=2,
+                ),
+                ScrapeRuntimeJob(
+                    runtime_job_id=child_job_id,
+                    university_id=uni_id,
+                    university_name="Test Uni",
+                    url="https://example.edu",
+                    job_type="targeted",
+                    status="completed",
+                    request_payload={"retrySourceJobId": parent_job_id},
+                ),
+                ScrapedCourse(
+                    scrape_job_id=parent_job_id,
+                    university_id=uni_id,
+                    course_name="Older Foundation Result",
+                    course_website="http://www.example.edu/course/foundation/",
+                    status="pending",
+                    created_at=now,
+                ),
+                ScrapedCourse(
+                    scrape_job_id=child_job_id,
+                    university_id=uni_id,
+                    course_name="Newest Foundation Result",
+                    course_website="https://example.edu/course/foundation",
+                    status="pending",
+                    created_at=now,
+                ),
+                ScrapedCourse(
+                    scrape_job_id=parent_job_id,
+                    university_id=uni_id,
+                    course_name="Distinct Course",
+                    course_website="https://example.edu/course/distinct",
+                    status="pending",
+                ),
+                # Rows without URL identity cannot be safely collapsed.
+                ScrapedCourse(
+                    scrape_job_id=parent_job_id,
+                    university_id=uni_id,
+                    course_name="Legacy Row One",
+                    status="pending",
+                ),
+                ScrapedCourse(
+                    scrape_job_id=child_job_id,
+                    university_id=uni_id,
+                    course_name="Legacy Row Two",
+                    status="pending",
+                ),
+            ])
+            await db.commit()
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.get(f"/api/scrape/staged/{parent_job_id}")
+
+        assert response.status_code == 200, response.text
+        names = [row["courseName"] for row in response.json()["courses"]]
+        assert "Newest Foundation Result" in names
+        assert "Older Foundation Result" not in names
+        assert "Distinct Course" in names
+        assert "Legacy Row One" in names
+        assert "Legacy Row Two" in names
+        assert len(names) == 4
+    finally:
+        await _cleanup(job_ids)

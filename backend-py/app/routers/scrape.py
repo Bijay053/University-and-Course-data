@@ -3307,16 +3307,36 @@ async def staged_one(
             )
         rows = (await db.execute(
             select(ScrapedCourse).where(where_clause, ScrapedCourse.status == "pending")
-            .order_by(ScrapedCourse.created_at.desc())
+            .order_by(ScrapedCourse.created_at.desc(), ScrapedCourse.id.desc())
         )).scalars().all()
+        # Recovery/continuation jobs deliberately preserve their source rows
+        # for audit and rollback.  The review screen spans that explicit chain,
+        # so the same canonical course can otherwise appear once per run.
+        # Rows are newest-first: retain the newest review candidate per URL
+        # without deleting or mutating the preserved history.
+        from app.services.scraper.url_identity import canonical_course_url_key
+        deduped_rows = []
+        seen_review_urls: set[tuple[int, str]] = set()
+        for row in rows:
+            canonical_url = (
+                getattr(row, "canonical_course_url", None)
+                or canonical_course_url_key(getattr(row, "course_website", None))
+            )
+            if canonical_url:
+                identity = (row.university_id, canonical_url)
+                if identity in seen_review_urls:
+                    continue
+                seen_review_urls.add(identity)
+            deduped_rows.append(row)
+
         quality_blocked_count = sum(
             1
-            for row in rows
+            for row in deduped_rows
             if getattr(row, "auto_publish_status", None) == "data_quality_failure"
         )
         review_rows = [
             row
-            for row in rows
+            for row in deduped_rows
             if getattr(row, "auto_publish_status", None) != "data_quality_failure"
         ]
         courses = [_staged_row_to_dict(s) for s in review_rows]
