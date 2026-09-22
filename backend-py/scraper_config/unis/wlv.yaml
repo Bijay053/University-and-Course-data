@@ -16,3 +16,7 @@ extraction:
   scrape_do_static: true
   fees:
     default_currency: GBP
+  staging:
+    # WLV legitimately publishes a near-flat annual international fee across
+    # most undergraduate courses; do not treat that as selector contamination.
+    skip_duplicate_fee_check: true

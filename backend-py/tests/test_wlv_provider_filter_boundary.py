@@ -26,6 +26,7 @@ def test_production_wlv_id_uses_static_proxy_for_course_pages():
         create_missing_stub=False,
     )
     assert cfg.extraction.scrape_do_static is True
+    assert cfg.extraction.staging.skip_duplicate_fee_check is True
 
 
 def test_provider_bypass_covers_final_course_detail_gate():
