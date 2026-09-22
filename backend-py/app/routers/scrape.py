@@ -1073,6 +1073,9 @@ async def get_status(
         "startedAt": job.started_at.isoformat() if job.started_at else None,
         "completedAt": job.completed_at.isoformat() if job.completed_at else None,
         "errorMessage": job.error_message,
+        "targetedRetryDiagnostic": (
+            (job.discovered_config or {}).get("targeted_retry_diagnostic")
+        ),
         "logs": logs,
         "events": logs,
         "logIndex": max((l["sequence"] for l in logs), default=since),
@@ -1350,6 +1353,9 @@ async def history_list(
             "htmlCompactionAlerts": compaction_alerts_by_run.get(r.runtime_job_id, []),
             "antiBotChallenges": (r.gate_skip_counts or {}).get("anti_bot_challenges"),
             "catalogueGuard": (r.gate_skip_counts or {}).get("catalogue_guard"),
+            "targetedRetryDiagnostic": (
+                (r.discovered_config or {}).get("targeted_retry_diagnostic")
+            ),
         })
     return {"runs": runs, "total": int(total), "limit": limit, "offset": offset}
 

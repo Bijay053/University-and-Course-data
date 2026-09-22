@@ -235,6 +235,7 @@ async def test_review_creates_one_bounded_exact_remaining_child_and_rejects_stal
     next_child = objects[result["job_id"]]
     assert next_child.request_payload["course_urls"] == urls[40:]
     assert next_child.request_payload["courseReport"]["requested_by"] == "original"
+    assert next_child.request_payload["courseReport"]["source_job_id"] == "source"
     assert next_child.request_payload["retrySourceJobId"] == "first"
     policy = next_child.request_payload["autonomousVerification"]
     assert (policy["max_courses"], policy["time_budget_seconds"], policy["cost_cap_usd"]) == (50, 600, 2)

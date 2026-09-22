@@ -1904,6 +1904,87 @@ def _is_targeted_retry_payload(payload: dict | None) -> bool:
     return bool(_target_course_urls_from_payload(payload))
 
 
+def _targeted_retry_all_filtered_diagnostic(
+    *,
+    selected_urls: list[str],
+    retained_urls: list[str],
+    extraction_urls: list[str] | None = None,
+    resolved_urls: list[str] | None = None,
+    retry_source_job_id: str | None = None,
+    source_review_job_id: str | None = None,
+) -> dict | None:
+    """Describe a targeted retry that URL filters reduced to no work.
+
+    A retry whose selected URLs are already represented by durable review rows
+    is a successful no-op, not a filter failure. Classification must use the
+    final extraction set: a retained URL can subsequently be removed by a
+    resume checkpoint, leaving a different selected URL blocked by filters.
+    """
+    selected = list(dict.fromkeys(url for url in selected_urls if url))
+    resolved_keys = {
+        canonical_course_url_key(url)
+        for url in (resolved_urls or [])
+        if canonical_course_url_key(url)
+    }
+    selected_keys = {
+        canonical_course_url_key(url)
+        for url in selected
+        if canonical_course_url_key(url)
+    }
+    # ``extraction_urls`` is the set left after resume checkpoint filtering.
+    # Defaulting to retained URLs preserves callers which only classify an
+    # all-filtered pre-resume result.
+    extraction_keys = {
+        canonical_course_url_key(url)
+        for url in (
+            retained_urls if extraction_urls is None else extraction_urls
+        )
+        if canonical_course_url_key(url)
+    }
+    retained_keys = {
+        canonical_course_url_key(url)
+        for url in retained_urls
+        if canonical_course_url_key(url)
+    }
+    if not selected_keys or extraction_keys:
+        return None
+
+    # Route expansion can change URL identity. Only classify actual zero work,
+    # and attribute rejection to the filter snapshot, not to later transforms.
+    filtered_keys = selected_keys - retained_keys - resolved_keys
+    if not filtered_keys:
+        return None
+    filtered_urls = [
+        url for url in selected
+        if canonical_course_url_key(url) in filtered_keys
+    ]
+    resolved_count = len(selected_keys & resolved_keys)
+    source_review_job_id = source_review_job_id or retry_source_job_id
+    message = (
+        "No selected courses were processed; "
+        f"{len(filtered_urls)} unresolved selected course "
+        f"{'URL was' if len(filtered_urls) == 1 else 'URLs were'} rejected "
+        "by URL filters."
+    )
+    return {
+        "error_type": "targeted_retry_all_filtered",
+        "message": message,
+        "selected_count": len(selected),
+        "filtered_count": len(filtered_urls),
+        "resolved_count": resolved_count,
+        "processed_count": 0,
+        "selected_urls": selected,
+        "filtered_urls": filtered_urls,
+        "retry_source_job_id": retry_source_job_id,
+        "source_review_job_id": source_review_job_id,
+        "recovery_action": "report_official_course_urls",
+        "next_action": (
+            "Submit the exact official course URLs using the established "
+            "reporting form."
+        ),
+    }
+
+
 def _is_safe_restart_smoke_payload(payload: dict | None) -> bool:
     """Return whether this is the one-URL production restart smoke sample."""
     return bool(
@@ -2185,6 +2266,9 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
     _release_revision = get_release_revision()
     _targeted_retry = _is_targeted_retry_payload(job.request_payload)
     _safe_restart_smoke = _is_safe_restart_smoke_payload(job.request_payload)
+    _targeted_retry_filter_diagnostic: dict | None = None
+    _targeted_retry_url_filter_retained_urls: list[str] = []
+    _targeted_retry_resolved_urls: list[str] = []
 
     summary = {"discovered": 0, "staged": 0, "skipped": 0, "errors": 0, "fetch_failed": 0}
     _sit_staged_links: list[dict] = []
@@ -5860,6 +5944,15 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             "non_degree_browser_launches_avoided": _non_degree_prefetch_count,
             "non_degree_ai_calls_avoided": _non_degree_prefetch_count,
         }
+        if _targeted_retry:
+            # Freeze the post-URL-filter set before resume checkpoints remove
+            # already-resolved review rows. Terminal classification happens
+            # after resume so those successful no-op retries cannot be failed.
+            _targeted_retry_url_filter_retained_urls = [
+                str(link.get("url") or "")
+                for link in links
+                if isinstance(link, dict)
+            ]
         job.discovered_config = _dc
         job.heartbeat_at = datetime.now(timezone.utc)
         await db.commit()
@@ -6198,6 +6291,10 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                     for url in ((job.discovered_config or {}).get("autonomousVerification") or {}).get("completed_urls", [])
                 )
             _resume_already_staged = len(recovered_keys - {"" , None})
+            if _targeted_retry:
+                _targeted_retry_resolved_urls = sorted(
+                    recovered_keys - {"", None}
+                )
             links = [
                 link for link in links
                 if canonical_course_url_key(link.get("url")) not in recovered_keys
@@ -6310,6 +6407,10 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                     _skipped_resume = _before - len(links)
                     if _skipped_resume > 0:
                         _resume_already_staged = _skipped_resume
+                        if _targeted_retry:
+                            _targeted_retry_resolved_urls = sorted(
+                                _matched_resume_keys
+                            )
                         # Persist exact row provenance so the review API can
                         # reunite this run with only the checkpoints it used.
                         # Counts alone are not a safe scope because unrelated
@@ -6339,6 +6440,52 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                     "[RESUME] checkpoint filter failed for uni %s (continuing "
                     "with full link set): %s", job.university_id, _resume_exc,
                 )
+
+        if _targeted_retry:
+            _request_payload = job.request_payload or {}
+            _course_report = _request_payload.get("courseReport")
+            _source_review_job_id = (
+                _course_report.get("source_job_id")
+                if isinstance(_course_report, dict)
+                else None
+            ) or _request_payload.get("retrySourceJobId")
+            _targeted_retry_filter_diagnostic = (
+                _targeted_retry_all_filtered_diagnostic(
+                    selected_urls=_target_course_urls,
+                    retained_urls=_targeted_retry_url_filter_retained_urls,
+                    extraction_urls=[
+                        str(link.get("url") or "")
+                        for link in links
+                        if isinstance(link, dict)
+                    ],
+                    resolved_urls=_targeted_retry_resolved_urls,
+                    retry_source_job_id=_request_payload.get("retrySourceJobId"),
+                    source_review_job_id=_source_review_job_id,
+                )
+            )
+        if _targeted_retry_filter_diagnostic:
+            # Keep the original request payload (including courseUrls and
+            # retrySourceJobId) intact. The diagnostic is additive so neither
+            # source-review linkage nor an earlier error is erased.
+            _dc["targeted_retry_diagnostic"] = _targeted_retry_filter_diagnostic
+            job.discovered_config = _dc
+            job.error_message = (
+                job.error_message
+                or _targeted_retry_filter_diagnostic["message"]
+            )
+            summary["errors"] = max(1, int(summary.get("errors", 0) or 0))
+            await emit(
+                "error",
+                _targeted_retry_filter_diagnostic["message"],
+                phase="extract",
+                kind="targeted_retry_all_filtered",
+                **{
+                    key: value
+                    for key, value in _targeted_retry_filter_diagnostic.items()
+                    if key != "message"
+                },
+            )
+            await db.commit()
 
         # Resume checkpoints are already-processed courses in this catalogue.
         # Seed current only AFTER checkpoint filtering computes the final offset,
@@ -8232,6 +8379,8 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             f"FetchFailed:{_fetch_failed_n} | "
             f"Errors:{summary.get('errors', 0)}"
         )
+        if _targeted_retry_filter_diagnostic:
+            _done_msg = _done_msg.replace("══ DONE ══", "══ FAILED ══", 1)
         if _catalogue_guard:
             _done_msg += (
                 f" | CatalogueFloor:{_catalogue_guard['expected_min_courses']} "
@@ -8378,8 +8527,13 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             phase_timings=_phase_timings,
             catalogue_guard=_catalogue_guard,
             pipeline_stats=_dc.get("pipeline_stats"),
+            targeted_retry_diagnostic=_targeted_retry_filter_diagnostic,
             sit_catalogue_outcomes=_sit_catalogue_outcomes,
-            level="success" if not _catalogue_guard else _catalogue_guard["level"],
+            level=(
+                "error"
+                if _targeted_retry_filter_diagnostic
+                else "success" if not _catalogue_guard else _catalogue_guard["level"]
+            ),
         )
         await emit(
             "status",
@@ -8410,7 +8564,9 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             else 0.30
         )
         _fg_warn_threshold = min(0.10, _fg_threshold / 3)
-        _forced_status: str | None = None
+        _forced_status: str | None = (
+            "failed" if _targeted_retry_filter_diagnostic else None
+        )
         if _discovered_n > 0 and _fetch_failure_rate > _fg_threshold:
             _forced_status = "failed_degraded"
             log.warning(

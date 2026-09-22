@@ -323,6 +323,129 @@ async def test_real_orchestrator_timeout_skips_cleanup_and_releases_tasks_and_lo
     assert len(closed) == 2
 
 
+async def test_production_verification_recovery_is_a_successful_targeted_noop(monkeypatch):
+    """Durable verification rows must classify all-selected recovery as success."""
+    import redis.asyncio as aioredis
+    from app.services.scraper import pdf_link_discoverer
+
+    selected = [
+        "https://study.csu.edu.au/international/courses/bachelor-business",
+        "https://study.csu.edu.au/international/courses/master-finance",
+    ]
+    recovered = [f"{selected[0]}/", f"{selected[1]}?utm_source=review"]
+    university = SimpleNamespace(
+        id=42,
+        name="Charles Sturt University",
+        country="Australia",
+        scrape_url="https://study.csu.edu.au/international/courses",
+        scrape_config=None,
+    )
+
+    class Result:
+        def __init__(self, *, scalar=None, rows=()):
+            self._scalar = scalar
+            self._rows = list(rows)
+
+        def scalar_one_or_none(self):
+            return self._scalar
+
+        def scalars(self):
+            return SimpleNamespace(all=lambda: self._rows)
+
+    class DB:
+        def __init__(self):
+            self.commit = AsyncMock()
+            self.rollback = AsyncMock()
+
+        async def execute(self, statement, *args, **kwargs):
+            sql = str(statement)
+            if "FROM universities" in sql:
+                return Result(scalar=university)
+            if "FROM scraped_courses" in sql:
+                return Result(rows=recovered)
+            raise AssertionError(f"unexpected production query: {sql}")
+
+    class Job(SimpleNamespace):
+        def __getattr__(self, name):
+            return None
+
+    job = Job(
+        runtime_job_id="child",
+        university_id=42,
+        url=university.scrape_url,
+        request_payload={
+            "courseUrls": selected,
+            "retrySourceJobId": "source",
+            "courseReport": {"source_job_id": "source"},
+        },
+        discovered_config={},
+        fast_mode=False,
+        status="running",
+    )
+    db = DB()
+
+    async def background(*args):
+        await asyncio.Event().wait()
+
+    class EmitSession:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        async def execute(self, *args, **kwargs):
+            pass
+
+        async def commit(self):
+            pass
+
+    redis = SimpleNamespace(
+        set=AsyncMock(return_value=True),
+        eval=AsyncMock(return_value=1),
+        delete=AsyncMock(),
+        aclose=AsyncMock(),
+    )
+    monkeypatch.setattr(aioredis, "from_url", lambda *args, **kwargs: redis)
+    monkeypatch.setattr(orch.settings, "max_concurrent_scrapes", 0)
+    monkeypatch.setattr(orch, "_heartbeat_pulser", background)
+    monkeypatch.setattr(orch, "_stop_poller", background)
+    monkeypatch.setattr(orch, "AsyncSessionLocal", EmitSession)
+    monkeypatch.setattr(
+        orch, "_persist_and_deliver_discovery_failure_alert", AsyncMock()
+    )
+    monkeypatch.setattr(
+        pdf_link_discoverer,
+        "discover_pdf_links_for_university",
+        AsyncMock(return_value=[]),
+    )
+
+    classification = {}
+
+    class Classified(Exception):
+        pass
+
+    real_classifier = orch._targeted_retry_all_filtered_diagnostic
+
+    def classify(**kwargs):
+        classification.update(kwargs)
+        classification["diagnostic"] = real_classifier(**kwargs)
+        raise Classified
+
+    monkeypatch.setattr(orch, "_targeted_retry_all_filtered_diagnostic", classify)
+
+    limits = VerificationLimits("parent", "session", max_courses=50)
+    result = await orch._run_claimed_scrape(db, job, limits)
+
+    assert result["ok"] is False  # synthetic stop immediately after classification
+    assert classification["extraction_urls"] == []
+    assert set(classification["resolved_urls"]) == {
+        orch.canonical_course_url_key(url) for url in selected
+    }
+    assert classification["diagnostic"] is None
+    assert "targeted_retry_diagnostic" not in job.discovered_config
+
+
 @pytest.fixture
 def staging(monkeypatch):
     module = importlib.import_module("app.services.scraper.stage_course")

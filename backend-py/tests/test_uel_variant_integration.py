@@ -86,6 +86,14 @@ async def test_discovery_fanout_extracts_two_records_from_one_fetch(monkeypatch)
     assert len({link["name"] for link in links}) == 2
     assert len({canonical_course_url_key(link["url"]) for link in links}) == 2
     assert all("uel_variant=" in link["url"] and "payload" not in link for link in links)
+    # Targeted retries retain the selected base URL at the filter boundary,
+    # but extraction legitimately processes different award-route URLs.
+    assert orchestrator._targeted_retry_all_filtered_diagnostic(
+        selected_urls=[URL],
+        retained_urls=[URL],
+        extraction_urls=[link["url"] for link in links],
+        retry_source_job_id="source-review",
+    ) is None
     fetch.assert_awaited_once()
     results = await asyncio.gather(*(
         orchestrator._extract_only(

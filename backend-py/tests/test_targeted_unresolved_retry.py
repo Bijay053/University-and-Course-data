@@ -7,6 +7,7 @@ unresolved, and the resulting job receives the course URLs explicitly.
 from __future__ import annotations
 
 import asyncio
+import inspect
 from types import SimpleNamespace
 
 import pytest
@@ -16,7 +17,10 @@ from app.schemas.scrape import ScrapeStartResponse, StartScrapeBody
 from app.services.scraper.orchestrator import (
     _inject_extra_course_urls,
     _is_targeted_retry_payload,
+    _matched_resume_provenance,
+    _normalize_course_url,
     _should_auto_discover_fee_page,
+    _targeted_retry_all_filtered_diagnostic,
     _target_course_urls_from_payload,
 )
 
@@ -82,6 +86,166 @@ def test_targeted_retry_does_not_probe_course_samples_for_fee_discovery() -> Non
         has_links=True,
         targeted_retry=False,
     )
+
+
+def test_targeted_retry_all_filtered_has_durable_recovery_diagnostic() -> None:
+    selected = [
+        "https://example.edu/course/a",
+        "https://example.edu/course/b",
+    ]
+
+    diagnostic = _targeted_retry_all_filtered_diagnostic(
+        selected_urls=selected,
+        retained_urls=[],
+        retry_source_job_id="job_source",
+    )
+
+    assert diagnostic == {
+        "error_type": "targeted_retry_all_filtered",
+        "message": (
+            "No selected courses were processed; 2 unresolved selected course "
+            "URLs were rejected by URL filters."
+        ),
+        "selected_count": 2,
+        "filtered_count": 2,
+        "resolved_count": 0,
+        "processed_count": 0,
+        "selected_urls": selected,
+        "filtered_urls": selected,
+        "retry_source_job_id": "job_source",
+        "source_review_job_id": "job_source",
+        "recovery_action": "report_official_course_urls",
+        "next_action": (
+            "Submit the exact official course URLs using the established "
+            "reporting form."
+        ),
+    }
+
+
+def test_partially_filtered_targeted_retry_is_processed_normally() -> None:
+    assert _targeted_retry_all_filtered_diagnostic(
+        selected_urls=[
+            "https://example.edu/course/a",
+            "https://example.edu/course/b",
+        ],
+        retained_urls=["https://example.edu/course/b"],
+        retry_source_job_id="job_source",
+    ) is None
+
+
+def test_already_resolved_targeted_retry_is_a_successful_noop() -> None:
+    assert _targeted_retry_all_filtered_diagnostic(
+        selected_urls=["https://example.edu/course/a"],
+        retained_urls=[],
+        resolved_urls=["https://example.edu/course/a/"],
+        retry_source_job_id="job_source",
+    ) is None
+
+
+def test_mixed_filtered_and_resume_resolved_targeted_retry_fails_with_exact_rejections() -> None:
+    filtered_url = "https://example.edu/course/filtered"
+    resolved_url = "https://example.edu/course/already-resolved"
+
+    diagnostic = _targeted_retry_all_filtered_diagnostic(
+        selected_urls=[filtered_url, resolved_url],
+        retained_urls=[resolved_url],
+        extraction_urls=[],
+        resolved_urls=[resolved_url],
+        retry_source_job_id="job_continuation",
+        source_review_job_id="job_original_review",
+    )
+
+    assert diagnostic is not None
+    assert diagnostic["selected_count"] == 2
+    assert diagnostic["filtered_count"] == 1
+    assert diagnostic["resolved_count"] == 1
+    assert diagnostic["selected_urls"] == [filtered_url, resolved_url]
+    assert diagnostic["filtered_urls"] == [filtered_url]
+    assert diagnostic["retry_source_job_id"] == "job_continuation"
+    assert diagnostic["source_review_job_id"] == "job_original_review"
+    assert diagnostic["message"] == (
+        "No selected courses were processed; 1 unresolved selected course "
+        "URL was rejected by URL filters."
+    )
+
+
+def test_production_resume_classifies_after_already_resolved_filtering() -> None:
+    """Lock the production ordering, not only the pure diagnostic helper."""
+    from app.services.scraper.orchestrator import _run_claimed_scrape
+
+    selected_url = "https://example.edu/course/already-resolved"
+    post_filter_links = [{"url": selected_url, "name": "Resolved course"}]
+    checkpoints = {
+        _normalize_course_url(selected_url): (42, "job_source")
+    }
+    matched_keys, _, _ = _matched_resume_provenance(
+        post_filter_links,
+        checkpoints,
+    )
+    remaining_links = [
+        link
+        for link in post_filter_links
+        if _normalize_course_url(link["url"]) not in checkpoints
+    ]
+    diagnostic = _targeted_retry_all_filtered_diagnostic(
+        selected_urls=[selected_url],
+        retained_urls=[link["url"] for link in post_filter_links],
+        extraction_urls=[link["url"] for link in remaining_links],
+        resolved_urls=sorted(matched_keys),
+        retry_source_job_id="job_source",
+    )
+    forced_status = "failed" if diagnostic else None
+
+    assert remaining_links == []
+    assert matched_keys == {_normalize_course_url(selected_url)}
+    assert diagnostic is None
+    assert forced_status is None
+
+    source = inspect.getsource(_run_claimed_scrape)
+    resume_filter = source.index("_matched_resume_provenance(links, _done_rows)")
+    resolved_capture = source.index(
+        "_targeted_retry_resolved_urls = sorted(", resume_filter
+    )
+    diagnostic_call = source.index(
+        "_targeted_retry_all_filtered_diagnostic(",
+        resume_filter,
+    )
+    forced_failure = source.index(
+        '"failed" if _targeted_retry_filter_diagnostic else None'
+    )
+
+    assert resume_filter < resolved_capture < diagnostic_call < forced_failure
+    assert "resolved_urls=_targeted_retry_resolved_urls" in source[
+        diagnostic_call:forced_failure
+    ]
+    assert "extraction_urls=[" in source[diagnostic_call:forced_failure]
+    assert '_course_report.get("source_job_id")' in source[
+        diagnostic_call - 700:diagnostic_call
+    ]
+
+
+def test_course_report_source_linkage_prefers_original_review_over_retry_parent() -> None:
+    diagnostic = _targeted_retry_all_filtered_diagnostic(
+        selected_urls=["https://example.edu/course/filtered"],
+        retained_urls=[],
+        retry_source_job_id="job_previous_continuation",
+        source_review_job_id="job_original_review",
+    )
+
+    assert diagnostic is not None
+    assert diagnostic["source_review_job_id"] == "job_original_review"
+    assert diagnostic["retry_source_job_id"] == "job_previous_continuation"
+
+
+
+def test_successfully_processed_targeted_retry_has_no_filter_diagnostic() -> None:
+    url = "https://example.edu/course/a"
+
+    assert _targeted_retry_all_filtered_diagnostic(
+        selected_urls=[url],
+        retained_urls=[url],
+        retry_source_job_id="job_source",
+    ) is None
 
 
 def test_unresolved_history_entries_keep_latest_reason_per_url() -> None:

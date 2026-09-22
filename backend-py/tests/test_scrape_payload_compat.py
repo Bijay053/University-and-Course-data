@@ -349,6 +349,45 @@ def test_status_returns_options_needed_to_continue_after_reload(client_with_uni)
     assert body["requirementsPageUrl"] == "https://test.example.edu/requirements"
 
 
+def test_status_returns_durable_targeted_retry_diagnostic(client_with_uni):
+    client, fake = client_with_uni
+    job_id = "job_targeted_all_filtered"
+    diagnostic = {
+        "error_type": "targeted_retry_all_filtered",
+        "message": (
+            "No selected courses were processed because URL filters removed "
+            "every selected course URL."
+        ),
+        "selected_count": 2,
+        "processed_count": 0,
+        "selected_urls": [
+            "https://test.example.edu/course/a",
+            "https://test.example.edu/course/b",
+        ],
+        "retry_source_job_id": "job_source",
+        "source_review_job_id": "job_source",
+        "recovery_action": "report_official_course_urls",
+    }
+    fake.jobs[job_id] = ScrapeRuntimeJob(
+        runtime_job_id=job_id,
+        university_id=42,
+        university_name="Test University",
+        url="https://test.example.edu/courses",
+        job_type="single",
+        status="failed",
+        errors=1,
+        request_payload={},
+        discovered_config={"targeted_retry_diagnostic": diagnostic},
+    )
+
+    response = client.get(f"/api/scrape/status/{job_id}")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["targetedRetryDiagnostic"] == diagnostic
+    assert body["status"] == "failed"
+
+
 def test_completed_status_reports_extraction_errors_as_failed_quality(client_with_uni):
     client, fake = client_with_uni
     job_id = "job_completed_with_extraction_errors"

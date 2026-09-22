@@ -14,3 +14,15 @@ Requirement recovery must work through the normal app for both existing records 
 **Why:** Overall IELTS and generic admission prose previously concealed unresolved requirements. Real extractor evidence must be tested end to end: fabricated test method names can pass while actual extraction provenance is rejected.
 
 **How to apply:** Preserve source-bound proof through staging and repair, invalidate it when the underlying values change, and prefill the affected course and issue when requesting a supporting official URL. Never interpret missing information as “not required.”
+
+Treat an already-resolved resume selection differently from a selection rejected by URL filters.
+
+**Why:** Both can leave zero extraction work, but only the latter means recovery was blocked. Calling an already-resolved selection a failure would send users through unnecessary recovery.
+
+**How to apply:** Preserve filter-stage evidence separately from resume/checkpoint exclusions. Zero remaining work succeeds only when every selected URL is resolved; a mixed resolved-and-filtered selection still needs recovery. Keep the official-URL action linked to the original source review, not merely the preceding continuation.
+
+Do not infer zero work by comparing final extraction URLs with selected URL identities.
+
+**Why:** Award-route expansion legitimately changes a selected base URL into multiple variant URLs. Identity mismatch does not prove that extraction was skipped.
+
+**How to apply:** Require an actually empty final extraction list, attribute filter rejection using the pre-expansion filter snapshot, and include both resume checkpoints and verification recovery in resolved evidence.

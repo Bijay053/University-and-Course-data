@@ -255,9 +255,26 @@ async def test_history_exposes_persisted_catalogue_guard() -> None:
         "staged": 0,
         "expected_min_courses": 200,
     }
+    targeted_retry_diagnostic = {
+        "error_type": "targeted_retry_all_filtered",
+        "message": "No selected courses were processed.",
+        "selected_count": 2,
+        "processed_count": 0,
+        "selected_urls": [
+            "https://example.edu/course/a",
+            "https://example.edu/course/b",
+        ],
+        "source_review_job_id": "job_source",
+    }
     transport = httpx.ASGITransport(app=app)
     async with AsyncSessionLocal() as db:
-        db.add(_job(runtime_job_id=job_id, gate_skip_counts={"catalogue_guard": guard}))
+        db.add(_job(
+            runtime_job_id=job_id,
+            gate_skip_counts={"catalogue_guard": guard},
+            discovered_config={
+                "targeted_retry_diagnostic": targeted_retry_diagnostic
+            },
+        ))
         await db.commit()
 
     async def view_user() -> dict:
@@ -273,6 +290,7 @@ async def test_history_exposes_persisted_catalogue_guard() -> None:
             if run["runtimeJobId"] == job_id
         )
         assert matching["catalogueGuard"] == guard
+        assert matching["targetedRetryDiagnostic"] == targeted_retry_diagnostic
     finally:
         app.dependency_overrides.pop(get_current_user, None)
         async with AsyncSessionLocal() as cleanup:

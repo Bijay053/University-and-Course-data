@@ -1073,6 +1073,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       staged: number;
       expected_min_courses: number;
     } | null;
+    targetedRetryDiagnostic: TargetedRetryDiagnostic | null;
   };
   type HistoryLogEntry = { sequence: number; event: string; createdAt: string; message?: string; phase?: string; [k: string]: unknown };
   // History staged course is now the full StagedCourse + evidence array
@@ -1131,6 +1132,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   };
 
   const [historyRuns, setHistoryRuns] = useState<HistoryRun[]>([]);
+  const [historyCourseReportOpenRequests, setHistoryCourseReportOpenRequests] = useState<Record<string, number>>({});
   const [historyTotal, setHistoryTotal] = useState(0);
   const [historyPage, setHistoryPage] = useState(1);
   const [historyPageSize, setHistoryPageSize] = useState<10 | 50 | 100>(10);
@@ -5174,7 +5176,24 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                   </div>
 
                   {["completed", "completed_with_errors", "stopped", "failed", "failed_degraded"].includes(run.status) && (
-                    <CourseReport jobId={run.runtimeJobId} onReview={id => handleReviewReady(id, run.universityName ?? "University", true)} onStarted={() => void fetchHistory()} />
+                    <>
+                      <div className="mx-4">
+                        <TargetedRetryAllFilteredNotice
+                          diagnostic={run.targetedRetryDiagnostic}
+                          diagnosticId={run.runtimeJobId}
+                          onReportOfficialUrls={() => setHistoryCourseReportOpenRequests(previous => ({
+                            ...previous,
+                            [run.runtimeJobId]: (previous[run.runtimeJobId] ?? 0) + 1,
+                          }))}
+                        />
+                      </div>
+                      <CourseReport
+                        jobId={run.targetedRetryDiagnostic?.source_review_job_id ?? run.runtimeJobId}
+                        onReview={id => handleReviewReady(id, run.universityName ?? "University", true)}
+                        onStarted={() => void fetchHistory()}
+                        openRequest={historyCourseReportOpenRequests[run.runtimeJobId] ?? 0}
+                      />
+                    </>
                   )}
                   {isExpanded && (
                     <div className="border-t bg-gray-50 p-3 sm:p-4">

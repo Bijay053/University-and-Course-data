@@ -393,4 +393,30 @@ def test_t209_orchestrator_run_scrape_emits_timing_and_done_payloads():
     # mapping picks them up rather than falling through to phase
     # heuristics.
     assert 'level="info"' in src or "level='info'" in src
-    assert 'level="success"' in src or "level='success'" in src
+    # Inspect the DONE event's actual level expression, rather than requiring
+    # a literal keyword assignment: blocked retries must render as errors.
+    import ast
+
+    done_calls = [
+        node for node in ast.walk(ast.parse(src))
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name) and node.func.id == "emit"
+        and node.args and isinstance(node.args[0], ast.Constant)
+        and node.args[0].value == "done"
+        and any(kw.arg == "targeted_retry_diagnostic" for kw in node.keywords)
+    ]
+    assert len(done_calls) == 1
+    level = next(kw.value for kw in done_calls[0].keywords if kw.arg == "level")
+    for diagnostic, guard, expected in [
+        (None, None, "success"),
+        ({"error_type": "targeted_retry_all_filtered"}, None, "error"),
+        (None, {"level": "warn"}, "warn"),
+    ]:
+        assert eval(
+            compile(ast.Expression(body=level), "<done-level>", "eval"),
+            {"__builtins__": {}},
+            {
+                "_targeted_retry_filter_diagnostic": diagnostic,
+                "_catalogue_guard": guard,
+            },
+        ) == expected

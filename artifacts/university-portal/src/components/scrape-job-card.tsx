@@ -14,6 +14,10 @@ import { useToast } from "@/hooks/use-toast";
 import { countPendingReviewCourses } from "@/utils/pending-review-count";
 import { CourseReport } from "@/components/course-report";
 import {
+  TargetedRetryAllFilteredNotice,
+  type TargetedRetryDiagnostic,
+} from "@/components/targeted-retry-diagnostic";
+import {
   AiRepairProgress,
   type AutonomousRepair,
   type LiveProbe,
@@ -577,6 +581,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
   const [resultSummary, setResultSummary] = useState<{ imported: number; skipped: number; errors: number } | null>(null);
   const [completedSkipReasons, setCompletedSkipReasons] = useState<Record<string, number> | undefined>();
   const [completedJobId, setCompletedJobId] = useState<string | null>(null);
+  const [targetedRetryDiagnostic, setTargetedRetryDiagnostic] = useState<TargetedRetryDiagnostic | null>(null);
   // `imported` is the total staged by the scrape. The Review screen only shows
   // rows still awaiting a decision, so keep its count independently.
   const [pendingReviewCount, setPendingReviewCount] = useState<number | null>(null);
@@ -863,6 +868,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
     setPendingReviewCount(null);
     setPerformanceSavings(null);
     setCompletedJobId(null);
+    setTargetedRetryDiagnostic(null);
     setBrowserRescueAttempted(false);
     setIsContinuationJob(false);
     setUnresolvedCount(null);
@@ -1521,6 +1527,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
           continuableUnresolvedCount?: number | null;
           exhaustedUnresolvedCount?: number | null;
           canContinueUnresolved?: boolean;
+          targetedRetryDiagnostic?: TargetedRetryDiagnostic | null;
           current?: number; total?: number; totalFound?: number;
         }>(res);
         if (!data) { schedule(POLL_BASE); return; }
@@ -1546,6 +1553,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
             ? data.exhaustedUnresolvedCount
             : null
         );
+        setTargetedRetryDiagnostic(data.targetedRetryDiagnostic ?? null);
         if (typeof data.fastMode === "boolean") setFastMode(data.fastMode);
         if (data.feePageUrl) {
           setFeePageUrl(data.feePageUrl);
@@ -2177,8 +2185,13 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
 
       {completedJobId && (
         <div id={`course-report-${slotIndex}`}>
+          <TargetedRetryAllFilteredNotice
+            diagnostic={targetedRetryDiagnostic}
+            diagnosticId={completedJobId}
+            onReportOfficialUrls={() => setCourseReportOpenRequest(value => value + 1)}
+          />
           <CourseReport
-            jobId={completedJobId}
+            jobId={targetedRetryDiagnostic?.source_review_job_id ?? completedJobId}
             onReview={id => onReviewReady(id, uniName, true)}
             onStarted={onReportStarted}
             openRequest={courseReportOpenRequest}
