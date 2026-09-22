@@ -11,5 +11,8 @@
 discovery: {}
 
 extraction:
+  # Direct datacentre requests receive WLV's JavaScript-disabled verification
+  # shell. The static residential proxy returns the complete SSR course page.
+  scrape_do_static: true
   fees:
     default_currency: GBP

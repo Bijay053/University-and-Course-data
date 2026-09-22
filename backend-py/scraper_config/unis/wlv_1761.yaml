@@ -158,6 +158,7 @@ extraction:
   # WLV serves fees + durations in static HTML via Scrape.do — no JS rendering
   # required.  Per-course browser adds only Cloudflare timeouts (~15 s each)
   # with no benefit.  Sparse-static rescue also disabled for the same reason.
+  scrape_do_static: true
   skip_per_course_browser: true
   skip_browser_rescue: true
 

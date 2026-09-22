@@ -94,12 +94,13 @@ def test_degree_title_with_owned_facts_survives_sibling_course_links():
     assert len(result["fields"]) == 2
 
 
-def test_wlv_course_length_is_owned_duration_evidence():
+@pytest.mark.parametrize("award", ["BA (Hons)", "BEng (Hons)", "MEng (Hons)"])
+def test_wlv_course_length_is_owned_duration_evidence(award):
     html = """<html><main>
-    <h1>BA (Hons) Creative and Professional Writing</h1>
-    <div class="info-data">Award BA (Hons)</div>
+    <h1>{award} Motorsport Engineering</h1>
+    <div class="info-data">Award {award}</div>
     <div class="info-data">Course length Part-time (6 years), Full-time (3 years)</div>
-    </main></html>"""
+    </main></html>""".format(award=award)
 
     result = live.inspect_page(ONE, html, config())
 

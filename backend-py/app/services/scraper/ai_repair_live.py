@@ -180,7 +180,10 @@ _LABEL = re.compile(
     r"\b(qualification|award|degree|duration|course length|study mode|mode of study|campus|location|"
     r"intake|start date|international (?:tuition|fee)|tuition fee|ielts|entry requirements?)\b", re.I
 )
-_AWARD = re.compile(r"\b(bachelor|master|doctor|phd|bsc|ba|msc|ma|mba|llb|llm|diploma|certificate)\b", re.I)
+_AWARD = re.compile(
+    r"\b(bachelor|master|doctor|phd|bsc|ba|beng|msc|ma|meng|mba|llb|llm|diploma|certificate)\b",
+    re.I,
+)
 _FAILURES = {"network_failure", "challenge", "unsafe_url", "budget_exhausted", "unsupported_content"}
 _REJECTED = {"listing", "non_course", "non_degree", "ineligible", "not_published"}
 
@@ -459,7 +462,10 @@ def inspect_page(url: str, html: str, config=None) -> dict:
     facts = set()
     for field in fields:
         text = field["text"]
-        if re.search(r"\b(?:qualification|award|degree)\b.{0,60}\b(?:bachelor|master|doctor|phd|bsc|ba|msc|ma|mba|llb|llm|diploma|certificate)\b", text, re.I):
+        if (
+            re.search(r"\b(?:qualification|award|degree)\b", text, re.I)
+            and _AWARD.search(text)
+        ):
             facts.add("award")
         if re.search(r"\b(?:duration|course length)\b.{0,40}\d.{0,15}\b(?:years?|months?|weeks?)\b", text, re.I):
             facts.add("duration")
