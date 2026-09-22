@@ -28,6 +28,22 @@ from app.services.scraper.page_type import classify_page
 _MAX_PROBE_HTML_BYTES = 1_000_000
 
 
+def _is_javascript_disabled_shell(html: str) -> bool:
+    """Detect a short JS-only placeholder without matching real course pages."""
+    if not html or len(html) > 20_000:
+        return False
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html, "html.parser")
+    if soup.select_one("main, article, [role=main]"):
+        return False
+    visible = soup.get_text(" ", strip=True)
+    return bool(
+        re.search(r"\bjavascript is disabled\b", visible, re.I)
+        and len(visible) < 1_000
+    )
+
+
 def bounded_limit(limits: dict, key: str, maximum: int) -> int:
     try:
         return max(1, min(maximum, int(limits.get(key, maximum))))
@@ -79,12 +95,28 @@ async def _fetch_official(url: str, config, timeout: float) -> tuple[str, str, s
                            or getattr(discovery, "scrape_do_skip_fallbacks", False))
     if proxy:
         from app.services.scraper.http_fetcher import fetch_html_scrape_do, get_last_fetch_failure
+        fetch_started = time.monotonic()
         html = await fetch_html_scrape_do(
             url, render=render, max_retries=0, request_timeout_seconds=timeout,
             super_mode=bool(getattr(discovery, "scrape_do_super", False)),
             geo_code=getattr(extraction, "scrape_do_geo", None) or None,
         )
         if html:
+            if _is_javascript_disabled_shell(html):
+                if not render:
+                    remaining = timeout - (time.monotonic() - fetch_started)
+                    if remaining > 0:
+                        rendered = await fetch_html_scrape_do(
+                            url,
+                            render=True,
+                            max_retries=0,
+                            request_timeout_seconds=remaining,
+                            super_mode=bool(getattr(discovery, "scrape_do_super", False)),
+                            geo_code=getattr(extraction, "scrape_do_geo", None) or None,
+                        )
+                        if rendered and not _is_javascript_disabled_shell(rendered):
+                            return _bounded_html(rendered), "", ""
+                return "", "challenge", "JavaScript-disabled shell; live course HTML unavailable"
             return _bounded_html(html), "", ""
         failure = get_last_fetch_failure() or {}
         kind = failure.get("kind")

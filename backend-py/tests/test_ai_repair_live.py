@@ -140,6 +140,57 @@ async def test_configured_proxy_uses_existing_provider_bounded_no_retries(monkey
 
 
 @pytest.mark.asyncio
+async def test_static_javascript_shell_retries_once_with_rendering(monkeypatch):
+    from app.services import scraper_config_ai
+    from app.services.scraper import http_fetcher
+
+    cfg = config()
+    cfg.extraction.scrape_do_static = True
+    monkeypatch.setattr(scraper_config_ai, "_is_safe_public_url", lambda _url: (True, ""))
+    shell = "<html><body><noscript><h1>JavaScript is disabled</h1></noscript></body></html>"
+    provider = AsyncMock(side_effect=[shell, course()])
+    monkeypatch.setattr(http_fetcher, "fetch_html_scrape_do", provider)
+
+    html, failure, reason = await live._fetch_official(ONE, cfg, 20)
+
+    assert html == course()
+    assert not failure and not reason
+    assert provider.await_count == 2
+    first, second = provider.await_args_list
+    assert first.kwargs["render"] is False
+    assert second.kwargs["render"] is True
+    assert first.kwargs["max_retries"] == second.kwargs["max_retries"] == 0
+    assert 0 < second.kwargs["request_timeout_seconds"] <= 20
+
+
+@pytest.mark.asyncio
+async def test_rendered_javascript_shell_fails_closed(monkeypatch):
+    from app.services import scraper_config_ai
+    from app.services.scraper import http_fetcher
+
+    cfg = config()
+    cfg.extraction.scrape_do_static = True
+    monkeypatch.setattr(scraper_config_ai, "_is_safe_public_url", lambda _url: (True, ""))
+    shell = "<html><body><noscript><h1>JavaScript is disabled</h1></noscript></body></html>"
+    provider = AsyncMock(side_effect=[shell, shell])
+    monkeypatch.setattr(http_fetcher, "fetch_html_scrape_do", provider)
+
+    html, failure, reason = await live._fetch_official(ONE, cfg, 20)
+
+    assert not html
+    assert failure == "challenge"
+    assert "JavaScript-disabled shell" in reason
+    assert provider.await_count == 2
+
+
+def test_incidental_javascript_disabled_message_does_not_replace_real_page():
+    html = course(extra="<noscript>JavaScript is disabled</noscript>")
+
+    assert live._is_javascript_disabled_shell(html) is False
+    assert live.inspect_page(ONE, html, config())["classification"] == "course"
+
+
+@pytest.mark.asyncio
 async def test_large_provider_html_keeps_bounded_course_evidence(monkeypatch):
     from app.services import scraper_config_ai
     from app.services.scraper import http_fetcher
