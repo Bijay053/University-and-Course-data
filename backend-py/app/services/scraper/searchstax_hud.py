@@ -35,6 +35,7 @@ from urllib.parse import parse_qsl, urlsplit, urlunsplit
 import httpx
 
 from app.services.scraper.config.schema import SearchStaxConfig
+from app.services.scraper.wlv_search_auth import WlvAuthRecovery, WlvCatalogueUnavailable
 
 log = logging.getLogger("scraper.searchstax_hud")
 
@@ -1180,6 +1181,7 @@ async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> tuple[list[dict
     headers: dict = {"Accept": "application/json"}
     if token:
         headers["Authorization"] = f"Token {token}"
+    auth_recovery = WlvAuthRecovery(cfg.endpoints, emit)
 
     _filter = cfg.filter_query or ""
 
@@ -1270,11 +1272,13 @@ async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> tuple[list[dict
                 _page_exc: Exception | None = None
                 for _attempt in range(3):
                     try:
-                        resp = await client.get(_base_url, params=params, headers=headers)
+                        resp = await auth_recovery.get(client, _base_url, params=params, headers=headers)
                         resp.raise_for_status()
                         data = resp.json()
                         _page_exc = None
                         break
+                    except WlvCatalogueUnavailable:
+                        raise  # Never turn failed authentication into a partial/empty catalogue.
                     except Exception as exc:  # noqa: BLE001
                         _page_exc = exc
                         log.warning(
@@ -1470,6 +1474,7 @@ async def fetch_searchstax_links(
     headers = {"Accept": "application/json"}
     if token:
         headers["Authorization"] = f"Token {token}"
+    auth_recovery = WlvAuthRecovery(cfg.endpoints, emit)
 
     # Choose mapper: field_map-driven generic (for universities like Durham
     # whose Solr has structured metadata but no fees/IELTS content blob),
@@ -1578,11 +1583,13 @@ async def fetch_searchstax_links(
                 _page_exc = None
                 for _attempt in range(3):
                     try:
-                        resp = await client.get(_base_url, params=params, headers=headers)
+                        resp = await auth_recovery.get(client, _base_url, params=params, headers=headers)
                         resp.raise_for_status()
                         data = resp.json()
                         _page_exc = None
                         break
+                    except WlvCatalogueUnavailable:
+                        raise
                     except Exception as _fetch_exc:  # noqa: BLE001
                         _page_exc = _fetch_exc
                         log.warning(

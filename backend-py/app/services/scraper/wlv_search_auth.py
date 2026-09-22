@@ -13,6 +13,51 @@ WLV_ENDPOINT = (
 )
 
 
+class WlvCatalogueUnavailable(RuntimeError):
+    """Safe, operator-facing failure rather than a misleading empty catalogue."""
+
+
+class WlvAuthRecovery:
+    """One refresh per discovery run, shared across pages and ordinary retries."""
+
+    def __init__(self, endpoints: list[str], emit=None):
+        self.enabled = endpoints == [WLV_ENDPOINT]
+        self.refreshed = False
+        self.emit = emit
+
+    async def _status(self, message: str) -> None:
+        if self.emit:
+            try:
+                await self.emit("status", message, phase="discover")
+            except Exception:
+                pass  # A disconnected progress stream must not abort recovery.
+
+    async def get(self, client, url: str, *, params: dict, headers: dict):
+        response = await client.get(url, params=params, headers=headers)
+        if not self.enabled or url != WLV_ENDPOINT:
+            return response
+        if getattr(response, "status_code", None) not in (401, 403):
+            return response
+        if not self.refreshed:
+            self.refreshed = True
+            await self._status(
+                "Wolverhampton changed its catalogue access. Refreshing it "
+                "automatically and continuing this scrape."
+            )
+            token = await fetch_public_search_auth()
+            headers["Authorization"] = f"Token {token}"
+            response = await client.get(url, params=params, headers=headers)
+            if response.status_code not in (401, 403):
+                if response.status_code == 200:
+                    await self._status("Wolverhampton catalogue access restored. Continuing discovery.")
+                return response
+        raise WlvCatalogueUnavailable(
+            "Wolverhampton's catalogue is temporarily unavailable, even after "
+            "automatic access recovery. No complete catalogue was obtained. "
+            "Please retry the scrape later; no token or developer setup is needed."
+        )
+
+
 def parse_public_search_auth(html: str) -> str | None:
     """Accept only the credential paired with the exact known search endpoint."""
     for script in BeautifulSoup(html, "html.parser").find_all("script"):
@@ -40,8 +85,15 @@ async def fetch_public_search_auth() -> str:
             timeout=45,
         )
     except Exception:
-        raise RuntimeError("WLV public search authentication page could not be fetched") from None
+        raise WlvCatalogueUnavailable(
+            "Wolverhampton's search page is temporarily unavailable. "
+            "Please retry the scrape later; access is refreshed automatically."
+        ) from None
     token = parse_public_search_auth(html or "")
     if not token:
-        raise RuntimeError("WLV public search authentication could not be verified")
+        raise WlvCatalogueUnavailable(
+            "Wolverhampton's public catalogue access could not be verified. "
+            "No complete catalogue was obtained. Please retry the scrape later; "
+            "no token or developer setup is needed."
+        )
     return token

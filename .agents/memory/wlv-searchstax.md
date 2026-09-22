@@ -15,6 +15,17 @@ HTTP 401 and zero provider candidates despite passing configuration tests.
 the authenticated provider request before claiming catalogue recovery. A healthy
 release and a correct field map do not establish provider availability.
 
+Credential recovery must be automatic for rejected credentials as well as missing
+ones, and confined to the same verified catalogue endpoint.
+
+**Why:** Developer-free operation cannot depend on an operator replacing an
+expired search token. A failure after earlier pages must not appear to be a
+complete smaller catalogue.
+
+**How to apply:** Bound refresh attempts per discovery run, resume the same page,
+and fail explicitly if the official public configuration cannot restore access.
+Never persist the public credential or send it to another configured endpoint.
+
 WLV uses SearchStax as the authority for which URLs are courses. Provider-owned
 links must bypass every post-discovery URL filter, including the final course
 detail allowlist. WLV may use links-only mode when a reliable static proxy is
