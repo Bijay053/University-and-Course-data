@@ -154,6 +154,22 @@ exact instance and document, and constrain AssumeRole with both
 `aws:SourceAccount` and that dedicated group ARN. Keep unchanged secret
 versions restart-free.
 
+The routine production credential-refresh principal must be able to read the
+fixed SSM document as well as invoke it. Do not substitute an arbitrary
+RunShellScript when that read permission is missing.
+
+**Why:** A rotated database credential left the managed host environment stale.
+Both configured SSM credential sets resolved to the same principal, which could
+run ordinary host commands but was denied the document read required to pin and
+verify the credential-refresh document. The guarded release then correctly
+stopped at its read-only database preflight.
+
+**How to apply:** Before a release depends on database credential refresh,
+verify that the dedicated refresh identity—not merely a general remote-command
+identity—can read and invoke the exact fixed document. Repair that scoped IAM
+path through the approved infrastructure pipeline; never bypass document
+version verification or manually handle the database password.
+
 RDS-managed master secrets may contain only username and password; credential
 refresh must preserve missing endpoint metadata from the root-only
 last-known-good connection URL.
