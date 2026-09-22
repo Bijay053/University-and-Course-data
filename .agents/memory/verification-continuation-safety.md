@@ -7,7 +7,7 @@ Continue verification only after cancellation has completed and the child has re
 
 **Why:** A verification timeout can leave useful staged courses, but reclaiming an active worker risks duplicate writes, and rediscovering URLs changes the sample being certified. Older runs without persisted selected URLs cannot be safely continued retroactively.
 
-**How to apply:** Preserve staged siblings, bound cumulative runs/time/observed provider cost, and evaluate safety across every child. A clean continuation must not erase earlier errors, contamination, critical-quality failures, or skipped courses. Keep publishing manual and full-catalogue coverage uncertified.
+**How to apply:** Preserve staged siblings, bound cumulative runs/time/observed provider cost, and evaluate safety across every child. A clean continuation must not erase earlier errors, contamination, critical-quality failures, or skipped courses. Every selected URL must have a conserved terminal outcome across staged, explicitly classified skip, or error evidence; one unaccounted URL must keep the run in review even when the remaining sample is clean. Keep publishing manual and full-catalogue coverage uncertified.
 
 Course-report recovery is a separate, explicitly reviewed continuation policy: each new bounded run requires human acknowledgement rather than consuming the autonomous verification continuation allowance.
 
