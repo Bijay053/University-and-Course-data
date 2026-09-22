@@ -2,11 +2,28 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CourseReport, Exclusions } from "./course-report";
+import { setAuthToken } from "@/lib/api";
 
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); setAuthToken(null); vi.unstubAllGlobals(); });
 const response = (body: unknown, ok = true) => ({ ok, text: async () => JSON.stringify(body) });
 
 describe("course report recovery", () => {
+  it("uses the saved bearer token when the session cookie is unavailable", async () => {
+    setAuthToken("saved-session-token");
+    const fetcher = vi.fn().mockResolvedValue(response({
+      reports: [],
+      source_exclusions: {},
+    }));
+    vi.stubGlobal("fetch", fetcher);
+
+    render(<CourseReport jobId="parent" onReview={vi.fn()} />);
+
+    await waitFor(() => expect(fetcher).toHaveBeenCalled());
+    const headers = new Headers(fetcher.mock.calls[0][1]?.headers);
+    expect(headers.get("Authorization")).toBe("Bearer saved-session-token");
+    expect(fetcher.mock.calls[0][1]?.credentials).toBe("include");
+  });
+
   it("opens the official URL form when automatic repair requests user input", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({
       reports: [],

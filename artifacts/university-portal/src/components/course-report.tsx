@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { readResponseJson } from "@/lib/readResponseJson";
+import { fetchWithAuth } from "@/lib/api";
 
 type Report = {
   job_id: string; report_id?: string; original_job_id?: string;
@@ -75,7 +76,7 @@ export function CourseReport({ jobId, onReview, onStarted, openRequest = 0 }: {
     let disposed = false;
     const load = async () => {
       try {
-        const response = await fetch(`/api/scrape/jobs/${encodeURIComponent(jobId)}/course-reports`, { credentials: "include" });
+        const response = await fetchWithAuth(`/api/scrape/jobs/${encodeURIComponent(jobId)}/course-reports`);
         const data = await readResponseJson<{ reports: Report[]; source_exclusions: Record<string, unknown>; detail?: string }>(response);
         if (!response.ok || !data || !Array.isArray(data.reports)) throw new Error(data?.detail || "Could not load report history");
         if (!disposed) { setReports(data.reports); setExclusions(data.source_exclusions ?? {}); setHistoryError(""); }
@@ -102,9 +103,9 @@ export function CourseReport({ jobId, onReview, onStarted, openRequest = 0 }: {
     setRetryBusy(report.job_id);
     setRetryErrors(previous => ({ ...previous, [report.job_id]: "" }));
     try {
-      const response = await fetch(
+      const response = await fetchWithAuth(
         `/api/scrape/jobs/${encodeURIComponent(jobId)}/course-reports/${encodeURIComponent(report.job_id)}/retry`,
-        { method: "POST", credentials: "include" },
+        { method: "POST" },
       );
       const data = await readResponseJson<Report & { detail?: unknown }>(response);
       if (!response.ok || !data) {
@@ -129,10 +130,10 @@ export function CourseReport({ jobId, onReview, onStarted, openRequest = 0 }: {
     setContinuationBusy(report.job_id);
     setContinuationErrors(previous => ({ ...previous, [report.job_id]: "" }));
     try {
-      const response = await fetch(
+      const response = await fetchWithAuth(
         `/api/scrape/jobs/${encodeURIComponent(jobId)}/course-reports/${encodeURIComponent(report.job_id)}/continue`,
         {
-          method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+          method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ reviewed: true }),
         },
       );
@@ -172,8 +173,8 @@ export function CourseReport({ jobId, onReview, onStarted, openRequest = 0 }: {
       setError("Use course URLs or a catalogue link, not both."); return;
     }
     try {
-      const response = await fetch(`/api/scrape/jobs/${encodeURIComponent(jobId)}/course-reports`, {
-        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+      const response = await fetchWithAuth(`/api/scrape/jobs/${encodeURIComponent(jobId)}/course-reports`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           kind: values.kind, course_urls: urls, catalogue_url: values.catalogue.trim() || null,
           eligibility_review: values.eligibilityReview,
