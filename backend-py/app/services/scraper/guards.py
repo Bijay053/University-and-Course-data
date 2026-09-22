@@ -544,6 +544,10 @@ _DEGREE_QUALIFIER_RE = re.compile(
     r"pgce\b|"                                    # Postgraduate Certificate of Education (UK)
     r"pgcert\b|"                                  # PgCert (abbreviated)
     r"pgdip\b|"                                   # PgDip (abbreviated)
+    # Standalone international foundation programmes use titles such as
+    # "Foundation in Business". Require a named subject after in/of so broad
+    # catalogue labels such as "Foundation Programmes" remain rejected.
+    r"foundation\s+(?:in|of)\s+\S|"
     r"foundation\s+degree|"                      # UK Foundation Degree (full phrase)
     r"fda\b|"                                     # Foundation Degree Arts (UK)
     r"fdsc\b|"                                    # Foundation Degree Science (UK)

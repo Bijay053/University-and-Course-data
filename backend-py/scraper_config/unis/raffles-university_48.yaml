@@ -27,6 +27,12 @@ extraction:
   skip_per_course_browser: true
   max_parallel_fetch: 8
 
+  course_name:
+    # Foundation pages split the qualification across the hero: the visible
+    # H1 contains only "Liberal Arts" or "Business", while the document title
+    # contains the complete official programme name.
+    prefer_title_over_h1: true
+
   # Raffles teaches its campus catalogue at Medini. This fallback applies only
   # when the course page has no location and no authoritative Online evidence.
   default_course_location: "Raffles University Medini Campus, Iskandar Puteri, Johor"
@@ -42,3 +48,12 @@ extraction:
     # Malaysian tuition legitimately converts below AU-market degree ranges.
     # Keep those amounts in review as warnings instead of critical failures.
     fee_crit_min_aud: 2000
+
+  text_cleaning:
+    field_overrides:
+      # "Foundation Degree" is a UK bachelor's award, so the global classifier
+      # deliberately cannot treat every "foundation" mention as this level.
+      # Raffles' exact programme URL family is authoritative and site-scoped.
+      - url_regex: "^https?://raffles-university\\.edu\\.my/programme/foundation-in-[^/?#]+/?$"
+        field: "degree_level"
+        value: "Foundation"

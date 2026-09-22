@@ -45,6 +45,10 @@ def test_raffles_recipe_suppresses_test_format_noise_and_sets_campus() -> None:
     assert config.extraction.fees.default_currency == "MYR"
     assert config.extraction.fees.currency_override == "MYR"
     assert config.extraction.fees.fee_crit_min_aud == 2000
+    assert config.extraction.course_name.prefer_title_over_h1 is True
+    foundation_override = config.extraction.text_cleaning.field_overrides[0]
+    assert foundation_override.field == "degree_level"
+    assert foundation_override.value == "Foundation"
 
 
 def test_title_owned_online_mode_blocks_default_campus() -> None:
@@ -148,3 +152,58 @@ async def test_raffles_delivery_and_campus_are_course_appropriate(
     assert result.get("error") is None
     assert result["payload"].get("study_mode") == expected_mode
     assert result["payload"].get("course_location") == expected_location
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("subject", "slug"),
+    [
+        ("Liberal Arts", "foundation-in-liberal-arts"),
+        ("Business", "foundation-in-business"),
+    ],
+)
+async def test_raffles_foundation_hero_keeps_full_name_and_level(
+    subject: str,
+    slug: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.services.scraper.extractors import gemini_primary
+
+    async def _skip_primary(*args, **kwargs):
+        return {}, 0.0, 0, 0, {"skipped": True, "skip_reason": "offline_test"}
+
+    monkeypatch.setattr(gemini_primary, "extract_primary", _skip_primary)
+    set_uni_config(_config())
+    full_name = f"Foundation in {subject}"
+    html = f"""
+    <html>
+      <head><title>{full_name} - Raffles University</title></head>
+      <body>
+        <main>
+          <p>Foundation in</p>
+          <h1>{subject}</h1>
+          <p>Duration: 1 year</p>
+          <p>Intakes: January, May, September</p>
+          <p>International fee: RM 39,300 per year</p>
+          <section>
+            <h2>International Student English Entry Requirement</h2>
+            <p>IELTS: 5.0</p>
+          </section>
+        </main>
+      </body>
+    </html>
+    """
+    url = f"https://raffles-university.edu.my/programme/{slug}/"
+
+    result = await extract_course(
+        url,
+        country="Malaysia",
+        html=html,
+        use_ai_fallback=False,
+    )
+
+    assert result.get("error") is None
+    payload = result["payload"]
+    assert payload["course_name"] == full_name
+    assert payload["degree_level"] == "Foundation"
+    assert should_stage_course(full_name, payload, source_url=url)[0] is True

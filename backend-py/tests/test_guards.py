@@ -845,3 +845,35 @@ def test_report_evidence_recovers_foundation_but_not_category_page():
             category_url,
         )
         assert rejected is False
+
+
+def test_named_foundation_programmes_are_qualifying_but_catalogue_labels_are_not():
+    from app.services.scraper.guards import should_stage_course
+
+    payload = {
+        "degree_level": "Foundation",
+        "international_fee": 39_300,
+        "study_mode": "On Campus",
+    }
+    for name, slug in (
+        ("Foundation in Liberal Arts", "foundation-in-liberal-arts"),
+        ("Foundation in Business", "foundation-in-business"),
+    ):
+        accepted, reason = should_stage_course(
+            name,
+            {**payload, "course_name": name},
+            f"https://raffles-university.edu.my/programme/{slug}/",
+        )
+        assert accepted is True
+        assert reason == "accepted"
+
+    rejected, reason = should_stage_course(
+        "Foundation Programmes",
+        {**payload, "course_name": "Foundation Programmes"},
+        "https://raffles-university.edu.my/programme/",
+    )
+    assert rejected is False
+    assert reason in {
+        "generic_category_page",
+        "category_landing_page_missing_degree_qualifier",
+    }
