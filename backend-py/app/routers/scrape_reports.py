@@ -8,7 +8,7 @@ import re
 import ipaddress
 from datetime import datetime, timezone
 from typing import Annotated, Literal
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, StrictBool, model_validator
@@ -80,6 +80,7 @@ async def validate_official_urls(report: CourseReport, university) -> dict:
     # collect a bounded, page-owned proof package for the child job.  This is
     # deliberately not a config edit or a user assertion.
     verified_programmes: dict[str, dict] = {}
+    related_programme_urls: list[str] = []
     def _programme_path_is_detail(url: str) -> bool:
         parts = [p for p in urlsplit(url).path.lower().split("/") if p]
         if not parts or parts[-1] in {"programme", "programmes", "course", "courses", "pathway", "pathways"}:
@@ -87,6 +88,13 @@ async def validate_official_urls(report: CourseReport, university) -> dict:
         if parts[-1] in {"foundation", "foundations", "pathway", "pathways"}:
             return False
         return any(p in {"programme", "programmes", "course", "courses", "pathway", "pathways"} for p in parts[:-1])
+
+    def _programme_scope(url: str) -> tuple[str, ...]:
+        parts = [p for p in urlsplit(url).path.lower().split("/") if p]
+        for index, part in enumerate(parts):
+            if part in {"programme", "programmes", "course", "courses"}:
+                return tuple(parts[:index])
+        return ()
 
     def _category_title(value: str) -> bool:
         return bool(re.search(
@@ -96,17 +104,21 @@ async def validate_official_urls(report: CourseReport, university) -> dict:
             value, re.I,
         ))
     async with httpx.AsyncClient(timeout=10, follow_redirects=False, trust_env=False) as client:
-        async def check_redirect(url):
+        async def check_redirect(url, *, required: bool = True, collect_related: bool = False):
             async with semaphore:
                 try:
                     async with client.stream("GET", url) as response:
                         if response.is_redirect:
-                            raise HTTPException(422, "An official URL redirects. Submit its final canonical official URL instead.")
+                            if required:
+                                raise HTTPException(422, "An official URL redirects. Submit its final canonical official URL instead.")
+                            return
                         content_length = response.headers.get("content-length")
                         if content_length and (
                             not content_length.isdigit() or int(content_length) > 500_000
                         ):
-                            raise HTTPException(422, "Official programme page is too large to verify (maximum 500KB).")
+                            if required:
+                                raise HTTPException(422, "Official programme page is too large to verify (maximum 500KB).")
+                            return
                         if response.status_code >= 400:
                             return
                         # Validate the peer that actually handled this request,
@@ -128,8 +140,12 @@ async def validate_official_urls(report: CourseReport, university) -> dict:
                         except ValueError:
                             peer_public = False
                         if not peer_public:
-                            raise HTTPException(422, "Official URL connected to a non-public network peer.")
-                        if report.eligibility_review and url in report.course_urls:
+                            if required:
+                                raise HTTPException(422, "Official URL connected to a non-public network peer.")
+                            return
+                        if report.eligibility_review and (
+                            url in report.course_urls or url in related_programme_urls
+                        ):
                             if not _programme_path_is_detail(url):
                                 return
                             chunks: list[bytes] = []
@@ -143,6 +159,30 @@ async def validate_official_urls(report: CourseReport, university) -> dict:
                             body = b"".join(chunks).decode("utf-8", "ignore")
                             from bs4 import BeautifulSoup
                             soup = BeautifulSoup(body, "html.parser")
+                            if collect_related:
+                                source_host = (urlsplit(url).hostname or "").lower()
+                                for anchor in soup.find_all("a", href=True):
+                                    candidate = urljoin(url, str(anchor.get("href") or ""))
+                                    parsed = urlsplit(candidate)
+                                    candidate = parsed._replace(fragment="").geturl()
+                                    label = anchor.get_text(" ", strip=True)
+                                    if (
+                                        len(related_programme_urls) >= 20
+                                        or candidate == url
+                                        or candidate in report.course_urls
+                                        or candidate in related_programme_urls
+                                        or (parsed.hostname or "").lower() != source_host
+                                        or not _programme_path_is_detail(candidate)
+                                        or _programme_scope(candidate) != _programme_scope(url)
+                                        or not re.search(
+                                            r"\b(?:foundation|pathway)\b",
+                                            f"{parsed.path} {label}",
+                                            re.I,
+                                        )
+                                        or not any(official_url(candidate, seed) for seed in seeds)
+                                    ):
+                                        continue
+                                    related_programme_urls.append(candidate)
                             text = soup.get_text(" ", strip=True)
                             title_match = re.search(r"<title[^>]*>(.*?)</title>", body, re.I | re.S)
                             title = re.sub(r"\s+", " ", BeautifulSoup(
@@ -226,28 +266,53 @@ async def validate_official_urls(report: CourseReport, university) -> dict:
                                     "evidence": "official page title + programme and admissions/international copy",
                                 }
                 except httpx.HTTPError:
-                    raise HTTPException(422, "Could not verify the official URL. Try again when the source is reachable.")
+                    if required:
+                        raise HTTPException(422, "Could not verify the official URL. Try again when the source is reachable.")
+                    return
         try:
             await asyncio.wait_for(
-                asyncio.gather(*(check_redirect(url) for url in dict.fromkeys(
+                asyncio.gather(*(check_redirect(
+                    url,
+                    collect_related=bool(report.eligibility_review and url in report.course_urls),
+                ) for url in dict.fromkeys(
                     report.course_urls[:50] + [u for u in (report.catalogue_url, report.source_url) if u]
                 ))), timeout=25,
             )
+            if related_programme_urls:
+                try:
+                    await asyncio.wait_for(
+                        asyncio.gather(*(check_redirect(url, required=False) for url in related_programme_urls)),
+                        timeout=25,
+                    )
+                except TimeoutError:
+                    # A slow optional sibling must not prevent recovery of the
+                    # exact page the operator submitted.
+                    pass
         except TimeoutError:
             raise HTTPException(422, "Official source validation timed out. Submit fewer links or try again when the source is reachable.")
-    return {"verified_programmes": verified_programmes}
+    return {
+        "verified_programmes": verified_programmes,
+        "related_programme_urls": related_programme_urls,
+    }
 
 
 def report_payload(parent, report: CourseReport, report_id: str, actor_id, validation: dict | None = None) -> dict:
     """Internal-only policy: clients cannot loosen review, budget or filter rules."""
+    related_urls = (
+        validation.get("related_programme_urls", [])
+        if isinstance(validation, dict) else []
+    )
+    expanded_urls = list(dict.fromkeys(report.course_urls + [
+        url for url in related_urls if isinstance(url, str)
+    ]))
     return {
         "url": report.catalogue_url or parent.url,
         "universityId": parent.university_id,
         "university_id": parent.university_id,
         "fastMode": False, "fast_mode": False, "forceDiscovery": True,
-        "courseUrls": report.course_urls[:50],
-        "course_urls": report.course_urls[:50],
-        "courseReportRemainingUrls": report.course_urls,
+        "courseUrls": expanded_urls[:50],
+        "course_urls": expanded_urls[:50],
+        "courseReportRemainingUrls": expanded_urls,
         "retrySourceJobId": parent.runtime_job_id,
         "feePage": report.source_url if "fee" in report.fields else None,
         "requirementsPage": report.source_url if "english" in report.fields else None,

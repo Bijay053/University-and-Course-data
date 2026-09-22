@@ -108,7 +108,7 @@ async def test_accepts_public_connected_server_addr_when_peername_is_unavailable
         CourseReport(kind="missing", course_urls=["https://uni.edu/course"]),
         SimpleNamespace(website="https://uni.edu", scrape_url=None),
     )
-    assert result == {"verified_programmes": {}}
+    assert result == {"verified_programmes": {}, "related_programme_urls": []}
 
 
 @pytest.mark.asyncio
@@ -143,7 +143,7 @@ async def test_verifies_elementor_foundation_page_with_sibling_admissions_copy(m
         "peername": None,
         "server_addr": ("52.76.147.18", 443),
     }.get(key))
-    html = """
+    liberal_arts_html = """
       <html><head><title>Foundation in Liberal Arts - Raffles University</title></head>
       <body>
         <main>
@@ -153,12 +153,30 @@ async def test_verifies_elementor_foundation_page_with_sibling_admissions_copy(m
             <div>Applicants require five credits or an equivalent qualification.</div>
             <div>International Student English Requirement</div>
           </section>
+          <a href="/programme/foundation-in-business/">Foundation in Business</a>
+          <a href="/programme/pathway-in-design/">Pathway in Design</a>
+          <a href="/programme/">Foundation Programmes</a>
+          <a href="/cn/programme/foundation-in-liberal-arts/">CN</a>
+          <a href="https://evil.test/programme/foundation-in-design/">Foundation in Design</a>
         </main>
       </body></html>
     """
+    business_html = """
+      <html><head><title>Foundation in Business - University</title></head>
+      <body><main>
+        <h1>Foundation in Business</h1>
+        <section><h2>Entry Requirements</h2>
+          <p>Applicants require an equivalent qualification.</p>
+          <p>International Student admissions</p>
+        </section>
+      </main></body></html>
+    """
 
     def handler(request):
-        return httpx.Response(200, text=html, extensions={"network_stream": stream})
+        if request.url.path.endswith("/pathway-in-design/"):
+            raise httpx.ConnectError("optional sibling unavailable", request=request)
+        body = business_html if request.url.path.endswith("/foundation-in-business/") else liberal_arts_html
+        return httpx.Response(200, text=body, extensions={"network_stream": stream})
 
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: real_client(
         transport=httpx.MockTransport(handler), **kwargs))
@@ -168,6 +186,21 @@ async def test_verifies_elementor_foundation_page_with_sibling_admissions_copy(m
         SimpleNamespace(website="https://uni.edu", scrape_url=None),
     )
     assert result["verified_programmes"][url]["kind"] == "foundation"
+    sibling = "https://uni.edu/programme/foundation-in-business/"
+    unavailable_sibling = "https://uni.edu/programme/pathway-in-design/"
+    assert result["related_programme_urls"] == [sibling, unavailable_sibling]
+    assert result["verified_programmes"][sibling]["kind"] == "foundation"
+    assert unavailable_sibling not in result["verified_programmes"]
+
+    payload = report_payload(
+        SimpleNamespace(url="https://uni.edu", university_id=7, runtime_job_id="parent"),
+        CourseReport(kind="missing", course_urls=[url], eligibility_review=True),
+        "report_1",
+        12,
+        result,
+    )
+    assert payload["courseUrls"] == [url, sibling, unavailable_sibling]
+    assert payload["courseReportRemainingUrls"] == [url, sibling, unavailable_sibling]
 
 
 def test_result_does_not_equate_staging_with_catalogue_coverage():
