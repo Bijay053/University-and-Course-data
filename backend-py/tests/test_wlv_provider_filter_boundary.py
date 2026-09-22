@@ -25,7 +25,14 @@ def test_production_wlv_id_uses_static_proxy_for_course_pages():
         university_id=74,
         create_missing_stub=False,
     )
+    assert cfg.discovery.searchstax is not None
+    assert cfg.discovery.searchstax.links_only is True
+    assert cfg.discovery.searchstax.field_map["name"] == "title_t"
     assert cfg.extraction.scrape_do_static is True
+    assert cfg.extraction.skip_per_course_browser is True
+    assert cfg.extraction.study_mode.suppress_nav_rule is True
+    assert cfg.extraction.fees.degree_level_defaults["undergraduate"] == 17600
+    assert cfg.extraction.english.degree_level_defaults["undergraduate"].ielts == 6.0
     assert cfg.extraction.staging.skip_duplicate_fee_check is True
 
 

@@ -8,14 +8,96 @@
 # Review and expand it to improve discovery and extraction quality.
 # See scraper_config/defaults.yaml for all available options.
 
-discovery: {}
+discovery:
+  # WLV's listing navigation exposes only a small, noisy subset of the
+  # catalogue. SearchStax owns the current course URL and title set.
+  searchstax:
+    endpoint: "https://searchcloud-1-eu-west-2.searchstax.com/29847/wolverhamptondevelopment-3254/emselect"
+    token_env: WLV_SEARCHSTAX_TOKEN
+    filter_query: "sectionType_s:courses"
+    field_map_as_payload: false
+    links_only: true
+    exclude_title_prefixes:
+      - "Postgraduate Credit"
+      - "Undergraduate Credit"
+      - "Professional Credit"
+      - "CPD "
+      - "Continuing Professional Development"
+      - "Short Course"
+      - "Workshop"
+      - "Training Course"
+      - "UGSKECREDIT"
+      - "PGSKECREDIT"
+    exclude_title_substrings:
+      - "(v300)"
+      - "non-medical prescribing"
+      - "approved mental health professional"
+      - "subject knowledge enhancement"
+    exclude_part_time: true
+    max_fulltime_duration_years: 4
+    url_base: "https://www.wlv.ac.uk/courses"
+    location_strip_prefixes:
+      - "University: "
+    field_map:
+      url: url_t
+      name: title_t
+      degree_type: award_s
+      degree_level: level_s
+      study_mode: multi_mode_ss
+      mode_fallback: mode_s
+      duration: multi_duration_ss
+      duration_fallback:
+        - duration_s
+        - duration_t
+      intake_dates: multi_course_start_date_ss
+      intake_fallback:
+        - course_start_date_s
+        - start_dates_s
+      category: subject_area_ss
+      location: multi_location_ss
+      location_fallback: location_s
+      description: description_t
+  seed_urls:
+    - https://www.wlv.ac.uk/courses/undergraduate/
+    - https://www.wlv.ac.uk/courses/postgraduate/
+  browser_time_budget_s: 180
+  browser_early_stop_courses: 300
 
 extraction:
   # Direct datacentre requests receive WLV's JavaScript-disabled verification
   # shell. The static residential proxy returns the complete SSR course page.
   scrape_do_static: true
+  skip_per_course_browser: true
+  skip_browser_rescue: true
+  filters:
+    reject_parttime_only: true
+  text_cleaning:
+    duration:
+      prefer_fulltime: true
+  study_mode:
+    # Site navigation repeatedly contains "Online"; only course-owned delivery
+    # evidence may classify a WLV programme as online.
+    suppress_nav_rule: true
   fees:
     default_currency: GBP
+    prefer_international: true
+    force_central_fee_stage: true
+    # WLV publishes this annual international rate for most taught courses.
+    degree_level_defaults:
+      undergraduate: 17600
+      postgraduate: 17600
+  english:
+    # WLV publishes these central minimums rather than repeating them on each
+    # course page.
+    degree_level_defaults:
+      undergraduate:
+        ielts: 6.0
+      postgraduate:
+        ielts: 6.5
+      doctorate:
+        ielts: 7.0
+    default_ielts: 6.0
+    skip_vision_when_core_found: true
   staging:
     # WLV legitimately publishes a near-flat annual international fee across
     # most undergraduate courses; do not treat that as selector contamination.
