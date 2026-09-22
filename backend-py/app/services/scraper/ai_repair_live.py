@@ -44,6 +44,21 @@ def _is_javascript_disabled_shell(html: str) -> bool:
     )
 
 
+async def _render_direct_shell(url: str, timeout: float) -> str | None:
+    """Use the existing browser pool for a direct-request JavaScript shell."""
+    if timeout <= 0:
+        return None
+    from app.services.scraper.recovery.extractor import _browser_fetch_html
+
+    try:
+        return await asyncio.wait_for(
+            _browser_fetch_html(url, timeout_ms=max(1, int(timeout * 1_000))),
+            timeout=timeout,
+        )
+    except (asyncio.TimeoutError, asyncio.CancelledError):
+        return None
+
+
 def bounded_limit(limits: dict, key: str, maximum: int) -> int:
     try:
         return max(1, min(maximum, int(limits.get(key, maximum))))
@@ -126,6 +141,7 @@ async def _fetch_official(url: str, config, timeout: float) -> tuple[str, str, s
     # Unlike fetch_html(), this cannot fall through to Wayback, a paid provider,
     # or several retries. Every request consumes exactly one page-budget slot.
     insecure = set(getattr(config.discovery, "insecure_tls_direct_hostnames", []) or [])
+    fetch_started = time.monotonic()
     async with httpx.AsyncClient(
         timeout=timeout, follow_redirects=False,
         verify=(urlsplit(url).hostname not in insecure),
@@ -150,11 +166,18 @@ async def _fetch_official(url: str, config, timeout: float) -> tuple[str, str, s
                 size += min(len(chunk), remaining)
                 if len(chunk) > remaining:
                     break
-            return b"".join(chunks).decode(response.encoding or "utf-8", errors="replace"), "", ""
+            html = b"".join(chunks).decode(response.encoding or "utf-8", errors="replace")
+            if _is_javascript_disabled_shell(html):
+                remaining = timeout - (time.monotonic() - fetch_started)
+                rendered = await _render_direct_shell(url, remaining)
+                if rendered and not _is_javascript_disabled_shell(rendered):
+                    return _bounded_html(rendered), "", ""
+                return "", "challenge", "JavaScript-disabled shell; browser rendering unavailable"
+            return html, "", ""
 
 
 _LABEL = re.compile(
-    r"\b(qualification|award|degree|duration|study mode|mode of study|campus|location|"
+    r"\b(qualification|award|degree|duration|course length|study mode|mode of study|campus|location|"
     r"intake|start date|international (?:tuition|fee)|tuition fee|ielts|entry requirements?)\b", re.I
 )
 _AWARD = re.compile(r"\b(bachelor|master|doctor|phd|bsc|ba|msc|ma|mba|llb|llm|diploma|certificate)\b", re.I)
@@ -438,7 +461,7 @@ def inspect_page(url: str, html: str, config=None) -> dict:
         text = field["text"]
         if re.search(r"\b(?:qualification|award|degree)\b.{0,60}\b(?:bachelor|master|doctor|phd|bsc|ba|msc|ma|mba|llb|llm|diploma|certificate)\b", text, re.I):
             facts.add("award")
-        if re.search(r"\bduration\b.{0,40}\d.{0,15}\b(?:years?|months?|weeks?)\b", text, re.I):
+        if re.search(r"\b(?:duration|course length)\b.{0,40}\d.{0,15}\b(?:years?|months?|weeks?)\b", text, re.I):
             facts.add("duration")
         if re.search(r"\b(?:study mode|mode of study)\b.{0,40}\b(?:full.time|part.time|campus|blended|online)\b", text, re.I):
             facts.add("mode")

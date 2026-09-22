@@ -94,6 +94,18 @@ def test_degree_title_with_owned_facts_survives_sibling_course_links():
     assert len(result["fields"]) == 2
 
 
+def test_wlv_course_length_is_owned_duration_evidence():
+    html = """<html><main>
+    <h1>BA (Hons) Creative and Professional Writing</h1>
+    <div class="info-data">Award BA (Hons)</div>
+    <div class="info-data">Course length Part-time (6 years), Full-time (3 years)</div>
+    </main></html>"""
+
+    result = live.inspect_page(ONE, html, config())
+
+    assert result["classification"] == "course"
+
+
 @pytest.mark.parametrize("extra", [
     "<p>Domestic students only</p>",
     "<p>Study mode: Online only</p>",
@@ -181,6 +193,20 @@ async def test_rendered_javascript_shell_fails_closed(monkeypatch):
     assert failure == "challenge"
     assert "JavaScript-disabled shell" in reason
     assert provider.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_direct_javascript_shell_uses_bounded_browser_pool(monkeypatch):
+    from app.services.scraper.recovery import extractor
+
+    rendered = AsyncMock(return_value=course())
+    monkeypatch.setattr(extractor, "_browser_fetch_html", rendered)
+
+    html = await live._render_direct_shell(ONE, 5)
+
+    assert html == course()
+    rendered.assert_awaited_once()
+    assert rendered.await_args.kwargs["timeout_ms"] == 5_000
 
 
 def test_incidental_javascript_disabled_message_does_not_replace_real_page():
