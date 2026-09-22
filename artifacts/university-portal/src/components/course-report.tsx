@@ -54,6 +54,8 @@ export function CourseReport({ jobId, onReview, onStarted }: {
   const [continuationReviewed, setContinuationReviewed] = useState<Record<string, boolean>>({});
   const [continuationBusy, setContinuationBusy] = useState<string | null>(null);
   const [continuationErrors, setContinuationErrors] = useState<Record<string, string>>({});
+  const [retryBusy, setRetryBusy] = useState<string | null>(null);
+  const [retryErrors, setRetryErrors] = useState<Record<string, string>>({});
   const form = useForm<Values>({ defaultValues: defaults });
   const kind = form.watch("kind");
   useEffect(() => {
@@ -78,7 +80,36 @@ export function CourseReport({ jobId, onReview, onStarted }: {
     setContinuationReviewed({});
     setContinuationBusy(null);
     setContinuationErrors({});
+    setRetryBusy(null);
+    setRetryErrors({});
   }, [jobId]);
+
+  const retryReport = async (report: Report) => {
+    if (retryBusy) return;
+    setRetryBusy(report.job_id);
+    setRetryErrors(previous => ({ ...previous, [report.job_id]: "" }));
+    try {
+      const response = await fetch(
+        `/api/scrape/jobs/${encodeURIComponent(jobId)}/course-reports/${encodeURIComponent(report.job_id)}/retry`,
+        { method: "POST", credentials: "include" },
+      );
+      const data = await readResponseJson<Report & { detail?: unknown }>(response);
+      if (!response.ok || !data) {
+        const detail = data && "detail" in data ? data.detail : undefined;
+        throw new Error(typeof detail === "string" ? detail : "Could not retry recovery");
+      }
+      setReports(previous => [data, ...previous]);
+      setRefresh(value => value + 1);
+      onStarted?.();
+    } catch (e) {
+      setRetryErrors(previous => ({
+        ...previous,
+        [report.job_id]: e instanceof Error ? e.message : "Could not retry recovery",
+      }));
+    } finally {
+      setRetryBusy(null);
+    }
+  };
 
   const continueReport = async (report: Report) => {
     if (!continuationReviewed[report.job_id] || continuationBusy) return;
@@ -310,10 +341,25 @@ export function CourseReport({ jobId, onReview, onStarted }: {
           Review {report.staged} staged {report.staged === 1 ? "course" : "courses"}
         </Button>
       ) : ["completed", "completed_with_errors", "stopped", "failed", "failed_degraded"].includes(report.status) ? (
-        <p className="rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900" role="status">
-          No recovered courses are available to review. This run skipped every reported page; use the exclusion reason above,
-          then report a direct eligible course page or an official catalogue source.
-        </p>
+        <div className="space-y-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900" role="status">
+          <p>
+            No recovered courses are available to review. Retry revalidates the original official sources and runs them
+            again with the current recovery rules.
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            type="button"
+            disabled={Boolean(retryBusy)}
+            onClick={() => void retryReport(report)}
+            data-testid={`button-retry-report-${report.job_id}`}
+          >
+            {retryBusy === report.job_id ? "Retrying recovery…" : "Retry recovery"}
+          </Button>
+          {retryErrors[report.job_id] && <p
+            className="text-destructive" role="alert" data-testid={`retry-error-${report.job_id}`}
+          >{retryErrors[report.job_id]}</p>}
+        </div>
       ) : (
         <p className="text-xs text-muted-foreground">Review will become available if this recovery stages an eligible course.</p>
       )}

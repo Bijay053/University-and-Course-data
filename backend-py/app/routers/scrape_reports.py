@@ -461,6 +461,34 @@ class ReviewedContinuation(BaseModel):
         return self
 
 
+@router.post("/jobs/{job_id}/course-reports/{report_job_id}/retry", status_code=202)
+async def retry_course_report(
+    job_id: str,
+    report_job_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    actor: Annotated[dict, Depends(require_permission("scraping.trigger"))],
+):
+    """Revalidate and rerun an unsuccessful report without developer help."""
+    previous = await db.get(ScrapeRuntimeJob, report_job_id)
+    request = (previous.request_payload or {}).get("courseReport", {}) if previous else {}
+    if (
+        not previous
+        or not request.get("id")
+        or request.get("source_job_id") != job_id
+    ):
+        raise HTTPException(404, "Course report not found")
+    if previous.status not in TERMINAL:
+        raise HTTPException(409, "Wait until the current recovery finishes")
+    if (previous.imported or 0) > 0:
+        raise HTTPException(409, "This recovery already has staged courses to review")
+
+    # Build a fresh report and workflow identity. The normal submission path
+    # revalidates every official URL, checks active-job/lease fences and applies
+    # the current bounded recovery policy before dispatching.
+    report = CourseReport.model_validate(request)
+    return await submit_course_report(job_id, report, db, actor)
+
+
 @router.post("/jobs/{job_id}/course-reports/{report_job_id}/continue", status_code=202)
 async def continue_course_report(
     job_id: str, report_job_id: str, body: ReviewedContinuation,

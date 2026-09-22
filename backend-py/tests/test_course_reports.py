@@ -315,6 +315,39 @@ async def test_active_scrape_rejects_before_creating_report(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_retry_revalidates_original_report_through_fresh_submission(monkeypatch):
+    from app.routers import scrape_reports as routes
+
+    previous = SimpleNamespace(
+        status="completed",
+        imported=0,
+        request_payload={"courseReport": {
+            "id": "report_old",
+            "source_job_id": "parent",
+            "kind": "missing",
+            "course_urls": [],
+            "catalogue_url": "https://uni.edu/programme/foundation-in-liberal-arts/",
+            "eligibility_review": True,
+        }},
+    )
+    db = SimpleNamespace(get=AsyncMock(return_value=previous))
+    submit = AsyncMock(return_value={"job_id": "fresh-child", "status": "queued"})
+    monkeypatch.setattr(routes, "submit_course_report", submit)
+
+    result = await routes.retry_course_report(
+        "parent", "old-child", db, {"id": 12}
+    )
+
+    assert result["job_id"] == "fresh-child"
+    retried = submit.await_args.args[1]
+    assert retried.catalogue_url == (
+        "https://uni.edu/programme/foundation-in-liberal-arts/"
+    )
+    assert retried.eligibility_review is True
+    submit.assert_awaited_once_with("parent", retried, db, {"id": 12})
+
+
+@pytest.mark.asyncio
 async def test_report_routes_require_existing_scrape_permissions():
     from fastapi import FastAPI
     from app.dependencies import get_current_user, get_db
