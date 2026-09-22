@@ -80,6 +80,10 @@ async def validate_official_urls(report: CourseReport, university) -> dict:
     # collect a bounded, page-owned proof package for the child job.  This is
     # deliberately not a config edit or a user assertion.
     verified_programmes: dict[str, dict] = {}
+    # Direct official course reports also carry a narrowly page-owned delivery
+    # decision. This lets a user recover a campus/blended course that broad
+    # page text falsely classified as online, without editing scraper config.
+    verified_delivery_modes: dict[str, dict] = {}
     related_programme_urls: list[str] = []
     def _programme_path_is_detail(url: str) -> bool:
         parts = [p for p in urlsplit(url).path.lower().split("/") if p]
@@ -143,10 +147,15 @@ async def validate_official_urls(report: CourseReport, university) -> dict:
                             if required:
                                 raise HTTPException(422, "Official URL connected to a non-public network peer.")
                             return
-                        if report.eligibility_review and (
+                        if (
                             url in report.course_urls
-                            or url == report.catalogue_url
-                            or url in related_programme_urls
+                            or (
+                                report.eligibility_review
+                                and (
+                                    url == report.catalogue_url
+                                    or url in related_programme_urls
+                                )
+                            )
                         ):
                             if not _programme_path_is_detail(url):
                                 return
@@ -159,6 +168,30 @@ async def validate_official_urls(report: CourseReport, university) -> dict:
                                 chunks.append(chunk)
                                 size += len(chunk)
                             body = b"".join(chunks).decode("utf-8", "ignore")
+                            if url in report.course_urls:
+                                from app.services.scraper.extractors.study_mode import (
+                                    extract as extract_study_mode,
+                                )
+                                delivery = await extract_study_mode(body, url)
+                                if delivery:
+                                    decision = delivery[0]
+                                    if (
+                                        decision.value in {"On Campus", "Blended"}
+                                        and decision.method in {
+                                            "study_mode:span_id_delivery",
+                                            "study_mode:data_attribute",
+                                            "study_mode:strong_label",
+                                            "study_mode:label",
+                                            "study_mode:title_keyword",
+                                        }
+                                    ):
+                                        verified_delivery_modes[url] = {
+                                            "mode": decision.value,
+                                            "method": decision.method,
+                                            "evidence": str(decision.snippet or "")[:500],
+                                        }
+                            if not report.eligibility_review:
+                                return
                             from bs4 import BeautifulSoup
                             soup = BeautifulSoup(body, "html.parser")
                             if collect_related:
@@ -297,6 +330,7 @@ async def validate_official_urls(report: CourseReport, university) -> dict:
             raise HTTPException(422, "Official source validation timed out. Submit fewer links or try again when the source is reachable.")
     return {
         "verified_programmes": verified_programmes,
+        "verified_delivery_modes": verified_delivery_modes,
         "related_programme_urls": related_programme_urls,
     }
 
@@ -305,6 +339,10 @@ def report_payload(parent, report: CourseReport, report_id: str, actor_id, valid
     """Internal-only policy: clients cannot loosen review, budget or filter rules."""
     verified_programmes = (
         validation.get("verified_programmes", {})
+        if isinstance(validation, dict) else {}
+    )
+    verified_delivery_modes = (
+        validation.get("verified_delivery_modes", {})
         if isinstance(validation, dict) else {}
     )
     related_urls = (
@@ -351,6 +389,7 @@ def report_payload(parent, report: CourseReport, report_id: str, actor_id, valid
             # Round zero deliberately strips targeted links; round one preserves them.
             "round_index": 1 if expanded_urls else 0,
             "verified_programmes": verified_programmes,
+            "verified_delivery_modes": verified_delivery_modes,
         },
     }
 

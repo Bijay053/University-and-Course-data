@@ -109,7 +109,11 @@ async def test_accepts_public_connected_server_addr_when_peername_is_unavailable
         CourseReport(kind="missing", course_urls=["https://uni.edu/course"]),
         SimpleNamespace(website="https://uni.edu", scrape_url=None),
     )
-    assert result == {"verified_programmes": {}, "related_programme_urls": []}
+    assert result == {
+        "verified_programmes": {},
+        "verified_delivery_modes": {},
+        "related_programme_urls": [],
+    }
 
 
 @pytest.mark.asyncio
@@ -223,6 +227,63 @@ async def test_verifies_elementor_foundation_page_with_sibling_admissions_copy(m
     assert catalogue_payload["courseUrls"] == [url, sibling, unavailable_sibling]
     assert catalogue_payload["course_urls"] == [url, sibling, unavailable_sibling]
     assert catalogue_payload["autonomousVerification"]["round_index"] == 1
+
+
+@pytest.mark.asyncio
+async def test_direct_report_preserves_page_owned_non_online_delivery(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.scraper_config_ai._is_safe_public_url",
+        lambda url: (True, ""),
+    )
+    real_client = httpx.AsyncClient
+    stream = SimpleNamespace(get_extra_info=lambda key: {
+        "peername": None,
+        "server_addr": ("52.76.147.18", 443),
+    }.get(key))
+    html = """
+      <html><head><title>Master of Business Administration</title></head>
+      <body><main>
+        <h1>Master of Business Administration</h1>
+        <p>Programme Delivery Mode: Conventional or Open Distance Learning</p>
+        <footer>Apply online</footer>
+      </main></body></html>
+    """
+
+    def handler(request):
+        return httpx.Response(
+            200,
+            text=html,
+            extensions={"network_stream": stream},
+        )
+
+    monkeypatch.setattr(
+        httpx,
+        "AsyncClient",
+        lambda **kwargs: real_client(transport=httpx.MockTransport(handler), **kwargs),
+    )
+    url = "https://uni.edu/programme/master-of-business-administration/"
+    report = CourseReport(kind="missing", course_urls=[url])
+    result = await validate_official_urls(
+        report,
+        SimpleNamespace(website="https://uni.edu", scrape_url=None),
+    )
+
+    proof = result["verified_delivery_modes"][url]
+    assert proof["mode"] == "Blended"
+    assert proof["method"] == "study_mode:label"
+    assert "Programme Delivery Mode: Conventional or Open Distance Learning" in proof[
+        "evidence"
+    ]
+    payload = report_payload(
+        SimpleNamespace(url="https://uni.edu", university_id=7, runtime_job_id="parent"),
+        report,
+        "report_delivery",
+        12,
+        result,
+    )
+    assert payload["autonomousVerification"]["verified_delivery_modes"][url][
+        "mode"
+    ] == "Blended"
 
 
 def test_verified_foundation_catalogue_url_becomes_targeted_course_url():
