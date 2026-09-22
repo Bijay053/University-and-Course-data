@@ -4,6 +4,17 @@ description: Wolverhampton uses SearchStax Solr for course-owned links; provider
 ---
 
 ## Rule
+Do not enable WLV's SearchStax route in production based only on recipe tests:
+verify that the running environment resolves its configured authentication and
+that a live query returns course records.
+
+**Why:** Enabling the canonical recipe without its production token produced
+HTTP 401 and zero provider candidates despite passing configuration tests.
+
+**How to apply:** Check credential existence without exposing values, then test
+the authenticated provider request before claiming catalogue recovery. A healthy
+release and a correct field map do not establish provider availability.
+
 WLV uses SearchStax as the authority for which URLs are courses. Provider-owned
 links must bypass every post-discovery URL filter, including the final course
 detail allowlist. WLV may use links-only mode when a reliable static proxy is
