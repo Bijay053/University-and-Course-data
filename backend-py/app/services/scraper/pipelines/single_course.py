@@ -10709,6 +10709,25 @@ async def extract_course(
     # missing/suspicious-field warnings.
     _apply_configured_field_overrides(payload, url)
 
+    # London Met's course-owned entry-point selector is final authority for
+    # international cohort facts. Keep this outside the optional AI-fallback
+    # block: deterministic extraction and targeted re-extraction can disable AI,
+    # and no later generic/default stage may restore a UK or page-wide month.
+    from app.services.scraper.extractors import londonmet_chrome_scrub as _lm_final
+    if _lm_final.is_londonmet_host(url):
+        try:
+            _lm_final_applied = _lm_final.apply_overrides(
+                payload, html, url=url, evidence=evidence
+            )
+            if _lm_final_applied.get("is_domestic_only"):
+                payload["domestic_only"] = True
+        except Exception as _lm_final_exc:  # noqa: BLE001
+            log.warning(
+                "final londonmet_chrome_scrub failed on %s: %s",
+                url,
+                _lm_final_exc,
+            )
+
     # ``intake_months`` is a calendar-month field at every persistence
     # boundary.  Normalize it before the quality audit and before the payload
     # is returned to staging so period labels (Rolling / ROI / Research Term)

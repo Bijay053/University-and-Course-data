@@ -57,6 +57,69 @@ async def _cleanup(prefix: str) -> None:
 
 
 @pytest.mark.asyncio
+async def test_stage_course_converts_londonmet_numeric_intake_to_january():
+    uni_id = await _pick_university()
+    job_id = f"test_londonmet_january_{uuid.uuid4().hex[:10]}"
+    url = (
+        "https://www.londonmet.ac.uk/courses/postgraduate/"
+        "applied-cyber-security-and-cloud-technology---msc/"
+    )
+    try:
+        async with AsyncSessionLocal() as db:
+            result = await stage_course(
+                db,
+                scrape_job_id=job_id,
+                university_id=uni_id,
+                course_name="Applied Cyber Security and Cloud Technology MSc",
+                payload={
+                    "course_name": (
+                        "Applied Cyber Security and Cloud Technology MSc"
+                    ),
+                    "degree_level": "Master",
+                    "study_load": "Full Time",
+                    "international_fee": 20000,
+                    "currency": "GBP",
+                    "fee_term": "Annual",
+                    "duration": 1,
+                    "duration_term": "Year",
+                    "intake_months": [1],
+                    "course_location": "Holloway",
+                },
+                evidence=[{
+                    "field_key": "intake_months",
+                    "value": [1],
+                    "method": "londonmet_chrome_scrub:data_cost_attr",
+                    "source_url": url,
+                    "snippet": (
+                        "London Met Overseas full-time entry-point option, "
+                        "cohort year 2027: January 2027"
+                    ),
+                }],
+                source_url=url,
+            )
+            assert result.saved, result.reason
+            await db.commit()
+
+            stored = await db.get(ScrapedCourse, result.scraped_course_id)
+            assert stored is not None
+            assert stored.intake_months == ["January"]
+            intake_evidence = (
+                await db.execute(
+                    select(ScrapedFieldEvidence).where(
+                        ScrapedFieldEvidence.scraped_course_id == stored.id,
+                        ScrapedFieldEvidence.field_key == "intake_months",
+                    )
+                )
+            ).scalars().all()
+            assert len(intake_evidence) == 1
+            assert intake_evidence[0].extraction_method == (
+                "londonmet_chrome_scrub:data_cost_attr"
+            )
+    finally:
+        await _cleanup(job_id)
+
+
+@pytest.mark.asyncio
 async def test_otago_metadata_fee_is_saved_for_review_with_selected_evidence():
     from app.services.scraper.config.context import current_uni_config
     from app.services.scraper.config.loader import load_uni_config

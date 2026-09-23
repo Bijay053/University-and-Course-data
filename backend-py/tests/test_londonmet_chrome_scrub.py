@@ -1,7 +1,10 @@
+from pathlib import Path
+
 import pytest
 
 from app.services.scraper import central_pages
 from app.services.scraper.extractors.londonmet_chrome_scrub import (
+    apply_overrides,
     extract_real_fees,
     has_international_options,
     is_londonmet_host,
@@ -12,6 +15,7 @@ from app.services.scraper.central_pages import (
     _parse_londonmet_undergraduate_english_programs,
 )
 from app.services.scraper.config.loader import get_config_for_host
+from app.services.scraper.config.context import set_uni_config
 from app.services.scraper.pipelines.single_course import (
     _central_english_audience_mismatch,
     _normalise_central_english_fields,
@@ -49,6 +53,159 @@ def test_overseas_intakes_do_not_use_page_wide_dates():
     """
 
     assert extract_real_fees(parse_data_cost_entries(html)) == {"intake_months": [1]}
+
+
+def test_overseas_next_year_intake_overwrites_stale_generated_uk_month():
+    html = """
+    <select id="course-entry-point-selector">
+      <optgroup label="UK">
+        <option data-mode="Full-time" data-m="September" data-y="2026">
+          September 2026 - Full-time
+        </option>
+        <option data-mode="Part-time" data-m="September" data-y="2026">
+          September 2026 - Part-time
+        </option>
+      </optgroup>
+      <optgroup label="Overseas">
+        <option data-mode="Full-time" data-cost="£20,000 per year"
+                data-duration="1 year" data-location="Holloway"
+                data-m="January" data-y="2027">
+          January 2027 - Full-time
+        </option>
+        <option data-mode="Part-time" data-m="January" data-y="2027">
+          January 2027 - Part-time
+        </option>
+      </optgroup>
+    </select>
+    """
+    payload = {"intake_months": [9]}
+    evidence = [{
+        "field_key": "intake_months",
+        "method": "ai_rule:regex",
+        "value": [9],
+        "source_url": "https://www.londonmet.ac.uk/courses/example/",
+    }]
+
+    applied = apply_overrides(
+        payload,
+        html,
+        url="https://www.londonmet.ac.uk/courses/postgraduate/"
+            "applied-cyber-security-and-cloud-technology---msc/",
+        evidence=evidence,
+    )
+
+    assert payload["intake_months"] == [1]
+    assert applied["intake_months"] == {"old": [9], "new": [1]}
+    intake_evidence = [
+        item for item in evidence if item["field_key"] == "intake_months"
+    ]
+    assert intake_evidence == [{
+        "field_key": "intake_months",
+        "method": "londonmet_chrome_scrub:data_cost_attr",
+        "source_url": (
+            "https://www.londonmet.ac.uk/courses/postgraduate/"
+            "applied-cyber-security-and-cloud-technology---msc/"
+        ),
+        "value": [1],
+        "raw_value": [1],
+        "snippet": (
+            "London Met Overseas full-time entry-point option, cohort year 2027: "
+            "January 2027"
+        ),
+    }]
+
+
+def test_overseas_part_time_only_cohort_does_not_create_eligible_intake():
+    html = """
+    <select id="course-entry-point-selector">
+      <optgroup label="UK">
+        <option data-mode="Full-time" data-m="September" data-y="2026">
+          September 2026 - Full-time
+        </option>
+      </optgroup>
+      <optgroup label="Overseas">
+        <option data-mode="Part-time" data-m="January" data-y="2027">
+          January 2027 - Part-time
+        </option>
+      </optgroup>
+    </select>
+    """
+    payload = {}
+
+    applied = apply_overrides(payload, html)
+
+    assert "intake_months" not in payload
+    assert payload["study_load"] == "Part Time"
+    assert applied["is_part_time_only"] is True
+
+
+@pytest.mark.asyncio
+async def test_full_pipeline_cannot_restore_generated_uk_september_intake(
+    monkeypatch,
+):
+    url = (
+        "https://www.londonmet.ac.uk/courses/postgraduate/"
+        "applied-cyber-security-and-cloud-technology---msc/"
+    )
+    html = (
+        Path(__file__).parent
+        / "fixtures"
+        / "londonmet_applied_cyber_entry_points.html"
+    ).read_text()
+    set_uni_config(get_config_for_host(
+        hostname="www.londonmet.ac.uk",
+        name="London Metropolitan University",
+        scrape_url="https://www.londonmet.ac.uk",
+        university_id=1,
+    ))
+
+    from app.services.scraper.pipelines.single_course import extract_course
+
+    async def no_ai(*_args, **_kwargs):
+        return {}, 0.0, 0, 0, {
+            "skipped": True,
+            "skip_reason": "deterministic London Met regression",
+        }
+
+    monkeypatch.setattr(
+        "app.services.scraper.extractors.gemini_primary.extract_primary",
+        no_ai,
+    )
+
+    async def no_browser(*_args, **_kwargs):
+        return {}, [], None, False
+
+    monkeypatch.setattr(
+        "app.services.scraper.per_course_browser.maybe_browser_refetch",
+        no_browser,
+    )
+
+    extracted = await extract_course(
+        url,
+        country="United Kingdom",
+        html=html,
+        use_ai_fallback=False,
+        extraction_rules={
+            # Reproduce the stale generated rule from the reported run. Stage 0
+            # sees the UK September option first.
+            "intake_months": {
+                "regex": r"(September)\s+2026",
+                "transform": "month_list",
+            },
+        },
+    )
+
+    assert extracted["payload"]["intake_months"] == ["January"]
+    intake_evidence = [
+        item for item in extracted["evidence"]
+        if item.get("field_key") == "intake_months"
+    ]
+    assert intake_evidence
+    assert {
+        item.get("method") for item in intake_evidence
+    } == {"londonmet_chrome_scrub:data_cost_attr"}
+    assert all(item.get("value") == [1] for item in intake_evidence)
+    assert all("cohort year 2027" in item.get("snippet", "") for item in intake_evidence)
 
 
 def test_londonmet_english_uses_standard_ug_row_not_exception_section():

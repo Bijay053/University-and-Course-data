@@ -200,6 +200,35 @@ def parse_data_cost_entries(html: str) -> list[dict[str, Any]]:
     return entries
 
 
+def _select_international_fulltime_cohort(
+    entries: list[dict[str, Any]], *, current_year: int
+) -> list[dict[str, Any]]:
+    """Return one eligible Overseas/International full-time cohort.
+
+    Audience filtering must happen before year selection: London Met commonly
+    publishes a UK September 2026 option beside an Overseas January 2027
+    option.  Selecting 2026 page-wide drops the international intake.
+    """
+    international_ft = [
+        entry
+        for entry in entries
+        if entry.get("fee_type", "").lower() in {"international", "overseas"}
+        and "full-time" in entry.get("mode", "").lower()
+    ]
+    dated = [
+        entry
+        for entry in international_ft
+        if entry.get("year") is not None and entry["year"] >= current_year
+    ]
+    if dated:
+        target_year = min(entry["year"] for entry in dated)
+        return [entry for entry in dated if entry["year"] == target_year]
+
+    # A yearless option is usable only when there is no current/future dated
+    # full-time option. Past dated options are deliberately not resurrected.
+    return [entry for entry in international_ft if entry.get("year") is None]
+
+
 def extract_real_fees(
     entries: list[dict[str, Any]], *, current_year: int | None = None
 ) -> dict[str, Any]:
@@ -225,27 +254,11 @@ def extract_real_fees(
         e for e in entries
         if e.get("fee_type", "").lower() in {"international", "overseas"}
     ]
-    dated_eligible = [
-        e for e in audience_entries
-        if e.get("year") is not None and e["year"] >= current_year
-    ]
-    if dated_eligible:
-        # Select one authoritative cohort.  Do not combine January/September
-        # from 2027 with March from 2028.
-        target_year = min(e["year"] for e in dated_eligible)
-        selected = [e for e in dated_eligible if e["year"] == target_year]
-    else:
-        # Yearless options are safe only when no dated current/future cohort
-        # exists.  Past-only dated pages must not resurrect stale intakes.
-        yearless = [e for e in audience_entries if e.get("year") is None]
-        if not yearless:
-            return out
-        selected = yearless
-
-    selected_ft = [
-        e for e in selected
-        if "full-time" in e.get("mode", "").lower()
-    ]
+    selected_ft = _select_international_fulltime_cohort(
+        entries, current_year=current_year
+    )
+    if audience_entries and not selected_ft:
+        return out
     intl_ft = [e for e in selected_ft if e.get("cost") is not None]
     if audience_entries:
         # A fee must pair with the selected cohort.  If same-year entries
@@ -266,10 +279,11 @@ def extract_real_fees(
             }
             if len(durations) == 1:
                 out["duration"] = next(iter(durations))
-        # Intake months from the selected cohort only (full + part-time).
+        # Intake months are from the same selected full-time cohort as fee,
+        # location, and duration. Part-time-only starts are not eligible.
         months = sorted({
             _MONTH_TO_NUM[e["month"]]
-            for e in selected
+            for e in selected_ft
             if e["month"] in _MONTH_TO_NUM
         })
         if months:
@@ -461,18 +475,42 @@ def apply_overrides(
     # Real-fee recovery — pull tuition fees from the data-cost attributes
     # that London Met embeds on every course page.  This runs AFTER the
     # loan-banner null above so the real fee replaces the bogus one.
-    # Only fields that are currently empty on the payload are filled.
+    # Most fields are fill-only. Intake is the exception: the audience-scoped
+    # selector is course-owned authority and must replace an earlier generic or
+    # generated page-wide month.
     entries = parse_data_cost_entries(html)
     real = extract_real_fees(entries)
+    _selected_ft = _select_international_fulltime_cohort(
+        entries, current_year=date.today().year
+    )
+    _eligible_audience_entries = [
+        entry
+        for entry in entries
+        if entry.get("fee_type", "").lower() in {"international", "overseas"}
+        and (
+            entry.get("year") is None
+            or entry["year"] >= date.today().year
+        )
+    ]
+    if (
+        _eligible_audience_entries
+        and not _selected_ft
+        and all(
+            "part-time" in entry.get("mode", "").lower()
+            for entry in _eligible_audience_entries
+        )
+    ):
+        # The global staging guard rejects a final Part Time study_load. Do not
+        # manufacture an intake from an ineligible part-time-only cohort.
+        payload["study_load"] = "Part Time"
+        applied["is_part_time_only"] = True
     # Build a human-readable snippet for enforce_source_evidence.
     # The guard (guards.py::enforce_source_evidence) requires BOTH
     # source_url AND snippet to be non-empty for critical fields such as
     # international_fee.  Without a snippet the guard silently nulls the
     # recovered fee even though the scrub correctly filled it.
     _intl_entry = next(
-        (e for e in entries
-         if e.get("fee_type", "").lower() == "international"
-         and "full-time" in e.get("mode", "").lower()),
+        (entry for entry in _selected_ft if entry.get("cost") is not None),
         None,
     )
     _fee_snippet = (
@@ -483,6 +521,19 @@ def apply_overrides(
         if _intl_entry and real.get("international_fee")
         else "londonmet data-cost entry"
     )
+    _selected_years = sorted({
+        entry["year"] for entry in _selected_ft if entry.get("year") is not None
+    })
+    _intake_snippet = (
+        "London Met Overseas full-time entry-point option"
+        + (f", cohort year {_selected_years[0]}" if _selected_years else "")
+        + ": "
+        + ", ".join(
+            f"{entry.get('month', '').title()} {entry.get('year') or ''}".strip()
+            for entry in _selected_ft
+            if entry.get("month")
+        )
+    )
     for field in ("international_fee", "domestic_fee", "fee_term", "currency",
                   "intake_months", "course_location"):
         new_val = real.get(field)
@@ -491,19 +542,31 @@ def apply_overrides(
         cur_val = payload.get(field)
         # Treat empty list / empty string as missing so we still fill them.
         is_empty = cur_val is None or cur_val == "" or cur_val == []
-        if not is_empty:
+        authoritative_intake = field == "intake_months"
+        if not is_empty and not authoritative_intake:
             continue
         payload[field] = new_val
         applied[field] = {"old": cur_val, "new": new_val}
         if evidence is not None:
+            if authoritative_intake:
+                # Remove stale page-wide/generated candidates so downstream
+                # first-write-wins provenance cannot relabel the corrected
+                # value as ai_rule:regex.
+                evidence[:] = [
+                    item for item in evidence
+                    if item.get("field_key") != "intake_months"
+                ]
             evidence.append({
                 "field_key": field,
                 "method": "londonmet_chrome_scrub:data_cost_attr",
                 "source_url": url,
+                "value": new_val,
                 "raw_value": new_val,
                 # snippet is required by enforce_source_evidence — without it
                 # the guard will null international_fee even after we fill it.
-                "snippet": _fee_snippet,
+                "snippet": (
+                    _intake_snippet if authoritative_intake else _fee_snippet
+                ),
             })
     if any(k in applied for k in ("international_fee", "domestic_fee")) and (
         real.get("international_fee") or real.get("domestic_fee")
