@@ -188,6 +188,46 @@ async def test_retryable_result_not_acknowledged_before_retry_exhaustion():
 
 
 @pytest.mark.asyncio
+async def test_exclusion_provenance_commits_with_ack_and_survives_batch_checkpoint():
+    db, job, policy, durable = memory()
+    await orch.checkpoint_report_exclusions(
+        db, job, policy, [{"url": URL}, {"url": NEXT}], [{"url": NEXT}],
+    )
+    metadata = durable["discovered_config"]["autonomousVerification"]
+    assert metadata["completed_urls"] == [URL]
+    assert metadata["excluded_urls"] == [URL]
+    assert "targeted_retry_diagnostic" not in durable["discovered_config"]
+    assert orch._prior_targeted_retry_resolved_urls(durable["discovered_config"]) == []
+    await checkpoint_report_urls(db, job, policy, [URL])
+    assert durable["discovered_config"]["autonomousVerification"]["excluded_urls"] == [URL]
+
+
+@pytest.mark.asyncio
+async def test_repeated_filter_does_not_reclassify_legacy_settled_checkpoint():
+    db, job, policy, durable = memory()
+    await checkpoint_report_urls(db, job, policy, [URL])
+    await orch.checkpoint_report_exclusions(
+        db, job, policy, [{"url": URL}], [],
+    )
+    assert durable["discovered_config"]["autonomousVerification"]["excluded_urls"] == []
+
+
+@pytest.mark.asyncio
+async def test_failed_exclusion_commit_leaves_neither_ack_nor_provenance():
+    db, job, policy, durable = memory()
+    await db.commit()
+    db.commit.side_effect = RuntimeError("database unavailable")
+    with pytest.raises(RuntimeError, match="database unavailable"):
+        await orch.checkpoint_report_exclusions(
+            db, job, policy, [{"url": URL}], [],
+        )
+    metadata = job.discovered_config.get("autonomousVerification", {})
+    assert not metadata.get("completed_urls")
+    assert not metadata.get("excluded_urls")
+    assert remaining(durable) == [URL, NEXT]
+
+
+@pytest.mark.asyncio
 async def test_checkpoint_commit_failure_is_explicit_not_success():
     db, job, policy, durable = memory()
     await db.commit()

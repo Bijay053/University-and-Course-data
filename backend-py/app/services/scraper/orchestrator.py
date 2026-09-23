@@ -2025,17 +2025,18 @@ def _prior_targeted_retry_resolved_urls(
     """Return checkpoints that a later delivery may treat as resolved.
 
     Course-report completion checkpoints include eligibility exclusions.  A
-    completed delivery's durable all-filtered diagnostic is the authoritative
-    record of which of those URLs were excluded rather than resolved.  Keep
-    those identities out of the resolved set when the exact child is delivered
-    again.
+    checkpoint's atomic exclusion provenance survives death before the final
+    diagnostic. Also honor older completed deliveries' diagnostics.
     """
     config = discovered_config or {}
     metadata = config.get("autonomousVerification") or {}
     diagnostic = config.get("targeted_retry_diagnostic") or {}
     filtered_keys = {
         canonical_course_url_key(url)
-        for url in diagnostic.get("filtered_urls", [])
+        for url in [
+            *metadata.get("excluded_urls", []),
+            *diagnostic.get("filtered_urls", []),
+        ]
         if canonical_course_url_key(url)
     }
     return [
@@ -4985,7 +4986,9 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                     _b, _r = (False, "")
                 if _b:
                     block_counts[_r] = block_counts.get(_r, 0) + 1
-                    await checkpoint_report_urls(db, job, _verification, [_u])
+                    await checkpoint_report_urls(
+                        db, job, _verification, [_u], excluded=True,
+                    )
                     await emit(
                         "status",
                         f"[EXTRACT] gate dropped ({_r}): {_n or _u}",
@@ -5414,7 +5417,9 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                             "[DISCOVER] YAML course detail filter: dropped listing URL %s",
                             _lk_url,
                         )
-                        await checkpoint_report_urls(db, job, _verification, [_lk_url])
+                        await checkpoint_report_urls(
+                            db, job, _verification, [_lk_url], excluded=True,
+                        )
                         _cdp_dropped.append(_lk)
                 links = _cdp_kept
                 _cdp_n_dropped = _pre_cdp - len(links)

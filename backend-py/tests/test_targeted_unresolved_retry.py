@@ -170,12 +170,16 @@ def test_mixed_filtered_and_resume_resolved_targeted_retry_fails_with_exact_reje
     )
 
 
-def test_redelivery_does_not_reinterpret_filtered_completion_checkpoints_as_resolved() -> None:
+@pytest.mark.parametrize("final_diagnostic_saved", [False, True])
+def test_redelivery_does_not_reinterpret_filtered_completion_checkpoints_as_resolved(
+    final_diagnostic_saved,
+) -> None:
     filtered = "https://example.edu/course/filtered"
     resolved = "https://example.edu/course/already-resolved"
     discovered_config = {
         "autonomousVerification": {
             "completed_urls": [filtered, resolved],
+            "excluded_urls": [filtered],
             "completed_scope": (
                 "settled attempts and eligibility exclusions; not successful recovery"
             ),
@@ -185,6 +189,8 @@ def test_redelivery_does_not_reinterpret_filtered_completion_checkpoints_as_reso
             "filtered_urls": [filtered],
         },
     }
+    if not final_diagnostic_saved:
+        discovered_config.pop("targeted_retry_diagnostic")
 
     prior_resolved = _prior_targeted_retry_resolved_urls(discovered_config)
     diagnostic = _targeted_retry_all_filtered_diagnostic(

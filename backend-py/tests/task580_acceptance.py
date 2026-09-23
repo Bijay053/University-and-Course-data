@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import select
 import signal
 import socket
 import subprocess
@@ -123,9 +124,13 @@ def decoded(value):
     return json.loads(value) if isinstance(value, str) else (value or {})
 
 
-def run(output: Path, *, continuation: bool = False, resume: str | None = None) -> dict:
+def run(
+    output: Path, *, continuation: bool = False, resume: str | None = None,
+    interruption: bool = False,
+) -> dict:
     assert resume in (None, "mixed", "resolved")
     assert not resume or continuation
+    assert not interruption or (continuation and resume is None)
     selected = PRIOR + (SELECTED if resume == "mixed" else []) if resume else SELECTED
     blocked = resume != "resolved"
     output.mkdir(parents=True, exist_ok=True)
@@ -134,8 +139,11 @@ def run(output: Path, *, continuation: bool = False, resume: str | None = None) 
             raise RuntimeError(f"Required binary missing: {binary}")
 
     evidence = {
-        "task": 580,
-        "scenario": f"course_report_{resume or 'continuation'}" if continuation else "retry_unresolved",
+        "task": 587 if interruption else 580,
+        "scenario": (
+            "course_report_checkpoint_interruption" if interruption else
+            f"course_report_{resume or 'continuation'}" if continuation else "retry_unresolved"
+        ),
         "passed": False,
         "production_boundaries": (
             "Production FastAPI router, Celery prefork task, scraper orchestrator, "
@@ -148,6 +156,7 @@ def run(output: Path, *, continuation: bool = False, resume: str | None = None) 
     temp = Path(tempfile.mkdtemp(prefix="task580-private-"))
     recipe_root = temp / "recipes"
     postrun_root = temp / "task-postrun"
+    checkpoint_marker_path = temp / "checkpoint-interruption.json"
     recipes_before = recipe_snapshot()
     pgport, redisport, apiport = [port() for _ in range(3)]
     dburl = f"postgresql+asyncpg://task564@127.0.0.1:{pgport}/postgres"
@@ -176,6 +185,8 @@ def run(output: Path, *, continuation: bool = False, resume: str | None = None) 
         "AI_INTEGRATIONS_OPENAI_API_KEY": "",
         "NODE_ENV": "test",
     })
+    if interruption:
+        env["TASK587_CHECKPOINT_MARKER"] = str(checkpoint_marker_path)
 
     def start(name: str, command: list[str]) -> subprocess.Popen:
         log = (output / f"{name}.log").open("w")
@@ -287,6 +298,92 @@ def run(output: Path, *, continuation: bool = False, resume: str | None = None) 
 
         retry_parent = REPORT_PARENT if continuation else SOURCE
 
+        if interruption:
+            deadline = time.monotonic() + 240
+            while time.monotonic() < deadline:
+                if checkpoint_marker_path.exists():
+                    checkpoint_marker = json.loads(checkpoint_marker_path.read_text())
+                    break
+                assert worker.poll() is None, "Worker exited before checkpoint pause"
+                time.sleep(.1)
+            else:
+                raise AssertionError("First exclusion checkpoint pause was not reached")
+            interrupted_snapshot = snapshot(dburl)
+            interrupted_child = next(
+                row for row in interrupted_snapshot["jobs"]
+                if row["runtime_job_id"] == retry_id
+            )
+            interrupted_config = decoded(interrupted_child["discovered_config"])
+            assert interrupted_child["status"] not in TERMINAL
+            assert set(interrupted_config["autonomousVerification"]["completed_urls"]) == set(SELECTED)
+            assert not interrupted_config.get("targeted_retry_diagnostic")
+            assert not interrupted_snapshot["diagnostic_logs"]
+            assert not (postrun_root / f"{retry_id}.json").exists()
+            assert interrupted_snapshot["earlier_reviews"] == before["earlier_reviews"]
+            assert interrupted_snapshot["published_bytes"] == before["published_bytes"]
+            assert interrupted_snapshot["child_rows_bytes"] == before["child_rows_bytes"]
+            evidence["interruption"] = {
+                "checkpoint_marker": checkpoint_marker,
+                "committed_child_before_kill": interrupted_child,
+                "diagnostic_absent_before_kill": True,
+            }
+
+            # Freeze the supervisor first: it must not auto-redeliver this
+            # lost task before we have observed death and revoked its fence.
+            os.kill(worker.pid, signal.SIGSTOP)
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline:
+                state = Path(f"/proc/{worker.pid}/stat").read_text().rsplit(")", 1)[1].split()[0]
+                if state == "T":
+                    break
+                time.sleep(.01)
+            else:
+                raise AssertionError("Could not freeze prefork supervisor")
+            from app.services.worker_fencing import process_identity
+            victim_pid = checkpoint_marker["worker_pid"]
+            assert victim_pid != worker.pid
+            assert os.getpgid(victim_pid) == worker.pid
+            pidfd = os.pidfd_open(victim_pid)
+            try:
+                assert process_identity(victim_pid) == checkpoint_marker["process_identity"]
+                poller = select.poll()
+                poller.register(pidfd, select.POLLIN)
+                os.kill(victim_pid, signal.SIGKILL)
+                assert any(
+                    flags & select.POLLIN for _, flags in poller.poll(15000)
+                ), "Kernel did not confirm interrupted prefork child's exit"
+            finally:
+                os.close(pidfd)
+            death = {
+                "worker_pid": victim_pid,
+                "process_identity": checkpoint_marker["process_identity"],
+                "pidfd_exit_observed": True,
+            }
+            checkpoint_marker_path.with_suffix(".death.json").write_text(json.dumps(death))
+            evidence["interruption"]["death"] = death
+            os.killpg(worker.pid, signal.SIGKILL)
+            worker.wait(timeout=15)
+            assert not (postrun_root / f"{retry_id}.json").exists()
+
+            requeue = start("requeue-interrupted", [
+                sys.executable, "-m", "tests.task580_process", "requeue-interrupted",
+            ])
+            assert requeue.wait(timeout=30) == 0, "Interrupted requeue failed"
+            requeued = snapshot(dburl)
+            matching = [row for row in requeued["jobs"] if row["runtime_job_id"] == retry_id]
+            assert len(matching) == 1
+            assert matching[0]["status"] == "queued"
+            assert matching[0]["request_payload"] == interrupted_child["request_payload"]
+            assert matching[0]["discovered_config"] == interrupted_child["discovered_config"]
+            # The durable marker makes the test hook one-shot across workers.
+            worker = start("worker-redelivery", [
+                sys.executable, "-m", "tests.task580_process", "worker",
+            ])
+            dispatch = start("dispatch-interrupted-redelivery", [
+                sys.executable, "-m", "tests.task580_process", "dispatch-continuation",
+            ])
+            assert dispatch.wait(timeout=30) == 0, "Interrupted redelivery dispatch failed"
+
         deadline = time.monotonic() + 240
         while time.monotonic() < deadline:
             final = snapshot(dburl)
@@ -322,6 +419,10 @@ def run(output: Path, *, continuation: bool = False, resume: str | None = None) 
         assert postrun_marker["state"] == "SUCCESS", postrun_marker
         assert postrun_marker["return_value"]["ok"] is True, postrun_marker
         assert postrun_marker["return_value"]["id"] == retry_id, postrun_marker
+        if interruption:
+            assert postrun_marker["task_id"] != checkpoint_marker["task_id"]
+            assert postrun_marker["worker_pid"] != checkpoint_marker["worker_pid"]
+            evidence["interruption"]["redelivery_postrun"] = postrun_marker
 
         # Discard the intermediate terminal snapshot. This is the authoritative
         # post-task state used by every persistence and API-restart assertion.
@@ -383,9 +484,10 @@ def run(output: Path, *, continuation: bool = False, resume: str | None = None) 
         expected_imported = len(retry_rows)
         assert retry["imported"] == expected_imported, retry
         assert final["child_rows_bytes"] == before["child_rows_bytes"]
-        if resume:
+        if resume or interruption:
             completed = config["autonomousVerification"]["completed_urls"]
-            assert PRIOR[1] in completed
+            if resume:
+                assert PRIOR[1] in completed
             if blocked:
                 assert set(SELECTED) <= set(completed)
         assert worker.poll() is None, "Prefork worker exited before lifecycle completion"
@@ -431,7 +533,7 @@ def run(output: Path, *, continuation: bool = False, resume: str | None = None) 
         assert reloaded_snapshot["child_rows_bytes"] == before["child_rows_bytes"]
 
         redelivery_evidence = None
-        if continuation and resume != "resolved":
+        if continuation and resume != "resolved" and not interruption:
             # Simulate at-least-once redelivery after the first task has fully
             # returned. This is the exact same durable child, not a newly
             # generated continuation. Its current-run exclusion checkpoints
@@ -642,7 +744,7 @@ def run(output: Path, *, continuation: bool = False, resume: str | None = None) 
             "earlier_reviews_before": before["earlier_reviews"],
             "earlier_reviews_after_reload": reloaded_snapshot["earlier_reviews"],
             "both_earlier_review_sets_byte_identical": True,
-            "delivery_count": 2 if redelivery_evidence else 1,
+            "delivery_count": 2 if redelivery_evidence or interruption else 1,
             "redelivery": redelivery_evidence,
         })
     except Exception:
@@ -707,14 +809,24 @@ def run(output: Path, *, continuation: bool = False, resume: str | None = None) 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--interruption-only", action="store_true",
+        help="Run only the task-587 first-exclusion checkpoint interruption scenario",
+    )
     args = parser.parse_args()
-    result = run(args.output.resolve())
-    continuation_result = run(args.output.resolve() / "continuation", continuation=True)
-    resumed_results = [
-        run(args.output.resolve() / scenario, continuation=True, resume=scenario)
-        for scenario in ("mixed", "resolved")
-    ]
+    results = []
+    if not args.interruption_only:
+        results.append(run(args.output.resolve()))
+        results.append(run(args.output.resolve() / "continuation", continuation=True))
+        results.extend(
+            run(args.output.resolve() / scenario, continuation=True, resume=scenario)
+            for scenario in ("mixed", "resolved")
+        )
+    results.append(run(
+        args.output.resolve() if args.interruption_only else args.output.resolve() / "interruption",
+        continuation=True, interruption=True,
+    ))
     print(json.dumps({
-        "passed": all(item["passed"] for item in [result, continuation_result, *resumed_results]),
+        "passed": all(item["passed"] for item in results),
         "evidence": str(args.output),
     }, indent=2))

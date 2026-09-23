@@ -153,7 +153,7 @@ def persist_verification_metadata(job, limits: VerificationLimits, **updates) ->
 
 
 async def checkpoint_report_urls(
-    db, job, limits, urls, *, candidate_urls=(), outcome="skipped",
+    db, job, limits, urls, *, candidate_urls=(), outcome="skipped", excluded=False,
 ):
     """Durably acknowledge settled outcomes before any cancellable follow-up.
 
@@ -171,6 +171,17 @@ async def checkpoint_report_urls(
     metadata = (job.discovered_config or {}).get("autonomousVerification") or {}
     payload = job.request_payload or {}
     url_outcomes = dict(metadata.get("url_outcomes") or {})
+    # A worker can die before its final diagnostic is saved. Keep exclusion
+    # provenance in the SAME commit as the acknowledgement, never reconstruct
+    # success from completed_urls alone on the next delivery.
+    excluded_urls = list(dict.fromkeys([
+        *metadata.get("excluded_urls", []),
+        # Re-running URL filters must not reclassify a previously settled
+        # legacy checkpoint. Only this call's new acknowledgements acquire
+        # provenance; existing exclusions remain sticky.
+        *(url for url in urls
+          if excluded and url not in metadata.get("completed_urls", [])),
+    ]))
     next_outcomes: dict[str, str] = {}
     for url in urls:
         if outcome == "error":
@@ -188,6 +199,7 @@ async def checkpoint_report_urls(
     ]))
     if (set(urls).issubset(metadata.get("completed_urls", []))
             and candidates == metadata.get("candidate_urls")
+            and excluded_urls == metadata.get("excluded_urls", [])
             and all(url_outcomes.get(url) == value for url, value in next_outcomes.items())):
         return
     url_outcomes.update(next_outcomes)
@@ -197,6 +209,7 @@ async def checkpoint_report_urls(
         candidate_urls=candidates,
         completed_urls=list(dict.fromkeys([*metadata.get("completed_urls", []), *urls])),
         url_outcomes=url_outcomes,
+        excluded_urls=excluded_urls,
         completed_scope="settled attempts and eligibility exclusions; not successful recovery",
     )
     commit = asyncio.create_task(db.commit())
@@ -227,7 +240,8 @@ async def checkpoint_report_exclusions(db, job, limits, before, after):
     await checkpoint_report_urls(db, job, limits, [
         link.get("url") for link in before
         if canonical_course_url_key(link.get("url")) not in retained
-    ], candidate_urls=[link["url"] for link in before if link.get("url")])
+    ], candidate_urls=[link["url"] for link in before if link.get("url")],
+        excluded=True)
 
 
 def cap_verification_links(job, limits, links, max_courses):

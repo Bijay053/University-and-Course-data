@@ -174,24 +174,88 @@ async def seed_continuation(resume: str | None = None) -> None:
         await engine.dispose()
 
 
-async def requeue_continuation() -> None:
+async def requeue_continuation(*, interrupted: bool = False) -> None:
     """Redeliver the exact durable child after its completed worker lifecycle."""
     from app.database import AsyncSessionLocal, engine
     from app.models import ScrapeRuntimeJob
-    from app.services.worker_fencing import revoke_stopped
+    from app.services.worker_fencing import record_process_death, revoke_stopped
+    from sqlalchemy import text
 
     async with AsyncSessionLocal() as db:
         child = await db.get(ScrapeRuntimeJob, "job_task582_continuation")
         assert child is not None
-        assert child.status in {"failed", "completed"}
+        if interrupted:
+            marker_path = Path(os.environ["TASK587_CHECKPOINT_MARKER"])
+            assert marker_path.parent.name.startswith("task580-private-")
+            marker = json.loads(marker_path.read_text())
+            death = json.loads(marker_path.with_suffix(".death.json").read_text())
+            assert death["pidfd_exit_observed"] is True
+            assert death["process_identity"] == marker["process_identity"]
+            assert death["worker_pid"] == marker["worker_pid"]
+            assert marker["runtime_job_id"] == child.runtime_job_id
+            claim = (await db.execute(text(
+                "SELECT generation, task_id, process_identity FROM autonomous_worker_claims "
+                "WHERE claim_key=:key"
+            ), {"key": f"verification:{child.runtime_job_id}"})).one()
+            assert tuple(claim) == (
+                marker["generation"], marker["task_id"], marker["process_identity"],
+            )
+            await record_process_death(
+                db, marker["task_id"], marker["process_identity"], "worker_lost",
+            )
+        else:
+            assert child.status in {"failed", "completed"}
         assert await revoke_stopped(
-            db, f"verification:{child.runtime_job_id}"
+            db, f"verification:{child.runtime_job_id}",
+            marker["generation"] if interrupted else None,
         ), "completed autonomous worker claim was not revocable"
         child.status = "queued"
         child.completed_at = None
         child.stop_requested = False
         await db.commit()
     await engine.dispose()
+
+
+def install_checkpoint_interruption() -> None:
+    """Pause only after the real first exclusion checkpoint has committed."""
+    destination = Path(os.environ["TASK587_CHECKPOINT_MARKER"]).resolve()
+    assert destination.parent.name.startswith("task580-private-")
+    from app.services.scraper import autonomous_verification, orchestrator
+    from app.services.worker_fencing import current_owner, process_identity
+    from celery import current_task
+    from tests.task580_acceptance import SELECTED
+
+    original = orchestrator.checkpoint_report_urls
+
+    async def pause_after_checkpoint(*args, **kwargs):
+        result = await original(*args, **kwargs)
+        job = args[1] if len(args) > 1 else kwargs["job"]
+        if job.runtime_job_id != "job_task582_continuation" or destination.exists():
+            return result
+        config = job.discovered_config or {}
+        completed = config.get("autonomousVerification", {}).get("completed_urls", [])
+        if SELECTED[0] not in completed:
+            return result
+        assert set(completed) == set(SELECTED), completed
+        assert not config.get("targeted_retry_diagnostic"), config
+        owner = current_owner.get()
+        assert owner is not None
+        marker = {
+            "runtime_job_id": job.runtime_job_id,
+            "worker_pid": os.getpid(),
+            "process_identity": process_identity(),
+            "generation": owner.generation,
+            "task_id": str(current_task.request.id),
+            "completed_urls": completed,
+        }
+        temporary = destination.with_suffix(".tmp")
+        temporary.write_text(json.dumps(marker))
+        os.replace(temporary, destination)
+        await asyncio.Event().wait()
+        return result
+
+    orchestrator.checkpoint_report_urls = pause_after_checkpoint
+    autonomous_verification.checkpoint_report_urls = pause_after_checkpoint
 
 
 def install_task_postrun_marker() -> None:
@@ -256,6 +320,8 @@ if __name__ == "__main__":
         )
     elif sys.argv[1] == "requeue-continuation":
         asyncio.run(requeue_continuation())
+    elif sys.argv[1] == "requeue-interrupted":
+        asyncio.run(requeue_continuation(interrupted=True))
     elif sys.argv[1] == "api":
         import uvicorn
         uvicorn.run(
@@ -265,6 +331,8 @@ if __name__ == "__main__":
         )
     elif sys.argv[1] == "worker":
         install_task_postrun_marker()
+        if os.environ.get("TASK587_CHECKPOINT_MARKER"):
+            install_checkpoint_interruption()
         from app.tasks.celery_app import celery_app
         celery_app.worker_main([
             "worker", "--pool=prefork", "--concurrency=1", "--loglevel=INFO",
