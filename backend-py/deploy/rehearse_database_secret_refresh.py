@@ -12,6 +12,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 import time
 import uuid
 from datetime import datetime, timezone
@@ -162,6 +163,30 @@ def _report_cleanup_errors(
         raise RuntimeError(message)
 
 
+def _preflight_output_paths(*outputs: Path | None) -> None:
+    """Prove each configured output directory is writable before AWS mutation."""
+    for output in outputs:
+        if output is None:
+            continue
+        parent = output.parent
+        if not parent.is_dir():
+            raise RuntimeError(f"output parent directory does not exist: {parent}")
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=parent,
+                prefix=f".{output.name}.preflight-",
+            ) as probe:
+                probe.write("output-preflight")
+                probe.flush()
+                os.fsync(probe.fileno())
+        except OSError as error:
+            raise RuntimeError(
+                f"output parent directory is not writable: {parent}"
+            ) from error
+
+
 def rehearse(*, expected_account: str, production_account: str, region: str, vpc_id: str,
              private_subnet_id: str, second_private_subnet_id: str, stack_name: str,
              opt_in: bool, proof_output: Path | None = None,
@@ -178,6 +203,7 @@ def rehearse(*, expected_account: str, production_account: str, region: str, vpc
         raise RuntimeError("a dedicated disposable KMS proof-signing key is required")
     if fail_at is not None and fail_at not in FAILURE_CHECKPOINTS:
         raise RuntimeError("unknown rehearsal failure checkpoint")
+    _preflight_output_paths(state_output, proof_output)
     session = _session()
     # Account identity is checked before CloudFormation, Scheduler, SSM, RDS, and SQS mutations.
     if (not production_account or expected_account == production_account
@@ -247,6 +273,7 @@ def rehearse(*, expected_account: str, production_account: str, region: str, vpc
     created = False
     outputs: dict[str, str] = {}
     primary_error: BaseException | None = None
+    secrets = session.client("secretsmanager", region_name=region)
     try:
         _require_account(session, region, expected_account, production_account)
         created = True
@@ -281,7 +308,6 @@ def rehearse(*, expected_account: str, production_account: str, region: str, vpc
                 ),
                 encoding="utf-8",
             )
-        secrets = session.client("secretsmanager", region_name=region)
         _inject_failure(fail_at, "after-stack-creation")
         _require_account(session, region, expected_account, production_account)
         before = _managed_secret_shape(secrets, outputs["DatabaseSecretArn"])

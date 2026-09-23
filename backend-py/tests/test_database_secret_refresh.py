@@ -10,7 +10,7 @@ import subprocess
 import sys
 import textwrap
 import types
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from botocore.exceptions import ClientError
 import pytest
@@ -244,6 +244,133 @@ def test_rehearsal_refuses_without_opt_in_before_any_aws_call() -> None:
             stack_name="test",
             opt_in=False,
         )
+
+
+def _rehearsal_arguments(tmp_path: Path) -> dict[str, object]:
+    return {
+        "expected_account": "123456789012",
+        "production_account": "210987654321",
+        "region": "ap-south-1",
+        "vpc_id": "vpc-test",
+        "private_subnet_id": "subnet-a",
+        "second_private_subnet_id": "subnet-b",
+        "stack_name": "up-db-refresh-rehearsal-0123456789abcdef",
+        "opt_in": True,
+        "state_output": tmp_path / "state.json",
+    }
+
+
+def test_rehearsal_rejects_missing_output_parent_before_create_stack(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RUN_DISPOSABLE_AWS_DATABASE_REFRESH_REHEARSAL", "1")
+    session_called = False
+
+    def unexpected_session():
+        nonlocal session_called
+        session_called = True
+        raise AssertionError("AWS session must not be created")
+
+    arguments = _rehearsal_arguments(tmp_path)
+    arguments["state_output"] = tmp_path / "absent" / "state.json"
+    with (
+        patch.object(rehearsal, "_session", side_effect=unexpected_session),
+        pytest.raises(RuntimeError, match="parent directory does not exist"),
+    ):
+        rehearsal.rehearse(**arguments)
+    assert not session_called
+
+
+def test_rehearsal_rejects_output_preflight_write_failure_before_create_stack(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RUN_DISPOSABLE_AWS_DATABASE_REFRESH_REHEARSAL", "1")
+    with (
+        patch.object(
+            rehearsal.tempfile,
+            "NamedTemporaryFile",
+            side_effect=PermissionError("read-only"),
+        ),
+        patch.object(rehearsal, "_session") as session,
+        pytest.raises(RuntimeError, match="not writable"),
+    ):
+        rehearsal.rehearse(**_rehearsal_arguments(tmp_path))
+    session.assert_not_called()
+
+
+def test_early_state_write_failure_still_verifies_secret_cleanup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RUN_DISPOSABLE_AWS_DATABASE_REFRESH_REHEARSAL", "1")
+    sts, cf, ec2, secrets, tagging = (MagicMock() for _ in range(5))
+    sts.get_caller_identity.return_value = {"Account": "123456789012"}
+    disposable_network_tag = [{
+        "Key": "university-portal:disposable-network",
+        "Value": "123456789012",
+    }]
+    ec2.describe_vpcs.return_value = {
+        "Vpcs": [{"IsDefault": False, "Tags": disposable_network_tag}]
+    }
+    ec2.describe_subnets.return_value = {"Subnets": [
+        {
+            "VpcId": "vpc-test",
+            "MapPublicIpOnLaunch": False,
+            "AvailabilityZone": zone,
+            "Tags": disposable_network_tag,
+        }
+        for zone in ("ap-south-1a", "ap-south-1b")
+    ]}
+    ec2.describe_route_tables.return_value = {"RouteTables": [{
+        "Associations": [{"Main": True}],
+        "Routes": [{
+            "DestinationCidrBlock": "0.0.0.0/0",
+            "NatGatewayId": "nat-test",
+            "State": "active",
+        }],
+    }]}
+    ec2.describe_tags.return_value = {"Tags": [{
+        "Key": rehearsal.TAG_KEY,
+        "Value": "0123456789abcdef",
+    }]}
+    cf.describe_stack_resources.return_value = {"StackResources": [{
+        "LogicalResourceId": "Host",
+        "PhysicalResourceId": "i-test",
+    }]}
+    cf.describe_stacks.return_value = {"Stacks": [{"Outputs": [
+        {"OutputKey": key, "OutputValue": value}
+        for key, value in {
+            "DatabaseSecretArn": "arn:aws:secretsmanager:test",
+            "ScheduleGroup": "group",
+            "ScheduleName": "schedule",
+        }.items()
+    ]}]}
+    tagging.get_resources.return_value = {"ResourceTagMappingList": []}
+    secrets.describe_secret.side_effect = ClientError(
+        {"Error": {"Code": "ResourceNotFoundException"}},
+        "DescribeSecret",
+    )
+    clients = {
+        "sts": sts,
+        "cloudformation": cf,
+        "ec2": ec2,
+        "secretsmanager": secrets,
+        "resourcegroupstaggingapi": tagging,
+    }
+    session = MagicMock()
+    session.client.side_effect = lambda name, region_name: clients[name]
+    with (
+        patch.object(rehearsal, "_session", return_value=session),
+        patch.object(Path, "write_text", side_effect=OSError("disk failure")),
+        pytest.raises(OSError, match="disk failure"),
+    ):
+        rehearsal.rehearse(**_rehearsal_arguments(tmp_path))
+    cf.create_stack.assert_called_once()
+    cf.delete_stack.assert_called_once_with(
+        StackName="up-db-refresh-rehearsal-0123456789abcdef"
+    )
+    secrets.describe_secret.assert_called_once_with(
+        SecretId="arn:aws:secretsmanager:test"
+    )
 
 
 def test_rehearsal_failure_injection_is_bounded_to_named_checkpoints() -> None:
