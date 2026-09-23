@@ -8,6 +8,19 @@ credential. When an authorized preservation commit is created there, transfer
 the commit to the authenticated workspace as a bounded Git bundle and push
 from the workspace rather than copying credentials onto the server.
 
+Production's Alembic ledger can lag schema changes already present. Inspect
+the actual schema before replaying a migration chain. An isolated additive
+revision can be run through Alembic Operations without falsely stamping its
+unexecuted ancestors; retain the original ledger until it is reconciled.
+
+**Why:** A guarded release found the worker-fencing schema present while the
+migration ledger still described a much older schema. Blindly upgrading the
+whole chain would replay unrelated data and schema transformations.
+
+**How to apply:** Fence the observed ledger, run only the reviewed additive
+revision transactionally with bounded lock/statement timeouts, verify its
+column type, and do not claim that this reconciles migration history.
+
 **Why:** Committing approved operator recipe edits succeeded on production,
 but its push failed because Git could not obtain a username. A bundle retained
 the exact commit, parentage and recipe bytes without provisioning another
