@@ -378,6 +378,10 @@ def run(output: Path, *, continuation: bool = False, resume: str | None = None) 
             if row["scrape_job_id"] == retry_id
         ]
         assert len(retry_rows) == (1 if resume else 0), retry_rows
+        # Imported counts review rows, not completed URL acknowledgements.
+        # A filtered checkpoint is settled work but has no row to import.
+        expected_imported = len(retry_rows)
+        assert retry["imported"] == expected_imported, retry
         assert final["child_rows_bytes"] == before["child_rows_bytes"]
         if resume:
             completed = config["autonomousVerification"]["completed_urls"]
@@ -402,12 +406,14 @@ def run(output: Path, *, continuation: bool = False, resume: str | None = None) 
             history_json = history_response.json()
         assert status_json["status"] == retry["status"]
         assert status_json["errors"] == retry["errors"]
+        assert status_json["imported"] == expected_imported, status_json
         assert status_json.get("targetedRetryDiagnostic") == diagnostic
         assert status_json.get("errorMessage") == retry["error_message"]
         if blocked:
             assert status_json["extractionQuality"]["errorCount"] > 0
         assert history_json["job"]["status"] == retry["status"]
         assert history_json["job"]["errors"] == retry["errors"]
+        assert history_json["job"]["imported"] == expected_imported, history_json["job"]
         diagnostic_history = [
             row for row in history_json["logs"]
             if row.get("kind") == "targeted_retry_all_filtered"
@@ -625,6 +631,12 @@ def run(output: Path, *, continuation: bool = False, resume: str | None = None) 
                 before["published"], final["published"],
             ],
             "retry_staged_rows": len(retry_rows),
+            "imported_counts": {
+                "expected_review_rows": expected_imported,
+                "persisted_worker": retry["imported"],
+                "fresh_status": status_json["imported"],
+                "fresh_history": history_json["job"]["imported"],
+            },
             "approved_review_rows_byte_identical": True,
             "published_records_byte_identical": True,
             "earlier_reviews_before": before["earlier_reviews"],

@@ -149,3 +149,4 @@
 - [Course-report URL field parity](course-report-url-field-parity.md) — a verified programme URL may arrive as catalogue_url; preserve proof and target semantics across report URL fields.
 - [Developer-free recovery UX](developer-free-recovery-ux.md) — blocked recovery must request an official course URL, never scraper settings or manual developer investigation.
 - [Automatic repair JS-shell evidence](automatic-repair-js-shell-evidence.md) — live repair probes must render JS-only shells and recognize site-owned field labels before rejecting valid course pages.
+- [Resume count semantics](resume-count-semantics.md) — settled URLs are not imports; same-child rows must not be added twice during database reconciliation.

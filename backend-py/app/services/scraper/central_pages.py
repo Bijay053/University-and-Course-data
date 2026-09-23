@@ -2696,6 +2696,13 @@ async def prefetch_central_pages(
                         # routed.  Preserve unrelated tests that the column
                         # parser does not model.
                         _ck_cleared_slots = set(_ck_routed_slots)
+                        # Ambiguous routed tests cannot retain generic
+                        # components from one category as universal values.
+                        _ck_ambiguous_tests = {
+                            slot.partition("_")[0]
+                            for slot in _ck_routed_slots
+                            if slot not in _ck_flat
+                        }
                         if "ielts_overall" in _ck_routed_slots:
                             _ck_cleared_slots.update(
                                 {
@@ -2709,6 +2716,7 @@ async def prefetch_central_pages(
                             key: value
                             for key, value in english_vals.items()
                             if key not in _ck_cleared_slots
+                            and key.partition("_")[0] not in _ck_ambiguous_tests
                         }
                         english_vals.update(_ck_flat)
                         result["english"] = english_vals

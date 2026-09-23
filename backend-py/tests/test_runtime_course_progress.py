@@ -55,6 +55,49 @@ def test_resumed_terminal_totals_include_checkpoints_and_all_attempted_courses()
     assert orchestrator._attempted_course_count({}, resumed=0) == 0
 
 
+def test_verification_acknowledgements_advance_progress_but_are_not_staged():
+    staged, processed = orchestrator._verification_resume_keys(
+        ["https://example.test/course/already-staged"],
+        [
+            "https://example.test/course/already-staged/",
+            "https://example.test/course/filtered-ack",
+        ],
+    )
+
+    assert len(staged) == 1
+    assert len(processed) == 2
+    summary = {"discovered": 3, "staged": 1}
+    assert orchestrator._attempted_course_count(summary, resumed=len(processed)) == 1
+    assert orchestrator._cumulative_imported(summary, resumed=len(staged)) == 2
+
+
+def test_same_job_recovery_rows_are_not_added_twice_after_db_reconciliation():
+    summary = {"discovered": 3, "staged": 1}
+
+    # The DB count already contains two recovered same-job checkpoints plus the
+    # row staged by this invocation.
+    assert orchestrator._reconciled_imported(
+        summary,
+        resumed_staged=2,
+        actual_same_job_rows=3,
+        same_job_resumed_staged=2,
+    ) == 3
+    # Ordinary cross-job checkpoints are not in this job's DB row count.
+    assert orchestrator._reconciled_imported(
+        summary,
+        resumed_staged=2,
+        actual_same_job_rows=1,
+        same_job_resumed_staged=0,
+    ) == 3
+    # A failed row-count query preserves the sensible in-memory fallback.
+    assert orchestrator._reconciled_imported(
+        summary,
+        resumed_staged=2,
+        actual_same_job_rows=None,
+        same_job_resumed_staged=2,
+    ) == 3
+
+
 @pytest.mark.asyncio
 async def test_resumed_mixed_outcomes_advance_once_after_settlement():
     """The production retry loop keeps durable and emitted progress reconciled."""

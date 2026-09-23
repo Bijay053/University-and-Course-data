@@ -1043,13 +1043,47 @@ def _cumulative_imported(summary: dict[str, Any], resumed: int) -> int:
     """Courses available from this run plus preserved resume checkpoints."""
     return int(summary.get("staged", 0) or 0) + max(0, int(resumed or 0))
 
+def _reconciled_imported(
+    summary: dict[str, Any],
+    resumed_staged: int,
+    *,
+    actual_same_job_rows: int | None,
+    same_job_resumed_staged: int = 0,
+) -> int:
+    """Return the authoritative reviewable count without double-counting rows.
 
+    A normal resume reuses rows from older jobs, so those rows must be added to
+    the current job's DB row count. Verification recovery instead reuses rows
+    already owned by this same job; they are already present in that DB count.
+    """
+    if actual_same_job_rows is None:
+        return _cumulative_imported(summary, resumed_staged)
+    cross_job_resumed = max(
+        0,
+        int(resumed_staged or 0) - max(0, int(same_job_resumed_staged or 0)),
+    )
+    return max(0, int(actual_same_job_rows or 0)) + cross_job_resumed
 def _attempted_course_count(summary: dict[str, Any], resumed: int) -> int:
     """Courses this worker invocation actually settled, including skips/errors."""
     discovered = int(summary.get("discovered", 0) or 0)
     return max(0, discovered - max(0, int(resumed or 0)))
 
-
+def _verification_resume_keys(
+    recovered_urls: list[str | None],
+    completed_urls: list[str | None],
+) -> tuple[set[str], set[str]]:
+    """Separate staged recovery rows from settled URL acknowledgements."""
+    staged_keys = {
+        key
+        for url in recovered_urls
+        if (key := canonical_course_url_key(url))
+    }
+    processed_keys = staged_keys | {
+        key
+        for url in completed_urls
+        if (key := canonical_course_url_key(url))
+    }
+    return staged_keys, processed_keys
 async def _settle_course_with_retries(
     link: dict,
     attempt,
@@ -2344,6 +2378,8 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
     _GLOBAL_SLOT_KEY = "scrape:active_runs"
     # Must exist before any early stop path can call _finalize_stopped().
     _resume_already_staged = 0
+    _resume_processed_offset = 0
+    _same_job_resume_staged = 0
     _bypassed_resume_course_ids: list[int] = []
 
     async def _finalize_stopped() -> dict:
@@ -6332,23 +6368,30 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                     _RecoveredCourse.university_id == job.university_id,
                 )
             )).scalars().all()
-            recovered_keys = {canonical_course_url_key(url) for url in recovered_urls}
+            _completed_ack_urls = []
+            if (job.request_payload or {}).get("courseReport"):
+                _completed_ack_urls = list(
+                    ((job.discovered_config or {}).get("autonomousVerification") or {}).get(
+                        "completed_urls", []
+                    )
+                )
+            recovered_keys, _processed_resume_keys = _verification_resume_keys(
+                list(recovered_urls),
+                _completed_ack_urls,
+            )
             _diagnostic_resolved_keys = recovered_keys | {
                 canonical_course_url_key(url) for url in _prior_report_completed_urls
             }
-            if (job.request_payload or {}).get("courseReport"):
-                recovered_keys.update(
-                    canonical_course_url_key(url)
-                    for url in ((job.discovered_config or {}).get("autonomousVerification") or {}).get("completed_urls", [])
-                )
-            _resume_already_staged = len(recovered_keys - {"" , None})
+            _resume_already_staged = len(recovered_keys)
+            _same_job_resume_staged = len(recovered_keys)
+            _resume_processed_offset = len(_processed_resume_keys)
             if _targeted_retry:
                 _targeted_retry_resolved_urls = sorted(
                     _diagnostic_resolved_keys - {"", None}
                 )
             links = [
                 link for link in links
-                if canonical_course_url_key(link.get("url")) not in recovered_keys
+                if canonical_course_url_key(link.get("url")) not in _processed_resume_keys
             ]
             await db.commit()
 
@@ -6458,6 +6501,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                     _skipped_resume = _before - len(links)
                     if _skipped_resume > 0:
                         _resume_already_staged = _skipped_resume
+                        _resume_processed_offset = _skipped_resume
                         if _targeted_retry:
                             _targeted_retry_resolved_urls = sorted(
                                 _matched_resume_keys
@@ -6549,8 +6593,8 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         # so the UI begins at e.g. 257/409 rather than 0/409. Retries do not
         # touch this counter until their final result settles, so each discovered
         # course contributes exactly once.
-        completed = [_resume_already_staged]
-        job.current = min(_resume_already_staged, job.total_found or 0)
+        completed = [_resume_processed_offset]
+        job.current = min(_resume_processed_offset, job.total_found or 0)
         await db.commit()
 
         # 2) Extraction + staging split into batches so completed courses are
@@ -8209,7 +8253,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         )
         course_count = _attempted_course_count(
             summary,
-            _resume_already_staged,
+            _resume_processed_offset,
         )
         avg_per_course = elapsed_sec / max(1, course_count)
         mins, secs = divmod(elapsed_sec, 60)
@@ -8478,7 +8522,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             f" | Sweep:{_ph_sweep_s:.0f}s | Staging:{_ph_staging_s:.0f}s"
         )
         # `imported` in the SSE event must match `job.imported` in the DB
-        # (summary["staged"] + _resume_already_staged) so the "Review N Courses"
+        # after row-count reconciliation so the "Review N Courses"
         # button in the UI shows the TOTAL courses available for review, not just
         # the new ones staged this run.  Without this, a resume-checkpoint run
         # (e.g. 25 new + 105 already-pending = 130 total) shows "Review 25 Courses"
@@ -8513,28 +8557,40 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 "leaving counter as-is", runtime_job_id, exc,
             )
             actual_staged = None
-        if actual_staged is not None and actual_staged != summary["staged"]:
+        # This is the authoritative replacement for the old
+        # ``summary["staged"] = actual_staged`` assignment. Keeping the
+        # invocation-local staged counter intact matters for verification
+        # metadata, while the reconciled total below drives every terminal
+        # user-visible and persisted count.
+        _reconciled_total_imported = _reconciled_imported(
+            summary,
+            _resume_already_staged,
+            actual_same_job_rows=actual_staged,
+            same_job_resumed_staged=_same_job_resume_staged,
+        )
+        if (
+            actual_staged is not None
+            and _reconciled_total_imported != _total_imported
+        ):
             log.warning(
-                "imported counter (%d) != actual rows in db (%d) for job %s "
-                "— using actual row count",
-                summary["staged"], actual_staged, runtime_job_id,
+                "imported total (%d) != reconciled rows (%d) for job %s "
+                "(same-job rows=%d, cross-job resumed=%d) — using reconciled count",
+                _total_imported, _reconciled_total_imported, runtime_job_id,
+                actual_staged,
+                max(0, _resume_already_staged - _same_job_resume_staged),
             )
             await emit(
                 "status",
-                f"[STAGE] counter reconciled: in-memory staged={summary['staged']} "
-                f"vs db rows={actual_staged} — using db count "
+                f"[STAGE] counter reconciled: in-memory total={_total_imported} "
+                f"vs reviewable rows={_reconciled_total_imported} — using reconciled count "
                 f"(prevents counter-vs-rows mismatch debugging hell)",
                 phase="stage",
                 kind="counter_reconciled",
                 in_memory=summary["staged"],
                 db_rows=actual_staged,
+                reconciled_total=_reconciled_total_imported,
                 level="warn",
             )
-            summary["staged"] = actual_staged
-        _reconciled_total_imported = _cumulative_imported(
-            summary,
-            _resume_already_staged,
-        )
         if _reconciled_total_imported != _total_imported:
             _done_msg = _done_msg.replace(
                 f"Staged:{_total_imported}",
@@ -8662,7 +8718,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         _catalogue_guard = _catalogue_floor_guard(
             raw_discovered=int(summary.get("discovered_raw", _discovered_n) or 0),
             extractable=int(_discovered_n or 0),
-            staged=_cumulative_imported(summary, _resume_already_staged),
+            staged=_total_imported,
             expected_min_courses=getattr(
                 getattr(_uni_cfg, "discovery", None),
                 "expected_min_courses",
@@ -8732,18 +8788,13 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 kind="resume_checkpoint_rows_discarded",
                 discarded_rows=_discarded_resume_rows,
             )
-        # Always update progress counters from this run.
-        # `_resume_already_staged` (Task #229 resume checkpoint, fixed after
-        # a real QMUL bug report) folds courses skipped as already-staged
-        # from an earlier interrupted run back into `imported` here, since
-        # `summary["discovered"]`/total_found is kept at the TRUE discovery
-        # count (not shrunk to the post-filter remaining count). This keeps
-        # imported + skipped + errors == total_found, so the UI shows the
-        # real cumulative progress (e.g. 350/409) instead of only this run's
-        # slice (e.g. 93/152), which looked like most courses were missing.
+        # Imported uses reconciled same-job rows plus genuine cross-job
+        # checkpoints, never settled URL acknowledgements. Progress retains
+        # the full discovery count; earlier filtered outcomes need not be in
+        # this invocation's skipped/errors totals. See resumed_report_counts.md.
         job.total_found = summary["discovered"]
         job.current = summary["discovered"]
-        job.imported = _cumulative_imported(summary, _resume_already_staged)
+        job.imported = _total_imported
         job.skipped = summary["skipped"]
         job.errors = summary["errors"]
         # Gemini cost tracking (Component 3 & 4)
