@@ -35,6 +35,9 @@ SELECTED = [
     "https://task564.example.test/courses/blocked-alpha",
     "https://task564.example.test/courses/blocked-beta",
 ]
+ERROR_SELECTED = [
+    "https://task564.example.test/courses/exhausted-fetch",
+]
 PRIOR = [
     "https://task564.example.test/courses/prior-reviewed",
     "https://task564.example.test/courses/blocked-prior-checkpoint",
@@ -126,12 +129,16 @@ def decoded(value):
 
 def run(
     output: Path, *, continuation: bool = False, resume: str | None = None,
-    interruption: bool = False,
+    interruption: bool = False, error_interruption: bool = False,
 ) -> dict:
     assert resume in (None, "mixed", "resolved")
     assert not resume or continuation
-    assert not interruption or (continuation and resume is None)
-    selected = PRIOR + (SELECTED if resume == "mixed" else []) if resume else SELECTED
+    assert not (interruption and error_interruption)
+    assert not (interruption or error_interruption) or (continuation and resume is None)
+    selected = (
+        ERROR_SELECTED if error_interruption else
+        PRIOR + (SELECTED if resume == "mixed" else []) if resume else SELECTED
+    )
     blocked = resume != "resolved"
     output.mkdir(parents=True, exist_ok=True)
     for binary in ("initdb", "pg_ctl", "redis-server"):
@@ -139,8 +146,9 @@ def run(
             raise RuntimeError(f"Required binary missing: {binary}")
 
     evidence = {
-        "task": 587 if interruption else 580,
+        "task": 591 if error_interruption else 587 if interruption else 580,
         "scenario": (
+            "course_report_error_checkpoint_interruption" if error_interruption else
             "course_report_checkpoint_interruption" if interruption else
             f"course_report_{resume or 'continuation'}" if continuation else "retry_unresolved"
         ),
@@ -185,8 +193,10 @@ def run(
         "AI_INTEGRATIONS_OPENAI_API_KEY": "",
         "NODE_ENV": "test",
     })
-    if interruption:
+    if interruption or error_interruption:
         env["TASK587_CHECKPOINT_MARKER"] = str(checkpoint_marker_path)
+    if error_interruption:
+        env["TASK591_ERROR_CASE"] = "yes"
 
     def start(name: str, command: list[str]) -> subprocess.Popen:
         log = (output / f"{name}.log").open("w")
@@ -298,7 +308,7 @@ def run(
 
         retry_parent = REPORT_PARENT if continuation else SOURCE
 
-        if interruption:
+        if interruption or error_interruption:
             deadline = time.monotonic() + 240
             while time.monotonic() < deadline:
                 if checkpoint_marker_path.exists():
@@ -315,7 +325,11 @@ def run(
             )
             interrupted_config = decoded(interrupted_child["discovered_config"])
             assert interrupted_child["status"] not in TERMINAL
-            assert set(interrupted_config["autonomousVerification"]["completed_urls"]) == set(SELECTED)
+            assert set(interrupted_config["autonomousVerification"]["completed_urls"]) == set(selected)
+            if error_interruption:
+                assert interrupted_config["autonomousVerification"]["url_outcomes"] == {
+                    selected[0]: "error",
+                }
             assert not interrupted_config.get("targeted_retry_diagnostic")
             assert not interrupted_snapshot["diagnostic_logs"]
             assert not (postrun_root / f"{retry_id}.json").exists()
@@ -419,7 +433,7 @@ def run(
         assert postrun_marker["state"] == "SUCCESS", postrun_marker
         assert postrun_marker["return_value"]["ok"] is True, postrun_marker
         assert postrun_marker["return_value"]["id"] == retry_id, postrun_marker
-        if interruption:
+        if interruption or error_interruption:
             assert postrun_marker["task_id"] != checkpoint_marker["task_id"]
             assert postrun_marker["worker_pid"] != checkpoint_marker["worker_pid"]
             evidence["interruption"]["redelivery_postrun"] = postrun_marker
@@ -439,14 +453,21 @@ def run(
             "discovered_config": config,
             "diagnostic_logs": final["diagnostic_logs"],
         }
-        assert retry["status"] == ("failed" if blocked else "completed"), retry
-        assert (retry["errors"] > 0 if blocked else retry["errors"] == 0), retry
+        expected_status = (
+            "failed_degraded" if error_interruption else
+            "failed" if blocked else "completed"
+        )
+        assert retry["status"] == expected_status, retry
+        assert (
+            retry["errors"] >= 0 if error_interruption else
+            retry["errors"] > 0 if blocked else retry["errors"] == 0
+        ), retry
         assert payload["courseUrls"] == selected
         assert payload["course_urls"] == selected
         assert payload["retrySourceJobId"] == retry_parent
         if continuation:
             assert payload["courseReport"]["source_job_id"] == SOURCE
-        if blocked:
+        if blocked and not error_interruption:
             assert diagnostic["selected_urls"] == selected
             assert diagnostic["filtered_urls"] == SELECTED
             assert diagnostic["selected_count"] == len(selected)
@@ -456,9 +477,13 @@ def run(
             assert diagnostic["source_review_job_id"] == SOURCE
             assert diagnostic["processed_count"] == 0
             assert retry["error_message"] == diagnostic["message"]
-        else:
+        elif not blocked:
             assert diagnostic is None
             assert not retry["error_message"]
+        else:
+            assert diagnostic is None
+            assert retry["status"] == "failed_degraded"
+            assert config["autonomousVerification"]["url_outcomes"][selected[0]] == "error"
         assert final["source_errors"] == before["source_errors"] == 7
         assert final["source_approved"] == before["source_approved"] > 0
         assert final["source_approved_bytes"] == before["source_approved_bytes"]
@@ -469,7 +494,7 @@ def run(
             row for row in final["diagnostic_logs"]
             if row["runtime_job_id"] == retry_id
         ]
-        assert bool(persisted_logs) == blocked
+        assert bool(persisted_logs) == (blocked and not error_interruption)
         for row in persisted_logs:
             logged = decoded(row["payload"])
             for key, value in diagnostic.items():
@@ -484,11 +509,11 @@ def run(
         expected_imported = len(retry_rows)
         assert retry["imported"] == expected_imported, retry
         assert final["child_rows_bytes"] == before["child_rows_bytes"]
-        if resume or interruption:
+        if resume or interruption or error_interruption:
             completed = config["autonomousVerification"]["completed_urls"]
             if resume:
                 assert PRIOR[1] in completed
-            if blocked:
+            if blocked and not error_interruption:
                 assert set(SELECTED) <= set(completed)
         assert worker.poll() is None, "Prefork worker exited before lifecycle completion"
 
@@ -511,7 +536,7 @@ def run(
         assert status_json["imported"] == expected_imported, status_json
         assert status_json.get("targetedRetryDiagnostic") == diagnostic
         assert status_json.get("errorMessage") == retry["error_message"]
-        if blocked:
+        if blocked and not error_interruption:
             assert status_json["extractionQuality"]["errorCount"] > 0
         assert history_json["job"]["status"] == retry["status"]
         assert history_json["job"]["errors"] == retry["errors"]
@@ -520,7 +545,7 @@ def run(
             row for row in history_json["logs"]
             if row.get("kind") == "targeted_retry_all_filtered"
         ]
-        assert bool(diagnostic_history) == blocked
+        assert bool(diagnostic_history) == (blocked and not error_interruption)
         for logged in diagnostic_history:
             for key, value in diagnostic.items():
                 assert logged[key] == value, (key, logged)
@@ -533,7 +558,12 @@ def run(
         assert reloaded_snapshot["child_rows_bytes"] == before["child_rows_bytes"]
 
         redelivery_evidence = None
-        if continuation and resume != "resolved" and not interruption:
+        if (
+            continuation
+            and resume != "resolved"
+            and not interruption
+            and not error_interruption
+        ):
             # Simulate at-least-once redelivery after the first task has fully
             # returned. This is the exact same durable child, not a newly
             # generated continuation. Its current-run exclusion checkpoints
@@ -744,7 +774,7 @@ def run(
             "earlier_reviews_before": before["earlier_reviews"],
             "earlier_reviews_after_reload": reloaded_snapshot["earlier_reviews"],
             "both_earlier_review_sets_byte_identical": True,
-            "delivery_count": 2 if redelivery_evidence or interruption else 1,
+            "delivery_count": 2 if redelivery_evidence or interruption or error_interruption else 1,
             "redelivery": redelivery_evidence,
         })
     except Exception:
@@ -813,19 +843,30 @@ if __name__ == "__main__":
         "--interruption-only", action="store_true",
         help="Run only the task-587 first-exclusion checkpoint interruption scenario",
     )
+    parser.add_argument(
+        "--error-interruption-only", action="store_true",
+        help="Run only the task-591 exhausted-error checkpoint interruption scenario",
+    )
     args = parser.parse_args()
+    assert not (args.interruption_only and args.error_interruption_only)
     results = []
-    if not args.interruption_only:
+    if not args.interruption_only and not args.error_interruption_only:
         results.append(run(args.output.resolve()))
         results.append(run(args.output.resolve() / "continuation", continuation=True))
         results.extend(
             run(args.output.resolve() / scenario, continuation=True, resume=scenario)
             for scenario in ("mixed", "resolved")
         )
-    results.append(run(
-        args.output.resolve() if args.interruption_only else args.output.resolve() / "interruption",
-        continuation=True, interruption=True,
-    ))
+    if not args.error_interruption_only:
+        results.append(run(
+            args.output.resolve() if args.interruption_only else args.output.resolve() / "interruption",
+            continuation=True, interruption=True,
+        ))
+    if not args.interruption_only:
+        results.append(run(
+            args.output.resolve() if args.error_interruption_only else args.output.resolve() / "error-interruption",
+            continuation=True, error_interruption=True,
+        ))
     print(json.dumps({
         "passed": all(item["passed"] for item in results),
         "evidence": str(args.output),

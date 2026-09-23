@@ -83,13 +83,16 @@ async def seed_continuation(resume: str | None = None) -> None:
 
     async with AsyncSessionLocal() as db:
         source = await db.get(ScrapeRuntimeJob, task564_process.SOURCE)
+        from tests.task580_acceptance import ERROR_SELECTED, SELECTED
+        report_urls = (
+            ERROR_SELECTED
+            if os.environ.get("TASK591_ERROR_CASE") == "yes"
+            else SELECTED
+        )
         report = {
             "id": "task582-report",
             "source_job_id": source.runtime_job_id,
-            "course_urls": [
-                "https://task564.example.test/courses/blocked-alpha",
-                "https://task564.example.test/courses/blocked-beta",
-            ],
+            "course_urls": report_urls,
             "fields": ["fee"],
         }
         parent_id = "task582-report-parent"
@@ -217,15 +220,16 @@ async def requeue_continuation(*, interrupted: bool = False) -> None:
 
 
 def install_checkpoint_interruption() -> None:
-    """Pause only after the real first exclusion checkpoint has committed."""
+    """Pause after the requested real checkpoint has committed."""
     destination = Path(os.environ["TASK587_CHECKPOINT_MARKER"]).resolve()
     assert destination.parent.name.startswith("task580-private-")
     from app.services.scraper import autonomous_verification, orchestrator
     from app.services.worker_fencing import current_owner, process_identity
     from celery import current_task
-    from tests.task580_acceptance import SELECTED
+    from tests.task580_acceptance import ERROR_SELECTED, SELECTED
 
     original = orchestrator.checkpoint_report_urls
+    error_case = os.environ.get("TASK591_ERROR_CASE") == "yes"
 
     async def pause_after_checkpoint(*args, **kwargs):
         result = await original(*args, **kwargs)
@@ -233,10 +237,16 @@ def install_checkpoint_interruption() -> None:
         if job.runtime_job_id != "job_task582_continuation" or destination.exists():
             return result
         config = job.discovered_config or {}
-        completed = config.get("autonomousVerification", {}).get("completed_urls", [])
-        if SELECTED[0] not in completed:
+        metadata = config.get("autonomousVerification", {})
+        completed = metadata.get("completed_urls", [])
+        expected = ERROR_SELECTED if error_case else SELECTED
+        if expected[0] not in completed:
             return result
-        assert set(completed) == set(SELECTED), completed
+        if error_case:
+            if kwargs.get("outcome") != "error":
+                return result
+            assert metadata.get("url_outcomes", {}).get(expected[0]) == "error"
+        assert set(completed) == set(expected), completed
         assert not config.get("targeted_retry_diagnostic"), config
         owner = current_owner.get()
         assert owner is not None
@@ -247,6 +257,7 @@ def install_checkpoint_interruption() -> None:
             "generation": owner.generation,
             "task_id": str(current_task.request.id),
             "completed_urls": completed,
+            "url_outcomes": metadata.get("url_outcomes", {}),
         }
         temporary = destination.with_suffix(".tmp")
         temporary.write_text(json.dumps(marker))

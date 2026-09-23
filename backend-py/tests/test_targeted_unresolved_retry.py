@@ -20,10 +20,12 @@ from app.services.scraper.orchestrator import (
     _matched_resume_provenance,
     _normalize_course_url,
     _prior_targeted_retry_resolved_urls,
+    _verification_resume_keys,
     _should_auto_discover_fee_page,
     _targeted_retry_all_filtered_diagnostic,
     _target_course_urls_from_payload,
 )
+from app.services.scraper.url_identity import canonical_course_url_key
 
 
 def test_start_scrape_body_accepts_targeted_course_urls() -> None:
@@ -205,6 +207,46 @@ def test_redelivery_does_not_reinterpret_filtered_completion_checkpoints_as_reso
     assert diagnostic is not None
     assert diagnostic["filtered_urls"] == [filtered]
     assert diagnostic["resolved_count"] == 1
+
+
+def test_redelivery_does_not_reinterpret_error_completion_checkpoint_as_resolved() -> None:
+    failed = "https://example.edu/course/exhausted-fetch"
+    resolved = "https://example.edu/course/already-resolved"
+    discovered_config = {
+        "autonomousVerification": {
+            "completed_urls": [failed, resolved],
+            "url_outcomes": {failed: "error"},
+            "completed_scope": (
+                "settled attempts and eligibility exclusions; not successful recovery"
+            ),
+        },
+    }
+
+    assert _prior_targeted_retry_resolved_urls(discovered_config) == [resolved]
+
+
+def test_verification_resume_keeps_error_outcome_available_for_redelivery() -> None:
+    failed = "https://example.edu/course/exhausted-fetch"
+    resolved = "https://example.edu/course/already-resolved"
+    metadata = {
+        "completed_urls": [failed, resolved],
+        "url_outcomes": {failed: "error"},
+    }
+    error_keys = {
+        canonical_course_url_key(url)
+        for url, outcome in metadata["url_outcomes"].items()
+        if outcome == "error"
+    }
+    resumable_acknowledgements = [
+        url
+        for url in metadata["completed_urls"]
+        if canonical_course_url_key(url) not in error_keys
+    ]
+
+    _, processed = _verification_resume_keys([], resumable_acknowledgements)
+
+    assert canonical_course_url_key(failed) not in processed
+    assert canonical_course_url_key(resolved) in processed
 
 
 def test_production_resume_classifies_after_already_resolved_filtering() -> None:

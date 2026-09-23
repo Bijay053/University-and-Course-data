@@ -150,3 +150,4 @@
 - [Developer-free recovery UX](developer-free-recovery-ux.md) — blocked recovery must request an official course URL, never scraper settings or manual developer investigation.
 - [Automatic repair JS-shell evidence](automatic-repair-js-shell-evidence.md) — live repair probes must render JS-only shells and recognize site-owned field labels before rejecting valid course pages.
 - [Resume count semantics](resume-count-semantics.md) — settled URLs are not imports; same-child rows must not be added twice during database reconciliation.
+- [Settled URL outcome semantics](settled-url-outcome-semantics.md) — completed URL checkpoints include errors; recovery must use outcome provenance before resolving or suppressing work.

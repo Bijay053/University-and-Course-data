@@ -2031,6 +2031,11 @@ def _prior_targeted_retry_resolved_urls(
     config = discovered_config or {}
     metadata = config.get("autonomousVerification") or {}
     diagnostic = config.get("targeted_retry_diagnostic") or {}
+    error_keys = {
+        canonical_course_url_key(url)
+        for url, outcome in (metadata.get("url_outcomes") or {}).items()
+        if outcome == "error" and canonical_course_url_key(url)
+    }
     filtered_keys = {
         canonical_course_url_key(url)
         for url in [
@@ -2042,7 +2047,7 @@ def _prior_targeted_retry_resolved_urls(
     return [
         url
         for url in metadata.get("completed_urls", [])
-        if canonical_course_url_key(url) not in filtered_keys
+        if canonical_course_url_key(url) not in filtered_keys | error_keys
     ]
 
 
@@ -6375,11 +6380,19 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             )).scalars().all()
             _completed_ack_urls = []
             if (job.request_payload or {}).get("courseReport"):
-                _completed_ack_urls = list(
-                    ((job.discovered_config or {}).get("autonomousVerification") or {}).get(
-                        "completed_urls", []
-                    )
+                _resume_metadata = (
+                    (job.discovered_config or {}).get("autonomousVerification") or {}
                 )
+                _error_outcome_keys = {
+                    canonical_course_url_key(url)
+                    for url, outcome in (_resume_metadata.get("url_outcomes") or {}).items()
+                    if outcome == "error" and canonical_course_url_key(url)
+                }
+                _completed_ack_urls = [
+                    url
+                    for url in _resume_metadata.get("completed_urls", [])
+                    if canonical_course_url_key(url) not in _error_outcome_keys
+                ]
             recovered_keys, _processed_resume_keys = _verification_resume_keys(
                 list(recovered_urls),
                 _completed_ack_urls,
