@@ -75,6 +75,75 @@ async def seed() -> None:
     await engine.dispose()
 
 
+async def seed_continuation() -> None:
+    """Seed the persisted payload produced by a reviewed report continuation."""
+    await seed()
+    from app.database import AsyncSessionLocal, engine
+    from app.models import ScrapeRuntimeJob, ScrapedCourse
+
+    async with AsyncSessionLocal() as db:
+        source = await db.get(ScrapeRuntimeJob, task564_process.SOURCE)
+        report = {
+            "id": "task582-report",
+            "source_job_id": source.runtime_job_id,
+            "course_urls": [
+                "https://task564.example.test/courses/blocked-alpha",
+                "https://task564.example.test/courses/blocked-beta",
+            ],
+            "fields": ["fee"],
+        }
+        parent_id = "task582-report-parent"
+        source.request_payload = {
+            "aiRepairWorkflow": {
+                "session_id": report["id"], "job_id": source.runtime_job_id,
+                "university_id": source.university_id, "status": "running",
+                "autonomous": {
+                    "phase": "verification_queued",
+                    "verification_job_id": "job_task582_continuation",
+                    "verification_job_ids": [parent_id, "job_task582_continuation"],
+                },
+            },
+        }
+        db.add(ScrapeRuntimeJob(
+            runtime_job_id=parent_id, university_id=source.university_id,
+            university_name=source.university_name, url=source.url,
+            job_type="scrape", status="completed_with_errors", errors=3,
+            imported=1,
+            request_payload={
+                "retrySourceJobId": source.runtime_job_id, "courseReport": report,
+            },
+        ))
+        db.add(ScrapedCourse(
+            scrape_job_id=parent_id, university_id=source.university_id,
+            course_name="Bachelor of Earlier Report Evidence", status="pending",
+            course_website="https://task564.example.test/courses/earlier-report",
+            canonical_course_url="https://task564.example.test/courses/earlier-report",
+        ))
+        db.add(ScrapeRuntimeJob(
+            runtime_job_id="job_task582_continuation",
+            university_id=source.university_id, university_name=source.university_name,
+            url=source.url, job_type="scrape", status="queued",
+            request_payload={
+                "url": source.url,
+                "universityId": source.university_id,
+                "university_id": source.university_id,
+                "courseUrls": report["course_urls"],
+                "course_urls": report["course_urls"],
+                "courseReportRemainingUrls": report["course_urls"],
+                "retrySourceJobId": parent_id,
+                "courseReport": report,
+                "autonomousVerification": {
+                    "parent_job_id": source.runtime_job_id,
+                    "session_id": report["id"], "round_index": 1,
+                    "max_courses": 50, "time_budget_seconds": 600,
+                    "cost_cap_usd": 2,
+                },
+            },
+        ))
+        await db.commit()
+    await engine.dispose()
+
+
 def install_task_postrun_marker() -> None:
     """Record completion only after the real Celery task has returned."""
     from celery.signals import task_postrun
@@ -126,6 +195,13 @@ if __name__ == "__main__":
     task564_process.install_http_fixture()
     if sys.argv[1] == "seed":
         asyncio.run(seed())
+    elif sys.argv[1] == "seed-continuation":
+        asyncio.run(seed_continuation())
+    elif sys.argv[1] == "dispatch-continuation":
+        from app.tasks.celery_app import celery_app
+        celery_app.send_task(
+            "scrape.university", args=["job_task582_continuation"], queue="scrape",
+        )
     elif sys.argv[1] == "api":
         import uvicorn
         uvicorn.run(

@@ -26,3 +26,9 @@ Cross-worker acceptance must prove distinct worker identities; queue delivery al
 **Why:** A persistent worker can execute both children and hide serialization, stale resource, or process-boundary defects.
 
 **How to apply:** Stop the first worker after its durable terminal checkpoint, start a replacement, and assert different recorded worker identities plus exact remaining work.
+
+Do not treat exclusions checkpointed during the current run as evidence that a targeted retry was already resolved.
+
+**Why:** Course-report verification records filtered URLs as completed attempts before resume classification. Counting those fresh acknowledgements as prior work can turn an entirely blocked continuation into a successful no-op and suppress its original-review diagnostic.
+
+**How to apply:** Distinguish pre-run checkpoints and persisted review rows from current-run exclusion acknowledgements when classifying zero-work retries.

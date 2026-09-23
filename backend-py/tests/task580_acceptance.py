@@ -1,4 +1,4 @@
-"""Disposable real-worker acceptance for an all-filtered targeted retry.
+"""Disposable real-worker acceptance for all-filtered retries and report continuations.
 
 Run from the repository root:
   python backend-py/tests/task580_acceptance.py --output /tmp/task580-evidence
@@ -29,6 +29,7 @@ from tests.task564_acceptance import port, recipe_snapshot
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND = ROOT / "backend-py"
 SOURCE = "task564-source"
+REPORT_PARENT = "task582-report-parent"
 SELECTED = [
     "https://task564.example.test/courses/blocked-alpha",
     "https://task564.example.test/courses/blocked-beta",
@@ -50,6 +51,23 @@ async def database_snapshot(url: str) -> dict:
         """)
         return {
             "jobs": [dict(row) for row in jobs],
+            "earlier_reviews": {
+                job_id: {
+                    "job": await db.fetchval(
+                        "SELECT row_to_json(j)::text FROM scrape_runtime_jobs j "
+                        "WHERE runtime_job_id=$1", job_id,
+                    ),
+                    "rows": await db.fetchval(
+                        "SELECT coalesce(json_agg(row_to_json(s) ORDER BY id)::text, '[]') "
+                        "FROM scraped_courses s WHERE scrape_job_id=$1", job_id,
+                    ),
+                    "logs": await db.fetchval(
+                        "SELECT coalesce(json_agg(row_to_json(l) ORDER BY sequence)::text, '[]') "
+                        "FROM scrape_runtime_logs l WHERE runtime_job_id=$1", job_id,
+                    ),
+                }
+                for job_id in (SOURCE, REPORT_PARENT)
+            },
             "source_errors": await db.fetchval(
                 "SELECT errors FROM scrape_runtime_jobs WHERE runtime_job_id=$1", SOURCE
             ),
@@ -97,7 +115,7 @@ def decoded(value):
     return json.loads(value) if isinstance(value, str) else (value or {})
 
 
-def run(output: Path) -> dict:
+def run(output: Path, *, continuation: bool = False) -> dict:
     output.mkdir(parents=True, exist_ok=True)
     for binary in ("initdb", "pg_ctl", "redis-server"):
         if not shutil.which(binary):
@@ -105,6 +123,7 @@ def run(output: Path) -> dict:
 
     evidence = {
         "task": 580,
+        "scenario": "course_report_continuation" if continuation else "retry_unresolved",
         "passed": False,
         "production_boundaries": (
             "Production FastAPI router, Celery prefork task, scraper orchestrator, "
@@ -186,6 +205,17 @@ def run(output: Path) -> dict:
         })
         assert response.status_code == 200, response.text
 
+    def submit_unresolved(base: str) -> str:
+        with httpx.Client(base_url=base, timeout=40) as client:
+            login(client)
+            response = client.post(
+                f"/api/scrape/history/{SOURCE}/retry-unresolved",
+                json={"urls": SELECTED},
+            )
+            assert response.status_code == 202, response.text
+            posted = response.json()
+            return posted.get("job_id") or posted["jobId"]
+
     try:
         subprocess.run(
             ["initdb", "-D", str(temp / "pg"), "-A", "trust", "-U", "task564"],
@@ -206,12 +236,20 @@ def run(output: Path) -> dict:
             "redis-server", "--bind", "127.0.0.1", "--port", str(redisport),
             "--save", "", "--appendonly", "no", "--dir", str(temp),
         ])
-        seed = start("seed", [sys.executable, "-m", "tests.task580_process", "seed"])
+        seed = start("seed", [
+            sys.executable, "-m", "tests.task580_process",
+            "seed-continuation" if continuation else "seed",
+        ])
         assert seed.wait(timeout=90) == 0, "Schema/seed failed; see seed.log"
         before = snapshot(dburl)
         assert before["source_errors"] == 7
         assert before["source_approved"] > 0
         assert before["published"] > 0
+        if continuation:
+            assert REPORT_PARENT != SOURCE
+            for review in before["earlier_reviews"].values():
+                assert review["job"] is not None
+                assert decoded(review["rows"])
 
         worker = start(
             "worker", [sys.executable, "-m", "tests.task580_process", "worker"]
@@ -221,15 +259,16 @@ def run(output: Path) -> dict:
         ])
         wait_http(f"http://127.0.0.1:{apiport}/api/health")
         base = f"http://127.0.0.1:{apiport}"
-        with httpx.Client(base_url=base, timeout=40) as client:
-            login(client)
-            response = client.post(
-                f"/api/scrape/history/{SOURCE}/retry-unresolved",
-                json={"urls": SELECTED},
-            )
-            assert response.status_code == 202, response.text
-            posted = response.json()
-            retry_id = posted.get("job_id") or posted["jobId"]
+        if continuation:
+            retry_id = "job_task582_continuation"
+            dispatch = start("dispatch", [
+                sys.executable, "-m", "tests.task580_process", "dispatch-continuation",
+            ])
+            assert dispatch.wait(timeout=30) == 0, "Dispatch failed; see dispatch.log"
+        else:
+            retry_id = submit_unresolved(base)
+
+        retry_parent = REPORT_PARENT if continuation else SOURCE
 
         deadline = time.monotonic() + 240
         while time.monotonic() < deadline:
@@ -286,10 +325,12 @@ def run(output: Path) -> dict:
         assert retry["errors"] > 0, retry
         assert payload["courseUrls"] == SELECTED
         assert payload["course_urls"] == SELECTED
-        assert payload["retrySourceJobId"] == SOURCE
+        assert payload["retrySourceJobId"] == retry_parent
+        if continuation:
+            assert payload["courseReport"]["source_job_id"] == SOURCE
         assert diagnostic["selected_urls"] == SELECTED
         assert diagnostic["filtered_urls"] == SELECTED
-        assert diagnostic["retry_source_job_id"] == SOURCE
+        assert diagnostic["retry_source_job_id"] == retry_parent
         assert diagnostic["source_review_job_id"] == SOURCE
         assert diagnostic["processed_count"] == 0
         assert retry["error_message"] == diagnostic["message"]
@@ -300,6 +341,15 @@ def run(output: Path) -> dict:
         assert final["source_approved_bytes"] == before["source_approved_bytes"]
         assert final["published"] == before["published"] > 0
         assert final["published_bytes"] == before["published_bytes"]
+        assert final["earlier_reviews"] == before["earlier_reviews"]
+        persisted_logs = [
+            row for row in final["diagnostic_logs"]
+            if row["runtime_job_id"] == retry_id
+        ]
+        assert persisted_logs
+        for row in persisted_logs:
+            assert decoded(row["payload"])["retry_source_job_id"] == retry_parent
+            assert decoded(row["payload"])["source_review_job_id"] == SOURCE
         retry_rows = [
             dict(row) for row in final["retry_rows"]
             if row["scrape_job_id"] == retry_id
@@ -334,7 +384,12 @@ def run(output: Path) -> dict:
         ]
         assert diagnostic_history
         assert diagnostic_history[-1]["selected_urls"] == SELECTED
+        assert diagnostic_history[-1]["retry_source_job_id"] == retry_parent
+        assert diagnostic_history[-1]["source_review_job_id"] == SOURCE
         assert history_json["stagedCourses"] == []
+        reloaded_snapshot = snapshot(dburl)
+        assert reloaded_snapshot["earlier_reviews"] == before["earlier_reviews"]
+        assert reloaded_snapshot["published_bytes"] == before["published_bytes"]
 
         evidence.update({
             "passed": True,
@@ -361,6 +416,9 @@ def run(output: Path) -> dict:
             "retry_staged_rows": len(retry_rows),
             "approved_review_rows_byte_identical": True,
             "published_records_byte_identical": True,
+            "earlier_reviews_before": before["earlier_reviews"],
+            "earlier_reviews_after_reload": reloaded_snapshot["earlier_reviews"],
+            "both_earlier_review_sets_byte_identical": True,
         })
     except Exception:
         evidence["error"] = traceback.format_exc()
@@ -426,7 +484,8 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     result = run(args.output.resolve())
+    continuation_result = run(args.output.resolve() / "continuation", continuation=True)
     print(json.dumps({
-        "passed": result["passed"],
+        "passed": result["passed"] and continuation_result["passed"],
         "evidence": str(args.output),
     }, indent=2))

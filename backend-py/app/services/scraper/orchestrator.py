@@ -2269,6 +2269,13 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
     _targeted_retry_filter_diagnostic: dict | None = None
     _targeted_retry_url_filter_retained_urls: list[str] = []
     _targeted_retry_resolved_urls: list[str] = []
+    # Current-run filter checkpoints acknowledge exclusions, not prior work.
+    # Keep the pre-run checkpoint set separate for zero-work classification.
+    _prior_report_completed_urls = list(
+        ((job.discovered_config or {}).get("autonomousVerification") or {}).get(
+            "completed_urls", []
+        )
+    )
 
     summary = {"discovered": 0, "staged": 0, "skipped": 0, "errors": 0, "fetch_failed": 0}
     _sit_staged_links: list[dict] = []
@@ -6302,6 +6309,9 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 )
             )).scalars().all()
             recovered_keys = {canonical_course_url_key(url) for url in recovered_urls}
+            _diagnostic_resolved_keys = recovered_keys | {
+                canonical_course_url_key(url) for url in _prior_report_completed_urls
+            }
             if (job.request_payload or {}).get("courseReport"):
                 recovered_keys.update(
                     canonical_course_url_key(url)
@@ -6310,7 +6320,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             _resume_already_staged = len(recovered_keys - {"" , None})
             if _targeted_retry:
                 _targeted_retry_resolved_urls = sorted(
-                    recovered_keys - {"", None}
+                    _diagnostic_resolved_keys - {"", None}
                 )
             links = [
                 link for link in links
