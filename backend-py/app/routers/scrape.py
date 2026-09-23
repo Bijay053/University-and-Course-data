@@ -3203,6 +3203,43 @@ _EXPECTED_FILL_RATE: dict[str, float] = {
 }
 
 
+def _winchester_course_name_missing_award(row) -> bool:
+    """Flag a bare Winchester subject only when its official URL carries an award.
+
+    Winchester's SSR template splits ``BA (Hons)`` into a sibling badge while
+    the persisted name from older runs came from the bare H1 (``Sociology``).
+    Keep this deliberately host- and URL-shape-bounded: the URL is the source
+    evidence for the missing award, and already-qualified names do not remain
+    perpetually repairable.
+    """
+    from urllib.parse import urlparse
+
+    url = str(getattr(row, "course_website", "") or "")
+    parsed = urlparse(url)
+    if (parsed.hostname or "").lower() not in {
+        "winchester.ac.uk",
+        "www.winchester.ac.uk",
+    }:
+        return False
+    if not re.search(
+        r"/courses/(?:ba|bsc|bn|bed|llb|ma|msc|mres|mba|mph|phd)(?:-hons)?-",
+        parsed.path,
+        re.IGNORECASE,
+    ):
+        return False
+    name = str(getattr(row, "course_name", "") or "").strip()
+    if not name:
+        return False
+    return not bool(
+        re.match(
+            r"^(?:ba|bsc|bn|bed|llb|ma|msc|mres|mba|mph|phd|"
+            r"bachelor|master|doctor)\b",
+            name,
+            re.IGNORECASE,
+        )
+    )
+
+
 @router.post("/staged/analyze")
 async def analyze_staged(
     body: ReExtractBody,
@@ -3311,22 +3348,33 @@ async def analyze_staged(
             ),
         })
 
-    # Check university name embedded in course title
+    # Check title defects.  The Winchester branch is intentionally bounded to
+    # official course URLs whose slug itself supplies the omitted award.
     if uni and uni.name:
         uni_lower = uni.name.lower()
-        name_in_title = sum(
-            1 for r in rows
+        university_name_rows = {
+            id(r) for r in rows
             if r.course_name and uni_lower in r.course_name.lower()
-        )
-        if name_in_title > 0:
-            current_pct = round((total - name_in_title) / total * 100) if total else 100
+        }
+        missing_award_rows = {
+            id(r) for r in rows if _winchester_course_name_missing_award(r)
+        }
+        course_name_issues = len(university_name_rows | missing_award_rows)
+        if course_name_issues > 0:
+            current_pct = round((total - course_name_issues) / total * 100) if total else 100
             fill_rate = _EXPECTED_FILL_RATE["course_name"]
-            fillable = round(name_in_title * (courses_with_url / total if total else 1) * fill_rate)
-            expected_pct = round((total - name_in_title + fillable) / total * 100) if total else current_pct
+            fillable = round(course_name_issues * (courses_with_url / total if total else 1) * fill_rate)
+            expected_pct = round((total - course_name_issues + fillable) / total * 100) if total else current_pct
+            if missing_award_rows and not university_name_rows:
+                title_label = "Missing Award in Course Title"
+            elif university_name_rows and not missing_award_rows:
+                title_label = "University Name in Course Title"
+            else:
+                title_label = "Invalid or Incomplete Course Title"
             issues.append({
                 "field": "course_name",
-                "label": "University Name in Course Title",
-                "missing": name_in_title,
+                "label": title_label,
+                "missing": course_name_issues,
                 "total": total,
                 "pct_missing": 100 - current_pct,
                 "current_pct": current_pct,

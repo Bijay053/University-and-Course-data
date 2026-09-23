@@ -3817,11 +3817,17 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                         <td className="p-2 text-center">
                           {course.requirementStatus?.englishComponents.state === "not_required" ? (
                             <span className="text-xs font-medium text-slate-600">Not required</span>
-                          ) : course.requirementStatus?.englishComponents.state === "unknown" ? (
-                            <span className="text-xs font-medium text-amber-700">Unverified</span>
                           ) : course.ieltsOverall ? (
                             <span className="inline-flex flex-col text-purple-700 font-medium">
                               <span>{course.ieltsOverall}</span>
+                              {course.requirementStatus?.englishComponents.state === "unknown" && (
+                                <span
+                                  className="mt-0.5 text-[10px] font-medium text-amber-700"
+                                  title="The extracted score is available, but its English requirements have not been verified."
+                                >
+                                  Unverified
+                                </span>
+                              )}
                               {course.requirementStatus?.englishComponents.missingFields?.length ? (
                                 <span className="mt-0.5 max-w-[130px] text-[10px] font-medium leading-tight text-amber-700">
                                   Missing: {course.requirementStatus.englishComponents.missingFields
@@ -3839,6 +3845,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                                 </a>
                               )}
                             </span>
+                          ) : course.requirementStatus?.englishComponents.state === "unknown" ? (
+                            <span className="text-xs font-medium text-amber-700">Unverified</span>
                           ) : (
                             <span className="inline-flex flex-col items-center gap-0.5 text-amber-600 text-xs font-medium" title="Missing IELTS Overall">
                               <AlertTriangle className="w-3 h-3" />

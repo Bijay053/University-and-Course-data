@@ -69,7 +69,16 @@ _PER_BAND_FLOOR_RE_EACH = re.compile(
     r"(?:score\s+of\s+|of\s+)?"
     r"([0-9]+(?:\.[0-9]+)?)\s+"
     r"in\s+(?:each|all)\s+"
-    r"(?:of\s+the\s+(?:four|4)\s+)?(?:components?|bands?|sections?|skills?)",
+    r"(?:(?:of\s+the\s+)?(?:four|4)\s+)?(?:components?|bands?|sections?|skills?)",
+    re.IGNORECASE,
+)
+
+# A named component is not a uniform floor.  Keep unpublished components empty:
+# "IELTS 6.0 (including 5.5 in academic writing)" sets writing only.
+_IELTS_NAMED_COMPONENT_RE = re.compile(
+    r"(?:including|with|and)\s+"
+    r"([4-9](?:\.[0-9])?)\s+in\s+(?:academic\s+)?"
+    r"(listening|reading|writing|speaking)\b",
     re.IGNORECASE,
 )
 
@@ -95,6 +104,19 @@ def _try_floor(text: str, match_end: int, lo: float, hi: float) -> float | None:
         if lo <= v <= hi:
             return v
     return None
+
+
+def _try_named_ielts_components(
+    text: str, match_end: int, overall: float
+) -> dict[str, float]:
+    """Return only explicitly named IELTS component minima near an overall."""
+    window = text[max(0, match_end - 50):match_end + 250]
+    found: dict[str, float] = {}
+    for match in _IELTS_NAMED_COMPONENT_RE.finditer(window):
+        value = float(match.group(1))
+        if 4.0 <= value <= overall:
+            found[match.group(2).lower()] = value
+    return found
 
 
 # --- IELTS (overall + subscores 4.0-9.0) -------------------------------------
@@ -479,7 +501,14 @@ def _ielts(text: str) -> dict[str, float] | None:
             floor = _try_floor(text, broad.end(), 4.0, 9.0)
             if floor is not None:
                 return {"overall": ov, "listening": floor, "reading": floor, "writing": floor, "speaking": floor}
-            return {"overall": ov, "listening": None, "reading": None, "writing": None, "speaking": None}
+            named = _try_named_ielts_components(text, broad.end(), ov)
+            return {
+                "overall": ov,
+                "listening": named.get("listening"),
+                "reading": named.get("reading"),
+                "writing": named.get("writing"),
+                "speaking": named.get("speaking"),
+            }
 
     # Pattern 6: score BEFORE the IELTS keyword — "a score of 6.5 on the IELTS
     # test", "6.5 in IELTS Academic", "at least 7.0 on IELTS", "band score of

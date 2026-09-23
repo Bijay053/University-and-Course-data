@@ -119,6 +119,40 @@ function initialReview(): ScrapingInitialReviewState {
 }
 
 describe("Scraping repair reviewer", () => {
+  it.each([6.0, 6.5, null])("keeps available IELTS %s visible alongside Unverified", async (score) => {
+    const review = initialReview();
+    review.courses = [{
+      ...review.courses[0],
+      courseName: "Course with unverified English",
+      ieltsOverall: score,
+      requirementStatus: {
+        academic: { state: "numeric" },
+        englishComponents: {
+          state: "unknown",
+          missingFields: ["ielts_writing"],
+          sourceUrl: "https://uni.test/english",
+        },
+      },
+    }] as ScrapingInitialReviewState["courses"];
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({})));
+    render(<ScrapingForTest initialReviewState={review} />);
+    const row = screen.getByText("Course with unverified English").closest("tr")!;
+    const cells = within(row).getAllByRole("cell");
+    const ielts = cells.find(cell => cell.textContent?.includes("Unverified")
+      && (score === null || cell.textContent.includes(String(score)))
+      && !cell.textContent.includes("Course with unverified English"))!;
+    expect(ielts).toBeTruthy();
+    expect(within(ielts).getByText("Unverified")).toBeTruthy();
+    if (score !== null) {
+      expect(within(ielts).getByText(String(score))).toBeTruthy();
+      expect(within(ielts).getByText(/Missing:.*Writing/i)).toBeTruthy();
+      expect(within(ielts).getByRole("link", { name: "Official source" }).getAttribute("href"))
+        .toBe("https://uni.test/english");
+    } else {
+      expect(ielts.textContent).toBe("Unverified");
+    }
+  });
+
   it("normalizes snake-case requirement status without inventing a numeric score", () => {
     const status = normalizeRequirementStatus({
       academic: {

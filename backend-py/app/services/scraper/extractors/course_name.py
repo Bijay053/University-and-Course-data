@@ -24,7 +24,7 @@ _CATALOGUE_SEGS: frozenset[str] = frozenset({
 _PREPOSITIONS = {"of", "in", "and", "for", "the", "with", "to", "on", "by"}
 _ACRONYMS = {
     "MBA", "BBA", "BA", "MA", "BS", "BSc", "MSc", "PhD", "ICT", "IT", "AI",
-    "MD", "JD", "LLM", "LLB", "ME", "MEng", "EMBA", "GDip", "GCert",
+    "MD", "JD", "LLM", "LLB", "ME", "MEng", "MPH", "EMBA", "GDip", "GCert",
     "MIT", "USQ", "CSU", "UTS", "ANU", "UNSW", "UoN", "RMIT",
     # Issue 3b: Roman numerals used in AQF course names (Certificate III,
     # Certificate IV, Diploma etc.). Without these, _smart_case title-cases

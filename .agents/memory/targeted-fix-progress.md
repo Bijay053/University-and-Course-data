@@ -26,3 +26,9 @@ Durable Fix job identity includes the selected course IDs, target-field set, and
 **Why:** Course-ID-only matching can attach a duration request to a fee job; checking only the newest active job can miss an older exact match and duplicate work.
 
 **How to apply:** Reuse only a semantically identical queued/running job, regardless of newer nonmatching jobs for the same university.
+
+An extractor correction for an existing nonblank value also needs a matching Fix-analysis issue.
+
+**Why:** Winchester's corrected full title was extracted successfully, but the saved bare subject was not identified as defective, so targeted Fix excluded the name from persistence.
+
+**How to apply:** Test analysis → requested targets → persisted fields together. Detect the defect with bounded source evidence, and ensure it disappears after correction rather than rewriting unrelated fields.

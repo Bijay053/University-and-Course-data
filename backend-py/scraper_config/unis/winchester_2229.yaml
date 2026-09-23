@@ -58,9 +58,17 @@ discovery:
 extraction:
   course_name:
     # Title format: "BA (Hons) Accounting and Finance - University of Winchester"
-    # Strip the suffix to get the full qualified course name.
+    # The H1 contains only the subject ("Sociology"); the adjacent award badge is
+    # not part of the H1.  The SSR title is therefore the bounded authoritative
+    # source for the complete name.
+    prefer_title_over_h1: true
     strip_title_suffixes:
       - " - University of Winchester"
+
+  english:
+    # Winchester publishes English requirements as SSR text.  Do not let
+    # unrelated course-page images replace those course-owned values.
+    trust_vision_ocr: false
 
   fees:
     default_currency: GBP
