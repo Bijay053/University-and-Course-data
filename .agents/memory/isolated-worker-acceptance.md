@@ -20,3 +20,9 @@ Run asynchronous database snapshots outside the synchronous Playwright caller's 
 **Why:** Playwright's synchronous API maintains a running event loop; an adjacent `asyncio.run()` raises instead of observing the worker. Keeping the connection and loop in a separate thread avoids cross-loop connection reuse.
 
 **How to apply:** Use a thread-local async snapshot or a synchronous database driver; do not share async connections across loops.
+
+Verify recovery invariants only after the actual Celery task returns, using a fresh database session and restarted API.
+
+**Why:** A terminal job row is not proof that the worker lifecycle has finished: post-terminal recovery work may still mutate data. Logs alone also cannot prove reload persistence.
+
+**How to apply:** Wait for an exact-job task completion signal before taking authoritative snapshots; compare diagnostics and protected records from that snapshot with fresh API projections.

@@ -23,7 +23,9 @@ def isolate_recipe_files():
     from app.services.scraper import yaml_cascade
 
     root = Path(os.environ["TASK564_RECIPE_ROOT"]).resolve()
-    assert root.parent.name.startswith(("task564-private-", "task568-private-"))
+    assert root.parent.name.startswith((
+        "task564-private-", "task568-private-", "task580-private-",
+    ))
     root.mkdir(parents=True, exist_ok=True)
     (root / "unis").mkdir(exist_ok=True)
     (root / "runtime_unis").mkdir(exist_ok=True)

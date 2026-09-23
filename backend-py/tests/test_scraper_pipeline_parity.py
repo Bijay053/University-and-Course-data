@@ -213,7 +213,7 @@ def test_t205_no_blockers_no_warnings_yields_ready_status_and_ok_reason():
         duration="3 years", intake_months=["February"],
         international_fee=45000, description="Great.",
         academic_level="Year 12", academic_score=85,
-        ielts_overall=6.5, other_requirement="Personal statement",
+        pte_overall=58, other_requirement="Personal statement",
     )
     comp = compute_completeness(sc)
     decision = decide_eligibility(sc, comp)

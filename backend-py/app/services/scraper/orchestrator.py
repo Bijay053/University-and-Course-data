@@ -6467,6 +6467,12 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             # Keep the original request payload (including courseUrls and
             # retrySourceJobId) intact. The diagnostic is additive so neither
             # source-review linkage nor an earlier error is erased.
+            # ``_dc`` was assigned to the JSONB attribute and committed above.
+            # Copy it before adding the terminal diagnostic: mutating and
+            # reassigning the same dict object is not considered a change by
+            # SQLAlchemy, so the diagnostic otherwise survives in logs but is
+            # absent after a fresh database/API load.
+            _dc = dict(_dc)
             _dc["targeted_retry_diagnostic"] = _targeted_retry_filter_diagnostic
             job.discovered_config = _dc
             job.error_message = (
@@ -8794,7 +8800,12 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             except Exception:  # noqa: BLE001
                 pass
             log.warning("[CONF_TREND] failed for run %s: %s", runtime_job_id, _conf_exc)
-        if _catalogue_guard:
+        if _targeted_retry_filter_diagnostic:
+            # Preserve the actionable terminal diagnostic written before
+            # extraction. The generic zero-work finalizer must not replace it
+            # with "all workers errored".
+            job.error_message = _targeted_retry_filter_diagnostic["message"][:1000]
+        elif _catalogue_guard:
             job.error_message = _catalogue_guard["message"][:1000]
         elif finished_cleanly:
             job.error_message = None  # clear any stale message
