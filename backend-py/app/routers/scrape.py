@@ -3360,7 +3360,7 @@ def _dated_source_fingerprint(url: object) -> str:
     return hashlib.sha256(str(url or "").encode("utf-8")).hexdigest()
 
 
-def _dated_catalogue_response(row) -> dict:
+def _dated_catalogue_response(row, *, history_count: int | None = None) -> dict:
     review = _dated_catalogue_review_payload(row)
     source_fingerprint = review.get("sourceFingerprint")
     evidence_stale = (
@@ -3370,7 +3370,12 @@ def _dated_catalogue_response(row) -> dict:
     response_review = {
             key: value for key, value in review.items() if key != "history"
         }
-    response_review["historyCount"] = len(review.get("history") or []) if isinstance(review.get("history"), list) else 0
+    legacy_history = review.get("history")
+    response_review["historyCount"] = (
+        history_count
+        if history_count is not None
+        else len(legacy_history) if isinstance(legacy_history, list) else 0
+    )
     return {
         "id": row.id,
         "jobId": row.scrape_job_id,
@@ -3386,7 +3391,13 @@ def _dated_catalogue_response(row) -> dict:
     }
 
 
-def _dated_catalogue_history_page(row, query: DatedCatalogueHistoryQuery) -> dict:
+def _dated_catalogue_history_page(
+    row,
+    query: DatedCatalogueHistoryQuery,
+    *,
+    entries: list[dict],
+    history_count: int,
+) -> dict:
     """Return an immutable newest-first page; cursor is a zero-based offset.
 
     The revision is part of the request and response so clients never append
@@ -3394,24 +3405,100 @@ def _dated_catalogue_history_page(row, query: DatedCatalogueHistoryQuery) -> dic
     only for presentation, and each page uses the same offset into that
     immutable snapshot.
     """
-    review = _dated_catalogue_review_payload(row)
-    history = review.get("history")
-    if not isinstance(history, list):
-        history = []
-    newest_first = list(reversed(history))
     start = query.cursor
-    entries = newest_first[start:start + query.limit]
-    next_cursor = start + len(entries) if start + len(entries) < len(newest_first) else None
+    next_cursor = start + len(entries) if start + len(entries) < history_count else None
     return {
         "rowId": row.id,
         "jobId": row.scrape_job_id,
         "universityId": row.university_id,
-        "revision": int(review.get("revision") or 0),
-        "historyCount": len(history),
+        "revision": int(_dated_catalogue_review_payload(row).get("revision") or 0),
+        "historyCount": history_count,
         "cursor": start,
         "nextCursor": next_cursor,
         "entries": entries,
     }
+
+
+async def _dated_history_count(
+    db: AsyncSession,
+    row_id: int,
+    *,
+    max_revision: int | None = None,
+) -> int:
+    from app.models import DatedCatalogueReviewHistory
+
+    query = select(func.count()).select_from(DatedCatalogueReviewHistory).where(
+        DatedCatalogueReviewHistory.scraped_course_id == row_id
+    )
+    if max_revision is not None:
+        query = query.where(
+            DatedCatalogueReviewHistory.revision <= max_revision
+        )
+    return int((await db.scalar(query)) or 0)
+
+
+async def _dated_history_counts(
+    db: AsyncSession,
+    row_ids: list[int],
+) -> dict[int, int]:
+    from app.models import DatedCatalogueReviewHistory
+
+    if not row_ids:
+        return {}
+    rows = (await db.execute(
+        select(
+            DatedCatalogueReviewHistory.scraped_course_id,
+            func.count(),
+        ).where(
+            DatedCatalogueReviewHistory.scraped_course_id.in_(row_ids)
+        ).group_by(DatedCatalogueReviewHistory.scraped_course_id)
+    )).all()
+    return {row_id: int(count) for row_id, count in rows}
+
+
+async def _promote_legacy_dated_history(
+    db: AsyncSession,
+    row,
+    review: dict,
+) -> dict:
+    """Copy legacy JSON events once, then return state without the history blob."""
+    from app.models import DatedCatalogueReviewHistory
+
+    history = review.get("history")
+    if isinstance(history, list) and history:
+        existing = await _dated_history_count(db, row.id)
+        if existing == 0:
+            current_revision = int(review.get("revision") or 0)
+            first_revision = (
+                current_revision - len(history) + 1
+                if current_revision >= len(history)
+                else 1
+            )
+            for revision, event in enumerate(history, start=first_revision):
+                db.add(DatedCatalogueReviewHistory(
+                    scraped_course_id=row.id,
+                    revision=revision,
+                    event=event,
+                ))
+    return {key: value for key, value in review.items() if key != "history"}
+
+
+async def _append_dated_history(
+    db: AsyncSession,
+    row,
+    review: dict,
+    revision: int,
+    event: dict,
+) -> dict:
+    from app.models import DatedCatalogueReviewHistory
+
+    state = await _promote_legacy_dated_history(db, row, review)
+    db.add(DatedCatalogueReviewHistory(
+        scraped_course_id=row.id,
+        revision=revision,
+        event=event,
+    ))
+    return state
 
 
 async def _exact_dated_rows(
@@ -3449,7 +3536,14 @@ async def read_dated_catalogue_reviews(
 ) -> dict:
     """Reload durable evidence and reviewer decisions without fetching live pages."""
     rows = await _exact_dated_rows(db, body)
-    return {"rows": [_dated_catalogue_response(row) for row in rows]}
+    counts = await _dated_history_counts(db, [row.id for row in rows])
+    for row in rows:
+        if counts.get(row.id, 0) == 0:
+            legacy = _dated_catalogue_review_payload(row).get("history")
+            counts[row.id] = len(legacy) if isinstance(legacy, list) else 0
+    return {"rows": [
+        _dated_catalogue_response(row, history_count=counts[row.id]) for row in rows
+    ]}
 
 
 @router.get("/staged/dated-catalogue-reviews/{sc_id}/history")
@@ -3478,7 +3572,27 @@ async def read_dated_catalogue_history(
     current_revision = int(_dated_catalogue_review_payload(row).get("revision") or 0)
     if current_revision != query.revision:
         raise HTTPException(status_code=409, detail="Review revision changed; reload the review.")
-    return _dated_catalogue_history_page(row, query)
+    from app.models import DatedCatalogueReviewHistory
+
+    history_count = await _dated_history_count(
+        db, row.id, max_revision=query.revision
+    )
+    if history_count:
+        entries = list((await db.execute(
+            select(DatedCatalogueReviewHistory.event).where(
+                DatedCatalogueReviewHistory.scraped_course_id == row.id,
+                DatedCatalogueReviewHistory.revision <= query.revision,
+            ).order_by(DatedCatalogueReviewHistory.revision.desc())
+            .offset(query.cursor).limit(query.limit)
+        )).scalars().all())
+    else:
+        legacy = _dated_catalogue_review_payload(row).get("history")
+        legacy = legacy if isinstance(legacy, list) else []
+        history_count = len(legacy)
+        entries = list(reversed(legacy))[query.cursor:query.cursor + query.limit]
+    return _dated_catalogue_history_page(
+        row, query, entries=entries, history_count=history_count
+    )
 
 
 @router.post("/staged/dated-catalogue-reviews/audit")
@@ -3539,14 +3653,17 @@ async def audit_dated_catalogue_reviews(
                 status_code=409,
                 detail="Course URL or review evidence changed during the audit; reload and audit the current URL.",
             )
-        history = list(previous.get("history") or [])
-        history.append({
+        next_revision = int(previous.get("revision") or 0) + 1
+        event = {
             "type": "official_source_audit",
             "at": evidence_by_id[row.id]["checkedAt"],
             "evidence": evidence_by_id[row.id],
-        })
+        }
+        previous = await _append_dated_history(
+            db, row, previous, next_revision, event
+        )
         metadata["dated_catalogue_review"] = {
-            "revision": int(previous.get("revision") or 0) + 1,
+            "revision": next_revision,
             "evidence": evidence_by_id[row.id],
             "sourceUrl": snapshot["url"],
             "sourceFingerprint": snapshot["fingerprint"],
@@ -3555,7 +3672,6 @@ async def audit_dated_catalogue_reviews(
             "decision": None,
             "reviewer": None,
             "decidedAt": None,
-            "history": history,
         }
         row.extraction_method = metadata
         warnings = list(row.scrape_warnings or [])
@@ -3568,7 +3684,12 @@ async def audit_dated_catalogue_reviews(
         await db.rollback()
         log.exception("Could not persist Winchester dated catalogue audit")
         raise HTTPException(status_code=500, detail="Could not persist dated catalogue audit") from exc
-    return {"rows": [_dated_catalogue_response(row) for row in locked_rows]}
+    return {"rows": [
+        _dated_catalogue_response(
+            row, history_count=await _dated_history_count(db, row.id)
+        )
+        for row in locked_rows
+    ]}
 
 
 @router.put("/staged/dated-catalogue-reviews/{sc_id}/decision")
@@ -3633,21 +3754,21 @@ async def decide_dated_catalogue_review(
         "email": user.get("email"),
         "name": user.get("name"),
     }
-    history = list(review.get("history") or [])
-    history.append({
+    next_revision = revision + 1
+    event = {
         "type": "reviewer_decision",
         "at": decided_at,
         "decision": body.decision,
         "reviewer": reviewer,
         "evidenceRevision": revision,
-    })
+    }
+    review = await _append_dated_history(db, row, review, next_revision, event)
     metadata["dated_catalogue_review"] = {
         **review,
-        "revision": revision + 1,
+        "revision": next_revision,
         "decision": body.decision,
         "reviewer": reviewer,
         "decidedAt": decided_at,
-        "history": history,
     }
     row.extraction_method = metadata
     try:
@@ -3657,7 +3778,9 @@ async def decide_dated_catalogue_review(
         log.exception("Could not persist Winchester dated catalogue decision")
         raise HTTPException(status_code=500, detail="Could not save reviewer decision") from exc
     # Deliberately does not alter URLs, status, warning, or publication gates.
-    return _dated_catalogue_response(row)
+    return _dated_catalogue_response(
+        row, history_count=await _dated_history_count(db, row.id)
+    )
 
 
 @router.post("/staged/analyze")
@@ -5070,20 +5193,22 @@ async def staged_update(
         review = metadata.get("dated_catalogue_review")
         if isinstance(review, dict):
             changed_at = datetime.now(timezone.utc).isoformat()
-            history = list(review.get("history") or [])
-            history.append({
+            next_revision = int(review.get("revision") or 0) + 1
+            event = {
                 "type": "source_url_changed",
                 "at": changed_at,
                 "fromUrl": original_course_website,
                 "toUrl": sc.course_website,
-            })
+            }
+            review = await _append_dated_history(
+                db, sc, review, next_revision, event
+            )
             metadata["dated_catalogue_review"] = {
                 **review,
-                "revision": int(review.get("revision") or 0) + 1,
+                "revision": next_revision,
                 "decision": None,
                 "reviewer": None,
                 "decidedAt": None,
-                "history": history,
             }
             sc.extraction_method = metadata
     if changed:

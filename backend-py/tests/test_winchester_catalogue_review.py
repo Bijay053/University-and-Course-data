@@ -7,7 +7,12 @@ from sqlalchemy import delete, select
 from pydantic import ValidationError
 
 from app.database import AsyncSessionLocal
-from app.models import ScrapedCourse, ScrapeRuntimeJob, University
+from app.models import (
+    DatedCatalogueReviewHistory,
+    ScrapedCourse,
+    ScrapeRuntimeJob,
+    University,
+)
 from app.routers.scrape import (
     DatedCatalogueAuditBody,
     DatedCatalogueDecisionBody,
@@ -160,9 +165,16 @@ async def test_decision_is_durable_scoped_and_optimistically_concurrent():
 
     class DB:
         commits = 0
+        added = []
 
         async def execute(self, _statement):
             return Result()
+
+        async def scalar(self, _statement):
+            return len(self.added)
+
+        def add(self, value):
+            self.added.append(value)
 
         async def commit(self):
             self.commits += 1
@@ -187,8 +199,14 @@ async def test_decision_is_durable_scoped_and_optimistically_concurrent():
     assert row.course_website.endswith("MA-Politics-2025/")
     assert row.scrape_warnings == ["dated_catalogue_page_review"]
     assert row.extraction_method["course_name"] == {"method": "title"}
+    assert "history" not in row.extraction_method["dated_catalogue_review"]
     assert "history" not in response["review"]
     assert response["review"]["historyCount"] == 2
+    assert [entry.event["type"] for entry in db.added] == [
+        "official_source_audit",
+        "reviewer_decision",
+    ]
+    assert [entry.revision for entry in db.added] == [2, 3]
     assert db.commits == 1
 
     with pytest.raises(HTTPException) as stale:
@@ -246,8 +264,17 @@ async def test_current_counterpart_decision_requires_verified_backend_suggestion
             return row
 
     class DB:
+        def __init__(self):
+            self.added = []
+
         async def execute(self, _statement):
             return Result()
+
+        async def scalar(self, _statement):
+            return len(self.added)
+
+        def add(self, value):
+            self.added.append(value)
 
     with pytest.raises(HTTPException) as denied:
         await decide_dated_catalogue_review(
@@ -310,8 +337,17 @@ async def test_archive_redirect_keeps_requested_identity_and_cannot_authorize_de
             return row
 
     class DB:
+        def __init__(self):
+            self.added = []
+
         async def execute(self, _statement):
             return Result()
+
+        async def scalar(self, _statement):
+            return len(self.added)
+
+        def add(self, value):
+            self.added.append(value)
 
         async def commit(self):
             return None
@@ -375,6 +411,15 @@ async def test_reaudits_append_evidence_history_instead_of_overwriting(monkeypat
         }
 
     class DB:
+        def __init__(self):
+            self.added = []
+
+        async def scalar(self, _statement):
+            return len(self.added)
+
+        def add(self, value):
+            self.added.append(value)
+
         async def commit(self):
             return None
 
@@ -390,11 +435,13 @@ async def test_reaudits_append_evidence_history_instead_of_overwriting(monkeypat
         universityId=87,
         rows=[{"id": 12, "jobId": "job-audit-history"}],
     )
-    await audit_dated_catalogue_reviews(body, DB(), {})
-    await audit_dated_catalogue_reviews(body, DB(), {})
+    db = DB()
+    await audit_dated_catalogue_reviews(body, db, {})
+    await audit_dated_catalogue_reviews(body, db, {})
     stored = row.extraction_method["dated_catalogue_review"]
     assert stored["revision"] == 2
-    assert [event["at"] for event in stored["history"]] == [
+    assert "history" not in stored
+    assert [entry.event["at"] for entry in db.added] == [
         "2026-07-21T00:00:00Z",
         "2026-07-22T00:00:00Z",
     ]
@@ -454,7 +501,13 @@ async def test_saved_decision_reloads_from_real_database_session():
             review_payload = reloaded.extraction_method["dated_catalogue_review"]
             assert review_payload["decision"] == "not_counterpart"
             assert review_payload["revision"] == 2
-            assert [entry["type"] for entry in review_payload["history"]] == [
+            assert "history" not in review_payload
+            history = (await db.execute(
+                select(DatedCatalogueReviewHistory.event)
+                .where(DatedCatalogueReviewHistory.scraped_course_id == staged_id)
+                .order_by(DatedCatalogueReviewHistory.revision)
+            )).scalars().all()
+            assert [entry["type"] for entry in history] == [
                 "official_source_audit",
                 "reviewer_decision",
             ]
@@ -632,7 +685,14 @@ async def test_any_url_change_marks_evidence_stale_and_blocks_later_decision(mon
             stored = row.extraction_method["dated_catalogue_review"]
             assert stored["revision"] == audited_revision + 1
             assert stored["decision"] is None
-            assert stored["history"][-1]["type"] == "source_url_changed"
+            assert "history" not in stored
+            latest = (await db.execute(
+                select(DatedCatalogueReviewHistory.event)
+                .where(DatedCatalogueReviewHistory.scraped_course_id == row_id)
+                .order_by(DatedCatalogueReviewHistory.revision.desc())
+                .limit(1)
+            )).scalar_one()
+            assert latest["type"] == "source_url_changed"
     finally:
         async with AsyncSessionLocal() as db:
             await db.execute(delete(ScrapedCourse).where(ScrapedCourse.scrape_job_id == job_id))
@@ -702,7 +762,15 @@ async def test_two_real_reviewers_cannot_overwrite_same_revision():
             reloaded = await db.get(ScrapedCourse, row_id)
             stored = reloaded.extraction_method["dated_catalogue_review"]
             assert stored["revision"] == 2
-            assert len([event for event in stored["history"] if event["type"] == "reviewer_decision"]) == 1
+            assert "history" not in stored
+            events = (await db.execute(
+                select(DatedCatalogueReviewHistory.event).where(
+                    DatedCatalogueReviewHistory.scraped_course_id == row_id
+                )
+            )).scalars().all()
+            assert len([
+                event for event in events if event["type"] == "reviewer_decision"
+            ]) == 1
     finally:
         async with AsyncSessionLocal() as db:
             await db.execute(delete(ScrapedCourse).where(ScrapedCourse.scrape_job_id == job_id))
@@ -791,4 +859,96 @@ async def test_history_read_is_bounded_newest_first_and_revision_fenced():
     finally:
         async with AsyncSessionLocal() as db:
             await db.execute(delete(ScrapedCourse).where(ScrapedCourse.scrape_job_id == job_id))
+            await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_history_read_stays_on_requested_snapshot_during_concurrent_append(
+    monkeypatch,
+):
+    job_id = f"test_dated_history_race_{uuid.uuid4().hex}"
+    source_url = "https://www.winchester.ac.uk/study/Postgraduate/Courses/MA-History-Race-2025/"
+    async with AsyncSessionLocal() as db:
+        university_id = (await db.execute(select(University.id).limit(1))).scalar_one()
+        row = ScrapedCourse(
+            scrape_job_id=job_id,
+            university_id=university_id,
+            course_name="MA History Race",
+            course_website=source_url,
+            scrape_warnings=["dated_catalogue_page_review"],
+            extraction_method={"dated_catalogue_review": {
+                "revision": 1,
+                "sourceUrl": source_url,
+                "sourceFingerprint": _dated_source_fingerprint(source_url),
+            }},
+        )
+        db.add(row)
+        await db.flush()
+        row_id = row.id
+        db.add(DatedCatalogueReviewHistory(
+            scraped_course_id=row_id,
+            revision=1,
+            event={"type": "legacy_event", "at": "2026-01-01T00:00:00Z", "n": 1},
+        ))
+        await db.commit()
+
+    count_started = asyncio.Event()
+    release_count = asyncio.Event()
+    from app.routers import scrape as scrape_router
+
+    real_count = scrape_router._dated_history_count
+
+    async def blocked_count(db, requested_row_id, *, max_revision=None):
+        count_started.set()
+        await release_count.wait()
+        return await real_count(
+            db, requested_row_id, max_revision=max_revision
+        )
+
+    monkeypatch.setattr(scrape_router, "_dated_history_count", blocked_count)
+    query = DatedCatalogueHistoryQuery(
+        universityId=university_id,
+        jobId=job_id,
+        revision=1,
+        cursor=0,
+        limit=50,
+    )
+    try:
+        async with AsyncSessionLocal() as read_db:
+            read_task = asyncio.create_task(
+                read_dated_catalogue_history(row_id, query, read_db, {})
+            )
+            await count_started.wait()
+            async with AsyncSessionLocal() as write_db:
+                concurrent_row = await write_db.get(ScrapedCourse, row_id)
+                review_state = dict(
+                    concurrent_row.extraction_method["dated_catalogue_review"]
+                )
+                review_state["revision"] = 2
+                concurrent_row.extraction_method = {
+                    **concurrent_row.extraction_method,
+                    "dated_catalogue_review": review_state,
+                }
+                write_db.add(DatedCatalogueReviewHistory(
+                    scraped_course_id=row_id,
+                    revision=2,
+                    event={
+                        "type": "reviewer_decision",
+                        "at": "2026-01-02T00:00:00Z",
+                        "n": 2,
+                    },
+                ))
+                await write_db.commit()
+            release_count.set()
+            page = await read_task
+        assert page["revision"] == 1
+        assert page["historyCount"] == 1
+        assert [event["n"] for event in page["entries"]] == [1]
+        assert page["nextCursor"] is None
+    finally:
+        release_count.set()
+        async with AsyncSessionLocal() as db:
+            await db.execute(
+                delete(ScrapedCourse).where(ScrapedCourse.scrape_job_id == job_id)
+            )
             await db.commit()
