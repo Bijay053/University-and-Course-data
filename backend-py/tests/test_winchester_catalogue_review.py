@@ -4,17 +4,20 @@ from fastapi import HTTPException
 from types import SimpleNamespace
 import uuid
 from sqlalchemy import delete, select
+from pydantic import ValidationError
 
 from app.database import AsyncSessionLocal
 from app.models import ScrapedCourse, ScrapeRuntimeJob, University
 from app.routers.scrape import (
     DatedCatalogueAuditBody,
     DatedCatalogueDecisionBody,
+    DatedCatalogueHistoryQuery,
     _dated_source_fingerprint,
     audit_dated_catalogue_reviews,
     decide_dated_catalogue_review,
     history_one,
     read_dated_catalogue_reviews,
+    read_dated_catalogue_history,
     staged_update,
 )
 from app.services import winchester_catalogue_review as review
@@ -184,10 +187,8 @@ async def test_decision_is_durable_scoped_and_optimistically_concurrent():
     assert row.course_website.endswith("MA-Politics-2025/")
     assert row.scrape_warnings == ["dated_catalogue_page_review"]
     assert row.extraction_method["course_name"] == {"method": "title"}
-    assert [item["type"] for item in response["review"]["history"]] == [
-        "official_source_audit",
-        "reviewer_decision",
-    ]
+    assert "history" not in response["review"]
+    assert response["review"]["historyCount"] == 2
     assert db.commits == 1
 
     with pytest.raises(HTTPException) as stale:
@@ -702,6 +703,91 @@ async def test_two_real_reviewers_cannot_overwrite_same_revision():
             stored = reloaded.extraction_method["dated_catalogue_review"]
             assert stored["revision"] == 2
             assert len([event for event in stored["history"] if event["type"] == "reviewer_decision"]) == 1
+    finally:
+        async with AsyncSessionLocal() as db:
+            await db.execute(delete(ScrapedCourse).where(ScrapedCourse.scrape_job_id == job_id))
+            await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_history_read_is_bounded_newest_first_and_revision_fenced():
+    """The initial row and each history page stay bounded for large append logs."""
+    job_id = f"test_dated_history_page_{uuid.uuid4().hex}"
+    source_url = "https://www.winchester.ac.uk/study/Postgraduate/Courses/MA-History-2025/"
+    history = [{"type": "legacy_event", "at": f"2026-01-{(index % 28) + 1:02d}T00:00:00Z", "n": index}
+               for index in range(501)]
+    async with AsyncSessionLocal() as db:
+        university_id = (await db.execute(select(University.id).limit(1))).scalar_one()
+        row = ScrapedCourse(
+            scrape_job_id=job_id, university_id=university_id,
+            course_name="MA History", course_website=source_url,
+            scrape_warnings=["dated_catalogue_page_review"],
+            extraction_method={"dated_catalogue_review": {
+                "revision": 501, "history": history,
+                "sourceUrl": source_url,
+                "sourceFingerprint": _dated_source_fingerprint(source_url),
+            }},
+        )
+        db.add(row)
+        await db.commit()
+        await db.refresh(row)
+        row_id = row.id
+    body = DatedCatalogueAuditBody(universityId=university_id, rows=[{"id": row_id, "jobId": job_id}])
+    try:
+        async with AsyncSessionLocal() as db:
+            initial = await read_dated_catalogue_reviews(body, db, {})
+            payload = initial["rows"][0]
+            assert "history" not in payload["review"]
+            assert payload["review"]["historyCount"] == 501
+            assert len(str(initial)) < 20_000
+            first = await read_dated_catalogue_history(
+                row_id,
+                DatedCatalogueHistoryQuery(
+                    universityId=university_id, jobId=job_id, revision=501,
+                    cursor=0, limit=50,
+                ),
+                db, {},
+            )
+            second = await read_dated_catalogue_history(
+                row_id,
+                DatedCatalogueHistoryQuery(
+                    universityId=university_id, jobId=job_id, revision=501,
+                    cursor=first["nextCursor"], limit=50,
+                ),
+                db, {},
+            )
+            assert len(first["entries"]) == len(second["entries"]) == 50
+            assert [item["n"] for item in first["entries"]] == list(range(500, 450, -1))
+            assert [item["n"] for item in second["entries"]] == list(range(450, 400, -1))
+            assert {item["n"] for item in first["entries"]}.isdisjoint(
+                item["n"] for item in second["entries"]
+            )
+            assert first["nextCursor"] == 50
+            with pytest.raises(ValidationError):
+                DatedCatalogueHistoryQuery(
+                    universityId=university_id, jobId=job_id, revision=501,
+                    cursor=0, limit=51,
+                )
+            with pytest.raises(HTTPException) as stale:
+                await read_dated_catalogue_history(
+                    row_id,
+                    DatedCatalogueHistoryQuery(
+                        universityId=university_id, jobId=job_id, revision=500,
+                        cursor=0, limit=50,
+                    ),
+                    db, {},
+                )
+            assert stale.value.status_code == 409
+            with pytest.raises(HTTPException) as mismatch:
+                await read_dated_catalogue_history(
+                    row_id,
+                    DatedCatalogueHistoryQuery(
+                        universityId=university_id, jobId="different-job", revision=501,
+                        cursor=0, limit=50,
+                    ),
+                    db, {},
+                )
+            assert mismatch.value.status_code == 404
     finally:
         async with AsyncSessionLocal() as db:
             await db.execute(delete(ScrapedCourse).where(ScrapedCourse.scrape_job_id == job_id))

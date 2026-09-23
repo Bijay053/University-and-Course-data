@@ -27,6 +27,7 @@ type SourceEvidence = {
 type Review = {
   revision: number;
   history?: ReviewHistoryEntry[] | null;
+  historyCount?: number;
   evidenceStale?: boolean;
   evidence?: {
     checkedAt: string;
@@ -75,14 +76,46 @@ function historyTime(value?: string) {
   return new Date(value).toLocaleString();
 }
 
-function ReviewHistory({ review, rowId }: { review: Review; rowId: number }) {
+function ReviewHistory({ review, rowId, jobId, universityId }: { review: Review; rowId: number; jobId: string; universityId: number }) {
   const [open, setOpen] = useState(false);
-  const [page, setPage] = useState(0);
-  const history = review.history ?? [];
-  const pageCount = Math.max(1, Math.ceil(history.length / 10));
-  const currentPage = Math.min(page, pageCount - 1);
-  useEffect(() => setPage(0), [review.revision]);
-  const entries = history.slice().reverse().slice(currentPage * 10, currentPage * 10 + 10);
+  const [entries, setEntries] = useState<ReviewHistoryEntry[]>([]);
+  const [nextCursor, setNextCursor] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const requestId = useState({ value: 0 })[0];
+  const inlineHistory = review.history ?? [];
+  const historyCount = review.historyCount ?? inlineHistory.length;
+  const [legacyPage, setLegacyPage] = useState(0);
+  const loadHistory = useCallback(async (cursor: number, replace = false) => {
+    const id = ++requestId.value;
+    setLoading(true); setError(null);
+    try {
+      const params = new URLSearchParams({ universityId: String(universityId), jobId, revision: String(review.revision), cursor: String(cursor), limit: "50" });
+      const response = await fetch(`/api/scrape/staged/dated-catalogue-reviews/${rowId}/history?${params}`);
+      if (!response.ok) throw new Error(await getFetchErrorMessage(response));
+      const payload = await readResponseJson<{ entries?: ReviewHistoryEntry[]; nextCursor?: number | null }>(response);
+      if (id !== requestId.value) return;
+      setEntries((current) => replace ? (payload?.entries ?? []) : [...current, ...(payload?.entries ?? [])]);
+      setNextCursor(payload?.nextCursor ?? null);
+    } catch (reason) {
+      if (id === requestId.value) setError(reason instanceof Error ? reason.message : "Could not load review history");
+    } finally {
+      if (id === requestId.value) setLoading(false);
+    }
+  }, [jobId, review.revision, rowId, universityId, requestId]);
+  useEffect(() => {
+    setOpen(false); setEntries([]); setNextCursor(null); setError(null); requestId.value++; setLegacyPage(0);
+  }, [review.revision, rowId, jobId, universityId, requestId]);
+  const toggle = () => {
+    const value = !open; setOpen(value);
+    if (value && historyCount > 0 && entries.length === 0) {
+      if (review.history) {
+        setLegacyPage(0);
+        setEntries(review.history.slice().reverse().slice(0, 10));
+        setNextCursor(review.history.length > 10 ? 10 : null);
+      } else void loadHistory(0, true);
+    }
+  };
   return (
     <div className="mt-3 border-t border-slate-200 pt-3 text-xs">
       <p className="font-medium text-slate-800" data-testid={`text-current-revision-${rowId}`}>
@@ -95,9 +128,9 @@ function ReviewHistory({ review, rowId }: { review: Review; rowId: number }) {
       <Button
         type="button" variant="ghost" size="sm" className="mt-1"
         aria-expanded={open} aria-controls={`dated-history-${rowId}`}
-        onClick={() => setOpen((value) => !value)}
+        onClick={toggle}
       >
-        {open ? "Hide" : "Show"} review history ({history.length})
+        {open ? "Hide" : "Show"} review history ({historyCount})
       </Button>
       <div id={`dated-history-${rowId}`} hidden={!open}>
         {open && <>
@@ -105,7 +138,9 @@ function ReviewHistory({ review, rowId }: { review: Review; rowId: number }) {
             Read-only history, newest first. A new audit or source URL change clears the previous confirmation.
             Superseded decisions do not apply to the current revision. Courses and publication warnings are unchanged by this timeline.
           </p>
-          {history.length === 0 ? <p>No review history recorded.</p> : (
+          {loading && <p className="flex items-center gap-2"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading history…</p>}
+          {error && <div className="flex items-center gap-2 text-red-700"><span>{error}</span><Button type="button" size="sm" variant="ghost" onClick={() => void loadHistory(0, true)}>Retry</Button></div>}
+          {!loading && !error && historyCount === 0 ? <p>No review history recorded.</p> : !loading && !error && (
             <ol className="space-y-3 border-l border-slate-200 pl-3" aria-label="Review history">
               {entries.map((entry, index) => {
                 const currentDecision = entry.type === "reviewer_decision"
@@ -115,9 +150,9 @@ function ReviewHistory({ review, rowId }: { review: Review; rowId: number }) {
                 const currentAudit = entry.type === "official_source_audit"
                   && !review.evidenceStale && !!entry.evidence
                   && entry.evidence.checkedAt === review.evidence?.checkedAt
-                  && !history.slice(history.lastIndexOf(entry) + 1).some((item) => item.type === "official_source_audit" || item.type === "source_url_changed");
+                  ;
                 return (
-                  <li key={history.length - currentPage * 10 - index} className="space-y-1 break-words">
+                  <li key={`${entry.at ?? "unknown"}-${index}`} className="space-y-1 break-words">
                     <p className="font-medium">
                       {entry.type === "official_source_audit" ? "Official-source audit"
                         : entry.type === "reviewer_decision" ? "Reviewer decision"
@@ -152,10 +187,20 @@ function ReviewHistory({ review, rowId }: { review: Review; rowId: number }) {
               })}
             </ol>
           )}
-          {pageCount > 1 && <div className="mt-3 flex items-center gap-2">
-            <Button type="button" size="sm" variant="outline" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Newer history</Button>
-            <span aria-live="polite">History page {currentPage + 1} of {pageCount}</span>
-            <Button type="button" size="sm" variant="outline" disabled={currentPage + 1 >= pageCount} onClick={() => setPage(currentPage + 1)}>Older history</Button>
+          {(nextCursor != null || (review.history && historyCount > 10)) && <div className="mt-3 flex items-center gap-2">
+            {review.history && <Button type="button" size="sm" variant="outline" disabled={legacyPage === 0} onClick={() => {
+              const page = legacyPage - 1;
+              setLegacyPage(page);
+              setEntries(inlineHistory.slice().reverse().slice(page * 10, page * 10 + 10));
+              setNextCursor((page + 1) * 10 < historyCount ? (page + 1) * 10 : null);
+            }}>Newer history</Button>}
+            {review.history ? <Button type="button" size="sm" variant="outline" disabled={(legacyPage + 1) * 10 >= historyCount} onClick={() => {
+              const page = legacyPage + 1;
+              setLegacyPage(page);
+              setEntries(inlineHistory.slice().reverse().slice(page * 10, page * 10 + 10));
+              setNextCursor((page + 1) * 10 < historyCount ? (page + 1) * 10 : null);
+            }}>Older history</Button> : <Button type="button" size="sm" variant="outline" onClick={() => void loadHistory(nextCursor ?? 0)}>Load more history</Button>}
+            <span aria-live="polite">{review.history ? `History page ${legacyPage + 1} of ${Math.ceil(historyCount / 10)}` : `${entries.length} of ${historyCount} loaded`}</span>
           </div>}
         </>}
       </div>
@@ -430,7 +475,7 @@ export function DatedCatalogueReview({ courses, readOnly = false }: { courses: C
                     </span>
                   )}
                 </div>
-                <ReviewHistory review={row.review} rowId={row.id} />
+                <ReviewHistory review={row.review} rowId={row.id} jobId={row.jobId} universityId={row.universityId} />
               </article>
             );
           })}

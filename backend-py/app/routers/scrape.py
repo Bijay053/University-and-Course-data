@@ -3339,6 +3339,16 @@ class DatedCatalogueDecisionBody(BaseModel):
         return value
 
 
+class DatedCatalogueHistoryQuery(BaseModel):
+    university_id: int = Field(alias="universityId", gt=0)
+    job_id: str = Field(alias="jobId", min_length=1, max_length=200)
+    revision: int = Field(ge=0)
+    cursor: int = Field(default=0, ge=0)
+    limit: int = Field(default=50, ge=1, le=50)
+
+    model_config = {"populate_by_name": True}
+
+
 def _dated_catalogue_review_payload(row) -> dict:
     metadata = row.extraction_method if isinstance(row.extraction_method, dict) else {}
     review = metadata.get("dated_catalogue_review")
@@ -3357,6 +3367,10 @@ def _dated_catalogue_response(row) -> dict:
         not isinstance(source_fingerprint, str)
         or source_fingerprint != _dated_source_fingerprint(row.course_website)
     )
+    response_review = {
+            key: value for key, value in review.items() if key != "history"
+        }
+    response_review["historyCount"] = len(review.get("history") or []) if isinstance(review.get("history"), list) else 0
     return {
         "id": row.id,
         "jobId": row.scrape_job_id,
@@ -3365,10 +3379,38 @@ def _dated_catalogue_response(row) -> dict:
         "courseUrl": row.course_website,
         "warningPresent": "dated_catalogue_page_review" in set(row.scrape_warnings or []),
         "review": {
-            **review,
+            **response_review,
             "evidenceStale": evidence_stale,
             "decision": None if evidence_stale else review.get("decision"),
         },
+    }
+
+
+def _dated_catalogue_history_page(row, query: DatedCatalogueHistoryQuery) -> dict:
+    """Return an immutable newest-first page; cursor is a zero-based offset.
+
+    The revision is part of the request and response so clients never append
+    pages from different review snapshots. Append-only storage is reversed
+    only for presentation, and each page uses the same offset into that
+    immutable snapshot.
+    """
+    review = _dated_catalogue_review_payload(row)
+    history = review.get("history")
+    if not isinstance(history, list):
+        history = []
+    newest_first = list(reversed(history))
+    start = query.cursor
+    entries = newest_first[start:start + query.limit]
+    next_cursor = start + len(entries) if start + len(entries) < len(newest_first) else None
+    return {
+        "rowId": row.id,
+        "jobId": row.scrape_job_id,
+        "universityId": row.university_id,
+        "revision": int(review.get("revision") or 0),
+        "historyCount": len(history),
+        "cursor": start,
+        "nextCursor": next_cursor,
+        "entries": entries,
     }
 
 
@@ -3408,6 +3450,35 @@ async def read_dated_catalogue_reviews(
     """Reload durable evidence and reviewer decisions without fetching live pages."""
     rows = await _exact_dated_rows(db, body)
     return {"rows": [_dated_catalogue_response(row) for row in rows]}
+
+
+@router.get("/staged/dated-catalogue-reviews/{sc_id}/history")
+async def read_dated_catalogue_history(
+    sc_id: int,
+    query: Annotated[DatedCatalogueHistoryQuery, Depends()],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(require_permission("staged.view"))],
+) -> dict:
+    """Read one bounded page of immutable, newest-first review history.
+
+    ``cursor`` is a zero-based offset in the newest-first snapshot. Supplying
+    the current revision prevents a page from being mixed with a later append.
+    """
+    from app.models import ScrapedCourse
+
+    row = (await db.execute(
+        select(ScrapedCourse).where(
+            ScrapedCourse.id == sc_id,
+            ScrapedCourse.university_id == query.university_id,
+            ScrapedCourse.scrape_job_id == query.job_id,
+        )
+    )).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Dated catalogue row not found")
+    current_revision = int(_dated_catalogue_review_payload(row).get("revision") or 0)
+    if current_revision != query.revision:
+        raise HTTPException(status_code=409, detail="Review revision changed; reload the review.")
+    return _dated_catalogue_history_page(row, query)
 
 
 @router.post("/staged/dated-catalogue-reviews/audit")
