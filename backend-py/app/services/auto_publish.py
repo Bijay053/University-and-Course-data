@@ -92,6 +92,12 @@ def should_auto_publish(sc: ScrapedCourse) -> AutoPublishDecision:
     score = float(sc.decision_score or 0)
 
     # ── Hard-required field checks ────────────────────────────────────────
+    if "dated_catalogue_page_review" in set(sc.scrape_warnings or []):
+        return AutoPublishDecision(
+            False,
+            "Dated catalogue page requires review against the current course",
+            score,
+        )
     if not sc.course_name or len(sc.course_name.strip()) < 3:
         return AutoPublishDecision(False, "Missing or invalid course name", score)
     if not sc.degree_level:

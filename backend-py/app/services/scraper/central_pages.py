@@ -2688,13 +2688,27 @@ async def prefetch_central_pages(
                         # Replace only slots understood by the column parser.
                         # An absent _ck_flat value is meaningful for such a
                         # slot: conflicting category columns made a universal
-                        # value unsafe.  Preserve unrelated tests that the
-                        # generic extractor found but this table parser does
-                        # not model.
+                        # value unsafe.  IELTS component values emitted by the
+                        # generic prose parser belong to that same requirement
+                        # tuple and can come from a different category column
+                        # (for example Middlesex's Business/Law reading floor),
+                        # so clear the complete IELTS tuple when its overall is
+                        # routed.  Preserve unrelated tests that the column
+                        # parser does not model.
+                        _ck_cleared_slots = set(_ck_routed_slots)
+                        if "ielts_overall" in _ck_routed_slots:
+                            _ck_cleared_slots.update(
+                                {
+                                    "ielts_listening",
+                                    "ielts_reading",
+                                    "ielts_writing",
+                                    "ielts_speaking",
+                                }
+                            )
                         english_vals = {
                             key: value
                             for key, value in english_vals.items()
-                            if key not in _ck_routed_slots
+                            if key not in _ck_cleared_slots
                         }
                         english_vals.update(_ck_flat)
                         result["english"] = english_vals

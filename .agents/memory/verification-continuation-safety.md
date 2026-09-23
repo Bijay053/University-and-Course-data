@@ -32,3 +32,9 @@ Do not treat exclusions checkpointed during the current run as evidence that a t
 **Why:** Course-report verification records filtered URLs as completed attempts before resume classification. Counting those fresh acknowledgements as prior work can turn an entirely blocked continuation into a successful no-op and suppress its original-review diagnostic.
 
 **How to apply:** Distinguish pre-run checkpoints and persisted review rows from current-run exclusion acknowledgements when classifying zero-work retries.
+
+Pre-run checkpoints are not necessarily successful work either: exact-child redelivery carries the previous delivery's exclusions forward as completed attempts.
+
+**Why:** Redelivering a completed blocked child could turn its excluded URLs into apparently resolved work and erase the blocked diagnostic.
+
+**How to apply:** Subtract persisted excluded identities before treating completion checkpoints as resolution; actual persisted review rows remain independent proof. Test the same child identity after task return and again through a restarted API.

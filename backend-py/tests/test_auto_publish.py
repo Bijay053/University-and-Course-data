@@ -84,3 +84,15 @@ def test_fails_below_completeness_threshold():
 def test_fails_without_degree_level():
     d = should_auto_publish(_make(degree_level=None))
     assert d.auto_publish is False
+
+
+def test_dated_catalogue_warning_requires_manual_review():
+    d = should_auto_publish(
+        _make(
+            ielts_overall=None,
+            pte_overall=58,
+            scrape_warnings=["dated_catalogue_page_review"],
+        )
+    )
+    assert d.auto_publish is False
+    assert "dated catalogue" in d.reason.lower()

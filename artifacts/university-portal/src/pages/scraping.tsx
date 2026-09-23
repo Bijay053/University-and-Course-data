@@ -569,7 +569,7 @@ const FIX_FIELD_LABELS: Record<string, string> = {
   score_type: "Academic Score Type",
   other_requirement: "Entry Requirements",
   requirement_status: "Requirement Verification",
-  course_name: "University Name in Title",
+  course_name: "Course Name",
 };
 
 const FIX_FIELD_GROUPS: Record<string, string> = {

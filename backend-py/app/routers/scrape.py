@@ -2248,6 +2248,8 @@ def _filter_resolved_reextract_warnings(
     current_payload: dict,
 ) -> list[str]:
     """Keep review warnings unless this extraction proves them resolved."""
+    from types import SimpleNamespace
+
     from app.services.scraper.confidence import CONFIDENCE_WARN, score_payload
 
     resolved_codes: set[str] = set()
@@ -2268,6 +2270,14 @@ def _filter_resolved_reextract_warnings(
         resolved_codes.add("confidence_low")
         # Older staging runs persisted the same score warning under this key.
         resolved_codes.add("confidence_warn")
+
+    if fresh_payload.get("course_location") and not _winchester_descriptive_location(
+        SimpleNamespace(
+            course_website=current_payload.get("course_website"),
+            course_location=fresh_payload.get("course_location"),
+        )
+    ):
+        resolved_codes.add("descriptive_location")
 
     return [
         str(warning)
@@ -3240,6 +3250,50 @@ def _winchester_course_name_missing_award(row) -> bool:
     )
 
 
+def _is_winchester_course_row(row) -> bool:
+    from urllib.parse import urlparse
+
+    host = (urlparse(str(getattr(row, "course_website", "") or "")).hostname or "").lower()
+    return host == "winchester.ac.uk" or host.endswith(".winchester.ac.uk")
+
+
+def _winchester_course_name_noncanonical(row) -> bool:
+    """Detect repairable Winchester title defects without collapsing archives."""
+    if not _is_winchester_course_row(row):
+        return False
+    name = str(getattr(row, "course_name", "") or "").strip()
+    url = str(getattr(row, "course_website", "") or "")
+    if re.match(r"^Mphil/phd\b", name, re.I) and not name.startswith("MPhil/PhD"):
+        return True
+    # A legacy year appended to a normal course slug is stale display text; the
+    # current official page title is authoritative.  Research archive routes
+    # explicitly own their cohort under /Courses/<year>/ and retain it so an
+    # archived record cannot become indistinguishable from its current sibling.
+    if (
+        re.search(r"\s*(?:\(\d{4}\)|\d{4})\s*$", name)
+        and not re.search(r"/courses/\d{4}/", url, re.I)
+    ):
+        return True
+    return False
+
+
+def _winchester_descriptive_location(row) -> bool:
+    """Flag delivery prose stored in Winchester's nonblank location column."""
+    if not _is_winchester_course_row(row):
+        return False
+    value = str(getattr(row, "course_location", "") or "").strip()
+    if not value:
+        return False
+    return bool(
+        re.search(
+            r"\b(?:on[\s-]+campus|blended|learning|school|placement|"
+            r"taught\s+elements?)\b|(?:&|\band\b)\s*$|^only$",
+            value,
+            re.I,
+        )
+    )
+
+
 @router.post("/staged/analyze")
 async def analyze_staged(
     body: ReExtractBody,
@@ -3268,7 +3322,12 @@ async def analyze_staged(
 
     issues: list[dict] = []
     for field, label in _ANALYZE_FIELDS:
-        missing = sum(1 for r in rows if not getattr(r, field, None))
+        missing = sum(
+            1
+            for r in rows
+            if not getattr(r, field, None)
+            or (field == "course_location" and _winchester_descriptive_location(r))
+        )
         if missing == 0:
             continue
         current_pct = round((total - missing) / total * 100) if total else 0
@@ -3357,7 +3416,10 @@ async def analyze_staged(
             if r.course_name and uni_lower in r.course_name.lower()
         }
         missing_award_rows = {
-            id(r) for r in rows if _winchester_course_name_missing_award(r)
+            id(r)
+            for r in rows
+            if _winchester_course_name_missing_award(r)
+            or _winchester_course_name_noncanonical(r)
         }
         course_name_issues = len(university_name_rows | missing_award_rows)
         if course_name_issues > 0:

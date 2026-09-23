@@ -1985,6 +1985,32 @@ def _targeted_retry_all_filtered_diagnostic(
     }
 
 
+def _prior_targeted_retry_resolved_urls(
+    discovered_config: dict | None,
+) -> list[str]:
+    """Return checkpoints that a later delivery may treat as resolved.
+
+    Course-report completion checkpoints include eligibility exclusions.  A
+    completed delivery's durable all-filtered diagnostic is the authoritative
+    record of which of those URLs were excluded rather than resolved.  Keep
+    those identities out of the resolved set when the exact child is delivered
+    again.
+    """
+    config = discovered_config or {}
+    metadata = config.get("autonomousVerification") or {}
+    diagnostic = config.get("targeted_retry_diagnostic") or {}
+    filtered_keys = {
+        canonical_course_url_key(url)
+        for url in diagnostic.get("filtered_urls", [])
+        if canonical_course_url_key(url)
+    }
+    return [
+        url
+        for url in metadata.get("completed_urls", [])
+        if canonical_course_url_key(url) not in filtered_keys
+    ]
+
+
 def _is_safe_restart_smoke_payload(payload: dict | None) -> bool:
     """Return whether this is the one-URL production restart smoke sample."""
     return bool(
@@ -2271,10 +2297,8 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
     _targeted_retry_resolved_urls: list[str] = []
     # Current-run filter checkpoints acknowledge exclusions, not prior work.
     # Keep the pre-run checkpoint set separate for zero-work classification.
-    _prior_report_completed_urls = list(
-        ((job.discovered_config or {}).get("autonomousVerification") or {}).get(
-            "completed_urls", []
-        )
+    _prior_report_completed_urls = _prior_targeted_retry_resolved_urls(
+        job.discovered_config
     )
 
     summary = {"discovered": 0, "staged": 0, "skipped": 0, "errors": 0, "fetch_failed": 0}

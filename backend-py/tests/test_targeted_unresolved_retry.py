@@ -19,6 +19,7 @@ from app.services.scraper.orchestrator import (
     _is_targeted_retry_payload,
     _matched_resume_provenance,
     _normalize_course_url,
+    _prior_targeted_retry_resolved_urls,
     _should_auto_discover_fee_page,
     _targeted_retry_all_filtered_diagnostic,
     _target_course_urls_from_payload,
@@ -167,6 +168,37 @@ def test_mixed_filtered_and_resume_resolved_targeted_retry_fails_with_exact_reje
         "No selected courses were processed; 1 unresolved selected course "
         "URL was rejected by URL filters."
     )
+
+
+def test_redelivery_does_not_reinterpret_filtered_completion_checkpoints_as_resolved() -> None:
+    filtered = "https://example.edu/course/filtered"
+    resolved = "https://example.edu/course/already-resolved"
+    discovered_config = {
+        "autonomousVerification": {
+            "completed_urls": [filtered, resolved],
+            "completed_scope": (
+                "settled attempts and eligibility exclusions; not successful recovery"
+            ),
+        },
+        "targeted_retry_diagnostic": {
+            "error_type": "targeted_retry_all_filtered",
+            "filtered_urls": [filtered],
+        },
+    }
+
+    prior_resolved = _prior_targeted_retry_resolved_urls(discovered_config)
+    diagnostic = _targeted_retry_all_filtered_diagnostic(
+        selected_urls=[filtered, resolved],
+        retained_urls=[resolved],
+        extraction_urls=[],
+        resolved_urls=prior_resolved,
+        retry_source_job_id="job_continuation",
+    )
+
+    assert prior_resolved == [resolved]
+    assert diagnostic is not None
+    assert diagnostic["filtered_urls"] == [filtered]
+    assert diagnostic["resolved_count"] == 1
 
 
 def test_production_resume_classifies_after_already_resolved_filtering() -> None:

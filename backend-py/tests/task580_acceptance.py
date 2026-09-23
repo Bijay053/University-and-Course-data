@@ -424,6 +424,181 @@ def run(output: Path, *, continuation: bool = False, resume: str | None = None) 
         assert reloaded_snapshot["published_bytes"] == before["published_bytes"]
         assert reloaded_snapshot["child_rows_bytes"] == before["child_rows_bytes"]
 
+        redelivery_evidence = None
+        if continuation and resume != "resolved":
+            # Simulate at-least-once redelivery after the first task has fully
+            # returned. This is the exact same durable child, not a newly
+            # generated continuation. Its current-run exclusion checkpoints
+            # are therefore pre-run checkpoints on the second delivery.
+            first_delivery = {
+                "status": retry["status"],
+                "errors": retry["errors"],
+                "error_message": retry["error_message"],
+                "diagnostic": diagnostic,
+                "diagnostic_logs": persisted_logs,
+                "completed_urls": config["autonomousVerification"]["completed_urls"],
+                "postrun": postrun_marker,
+                "status_api": status_json,
+                "history_diagnostics": diagnostic_history,
+            }
+            marker_path.unlink()
+            requeue = start("requeue", [
+                sys.executable, "-m", "tests.task580_process",
+                "requeue-continuation",
+            ])
+            assert requeue.wait(timeout=30) == 0, "Requeue failed; see requeue.log"
+            pre_redelivery = snapshot(dburl)
+            redelivered_rows = [
+                row for row in pre_redelivery["jobs"]
+                if row["runtime_job_id"] == retry_id
+            ]
+            assert len(redelivered_rows) == 1
+            redelivered_child = redelivered_rows[0]
+            assert redelivered_child["status"] == "queued"
+            assert decoded(redelivered_child["request_payload"]) == payload
+            assert (
+                decoded(redelivered_child["discovered_config"])
+                ["targeted_retry_diagnostic"]
+                == diagnostic
+            )
+            pre_redelivery_checkpoint_urls = (
+                decoded(redelivered_child["discovered_config"])
+                ["autonomousVerification"]["completed_urls"]
+            )
+            assert set(selected) <= set(pre_redelivery_checkpoint_urls)
+
+            dispatch = start("dispatch-redelivery", [
+                sys.executable, "-m", "tests.task580_process",
+                "dispatch-continuation",
+            ])
+            assert dispatch.wait(timeout=30) == 0, (
+                "Redelivery dispatch failed; see dispatch-redelivery.log"
+            )
+            deadline = time.monotonic() + 240
+            while time.monotonic() < deadline:
+                redelivered = snapshot(dburl)
+                redelivered_child = next(
+                    row for row in redelivered["jobs"]
+                    if row["runtime_job_id"] == retry_id
+                )
+                if redelivered_child["status"] in TERMINAL:
+                    break
+                time.sleep(.25)
+            else:
+                raise AssertionError(
+                    "Redelivered real prefork task did not reach terminal state"
+                )
+
+            marker_deadline = time.monotonic() + 120
+            while time.monotonic() < marker_deadline:
+                if marker_path.exists():
+                    redelivery_postrun = json.loads(marker_path.read_text())
+                    break
+                if worker.poll() is not None:
+                    raise AssertionError(
+                        "Prefork worker exited before redelivery task_postrun"
+                    )
+                time.sleep(.1)
+            else:
+                raise AssertionError(
+                    "Redelivery Celery task_postrun marker was not persisted"
+                )
+            assert redelivery_postrun["task_name"] == "scrape.university"
+            assert redelivery_postrun["runtime_job_id"] == retry_id
+            assert redelivery_postrun["task_id"]
+            assert redelivery_postrun["task_id"] != postrun_marker["task_id"]
+            assert redelivery_postrun["state"] == "SUCCESS", redelivery_postrun
+            assert redelivery_postrun["return_value"]["ok"] is True
+            assert redelivery_postrun["return_value"]["id"] == retry_id
+
+            final = snapshot(dburl)
+            matching_jobs = [
+                row for row in final["jobs"]
+                if row["runtime_job_id"] == retry_id
+            ]
+            assert len(matching_jobs) == 1
+            retry = matching_jobs[0]
+            payload = decoded(retry["request_payload"])
+            config = decoded(retry["discovered_config"])
+            diagnostic = config.get("targeted_retry_diagnostic")
+            persisted_logs = [
+                row for row in final["diagnostic_logs"]
+                if row["runtime_job_id"] == retry_id
+            ]
+            assert retry["status"] == first_delivery["status"] == "failed"
+            assert retry["errors"] > 0
+            assert retry["error_message"] == first_delivery["error_message"]
+            assert diagnostic == first_delivery["diagnostic"]
+            assert payload["courseUrls"] == selected
+            assert payload["course_urls"] == selected
+            assert payload["retrySourceJobId"] == REPORT_PARENT
+            assert set(selected) <= set(
+                config["autonomousVerification"]["completed_urls"]
+            )
+            assert len(persisted_logs) > len(first_delivery["diagnostic_logs"])
+            for old_log in first_delivery["diagnostic_logs"]:
+                assert old_log in persisted_logs
+            for row in persisted_logs:
+                logged = decoded(row["payload"])
+                for key, value in diagnostic.items():
+                    assert logged[key] == value, (key, logged)
+            assert final["source_errors"] == before["source_errors"]
+            assert final["source_approved_bytes"] == before["source_approved_bytes"]
+            assert final["published_bytes"] == before["published_bytes"]
+            assert final["earlier_reviews"] == before["earlier_reviews"]
+            assert final["child_rows_bytes"] == before["child_rows_bytes"]
+
+            # A second fresh API process must project the post-redelivery row
+            # and both durable diagnostics without relying on process memory.
+            stop(api)
+            api = start("api-redelivery-restarted", [
+                sys.executable, "-m", "tests.task580_process", "api",
+            ])
+            wait_http(f"http://127.0.0.1:{apiport}/api/health")
+            with httpx.Client(base_url=base, timeout=40) as reloaded:
+                login(reloaded)
+                status_response = reloaded.get(f"/api/scrape/status/{retry_id}")
+                history_response = reloaded.get(f"/api/scrape/history/{retry_id}")
+                assert status_response.status_code == 200, status_response.text
+                assert history_response.status_code == 200, history_response.text
+                status_json = status_response.json()
+                history_json = history_response.json()
+            diagnostic_history = [
+                row for row in history_json["logs"]
+                if row.get("kind") == "targeted_retry_all_filtered"
+            ]
+            assert status_json["status"] == "failed"
+            assert status_json["errors"] == retry["errors"]
+            assert status_json["targetedRetryDiagnostic"] == diagnostic
+            assert status_json["errorMessage"] == retry["error_message"]
+            assert len(diagnostic_history) > len(
+                first_delivery["history_diagnostics"]
+            )
+            for logged in diagnostic_history:
+                for key, value in diagnostic.items():
+                    assert logged[key] == value, (key, logged)
+            assert len(history_json["stagedCourses"]) == (1 if resume else 0)
+            reloaded_snapshot = snapshot(dburl)
+            assert reloaded_snapshot["earlier_reviews"] == before["earlier_reviews"]
+            assert reloaded_snapshot["published_bytes"] == before["published_bytes"]
+            assert reloaded_snapshot["child_rows_bytes"] == before["child_rows_bytes"]
+            postrun_marker = redelivery_postrun
+            redelivery_evidence = {
+                "same_runtime_job_id": retry_id,
+                "job_row_count": len(matching_jobs),
+                "pre_redelivery_checkpoint_urls": pre_redelivery_checkpoint_urls,
+                "first_delivery": first_delivery,
+                "second_delivery_postrun": redelivery_postrun,
+                "second_delivery_status": retry["status"],
+                "second_delivery_diagnostic": diagnostic,
+                "diagnostic_log_count_before_after": [
+                    len(first_delivery["diagnostic_logs"]),
+                    len(persisted_logs),
+                ],
+                "fresh_api_status": status_json,
+                "fresh_api_history_diagnostic_count": len(diagnostic_history),
+            }
+
         evidence.update({
             "passed": True,
             "retry_job_id": retry_id,
@@ -455,6 +630,8 @@ def run(output: Path, *, continuation: bool = False, resume: str | None = None) 
             "earlier_reviews_before": before["earlier_reviews"],
             "earlier_reviews_after_reload": reloaded_snapshot["earlier_reviews"],
             "both_earlier_review_sets_byte_identical": True,
+            "delivery_count": 2 if redelivery_evidence else 1,
+            "redelivery": redelivery_evidence,
         })
     except Exception:
         evidence["error"] = traceback.format_exc()

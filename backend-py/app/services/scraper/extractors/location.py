@@ -1649,6 +1649,39 @@ def _from_uow_campus_select(soup: BeautifulSoup) -> str | None:
     return ", ".join(campuses) if campuses else None
 
 
+def _from_winchester_course_facts(soup: BeautifulSoup) -> str | None:
+    """Read only Winchester's course-owned Location fact.
+
+    The CMS puts delivery prose in this field (for example, "Blended learning
+    in school and on campus in Winchester").  That prose is evidence about
+    delivery, not a display location.  Keep named-campus specificity when it is
+    present and otherwise return the explicitly named city.  A bare "On
+    campus" deliberately yields no location rather than inventing a campus.
+    """
+    for fact in soup.select(".uow-course-content__overview-info"):
+        heading = fact.find(["h2", "h3", "h4", "dt"])
+        if not heading or heading.get_text(" ", strip=True).casefold() != "location":
+            continue
+        value_node = fact.find(["p", "dd", "ul", "ol"])
+        raw = compact(value_node.get_text(" ", strip=True) if value_node else "")
+        if not raw:
+            return None
+
+        campuses: list[str] = []
+        for pattern, canonical in (
+            (r"\bKing\s+Alfred(?:\s+Campus)?\b", "King Alfred Campus"),
+            (r"\bWest\s+Downs(?:\s+Campus)?\b", "West Downs Campus"),
+        ):
+            if re.search(pattern, raw, re.I):
+                campuses.append(canonical)
+        if campuses:
+            return ", ".join(campuses)
+        if re.search(r"\bWinchester\b", raw, re.I):
+            return "Winchester"
+        return None
+    return None
+
+
 async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG001
     if not html:
         return []
@@ -1771,6 +1804,10 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
         or _parsed_host.endswith(".swinburne.edu.au")
     )
     _is_segi_college_host = _parsed_host == "www.segi.edu.my"
+    _is_winchester_host = (
+        _parsed_host == "winchester.ac.uk"
+        or _parsed_host.endswith(".winchester.ac.uk")
+    )
 
     def _from_segi_college_page() -> str | None:
         if not _is_segi_college_host:
@@ -1811,7 +1848,14 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
     # pages, and `course_location` stages blank fleet-wide.  Verified
     # 2026-05-17 on Master of Nursing, Master of Leadership and Management
     # in Education, and Master of Health Management and Policy (Global).
-    if _is_segi_college_host:
+    if _is_winchester_host:
+        # Do not fall through to generic text walkers: the same page repeats a
+        # longer Location paragraph in body content and carries campus links in
+        # navigation.  Only the overview fact belongs to this course.
+        cascade_list = [
+            ("winchester_course_fact", _from_winchester_course_facts(soup), 0.99),
+        ]
+    elif _is_segi_college_host:
         cascade_list = [
             ("segi_course_campus", _from_segi_college_page(), 0.98),
         ]

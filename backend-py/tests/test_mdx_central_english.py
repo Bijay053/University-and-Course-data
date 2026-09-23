@@ -136,7 +136,14 @@ async def test_mdx_all_ambiguous_columns_clear_only_the_routed_flat_slot(
         return html
 
     async def fake_parse(_html, _url):
-        return {"ielts_overall": 6.0, "pte_overall": 59.0}
+        return {
+            "ielts_overall": 6.0,
+            "ielts_listening": 5.5,
+            "ielts_reading": 6.0,
+            "ielts_writing": 6.0,
+            "ielts_speaking": 5.5,
+            "pte_overall": 59.0,
+        }
 
     monkeypatch.setattr(central_pages, "fetch_html", fake_fetch_html)
     monkeypatch.setattr(

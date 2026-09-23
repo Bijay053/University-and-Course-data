@@ -174,6 +174,26 @@ async def seed_continuation(resume: str | None = None) -> None:
         await engine.dispose()
 
 
+async def requeue_continuation() -> None:
+    """Redeliver the exact durable child after its completed worker lifecycle."""
+    from app.database import AsyncSessionLocal, engine
+    from app.models import ScrapeRuntimeJob
+    from app.services.worker_fencing import revoke_stopped
+
+    async with AsyncSessionLocal() as db:
+        child = await db.get(ScrapeRuntimeJob, "job_task582_continuation")
+        assert child is not None
+        assert child.status in {"failed", "completed"}
+        assert await revoke_stopped(
+            db, f"verification:{child.runtime_job_id}"
+        ), "completed autonomous worker claim was not revocable"
+        child.status = "queued"
+        child.completed_at = None
+        child.stop_requested = False
+        await db.commit()
+    await engine.dispose()
+
+
 def install_task_postrun_marker() -> None:
     """Record completion only after the real Celery task has returned."""
     from celery.signals import task_postrun
@@ -234,6 +254,8 @@ if __name__ == "__main__":
         celery_app.send_task(
             "scrape.university", args=["job_task582_continuation"], queue="scrape",
         )
+    elif sys.argv[1] == "requeue-continuation":
+        asyncio.run(requeue_continuation())
     elif sys.argv[1] == "api":
         import uvicorn
         uvicorn.run(

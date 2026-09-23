@@ -862,6 +862,141 @@ async def test_re_extract_staged_refreshes_changed_fee_evidence(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_winchester_analyze_targets_and_reextract_persists_owned_fields(
+    monkeypatch,
+):
+    """Portal Fix path updates name/location/mode and nothing unrelated."""
+    uni_id = await _pick_university()
+    job_id = f"test_winchester_fix_{uuid.uuid4().hex[:10]}"
+    url = (
+        "https://www.winchester.ac.uk/study/Postgraduate/Courses/"
+        "MA-Politics-and-International-Relations-2025/"
+    )
+    try:
+        async with AsyncSessionLocal() as db:
+            staged = await stage_course(
+                db,
+                scrape_job_id=job_id,
+                university_id=uni_id,
+                course_name="MA Politics and International Relations (2025)",
+                payload={
+                    "course_name": "MA Politics and International Relations (2025)",
+                    "degree_level": "Master",
+                    "category": "Arts, Humanities & Social Sciences",
+                    "international_fee": 17450,
+                    "currency": "GBP",
+                    "fee_term": "Annual",
+                    "ielts_overall": 6.0,
+                    "pte_overall": 58,
+                    "duration": 1,
+                    "duration_term": "Year",
+                    "intake_months": ["September"],
+                    "course_location": (
+                        "Blended learning in school and on campus in Winchester"
+                    ),
+                    "study_mode": "On Campus",
+                    "course_website": url,
+                    "scrape_warnings": ["dated_catalogue_page_review"],
+                },
+                evidence=[],
+                source_url=url,
+            )
+        assert staged.saved, staged.reason
+        sc_id = staged.scraped_course_id
+        assert sc_id is not None
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            analysis_response = await client.post(
+                "/api/scrape/staged/analyze",
+                json={"ids": [sc_id], "universityId": uni_id},
+            )
+        assert analysis_response.status_code == 200, analysis_response.text
+        target_fields = [
+            issue["field"] for issue in analysis_response.json()["issues"]
+            if issue["field"] in {"course_name", "course_location"}
+        ]
+        assert set(target_fields) == {"course_name", "course_location"}
+
+        async def _fake_extract_only(*_args, **_kwargs):
+            return {
+                "url": url,
+                "payload": {
+                    "course_name": "MA Politics and International Relations",
+                    "course_location": "Winchester",
+                    "study_mode": "Blended",
+                    "category": "Business & Management",
+                },
+                "evidence": [
+                    {
+                        "field_key": field,
+                        "value": value,
+                        "normalized": value,
+                        "method": "winchester:course_owned_fact",
+                        "source_url": url,
+                        "snippet": "Official Winchester course-owned fact",
+                        "decision_status": "selected",
+                    }
+                    for field, value in (
+                        ("course_name", "MA Politics and International Relations"),
+                        ("course_location", "Winchester"),
+                        ("study_mode", "Blended"),
+                    )
+                ],
+            }
+
+        async def _fake_prefetch(*_args, **_kwargs):
+            return {}
+
+        monkeypatch.setattr(
+            "app.services.scraper.orchestrator._extract_only",
+            _fake_extract_only,
+        )
+        monkeypatch.setattr(
+            "app.services.scraper.central_pages.prefetch_central_pages",
+            _fake_prefetch,
+        )
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            fix_response = await client.post(
+                "/api/scrape/staged/re-extract",
+                json={
+                    "ids": [sc_id],
+                    "universityId": uni_id,
+                    "targetFields": target_fields,
+                },
+            )
+        assert fix_response.status_code == 200, fix_response.text
+        assert fix_response.json()["updated"] == 1
+
+        async with AsyncSessionLocal() as db:
+            stored = await db.get(ScrapedCourse, sc_id)
+            assert stored is not None
+            assert stored.course_name == "MA Politics and International Relations"
+            assert stored.course_location == "Winchester"
+            assert stored.study_mode == "Blended"
+            assert stored.category == "Arts, Humanities & Social Sciences"
+            assert "dated_catalogue_page_review" in (stored.scrape_warnings or [])
+            assert stored.auto_publish_status == "review"
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            after_response = await client.post(
+                "/api/scrape/staged/analyze",
+                json={"ids": [sc_id], "universityId": uni_id},
+            )
+        assert after_response.status_code == 200, after_response.text
+        remaining = {issue["field"] for issue in after_response.json()["issues"]}
+        assert "course_name" not in remaining
+        assert "course_location" not in remaining
+    finally:
+        await _cleanup(job_id)
+
+
+@pytest.mark.asyncio
 async def test_re_extract_clears_legacy_rolling_intake_without_touching_other_fields(
     monkeypatch,
 ):

@@ -19,3 +19,9 @@ count threshold passes.
 records and source-backed reason first. Any future bulk reconciliation flow must
 require authorization, all-row linkage checks, an explicit removal confirmation,
 an audit record, and transaction locking shared with course promotion.
+
+A dated URL is not enough evidence to merge a course into a current sibling or strip its archive identity.
+
+**Why:** Winchester's year-suffixed MA route serves a current title, while its explicit year-directory research route remains an archive. Treating both as identical title-cleaning cases can create indistinguishable duplicates.
+
+**How to apply:** Follow course-owned official titles, preserve explicit archive years, and require review of dated routes rather than automatically publishing or removing possible duplicates.

@@ -701,6 +701,43 @@ _STUDY_MODE_RULE_SUPPRESSED_HOSTS: frozenset[str] = frozenset({
 async def extract(html: str, url: str) -> list[ExtractionResult]:
     import urllib.parse as _up
     _host = _up.urlparse(url).netloc.lower()
+    if _host == "winchester.ac.uk" or _host.endswith(".winchester.ac.uk"):
+        # Winchester's labelled Location fact frequently contains delivery
+        # prose.  Classify that bounded course-owned value before page-wide
+        # keyword rules can turn "Blended ... on campus" into On Campus.
+        from bs4 import BeautifulSoup
+
+        _soup = BeautifulSoup(html, "html.parser")
+        for _fact in _soup.select(".uow-course-content__overview-info"):
+            _heading = _fact.find(["h2", "h3", "h4", "dt"])
+            if (
+                not _heading
+                or _heading.get_text(" ", strip=True).casefold() != "location"
+            ):
+                continue
+            _value_node = _fact.find(["p", "dd", "ul", "ol"])
+            _value = (
+                _value_node.get_text(" ", strip=True) if _value_node else ""
+            )
+            _mode = (
+                "Blended"
+                if "blend" in _value.casefold()
+                else "On Campus"
+                if re.search(r"\bon[\s-]+campus\b", _value, re.I)
+                else None
+            )
+            if _mode:
+                return [
+                    ExtractionResult(
+                        field_key=field_key,
+                        value=_mode,
+                        normalized={"study_mode": _mode},
+                        confidence=0.99,
+                        method="study_mode:winchester_course_fact",
+                        snippet=_value[:200],
+                    )
+                ]
+            break
     # APU course identity is authoritative.  Do this before all generic
     # label/keyword passes: its page-wide navigation and related-course
     # catalogue contain many unrelated "Online" / "ODL" mentions.

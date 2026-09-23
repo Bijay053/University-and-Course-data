@@ -195,6 +195,12 @@ def _smart_case(text: str) -> str:
             continue
         upper = w.upper().strip(",.;:()")
         bare = w.strip(",.;:()")
+        # Research awards are commonly published as a slash-separated token.
+        # Treat the complete token atomically: punctuation is deliberately not
+        # stripped globally because it is meaningful in course titles.
+        if upper == "MPHIL/PHD":
+            out.append(w.replace(bare, "MPhil/PhD"))
+            continue
         canon = _ACRONYM_CANON.get(upper)
         if canon is not None:
             out.append(w.replace(bare, canon))

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
@@ -10757,6 +10758,24 @@ async def extract_course(
     #   no_intake_months — intake_months list is empty after extraction. Flags
     #     courses where the page shows intake info but none was captured.
     _scrape_warnings: list[str] = list(payload.get("scrape_warnings") or [])
+
+    # Winchester still serves year-stamped catalogue routes alongside current
+    # siblings.  Keep those rows review-only: extraction may repair display
+    # casing or follow a redirect, but must not silently publish/delete a
+    # potentially duplicated historical cohort.
+    from urllib.parse import urlparse as _warning_urlparse
+    _warning_parsed = _warning_urlparse(url or "")
+    _warning_host = (_warning_parsed.hostname or "").lower()
+    if (
+        (_warning_host == "winchester.ac.uk" or _warning_host.endswith(".winchester.ac.uk"))
+        and re.search(
+            r"/courses/(?:\d{4}/[^/?#]+|[^/?#]*-20\d{2})/?$",
+            _warning_parsed.path,
+            re.I,
+        )
+        and "dated_catalogue_page_review" not in _scrape_warnings
+    ):
+        _scrape_warnings.append("dated_catalogue_page_review")
 
     _check_html = rendered_html or html or ""
     _check_lower = _check_html.lower()
