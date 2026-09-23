@@ -2,7 +2,16 @@
 
 import React from "react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+const permissionState = vi.hoisted(() => ({ canTriggerRepair: true }));
+vi.mock("@/components/can", () => ({
+  useCan: () => ({
+    can: (permission: string) => permission === "scraping.trigger" && permissionState.canTriggerRepair,
+    canAny: () => false,
+  }),
+}));
 
 import {
   activeRepairFromStartConflict,
@@ -13,6 +22,7 @@ import {
   onlyKnownExcludedUrls,
   repairJobIdForTerminalState,
   runtimeProgressFromStatus,
+  searchProviderAccessFailure,
   shouldOfferIdenticalContinuation,
   shouldShowAutomaticUrlRepair,
   shouldShowScrapeDiagnostics,
@@ -22,6 +32,7 @@ import {
 afterEach(() => {
   cleanup();
   sessionStorage.clear();
+  permissionState.canTriggerRepair = true;
   vi.unstubAllGlobals();
 });
 
@@ -333,5 +344,197 @@ describe("activeRepairFromStartConflict", () => {
     expect(activeRepairFromStartConflict({
       active_repair: { job_id: "job_owner", session_id: "" },
     })).toBeNull();
+  });
+});
+
+describe("SearchStax provider discovery recovery", () => {
+  it("recognizes only a structured SearchStax access denial or narrow historical correlation", () => {
+    expect(searchProviderAccessFailure({
+      provider: "searchstax",
+      http_status: 401,
+      kind: "provider_access_denied",
+      message: "Course search unavailable",
+    })).toMatchObject({ provider: "searchstax", http_status: 401 });
+    expect(searchProviderAccessFailure(null, [{
+      kind: "discovery",
+      message: "SearchStax HTTP 401 unauthorized",
+    }])).toMatchObject({ kind: "provider_access_denied" });
+    expect(searchProviderAccessFailure({
+      provider: "searchstax",
+      http_status: 403,
+      kind: "provider_access_denied",
+      message: "Course search unavailable",
+    })).toMatchObject({ provider: "searchstax", http_status: 403 });
+    expect(searchProviderAccessFailure(null, [{
+      kind: "discovery",
+      message: "SearchStax HTTP 403 Forbidden",
+    }])).toMatchObject({ kind: "provider_access_denied", http_status: 403 });
+    expect(searchProviderAccessFailure(null, [{
+      kind: "discovery",
+      message: "Official catalogue returned HTTP 401",
+    }])).toBeNull();
+    expect(searchProviderAccessFailure(null, [{
+      kind: "discovery",
+      message: "SearchStax found 42 courses",
+    }])).toBeNull();
+  });
+
+  it("offers repair on a rehydrated failed zero-course job and posts the original job id", async () => {
+    sessionStorage.setItem("scrape_slot_9_jobId", "leeds-trinity-original");
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith("/api/scrape/status/leeds-trinity-original")) {
+        return jsonResponse({
+          status: "failed",
+          universityId: 401,
+          universityName: "Leeds Trinity University",
+          url: "https://www.leedstrinity.ac.uk/courses/",
+          totalFound: 0,
+          imported: 0,
+          skipped: 0,
+          errors: 0,
+          logs: [{
+            event: "error",
+            message: "SearchStax HTTP 401 unauthorized at https://search.example.invalid/?api_key=secret",
+          }],
+          provider_failure: {
+            provider: "searchstax",
+            http_status: 401,
+            kind: "provider_access_denied",
+            message: "Course search unavailable",
+          },
+        });
+      }
+      if (url === "/api/scrape/staged/leeds-trinity-original") return jsonResponse([]);
+      if (url === "/api/scrape/jobs/leeds-trinity-original/ai-repair-status") {
+        return jsonResponse({ status: "not_started" });
+      }
+      if (url === "/api/scrape/jobs/leeds-trinity-original/ai-repair" && init?.method === "POST") {
+        return jsonResponse({
+          session_id: "repair-leeds",
+          job_id: "leeds-trinity-original",
+          status: "queued",
+          autonomous: {
+            enabled: true,
+            phase: "queued",
+            discovery_repair: { status: "queued" },
+          },
+        });
+      }
+      return jsonResponse({ reports: [], source_exclusions: {} });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(React.createElement(ScrapeJobCard, {
+      slotId: 9,
+      slotIndex: 0,
+      universities: [{ id: 401, name: "Leeds Trinity University" }],
+      onReviewReady: () => undefined,
+    }));
+
+    const repair = await screen.findByRole("button", { name: "Repair discovery and retry" });
+    expect(screen.queryByRole("button", { name: "Continue" })).toBeNull();
+    expect(screen.getByText(/course search is unavailable/i)).toBeTruthy();
+    expect(screen.queryByText(/api_key=secret/i)).toBeNull();
+    await userEvent.click(repair);
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/scrape/jobs/leeds-trinity-original/ai-repair",
+        expect.objectContaining({ method: "POST", credentials: "include" }),
+      );
+    });
+    expect(await screen.findByText("Trying official alternatives…")).toBeTruthy();
+  });
+
+  it("does not expose the repair trigger without scraping.trigger permission", async () => {
+    permissionState.canTriggerRepair = false;
+    sessionStorage.setItem("scrape_slot_10_jobId", "provider-denied-job");
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/api/scrape/status/provider-denied-job")) {
+        return jsonResponse({
+          status: "failed",
+          universityName: "Leeds Trinity University",
+          totalFound: 0,
+          provider_failure: {
+            provider: "searchstax",
+            http_status: 401,
+            kind: "provider_access_denied",
+          },
+        });
+      }
+      if (url.includes("/ai-repair-status")) return jsonResponse({ status: "not_started" });
+      if (url.includes("/staged/")) return jsonResponse([]);
+      return jsonResponse({ reports: [], source_exclusions: {} });
+    }));
+
+    render(React.createElement(ScrapeJobCard, {
+      slotId: 10,
+      slotIndex: 0,
+      universities: [],
+      onReviewReady: () => undefined,
+    }));
+
+    expect(await screen.findByTestId("text-repair-permission-required")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /repair discovery and retry/i })).toBeNull();
+  });
+
+  it("opens the existing report with the official catalogue URL when automatic repair is blocked", async () => {
+    sessionStorage.setItem("scrape_slot_11_jobId", "provider-blocked-job");
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/api/scrape/status/provider-blocked-job")) {
+        return jsonResponse({
+          status: "failed",
+          universityName: "Leeds Trinity University",
+          url: "https://www.leedstrinity.ac.uk/courses/",
+          totalFound: 0,
+          provider_failure: {
+            provider: "searchstax",
+            http_status: 401,
+            kind: "provider_access_denied",
+          },
+        });
+      }
+      if (url.endsWith("/ai-repair-status")) {
+        return jsonResponse({
+          session_id: "blocked-repair",
+          job_id: "provider-blocked-job",
+          status: "completed",
+          current_attempt: 1,
+          attempts: [],
+          final_verdict: null,
+          uni_name: "Leeds Trinity University",
+          started_at: null,
+          completed_at: null,
+          error: null,
+          autonomous: {
+            enabled: true,
+            phase: "blocked",
+            discovery_repair: {
+              status: "blocked",
+              strategy: "official_sitemap",
+              candidate_count: 144,
+              verified_course_count: 2,
+              next_action: "report_official_url",
+            },
+          },
+        });
+      }
+      if (url.includes("/staged/")) return jsonResponse([]);
+      return jsonResponse({ reports: [], source_exclusions: {} });
+    }));
+
+    render(React.createElement(ScrapeJobCard, {
+      slotId: 11,
+      slotIndex: 0,
+      universities: [],
+      onReviewReady: () => undefined,
+    }));
+
+    const report = await screen.findByRole("button", { name: "Report official catalogue or course URL" });
+    await userEvent.click(report);
+    const urlInput = await screen.findByTestId("input-report-urls") as HTMLTextAreaElement;
+    expect(urlInput.value).toBe("https://www.leedstrinity.ac.uk/courses/");
   });
 });

@@ -19,6 +19,32 @@ const base: AutonomousRepair = {
 afterEach(cleanup);
 
 describe("AiRepairProgress", () => {
+  it("shows actual discovery-repair counts without claiming candidates are eligible courses", () => {
+    render(
+      <AiRepairProgress
+        autonomous={{
+          ...base,
+          discovery_repair: {
+            status: "running",
+            strategy: "official_sitemap",
+            candidate_count: 144,
+            verified_course_count: 2,
+            message: "Checking MSc and MA samples",
+            next_action: "retry_discovery",
+          },
+        }}
+        currentAttempt={1}
+      />,
+    );
+
+    const status = screen.getByTestId("status-discovery-repair");
+    expect(status.textContent).toContain("144 candidate URLs found");
+    expect(status.textContent).toContain("2 verified course pages");
+    expect(status.textContent).toContain("official sitemap");
+    expect(status.textContent).toContain("Next: retry discovery");
+    expect(status.textContent).not.toContain("144 eligible");
+  });
+
   it("does not show completed stages when delivery was blocked before attempt one", () => {
     const { container } = render(
       <AiRepairProgress autonomous={{ ...base, phase: "blocked" }} currentAttempt={0} />,

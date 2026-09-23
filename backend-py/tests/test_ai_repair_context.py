@@ -29,6 +29,8 @@ def _make_db(job_row_data, quality_row_data: dict | None = None):
         "total_found":       10,
         "imported":          5,
         "total_errors":      None,
+        "status":            "completed",
+        "error_message":     None,
         "discovered_config": None,
         "gate_skip_counts":  None,
         "uni_name":          "Test University",

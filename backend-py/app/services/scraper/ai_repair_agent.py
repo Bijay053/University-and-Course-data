@@ -599,7 +599,8 @@ def validate_ai_repair_target(
     if status not in _REPAIR_TERMINAL_STATUSES:
         return False, f"Scrape is still {status!r}; wait for it to finish before repair."
     url_repairable, _ = validate_url_repair_target(status, discovered_config)
-    if url_repairable or has_extraction_gap:
+    from app.services.scraper.provider_failure import recognize_failure
+    if url_repairable or has_extraction_gap or recognize_failure(discovered_config):
         return True, ""
     return False, (
         "This job has neither a URL-filter failure nor missing fee, IELTS, "
@@ -634,6 +635,7 @@ def _set_dotpath(dotpath: str, value: Any) -> dict:
 # ── Strict patch validation ───────────────────────────────────────────────────
 
 _ALLOWED_DISCOVERY_FIELDS: dict[str, type | tuple] = {
+    "official_catalogue_fallback": bool,
     "allow_url_patterns":   list,
     "block_url_patterns":   list,
     "must_contain":         list,
@@ -1775,6 +1777,8 @@ async def _gather_context(job_id: str, db, *, probe_sitemap: bool = True) -> dic
                    srj.imported,
                    srj.errors          AS total_errors,
                    srj.discovered_config,
+                   srj.status,
+                   srj.error_message,
                    srj.gate_skip_counts,
                    u.name          AS uni_name,
                    u.scrape_url    AS scrape_url,
@@ -1791,6 +1795,11 @@ async def _gather_context(job_id: str, db, *, probe_sitemap: bool = True) -> dic
 
     uni_id: int   = row["university_id"]
     disc_cfg: dict = row["discovered_config"] or {}
+    from app.services.scraper.provider_failure import load_failure
+    provider_failure = await load_failure(
+        db, job_id, disc_cfg, status=row["status"], total_found=row["total_found"],
+        error_message=row["error_message"] or "",
+    )
     pipeline: dict = disc_cfg.get("pipeline_stats", {})
     gate_skip_counts: dict = row["gate_skip_counts"] or {}
 
@@ -1865,6 +1874,7 @@ async def _gather_context(job_id: str, db, *, probe_sitemap: bool = True) -> dic
         effective_discovery["sitemap_url"] = (
             getattr(effective_cfg.discovery, "sitemap_url", None) or ""
         )
+        effective_discovery["official_catalogue_fallback"] = effective_cfg.discovery.official_catalogue_fallback
     except Exception as exc:
         log.warning("ai_repair: effective discovery config load failed: %s", exc)
 
@@ -2054,6 +2064,7 @@ async def _gather_context(job_id: str, db, *, probe_sitemap: bool = True) -> dic
         "filter_config_snapshot_present": filter_config_snapshot_present,
         "effective_discovery": effective_discovery,
         "effective_config": effective_cfg,
+        "provider_failure": provider_failure,
         "yaml_snapshot": yaml_content if yaml_files else None,
         "yaml_content":    yaml_content[:4000],
         "quality":         quality,
@@ -2514,6 +2525,8 @@ async def _assert_effective_discovery_patch(uni_id: int, disc_patch: dict, db) -
                 f"Effective config verification failed for discovery.{field}: "
                 f"expected {expected!r}, got {actual!r}"
             )
+    if disc_patch.get("official_catalogue_fallback") and cfg.discovery.searchstax is not None:
+        raise RuntimeError("The verified discovery strategy did not disable the unavailable course search.")
 
 
 # ── Quality delta computation ─────────────────────────────────────────────────
@@ -2826,6 +2839,15 @@ async def run_ai_repair_loop(
             from app.services.scraper.config.context import current_uni_config
             uni_config_token = current_uni_config.set(live.config)
             session["live_probe"] = await live.probe()
+            if ctx.get("provider_failure"):
+                from app.services.scraper.official_catalogue_repair import NEXT_ACTION
+                autonomous["discovery_repair"] = {
+                    "status": "validating", "strategy": "official_sitemap" if (live.fallback["source"] or "").endswith(".xml") else "official_catalogue",
+                    "candidate_count": len(live.fallback["candidates"]),
+                    "verified_course_count": sum(p["classification"] == "course" for p in live.initial.values()),
+                    "message": "Checking official course pages before changing discovery.",
+                    "next_action": NEXT_ACTION,
+                }
             session["audience_reviews"] = _repair_audience_reviews(session["live_probe"])
             ctx["live_probe"] = session["live_probe"]
             # This fresh baseline is captured before live validation and fenced
@@ -2839,6 +2861,9 @@ async def run_ai_repair_loop(
             if not ctx["repair_url_sample"]:
                 session.update(status="failed", error=session["live_probe"]["reason"],
                                final_verdict="No config changed: positive live course evidence is unavailable.")
+                if ctx.get("provider_failure"):
+                    session["error"] = "No changes were made: official course pages could not be verified. " + NEXT_ACTION
+                    autonomous["discovery_repair"].update(status="blocked", message=session["error"])
                 return session
 
         # An old failed job may be opened after its university recipe was
@@ -2940,10 +2965,20 @@ async def run_ai_repair_loop(
 
             # ③ Call OpenAI
             user_msg = _build_user_message(ctx, session["attempts"], phase=phase)
-            ai_data = await asyncio.wait_for(
-                chat_json(system=_SYSTEM_PROMPT, user=user_msg, max_tokens=ai_max_tokens),
-                timeout=ai_timeout,
-            )
+            if ctx.get("provider_failure"):
+                ai_data = {
+                    "diagnosis": "Course search access denied; validate official sitemap alternative.",
+                    "root_cause": "provider_access_denied", "confidence": 100,
+                    "patches": [
+                        {"section": "discovery", "field": "official_catalogue_fallback", "value": True},
+                        {"section": "discovery", "field": "sitemap_url", "value": live.fallback["source"] or ""},
+                    ],
+                }
+            else:
+                ai_data = await asyncio.wait_for(
+                    chat_json(system=_SYSTEM_PROMPT, user=user_msg, max_tokens=ai_max_tokens),
+                    timeout=ai_timeout,
+                )
 
             if ai_data is None:
                 current_attempt_evidence["validation_errors"] = ["OpenAI service unavailable."]
@@ -3022,6 +3057,9 @@ async def run_ai_repair_loop(
                     log.info("ai_repair: blocked discovery patches in extraction phase: %s", blocked)
 
             disc_patch, extr_patch, validation_errors = _validate_and_build_config_patch(patches_raw)
+            if "official_catalogue_fallback" in disc_patch and not (live and ctx.get("provider_failure")):
+                disc_patch = {}
+                validation_errors.append("Provider strategy changes require bounded official-source validation.")
             # A model may diagnose an audience-scoped intake/English defect
             # without proposing a recipe (the recipe is live-derived). Force
             # the bounded live validator onto this path even when AI emitted
@@ -3566,6 +3604,19 @@ async def run_ai_repair_loop(
                     ),
                 )
                 pending_extraction_rollback = None
+                break
+
+            if ctx.get("provider_failure"):
+                accepted = patch_applied_ok and session.get("live_probe", {}).get("accepted") is True
+                message = ("Official discovery saved; bounded review-only verification is next."
+                           if accepted else "No changes were made: an official fallback could not be verified. " + NEXT_ACTION)
+                if "rollback failed" in patch_error.lower():
+                    message = "Automatic repair stopped because the configuration changed during repair. Refresh and review the saved settings before trying again. " + NEXT_ACTION
+                autonomous["discovery_repair"].update(
+                    status="verification_pending" if accepted else "blocked", message=message,
+                )
+                session.update(status="completed" if accepted else "failed",
+                               final_verdict=message, error=None if accepted else message)
                 break
 
             if overall and (not live or session.get("live_probe", {}).get("accepted")):

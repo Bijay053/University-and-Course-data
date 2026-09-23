@@ -155,7 +155,8 @@ async def _fetch_official(url: str, config, timeout: float) -> tuple[str, str, s
             if response.is_redirect:
                 return "", "network_failure", "Redirect refused; destination not verified"
             response.raise_for_status()
-            if "html" not in response.headers.get("content-type", "").lower():
+            content_type = response.headers.get("content-type", "").lower()
+            if "html" not in content_type and "xml" not in content_type:
                 return "", "unsupported_content", "Live HTML evidence required"
             chunks, size = [], 0
             async for chunk in response.aiter_bytes():
@@ -167,6 +168,11 @@ async def _fetch_official(url: str, config, timeout: float) -> tuple[str, str, s
                 if len(chunk) > remaining:
                     break
             html = b"".join(chunks).decode(response.encoding or "utf-8", errors="replace")
+            if "xml" in content_type:
+                # A truncated sitemap cannot establish a usable catalogue.
+                if size >= _MAX_PROBE_HTML_BYTES:
+                    return "", "unsupported_content", "Sitemap exceeds bounded evidence size"
+                return html, "", ""
             if _is_javascript_disabled_shell(html):
                 remaining = timeout - (time.monotonic() - fetch_started)
                 rendered = await _render_direct_shell(url, remaining)
@@ -391,6 +397,22 @@ def audience_scoped_recipe_proposals(evidence: dict) -> dict:
 
 
 def inspect_page(url: str, html: str, config=None) -> dict:
+    if html.lstrip().startswith("<?xml") or re.match(r"\s*<urlset\b", html):
+        from xml.etree import ElementTree
+        try:
+            if "<!DOCTYPE" in html.upper() or "<!ENTITY" in html.upper():
+                raise ValueError("External entities prohibited")
+            root = ElementTree.fromstring(html)
+            if root.tag.rsplit("}", 1)[-1] != "urlset":
+                return {"url": url, "classification": "unconfirmed", "reason": "A complete course sitemap is required"}
+            urls = [node.text.strip() for node in root.iter()
+                    if node.tag.rsplit("}", 1)[-1] == "loc" and node.text]
+            if len(urls) > 5000:
+                raise ValueError("Sitemap too large")
+            return {"url": url, "classification": "sitemap", "links": [{"url": value} for value in urls],
+                    "reason": "Complete bounded sitemap"}
+        except Exception:
+            return {"url": url, "classification": "unconfirmed", "reason": "Sitemap could not be validated"}
     """Classify using shared gates and visible, course-owned positive evidence."""
     from app.services.scraper.challenge_shell import is_challenge_shell
 
@@ -399,6 +421,11 @@ def inspect_page(url: str, html: str, config=None) -> dict:
     if is_challenge_shell(html):
         return {**result, "classification": "challenge", "reason": "Challenge shell, not course evidence"}
     soup = _sanitized_visible_document(html)
+    result["has_pagination"] = bool(
+        soup.select('[rel=next], .pagination, [class*=load-more], [id*=load-more]')
+        or any(re.search(r"\b(?:load more|next page|show more courses)\b", node.get_text(" ", strip=True), re.I)
+               for node in soup.select("button, a"))
+    )
     extra_hosts = getattr(getattr(config, "discovery", None), "allowed_extra_hostnames", ())
     canonical = soup.select_one('link[rel="canonical"][href]')
     if canonical and not official_url(urljoin(url, canonical["href"]), url, extra_hosts):
@@ -491,6 +518,11 @@ def inspect_page(url: str, html: str, config=None) -> dict:
         return {**result, "classification": "listing" if page["course_links"] else "unconfirmed",
                 "reason": "No positive course-owned award and field evidence"}
     # Explicit, course-owned negative availability is never repaired away.
+    from app.services.scraper.pipelines.single_course import _is_domestic_only_page, _is_parttime_only_page
+    from app.services.scraper.guards import is_confirmed_host_online_only_page
+    if (_is_domestic_only_page(owned_html, url) or _is_parttime_only_page(owned_html)
+            or is_confirmed_host_online_only_page(owned_html, url)):
+        return {**result, "classification": "ineligible", "reason": "Shared international course eligibility gate"}
     from app.services.scraper.extractors.eligibility import _NEG
     if _NEG.search(region.get_text(" ", strip=True)):
         return {**result, "classification": "ineligible", "reason": "Explicit international-audience exclusion"}
@@ -601,6 +633,12 @@ class LiveRepairEvidence:
         return record
 
     async def probe(self) -> dict:
+        if self.ctx.get("provider_failure"):
+            from app.services.scraper.official_catalogue_repair import discover_official_catalogue
+            self.fallback = await discover_official_catalogue(self)
+            for url in self.fallback["sample"]:
+                self.initial[url] = await self.fetch(url)
+            return self.audit()
         # Reserve half the entire session budget for fresh, pre-apply validation.
         limit = min(6, self.max_pages // 2)
         pending = list(dict.fromkeys(
@@ -645,6 +683,8 @@ class LiveRepairEvidence:
     def discovery_needed(self, discovery: dict) -> bool:
         known = self.ctx.get("passed_sample") or []
         return (
+            bool(self.ctx.get("provider_failure") and not discovery.get("official_catalogue_fallback"))
+            or
             not any(r["classification"] == "course" for r in self.initial.values())
             or any(r["classification"] == "course" and not passes(url, discovery)
                    for url, r in self.initial.items())
@@ -668,7 +708,14 @@ class LiveRepairEvidence:
             patch["sitemap_url"], self.ctx["scrape_url"], self.extra_hosts
         ):
             reasons.append("Proposed sitemap is not an official configured university source")
-        if set(patch) - {"allow_url_patterns", "block_url_patterns", "must_contain", "course_detail_url_patterns"}:
+        fallback_patch = (
+            self.ctx.get("provider_failure") and patch.get("official_catalogue_fallback") is True
+            and set(patch) == {"official_catalogue_fallback", "sitemap_url"}
+            and patch.get("sitemap_url") == getattr(self, "fallback", {}).get("source")
+            and len(new) >= 2
+            and len(new) == len(getattr(self, "fallback", {}).get("sample", []))
+        )
+        if set(patch) - {"allow_url_patterns", "block_url_patterns", "must_contain", "course_detail_url_patterns"} and not fallback_patch:
             reasons.append("Discovery strategy changes require a bounded provider replay not available in this probe")
         if not new:
             reasons.append("No positive live course candidate passes proposed filters")
@@ -681,7 +728,7 @@ class LiveRepairEvidence:
                 reasons.append("Cannot drop an unconfirmed candidate based on title or transport failure")
         if bad_new:
             reasons.append("Proposed filters still admit observed non-course candidates")
-        if patch and not ((new - old) or (bad_old - bad_new)):
+        if patch and not ((new - old) or (bad_old - bad_new) or fallback_patch):
             reasons.append("No evidenced course rescue or contamination reduction")
         if not old and len(new) < max(1, (len(courses) + 1) // 2):
             reasons.append("Insufficient positive course rescue for total-loss discovery")
@@ -693,6 +740,11 @@ class LiveRepairEvidence:
         """Fresh actual fetches then pure rule replay, all before a config write."""
         report = self.discovery_validation(discovery, patch)
         reasons = report["reasons"]
+        if patch.get("official_catalogue_fallback") and not reasons:
+            from app.services.scraper.official_catalogue_repair import discover_official_catalogue
+            fresh = await discover_official_catalogue(self)
+            if fresh != self.fallback:
+                reasons.append("Official catalogue changed during validation; no changes are safe")
         required = set(report["courses"])
         for item in (snapshot_validation or {}).get("reports") or []:
             required.update(sample["url"] for sample in item.get("samples") or [] if sample.get("url"))

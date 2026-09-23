@@ -96,6 +96,14 @@ export type AutonomousRepair = {
     [key: string]: unknown;
   };
   reason?: string;
+  discovery_repair?: {
+    status?: "queued" | "running" | "completed" | "failed" | "blocked";
+    strategy?: string;
+    candidate_count?: number;
+    verified_course_count?: number;
+    message?: string;
+    next_action?: string;
+  };
 };
 
 type VerificationQuality = Partial<Record<
@@ -119,6 +127,12 @@ const PHASES: Array<{ phase: AutonomousRepair["phase"]; label: string }> = [
   { phase: "verifying", label: "Verification scrape" },
   { phase: "verified", label: "Sample verified" },
 ];
+
+function safeDiscoveryRepairText(value: string): string {
+  return value
+    .replace(/https?:\/\/\S+/gi, "official source")
+    .replace(/\b(?:api[_-]?key|token|secret|password)\s*[=:]\s*\S+/gi, "credential [redacted]");
+}
 
 function phaseIndex(phase: AutonomousRepair["phase"]) {
   if (phase === "queued") return -1;
@@ -203,6 +217,8 @@ export function AiRepairProgress({
     autonomous.continuation
     && (autonomous.phase === "verification_queued" || autonomous.phase === "verifying")
   );
+  const discoveryRepair = autonomous.discovery_repair;
+  const discoveryRepairRunning = discoveryRepair?.status === "queued" || discoveryRepair?.status === "running";
 
   return (
     <section
@@ -255,6 +271,40 @@ export function AiRepairProgress({
           Attempt {Math.min(currentAttempt, effectiveMaxAttempts)}/{effectiveMaxAttempts}
         </span>
       </div>
+
+      {discoveryRepair && (
+        <div
+          className="rounded border border-violet-200 bg-white/80 px-2 py-1.5 text-[9px] text-violet-900"
+          data-testid="status-discovery-repair"
+        >
+          <strong>
+            {discoveryRepairRunning
+              ? "Course search unavailable — trying official alternatives"
+              : discoveryRepair.status === "completed"
+                ? "Official alternative found; discovery retry started"
+                : "Official alternative search finished"}
+          </strong>
+          {discoveryRepair.strategy && (
+            <span> · {discoveryRepair.strategy.replaceAll("_", " ")}</span>
+          )}
+          {discoveryRepair.candidate_count != null && (
+            <span> · {discoveryRepair.candidate_count} candidate URLs found</span>
+          )}
+          {discoveryRepair.verified_course_count != null && (
+            <span> · {discoveryRepair.verified_course_count} verified course pages</span>
+          )}
+          {discoveryRepair.message && (
+            <p className="mt-0.5 text-violet-700">
+              {safeDiscoveryRepairText(discoveryRepair.message)}
+            </p>
+          )}
+          {discoveryRepair.next_action && (
+            <p className="mt-0.5 text-violet-700">
+              Next: {safeDiscoveryRepairText(discoveryRepair.next_action.replaceAll("_", " "))}
+            </p>
+          )}
+        </div>
+      )}
 
       {!needsCoursePage && <ol className="grid grid-cols-3 gap-1 sm:grid-cols-6" aria-label="Repair stages">
         {PHASES.map((item, index) => {

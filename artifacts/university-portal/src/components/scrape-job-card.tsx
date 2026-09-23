@@ -13,6 +13,7 @@ import { CountrySelect } from "@/components/country-select";
 import { useToast } from "@/hooks/use-toast";
 import { countPendingReviewCourses } from "@/utils/pending-review-count";
 import { CourseReport } from "@/components/course-report";
+import { useCan } from "@/components/can";
 import {
   TargetedRetryAllFilteredNotice,
   type TargetedRetryDiagnostic,
@@ -69,6 +70,48 @@ type ScrapeLog = {
     fail_open_reasons: Record<string, number>;
   } | null;
 };
+
+export type ProviderFailure = {
+  provider: string;
+  http_status: number;
+  kind: string;
+  message?: string;
+};
+
+export function searchProviderAccessFailure(
+  providerFailure: ProviderFailure | null | undefined,
+  logs: Array<Pick<ScrapeLog, "message" | "kind">> = [],
+): ProviderFailure | null {
+  if (
+    providerFailure?.provider?.toLowerCase() === "searchstax"
+    && (providerFailure.http_status === 401 || providerFailure.http_status === 403)
+    && providerFailure.kind === "provider_access_denied"
+  ) {
+    return providerFailure;
+  }
+
+  // Historical jobs predate provider_failure. Keep this deliberately narrow:
+  // require the provider name, an HTTP 401/403, and an authentication/access
+  // correlation in the same plaintext log line.
+  const matched = logs.find(log => {
+    const text = `${log.kind ?? ""} ${log.message ?? ""}`;
+    return /\bsearchstax\b/i.test(text)
+      && /\b(?:http\s*)?(?:401|403)\b/i.test(text)
+      && /\b(?:unauthori[sz]ed|forbidden|authentication|access denied|invalid (?:api )?key)\b/i.test(text);
+  });
+  return matched ? {
+    provider: "searchstax",
+    http_status: /\b(?:http\s*)?403\b/i.test(`${matched.kind ?? ""} ${matched.message ?? ""}`) ? 403 : 401,
+    kind: "provider_access_denied",
+  } : null;
+}
+
+function providerSafeLogMessage(log: Pick<ScrapeLog, "event" | "message">, failure: ProviderFailure | null): string {
+  if (failure?.provider.toLowerCase() === "searchstax" && /\bsearchstax\b/i.test(log.message ?? "")) {
+    return "Course search unavailable (provider access denied).";
+  }
+  return log.message || log.event;
+}
 
 export function runtimeProgressFromStatus(data: {
   current?: number;
@@ -550,6 +593,7 @@ function UniPicker({ value, onChange, universities, disabled }: {
 // ── Main component ────────────────────────────────────────────────────────────
 export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, onReportStarted, onRemove, canRemove, forceResetKey }: ScrapeJobCardProps) {
   const { toast } = useToast();
+  const { can } = useCan();
   const slotKey = `scrape_slot_${slotId}_jobId`;
   const startTimeKey = `scrape_slot_${slotId}_startTime`;
   const [selectedUni, setSelectedUni] = useState("");
@@ -593,6 +637,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
   const [continuableUnresolvedCount, setContinuableUnresolvedCount] = useState<number | null>(null);
   const [exhaustedUnresolvedCount, setExhaustedUnresolvedCount] = useState<number | null>(null);
   const [recoveringSkipped, setRecoveringSkipped] = useState(false);
+  const [providerFailure, setProviderFailure] = useState<ProviderFailure | null>(null);
 
   // Snapshot badge state — loaded after job completes
   type SnapshotSummary = {
@@ -869,6 +914,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
     setPerformanceSavings(null);
     setCompletedJobId(null);
     setTargetedRetryDiagnostic(null);
+    setProviderFailure(null);
     setBrowserRescueAttempted(false);
     setIsContinuationJob(false);
     setUnresolvedCount(null);
@@ -1135,6 +1181,8 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
               || autonomousPhase === "verification_queued"
               || autonomousPhase === "verifying"
               || autonomousPhase === "recovering"
+              || data.autonomous.discovery_repair?.status === "queued"
+              || data.autonomous.discovery_repair?.status === "running"
             );
             if (!autonomousActive && (data.status === "completed" || data.status === "failed")) {
               setAiRepairPolling(false);
@@ -1176,6 +1224,8 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
              || autonomousPhase === "verification_queued"
              || autonomousPhase === "verifying"
              || autonomousPhase === "recovering"
+              || data.autonomous.discovery_repair?.status === "queued"
+              || data.autonomous.discovery_repair?.status === "running"
            );
            if (autonomousActive || data.status === "queued" || data.status === "starting" || data.status === "running") {
             setAiRepairPolling(true);
@@ -1528,6 +1578,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
           exhaustedUnresolvedCount?: number | null;
           canContinueUnresolved?: boolean;
           targetedRetryDiagnostic?: TargetedRetryDiagnostic | null;
+           provider_failure?: ProviderFailure | null;
           current?: number; total?: number; totalFound?: number;
         }>(res);
         if (!data) { schedule(POLL_BASE); return; }
@@ -1554,6 +1605,9 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
             : null
         );
         setTargetedRetryDiagnostic(data.targetedRetryDiagnostic ?? null);
+         setProviderFailure(
+           searchProviderAccessFailure(data.provider_failure, [...logs, ...(data.logs ?? [])]),
+         );
         if (typeof data.fastMode === "boolean") setFastMode(data.fastMode);
         if (data.feePageUrl) {
           setFeePageUrl(data.feePageUrl);
@@ -1835,6 +1889,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
     setUnresolvedCount(null);
     setContinuableUnresolvedCount(null);
     setExhaustedUnresolvedCount(null);
+    setProviderFailure(null);
     setUrlFilterWarning(null);
     setRepairCandidates(null);
     setRepairFixApplied(false);
@@ -2195,6 +2250,12 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
             onReview={id => onReviewReady(id, uniName, true)}
             onStarted={onReportStarted}
             openRequest={courseReportOpenRequest}
+            prefillCourses={providerFailure && scrapeUrl ? [{
+              courseName: "Official course catalogue",
+              courseUrl: scrapeUrl,
+              fields: ["other"],
+              description: "Course discovery could not reach the catalogue. Please provide the official catalogue or course page so automatic recovery can retry.",
+            }] : undefined}
           />
         </div>
       )}
@@ -2452,12 +2513,12 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                   )
                 ) : logs.map((l, i) => (
                   <div key={i} className={`${logColor(l.event, l.phase)} break-words`}>
-                    {l.message || l.event}
+                    {providerSafeLogMessage(l, providerFailure)}
                   </div>
                 ))}
                 <div ref={logEndRef} />
               </div>
-              {logs.length > 0 && (
+              {logs.length > 0 && !providerFailure && (
                 <button
                   onClick={handleCopyLogs}
                   title="Copy all logs"
@@ -2481,7 +2542,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                   {stopping ? "Stopping…" : "Stop"}
                 </Button>
               )}
-              {phase === "error" && (
+              {phase === "error" && !providerFailure && (
                 <>
                   <Button
                     onClick={handleStart}
@@ -2498,7 +2559,67 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                 </>
               )}
             </div>
-            {phase === "error" && urlFilterWarning?.kind === "high_drop_rate" && repairJobId && (
+            {phase === "error" && providerFailure && repairJobId && (
+              <div
+                className="rounded-lg border border-violet-200 bg-violet-50 p-2.5 space-y-2"
+                data-testid={`provider-discovery-repair-${repairJobId}`}
+              >
+                <div className="flex items-center gap-1.5">
+                  <Bot className="w-3.5 h-3.5 text-violet-700" />
+                  <span className="text-[11px] font-semibold text-violet-900">Course search unavailable</span>
+                </div>
+                <p className="text-[10px] leading-relaxed text-violet-800">
+                  Course search is unavailable. Automatic repair can try official alternatives and retry discovery.
+                </p>
+                {can("scraping.trigger") ? (
+                  <Button
+                    type="button"
+                    data-testid={`button-repair-discovery-${repairJobId}`}
+                    onClick={() => {
+                      const blocked = aiRepairSession?.autonomous?.phase === "blocked";
+                      if (blocked) {
+                        setCourseReportOpenRequest(value => value + 1);
+                        requestAnimationFrame(() => {
+                          document.getElementById(`course-report-${slotIndex}`)
+                            ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+                        });
+                        return;
+                      }
+                      void handleAiRepair();
+                    }}
+                    disabled={aiRepairLoading || aiRepairPolling}
+                    size="sm"
+                    className="w-full bg-violet-600 hover:bg-violet-700"
+                  >
+                    {(aiRepairLoading || aiRepairPolling)
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                      : <Radar className="w-3.5 h-3.5 mr-1.5" />}
+                    {aiRepairSession?.autonomous?.phase === "blocked"
+                      ? "Report official catalogue or course URL"
+                      : aiRepairPolling
+                        ? "Trying official alternatives…"
+                        : aiRepairSession?.status === "failed"
+                          ? "Repair discovery and retry again"
+                          : "Repair discovery and retry"}
+                  </Button>
+                ) : (
+                  <p className="text-[10px] text-violet-800" data-testid="text-repair-permission-required">
+                    You do not have permission to start a discovery retry.
+                  </p>
+                )}
+                {aiRepairSession?.autonomous && (
+                  <AiRepairProgress
+                    autonomous={aiRepairSession.autonomous}
+                    liveProbe={aiRepairSession.live_probe}
+                    currentAttempt={aiRepairSession.current_attempt}
+                    maxAttempts={aiRepairSession.max_attempts}
+                    audienceReviews={aiRepairSession.audience_reviews}
+                    onOpenVerificationJob={jobId => onReviewReady(jobId, uniName, true)}
+                  />
+                )}
+              </div>
+            )}
+            {phase === "error" && !providerFailure && urlFilterWarning?.kind === "high_drop_rate" && repairJobId && (
               <div className="rounded-lg border border-violet-200 bg-violet-50 p-2.5 space-y-2">
                 <div className="flex items-center gap-1.5">
                   <Bot className="w-3.5 h-3.5 text-violet-700" />
@@ -2521,7 +2642,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                     setCourseReportOpenRequest(value => value + 1);
                     requestAnimationFrame(() => {
                       document.getElementById(`course-report-${slotIndex}`)
-                        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                        ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
                     });
                   }}
                   disabled={aiRepairLoading || aiRepairPolling}
@@ -2554,7 +2675,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                 )}
               </div>
             )}
-            {phase === "error" && activeJobId && (
+            {phase === "error" && activeJobId && !providerFailure && (
               <p className="text-[11px] text-gray-500 text-center">
                 Continue keeps saved courses and resumes the remaining URLs.
               </p>

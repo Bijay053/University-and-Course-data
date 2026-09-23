@@ -1280,6 +1280,9 @@ async def _fetch_links_only(cfg: SearchStaxConfig, emit=None) -> tuple[list[dict
                     except WlvCatalogueUnavailable:
                         raise  # Never turn failed authentication into a partial/empty catalogue.
                     except Exception as exc:  # noqa: BLE001
+                        if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code in (401, 403):
+                            from app.services.scraper.provider_failure import ProviderAccessDenied
+                            raise ProviderAccessDenied(exc.response.status_code) from None
                         _page_exc = exc
                         log.warning(
                             "[SEARCHSTAX links_only] fetch failed (start=%d, "
@@ -1591,6 +1594,9 @@ async def fetch_searchstax_links(
                     except WlvCatalogueUnavailable:
                         raise
                     except Exception as _fetch_exc:  # noqa: BLE001
+                        if isinstance(_fetch_exc, httpx.HTTPStatusError) and _fetch_exc.response.status_code in (401, 403):
+                            from app.services.scraper.provider_failure import ProviderAccessDenied
+                            raise ProviderAccessDenied(_fetch_exc.response.status_code) from None
                         _page_exc = _fetch_exc
                         log.warning(
                             "[SEARCHSTAX] fetch failed (start=%d, attempt=%d/3): %s",

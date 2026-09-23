@@ -1023,7 +1023,14 @@ async def get_status(
             or 0
         )
 
+    from app.services.scraper.provider_failure import load_failure, sanitize_provider_logs
+    provider_failure = await load_failure(
+        db, job_id, job.discovered_config, status=job.status, total_found=job.total_found,
+        error_message=job.error_message or "",
+    )
+    sanitize_provider_logs(logs)
     return {
+        "provider_failure": provider_failure,
         "id": job.runtime_job_id,
         "runtimeJobId": job.runtime_job_id,
         "jobId": job.runtime_job_id,
@@ -1072,7 +1079,7 @@ async def get_status(
         ),
         "startedAt": job.started_at.isoformat() if job.started_at else None,
         "completedAt": job.completed_at.isoformat() if job.completed_at else None,
-        "errorMessage": job.error_message,
+        "errorMessage": provider_failure["message"] if provider_failure else job.error_message,
         "targetedRetryDiagnostic": (
             (job.discovered_config or {}).get("targeted_retry_diagnostic")
         ),
@@ -1714,8 +1721,16 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
     await _apply_inherited_suppression(db, staged)
     await _attach_recovery_counts_bulk(db, staged)
 
+    from app.services.scraper.provider_failure import load_failure, sanitize_provider_logs
+    provider_failure = await load_failure(
+        db, job_id, job.discovered_config, status=job.status,
+        total_found=job.total_found, error_message=job.error_message or "",
+    )
+    sanitize_provider_logs(logs)
     return {
+        "provider_failure": provider_failure,
         "job": {
+            "provider_failure": provider_failure,
             "runtimeJobId": job.runtime_job_id,
             "jobId": job.runtime_job_id,
             "universityId": job.university_id,
@@ -1729,7 +1744,7 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
             "current": job.current or 0,
             "startedAt": job.started_at.isoformat() if job.started_at else None,
             "completedAt": job.completed_at.isoformat() if job.completed_at else None,
-            "errorMessage": job.error_message,
+            "errorMessage": provider_failure["message"] if provider_failure else job.error_message,
         },
         "logs": logs,
         "stagedCourses": staged,
@@ -8089,7 +8104,7 @@ async def start_ai_repair(
     row = (await db.execute(
         _text(
             "SELECT runtime_job_id, status, university_id, discovered_config, "
-            "total_found, imported, errors, gate_skip_counts "
+            "total_found, imported, errors, gate_skip_counts, error_message "
             "FROM scrape_runtime_jobs WHERE runtime_job_id = :j"
         ),
         {"j": job_id},
@@ -8110,6 +8125,13 @@ async def start_ai_repair(
         {"j": job_id},
     )).scalar() or 0
     evidence_config = dict(row["discovered_config"] or {})
+    from app.services.scraper.provider_failure import load_failure
+    provider_failure = await load_failure(
+        db, job_id, evidence_config, status=row["status"], total_found=row["total_found"],
+        error_message=row["error_message"] or "",
+    )
+    if provider_failure:
+        evidence_config["provider_failure"] = provider_failure
     evidence_config["catalogue_floor_guard"] = (row["gate_skip_counts"] or {}).get("catalogue_guard") or {}
     catalogue_problem = workflow.has_catalogue_evidence(evidence_config) or (
         int(row["total_found"] or 0) > 0
@@ -8117,7 +8139,7 @@ async def start_ai_repair(
     )
     repairable, reason = validate_ai_repair_target(
         str(row["status"] or ""),
-        row["discovered_config"] or {},
+        evidence_config,
         has_extraction_gap=missing_repairable > 0 or catalogue_problem,
     )
     if not repairable:

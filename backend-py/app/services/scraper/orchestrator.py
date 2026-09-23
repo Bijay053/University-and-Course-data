@@ -3279,6 +3279,20 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         # browser rendering, AND per-course extraction (the prebuilt result is
         # returned verbatim by _extract_only). See searchstax_hud.py.
         _searchstax_cfg = getattr(_uni_cfg.discovery, "searchstax", None)
+        if not _targeted_retry and _uni_cfg.discovery.official_catalogue_fallback:
+            from app.services.scraper.ai_repair_live import LiveRepairEvidence
+            from app.services.scraper.official_catalogue_repair import discover_official_catalogue, NEXT_ACTION
+            replay = LiveRepairEvidence({
+                "scrape_url": scrape_url, "effective_config": _uni_cfg,
+            })
+            catalogue = await discover_official_catalogue(replay)
+            links = [{"url": url, "name": ""} for url in catalogue["candidates"]]
+            _searchstax_cfg = None
+            if not links:
+                job.status = "failed"
+                job.error_message = "Official catalogue discovery could not be verified. " + NEXT_ACTION
+                await db.commit()
+                return
         _ss_filter_stats: dict = {}  # populated only when links_only SearchStax runs
         if not _targeted_retry and _searchstax_cfg is not None:
             from app.services.scraper.searchstax_hud import fetch_searchstax_links
@@ -3314,9 +3328,15 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 else:
                     links = _ss_result
             except Exception as _ss_exc:  # noqa: BLE001
-                log.error("SearchStax provider failed: %s", _ss_exc, exc_info=True)
+                from app.services.scraper.provider_failure import ProviderAccessDenied
+                log.error("SearchStax provider failed (%s)", type(_ss_exc).__name__)
                 links = []
-                _ss_error = str(_ss_exc)
+                _ss_error = "The course search could not be accessed."
+                if isinstance(_ss_exc, ProviderAccessDenied):
+                    job.discovered_config = {
+                        **(job.discovered_config or {}),
+                        "provider_failure": _ss_exc.provider_failure,
+                    }
             _always_browser = False  # never run browser discovery for these
             # Fail fast: when SearchStax is configured it is the ONLY discovery
             # path for this university (the live site is a CF-protected SPA that
@@ -3325,12 +3345,9 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             # rather than burning 2+ minutes on tiers that cannot possibly work.
             if not links:
                 _failure_msg = (
-                    f"SearchStax provider returned 0 links — aborting (not falling "
-                    f"back to BFS which will also return 0).  Provider error: {_ss_error or 'none'}. "
-                    f"Check that the SearchStax token is valid: set 'authorization_token' "
-                    f"in the uni YAML, 'token_env' pointing to an env var, or the global "
-                    f"'SEARCHSTAX_TOKEN' environment variable.  Also verify the Solr "
-                    f"endpoint URL is reachable and the filter_query matches this core."
+                    "The university's course search returned no courses. "
+                    "No courses were changed. Use Repair discovery to check official course pages, "
+                    "or provide an official university catalogue or course page URL."
                 )
                 log.error(_failure_msg)
                 job.status = "failed"

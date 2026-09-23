@@ -1244,6 +1244,7 @@ class NonDegreeClassifierConfig(BaseModel):
 
 
 class DiscoveryConfig(BaseModel):
+    official_catalogue_fallback: bool = False
     """Safe to replay against unknown universities (Tier-3 playbook matching)."""
 
     non_degree_classifier: NonDegreeClassifierConfig = Field(

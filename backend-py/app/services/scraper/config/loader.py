@@ -429,6 +429,10 @@ def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any
             result[key] = _deep_merge(result[key], val)
         else:
             result[key] = val
+    if result.get("official_catalogue_fallback") is True:
+        # Explicit strategy override survives recursive merges and cannot be
+        # undone by the legacy "None means unset" merge rule.
+        result["searchstax"] = None
     return result
 
 
@@ -697,6 +701,13 @@ def load_uni_config(
     # section. All unlocked fields retain normal admin-highest precedence.
     for path, value in locked_config_values.items():
         _set_config_path(merged, path, value)
+    if any(path == "discovery" or path.startswith("discovery.searchstax")
+           or path in {"discovery.sitemap_url", "discovery.official_catalogue_fallback"}
+           for path in locked_config_values):
+        # A strategy override is not permission to bypass a verified recipe's
+        # locked transport or source. The repair reload assertion rejects it.
+        if "discovery.official_catalogue_fallback" not in locked_config_values:
+            merged.setdefault("discovery", {})["official_catalogue_fallback"] = False
 
     # 5. Inject identity fields (these are not in YAML, they come from the DB row)
     merged.pop("slug", None)

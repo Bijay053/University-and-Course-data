@@ -5,6 +5,12 @@ description: Product rule for blocked automatic course recovery and user-facing 
 
 When automatic recovery cannot recognize an individual course page, the user action is to submit the exact official course URL through the bounded course-report flow. Do not expose scraper configuration, regexes, internal repair stages, or “manual developer investigation” as the remediation.
 
+Provider access failures need an in-app discovery repair action, not only a report form for individual missing courses. Try independently validated official catalogue sources; keep the report form as the fallback when discovery cannot be repaired safely.
+
+**Why:** Reporting individual URLs did not meet the user's requirement to fix a university whose course-search provider rejected access. Retrying the same rejected provider is not a repair.
+
+**How to apply:** Distinguish candidate links, validated samples, and actually staged courses. Never describe sample validation or a saved strategy as full catalogue recovery.
+
 **Why:** The product requirement is fully developer-free recovery. Official URLs are understandable user evidence, while eligibility and delivery decisions must remain independently verified by the server.
 
 **How to apply:** Any blocked or zero-course recovery state should explain that no course was changed, open the official-course-URL form directly, and preserve all server-side eligibility and online-only safeguards. An exact endpoint-validated official course URL must survive stale catalogue discovery filters, but it must still pass global non-degree and staging guards. Show “staged” only for persisted staged rows, and keep retry available until the reported URL actually produces one.

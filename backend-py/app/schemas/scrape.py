@@ -1,7 +1,7 @@
 """Schemas matching Node's API for frontend compatibility."""
 from __future__ import annotations
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class StartScrapeBody(BaseModel):
@@ -57,6 +57,25 @@ class BulkScrapeResponse(BaseModel):
 
 
 class ScrapeJobRead(BaseModel):
+    provider_failure: dict | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def attach_provider_failure(cls, value):
+        from app.services.scraper.provider_failure import recognize_failure
+        if not isinstance(value, dict):
+            failure = recognize_failure(
+                getattr(value, "discovered_config", None),
+                status=getattr(value, "status", ""),
+                total_found=getattr(value, "total_found", 0),
+                error_message=getattr(value, "error_message", "") or "",
+            )
+            data = {name: getattr(value, name) for name in cls.model_fields if hasattr(value, name)}
+            data["provider_failure"] = failure
+            if failure:
+                data["error_message"] = failure["message"]
+            return data
+        return value
     runtime_job_id: str
     university_id: int | None = None
     university_name: str | None = None

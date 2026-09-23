@@ -86,6 +86,8 @@ def merge_live_progress(session: dict, live: dict) -> dict:
         if key in live:
             session[key] = live[key]
     phase = (live.get("autonomous") or {}).get("phase")
+    if "discovery_repair" in (live.get("autonomous") or {}):
+        state["discovery_repair"] = live["autonomous"]["discovery_repair"]
     if phase in {"live_probe", "repairing", "validating"}:
         state["phase"] = phase
     return session
@@ -156,6 +158,8 @@ def merge_audit(backup: dict, audit: dict) -> dict:
     merged = {**audit, **backup, "autonomous": state, "status": "running",
               "completed_at": None, "max_attempts": 5}
     if owned:
+        if "discovery_repair" in loop_state:
+            state["discovery_repair"] = loop_state["discovery_repair"]
         if int(audit.get("current_attempt") or 0) >= int(backup.get("current_attempt") or 0):
             for key in (
                 "current_attempt", "attempts", "live_probe", "quality_before",
