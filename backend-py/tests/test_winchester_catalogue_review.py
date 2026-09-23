@@ -1,12 +1,14 @@
 import pytest
 import asyncio
+import json
+import time
 from fastapi import HTTPException
 from types import SimpleNamespace
 import uuid
-from sqlalchemy import delete, select
+from sqlalchemy import delete, event, select
 from pydantic import ValidationError
 
-from app.database import AsyncSessionLocal
+from app.database import AsyncSessionLocal, engine
 from app.models import (
     DatedCatalogueReviewHistory,
     ScrapedCourse,
@@ -859,6 +861,136 @@ async def test_history_read_is_bounded_newest_first_and_revision_fenced():
     finally:
         async with AsyncSessionLocal() as db:
             await db.execute(delete(ScrapedCourse).where(ScrapedCourse.scrape_job_id == job_id))
+            await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_dated_catalogue_history_production_shape_latency_size_and_query_gate():
+    """Large normalized histories must not leak into or multiply review reads."""
+    row_count = 40
+    events_per_row = 100
+    page_limit = 50
+    job_id = f"test_dated_history_scale_{uuid.uuid4().hex}"
+    source_url = "https://www.winchester.ac.uk/study/Postgraduate/Courses/MA-History-2025/"
+    query_count = 0
+
+    def count_query(*_args):
+        nonlocal query_count
+        query_count += 1
+
+    async with AsyncSessionLocal() as db:
+        university_id = (await db.execute(select(University.id).limit(1))).scalar_one()
+        rows = [
+            ScrapedCourse(
+                scrape_job_id=job_id,
+                university_id=university_id,
+                course_name=f"MA History {index}",
+                course_website=f"{source_url}?course={index}",
+                scrape_warnings=["dated_catalogue_page_review"],
+                extraction_method={"dated_catalogue_review": {
+                    "revision": events_per_row,
+                    "sourceUrl": f"{source_url}?course={index}",
+                    "sourceFingerprint": _dated_source_fingerprint(
+                        f"{source_url}?course={index}"
+                    ),
+                }},
+            )
+            for index in range(row_count)
+        ]
+        db.add_all(rows)
+        await db.flush()
+        db.add_all([
+            DatedCatalogueReviewHistory(
+                scraped_course_id=row.id,
+                revision=revision,
+                event={
+                    "type": "reviewer_decision",
+                    "at": "2026-01-01T00:00:00Z",
+                    "row": row_index,
+                    "n": revision,
+                    "detail": "x" * 256,
+                },
+            )
+            for row_index, row in enumerate(rows)
+            for revision in range(1, events_per_row + 1)
+        ])
+        await db.commit()
+        row_ids = [row.id for row in rows]
+
+    body = DatedCatalogueAuditBody(
+        universityId=university_id,
+        rows=[{"id": row_id, "jobId": job_id} for row_id in row_ids],
+    )
+    event.listen(engine.sync_engine, "before_cursor_execute", count_query)
+    try:
+        async with AsyncSessionLocal() as db:
+            query_count = 0
+            started = time.perf_counter()
+            initial = await read_dated_catalogue_reviews(body, db, {})
+            initial_elapsed = time.perf_counter() - started
+            initial_queries = query_count
+            initial_bytes = len(json.dumps(initial, separators=(",", ":")).encode())
+
+            assert len(initial["rows"]) == row_count
+            assert {row["review"]["historyCount"] for row in initial["rows"]} == {
+                events_per_row
+            }
+            assert all("history" not in row["review"] for row in initial["rows"])
+            assert initial_queries == 2
+            assert initial_bytes < 100_000
+            assert initial_elapsed < 2.0
+
+            query_count = 0
+            started = time.perf_counter()
+            page = await read_dated_catalogue_history(
+                row_ids[0],
+                DatedCatalogueHistoryQuery(
+                    universityId=university_id,
+                    jobId=job_id,
+                    revision=events_per_row,
+                    cursor=0,
+                    limit=page_limit,
+                ),
+                db,
+                {},
+            )
+            page_elapsed = time.perf_counter() - started
+            page_queries = query_count
+            page_bytes = len(json.dumps(page, separators=(",", ":")).encode())
+
+            assert len(page["entries"]) == page_limit
+            assert page["historyCount"] == events_per_row
+            assert page["nextCursor"] == page_limit
+            assert page_queries == 3
+            assert page_bytes < 30_000
+            assert page_elapsed < 1.0
+
+            query_count = 0
+            started = time.perf_counter()
+            with pytest.raises(HTTPException) as stale:
+                await read_dated_catalogue_history(
+                    row_ids[0],
+                    DatedCatalogueHistoryQuery(
+                        universityId=university_id,
+                        jobId=job_id,
+                        revision=events_per_row - 1,
+                        cursor=0,
+                        limit=page_limit,
+                    ),
+                    db,
+                    {},
+                )
+            stale_elapsed = time.perf_counter() - started
+
+            assert stale.value.status_code == 409
+            assert query_count == 1
+            assert stale_elapsed < 0.5
+    finally:
+        event.remove(engine.sync_engine, "before_cursor_execute", count_query)
+        async with AsyncSessionLocal() as db:
+            await db.execute(
+                delete(ScrapedCourse).where(ScrapedCourse.scrape_job_id == job_id)
+            )
             await db.commit()
 
 

@@ -56,6 +56,10 @@ args = "full-scraper-regression"
 task = "workflow.run"
 args = "academic-level-migration"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "dated-catalogue-history-scale"
+
 [[workflows.workflow]]
 name = "backend-py: FastAPI"
 author = "agent"
@@ -163,6 +167,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd backend-py && ALLOW_ISOLATED_SCHEMA_MIGRATION_TESTS=1 PYTHONPATH=. python -m pytest tests/test_academic_level_migration_roundtrip.py -q -c /dev/null -p no:cacheprovider"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "dated-catalogue-history-scale"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend-py && PYTHONPATH=. python -m pytest tests/test_winchester_catalogue_review.py::test_dated_catalogue_history_production_shape_latency_size_and_query_gate -q -c /dev/null -p no:cacheprovider"
 
 [workflows.workflow.metadata]
 isValidation = true
