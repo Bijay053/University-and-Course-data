@@ -26,6 +26,7 @@ type SourceEvidence = {
 
 type Review = {
   revision: number;
+  history?: ReviewHistoryEntry[] | null;
   evidenceStale?: boolean;
   evidence?: {
     checkedAt: string;
@@ -38,6 +39,17 @@ type Review = {
   decision?: Decision | null;
   reviewer?: { name?: string; email?: string } | null;
   decidedAt?: string | null;
+};
+
+type ReviewHistoryEntry = {
+  type: string;
+  at?: string;
+  evidence?: Review["evidence"];
+  decision?: Decision;
+  reviewer?: Review["reviewer"];
+  evidenceRevision?: number;
+  fromUrl?: string | null;
+  toUrl?: string | null;
 };
 
 type ReviewRow = {
@@ -57,6 +69,99 @@ const DECISIONS: { value: Decision; label: string }[] = [
   { value: "not_counterpart", label: "Not a counterpart" },
   { value: "current_counterpart", label: "Current counterpart" },
 ];
+
+function historyTime(value?: string) {
+  if (!value || Number.isNaN(Date.parse(value))) return "Timestamp unavailable";
+  return new Date(value).toLocaleString();
+}
+
+function ReviewHistory({ review, rowId }: { review: Review; rowId: number }) {
+  const [open, setOpen] = useState(false);
+  const [page, setPage] = useState(0);
+  const history = review.history ?? [];
+  const pageCount = Math.max(1, Math.ceil(history.length / 10));
+  const currentPage = Math.min(page, pageCount - 1);
+  useEffect(() => setPage(0), [review.revision]);
+  const entries = history.slice().reverse().slice(currentPage * 10, currentPage * 10 + 10);
+  return (
+    <div className="mt-3 border-t border-slate-200 pt-3 text-xs">
+      <p className="font-medium text-slate-800" data-testid={`text-current-revision-${rowId}`}>
+        Current revision {review.revision} · {review.evidenceStale
+          ? "Evidence stale — re-audit required"
+          : review.decision
+            ? DECISIONS.find((item) => item.value === review.decision)?.label
+            : "No current reviewer decision"}
+      </p>
+      <Button
+        type="button" variant="ghost" size="sm" className="mt-1"
+        aria-expanded={open} aria-controls={`dated-history-${rowId}`}
+        onClick={() => setOpen((value) => !value)}
+      >
+        {open ? "Hide" : "Show"} review history ({history.length})
+      </Button>
+      <div id={`dated-history-${rowId}`} hidden={!open}>
+        {open && <>
+          <p className="mb-2 text-slate-600">
+            Read-only history, newest first. A new audit or source URL change clears the previous confirmation.
+            Superseded decisions do not apply to the current revision. Courses and publication warnings are unchanged by this timeline.
+          </p>
+          {history.length === 0 ? <p>No review history recorded.</p> : (
+            <ol className="space-y-3 border-l border-slate-200 pl-3" aria-label="Review history">
+              {entries.map((entry, index) => {
+                const currentDecision = entry.type === "reviewer_decision"
+                  && !review.evidenceStale && !!review.decision
+                  && entry.decision === review.decision && entry.at === review.decidedAt
+                  && entry.evidenceRevision === review.revision - 1;
+                const currentAudit = entry.type === "official_source_audit"
+                  && !review.evidenceStale && !!entry.evidence
+                  && entry.evidence.checkedAt === review.evidence?.checkedAt
+                  && !history.slice(history.lastIndexOf(entry) + 1).some((item) => item.type === "official_source_audit" || item.type === "source_url_changed");
+                return (
+                  <li key={history.length - currentPage * 10 - index} className="space-y-1 break-words">
+                    <p className="font-medium">
+                      {entry.type === "official_source_audit" ? "Official-source audit"
+                        : entry.type === "reviewer_decision" ? "Reviewer decision"
+                          : entry.type === "source_url_changed" ? "Source URL changed" : "Historical event"}
+                      {" · "}{currentDecision ? "Current decision" : currentAudit ? "Current evidence"
+                        : entry.type === "reviewer_decision" ? "Superseded decision"
+                          : entry.type === "official_source_audit" ? "Superseded evidence" : "Historical record"}
+                    </p>
+                    <p className="text-slate-500">{historyTime(entry.at)}</p>
+                    {entry.type === "official_source_audit" && <>
+                      <p>{entry.evidence?.reason || "No audit reason recorded."}</p>
+                      {([{ label: "Archived/original source", evidence: entry.evidence?.original }, { label: "Yearless candidate", evidence: entry.evidence?.candidate }]).map(({ label, evidence }) => {
+                        return <div key={label} className="text-slate-600">
+                          <p>{label}: {evidence ? (evidence.verified ? "Verified" : "Unverified") : "Not recorded"}
+                            {evidence?.title ? ` · ${evidence.title}` : ""}</p>
+                          {evidence && <p className="break-all">{evidence.url}</p>}
+                          {evidence?.reason && <p>{evidence.reason}</p>}
+                        </div>;
+                      })}
+                    </>}
+                    {entry.type === "reviewer_decision" && <>
+                      <p>{DECISIONS.find((item) => item.value === entry.decision)?.label || "Decision not recorded"}
+                        {" · "}By {entry.reviewer?.name || entry.reviewer?.email || "reviewer"}</p>
+                      {entry.evidenceRevision != null && <p>Based on revision {entry.evidenceRevision}</p>}
+                    </>}
+                    {entry.type === "source_url_changed" && <>
+                      <p className="break-all">From: {entry.fromUrl || "No URL"}</p>
+                      <p className="break-all">To: {entry.toUrl || "No URL"}</p>
+                    </>}
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+          {pageCount > 1 && <div className="mt-3 flex items-center gap-2">
+            <Button type="button" size="sm" variant="outline" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Newer history</Button>
+            <span aria-live="polite">History page {currentPage + 1} of {pageCount}</span>
+            <Button type="button" size="sm" variant="outline" disabled={currentPage + 1 >= pageCount} onClick={() => setPage(currentPage + 1)}>Older history</Button>
+          </div>}
+        </>}
+      </div>
+    </div>
+  );
+}
 
 export function DatedCatalogueReview({ courses, readOnly = false }: { courses: CourseRef[]; readOnly?: boolean }) {
   const { can } = useCan();
@@ -325,6 +430,7 @@ export function DatedCatalogueReview({ courses, readOnly = false }: { courses: C
                     </span>
                   )}
                 </div>
+                <ReviewHistory review={row.review} rowId={row.id} />
               </article>
             );
           })}

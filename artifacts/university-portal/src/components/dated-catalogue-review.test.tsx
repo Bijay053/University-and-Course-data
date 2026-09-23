@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const permissions = vi.hoisted(() => ({ edit: true }));
 vi.mock("@/components/can", () => ({
-  useCan: () => ({ can: () => true }),
+  useCan: () => ({ can: () => permissions.edit }),
 }));
 
 import { DatedCatalogueReview } from "./dated-catalogue-review";
@@ -58,11 +59,102 @@ function row(decision: string | null = null) {
 }
 
 afterEach(() => {
+  permissions.edit = true;
   cleanup();
   vi.restoreAllMocks();
 });
 
 describe("DatedCatalogueReview", () => {
+  const auditEntry = () => ({
+    type: "official_source_audit", at: "2026-07-20T12:00:00Z", evidence: row().review.evidence,
+  });
+  const decisionEntry = () => ({
+    type: "reviewer_decision", at: "2026-07-20T12:05:00Z",
+    decision: "current_counterpart", reviewer: { name: "Earlier Reviewer" }, evidenceRevision: 3,
+  });
+
+  it("shows superseded confirmation and audit reasons after re-audit without writing", async () => {
+    const latest = row();
+    latest.review.revision = 5;
+    latest.review.evidence.checkedAt = "2026-07-21T12:00:00Z";
+    latest.review.evidence.reason = "Candidate now unavailable.";
+    const history = [auditEntry(), decisionEntry(), {
+      type: "official_source_audit", at: latest.review.evidence.checkedAt, evidence: latest.review.evidence,
+    }];
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ rows: [{ ...latest, review: { ...latest.review, history } }] })),
+    );
+    const original = JSON.stringify(course);
+    render(<DatedCatalogueReview courses={[course]} />);
+    const toggle = await screen.findByRole("button", { name: "Show review history (3)" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByRole("list", { name: "Review history" })).toBeNull();
+    fireEvent.click(toggle);
+    const list = screen.getByRole("list", { name: "Review history" });
+    const items = within(list).getAllByRole("listitem");
+    expect(items[0].textContent).toContain("Current evidence");
+    expect(items[0].textContent).toContain("Candidate now unavailable.");
+    expect(items[1].textContent).toContain("Superseded decision");
+    expect(items[1].textContent).toContain("Current counterpart · By Earlier Reviewer");
+    expect(items[1].textContent).toContain(new Date(decisionEntry().at).toLocaleString());
+    expect(items[2].textContent).toContain("Superseded evidence");
+    expect(items[2].textContent).toContain("Official titles and awards align.");
+    expect(screen.getByTestId("text-current-revision-41").textContent).toContain("Current revision 5 · No current reviewer decision");
+    fireEvent.click(screen.getByRole("button", { name: "Hide review history (3)" }));
+    expect(screen.queryByRole("list", { name: "Review history" })).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(course)).toBe(original);
+  });
+
+  it.each(["historical", "no-permission"])("allows read-only history in %s mode with no mutation controls enabled", async (mode) => {
+    permissions.edit = mode !== "no-permission";
+    const latest = row("current_counterpart");
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(JSON.stringify({
+      rows: [{ ...latest, review: { ...latest.review, history: [auditEntry(), decisionEntry()] } }],
+    })));
+    render(<DatedCatalogueReview courses={[course]} readOnly={mode === "historical"} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Show review history (2)" }));
+    expect(screen.getByText("Reviewer decision · Current decision")).toBeTruthy();
+    expect(screen.queryByTestId("button-audit-dated-catalogue")).toBeNull();
+    for (const decision of ["keep_separate", "not_counterpart", "current_counterpart"]) {
+      expect((screen.getByTestId(`button-decision-${decision}-41`) as HTMLButtonElement).disabled).toBe(true);
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("pages a large timeline locally and handles URL changes and incomplete legacy events", async () => {
+    const history = [
+      auditEntry(), decisionEntry(),
+      { type: "source_url_changed", at: "2026-07-22T12:00:00Z", fromUrl: course.courseWebsite, toUrl: "https://www.winchester.ac.uk/new/" },
+      ...Array.from({ length: 9 }, () => ({ type: "legacy_event" })),
+    ];
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(JSON.stringify({
+      rows: [{ ...row(), review: { ...row().review, evidenceStale: true, history } }],
+    })));
+    render(<DatedCatalogueReview courses={[course]} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Show review history (12)" }));
+    expect(screen.getAllByRole("listitem")).toHaveLength(10);
+    expect(screen.getAllByText("Timestamp unavailable")).toHaveLength(9);
+    expect(screen.getByText(`From: ${course.courseWebsite}`)).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Newer history" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Older history" }));
+    expect(screen.getByText("History page 2 of 2")).toBeTruthy();
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    expect(screen.getByText("Reviewer decision · Superseded decision")).toBeTruthy();
+    expect(screen.getByText("Official-source audit · Superseded evidence")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Older history" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Newer history" }));
+    expect(screen.getByText("History page 1 of 2")).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("handles missing history without inventing prior events", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(JSON.stringify({ rows: [row()] })));
+    render(<DatedCatalogueReview courses={[course]} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Show review history (0)" }));
+    expect(screen.getByText("No review history recorded.")).toBeTruthy();
+  });
+
   it("reloads durable evidence and saves an exact-row optimistic decision", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response(JSON.stringify({ rows: [row()] }), { status: 200 }))
