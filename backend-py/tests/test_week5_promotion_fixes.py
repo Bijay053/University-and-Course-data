@@ -75,6 +75,7 @@ async def test_approve_reactivates_a_matching_inactive_course():
         id=101,
         university_id=1,
         course_name="Master of Example Studies",
+        scrape_warnings=[],
         category=None,
         sub_category=None,
         degree_level="Master",

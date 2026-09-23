@@ -11,6 +11,8 @@ import math
 import re
 import json
 import uuid
+import asyncio
+import hashlib
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
@@ -1692,6 +1694,8 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
     )).scalars().all()
     staged = [{
         "id": s.id,
+        "scrapeJobId": s.scrape_job_id,
+        "universityId": s.university_id,
         "courseName": s.course_name,
         "category": s.category,
         "courseWebsite": s.course_website,
@@ -1713,6 +1717,7 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
         "eligibilityStatus": s.eligibility_status,
         "notes": s.notes,
         "completeness": s.completeness,
+        "scrapeWarnings": s.scrape_warnings,
         "status": s.status,
         "createdAt": s.created_at.isoformat() if s.created_at else None,
         "evidence": [],
@@ -3257,6 +3262,15 @@ def _is_winchester_course_row(row) -> bool:
     return host == "winchester.ac.uk" or host.endswith(".winchester.ac.uk")
 
 
+def _is_dated_winchester_route(row) -> bool:
+    if not _is_winchester_course_row(row):
+        return False
+    from urllib.parse import urlparse
+
+    path = urlparse(str(getattr(row, "course_website", "") or "")).path
+    return bool(re.search(r"(?:/|-)(?:19|20)\d{2}(?:/|-|$)", path))
+
+
 def _winchester_course_name_noncanonical(row) -> bool:
     """Detect repairable Winchester title defects without collapsing archives."""
     if not _is_winchester_course_row(row):
@@ -3292,6 +3306,287 @@ def _winchester_descriptive_location(row) -> bool:
             re.I,
         )
     )
+
+
+class DatedCatalogueRowRef(BaseModel):
+    id: int = Field(gt=0)
+    job_id: str = Field(alias="jobId", min_length=1, max_length=200)
+
+    model_config = {"populate_by_name": True}
+
+
+class DatedCatalogueAuditBody(BaseModel):
+    university_id: int = Field(alias="universityId", gt=0)
+    rows: list[DatedCatalogueRowRef] = Field(min_length=1, max_length=50)
+
+    model_config = {"populate_by_name": True}
+
+
+class DatedCatalogueDecisionBody(BaseModel):
+    university_id: int = Field(alias="universityId", gt=0)
+    job_id: str = Field(alias="jobId", min_length=1, max_length=200)
+    expected_revision: int = Field(alias="expectedRevision", ge=0)
+    decision: str
+
+    model_config = {"populate_by_name": True}
+
+    @field_validator("decision")
+    @classmethod
+    def validate_decision(cls, value: str) -> str:
+        allowed = {"keep_separate", "not_counterpart", "current_counterpart"}
+        if value not in allowed:
+            raise ValueError(f"decision must be one of {sorted(allowed)}")
+        return value
+
+
+def _dated_catalogue_review_payload(row) -> dict:
+    metadata = row.extraction_method if isinstance(row.extraction_method, dict) else {}
+    review = metadata.get("dated_catalogue_review")
+    return review if isinstance(review, dict) else {"revision": 0}
+
+
+def _dated_source_fingerprint(url: object) -> str:
+    """Bind evidence to the exact staged URL, including its cohort path."""
+    return hashlib.sha256(str(url or "").encode("utf-8")).hexdigest()
+
+
+def _dated_catalogue_response(row) -> dict:
+    review = _dated_catalogue_review_payload(row)
+    source_fingerprint = review.get("sourceFingerprint")
+    evidence_stale = (
+        not isinstance(source_fingerprint, str)
+        or source_fingerprint != _dated_source_fingerprint(row.course_website)
+    )
+    return {
+        "id": row.id,
+        "jobId": row.scrape_job_id,
+        "universityId": row.university_id,
+        "courseName": row.course_name,
+        "courseUrl": row.course_website,
+        "warningPresent": "dated_catalogue_page_review" in set(row.scrape_warnings or []),
+        "review": {
+            **review,
+            "evidenceStale": evidence_stale,
+            "decision": None if evidence_stale else review.get("decision"),
+        },
+    }
+
+
+async def _exact_dated_rows(
+    db: AsyncSession,
+    body: DatedCatalogueAuditBody,
+    *,
+    lock: bool = False,
+) -> list:
+    from app.models import ScrapedCourse
+
+    refs = {(item.id, item.job_id) for item in body.rows}
+    if len(refs) != len(body.rows):
+        raise HTTPException(status_code=422, detail="Duplicate row references are not allowed")
+    query = select(ScrapedCourse).where(
+        ScrapedCourse.university_id == body.university_id,
+        ScrapedCourse.id.in_([item.id for item in body.rows]),
+    )
+    if lock:
+        query = query.with_for_update().execution_options(populate_existing=True)
+    rows = (await db.execute(query)).scalars().all()
+    found = {(row.id, row.scrape_job_id) for row in rows}
+    if found != refs:
+        raise HTTPException(
+            status_code=409,
+            detail="One or more row/job/university identities no longer match; reload the review.",
+        )
+    return rows
+
+
+@router.post("/staged/dated-catalogue-reviews/read")
+async def read_dated_catalogue_reviews(
+    body: DatedCatalogueAuditBody,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(require_permission("staged.view"))],
+) -> dict:
+    """Reload durable evidence and reviewer decisions without fetching live pages."""
+    rows = await _exact_dated_rows(db, body)
+    return {"rows": [_dated_catalogue_response(row) for row in rows]}
+
+
+@router.post("/staged/dated-catalogue-reviews/audit")
+async def audit_dated_catalogue_reviews(
+    body: DatedCatalogueAuditBody,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(require_permission("staged.edit"))],
+) -> dict:
+    """Audit a bounded set of exact Winchester rows against official live pages."""
+    from app.services.winchester_catalogue_review import audit_dated_route
+
+    rows = await _exact_dated_rows(db, body)
+    for row in rows:
+        if not _is_winchester_course_row(row):
+            raise HTTPException(status_code=422, detail=f"Row {row.id} is not an official Winchester course URL")
+        if (
+            "dated_catalogue_page_review" not in set(row.scrape_warnings or [])
+            and not _is_dated_winchester_route(row)
+        ):
+            raise HTTPException(status_code=422, detail=f"Row {row.id} is not a dated Winchester catalogue route")
+        if not row.course_website:
+            raise HTTPException(status_code=422, detail=f"Row {row.id} has no official source URL")
+
+    fetch_limit = asyncio.Semaphore(5)
+
+    async def bounded_audit(row):
+        async with fetch_limit:
+            return await audit_dated_route(row.course_website)
+
+    source_snapshot = {
+        row.id: {
+            "url": row.course_website,
+            "fingerprint": _dated_source_fingerprint(row.course_website),
+            "revision": int(_dated_catalogue_review_payload(row).get("revision") or 0),
+        }
+        for row in rows
+    }
+    evidence_by_id = {
+        row.id: evidence
+        for row, evidence in zip(
+            rows,
+            await asyncio.gather(
+                *(bounded_audit(row) for row in rows)
+            ),
+        )
+    }
+    locked_rows = await _exact_dated_rows(db, body, lock=True)
+    for row in locked_rows:
+        metadata = dict(row.extraction_method) if isinstance(row.extraction_method, dict) else {}
+        previous = _dated_catalogue_review_payload(row)
+        snapshot = source_snapshot[row.id]
+        if (
+            _dated_source_fingerprint(row.course_website) != snapshot["fingerprint"]
+            or int(previous.get("revision") or 0) != snapshot["revision"]
+        ):
+            await db.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail="Course URL or review evidence changed during the audit; reload and audit the current URL.",
+            )
+        history = list(previous.get("history") or [])
+        history.append({
+            "type": "official_source_audit",
+            "at": evidence_by_id[row.id]["checkedAt"],
+            "evidence": evidence_by_id[row.id],
+        })
+        metadata["dated_catalogue_review"] = {
+            "revision": int(previous.get("revision") or 0) + 1,
+            "evidence": evidence_by_id[row.id],
+            "sourceUrl": snapshot["url"],
+            "sourceFingerprint": snapshot["fingerprint"],
+            # An evidence refresh does not silently retain a decision made
+            # against an older snapshot. The reviewer must explicitly decide.
+            "decision": None,
+            "reviewer": None,
+            "decidedAt": None,
+            "history": history,
+        }
+        row.extraction_method = metadata
+        warnings = list(row.scrape_warnings or [])
+        if "dated_catalogue_page_review" not in warnings:
+            warnings.append("dated_catalogue_page_review")
+            row.scrape_warnings = warnings
+    try:
+        await db.commit()
+    except Exception as exc:
+        await db.rollback()
+        log.exception("Could not persist Winchester dated catalogue audit")
+        raise HTTPException(status_code=500, detail="Could not persist dated catalogue audit") from exc
+    return {"rows": [_dated_catalogue_response(row) for row in locked_rows]}
+
+
+@router.put("/staged/dated-catalogue-reviews/{sc_id}/decision")
+async def decide_dated_catalogue_review(
+    sc_id: int,
+    body: DatedCatalogueDecisionBody,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict, Depends(require_permission("staged.edit"))],
+) -> dict:
+    """Persist an explicit reviewer choice with optimistic concurrency."""
+    from datetime import datetime, timezone
+    from app.models import ScrapedCourse
+
+    row = (await db.execute(
+        select(ScrapedCourse).where(
+            ScrapedCourse.id == sc_id,
+            ScrapedCourse.university_id == body.university_id,
+            ScrapedCourse.scrape_job_id == body.job_id,
+        ).with_for_update().execution_options(populate_existing=True)
+    )).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=409, detail="Row/job/university identity changed; reload the review.")
+    review = _dated_catalogue_review_payload(row)
+    revision = int(review.get("revision") or 0)
+    if revision != body.expected_revision:
+        raise HTTPException(status_code=409, detail="Audit evidence changed; reload before saving a decision.")
+    if not isinstance(review.get("evidence"), dict):
+        raise HTTPException(status_code=409, detail="Run the official-source audit before saving a decision.")
+    if review.get("sourceFingerprint") != _dated_source_fingerprint(row.course_website):
+        raise HTTPException(
+            status_code=409,
+            detail="Course URL changed after the audit; audit the current URL before saving a decision.",
+        )
+    if body.decision == "current_counterpart":
+        from app.services.winchester_catalogue_review import _comparison
+
+        evidence = review["evidence"]
+        original = evidence.get("original")
+        candidate = evidence.get("candidate")
+        if isinstance(original, dict):
+            # The staged source URL, not its final redirect destination,
+            # determines archive identity. Overriding this also makes legacy
+            # evidence fail safely under the current proof rules.
+            original = {
+                **original,
+                "url": review.get("sourceUrl") or original.get("url"),
+            }
+        proof, _reason = _comparison(
+            original if isinstance(original, dict) else {},
+            candidate if isinstance(candidate, dict) else None,
+        )
+        if proof != "current_counterpart":
+            raise HTTPException(
+                status_code=422,
+                detail="Current counterpart requires verified matching official titles and recognized awards.",
+            )
+
+    metadata = dict(row.extraction_method) if isinstance(row.extraction_method, dict) else {}
+    decided_at = datetime.now(timezone.utc).isoformat()
+    reviewer = {
+        "id": user.get("id"),
+        "email": user.get("email"),
+        "name": user.get("name"),
+    }
+    history = list(review.get("history") or [])
+    history.append({
+        "type": "reviewer_decision",
+        "at": decided_at,
+        "decision": body.decision,
+        "reviewer": reviewer,
+        "evidenceRevision": revision,
+    })
+    metadata["dated_catalogue_review"] = {
+        **review,
+        "revision": revision + 1,
+        "decision": body.decision,
+        "reviewer": reviewer,
+        "decidedAt": decided_at,
+        "history": history,
+    }
+    row.extraction_method = metadata
+    try:
+        await db.commit()
+    except Exception as exc:
+        await db.rollback()
+        log.exception("Could not persist Winchester dated catalogue decision")
+        raise HTTPException(status_code=500, detail="Could not save reviewer decision") from exc
+    # Deliberately does not alter URLs, status, warning, or publication gates.
+    return _dated_catalogue_response(row)
 
 
 @router.post("/staged/analyze")
@@ -3622,7 +3917,12 @@ async def staged_one(
         sc_id = int(sc_id_or_job)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid id or job_id")
-    sc = await db.get(ScrapedCourse, sc_id)
+    sc = (await db.execute(
+        select(ScrapedCourse)
+        .where(ScrapedCourse.id == sc_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )).scalar_one_or_none()
     if not sc:
         raise HTTPException(status_code=404, detail="Not found")
     return _staged_row_to_dict(sc) | {"ok": True}
@@ -4677,6 +4977,7 @@ async def staged_update(
             status_code=400, detail="Can only edit pending or approved courses"
         )
     changed = False
+    original_course_website = sc.course_website
     for camel, snake in _STAGED_EDITABLE_FIELDS.items():
         if camel in body:
             value = body[camel]
@@ -4691,6 +4992,29 @@ async def staged_update(
                 value = normalize_intake_months(value)
             setattr(sc, snake, value)
             changed = True
+    if sc.course_website != original_course_website:
+        from datetime import datetime, timezone
+
+        metadata = dict(sc.extraction_method) if isinstance(sc.extraction_method, dict) else {}
+        review = metadata.get("dated_catalogue_review")
+        if isinstance(review, dict):
+            changed_at = datetime.now(timezone.utc).isoformat()
+            history = list(review.get("history") or [])
+            history.append({
+                "type": "source_url_changed",
+                "at": changed_at,
+                "fromUrl": original_course_website,
+                "toUrl": sc.course_website,
+            })
+            metadata["dated_catalogue_review"] = {
+                **review,
+                "revision": int(review.get("revision") or 0) + 1,
+                "decision": None,
+                "reviewer": None,
+                "decidedAt": None,
+                "history": history,
+            }
+            sc.extraction_method = metadata
     if changed:
         # Recompute completeness so the UI badge updates after save.
         try:

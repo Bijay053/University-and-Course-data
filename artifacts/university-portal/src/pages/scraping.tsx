@@ -30,6 +30,7 @@ import {
 import { ScrapeJobCard } from "@/components/scrape-job-card";
 import { CourseReport, type CourseReportPrefillCourse } from "@/components/course-report";
 import { TargetedRetryAllFilteredNotice, type TargetedRetryDiagnostic } from "@/components/targeted-retry-diagnostic";
+import { DatedCatalogueReview } from "@/components/dated-catalogue-review";
 import { DEGREE_LEVELS, FEE_TERM_OPTIONS, STUDY_LOADS, STUDY_MODES } from "@/lib/course-constants";
 
 function optionsIncludingCurrent(options: string[], current: string | null): string[] {
@@ -1080,7 +1081,11 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   // History staged course is now the full StagedCourse + evidence array
   // (matches the live Review table). Keep it loose here — the component
   // owns the strict typing.
-  type HistoryStagedCourse = ReviewStagedCourse & { evidence: ReviewEvidenceItem[] };
+  type HistoryStagedCourse = ReviewStagedCourse & {
+    evidence: ReviewEvidenceItem[];
+    scrapeJobId: string;
+    universityId: number;
+  };
   type UnresolvedCourseUrl = {
     url: string;
     courseName: string | null;
@@ -3424,6 +3429,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             </p>
           </CardHeader>
           <CardContent>
+            <DatedCatalogueReview courses={stagedCourses} />
             {reviewJobId && requirementRecoveryRequest > 0 && (
               <CourseReport
                 jobId={reviewJobId}
@@ -5391,6 +5397,10 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                             {historyDetail?.stagedCourses.length ?? 0} staged courses
                           </div>
                           <div className="max-h-[600px] overflow-auto bg-white">
+                            <DatedCatalogueReview
+                              courses={historyDetail?.stagedCourses ?? []}
+                              readOnly
+                            />
                             <ReviewScrapedCoursesTable
                               courses={historyDetail?.stagedCourses ?? []}
                               universityName={run.universityName}

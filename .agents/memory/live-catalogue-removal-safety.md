@@ -25,3 +25,9 @@ A dated URL is not enough evidence to merge a course into a current sibling or s
 **Why:** Winchester's year-suffixed MA route serves a current title, while its explicit year-directory research route remains an archive. Treating both as identical title-cleaning cases can create indistinguishable duplicates.
 
 **How to apply:** Follow course-owned official titles, preserve explicit archive years, and require review of dated routes rather than automatically publishing or removing possible duplicates.
+
+Counterpart evidence must certify the exact source URL, not just a stable database row identity.
+
+**Why:** A reviewer can edit the course URL while an official-page fetch is pending or after evidence was saved. Row/job/university checks alone then allow evidence from the old page to certify the new page.
+
+**How to apply:** Revalidate source identity and review revision under a fresh database lock before persisting evidence or decisions. Invalidate active decisions on URL edits while retaining audit history; test edits during fetching in separate sessions.
