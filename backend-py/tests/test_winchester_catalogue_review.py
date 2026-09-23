@@ -6,9 +6,12 @@ from fastapi import HTTPException
 from types import SimpleNamespace
 import uuid
 from sqlalchemy import delete, event, select
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 from pydantic import ValidationError
 
-from app.database import AsyncSessionLocal, engine
+from app.database import AsyncSessionLocal, engine, postgres_tls_connect_args
+from app import database
 from app.models import (
     DatedCatalogueReviewHistory,
     ScrapedCourse,
@@ -28,6 +31,45 @@ from app.routers.scrape import (
     staged_update,
 )
 from app.services import winchester_catalogue_review as review
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _isolated_database():
+    """Never borrow production's pool or retain connections across test loops."""
+    test_engine = create_async_engine(
+        database.engine.url,
+        poolclass=NullPool,
+        connect_args=postgres_tls_connect_args(),
+    )
+    sessions = async_sessionmaker(
+        test_engine, expire_on_commit=False, autoflush=False,
+    )
+    # Keep the session factory and query-count listener on the same engine.
+    # NullPool closes each connection when its session exits, on its owning loop.
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(__name__ + ".engine", test_engine)
+        patch.setattr(__name__ + ".AsyncSessionLocal", sessions)
+        try:
+            yield
+        finally:
+            asyncio.run(test_engine.dispose())
+
+
+def test_database_connections_are_isolated_across_event_loops():
+    assert isinstance(engine.pool, NullPool)
+    assert engine is not database.engine
+    assert AsyncSessionLocal is not database.AsyncSessionLocal
+    assert database.AsyncSessionLocal.kw["bind"] is database.engine
+    assert not isinstance(database.engine.pool, NullPool)
+
+    async def query():
+        async with AsyncSessionLocal() as db:
+            assert (await db.execute(select(1))).scalar_one() == 1
+
+    # Explicitly exercise two closed/recreated loops even when pytest defaults
+    # to a session loop. This failed with the application's shared asyncpg pool.
+    asyncio.run(query())
+    asyncio.run(query())
 
 
 def _source(title: str, awards: list[str], *, verified: bool = True) -> dict:

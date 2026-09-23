@@ -151,3 +151,4 @@
 - [Automatic repair JS-shell evidence](automatic-repair-js-shell-evidence.md) — live repair probes must render JS-only shells and recognize site-owned field labels before rejecting valid course pages.
 - [Resume count semantics](resume-count-semantics.md) — settled URLs are not imports; same-child rows must not be added twice during database reconciliation.
 - [Settled URL outcome semantics](settled-url-outcome-semantics.md) — completed URL checkpoints include errors; recovery must use outcome provenance before resolving or suppressing work.
+- [Pytest asyncio isolation](pytest-asyncio-isolation.md) — session-loop defaults can hide pool reuse failures; loop-independent suites need test-owned connections.
