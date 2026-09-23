@@ -68,3 +68,14 @@ echo "Redis dependency ready at ${REDIS_HOST}:${REDIS_PORT}."
 PYTHONPATH=. python -m pytest -q "$@" &
 PYTEST_PID=$!
 wait "$PYTEST_PID"
+PYTEST_PID=""
+
+# The normal suite uses session loops; also catch catalogue connections that
+# accidentally survive their owning loop. Do not forward selection arguments:
+# this release gate must exercise the entire catalogue review file.
+echo "Checking catalogue review with function-scoped test loops."
+PYTHONPATH=. python -m pytest -q tests/test_winchester_catalogue_review.py \
+  -o asyncio_default_test_loop_scope=function &
+PYTEST_PID=$!
+wait "$PYTEST_PID"
+PYTEST_PID=""

@@ -75,6 +75,11 @@ printf 'PONG\\n'
     assert "redis-server" not in calls
     assert "shutdown" not in calls
     assert "python -m pytest -q tests/example.py" in calls
+    assert [line for line in calls.splitlines() if line.startswith("python ")] == [
+        "python -m pytest -q tests/example.py",
+        "python -m pytest -q tests/test_winchester_catalogue_review.py "
+        "-o asyncio_default_test_loop_scope=function",
+    ]
 
 
 def test_starts_and_cleans_up_only_its_temporary_redis(tmp_path: Path) -> None:
@@ -122,13 +127,43 @@ touch "$TEST_STATE"
 
     assert result.returncode == 7
     calls = log.read_text()
+    assert "asyncio_default_test_loop_scope=function" not in calls
     assert "redis-server --bind test.invalid --port 16379" in calls
     assert "python -m pytest -q tests/example.py" in calls
     assert "redis-cli -h test.invalid -p 16379 shutdown nosave" in calls
     assert not (tmp_path / "redis-ready").exists()
 
 
-def test_interrupted_pytest_cleans_up_temporary_redis(tmp_path: Path) -> None:
+def test_failed_function_loop_gate_preserves_exit_code_and_cleans_up(tmp_path: Path) -> None:
+    result, log = _run_preflight(
+        tmp_path,
+        cli_body="""
+echo "redis-cli $*" >> "$CALLS_LOG"
+case " $* " in
+  *" shutdown nosave "*) rm -f "$TEST_STATE"; exit 0 ;;
+esac
+test -f "$TEST_STATE" && printf 'PONG\\n'
+""",
+        server_body='touch "$TEST_STATE"',
+        python_body="""
+echo "python $*" >> "$CALLS_LOG"
+case " $* " in
+  *" asyncio_default_test_loop_scope=function "*) exit 8 ;;
+esac
+""",
+    )
+    assert result.returncode == 8
+    calls = log.read_text()
+    assert "python -m pytest -q tests/example.py" in calls
+    assert "asyncio_default_test_loop_scope=function" in calls
+    assert "shutdown nosave" in calls
+    assert not (tmp_path / "redis-ready").exists()
+
+
+@pytest.mark.parametrize("interrupt_function_gate", [False, True])
+def test_interrupted_pytest_cleans_up_temporary_redis(
+    tmp_path: Path, interrupt_function_gate: bool,
+) -> None:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     log = tmp_path / "calls.log"
@@ -160,6 +195,12 @@ touch "$TEST_STATE"
         "python",
         """
 echo "python $*" >> "$CALLS_LOG"
+if [ "$INTERRUPT_FUNCTION_GATE" = 1 ]; then
+  case " $* " in
+    *" asyncio_default_test_loop_scope=function "*) ;;
+    *) exit 0 ;;
+  esac
+fi
 echo "$$" > "$PYTEST_PID_FILE"
 touch "$PYTEST_RUNNING"
 trap 'touch "$PYTEST_STOPPED"; exit 0' TERM
@@ -175,6 +216,7 @@ while :; do sleep 1; done
         "PYTEST_RUNNING": str(pytest_running),
         "PYTEST_STOPPED": str(pytest_stopped),
         "PYTEST_PID_FILE": str(pytest_pid_file),
+        "INTERRUPT_FUNCTION_GATE": "1" if interrupt_function_gate else "0",
         "TEST_REDIS_HOST": "test.invalid",
         "TEST_REDIS_PORT": "16379",
     }
