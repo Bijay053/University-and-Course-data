@@ -75,7 +75,7 @@ async def seed() -> None:
     await engine.dispose()
 
 
-async def seed_continuation() -> None:
+async def seed_continuation(resume: str | None = None) -> None:
     """Seed the persisted payload produced by a reviewed report continuation."""
     await seed()
     from app.database import AsyncSessionLocal, engine
@@ -143,6 +143,36 @@ async def seed_continuation() -> None:
         await db.commit()
     await engine.dispose()
 
+    if resume:
+        # A row and a checkpoint-only URL exercise both sources of prior work.
+        # The checkpoint URL deliberately also matches the active URL filter.
+        from tests.task580_acceptance import PRIOR, SELECTED
+        async with AsyncSessionLocal() as db:
+            child = await db.get(ScrapeRuntimeJob, "job_task582_continuation")
+            selected = PRIOR + (SELECTED if resume == "mixed" else [])
+            payload = dict(child.request_payload)
+            payload.update({
+                "courseUrls": selected,
+                "course_urls": selected,
+                "courseReportRemainingUrls": selected,
+                "courseReport": {**payload["courseReport"], "course_urls": selected},
+            })
+            child.request_payload = payload
+            child.discovered_config = {
+                "autonomousVerification": {"completed_urls": [PRIOR[1]]},
+            }
+            child.imported = 1
+            db.add(ScrapedCourse(
+                scrape_job_id=child.runtime_job_id,
+                university_id=child.university_id,
+                course_name="Bachelor of Previously Reviewed Evidence",
+                status="pending",
+                course_website=PRIOR[0],
+                canonical_course_url=PRIOR[0],
+            ))
+            await db.commit()
+        await engine.dispose()
+
 
 def install_task_postrun_marker() -> None:
     """Record completion only after the real Celery task has returned."""
@@ -197,6 +227,8 @@ if __name__ == "__main__":
         asyncio.run(seed())
     elif sys.argv[1] == "seed-continuation":
         asyncio.run(seed_continuation())
+    elif sys.argv[1] in ("seed-mixed", "seed-resolved"):
+        asyncio.run(seed_continuation(sys.argv[1].removeprefix("seed-")))
     elif sys.argv[1] == "dispatch-continuation":
         from app.tasks.celery_app import celery_app
         celery_app.send_task(

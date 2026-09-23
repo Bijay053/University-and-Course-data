@@ -34,6 +34,10 @@ SELECTED = [
     "https://task564.example.test/courses/blocked-alpha",
     "https://task564.example.test/courses/blocked-beta",
 ]
+PRIOR = [
+    "https://task564.example.test/courses/prior-reviewed",
+    "https://task564.example.test/courses/blocked-prior-checkpoint",
+]
 TERMINAL = {
     "completed", "completed_with_errors", "completed_with_warnings",
     "failed", "failed_degraded", "stopped",
@@ -91,6 +95,10 @@ async def database_snapshot(url: str) -> dict:
                 SELECT id, scrape_job_id, course_website, status
                 FROM scraped_courses WHERE scrape_job_id <> $1 ORDER BY id
             """, SOURCE),
+            "child_rows_bytes": await db.fetchval("""
+                SELECT coalesce(json_agg(row_to_json(s) ORDER BY id)::text, '[]')
+                FROM scraped_courses s WHERE scrape_job_id='job_task582_continuation'
+            """),
             "diagnostic_logs": [
                 dict(row) for row in await db.fetch("""
                     SELECT runtime_job_id, sequence, event, payload
@@ -115,7 +123,11 @@ def decoded(value):
     return json.loads(value) if isinstance(value, str) else (value or {})
 
 
-def run(output: Path, *, continuation: bool = False) -> dict:
+def run(output: Path, *, continuation: bool = False, resume: str | None = None) -> dict:
+    assert resume in (None, "mixed", "resolved")
+    assert not resume or continuation
+    selected = PRIOR + (SELECTED if resume == "mixed" else []) if resume else SELECTED
+    blocked = resume != "resolved"
     output.mkdir(parents=True, exist_ok=True)
     for binary in ("initdb", "pg_ctl", "redis-server"):
         if not shutil.which(binary):
@@ -123,7 +135,7 @@ def run(output: Path, *, continuation: bool = False) -> dict:
 
     evidence = {
         "task": 580,
-        "scenario": "course_report_continuation" if continuation else "retry_unresolved",
+        "scenario": f"course_report_{resume or 'continuation'}" if continuation else "retry_unresolved",
         "passed": False,
         "production_boundaries": (
             "Production FastAPI router, Celery prefork task, scraper orchestrator, "
@@ -238,7 +250,7 @@ def run(output: Path, *, continuation: bool = False) -> dict:
         ])
         seed = start("seed", [
             sys.executable, "-m", "tests.task580_process",
-            "seed-continuation" if continuation else "seed",
+            f"seed-{resume}" if resume else ("seed-continuation" if continuation else "seed"),
         ])
         assert seed.wait(timeout=90) == 0, "Schema/seed failed; see seed.log"
         before = snapshot(dburl)
@@ -250,6 +262,11 @@ def run(output: Path, *, continuation: bool = False) -> dict:
             for review in before["earlier_reviews"].values():
                 assert review["job"] is not None
                 assert decoded(review["rows"])
+        if resume:
+            child_before = next(row for row in before["jobs"]
+                                if row["runtime_job_id"] == "job_task582_continuation")
+            assert decoded(child_before["discovered_config"])["autonomousVerification"]["completed_urls"] == [PRIOR[1]]
+            assert [row["course_website"] for row in decoded(before["child_rows_bytes"])] == [PRIOR[0]]
 
         worker = start(
             "worker", [sys.executable, "-m", "tests.task580_process", "worker"]
@@ -321,21 +338,26 @@ def run(output: Path, *, continuation: bool = False) -> dict:
             "discovered_config": config,
             "diagnostic_logs": final["diagnostic_logs"],
         }
-        assert retry["status"] == "failed", retry
-        assert retry["errors"] > 0, retry
-        assert payload["courseUrls"] == SELECTED
-        assert payload["course_urls"] == SELECTED
+        assert retry["status"] == ("failed" if blocked else "completed"), retry
+        assert (retry["errors"] > 0 if blocked else retry["errors"] == 0), retry
+        assert payload["courseUrls"] == selected
+        assert payload["course_urls"] == selected
         assert payload["retrySourceJobId"] == retry_parent
         if continuation:
             assert payload["courseReport"]["source_job_id"] == SOURCE
-        assert diagnostic["selected_urls"] == SELECTED
-        assert diagnostic["filtered_urls"] == SELECTED
-        assert diagnostic["retry_source_job_id"] == retry_parent
-        assert diagnostic["source_review_job_id"] == SOURCE
-        assert diagnostic["processed_count"] == 0
-        assert retry["error_message"] == diagnostic["message"]
-        assert final["diagnostic_logs"]
-        assert decoded(final["diagnostic_logs"][-1]["payload"])["selected_urls"] == SELECTED
+        if blocked:
+            assert diagnostic["selected_urls"] == selected
+            assert diagnostic["filtered_urls"] == SELECTED
+            assert diagnostic["selected_count"] == len(selected)
+            assert diagnostic["filtered_count"] == len(SELECTED)
+            assert diagnostic["resolved_count"] == (len(PRIOR) if resume else 0)
+            assert diagnostic["retry_source_job_id"] == retry_parent
+            assert diagnostic["source_review_job_id"] == SOURCE
+            assert diagnostic["processed_count"] == 0
+            assert retry["error_message"] == diagnostic["message"]
+        else:
+            assert diagnostic is None
+            assert not retry["error_message"]
         assert final["source_errors"] == before["source_errors"] == 7
         assert final["source_approved"] == before["source_approved"] > 0
         assert final["source_approved_bytes"] == before["source_approved_bytes"]
@@ -346,15 +368,22 @@ def run(output: Path, *, continuation: bool = False) -> dict:
             row for row in final["diagnostic_logs"]
             if row["runtime_job_id"] == retry_id
         ]
-        assert persisted_logs
+        assert bool(persisted_logs) == blocked
         for row in persisted_logs:
-            assert decoded(row["payload"])["retry_source_job_id"] == retry_parent
-            assert decoded(row["payload"])["source_review_job_id"] == SOURCE
+            logged = decoded(row["payload"])
+            for key, value in diagnostic.items():
+                assert logged[key] == value, (key, logged)
         retry_rows = [
             dict(row) for row in final["retry_rows"]
             if row["scrape_job_id"] == retry_id
         ]
-        assert not retry_rows, retry_rows
+        assert len(retry_rows) == (1 if resume else 0), retry_rows
+        assert final["child_rows_bytes"] == before["child_rows_bytes"]
+        if resume:
+            completed = config["autonomousVerification"]["completed_urls"]
+            assert PRIOR[1] in completed
+            if blocked:
+                assert set(SELECTED) <= set(completed)
         assert worker.poll() is None, "Prefork worker exited before lifecycle completion"
 
         # Force a fresh API process and prove both projections reload persisted state.
@@ -371,25 +400,29 @@ def run(output: Path, *, continuation: bool = False) -> dict:
             assert history_response.status_code == 200, history_response.text
             status_json = status_response.json()
             history_json = history_response.json()
-        assert status_json["status"] == "failed"
-        assert status_json["errors"] > 0
-        assert status_json["targetedRetryDiagnostic"] == diagnostic
-        assert status_json["errorMessage"] == diagnostic["message"]
-        assert status_json["extractionQuality"]["errorCount"] > 0
-        assert history_json["job"]["status"] == "failed"
-        assert history_json["job"]["errors"] > 0
+        assert status_json["status"] == retry["status"]
+        assert status_json["errors"] == retry["errors"]
+        assert status_json.get("targetedRetryDiagnostic") == diagnostic
+        assert status_json.get("errorMessage") == retry["error_message"]
+        if blocked:
+            assert status_json["extractionQuality"]["errorCount"] > 0
+        assert history_json["job"]["status"] == retry["status"]
+        assert history_json["job"]["errors"] == retry["errors"]
         diagnostic_history = [
             row for row in history_json["logs"]
             if row.get("kind") == "targeted_retry_all_filtered"
         ]
-        assert diagnostic_history
-        assert diagnostic_history[-1]["selected_urls"] == SELECTED
-        assert diagnostic_history[-1]["retry_source_job_id"] == retry_parent
-        assert diagnostic_history[-1]["source_review_job_id"] == SOURCE
-        assert history_json["stagedCourses"] == []
+        assert bool(diagnostic_history) == blocked
+        for logged in diagnostic_history:
+            for key, value in diagnostic.items():
+                assert logged[key] == value, (key, logged)
+        assert len(history_json["stagedCourses"]) == (1 if resume else 0)
+        if resume:
+            assert history_json["stagedCourses"][0]["id"] == retry_rows[0]["id"]
         reloaded_snapshot = snapshot(dburl)
         assert reloaded_snapshot["earlier_reviews"] == before["earlier_reviews"]
         assert reloaded_snapshot["published_bytes"] == before["published_bytes"]
+        assert reloaded_snapshot["child_rows_bytes"] == before["child_rows_bytes"]
 
         evidence.update({
             "passed": True,
@@ -398,12 +431,15 @@ def run(output: Path, *, continuation: bool = False) -> dict:
             "celery_task_postrun": postrun_marker,
             "terminal_status": retry["status"],
             "errors": retry["errors"],
-            "selected_urls": SELECTED,
+            "selected_urls": selected,
             "persisted_request_payload": payload,
             "persisted_diagnostic": diagnostic,
-            "diagnostic_log": final["diagnostic_logs"][-1],
+            "diagnostic_log": persisted_logs[-1] if persisted_logs else None,
             "fresh_api_status": status_json,
-            "fresh_api_history_diagnostic": diagnostic_history[-1],
+            "fresh_api_history_diagnostic": diagnostic_history[-1] if diagnostic_history else None,
+            "same_child_rows_byte_identical": True,
+            "prior_checkpoint_urls": [PRIOR[1]] if resume else [],
+            "post_task_checkpoint_urls": config.get("autonomousVerification", {}).get("completed_urls", []),
             "source_errors_before_after": [
                 before["source_errors"], final["source_errors"],
             ],
@@ -485,7 +521,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
     result = run(args.output.resolve())
     continuation_result = run(args.output.resolve() / "continuation", continuation=True)
+    resumed_results = [
+        run(args.output.resolve() / scenario, continuation=True, resume=scenario)
+        for scenario in ("mixed", "resolved")
+    ]
     print(json.dumps({
-        "passed": result["passed"] and continuation_result["passed"],
+        "passed": all(item["passed"] for item in [result, continuation_result, *resumed_results]),
         "evidence": str(args.output),
     }, indent=2))
