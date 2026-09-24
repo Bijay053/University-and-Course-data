@@ -15,11 +15,11 @@ Provider access failures need an in-app discovery repair action, not only a repo
 
 **How to apply:** Any blocked or zero-course recovery state should explain that no course was changed, open the official-course-URL form directly, and preserve all server-side eligibility and online-only safeguards. An exact endpoint-validated official course URL must survive stale catalogue discovery filters, but it must still pass global non-degree and staging guards. Show “staged” only for persisted staged rows, and keep retry available until the reported URL actually produces one.
 
-Bounded live checks must give known course-page candidates a turn before following catalogue navigation links.
+Bounded live checks must give known course-page candidates a turn before following catalogue navigation links, then select course-owned content rather than the first unrelated article card.
 
-**Why:** A six-page check exhausted its budget on listings, reported zero course pages, and sent an operator toward selector editing despite having course-page candidates in its evidence set.
+**Why:** A six-page check reported zero course pages and sent an operator toward selector editing. Later inspection of its stored evidence showed it had checked five real University of Law course URLs, but classified each as a listing because a promotional article appeared before the course's body-level main container.
 
-**How to apply:** Preserve the catalogue root for discovery evidence, then check known course candidates and current passing samples before spending the remaining budget on links or historical dropped URLs. A zero-course result still fails closed and must offer the official-URL report in the app, not a developer instruction.
+**How to apply:** Preserve the catalogue root for discovery evidence, then check known course candidates and current passing samples before spending the remaining budget on links or historical dropped URLs. Prefer semantic primary content and only use an article containing the page H1 or a body-level main container when needed. A zero-course result still fails closed but must offer both an automatic retry and the official-URL fallback in the app, not a developer instruction. Historical failed evidence does not re-evaluate itself after a release.
 
 Requirement recovery must work through the normal app for both existing records and new scrapes, not depend on one-off repair scripts. Qualification-based admission is a valid alternative to a numeric score only when backed by deterministic official-source evidence; missing IELTS bands remain unresolved.
 

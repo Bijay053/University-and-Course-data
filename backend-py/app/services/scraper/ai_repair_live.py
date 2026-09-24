@@ -433,7 +433,14 @@ def inspect_page(url: str, html: str, config=None) -> dict:
                 "reason": "Cross-host canonical source; official course ownership unverified"}
     for node in soup.select("nav, footer, header, aside, [role=navigation]"):
         node.decompose()
-    region = soup.select_one("main, article, [role=main]")
+    # Prefer the page's primary content over article cards that happen to
+    # precede it in document order. Some course sites use a body-level
+    # div.main for the course, with unrelated <article> cards elsewhere.
+    region = soup.select_one("main, [role=main]")
+    if region is None:
+        region = next((node for node in soup.select("article") if node.find("h1")), None)
+    if region is None:
+        region = soup.select_one("body > div.main:has(h1)")
     if region is None:
         # Missing course scope must not turn shared footer/legal text into proof.
         page = classify_page(str(soup), url)

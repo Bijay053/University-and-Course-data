@@ -252,7 +252,7 @@ export function AiRepairProgress({
               : needsReview
                 ? "Repair needs review"
                 : needsCoursePage
-                  ? "Official course page needed"
+                  ? "Course page not confirmed"
                   : blocked
                     ? "Automatic repair stopped safely"
                     : "Automatic repair running"}
@@ -263,7 +263,7 @@ export function AiRepairProgress({
               : needsReview
                 ? "The result was not verified automatically. Review the evidence and staged courses."
                 : needsCoursePage
-                  ? "The pages checked were not recognized as individual course pages. Paste the exact official course URL in the course report; the system will verify it and retry automatically."
+                  ? "This run did not recognize an individual course page. Retry automatic repair with the current checks, or report an exact official course URL if it still cannot recognize one."
                 : blocked
                   ? "The automatic checks could not prove a safe correction. Existing courses and settings were left unchanged."
                   : "Testing bounded changes against live official sources."}
@@ -455,7 +455,7 @@ export function AiRepairProgress({
       {(autonomous.reason || (autonomous.phase === "verification_queued" && !autonomous.verification_job_id)) && (
         <p className={`rounded border bg-white/70 px-2 py-1 text-[9px] ${blocked ? "border-red-200 text-red-800" : "border-amber-200 text-amber-800"}`}>
           {needsCoursePage
-            ? "No course was changed. Use Report official course URL so the system can verify and retry the exact page."
+            ? "No course was changed. Retry automatic repair with the current checks, or report an official course URL if the page still cannot be recognized."
             : autonomous.reason ?? "Config saved. Waiting for the automatic verification scrape; this is not verified yet."}
         </p>
       )}

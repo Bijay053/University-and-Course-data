@@ -2638,21 +2638,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                 </p>
                 <Button
                   type="button"
-                  onClick={() => {
-                    const needsCoursePage = (
-                      aiRepairSession?.autonomous?.phase === "blocked"
-                      && (aiRepairSession.live_probe?.course_pages ?? 0) === 0
-                    );
-                    if (!needsCoursePage) {
-                      void handleAiRepair();
-                      return;
-                    }
-                    setCourseReportOpenRequest(value => value + 1);
-                    requestAnimationFrame(() => {
-                      document.getElementById(`course-report-${slotIndex}`)
-                        ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
-                    });
-                  }}
+                  onClick={() => void handleAiRepair()}
                   disabled={aiRepairLoading || aiRepairPolling}
                   size="sm"
                   className="w-full bg-violet-600 hover:bg-violet-700"
@@ -2661,10 +2647,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                     ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
                     : <Bot className="w-3.5 h-3.5 mr-1.5" />
                   }
-                  {aiRepairSession?.autonomous?.phase === "blocked"
-                    && (aiRepairSession.live_probe?.course_pages ?? 0) === 0
-                    ? "Report official course URL"
-                    : aiRepairPolling
+                  {aiRepairPolling
                     ? `Repairing… attempt ${aiRepairSession?.current_attempt ?? 0}/${aiRepairSession?.max_attempts ?? aiRepairSession?.autonomous?.limits?.max_attempts ?? 5}`
                     : aiRepairSession?.status === "failed"
                     ? "Try automatic repair again"
@@ -3966,9 +3949,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                             </button>
                             <button
                               type="button"
-                              onClick={aiRepairSession?.autonomous?.phase === "blocked"
-                                && (aiRepairSession.live_probe?.course_pages ?? 0) === 0
-                                ? openOfficialCourseReport : handleAiRepair}
+                              onClick={handleAiRepair}
                               disabled={aiRepairLoading || aiRepairPolling}
                               title="Tests bounded repairs against official live sources, saves only validated config, and runs one automatic verification scrape."
                               className="text-[10px] bg-violet-600 hover:bg-violet-700 text-white px-2 py-1 rounded flex items-center gap-1 disabled:opacity-50 font-semibold"
@@ -3981,7 +3962,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                                 ? `One-click AI repair… (attempt ${aiRepairSession?.current_attempt ?? 0}/${aiRepairSession?.max_attempts ?? aiRepairSession?.autonomous?.limits?.max_attempts ?? 5})`
                                 : aiRepairSession?.autonomous?.phase === "blocked"
                                   && (aiRepairSession.live_probe?.course_pages ?? 0) === 0
-                                  ? "Report official course URL" : "One-click AI repair"}
+                                  ? "Retry automatic repair" : "One-click AI repair"}
                             </button>
                             {(diagnoseResult?.university_id || (selectedUni && selectedUni !== ALL)) && (
                               <a

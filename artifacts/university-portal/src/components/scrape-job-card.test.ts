@@ -51,7 +51,7 @@ function jsonResponse(body: unknown): Response {
   });
 }
 
-async function renderCompletedCard(errors: number, diagnosis?: unknown): Promise<HTMLElement> {
+async function renderCompletedCard(errors: number, diagnosis?: unknown, repairSession?: unknown): Promise<HTMLElement> {
   sessionStorage.setItem("scrape_slot_1_jobId", "job-complete");
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
@@ -70,7 +70,7 @@ async function renderCompletedCard(errors: number, diagnosis?: unknown): Promise
     }
     if (url === "/api/scrape/staged/job-complete") return jsonResponse([]);
     if (url === "/api/scrape/jobs/job-complete/diagnose" && diagnosis) return jsonResponse(diagnosis);
-    if (url.includes("/ai-repair-status")) return jsonResponse({ status: "not_started" });
+    if (url.includes("/ai-repair-status")) return jsonResponse(repairSession ?? { status: "not_started" });
     return jsonResponse({});
   }));
 
@@ -107,6 +107,29 @@ it("turns a selector recommendation into a course report action", async () => {
   expect(screen.queryByText(/location field selector/)).toBeNull();
   await userEvent.click(reportAction);
   expect(await screen.findByTestId("input-report-urls")).toBeTruthy();
+});
+
+it("lets a blocked historical repair run retry with current checks", async () => {
+  await renderCompletedCard(1, {
+    ok: true, job_id: "job-complete", university_id: 7,
+    diagnosis: { summary: "Course locations are missing.", root_causes: [], recommended_actions: [] },
+  }, {
+    session_id: "previous-run", job_id: "job-complete", status: "failed",
+    attempts: [], current_attempt: 0,
+    autonomous: { enabled: true, phase: "blocked", reason: "No course page recognized" },
+    live_probe: { status: "needs_review", pages_checked: 6, course_pages: 0, samples: [] },
+  });
+  await userEvent.click(screen.getByRole("button", { name: /AI Scrape Diagnostics/ }));
+  const retry = await screen.findByRole("button", { name: "Retry automatic repair" });
+  expect(screen.getAllByRole("button", { name: "Report official course URL" }).length).toBeGreaterThan(0);
+
+  await userEvent.click(retry);
+  await waitFor(() => {
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+      "/api/scrape/jobs/job-complete/ai-repair",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
 });
 
 async function renderFailedFilterCollapseCard(): Promise<void> {

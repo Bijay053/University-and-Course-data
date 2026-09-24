@@ -96,6 +96,37 @@ def test_non_course_and_title_only_evidence_not_accepted(html, expected):
     assert live.inspect_page(ONE, html, config())["classification"] == expected
 
 
+def test_primary_course_region_wins_over_earlier_unrelated_article():
+    html = """<html><body class="coursedetailpage">
+    <article class="stats-card"><h2>Professional Networking</h2>
+      <p>Courses and degree awards at our partners</p></article>
+    <div class="main course-main">
+      <section class="course-details-header"><h1>MBA</h1>
+        <p>Become a leader with our Master of Business Administration (MBA) degree.</p>
+        <p>This MBA degree is available full-time on campus (1 year).</p>
+      </section>
+      <section><h2>Course Details</h2><p>Study mode options: Full-time</p></section>
+    </div></body></html>"""
+    url = "https://www.law.ac.uk/study/postgraduate/business/mba-masters-in-business-administration/"
+
+    result = live.inspect_page(url, html, config())
+
+    assert result["classification"] == "course"
+    assert result["title"] == "MBA"
+    assert "Professional Networking" not in result["owned_html"]
+
+
+def test_primary_main_precedes_article_card_and_listing_still_fails_closed():
+    course_html = f"""<article class="stats-card"><p>Partner courses</p></article>
+      <main>{course()}</main>"""
+    assert live.inspect_page(ONE, course_html, config())["classification"] == "course"
+
+    listing_html = f"""<article class="stats-card"><p>Degree awards</p></article>
+      <div class="main"><h1>Our courses</h1><a href="{ONE}">Bachelor of Laws</a>
+      <a href="{TWO}">Bachelor of Science</a></div>"""
+    assert live.inspect_page(SEED, listing_html, config())["classification"] == "listing"
+
+
 def test_hidden_non_degree_and_footer_cannot_reject_degree():
     html = course(extra='<div hidden><dl><dt>Award</dt><dd>Short course</dd></dl></div>')
     html += "<footer>Domestic only. This is a short course.</footer>"

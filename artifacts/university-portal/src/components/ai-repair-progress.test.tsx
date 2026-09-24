@@ -138,11 +138,11 @@ describe("AiRepairProgress", () => {
       />,
     );
 
-    expect(screen.getByText("Official course page needed")).toBeTruthy();
+    expect(screen.getByText("Course page not confirmed")).toBeTruthy();
     expect(screen.queryByText("Repair verified")).toBeNull();
     expect(container.querySelector("section")?.className).toContain("border-red-200");
     expect(container.querySelectorAll("li.bg-emerald-100")).toHaveLength(0);
-    expect(screen.getByText(/Use Report official course URL/)).toBeTruthy();
+    expect(screen.getAllByText(/Retry automatic repair with the current checks/).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: "Report official course URL" }));
     expect(onReportOfficialCourse).toHaveBeenCalledOnce();
     expect(screen.queryByText(/Manual investigation/)).toBeNull();
