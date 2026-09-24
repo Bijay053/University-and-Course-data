@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from "react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -19,6 +19,7 @@ import {
   hasCompletedExtractionErrors,
   hasReviewableCourses,
   isCategoryPageWarningStale,
+  isConfigurationWaitingResponse,
   onlyKnownExcludedUrls,
   repairJobIdForTerminalState,
   runtimeProgressFromStatus,
@@ -42,6 +43,60 @@ it("does not treat known Law online variants as campus course losses", () => {
   expect(onlyKnownExcludedUrls([online, online.replace("/online/", "/")])).toBe(false);
   expect(onlyKnownExcludedUrls([online.replace("www.law.ac.uk", "example.edu")])).toBe(false);
   expect(onlyKnownExcludedUrls([])).toBe(false);
+});
+
+it("classifies only truthful configuration gates as waiting", () => {
+  expect(isConfigurationWaitingResponse(
+    409,
+    "Configuration is currently in progress. No scrape was started by this request.",
+  )).toBe(true);
+  expect(isConfigurationWaitingResponse(409, "A scrape is already running.")).toBe(false);
+  expect(isConfigurationWaitingResponse(500, "Configuration failed. No scrape was started.")).toBe(false);
+});
+
+it("renders a configuring start response as waiting without auto-retrying", async () => {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    if (String(input) === "/api/scrape/start") {
+      return new Response(JSON.stringify({
+        detail:
+          "Configuration is currently in progress. No scrape was started by this request. " +
+          "Wait for configuration to finish, then try again.",
+      }), {
+        status: 409,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return jsonResponse({});
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(React.createElement(ScrapeJobCard, {
+    slotId: 2,
+    slotIndex: 0,
+    universities: [{
+      id: 42,
+      name: "Ulster University",
+      scrapeUrl: "https://www.ulster.ac.uk/courses",
+    }],
+    defaultUniversityId: 42,
+    onReviewReady: () => undefined,
+  }));
+
+  fireEvent.click(screen.getByRole("button", { name: "Start Scrape" }));
+
+  expect(await screen.findByText(/Waiting for configuration/)).toBeTruthy();
+  expect(screen.getByText(/No scrape was started by this request/)).toBeTruthy();
+  const retryButton = screen.getByRole("button", { name: "Check and try again" });
+  expect(screen.queryByText(/— Error/)).toBeNull();
+  expect(sessionStorage.getItem("scrape_slot_2_startTime")).toBeNull();
+  expect(fetchMock.mock.calls.filter(([input]) => String(input) === "/api/scrape/start")).toHaveLength(1);
+
+  fireEvent.click(retryButton);
+  await waitFor(() => {
+    expect(fetchMock.mock.calls.filter(([input]) => String(input) === "/api/scrape/start")).toHaveLength(2);
+  });
+  expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/probe"))).toBe(false);
+  expect(sessionStorage.getItem("scrape_slot_2_startTime")).toBeNull();
 });
 
 function jsonResponse(body: unknown): Response {

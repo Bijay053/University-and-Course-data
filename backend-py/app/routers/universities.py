@@ -2203,7 +2203,7 @@ async def trigger_probe(
     """
     from datetime import datetime, timezone
 
-    from sqlalchemy import update
+    from sqlalchemy import text, update
 
     u = await db.get(University, uni_id)
     if not u:
@@ -2214,6 +2214,25 @@ async def trigger_probe(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="University has no scrape_url or website configured",
+        )
+
+    # Serialize retries with onboarding and scrape-start decisions. Probe work
+    # has no durable generation token today, so an old timestamp cannot prove
+    # ownership ended and a second worker must never be published over a
+    # pending/probing owner.
+    await db.execute(
+        text("SELECT pg_advisory_xact_lock(:uid)"),
+        {"uid": uni_id},
+    )
+    await db.refresh(u, attribute_names=["probe_status"])
+    if (u.probe_status or "").strip().lower() in {"pending", "probing"}:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Configuration is already in progress. No additional probe was "
+                "started. Wait for the current owner to finish."
+            ),
         )
 
     # Mark as probing immediately so the UI can show a spinner

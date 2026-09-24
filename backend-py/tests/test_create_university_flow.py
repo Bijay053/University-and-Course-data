@@ -279,7 +279,17 @@ async def test_scrape_start_waits_for_new_university_probe() -> None:
             )
 
         assert response.status_code == 409
-        assert "still being configured" in response.json()["detail"]
+        assert "currently in progress" in response.json()["detail"]
+        assert "No scrape was started" in response.json()["detail"]
+
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as ac3:
+            retry_response = await ac3.post(
+                f"/api/universities/{created_id}/probe",
+            )
+        assert retry_response.status_code == 409
+        assert "No additional probe was started" in retry_response.json()["detail"]
     finally:
         if created_id:
             await _delete_uni(created_id)

@@ -11,7 +11,7 @@ schema (camelCase keys, including ``url``). This test pins that contract.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
 import pytest
@@ -267,11 +267,39 @@ def test_bulk_scrape_waits_for_onboarding_configuration(
     )
 
     assert response.status_code == 409
-    assert "still being configured" in response.json()["detail"]
+    assert "currently in progress" in response.json()["detail"]
+    assert "No scrape was started" in response.json()["detail"]
     assert fake.added == []
     assert fake.committed is False
     fake_task.delay.assert_not_called()
     fake_lock.assert_not_called()
+
+
+def test_start_scrape_never_reclaims_configuration_from_timestamp_age(
+    client_with_uni,
+    monkeypatch,
+):
+    client, fake = client_with_uni
+    fake._uni.probe_status = "probing"
+    fake._uni.probe_updated_at = datetime.now(timezone.utc) - timedelta(hours=2)
+    fake_probe = MagicMock()
+    fake_probe.delay = MagicMock()
+    monkeypatch.setattr(
+        "app.tasks.scrape_tasks.probe_and_configure",
+        fake_probe,
+        raising=False,
+    )
+
+    response = _post_start(
+        client,
+        {"university_id": 42, "url": "https://test.example.edu/"},
+    )
+
+    assert response.status_code == 409
+    assert "currently in progress" in response.json()["detail"]
+    assert "No scrape was started" in response.json()["detail"]
+    assert fake.added == []
+    fake_probe.delay.assert_not_called()
 
 
 def test_bulk_scrape_reuses_active_job_under_advisory_lock(

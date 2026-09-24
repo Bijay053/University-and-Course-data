@@ -543,6 +543,33 @@ async def _lock_and_find_active_job(
     ).scalar_one_or_none()
 
 
+_CONFIGURING_PROBE_STATUSES = {"pending", "probing"}
+
+
+async def _gate_probe_configuration(
+    db: AsyncSession,
+    uni: University,
+) -> None:
+    """Keep setup gated until its worker records a terminal probe status.
+
+    ``probe_updated_at`` is intentionally not consulted. Probe workers do not
+    own a durable generation token, so timestamp age cannot prove that an older
+    worker has stopped or fence its later writes.
+    """
+    probe_status = (uni.probe_status or "").strip().lower()
+    if probe_status not in _CONFIGURING_PROBE_STATUSES:
+        return
+
+    await db.rollback()
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail=(
+            "Configuration is currently in progress. No scrape was started "
+            "by this request. Wait for configuration to finish, then try again."
+        ),
+    )
+
+
 @router.post(
     "/start",
     response_model=ScrapeStartResponse,
@@ -601,16 +628,7 @@ async def start_scrape(
         )
     existing_job = await _lock_and_find_active_job(db, uni.id)
     await db.refresh(uni, attribute_names=["probe_status"])
-    probe_status = (uni.probe_status or "").strip().lower()
-    if probe_status in {"pending", "probing"}:
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "This university is still being configured. "
-                "The first scrape will start automatically when configuration completes."
-            ),
-        )
+    await _gate_probe_configuration(db, uni)
     if existing_job:
         await db.commit()
         return ScrapeStartResponse(
@@ -713,14 +731,6 @@ async def start_bulk(
         uni = await db.get(University, uid)
         if not uni:
             continue
-        if (uni.probe_status or "").strip().lower() in {"pending", "probing"}:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    f"{uni.name} is still being configured. Its first scrape "
-                    "will start automatically when configuration completes."
-                ),
-            )
         universities[uid] = uni
 
     # Acquire locks in stable order to avoid deadlocks between overlapping bulk
@@ -729,15 +739,7 @@ async def start_bulk(
         uni = universities[uid]
         existing_job = await _lock_and_find_active_job(db, uid)
         await db.refresh(uni, attribute_names=["probe_status"])
-        if (uni.probe_status or "").strip().lower() in {"pending", "probing"}:
-            await db.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    f"{uni.name} is still being configured. Its first scrape "
-                    "will start automatically when configuration completes."
-                ),
-            )
+        await _gate_probe_configuration(db, uni)
         if existing_job:
             continue
 

@@ -176,6 +176,12 @@ export function hasReviewableCourses(
   );
 }
 
+export function isConfigurationWaitingResponse(status: number, message: string): boolean {
+  return status === 409
+    && /\bconfigur(?:ation|ing|ed)\b/i.test(message)
+    && /\bno scrape\b/i.test(message);
+}
+
 export function hasCompletedExtractionErrors(
   phase: string,
   summary: { errors: number } | null,
@@ -484,6 +490,8 @@ export type ScrapeJobCardProps = {
   /** Current visual position, used only for the user-facing slot number. */
   slotIndex: number;
   universities: UniOption[];
+  /** Optional university to preselect when opening a new card. */
+  defaultUniversityId?: number;
   onReviewReady: (jobId: string, uniName: string, force?: boolean) => void;
   onReportStarted?: () => void;
   onRemove?: () => void;
@@ -591,13 +599,18 @@ function UniPicker({ value, onChange, universities, disabled }: {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, onReportStarted, onRemove, canRemove, forceResetKey }: ScrapeJobCardProps) {
+export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversityId, onReviewReady, onReportStarted, onRemove, canRemove, forceResetKey }: ScrapeJobCardProps) {
   const { toast } = useToast();
   const { can } = useCan();
   const slotKey = `scrape_slot_${slotId}_jobId`;
   const startTimeKey = `scrape_slot_${slotId}_startTime`;
-  const [selectedUni, setSelectedUni] = useState("");
-  const [scrapeUrl, setScrapeUrl] = useState("");
+  const defaultUniversity = defaultUniversityId == null
+    ? undefined
+    : universities.find((university) => university.id === defaultUniversityId);
+  const [selectedUni, setSelectedUni] = useState(
+    defaultUniversity ? String(defaultUniversity.id) : "",
+  );
+  const [scrapeUrl, setScrapeUrl] = useState(defaultUniversity?.scrapeUrl ?? "");
   const [newUniName, setNewUniName] = useState("");
   const [newUniCountry, setNewUniCountry] = useState("");
   const [newUniCity, setNewUniCity] = useState("");
@@ -606,7 +619,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [fastMode, setFastMode] = useState(false);
 
-  const [phase, setPhase] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [phase, setPhase] = useState<"idle" | "running" | "waiting" | "done" | "error">("idle");
   const [jobStatus, setJobStatus] = useState<"queued" | "running" | "awaiting_approval" | null>(null);
   const [scraping, setScraping] = useState(false);
   const [stopping, setStopping] = useState(false);
@@ -1916,7 +1929,17 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
       });
       if (!resp.ok) {
         const msg = await getFetchErrorMessage(resp);
-        setLogs([{ event: "error", message: msg }]); setScraping(false); setPhase("error"); return;
+        setScraping(false);
+        setStartTime(null);
+        sessionStorage.removeItem(startTimeKey);
+        if (isConfigurationWaitingResponse(resp.status, msg)) {
+          setLogs([{ event: "status", message: msg }]);
+          setPhase("waiting");
+        } else {
+          setLogs([{ event: "error", message: msg }]);
+          setPhase("error");
+        }
+        return;
       }
       const data = await readResponseJson<{ jobId: string }>(resp);
       if (!data?.jobId) {
@@ -1928,7 +1951,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
     } catch (e) {
       setLogs([{ event: "error", message: String(e) }]); setScraping(false); setPhase("error");
     }
-  }, [scraping, scrapeUrl, selectedUni, newUniName, newUniCountry, newUniCity, feePageUrl, requirementsPageUrl, fastMode, pollJobStatus, slotKey]);
+  }, [scraping, scrapeUrl, selectedUni, newUniName, newUniCountry, newUniCity, feePageUrl, requirementsPageUrl, fastMode, pollJobStatus, slotKey, startTimeKey]);
 
   // Compatibility for repair sessions created by older workers. New
   // autonomous sessions enqueue and poll their own bounded verification job,
@@ -2178,6 +2201,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
       replayPhase === "error"   ? "border-red-200" :
       phase === "running" && jobStatus === "queued" ? "border-amber-300 shadow-amber-50" :
       phase === "running" ? "border-blue-300 shadow-blue-100" :
+      phase === "waiting" ? "border-amber-300 shadow-amber-50" :
       completedWithExtractionErrors ? "border-amber-300 shadow-amber-50" :
       phase === "done"    ? "border-green-300 shadow-green-50" :
       phase === "error"   ? "border-red-200"  : "border-gray-200"
@@ -2189,6 +2213,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
         replayPhase === "error"   ? "bg-red-50 border-red-200 text-red-700" :
         phase === "running" && jobStatus === "queued" ? "bg-amber-50 border-amber-200 text-amber-800" :
         phase === "running" ? "bg-blue-50 border-blue-200 text-blue-800" :
+        phase === "waiting" ? "bg-amber-50 border-amber-200 text-amber-800" :
         completedWithExtractionErrors ? "bg-amber-50 border-amber-200 text-amber-900" :
         phase === "done"    ? "bg-green-50 border-green-200 text-green-800" :
         phase === "error"   ? "bg-red-50 border-red-200 text-red-700" : "bg-gray-50 border-gray-200 text-gray-700"
@@ -2199,6 +2224,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
           {replayPhase === "error"   && <AlertCircle className="w-3.5 h-3.5" />}
           {replayPhase === "idle" && phase === "running" && jobStatus === "queued" && <span className="text-base leading-none">⏳</span>}
           {replayPhase === "idle" && phase === "running" && jobStatus !== "queued" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+          {replayPhase === "idle" && phase === "waiting" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
           {replayPhase === "idle" && phase === "done" && (
             completedWithExtractionErrors
               ? <AlertTriangle className="w-3.5 h-3.5" />
@@ -2212,6 +2238,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
             {replayPhase === "idle" && phase === "idle"    && `Slot ${slotIndex + 1}`}
             {replayPhase === "idle" && phase === "running" && jobStatus === "queued" && (uniName ? `${uniName} — Queued` : `Slot ${slotIndex + 1} — Queued`)}
             {replayPhase === "idle" && phase === "running" && jobStatus !== "queued" && (uniName || `Slot ${slotIndex + 1} — Running`)}
+            {replayPhase === "idle" && phase === "waiting" && (uniName ? `${uniName} — Waiting for configuration` : `Slot ${slotIndex + 1} — Waiting for configuration`)}
             {replayPhase === "idle" && phase === "done" && (
               completedWithExtractionErrors
                 ? `${uniName || `Slot ${slotIndex + 1}`} — Completed with errors`
@@ -2237,7 +2264,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
               <X className="w-3.5 h-3.5" />
             </button>
           )}
-          {replayPhase === "idle" && (phase === "done" || phase === "error") && (
+          {replayPhase === "idle" && (phase === "waiting" || phase === "done" || phase === "error") && (
             <button onClick={resetToIdle} className="p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-700" title="New scrape">
               <RefreshCw className="w-3.5 h-3.5" />
             </button>
@@ -2405,7 +2432,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
         )}
 
         {/* ── RUNNING / ERROR: Log view ─────────────────────────────── */}
-        {replayPhase === "idle" && (phase === "running" || phase === "error") && (
+        {replayPhase === "idle" && (phase === "running" || phase === "waiting" || phase === "error") && (
           <>
             {/* Progress bar */}
             {progressLog && progressLog.total ? (() => {
@@ -2562,6 +2589,21 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                   </Button>
                   <Button onClick={resetToIdle} variant="outline" size="sm" className="flex-1">
                     <RefreshCw className="w-3.5 h-3.5 mr-1.5" />New Scrape
+                  </Button>
+                </>
+              )}
+              {phase === "waiting" && (
+                <>
+                  <Button
+                    onClick={handleStart}
+                    disabled={!scrapeUrl.trim()}
+                    size="sm"
+                    className="flex-1 bg-amber-600 hover:bg-amber-700"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 mr-1.5" />Check and try again
+                  </Button>
+                  <Button onClick={resetToIdle} variant="outline" size="sm" className="flex-1">
+                    Back
                   </Button>
                 </>
               )}
