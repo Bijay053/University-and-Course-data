@@ -153,6 +153,7 @@ python backend-py/deploy/rehearse_database_secret_refresh.py \
   --second-private-subnet-id "$TEST_PRIVATE_SUBNET_B" \
   --proof-output runtime-proofs/database-refresh-rehearsal.json \
   --proof-signing-key-id "$DISPOSABLE_AWS_PROOF_SIGNING_KEY_ID" \
+   --handoff-production-instance-id "$UNIVERSITY_PORTAL_INSTANCE_ID" \
   --i-understand-this-creates-disposable-aws-resources
 ```
 
@@ -162,6 +163,44 @@ The runner reads only `DISPOSABLE_AWS_ACCESS_KEY_ID`,
 `AWS_SSM_*` identity or the default AWS credential chain. The non-secret proof
 is written atomically only after Scheduler is disabled, the stack is deleted,
 the exact run-tag residue search is empty, and the RDS-managed secret is gone.
+With `--handoff-production-instance-id`, the same run rechecks the signed
+receipt, disposable STS identity, deleted stack and run-tag residues, then
+checks the **separate** production STS identity and running instance before
+installing the receipt. Supply dedicated `AWS_SSM_ACCESS_KEY_ID` and
+`AWS_SSM_SECRET_ACCESS_KEY` (and `AWS_SSM_SESSION_TOKEN` when applicable);
+there is no production default-credential fallback. The production account
+argument must be the protected account ID. The production SSM principal needs
+`sts:GetCallerIdentity`, `ec2:DescribeInstances`, and `ssm:SendCommand` /
+`ssm:GetCommandInvocation` to that exact instance and `AWS-RunShellScript`;
+the disposable principal needs read-only CloudFormation, resource-tag and EC2
+inspection in addition to the rehearsal permissions. The host must already
+have this template and pinned signer, Python 3 and OpenSSL. Only a temporary
+public certificate, encrypted receipt, and fixed status cross SSM; command
+output never includes receipt JSON or credentials. Host validation runs before
+an fsynced, mode-0600 atomic install at
+`/etc/university-portal/database-refresh-rehearsal-proof.json`. The guarded
+release still validates the host receipt independently with its existing
+24-hour limit; handoff does not bypass that gate.
+
+If handoff fails or the workspace is interrupted, **do not rerun the billable
+rehearsal immediately**. Check that the protected host receipt passes the
+existing release-gate validation and check disposable teardown. If the
+receipt is absent but the ignored local proof survives, retry only the handoff:
+
+```bash
+python backend-py/deploy/handoff_database_refresh_rehearsal.py \
+  --proof runtime-proofs/database-refresh-rehearsal.json \
+  --disposable-account-id "$DISPOSABLE_AWS_ACCOUNT_ID" \
+  --production-account-id "$PRODUCTION_AWS_ACCOUNT_ID" \
+  --production-instance-id "$UNIVERSITY_PORTAL_INSTANCE_ID" \
+  --region ap-south-1
+```
+
+This retry refuses stale or invalid signatures, a live stack, tagged residues,
+wrong accounts or a wrong-region proof. If both the host receipt and local
+proof are lost, no receipt can be reconstructed; investigate teardown and
+only then decide whether a new rehearsal is needed. Do not copy a receipt
+through SSM stdout, logs, command comments, or a credential-bearing URL.
 
 Provision one persistent asymmetric KMS key in the disposable account with
 `KeyUsage=SIGN_VERIFY` and an RSA key spec. Restrict the rehearsal principal to

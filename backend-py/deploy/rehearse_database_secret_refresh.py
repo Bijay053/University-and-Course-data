@@ -192,7 +192,8 @@ def rehearse(*, expected_account: str, production_account: str, region: str, vpc
              opt_in: bool, proof_output: Path | None = None,
              proof_signing_key_id: str | None = None,
              fail_at: str | None = None,
-             state_output: Path | None = None) -> None:
+             state_output: Path | None = None,
+             handoff_instance_id: str | None = None) -> None:
     if not opt_in:
         raise RuntimeError("pass --i-understand-this-creates-disposable-aws-resources")
     if os.environ.get("RUN_DISPOSABLE_AWS_DATABASE_REFRESH_REHEARSAL") != "1":
@@ -201,6 +202,8 @@ def rehearse(*, expected_account: str, production_account: str, region: str, vpc
         )
     if proof_output is not None and not proof_signing_key_id:
         raise RuntimeError("a dedicated disposable KMS proof-signing key is required")
+    if handoff_instance_id and proof_output is None:
+        raise RuntimeError("handoff requires a signed proof output")
     if fail_at is not None and fail_at not in FAILURE_CHECKPOINTS:
         raise RuntimeError("unknown rehearsal failure checkpoint")
     _preflight_output_paths(state_output, proof_output)
@@ -508,6 +511,17 @@ def rehearse(*, expected_account: str, production_account: str, region: str, vpc
             run_id=rehearsal_id,
             template_path=Path(template_url[7:]),
         )
+        if handoff_instance_id:
+            from handoff_database_refresh_rehearsal import handoff
+
+            handoff(
+                proof_output,
+                disposable_account=expected_account,
+                production_account=production_account,
+                instance_id=handoff_instance_id,
+                region=region,
+                disposable_session=session,
+            )
     print("disposable-database-secret-refresh-rehearsal-passed")
 
 
@@ -527,6 +541,8 @@ def main() -> None:
     parser.add_argument("--region", default="ap-south-1")
     parser.add_argument("--proof-output", type=Path, required=True)
     parser.add_argument("--proof-signing-key-id", required=True)
+    parser.add_argument("--handoff-production-instance-id",
+                        help="install signed proof on the protected host before declaring success")
     parser.add_argument("--fail-at", choices=sorted(FAILURE_CHECKPOINTS))
     parser.add_argument("--state-output", type=Path)
     parser.add_argument("--run-id")
@@ -542,7 +558,8 @@ def main() -> None:
               proof_output=args.proof_output,
                proof_signing_key_id=args.proof_signing_key_id,
                fail_at=args.fail_at,
-               state_output=args.state_output)
+                state_output=args.state_output,
+                handoff_instance_id=args.handoff_production_instance_id)
 
 
 if __name__ == "__main__":
