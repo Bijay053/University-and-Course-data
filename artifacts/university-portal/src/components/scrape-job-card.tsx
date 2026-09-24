@@ -618,6 +618,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
   const [requirementsPageUrl, setRequirementsPageUrl] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [fastMode, setFastMode] = useState(false);
+  const [fullCatalogueReviewOnly, setFullCatalogueReviewOnly] = useState(false);
 
   const [phase, setPhase] = useState<"idle" | "running" | "waiting" | "done" | "error">("idle");
   const [jobStatus, setJobStatus] = useState<"queued" | "running" | "awaiting_approval" | null>(null);
@@ -939,6 +940,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
     setTargetedRetryDiagnostic(null);
     setProviderFailure(null);
     setBrowserRescueAttempted(false);
+    setFullCatalogueReviewOnly(false);
     setIsContinuationJob(false);
     setUnresolvedCount(null);
     setContinuableUnresolvedCount(null);
@@ -1642,7 +1644,8 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
         pollFailRef.current = 0;
         const data = await readResponseJson<{
           universityId?: number; universityName?: string; url?: string;
-          fastMode?: boolean; feePageUrl?: string | null; requirementsPageUrl?: string | null;
+          fastMode?: boolean; fullCatalogueReviewOnly?: boolean;
+          feePageUrl?: string | null; requirementsPageUrl?: string | null;
           logs?: ScrapeLog[]; logIndex?: number;
           status?: string; imported?: number; skipped?: number; errors?: number;
           reviewableCount?: number;
@@ -1684,6 +1687,13 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
            searchProviderAccessFailure(data.provider_failure, [...logs, ...(data.logs ?? [])]),
          );
         if (typeof data.fastMode === "boolean") setFastMode(data.fastMode);
+        if (typeof data.fullCatalogueReviewOnly === "boolean") {
+          setFullCatalogueReviewOnly(data.fullCatalogueReviewOnly);
+          if (data.fullCatalogueReviewOnly) {
+            setFastMode(false);
+            setShowAdvanced(true);
+          }
+        }
         if (data.feePageUrl) {
           setFeePageUrl(data.feePageUrl);
           setShowAdvanced(true);
@@ -1952,6 +1962,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
     if (feePageUrl.trim()) body.feePageUrl = feePageUrl.trim();
     if (requirementsPageUrl.trim()) body.requirementsPageUrl = requirementsPageUrl.trim();
     if (fastMode) body.fastMode = true;
+    body.fullCatalogueReviewOnly = fullCatalogueReviewOnly;
 
     setScraping(true);
     setPhase("running");
@@ -2006,7 +2017,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
     } catch (e) {
       setLogs([{ event: "error", message: String(e) }]); setScraping(false); setPhase("error");
     }
-  }, [scraping, scrapeUrl, selectedUni, newUniName, newUniCountry, newUniCity, feePageUrl, requirementsPageUrl, fastMode, pollJobStatus, slotKey, startTimeKey]);
+  }, [scraping, scrapeUrl, selectedUni, newUniName, newUniCountry, newUniCity, feePageUrl, requirementsPageUrl, fastMode, fullCatalogueReviewOnly, pollJobStatus, slotKey, startTimeKey]);
 
   // Compatibility for repair sessions created by older workers. New
   // autonomous sessions enqueue and poll their own bounded verification job,
@@ -2307,6 +2318,11 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
           {replayPhase === "idle" && elapsed && phase === "running" && (
             <span className={`text-xs font-normal tabular-nums ${jobStatus === "queued" ? "text-amber-500" : "text-blue-500"}`}>({elapsed})</span>
           )}
+          {replayPhase === "idle" && phase !== "idle" && fullCatalogueReviewOnly && (
+            <Badge variant="outline" className="border-violet-300 bg-violet-50 text-violet-700 font-normal">
+              Full catalogue review only
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-1">
           {replayPhase !== "idle" && (
@@ -2381,7 +2397,13 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
 
             <div className="flex items-center gap-3">
               <label className="flex items-center gap-1.5 text-xs text-amber-800 cursor-pointer select-none">
-                <input type="checkbox" checked={fastMode} onChange={(e) => setFastMode(e.target.checked)} className="accent-amber-600" />
+                <input
+                  type="checkbox"
+                  checked={fastMode}
+                  disabled={fullCatalogueReviewOnly}
+                  onChange={(e) => setFastMode(e.target.checked)}
+                  className="accent-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
+                />
                 Fast mode
               </label>
               <button
@@ -2395,14 +2417,35 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
             </div>
 
             {showAdvanced && (
-              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-gray-100">
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Fee Page URL</label>
-                  <Input placeholder="https://…/fees" value={feePageUrl} onChange={(e) => setFeePageUrl(e.target.value)} className="h-8 text-xs" />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Requirements URL</label>
-                  <Input placeholder="https://…/requirements" value={requirementsPageUrl} onChange={(e) => setRequirementsPageUrl(e.target.value)} className="h-8 text-xs" />
+              <div className="space-y-3 pt-2 border-t border-gray-100">
+                <label className="flex items-start gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={fullCatalogueReviewOnly}
+                    onChange={(event) => {
+                      const checked = event.target.checked;
+                      setFullCatalogueReviewOnly(checked);
+                      if (checked) setFastMode(false);
+                    }}
+                    className="mt-0.5 accent-violet-600"
+                  />
+                  <span>
+                    <span className="block text-xs font-medium text-gray-700">Full catalogue review only</span>
+                    <span className="mt-0.5 block text-xs leading-relaxed text-gray-500">
+                      Runs fresh discovery and extraction across the whole catalogue for review.
+                      Preserves existing reviews and all pending and published courses; nothing is auto-published, removed, or repaired.
+                    </span>
+                  </span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Fee Page URL</label>
+                    <Input placeholder="https://…/fees" value={feePageUrl} onChange={(e) => setFeePageUrl(e.target.value)} className="h-8 text-xs" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Requirements URL</label>
+                    <Input placeholder="https://…/requirements" value={requirementsPageUrl} onChange={(e) => setRequirementsPageUrl(e.target.value)} className="h-8 text-xs" />
+                  </div>
                 </div>
               </div>
             )}
