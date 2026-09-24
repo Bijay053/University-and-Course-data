@@ -18,6 +18,22 @@ class StartScrapeBody(BaseModel):
     default_study_mode: str | None = Field(default=None, alias="defaultStudyMode")
     fast_mode: bool = Field(default=False, alias="fastMode")
     bulk_mode: bool = Field(default=False, alias="bulkMode")
+    full_catalogue_review_only: bool = Field(
+        default=False, alias="fullCatalogueReviewOnly", strict=True,
+    )
+
+    @model_validator(mode="after")
+    def validate_full_catalogue_review(self):
+        if self.full_catalogue_review_only and (
+            self.fast_mode or self.bulk_mode or self.course_urls
+            or self.retry_source_job_id or self.browser_rescue_attempted
+        ):
+            raise ValueError(
+                "fullCatalogueReviewOnly cannot be combined with fastMode, bulkMode, "
+                "courseUrls, retrySourceJobId or browserRescueAttempted"
+            )
+        return self
+
     # C1 (fetch-layer brief): bypass the 7-day discovery URL cache and force a
     # full fresh discovery crawl for this run.
     force_discovery: bool = Field(default=False, alias="forceDiscovery")
@@ -58,6 +74,7 @@ class BulkScrapeResponse(BaseModel):
 
 class ScrapeJobRead(BaseModel):
     provider_failure: dict | None = None
+    fullCatalogueReviewOnly: bool = False
 
     @model_validator(mode="before")
     @classmethod
@@ -72,6 +89,10 @@ class ScrapeJobRead(BaseModel):
             )
             data = {name: getattr(value, name) for name in cls.model_fields if hasattr(value, name)}
             data["provider_failure"] = failure
+            from app.services.scraper.review_policy import full_catalogue_review
+            data["fullCatalogueReviewOnly"] = full_catalogue_review(
+                getattr(value, "request_payload", None)
+            )
             if failure:
                 data["error_message"] = failure["message"]
             return data

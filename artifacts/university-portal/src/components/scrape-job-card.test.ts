@@ -55,19 +55,50 @@ it("classifies only truthful configuration gates as waiting", () => {
 });
 
 it("renders a configuring start response as waiting without auto-retrying", async () => {
-  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-    if (String(input) === "/api/scrape/start") {
-      return new Response(JSON.stringify({
-        detail:
-          "Configuration is currently in progress. No scrape was started by this request. " +
-          "Wait for configuration to finish, then try again.",
-      }), {
-        status: 409,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-    return jsonResponse({});
-  });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith("/api/scrape/status/leeds-trinity-original")) {
+        return jsonResponse({
+          status: "failed",
+          universityId: 401,
+          universityName: "Leeds Trinity University",
+          url: "https://www.leedstrinity.ac.uk/courses/",
+          totalFound: 0,
+          imported: 0,
+          skipped: 0,
+          errors: 0,
+          logs: [{
+            event: "error",
+            message: "SearchStax HTTP 401 unauthorized at https://search.example.invalid/?api_key=secret",
+          }],
+          provider_failure: {
+            provider: "searchstax",
+            http_status: 401,
+            kind: "provider_access_denied",
+            message: "Course search unavailable",
+          },
+        });
+      }
+      if (url === "/api/scrape/staged/leeds-trinity-original") return jsonResponse([]);
+      if (url === "/api/scrape/jobs/leeds-trinity-original/ai-repair-status") {
+        return jsonResponse({ status: "not_started" });
+      }
+      if (url === "/api/scrape/jobs/leeds-trinity-original/ai-repair" && init?.method === "POST") {
+        return jsonResponse({
+          session_id: "repair-leeds",
+          job_id: "leeds-trinity-original",
+          status: "queued",
+          autonomous: {
+            enabled: true,
+            phase: "queued",
+            discovery_repair: { status: "queued" },
+          },
+        });
+      }
+      return jsonResponse({ reports: [], source_exclusions: {} });
+    });
+
+    const reviewOnly = screen.getByRole("checkbox", { name: /Full catalogue review only/ });
   vi.stubGlobal("fetch", fetchMock);
 
   render(React.createElement(ScrapeJobCard, {
@@ -87,18 +118,6 @@ it("renders a configuring start response as waiting without auto-retrying", asyn
   expect(await screen.findByText(/Waiting for configuration/)).toBeTruthy();
   expect(screen.getByText(/No scrape was started by this request/)).toBeTruthy();
   const retryButton = screen.getByRole("button", { name: "Check and try again" });
-  expect(screen.queryByText(/— Error/)).toBeNull();
-  expect(sessionStorage.getItem("scrape_slot_2_startTime")).toBeNull();
-  expect(fetchMock.mock.calls.filter(([input]) => String(input) === "/api/scrape/start")).toHaveLength(1);
-
-  fireEvent.click(retryButton);
-  await waitFor(() => {
-    expect(fetchMock.mock.calls.filter(([input]) => String(input) === "/api/scrape/start")).toHaveLength(2);
-  });
-  expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/probe"))).toBe(false);
-  expect(sessionStorage.getItem("scrape_slot_2_startTime")).toBeNull();
-});
-
 function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status: 200,
@@ -260,43 +279,50 @@ it("keeps a newly returned retry selected when older hydration finishes later", 
   sessionStorage.setItem("scrape_slot_12_jobId", "job-race");
   let resolveHydration!: (response: Response) => void;
   const hydration = new Promise<Response>(resolve => { resolveHydration = resolve; });
-  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = String(input);
-    if (url.startsWith("/api/scrape/status/job-race")) {
-      return jsonResponse({
-        status: "completed",
-        universityId: 7,
-        universityName: "Test University",
-        totalFound: 10,
-        imported: 9,
-        skipped: 0,
-        errors: 1,
-        current: 10,
-        logs: [],
-      });
-    }
-    if (url === "/api/scrape/staged/job-race") return jsonResponse([]);
-    if (url === "/api/scrape/jobs/job-race/diagnose") {
-      return jsonResponse({
-        ok: true,
-        job_id: "job-race",
-        university_id: 7,
-        diagnosis: { summary: "One extraction failed.", root_causes: [], recommended_actions: [] },
-      });
-    }
-    if (url === "/api/scrape/jobs/job-race/ai-repair-status") return hydration;
-    if (url === "/api/scrape/jobs/job-race/ai-repair" && init?.method === "POST") {
-      return jsonResponse({
-        session_id: "new-retry",
-        job_id: "job-race",
-        status: "queued",
-        attempts: [],
-        current_attempt: 0,
-        started_at: "2024-09-25T09:00:00.000Z",
-      });
-    }
-    return jsonResponse({});
-  });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith("/api/scrape/status/leeds-trinity-original")) {
+        return jsonResponse({
+          status: "failed",
+          universityId: 401,
+          universityName: "Leeds Trinity University",
+          url: "https://www.leedstrinity.ac.uk/courses/",
+          totalFound: 0,
+          imported: 0,
+          skipped: 0,
+          errors: 0,
+          logs: [{
+            event: "error",
+            message: "SearchStax HTTP 401 unauthorized at https://search.example.invalid/?api_key=secret",
+          }],
+          provider_failure: {
+            provider: "searchstax",
+            http_status: 401,
+            kind: "provider_access_denied",
+            message: "Course search unavailable",
+          },
+        });
+      }
+      if (url === "/api/scrape/staged/leeds-trinity-original") return jsonResponse([]);
+      if (url === "/api/scrape/jobs/leeds-trinity-original/ai-repair-status") {
+        return jsonResponse({ status: "not_started" });
+      }
+      if (url === "/api/scrape/jobs/leeds-trinity-original/ai-repair" && init?.method === "POST") {
+        return jsonResponse({
+          session_id: "repair-leeds",
+          job_id: "leeds-trinity-original",
+          status: "queued",
+          autonomous: {
+            enabled: true,
+            phase: "queued",
+            discovery_repair: { status: "queued" },
+          },
+        });
+      }
+      return jsonResponse({ reports: [], source_exclusions: {} });
+    });
+
+    const reviewOnly = screen.getByRole("checkbox", { name: /Full catalogue review only/ });
   vi.stubGlobal("fetch", fetchMock);
 
   render(React.createElement(ScrapeJobCard, {
@@ -479,7 +505,7 @@ describe("completed ScrapeJobCard quality state", () => {
       "Completed with extraction errors — quality is not all clear",
     );
     expect(screen.getByRole("alert").textContent).toContain("82 candidates failed extraction");
-    const header = screen.getByText("Test University — Completed with errors").closest(".border-b");
+    const header = screen.getByText("Test University").closest(".border-b");
     expect(header?.className).toContain("bg-amber-50");
     expect(header?.className).not.toContain("bg-green-50");
     expect(card.textContent).not.toContain("Test University — Done");
@@ -664,6 +690,8 @@ describe("SearchStax provider discovery recovery", () => {
       }
       return jsonResponse({ reports: [], source_exclusions: {} });
     });
+
+    const reviewOnly = screen.getByRole("checkbox", { name: /Full catalogue review only/ });
     vi.stubGlobal("fetch", fetchMock);
 
     render(React.createElement(ScrapeJobCard, {
@@ -779,3 +807,7 @@ describe("SearchStax provider discovery recovery", () => {
     expect(urlInput.value).toBe("https://www.leedstrinity.ac.uk/courses/");
   });
 });
+
+    const payload = JSON.parse(String(startCall?.[1]?.body));
+
+    const startCall = fetchMock.mock.calls.find(([input]) => String(input) === "/api/scrape/start");

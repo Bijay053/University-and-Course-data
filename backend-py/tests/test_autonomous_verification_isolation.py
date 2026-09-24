@@ -554,17 +554,18 @@ def test_pipeline_guards_all_resume_and_post_run_mutation_paths():
     """Structural regression for late hooks too costly to execute in unit tests."""
     source = inspect.getsource(orch._run_claimed_scrape)
     tree = ast.parse(source)
-    assert "and not _verification\n            and job.university_id" in source
-    assert "if not _verification and job.status == \"completed\" and _bypassed_resume_course_ids:" in source
-    assert "if _sweep_links and not _verification:" in source
-    assert "_qi_row = None if _verification else" in source
-    assert "if _dq_critical_urls and not _verification:" in source
+    assert "_preserve_review = bool(_verification) or _full_review" in source
+    assert "and not _preserve_review\n            and job.university_id" in source
+    assert "if not _preserve_review and job.status == \"completed\" and _bypassed_resume_course_ids:" in source
+    assert "if _sweep_links and not _preserve_review:" in source
+    assert "_qi_row = None if _preserve_review else" in source
+    assert "if _dq_critical_urls and not _preserve_review:" in source
     stage_calls = [
         node for node in ast.walk(tree) if isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name) and node.func.id == "stage_course"
     ]
     assert len(stage_calls) == 2
-    assert all(any(k.arg == "preserve_existing" and ast.unparse(k.value) == "bool(_verification)"
+    assert all(any(k.arg == "preserve_existing" and ast.unparse(k.value) == "_preserve_review"
                    for k in call.keywords) for call in stage_calls)
     early_return = source.index("# Stop before ALL mutation/dispatch hooks")
     assert early_return < source.index("from app.services.scraper.metrics import compute_run_metrics")
