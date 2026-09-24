@@ -3,7 +3,8 @@
 # Country: United Kingdom  |  Currency: GBP
 # Slug: leedstrinity
 # Verified recovery from SearchStax access denial: the official sitemap
-# supplied 111 filtered course candidates in a bounded live replay.
+# supplied 107 detail-shaped candidates with the verified absolute-URL filters
+# and the production homepage seed (the earlier unscoped replay returned 111).
 # Four course-owned pages passed fresh acceptance checks (10 pages fetched
 # across probe and validation). This is not a complete scrape or eligibility
 # certification: normal per-course extraction and global staging guards apply.
@@ -14,10 +15,18 @@ hostname_guard: www.leedstrinity.ac.uk
 locked_config_paths:
   - discovery.official_catalogue_fallback
   - discovery.sitemap_url
+  - discovery.allow_url_patterns
+  - discovery.block_url_patterns
 
 discovery:
   official_catalogue_fallback: true
   sitemap_url: https://www.leedstrinity.ac.uk/sitemap.xml
+  # Match absolute sitemap URLs, not path-only strings. These are the two
+  # course-detail branches confirmed by the bounded official-source replay.
+  allow_url_patterns:
+    - '^https://www\.leedstrinity\.ac\.uk/courses/(undergraduate|postgraduate)/[^/?#]+/$'
+  block_url_patterns:
+    - '(?i)/(apprenticeships?|cpd(?:-and-short-courses)?|short-courses?|online)(/|$)'
 
 extraction:
   fees:

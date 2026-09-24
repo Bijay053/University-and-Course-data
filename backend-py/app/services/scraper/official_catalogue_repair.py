@@ -38,13 +38,33 @@ async def discover_official_catalogue(evidence) -> dict:
             and not re.search(r"/(?:apprenticeships?|cpd(?:-and-short-courses)?|short-courses?)/",
                               urlsplit(urljoin(source, item["url"])).path, re.I)
             and not is_blocked_page(urljoin(source, item["url"]))[0]
-            and passes(urljoin(source, item["url"]), discovery)
             and not is_intentionally_excluded_course_url(urljoin(source, item["url"]))
         ))
+        filter_patch = {}
+        if evidence.ctx.get("provider_failure") and candidates:
+            # Old UI filters sometimes blocked the catalogue root itself and
+            # used path-only allows even though runtime evaluates full URLs.
+            # Repair only these narrow, recognizable mistakes; preserve all
+            # other blocks, detail patterns, must-contain and global guards.
+            blocks = discovery.get("block_url_patterns") or []
+            kept = [p for p in blocks if p not in {
+                "^/courses/", "^/postgraduate/", "^/study/",
+            }]
+            if kept != blocks:
+                filter_patch["block_url_patterns"] = kept or ["(?!)"]
+            allows = discovery.get("allow_url_patterns") or []
+            if allows and all(p.startswith("^/") for p in allows):
+                filter_patch["allow_url_patterns"] = [
+                    "^https?://[^/]+" + p[1:] for p in allows
+                ]
+        candidates = [url for url in candidates if passes(url, {**discovery, **filter_patch})]
         # Never persist an explicitly paginated first page as a whole strategy.
         # Neither a complete sitemap nor an unpaginated listing proves every
         # course is eligible: normal extraction and the floor guard still run.
         if len(candidates) >= 2 and not record.get("has_pagination"):
-            return {"source": source, "candidates": candidates,
-                    "sample": candidates[:max(0, min(4, (evidence.max_pages - 2 * (source_index + 1)) // 2))]}
+            result = {"source": source, "candidates": candidates,
+                      "sample": candidates[:max(0, min(4, (evidence.max_pages - 2 * (source_index + 1)) // 2))]}
+            if filter_patch:
+                result["filter_patch"] = filter_patch
+            return result
     return {"source": None, "candidates": [], "sample": []}

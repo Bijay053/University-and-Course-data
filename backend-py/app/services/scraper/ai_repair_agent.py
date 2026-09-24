@@ -2992,6 +2992,10 @@ async def run_ai_repair_loop(
                     "patches": [
                         {"section": "discovery", "field": "official_catalogue_fallback", "value": True},
                         {"section": "discovery", "field": "sitemap_url", "value": live.fallback["source"] or ""},
+                        *[
+                            {"section": "discovery", "field": field, "value": value}
+                            for field, value in live.fallback.get("filter_patch", {}).items()
+                        ],
                     ],
                 }
             else:

@@ -20,6 +20,16 @@ from tests.test_searchstax_hud import _FlakyAsyncClient, _cfg, _page
 from app.services.scraper import searchstax_hud
 
 
+PRODUCTION_LEEDS_FILTERS = {
+    "block_url_patterns": [
+        "^/courses/", "^/postgraduate/", "^/study/", "^/student-life/",
+        "^/about-us/", "^/contact/", "^/apply/", "^/international-students/",
+        "^/fees-and-finance/", "^/careers/", "^/research/",
+    ],
+    "allow_url_patterns": ["^/courses/.+/.+/$", "^/postgraduate/.+/.+/$"],
+}
+
+
 def repair_context(**kwargs):
     cfg = config()
     cfg.discovery = DiscoveryConfig()
@@ -159,6 +169,7 @@ def test_merged_reload_preserves_existing_leeds_degree_exception():
 @pytest.mark.parametrize("university_id", [89, 2220])
 def test_saved_leeds_recipe_overrides_stale_provider_and_source(university_id):
     stale = {"discovery": {
+        **PRODUCTION_LEEDS_FILTERS,
         "official_catalogue_fallback": False, "sitemap_url": "https://obsolete.example/sitemap.xml",
         "searchstax": {"endpoint": "https://provider.example/search", "links_only": True},
     }}
@@ -173,6 +184,41 @@ def test_saved_leeds_recipe_overrides_stale_provider_and_source(university_id):
     assert cfg.discovery.searchstax is None
     assert cfg.extraction.staging.skip_degree_qualifier_check is True
     assert cfg.extraction.fees.default_currency == "GBP"
+    assert live.passes("https://www.leedstrinity.ac.uk/courses/postgraduate/digital-marketing/",
+                       cfg.discovery.model_dump())
+    assert not live.passes("https://www.leedstrinity.ac.uk/courses/online/business/",
+                           cfg.discovery.model_dump())
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("bad_pages", [False, True])
+async def test_provider_repair_corrects_path_only_filters_from_live_catalogue(monkeypatch, bad_pages):
+    first = SEED + "/courses/postgraduate/law/"
+    second = SEED + "/courses/undergraduate/science/"
+    async def fetch(url, *_args):
+        html = "<main><h1>Partners</h1></main>" if bad_pages else course()
+        return (sitemap([first, second]), "", "") if url.endswith(".xml") else (html, "", "")
+    monkeypatch.setattr(live, "_fetch_official", fetch)
+    ctx = repair_context()
+    filters = {**PRODUCTION_LEEDS_FILTERS, "block_url_patterns": [
+        *PRODUCTION_LEEDS_FILTERS["block_url_patterns"], "/online/", "/short-courses/",
+    ]}
+    ctx["effective_config"].discovery = DiscoveryConfig(**filters)
+    evidence = live.LiveRepairEvidence(ctx)
+    await evidence.probe()
+    patch = {
+        "official_catalogue_fallback": True,
+        "sitemap_url": evidence.fallback["source"],
+        **evidence.fallback["filter_patch"],
+    }
+    assert "^/research/" in patch["block_url_patterns"]
+    assert "^/courses/" not in patch["block_url_patterns"]
+    assert "/online/" in patch["block_url_patterns"]
+    assert "/short-courses/" in patch["block_url_patterns"]
+    report = await evidence.validate(filters, patch, {})
+    assert report["accepted"] is (not bad_pages), report
+    if not bad_pages:
+        assert set(report["courses"]) == {first, second}
 
 
 class PersistentConfigDb(FakeDb):
@@ -363,10 +409,13 @@ async def test_unpaginated_official_catalogue_alternative_and_paginated_refusal(
 @pytest.mark.skipif(os.environ.get("RUN_PUBLIC_CATALOGUE_ACCEPTANCE") != "1",
                     reason="Opt-in bounded public website acceptance; no database or credentials")
 async def test_real_leeds_official_source_acceptance():
-    url = "https://www.leedstrinity.ac.uk/courses/"
+    url = "https://www.leedstrinity.ac.uk"
     cfg = get_config_for_host(
         hostname="www.leedstrinity.ac.uk", name="Leeds Trinity University",
-        scrape_url=url, university_id=89, db_scrape_config={}, create_missing_stub=False,
+        scrape_url=url, university_id=89,
+        db_scrape_config={"auto_config": {"discovery": PRODUCTION_LEEDS_FILTERS},
+                          "admin_config": {"discovery": PRODUCTION_LEEDS_FILTERS}},
+        create_missing_stub=False,
     )
     evidence = live.LiveRepairEvidence({
         "scrape_url": url, "effective_config": cfg,
@@ -388,6 +437,7 @@ async def test_real_leeds_official_source_acceptance():
         hostname="www.leedstrinity.ac.uk", name="Leeds Trinity University",
         scrape_url=url, university_id=89,
         db_scrape_config={"admin_config": {"discovery": {
+            **PRODUCTION_LEEDS_FILTERS,
             "official_catalogue_fallback": False,
             "searchstax": {"endpoint": "https://provider.example/search", "links_only": True},
         }}},

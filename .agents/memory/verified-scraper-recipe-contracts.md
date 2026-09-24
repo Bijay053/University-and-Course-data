@@ -14,3 +14,9 @@ Critical fields in a verified per-university YAML recipe may be declared as lock
 **Why:** Stale generated and admin discovery rules narrowed a verified main catalogue to an obsolete online-only subset.
 
 **How to apply:** Lock only transport/discovery fields whose live evidence has been verified, and regression-test stale generated/admin overrides against the merged runtime config.
+
+Validate reusable repair against the actual stored discovery filters as well as the provider configuration.
+
+**Why:** Leeds' repaired sitemap passed clean-environment replay but production still returned zero because legacy URL filters rejected every course. Correct source selection alone did not establish a working reusable recipe.
+
+**How to apply:** Check a fresh load with real production overlays and the stored seed URL. Verify accepted URLs through the normal filtering path before claiming production discovery is repaired.

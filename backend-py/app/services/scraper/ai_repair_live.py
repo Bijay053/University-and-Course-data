@@ -718,7 +718,10 @@ class LiveRepairEvidence:
             reasons.append("Proposed sitemap is not an official configured university source")
         fallback_patch = (
             self.ctx.get("provider_failure") and patch.get("official_catalogue_fallback") is True
-            and set(patch) == {"official_catalogue_fallback", "sitemap_url"}
+            and set(patch) == {"official_catalogue_fallback", "sitemap_url",
+                               *getattr(self, "fallback", {}).get("filter_patch", {})}
+            and all(patch.get(key) == value for key, value in
+                    getattr(self, "fallback", {}).get("filter_patch", {}).items())
             and patch.get("sitemap_url") == getattr(self, "fallback", {}).get("source")
             and len(new) >= 2
             and len(new) == len(getattr(self, "fallback", {}).get("sample", []))
