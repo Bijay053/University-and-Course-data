@@ -14,3 +14,9 @@ Task failure and process death are different facts. A worker may report a failur
 **Why:** Treating a task-result exception as death can admit a conflicting replacement; waiting for a particular failure callback can miss a real death.
 
 **How to apply:** Require evidence tied to the exact execution process, independently of application-reported failure. If authoritative evidence is unavailable, keep ownership fenced.
+
+An idle worker inspection is not proof that the broker will remain empty through shutdown. Recheck queued and unacknowledged deliveries after stopping workers before clearing orphaned ownership.
+
+**Why:** An interrupted university-setup recovery passed active/reserved/scheduled checks but found a queued repair monitor after shutdown. Such monitors can schedule more work; their presence is not automatically harmless maintenance.
+
+**How to apply:** Keep the state unchanged when queue ownership is unresolved and restore services on every abort. If considering an exception, verify the exact queued task's durable workflow identity and behavior rather than assuming a successful smoke test makes it safe.
