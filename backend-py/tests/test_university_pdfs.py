@@ -23,6 +23,26 @@ _BARE_CFG = UniConfig.model_validate(
 )
 
 
+@pytest.mark.asyncio
+async def test_graduate_visa_pdf_cannot_backfill_tuition_even_when_preconfigured(monkeypatch):
+    """Cached/manual feesPdf selections must hit the same non-tuition gate."""
+    from unittest.mock import AsyncMock
+
+    download = AsyncMock()
+    emit = AsyncMock()
+    monkeypatch.setattr(university_pdfs, "_download_raw_pdf", download)
+    result = await university_pdfs._parse_fee_pdf(
+        "https://www.law.ac.uk/globalassets/13.-media--doc-repo/"
+        "04.-students/international/uk-visa-requirements/"
+        "pdf_students_graduate-work-visa-faq.pdf",
+        "United Kingdom",
+        emit=emit,
+    )
+    assert result == {}
+    download.assert_not_awaited()
+    assert emit.await_args.kwargs["kind"] == "pdf_non_tuition_rejected"
+
+
 @pytest.fixture(autouse=True)
 def _uni_config(monkeypatch):
     set_uni_config(_BARE_CFG)

@@ -669,6 +669,37 @@ class TestLowValuePdfClassifier:
             "2026-international-tuition-fee-schedule.pdf"
         )
 
+    def test_ulaw_graduate_visa_health_surcharge_is_not_tuition(self):
+        url = (
+            "https://www.law.ac.uk/globalassets/13.-media--doc-repo/"
+            "04.-students/international/uk-visa-requirements/"
+            "pdf_students_graduate-work-visa-faq.pdf"
+        )
+        text = (
+            "FAQ’s for the Graduate Route Visa\n"
+            "The application fee is currently £937. Applicants will also be liable "
+            "for the Immigration Health Surcharge (IHS), which will be £2,070 for 2 years."
+        )
+        assert is_non_tuition_fee_pdf(url, text)
+        assert is_low_value_pdf(url, text)
+        assert _is_non_tuition_central_fee_pdf(url, text)
+        assert classify_by_keywords(url, text).category == "other"
+
+    def test_visa_title_rejected_even_with_generic_pdf_filename(self):
+        assert is_non_tuition_fee_pdf(
+            "https://university.example/download.pdf",
+            "Graduate Route Visa FAQs\nApplication fees and health surcharge £2,070",
+        )
+
+    def test_tuition_schedule_with_secondary_visa_information_still_eligible(self):
+        text = (
+            "International Tuition Fee Schedule\n"
+            "MBA tuition fees £20,600. Student visa application costs and "
+            "Immigration Health Surcharge are paid separately."
+        )
+        assert not is_non_tuition_fee_pdf("https://uni.edu/tuition.pdf", text)
+        assert classify_by_keywords("https://uni.edu/tuition.pdf", text).category == "fee_schedule"
+
     def test_fee_schedule_not_blocked(self):
         assert not is_low_value_pdf("https://uni.edu/2025-fee-schedule.pdf")
 

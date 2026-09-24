@@ -458,7 +458,14 @@ def inspect_page(url: str, html: str, config=None) -> dict:
     fields = []
     for node in region.select("dt, tr, h2, h3, p, li, [class], [id]"):
         text = node.get_text(" ", strip=True)
-        if not _LABEL.search(text) or len(text) > 350:
+        # Audience-labelled prices are often near the end of the page, below
+        # many repeated duration/entry blocks. They need not say "tuition":
+        # ULaw labels them "International students (Overseas Fee Payer)".
+        audience_price = (
+            re.search(r"\b(?:international|overseas)\b", text, re.I)
+            and re.search(r"(?:[£$€]\s*\d|\d[\d,]*\s*(?:GBP|AUD|USD|EUR))", text, re.I)
+        )
+        if (not _LABEL.search(text) and not audience_price) or len(text) > 350:
             continue
         if node.name in ("dt", "h2", "h3"):
             sibling = node.find_next_sibling()
@@ -478,9 +485,32 @@ def inspect_page(url: str, html: str, config=None) -> dict:
     audience_evidence = extract_audience_option_evidence(
         owned_html, url, url, extra_hosts
     )
+    # Preserve bounded evidence from every field family rather than the first
+    # twelve DOM matches (usually duplicate entry/mode blocks). This is prompt
+    # evidence only: mixed fees/bursaries still must pass field_authority_html
+    # and fresh two-page rule validation before any configuration is saved.
+    def evidence_priority(field):
+        text = field["text"]
+        if (re.search(r"\b(?:international|overseas)\b", text, re.I)
+                and re.search(r"[£$€]\s*\d|\d[\d,]*\s*(?:GBP|AUD|USD|EUR)", text, re.I)):
+            return 0
+        if re.search(r"\b(?:campus|location)\s*:", text, re.I):
+            return 1
+        if re.search(r"\bIELTS\b", text, re.I):
+            return 2
+        return 3
+    prompt_fields = sorted(fields, key=evidence_priority)[:12]
     result.update(title=title, snippet=region.get_text(" ", strip=True)[:1400],
-                  fields=fields[:12], owned_html=owned_html, links=page["course_links"],
+                  fields=prompt_fields, owned_html=owned_html, links=page["course_links"],
                   audience_evidence=audience_evidence)
+    result["fee_source_links"] = list(dict.fromkeys(
+        urldefrag(urljoin(url, node["href"]))[0]
+        for node in region.select("a[href]")
+        if re.search(r"\b(?:fees?|tuition)\b", node.get_text(" ", strip=True), re.I)
+        and not node["href"].startswith("#")
+        and official_url(urljoin(url, node["href"]), url, extra_hosts)
+        and urldefrag(urljoin(url, node["href"]))[0] != urldefrag(url)[0]
+    ))[:3]
     blocked, reason = is_blocked_page(url, title)
     if blocked:
         return {**result, "classification": "listing" if page["page_type"] == "listing" else "non_course",
@@ -651,8 +681,23 @@ class LiveRepairEvidence:
             return self.audit()
         # Reserve half the entire session budget for fresh, pre-apply validation.
         limit = min(6, self.max_pages // 2)
+        # Probe the actual failed rows before generic, name-ranked candidates.
+        # Critical populated values take priority over completeness percentages,
+        # but retain a missing-location target when one is explicitly recorded.
+        quality = self.ctx.get("critical_quality") or {}
+        affected = quality.get("affected_rows") or []
+        missing_location = [
+            row.get("url") for row in affected
+            if not row.get("course_location") and row.get("url")
+        ][:1]
+        targets = list(dict.fromkeys(
+            missing_location
+            + [row.get("url") for row in affected if row.get("url")]
+            + list(quality.get("critical_urls") or [])
+            + list(self.ctx.get("repair_course_url_sample") or [])
+        ))
         course_candidates = [
-            url for url in self.ctx.get("repair_course_url_sample") or []
+            url for url in targets
             if not is_intentionally_excluded_course_url(url)
         ][:3]
         passed = [
@@ -664,12 +709,27 @@ class LiveRepairEvidence:
             [self.ctx["scrape_url"]] + course_candidates + passed
             + (self.ctx.get("repair_url_sample") or self.ctx.get("dropped_sample") or [])
         ))
+        fee_sources = []
         while pending and len(self.initial) < limit:
+            # A course-linked central fee page is diagnostic reference material,
+            # not a course candidate or authority for a course's numeric fee.
+            # Use at most one remaining probe slot, never a validation slot or
+            # a slot reserved for an affected course.
+            if (fee_sources and len(self.initial) == limit - 1
+                    and not any(url in seeds for url in pending)):
+                source_url, linked_from = fee_sources[0]
+                reference = await self.fetch(source_url)
+                reference.update(reference_only=True, linked_from=linked_from)
+                break
             url = urldefrag(pending.pop(0))[0]
             if url in self.initial or is_intentionally_excluded_course_url(url):
                 continue
             record = await self.fetch(url)
             self.initial[url] = record
+            if record.get("classification") == "course":
+                for source_url in record.get("fee_source_links") or []:
+                    if source_url not in self.initial and source_url not in seeds:
+                        fee_sources.append((source_url, url))
             linked = []
             for link in record.get("links") or []:
                 candidate = urljoin(url, link["url"])
@@ -695,7 +755,7 @@ class LiveRepairEvidence:
             "failures": failures,
             "reason": ("Bounded live evidence; full scrape verification still required" if courses
                        else "No positive live course evidence; no automatic apply is safe"),
-            "samples": [{k: r.get(k) for k in ("url", "classification", "reason", "title", "snippet", "fields", "audience_evidence")}
+            "samples": [{k: r.get(k) for k in ("url", "classification", "reason", "title", "snippet", "fields", "audience_evidence", "fee_source_links", "reference_only", "linked_from")}
                         for r in self.records],
         }
 

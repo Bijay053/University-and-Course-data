@@ -161,7 +161,10 @@ _NON_TUITION_FEE_URL_RE = re.compile(
     r"|\bssaf\b"
     r"|application[-_\s]*fees?"
     r"|(?:enrolment|enrollment)[-_\s]*deposits?"
-    r"|(?:materials?|equipment)[-_\s]*(?:fees?|costs?)",
+    r"|(?:materials?|equipment)[-_\s]*(?:fees?|costs?)"
+    r"|(?:graduate|student|post[-_\s]*study)[-_\s]+(?:work[-_\s]+|route[-_\s]+)?visa"
+    r"|visa[-_\s]+(?:fees?|costs?|faq|guide)"
+    r"|immigration[-_\s]+health[-_\s]+surcharge",
     re.I,
 )
 # UniSC's "full fee paying" PDFs are schedules for individual units of study,
@@ -184,7 +187,10 @@ _NON_TUITION_FEE_TITLE_RE = re.compile(
     r"|\bssaf\b"
     r"|\bapplication\s+fees?\b"
     r"|\b(?:enrolment|enrollment)\s+deposits?\b"
-    r"|\b(?:materials?|equipment)\s+(?:fees?|costs?)\b",
+    r"|\b(?:materials?|equipment)\s+(?:fees?|costs?)\b"
+    r"|\b(?:graduate|student|post[-\s]*study)\s+(?:work\s+|route\s+)?visa\b"
+    r"|\bvisa\s+(?:fees?|costs?|faq|guide)\b"
+    r"|\bimmigration\s+health\s+surcharge\b",
     re.I,
 )
 _POSITIVE_TUITION_TITLE_RE = re.compile(
