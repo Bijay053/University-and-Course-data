@@ -205,6 +205,57 @@ it("labels hydrated terminal evidence as a saved result with its timestamp", asy
   expect(screen.getAllByText("The saved repair failed.").length).toBeGreaterThan(0);
 });
 
+it.each(["stored", "omitted", "null"])(
+  "renders the sparse failed production audit with %s attempt arrays without hiding its error",
+  async (shape) => {
+    const error = "'NoneType' object has no attribute 'get'";
+    // Actual early-failure audit shape: no rescued_sample, simulation counts,
+    // cost, or quality results were persisted before snapshot validation failed.
+    const attempt = {
+      attempt_number: 1, phase: "extraction", outcome: "failed",
+      diagnosis: "The international-fee extractor is selecting a recurring £2,070 payment amount.",
+      root_cause: "fees", confidence: 95,
+      explanation: "Select the full international tuition before any optional bursary.",
+      patches_proposed: [{
+        section: "recipe", field: "extraction_rules.international_fee",
+        new_value: { css: "tr, li", confidence: .95 },
+      }],
+      patch_applied_ok: false, patch_error: error,
+      rollback_status: "unchanged", extraction_validation: null,
+      ...(shape === "stored"
+        ? { patches_applied: [], validation_errors: [error] }
+        : shape === "null"
+          ? { patches_applied: null, validation_errors: null, rescued_sample: null, recipe_patch_applied: null }
+          : {}),
+    };
+    await renderCompletedCard(3, {
+      ok: true, job_id: "job-complete", university_id: 7,
+      diagnosis: { summary: "Critical fee failures.", root_causes: [], recommended_actions: [] },
+    }, {
+      session_id: "89f1f65c-600d-4030-a171-2e68a3976afb",
+      job_id: "job-complete", status: "failed", current_attempt: 1,
+      started_at: "2026-09-24T09:11:08.705128+00:00",
+      completed_at: "2026-09-24T09:11:28.000000+00:00",
+      attempts: [attempt],
+      error: "Accepted live validation is required; no scrape launched.",
+      autonomous: {
+        enabled: true, phase: "blocked",
+        reason: "Accepted live validation is required; no scrape launched.",
+      },
+      live_probe: { status: "accepted", accepted: true, pages_checked: 6, course_pages: 4, samples: [] },
+    });
+    await userEvent.click(screen.getByRole("button", { name: /AI Scrape Diagnostics/ }));
+    expect(await screen.findByRole("button", { name: "One-click AI repair" })).toBeTruthy();
+    expect(screen.getByText(attempt.diagnosis)).toBeTruthy();
+    expect(screen.getAllByText((content) => content.includes(error)).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Rollback status: config unchanged/)).toBeTruthy();
+    expect(screen.queryByText("Verified")).toBeNull();
+    expect(vi.mocked(fetch).mock.calls.some(([url, init]) =>
+      String(url).endsWith("/ai-repair") && init?.method === "POST"
+    )).toBe(false);
+  },
+);
+
 it("keeps a newly returned retry selected when older hydration finishes later", async () => {
   sessionStorage.setItem("scrape_slot_12_jobId", "job-race");
   let resolveHydration!: (response: Response) => void;
