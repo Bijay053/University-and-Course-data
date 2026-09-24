@@ -50,7 +50,7 @@ _SECRET_KEY = re.compile(r"(token|secret|password|authorization|api[_-]?key)", r
 _URL = re.compile(r"https?://\S+", re.I)
 _EMAIL = re.compile(r"\b[^\s@]+@[^\s@]+\.[^\s@]+\b")
 _SECRET_VALUE = re.compile(
-    r"(?i)\b(token|secret|password|authorization|api[_-]?key)\b\s*([:=]\s*|:\s*[^\s,;]+)"
+    r"(?i)\b(token|secret|password|authorization|api[_-]?key)\b\s*(?:=|:)"
 )
 
 
@@ -76,9 +76,13 @@ def digest_row(row: dict[str, Any]) -> str:
 def _safe_reason(value: Any) -> str | None:
     if value is None:
         return None
-    value = _URL.sub("[url]", str(value))
+    value = str(value)
+    # Do not attempt partial replacement: credentials can contain whitespace or
+    # punctuation that makes reliably finding the end of their value impossible.
+    if _SECRET_VALUE.search(value):
+        return "[redacted secret-bearing reason]"
+    value = _URL.sub("[url]", value)
     value = _EMAIL.sub("[email]", value)
-    value = _SECRET_VALUE.sub(r"\1=[redacted]", value)
     return value[:500] or None
 
 
@@ -97,6 +101,7 @@ def _config_evidence(university: dict[str, Any]) -> dict[str, Any]:
         university_id=university["id"],
         db_scrape_config=university.get("scrape_config"),
         create_missing_stub=False,
+        strict=True,
     )
     data = config.model_dump(mode="json")
     slug = config_loader._hostname_to_slug(host)  # exact loader derivation
@@ -106,7 +111,9 @@ def _config_evidence(university: dict[str, Any]) -> dict[str, Any]:
     discovery = data.get("discovery", {})
     extraction = data.get("extraction", {})
     fees = extraction.get("fees", {}) if isinstance(extraction, dict) else {}
-    degree = extraction.get("degree_level", {}) if isinstance(extraction, dict) else {}
+    staging = extraction.get("staging", {}) if isinstance(extraction, dict) else {}
+    searchstax = discovery.get("searchstax") if isinstance(discovery, dict) else None
+    official_fallback = bool(discovery.get("official_catalogue_fallback", False))
     return {
         "identity": {
             "university_id": university["id"],
@@ -130,24 +137,54 @@ def _config_evidence(university: dict[str, Any]) -> dict[str, Any]:
                     "official_catalogue_fallback", "sitemap_url", "search_url",
                 ) if key in discovery
             },
+            "searchstax_status": {
+                "configured": isinstance(searchstax, dict),
+                "enabled": bool(
+                    isinstance(searchstax, dict) and searchstax.get("enabled", True)
+                ),
+                "disabled_by_official_catalogue_fallback": bool(
+                    official_fallback and searchstax is None
+                ),
+            },
         },
         "extraction": {
             "currency": {
                 "default_currency": fees.get("default_currency"),
                 "currency_override": fees.get("currency_override"),
             },
-            "degree_level_exception": degree,
+            "degree_level_exception": bool(
+                staging.get("skip_degree_qualifier_check", False)
+            ),
         },
     }
 
 
 def _compare(baseline: dict[str, Any], current: dict[str, Any]) -> dict[str, Any]:
     """Compare only stable identifiers/digests; staged additions are permitted."""
-    old_rows = {r["id"]: r["sha256"] for r in baseline.get("scraped_courses", {}).get("rows", [])}
-    now_rows = {r["id"]: r["sha256"] for r in current.get("scraped_courses", {}).get("rows", [])}
-    old_courses = {r["id"]: r["sha256"] for r in baseline.get("published_courses", {}).get("rows", [])}
-    now_courses = {r["id"]: r["sha256"] for r in current.get("published_courses", {}).get("rows", [])}
-    def changed(old: dict[int, str], now: dict[int, str]) -> dict[str, list[int]]:
+    def signatures(
+        report: dict[str, Any], section: str, related_fields: tuple[str, ...]
+    ) -> dict[int, tuple[Any, ...]]:
+        return {
+            row["id"]: (
+                row["sha256"],
+                *(tuple(sorted(row.get(field, []))) for field in related_fields),
+            )
+            for row in report.get(section, {}).get("rows", [])
+        }
+
+    old_rows = signatures(baseline, "scraped_courses", ("evidence_sha256",))
+    now_rows = signatures(current, "scraped_courses", ("evidence_sha256",))
+    published_related = (
+        "fee_sha256",
+        "english_requirement_sha256",
+        "academic_requirement_sha256",
+    )
+    old_courses = signatures(baseline, "published_courses", published_related)
+    now_courses = signatures(current, "published_courses", published_related)
+
+    def changed(
+        old: dict[int, tuple[Any, ...]], now: dict[int, tuple[Any, ...]]
+    ) -> dict[str, list[int]]:
         return {
             "preserved_unchanged_ids": sorted(k for k in old.keys() & now.keys() if old[k] == now[k]),
             "changed_existing_ids": sorted(k for k in old.keys() & now.keys() if old[k] != now[k]),
