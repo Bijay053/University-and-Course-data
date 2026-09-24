@@ -968,6 +968,25 @@ def critical_recheck_session():
     return evidence
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("detail", [
+    "'NoneType' object has no attribute 'get'",
+    "The rule changed 12 already-populated value(s).",
+])
+async def test_blocked_repair_retains_validation_reason_in_ui_contract(memory, detail):
+    evidence = critical_recheck_session()
+    evidence["status"] = "failed"
+    evidence["attempts"][-1].update(outcome="failed", validation_errors=[detail])
+    memory.evidence = copy.deepcopy(evidence)
+    result = await workflow.queue_verification(evidence, DB(memory))
+    assert result["autonomous"]["phase"] == "blocked"
+    assert detail in result["autonomous"]["reason"]
+    assert detail in result["final_verdict"]
+    assert detail in result["error"]
+    assert "No verification scrape was launched" in result["final_verdict"]
+    assert not memory.added
+
+
 def test_unchanged_critical_rows_can_request_verification_not_numeric_overwrite():
     evidence = critical_recheck_session()
     assert workflow.accepted_live_probe(evidence)

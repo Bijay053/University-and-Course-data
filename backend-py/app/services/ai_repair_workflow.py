@@ -532,8 +532,25 @@ async def queue_verification(session: dict, db) -> dict:
     if not lease_owned:
         return await finish(session, db, "blocked", "Repair lease lost before verification.", failed=True)
     if not accepted_live_probe(session):
+        last_attempt = (session.get("attempts") or [{}])[-1]
+        validation_errors = last_attempt.get("validation_errors") or []
+        detail = "; ".join(str(error) for error in validation_errors if error)
+        detail = detail or str(last_attempt.get("patch_error") or "")
+        if detail:
+            reason = (
+                f"Repair validation did not pass: {detail[:1200]} "
+                "No verification scrape was launched."
+            )
+        elif (session.get("live_probe") or {}).get("accepted") is True:
+            reason = (
+                "Live course pages were confirmed, but no accepted repair or "
+                "eligible unchanged-config recheck was established. "
+                "No verification scrape was launched."
+            )
+        else:
+            reason = "Accepted live validation is required; no scrape launched."
         return await finish(
-            session, db, "blocked", "Accepted live validation is required; no scrape launched.",
+            session, db, "blocked", reason,
             failed=session.get("status") == "failed",
         )
     parent = await db.get(ScrapeRuntimeJob, session["job_id"])
