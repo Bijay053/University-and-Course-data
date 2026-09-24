@@ -128,11 +128,13 @@ describe("AiRepairProgress", () => {
   });
 
   it("turns a zero-course dead end into a user-facing official URL action", () => {
+    const onReportOfficialCourse = vi.fn();
     const { container } = render(
       <AiRepairProgress
         autonomous={{ ...base, phase: "blocked", reason: "Accepted live validation is required; no scrape launched." }}
         liveProbe={{ status: "needs_review", pages_checked: 6, course_pages: 0 }}
         currentAttempt={5}
+        onReportOfficialCourse={onReportOfficialCourse}
       />,
     );
 
@@ -141,6 +143,8 @@ describe("AiRepairProgress", () => {
     expect(container.querySelector("section")?.className).toContain("border-red-200");
     expect(container.querySelectorAll("li.bg-emerald-100")).toHaveLength(0);
     expect(screen.getByText(/Use Report official course URL/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Report official course URL" }));
+    expect(onReportOfficialCourse).toHaveBeenCalledOnce();
     expect(screen.queryByText(/Manual investigation/)).toBeNull();
     expect(screen.getByText(/publishing is always manual/)).toBeTruthy();
   });

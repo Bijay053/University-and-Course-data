@@ -147,6 +147,7 @@ export function AiRepairProgress({
   currentAttempt,
   maxAttempts = 5,
   onOpenVerificationJob,
+  onReportOfficialCourse,
   audienceEvidence,
   audienceProposals,
   audienceReviews,
@@ -156,6 +157,7 @@ export function AiRepairProgress({
   currentAttempt: number;
   maxAttempts?: number;
   onOpenVerificationJob?: (jobId: string) => void;
+  onReportOfficialCourse?: () => void;
   audienceEvidence?: AudienceEvidence[];
   audienceProposals?: AudienceProposal[];
   audienceReviews?: Array<{ url?: string; title?: string; evidence: AudienceEvidence; proposal: AudienceProposal }>;
@@ -456,6 +458,15 @@ export function AiRepairProgress({
             ? "No course was changed. Use Report official course URL so the system can verify and retry the exact page."
             : autonomous.reason ?? "Config saved. Waiting for the automatic verification scrape; this is not verified yet."}
         </p>
+      )}
+      {needsCoursePage && onReportOfficialCourse && (
+        <button
+          type="button"
+          onClick={onReportOfficialCourse}
+          className="rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"
+        >
+          Report official course URL
+        </button>
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2">

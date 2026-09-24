@@ -51,7 +51,7 @@ function jsonResponse(body: unknown): Response {
   });
 }
 
-async function renderCompletedCard(errors: number): Promise<HTMLElement> {
+async function renderCompletedCard(errors: number, diagnosis?: unknown): Promise<HTMLElement> {
   sessionStorage.setItem("scrape_slot_1_jobId", "job-complete");
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
@@ -69,6 +69,8 @@ async function renderCompletedCard(errors: number): Promise<HTMLElement> {
       });
     }
     if (url === "/api/scrape/staged/job-complete") return jsonResponse([]);
+    if (url === "/api/scrape/jobs/job-complete/diagnose" && diagnosis) return jsonResponse(diagnosis);
+    if (url.includes("/ai-repair-status")) return jsonResponse({ status: "not_started" });
     return jsonResponse({});
   }));
 
@@ -85,6 +87,27 @@ async function renderCompletedCard(errors: number): Promise<HTMLElement> {
     return card as HTMLElement;
   });
 }
+
+it("turns a selector recommendation into a course report action", async () => {
+  await renderCompletedCard(1, {
+    ok: true, job_id: "job-complete", university_id: 7,
+    diagnosis: {
+      summary: "Course locations are missing.",
+      root_causes: [],
+      recommended_actions: [{
+        action: "Check the missing location rule",
+        detail: "Adjust the location field selector in the Recipe Editor.",
+        auto_fixable: false, fix_type: "recipe_fix",
+      }],
+      discovery_verdict: "ok", location_verdict: "missing",
+    },
+  });
+  await userEvent.click(screen.getByRole("button", { name: /AI Scrape Diagnostics/ }));
+  const reportAction = await screen.findByRole("button", { name: "Report official course URL" });
+  expect(screen.queryByText(/location field selector/)).toBeNull();
+  await userEvent.click(reportAction);
+  expect(await screen.findByTestId("input-report-urls")).toBeTruthy();
+});
 
 async function renderFailedFilterCollapseCard(): Promise<void> {
   sessionStorage.setItem("scrape_slot_1_jobId", "job-filter-collapse");

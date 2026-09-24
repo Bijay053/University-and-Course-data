@@ -7125,6 +7125,11 @@ LIVE COURSE PAGE PROBE RESULTS (httpx fetch of {_course_probe.get("probed", 0)} 
 {_probe_summary_text}
 
 Diagnose the scraping failure in plain English for a non-technical admin.
+Recommended actions are for a non-developer: never instruct them to edit
+selectors, regexes, YAML, code, or Recipe Editor settings. If a safe patch is
+available, the automatic repair flow can validate it separately. If the page
+evidence is insufficient, ask for an exact official course URL through the
+course report so the system can verify and retry. Do not claim a fix was made.
 
 URL FILTER KILL PATTERN — highest priority diagnosis rule:
 Read the PIPELINE COUNTS block above carefully before writing any diagnosis.

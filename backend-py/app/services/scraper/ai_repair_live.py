@@ -641,9 +641,10 @@ class LiveRepairEvidence:
             return self.audit()
         # Reserve half the entire session budget for fresh, pre-apply validation.
         limit = min(6, self.max_pages // 2)
+        course_candidates = (self.ctx.get("repair_course_url_sample") or [])[:3]
+        passed = (self.ctx.get("passed_sample") or [])[:2]
         pending = list(dict.fromkeys(
-            [self.ctx["scrape_url"]] + (self.ctx.get("passed_sample") or [])[:2]
-            + (self.ctx.get("repair_course_url_sample") or [])
+            [self.ctx["scrape_url"]] + course_candidates + passed
             + (self.ctx.get("repair_url_sample") or self.ctx.get("dropped_sample") or [])
         ))
         while pending and len(self.initial) < limit:
@@ -657,10 +658,10 @@ class LiveRepairEvidence:
                 candidate = urljoin(url, link["url"])
                 if candidate not in self.initial and candidate not in pending:
                     linked.append(candidate)
-            # Official catalogue links are fresher evidence than a long stale
-            # dropped-URL list. Still inspect two currently-passing candidates
-            # so contamination cannot hide behind a low historical drop rate.
-            index = min(2, len(pending)) if url == self.ctx["scrape_url"] else 0
+            # Root navigation must not consume the six-page budget before
+            # known course candidates and passing samples get live checked.
+            # After those seeds, fresh catalogue links beat stale dropped URLs.
+            index = min(len(course_candidates) + len(passed), len(pending)) if url == self.ctx["scrape_url"] else 0
             pending[index:index] = linked
         return self.audit()
 

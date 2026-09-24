@@ -15,6 +15,12 @@ Provider access failures need an in-app discovery repair action, not only a repo
 
 **How to apply:** Any blocked or zero-course recovery state should explain that no course was changed, open the official-course-URL form directly, and preserve all server-side eligibility and online-only safeguards. An exact endpoint-validated official course URL must survive stale catalogue discovery filters, but it must still pass global non-degree and staging guards. Show “staged” only for persisted staged rows, and keep retry available until the reported URL actually produces one.
 
+Bounded live checks must give known course-page candidates a turn before following catalogue navigation links.
+
+**Why:** A six-page check exhausted its budget on listings, reported zero course pages, and sent an operator toward selector editing despite having course-page candidates in its evidence set.
+
+**How to apply:** Preserve the catalogue root for discovery evidence, then check known course candidates and current passing samples before spending the remaining budget on links or historical dropped URLs. A zero-course result still fails closed and must offer the official-URL report in the app, not a developer instruction.
+
 Requirement recovery must work through the normal app for both existing records and new scrapes, not depend on one-off repair scripts. Qualification-based admission is a valid alternative to a numeric score only when backed by deterministic official-source evidence; missing IELTS bands remain unresolved.
 
 **Why:** Overall IELTS and generic admission prose previously concealed unresolved requirements. Real extractor evidence must be tested end to end: fabricated test method names can pass while actual extraction provenance is rejected.

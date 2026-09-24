@@ -428,7 +428,7 @@ export function activeRepairFromStartConflict(payload: unknown): ActiveRepairRef
 
 // ── AI Diagnostic types ───────────────────────────────────────────────────────
 type DiagnoseRootCause = { issue: string; explanation: string; severity: "high" | "medium" | "low" };
-type DiagnoseAction    = { action: string; detail: string; auto_fixable: boolean; fix_type?: "config" | "platform_bug" };
+type DiagnoseAction    = { action: string; detail: string; auto_fixable: boolean; fix_type?: "config" | "recipe_fix" | "platform_bug" };
 type DiagnosisPayload  = {
   summary: string;
   root_causes: DiagnoseRootCause[];
@@ -804,6 +804,13 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
   const [aiRepairLoading, setAiRepairLoading] = useState(false);
   const [aiRepairPolling, setAiRepairPolling] = useState(false);
   const [courseReportOpenRequest, setCourseReportOpenRequest] = useState(0);
+  const openOfficialCourseReport = () => {
+    setCourseReportOpenRequest(value => value + 1);
+    requestAnimationFrame(() => {
+      document.getElementById(`course-report-${slotIndex}`)
+        ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    });
+  };
   const [aiRepairJobId, setAiRepairJobId] = useState<string | null>(null);
   const [showAiRepairLog, setShowAiRepairLog] = useState(false);
   const aiRepairRequestRef = useRef(0);
@@ -2615,6 +2622,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                     maxAttempts={aiRepairSession.max_attempts}
                     audienceReviews={aiRepairSession.audience_reviews}
                     onOpenVerificationJob={jobId => onReviewReady(jobId, uniName, true)}
+                    onReportOfficialCourse={openOfficialCourseReport}
                   />
                 )}
               </div>
@@ -2671,6 +2679,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                     maxAttempts={aiRepairSession.max_attempts}
                     audienceReviews={aiRepairSession.audience_reviews}
                     onOpenVerificationJob={jobId => onReviewReady(jobId, uniName, true)}
+                    onReportOfficialCourse={openOfficialCourseReport}
                   />
                 )}
               </div>
@@ -2778,6 +2787,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                               maxAttempts={aiRepairSession.max_attempts}
                               audienceReviews={aiRepairSession.audience_reviews}
                               onOpenVerificationJob={jobId => onReviewReady(jobId, uniName, true)}
+                              onReportOfficialCourse={openOfficialCourseReport}
                             />
                           )}
                           {!aiRepairSession?.autonomous && aiRepairSession?.status === "completed" && aiRepairSession.final_verdict && (() => {
@@ -3855,6 +3865,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                               <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Recommended Actions</p>
                               {d.recommended_actions.map((a, i) => {
                                 const isPlatformBug = a.fix_type === "platform_bug";
+                                const requiresDeveloper = isPlatformBug || /recipe editor|field selector|css\/xpath|regex|yaml|configur(?:e|ation)|scrape logs/i.test(`${a.action} ${a.detail}`);
                                 return (
                                   <div key={i} className={`flex items-start gap-2 text-[10px] px-2 py-1.5 rounded border ${isPlatformBug ? "bg-slate-50 border-slate-200" : "bg-gray-50 border-gray-100"}`}>
                                     <div className={`shrink-0 mt-0.5 ${isPlatformBug ? "text-slate-400" : a.auto_fixable ? "text-green-500" : "text-gray-400"}`}>
@@ -3862,15 +3873,21 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                                     </div>
                                     <div className="flex-1 min-w-0">
                                       <div className="font-semibold text-gray-700 mb-0.5 flex items-center gap-1">
-                                        {a.action}
-                                        {isPlatformBug && (
-                                          <span className="text-[9px] bg-slate-200 text-slate-600 px-1 py-0.5 rounded">Developer fix required</span>
-                                        )}
-                                        {!isPlatformBug && a.auto_fixable && (
+                                        {requiresDeveloper ? "Provide an official course page" : a.action}
+                                        {!requiresDeveloper && a.auto_fixable && (
                                           <span className="text-[9px] bg-green-100 text-green-700 px-1 py-0.5 rounded">config fix</span>
                                         )}
                                       </div>
-                                      <div className="text-gray-500 leading-relaxed">{a.detail}</div>
+                                      <div className="text-gray-500 leading-relaxed">
+                                        {requiresDeveloper
+                                          ? "Submit the exact official course page so the system can check it and retry. No settings changes are needed."
+                                          : a.detail}
+                                      </div>
+                                      {requiresDeveloper && (
+                                        <button type="button" onClick={openOfficialCourseReport} className="mt-1 font-semibold text-violet-700 underline">
+                                          Report official course URL
+                                        </button>
+                                      )}
                                     </div>
                                   </div>
                                 );
@@ -3949,7 +3966,9 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                             </button>
                             <button
                               type="button"
-                              onClick={handleAiRepair}
+                              onClick={aiRepairSession?.autonomous?.phase === "blocked"
+                                && (aiRepairSession.live_probe?.course_pages ?? 0) === 0
+                                ? openOfficialCourseReport : handleAiRepair}
                               disabled={aiRepairLoading || aiRepairPolling}
                               title="Tests bounded repairs against official live sources, saves only validated config, and runs one automatic verification scrape."
                               className="text-[10px] bg-violet-600 hover:bg-violet-700 text-white px-2 py-1 rounded flex items-center gap-1 disabled:opacity-50 font-semibold"
@@ -3960,7 +3979,9 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                               }
                               {aiRepairPolling
                                 ? `One-click AI repair… (attempt ${aiRepairSession?.current_attempt ?? 0}/${aiRepairSession?.max_attempts ?? aiRepairSession?.autonomous?.limits?.max_attempts ?? 5})`
-                                : "One-click AI repair"}
+                                : aiRepairSession?.autonomous?.phase === "blocked"
+                                  && (aiRepairSession.live_probe?.course_pages ?? 0) === 0
+                                  ? "Report official course URL" : "One-click AI repair"}
                             </button>
                             {(diagnoseResult?.university_id || (selectedUni && selectedUni !== ALL)) && (
                               <a
@@ -3980,6 +4001,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, onReviewReady, 
                               maxAttempts={aiRepairSession.max_attempts}
                               audienceReviews={aiRepairSession.audience_reviews}
                               onOpenVerificationJob={jobId => onReviewReady(jobId, uniName, true)}
+                              onReportOfficialCourse={openOfficialCourseReport}
                             />
                           )}
 

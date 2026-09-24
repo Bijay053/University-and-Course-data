@@ -54,6 +54,29 @@ def context(**overrides):
     }
 
 
+@pytest.mark.asyncio
+async def test_live_probe_checks_known_course_before_listing_links():
+    ctx = context(repair_course_url_sample=[ONE], passed_sample=[TWO],
+                  repair_url_sample=[PARTNER])
+    evidence = live.LiveRepairEvidence(ctx)
+    visited = []
+
+    async def fetch(url):
+        visited.append(url)
+        evidence.pages_checked += 1
+        record = {
+            "url": url, "classification": "course" if url == ONE else "listing",
+            "links": [{"url": PARTNER}] if url == SEED else [],
+        }
+        evidence.records.append(record)
+        return record
+
+    evidence.fetch = fetch
+    result = await evidence.probe()
+    assert visited[:3] == [SEED, ONE, TWO]
+    assert result["course_pages"] == 1
+
+
 @pytest.mark.parametrize("title", ["Bachelor of Laws", "Business", "MSc Clinical Practice"])
 def test_legitimate_degree_survives_title_and_cpd_path(title):
     result = live.inspect_page("https://university.example/cpd/clinical-practice", course(title), config())
