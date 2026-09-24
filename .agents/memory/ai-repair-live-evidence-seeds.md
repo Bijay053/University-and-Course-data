@@ -14,3 +14,9 @@ Repair diagnosis must distinguish URL-filter loss from later staging rejection, 
 **Why:** A high field fill rate concealed critically invalid tuition values, while a low staged count was incorrectly blamed on URL filtering even though nearly all URLs passed that filter.
 
 **How to apply:** Never substitute imported/staged counts for post-filter counts in legacy evidence. Include critical-quality issues and affected URLs in repair assessment; populated invalid values cannot justify a healthy no-change result. Keep safe filter-tightening proposals subject to validation rather than suppressing all URL changes.
+
+Bounded live probes must preserve staged seed priority across every fetched page, not just the homepage, and must not demand rescue of intentionally excluded variants.
+
+**Why:** ULaw related links displaced remaining staged seeds with online variants. Recognizing those pages as courses then incorrectly demanded discovery changes to admit them; a filtered funding page also kept repair unaccepted.
+
+**How to apply:** Reuse proven intentional exclusions for probe targets and positive evidence. Unknown admitted pages still need review; unknown pages already rejected by effective filters do not independently justify relaxing discovery. Course recognition is not eligibility approval.

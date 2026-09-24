@@ -826,7 +826,10 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
   };
   const [aiRepairJobId, setAiRepairJobId] = useState<string | null>(null);
   const [showAiRepairLog, setShowAiRepairLog] = useState(false);
+  const [aiRepairViewKind, setAiRepairViewKind] = useState<"saved" | "live" | null>(null);
   const aiRepairRequestRef = useRef(0);
+  const liveAiRepairSessionIdRef = useRef<string | null>(null);
+  const repairJobIdentityRef = useRef<string | null>(null);
   const aiRepairAutoRetryArmedRef = useRef(false);
   const repairJobId = repairJobIdForTerminalState(
     completedJobId,
@@ -963,6 +966,9 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
     setAiRepairRuns([]);
     setSelectedAiRepairRunId(null);
     setShowAiRepairLog(false);
+    setAiRepairViewKind(null);
+    liveAiRepairSessionIdRef.current = null;
+    repairJobIdentityRef.current = null;
     setCategoryDiagnostics(null);
     setApiDiscJobId(null);
     setApiDiscStatus("idle");
@@ -1173,6 +1179,22 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
     }
   }, [phase, urlFilterWarning, completedJobId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // A card can be reused for a different history job. Do not leave repair
+  // evidence from the previous job visible while the new job hydrates.
+  useEffect(() => {
+    if (repairJobIdentityRef.current === completedJobId) return;
+    repairJobIdentityRef.current = completedJobId;
+    ++aiRepairRequestRef.current;
+    liveAiRepairSessionIdRef.current = null;
+    setAiRepairPolling(false);
+    setAiRepairSession(null);
+    setAiRepairRuns([]);
+    setSelectedAiRepairRunId(null);
+    setAiRepairJobId(null);
+    setShowAiRepairLog(false);
+    setAiRepairViewKind(null);
+  }, [completedJobId]);
+
   // Poll AI repair session status every 2.5 s while the loop is running
   useEffect(() => {
     const statusJobId = aiRepairJobId ?? completedJobId;
@@ -1188,9 +1210,18 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
           const data = await readResponseJson<AIRepairSession>(res);
           if (data && requestId === aiRepairRequestRef.current) {
             const runs = data.runs ?? [data];
+            const liveSessionId = liveAiRepairSessionIdRef.current;
+            // A status response can have been produced before a just-started
+            // retry was committed. Never let that older payload replace the
+            // new session selected from the POST response.
+            if (liveSessionId && !runs.some(run => run.session_id === liveSessionId)) {
+              return;
+            }
             setAiRepairRuns(runs);
             setSelectedAiRepairRunId(current =>
-              current && runs.some(run => run.session_id === current) ? current : data.session_id
+              liveSessionId && runs.some(run => run.session_id === liveSessionId)
+                ? liveSessionId
+                : current && runs.some(run => run.session_id === current) ? current : data.session_id
             );
             const autonomousPhase = data.autonomous?.phase;
             const autonomousActive = data.autonomous?.enabled && (
@@ -1248,7 +1279,11 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
               || data.autonomous.discovery_repair?.status === "running"
            );
            if (autonomousActive || data.status === "queued" || data.status === "starting" || data.status === "running") {
+            liveAiRepairSessionIdRef.current = data.session_id;
+            setAiRepairViewKind("live");
             setAiRepairPolling(true);
+           } else {
+            setAiRepairViewKind("saved");
           }
         }
       })
@@ -1363,7 +1398,23 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
 
   const handleAiRepair = useCallback(async () => {
     if (!repairJobId) return;
+    const previousSession = aiRepairSession;
+    const previousSelection = selectedAiRepairRunId;
+    const previousViewKind = aiRepairViewKind;
+    const previousLiveSessionId = liveAiRepairSessionIdRef.current;
+    const restorePreviousResult = () => {
+      liveAiRepairSessionIdRef.current = previousLiveSessionId;
+      setAiRepairSession(previousSession);
+      setSelectedAiRepairRunId(previousSelection);
+      setAiRepairViewKind(previousViewKind);
+    };
     ++aiRepairRequestRef.current;
+    // The existing terminal panel is saved evidence, not progress for this
+    // click. Clear it immediately and wait for the server-created session.
+    liveAiRepairSessionIdRef.current = null;
+    setSelectedAiRepairRunId(null);
+    setAiRepairSession(null);
+    setAiRepairViewKind("live");
     setAiRepairLoading(true);
     setShowAiRepairLog(true);
     try {
@@ -1380,6 +1431,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
         }>(res);
         const activeRepair = res.status === 409 ? activeRepairFromStartConflict(errorData) : null;
         if (activeRepair) {
+          liveAiRepairSessionIdRef.current = activeRepair.sessionId;
           setAiRepairJobId(activeRepair.jobId);
           setSelectedAiRepairRunId(activeRepair.sessionId);
           setAiRepairPolling(true);
@@ -1390,6 +1442,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
           return;
         }
         const msg = typeof errorData?.detail === "string" ? errorData.detail : `Error ${res.status}`;
+        restorePreviousResult();
         toast({ title: "Automatic repair failed to start", description: msg, variant: "destructive" });
         return;
       }
@@ -1404,6 +1457,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
         // Retain the legacy manual repair follow-up. The autonomous contract
         // supersedes this and owns its single verification scrape.
         aiRepairAutoRetryArmedRef.current = !data.autonomous?.enabled;
+        liveAiRepairSessionIdRef.current = data.session_id;
         setAiRepairJobId(data.job_id || repairJobId);
         const queuedSession: AIRepairSession = {
           current_attempt: 0,
@@ -1424,11 +1478,12 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
         setAiRepairPolling(true);
       }
     } catch (e) {
+      restorePreviousResult();
       toast({ title: "AI Repair error", description: String(e), variant: "destructive" });
     } finally {
       setAiRepairLoading(false);
     }
-  }, [repairJobId, toast]);
+  }, [aiRepairSession, aiRepairViewKind, repairJobId, selectedAiRepairRunId, toast]);
 
   const applyFix = useCallback(async (
     jobId: string,
@@ -4028,6 +4083,13 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
                             />
                           )}
 
+                           {aiRepairLoading && !aiRepairSession && (
+                             <div className="mt-2 flex items-center gap-1.5 rounded border border-violet-200 bg-violet-50 px-2.5 py-2 text-[10px] text-violet-700">
+                               <Loader2 className="h-3 w-3 animate-spin" />
+                               Starting a new repair session…
+                             </div>
+                           )}
+
                           {/* ── AI Repair Log ─────────────────────────────── */}
                           {aiRepairSession && aiRepairSession.status !== "not_started" && showAiRepairLog && (
                             <div className="mt-2 rounded border border-violet-200 overflow-hidden">
@@ -4038,7 +4100,16 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
                               >
                                 <div className="flex items-center gap-1.5">
                                   <Zap className="w-3 h-3 text-violet-600" />
-                                  <span className="text-[10px] font-semibold text-violet-800">AI Repair Agent Log</span>
+                                   <span className="text-[10px] font-semibold text-violet-800">
+                                     {aiRepairViewKind === "saved"
+                                       && (aiRepairSession.status === "completed" || aiRepairSession.status === "failed")
+                                       ? `Saved repair result · ${
+                                           aiRepairSession.completed_at || aiRepairSession.started_at
+                                             ? new Date(aiRepairSession.completed_at ?? aiRepairSession.started_at!).toLocaleString()
+                                             : "timestamp unavailable"
+                                         }`
+                                       : "AI Repair Agent Log"}
+                                   </span>
                                   {aiRepairPolling && <Loader2 className="w-2.5 h-2.5 animate-spin text-violet-400" />}
                                   {aiRepairSession.status === "completed" && aiRepairSession.autonomous?.phase === "verified" && (
                                     <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">Sample verified</span>
@@ -4061,7 +4132,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
                                       </span>
                                     );
                                   })()}
-                                  {(aiRepairSession.status === "queued" || aiRepairSession.status === "running") && (
+                                   {(aiRepairSession.status === "queued" || aiRepairSession.status === "starting" || aiRepairSession.status === "running") && (
                                     <span className="text-[9px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-full">Running</span>
                                   )}
                                 </div>
@@ -4078,7 +4149,11 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
                                       aria-label="Compare repair runs"
                                       value={selectedAiRepairRunId ?? aiRepairSession.session_id}
                                       onChange={(event) => {
-                                        setSelectedAiRepairRunId(event.target.value);
+                                         const sessionId = event.target.value;
+                                         setSelectedAiRepairRunId(sessionId);
+                                         setAiRepairViewKind(
+                                           sessionId === liveAiRepairSessionIdRef.current ? "live" : "saved"
+                                         );
                                       }}
                                       disabled={aiRepairPolling}
                                       className="max-w-[240px] rounded border border-violet-200 bg-white px-1.5 py-1 text-[9px] text-gray-700 disabled:opacity-60"
@@ -4092,10 +4167,12 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
                                   </label>
                                 )}
                                 {/* Status + verdict */}
-                                {(aiRepairSession.status === "queued") && (
+                                 {(aiRepairSession.status === "queued" || aiRepairSession.status === "starting") && (
                                   <div className="flex items-center gap-1.5 text-[10px] text-violet-600">
                                     <Loader2 className="w-3 h-3 animate-spin" />
-                                    AI repair agent is queued — waiting for a Celery worker…
+                                     {aiRepairSession.status === "queued"
+                                       ? "AI repair agent is queued — waiting for a Celery worker…"
+                                       : "AI repair agent is starting…"}
                                   </div>
                                 )}
                                 {aiRepairSession.status === "running" && (

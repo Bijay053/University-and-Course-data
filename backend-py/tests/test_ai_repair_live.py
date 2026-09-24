@@ -438,6 +438,73 @@ def test_preserve_known_courses_and_remove_contamination_not_raw_count():
     assert any("lose known valid" in reason for reason in bad["reasons"])
 
 
+LAW_CAMPUS = "https://www.law.ac.uk/study/postgraduate/law/ma-law/"
+LAW_ONLINE = LAW_CAMPUS + "online/"
+LAW_FUNDING = "https://www.law.ac.uk/study/postgraduate/course-fees-and-funding/"
+LAW_FILTERS = {"allow_url_patterns": [r"/study/(?:undergraduate|postgraduate)/[^/]+/[^/]+/?$"]}
+
+
+def test_intentional_variants_and_already_filtered_unknown_do_not_require_rescue():
+    evidence = live.LiveRepairEvidence(context(
+        effective_discovery=LAW_FILTERS, passed_sample=[LAW_ONLINE, LAW_FUNDING],
+    ))
+    evidence.initial = {
+        LAW_CAMPUS: {"classification": "course"},
+        LAW_ONLINE: {"classification": "course"},
+        LAW_FUNDING: {"classification": "unconfirmed"},
+    }
+    assert not evidence.discovery_needed(LAW_FILTERS)
+    report = evidence.discovery_validation(LAW_FILTERS, {})
+    assert report["accepted"]
+    assert report["courses"] == [LAW_CAMPUS]
+    assert not live.passes(LAW_ONLINE, {})
+    # A configured gate is not by itself evidence of intentional exclusion.
+    assert evidence.discovery_needed({"allow_url_patterns": ["/broken/"]})
+    assert evidence.discovery_needed({})
+
+
+def test_excluded_variant_alone_is_not_positive_eligible_evidence():
+    evidence = live.LiveRepairEvidence(context(effective_discovery={}))
+    evidence.initial = {LAW_ONLINE: {"classification": "course"}}
+    assert evidence.discovery_needed({})
+    assert not evidence.discovery_validation({}, {})["accepted"]
+
+
+@pytest.mark.asyncio
+async def test_probe_keeps_all_known_seeds_ahead_of_course_child_links():
+    evidence = live.LiveRepairEvidence(context(
+        repair_course_url_sample=[LAW_CAMPUS, ONE, TWO],
+        passed_sample=[LAW_ONLINE], effective_discovery={},
+    ))
+    visited = []
+
+    async def fetch(url):
+        visited.append(url)
+        record = {
+            "url": url, "classification": "course",
+            "links": [{"url": LAW_ONLINE}, {"url": PARTNER}],
+        }
+        evidence.records.append(record)
+        return record
+
+    evidence.fetch = fetch
+    await evidence.probe()
+    assert visited[:4] == [SEED, LAW_CAMPUS, ONE, TWO]
+    assert LAW_ONLINE not in visited
+
+
+@pytest.mark.asyncio
+async def test_snapshot_cannot_make_excluded_variant_an_eligible_validation_target():
+    evidence = live.LiveRepairEvidence(context(effective_discovery={}))
+    evidence.initial = {LAW_CAMPUS: {"classification": "course"}}
+    evidence.fetch = AsyncMock()
+    result = await evidence.validate({}, {}, {}, {
+        "reports": [{"samples": [{"url": LAW_ONLINE}]}],
+    })
+    assert not result["accepted"]
+    evidence.fetch.assert_not_awaited()
+
+
 @pytest.mark.asyncio
 async def test_live_recheck_failure_blocks_apply_evidence(monkeypatch):
     evidence = live.LiveRepairEvidence(context())

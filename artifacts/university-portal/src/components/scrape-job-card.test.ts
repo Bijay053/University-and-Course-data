@@ -187,6 +187,95 @@ it("lets a blocked historical repair run retry with current checks", async () =>
   });
 });
 
+it("labels hydrated terminal evidence as a saved result with its timestamp", async () => {
+  await renderCompletedCard(1, {
+    ok: true, job_id: "job-complete", university_id: 7,
+    diagnosis: { summary: "Course locations are missing.", root_causes: [], recommended_actions: [] },
+  }, {
+    session_id: "saved-run", job_id: "job-complete", status: "failed",
+    attempts: [], current_attempt: 0,
+    started_at: "2024-09-24T12:55:00.000Z",
+    completed_at: "2024-09-24T13:01:00.000Z",
+    error: "The saved repair failed.",
+  });
+
+  await userEvent.click(screen.getByRole("button", { name: /AI Scrape Diagnostics/ }));
+
+  expect(await screen.findByText(/Saved repair result · .*2024/)).toBeTruthy();
+  expect(screen.getAllByText("The saved repair failed.").length).toBeGreaterThan(0);
+});
+
+it("keeps a newly returned retry selected when older hydration finishes later", async () => {
+  sessionStorage.setItem("scrape_slot_12_jobId", "job-race");
+  let resolveHydration!: (response: Response) => void;
+  const hydration = new Promise<Response>(resolve => { resolveHydration = resolve; });
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.startsWith("/api/scrape/status/job-race")) {
+      return jsonResponse({
+        status: "completed",
+        universityId: 7,
+        universityName: "Test University",
+        totalFound: 10,
+        imported: 9,
+        skipped: 0,
+        errors: 1,
+        current: 10,
+        logs: [],
+      });
+    }
+    if (url === "/api/scrape/staged/job-race") return jsonResponse([]);
+    if (url === "/api/scrape/jobs/job-race/diagnose") {
+      return jsonResponse({
+        ok: true,
+        job_id: "job-race",
+        university_id: 7,
+        diagnosis: { summary: "One extraction failed.", root_causes: [], recommended_actions: [] },
+      });
+    }
+    if (url === "/api/scrape/jobs/job-race/ai-repair-status") return hydration;
+    if (url === "/api/scrape/jobs/job-race/ai-repair" && init?.method === "POST") {
+      return jsonResponse({
+        session_id: "new-retry",
+        job_id: "job-race",
+        status: "queued",
+        attempts: [],
+        current_attempt: 0,
+        started_at: "2024-09-25T09:00:00.000Z",
+      });
+    }
+    return jsonResponse({});
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(React.createElement(ScrapeJobCard, {
+    slotId: 12,
+    slotIndex: 0,
+    universities: [{ id: 7, name: "Test University" }],
+    onReviewReady: () => undefined,
+  }));
+
+  await userEvent.click(await screen.findByRole("button", { name: /AI Scrape Diagnostics/ }));
+  await userEvent.click(await screen.findByRole("button", { name: "One-click AI repair" }));
+
+  expect(await screen.findByText(/AI repair agent is queued/)).toBeTruthy();
+  resolveHydration(jsonResponse({
+    session_id: "old-failed",
+    job_id: "job-race",
+    status: "failed",
+    attempts: [],
+    current_attempt: 3,
+    started_at: "2024-09-24T12:55:00.000Z",
+    completed_at: "2024-09-24T13:01:00.000Z",
+    error: "Old failure must not replace the retry.",
+  }));
+
+  await waitFor(() => {
+    expect(screen.getByText(/AI repair agent is queued/)).toBeTruthy();
+    expect(screen.queryByText(/Old failure must not replace/)).toBeNull();
+  });
+});
+
 async function renderFailedFilterCollapseCard(): Promise<void> {
   sessionStorage.setItem("scrape_slot_1_jobId", "job-filter-collapse");
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {

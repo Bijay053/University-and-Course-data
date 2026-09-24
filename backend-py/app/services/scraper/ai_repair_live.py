@@ -15,6 +15,7 @@ from urllib.parse import urldefrag, urljoin, urlsplit
 import httpx
 
 from app.services.scraper.config.context import current_uni_config
+from app.services.scraper.auto_repair_candidates import is_intentionally_excluded_course_url
 from app.services.scraper.guards import (
     OBVIOUS_NON_DEGREE,
     _sanitized_visible_document,
@@ -543,6 +544,8 @@ def inspect_page(url: str, html: str, config=None) -> dict:
 
 def passes(url: str, discovery: dict) -> bool:
     """All effective configurable URL gates; no raw-count success heuristic."""
+    if is_intentionally_excluded_course_url(url):
+        return False
     for key in ("allow_url_patterns", "course_detail_url_patterns"):
         patterns = discovery.get(key) or []
         if patterns and not any(re.search(p, url, re.I) for p in patterns):
@@ -648,27 +651,35 @@ class LiveRepairEvidence:
             return self.audit()
         # Reserve half the entire session budget for fresh, pre-apply validation.
         limit = min(6, self.max_pages // 2)
-        course_candidates = (self.ctx.get("repair_course_url_sample") or [])[:3]
-        passed = (self.ctx.get("passed_sample") or [])[:2]
+        course_candidates = [
+            url for url in self.ctx.get("repair_course_url_sample") or []
+            if not is_intentionally_excluded_course_url(url)
+        ][:3]
+        passed = [
+            url for url in self.ctx.get("passed_sample") or []
+            if not is_intentionally_excluded_course_url(url)
+        ][:2]
+        seeds = set(course_candidates + passed)
         pending = list(dict.fromkeys(
             [self.ctx["scrape_url"]] + course_candidates + passed
             + (self.ctx.get("repair_url_sample") or self.ctx.get("dropped_sample") or [])
         ))
         while pending and len(self.initial) < limit:
             url = urldefrag(pending.pop(0))[0]
-            if url in self.initial:
+            if url in self.initial or is_intentionally_excluded_course_url(url):
                 continue
             record = await self.fetch(url)
             self.initial[url] = record
             linked = []
             for link in record.get("links") or []:
                 candidate = urljoin(url, link["url"])
-                if candidate not in self.initial and candidate not in pending:
+                if (candidate not in self.initial and candidate not in pending
+                        and not is_intentionally_excluded_course_url(candidate)):
                     linked.append(candidate)
-            # Root navigation must not consume the six-page budget before
-            # known course candidates and passing samples get live checked.
+            # Neither root navigation nor links from the first course may
+            # consume the budget before the remaining known seeds are checked.
             # After those seeds, fresh catalogue links beat stale dropped URLs.
-            index = min(len(course_candidates) + len(passed), len(pending)) if url == self.ctx["scrape_url"] else 0
+            index = max((i + 1 for i, candidate in enumerate(pending) if candidate in seeds), default=0)
             pending[index:index] = linked
         return self.audit()
 
@@ -693,18 +704,21 @@ class LiveRepairEvidence:
         return (
             bool(self.ctx.get("provider_failure") and not discovery.get("official_catalogue_fallback"))
             or
-            not any(r["classification"] == "course" for r in self.initial.values())
-            or any(r["classification"] == "course" and not passes(url, discovery)
+            not any(r["classification"] == "course" and not is_intentionally_excluded_course_url(url)
+                    for url, r in self.initial.items())
+            or any(r["classification"] == "course" and not is_intentionally_excluded_course_url(url)
+                   and not passes(url, discovery)
                    for url, r in self.initial.items())
             or any(url in known and r["classification"] in _REJECTED and passes(url, discovery)
                    for url, r in self.initial.items())
-            or any(url in known and r["classification"] == "unconfirmed"
+            or any(url in known and r["classification"] == "unconfirmed" and passes(url, discovery)
                    for url, r in self.initial.items())
         )
 
     def discovery_validation(self, before: dict, patch: dict) -> dict:
         after = {**before, **patch}
-        courses = {url for url, r in self.initial.items() if r["classification"] == "course"}
+        courses = {url for url, r in self.initial.items()
+                   if r["classification"] == "course" and not is_intentionally_excluded_course_url(url)}
         rejected = {url for url, r in self.initial.items()
                     if r["classification"] in _REJECTED and url in (self.ctx.get("passed_sample") or [])}
         old = {url for url in courses if passes(url, before)}
@@ -761,6 +775,8 @@ class LiveRepairEvidence:
             required.update(sample["url"] for sample in item.get("samples") or [] if sample.get("url"))
         if not required:
             reasons.append("No live validation targets")
+        if any(is_intentionally_excluded_course_url(url) for url in required):
+            reasons.append("Live validation targets include intentionally excluded course variants")
         checked = {}
         # Do not spend live-page budget on a proposal already rejected by pure
         # filter replay. This leaves the reserved validation slots available
