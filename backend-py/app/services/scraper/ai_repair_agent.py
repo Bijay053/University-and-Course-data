@@ -1851,8 +1851,10 @@ async def _gather_context(job_id: str, db, *, probe_sitemap: bool = True) -> dic
             university_id=uni_id,
             scrape_url=scrape_url,
         )
-        if yaml_path.exists():
-            yaml_files = [yaml_path]
+        # Keep the exact runtime-selected path even when it does not exist.
+        # Re-discovering it by ID or a substring at apply time can patch an
+        # unrelated recipe or create a file that shadows extraction settings.
+        yaml_files = [yaml_path]
 
         effective_cfg = get_config_for_host(
             hostname=hostname,
@@ -2065,7 +2067,7 @@ async def _gather_context(job_id: str, db, *, probe_sitemap: bool = True) -> dic
         "effective_discovery": effective_discovery,
         "effective_config": effective_cfg,
         "provider_failure": provider_failure,
-        "yaml_snapshot": yaml_content if yaml_files else None,
+        "yaml_snapshot": yaml_content if yaml_files and yaml_files[0].exists() else None,
         "yaml_content":    yaml_content[:4000],
         "quality":         quality,
         "unis_dir":        unis_dir,
@@ -2425,30 +2427,34 @@ def _apply_to_yaml(
     import yaml as _yaml
 
     if not yaml_file:
-        candidates = list(unis_dir.glob(f"*_{uni_id}.yaml"))
-        if not candidates:
-            bare = re.sub(r"^www\.", "", re.sub(r"^https?://", "", scrape_url).split("/")[0].lower())
-            if bare:
-                for f in unis_dir.glob("*.yaml"):
-                    try:
-                        if bare in f.read_text(encoding="utf-8")[:600]:
-                            candidates = [f]; break
-                    except Exception:
-                        continue
-        if not candidates:
-            from urllib.parse import urlparse
-            from app.services.scraper.config.loader import _hostname_to_slug
+        from urllib.parse import urlparse
+        from app.services.scraper.config.loader import _hostname_to_slug, _select_uni_yaml
 
-            hostname = urlparse(scrape_url).hostname or "university"
-            yaml_file = unis_dir / f"{_hostname_to_slug(hostname)}_{uni_id}.yaml"
-        else:
-            yaml_file = candidates[0]
+        hostname = urlparse(scrape_url).hostname
+        if not hostname:
+            raise RuntimeError("Cannot save repair without a university hostname.")
+        yaml_file, _ = _select_uni_yaml(
+            slug=_hostname_to_slug(hostname), university_id=uni_id,
+            scrape_url=scrape_url, unis_dir=unis_dir,
+        )
 
     original_text = yaml_file.read_text(encoding="utf-8") if yaml_file.exists() else None
     if expected_text is not ... and original_text != expected_text:
         raise RuntimeError("YAML config changed during validation; no repair was saved.")
     existing_text = original_text or ""
-    existing_config = _yaml.safe_load(existing_text) or {}
+    try:
+        existing_config = _yaml.safe_load(existing_text) or {}
+    except _yaml.YAMLError:
+        # Parser exceptions quote source lines, which may contain provider keys.
+        raise RuntimeError("University YAML is invalid; no repair was saved.") from None
+    if not isinstance(existing_config, dict):
+        raise RuntimeError("University YAML is not a configuration mapping; no repair was saved.")
+    from urllib.parse import urlparse
+    from app.services.scraper.config.loader import _declared_yaml_hostname, _hosts_match
+
+    declared_host = _declared_yaml_hostname(yaml_file) if original_text is not None else None
+    if declared_host and not _hosts_match(urlparse(scrape_url).hostname or "", declared_host):
+        raise RuntimeError("University YAML hostname does not match; no repair was saved.")
     locked_paths = existing_config.get("locked_config_paths") or []
     for locked_path in locked_paths:
         if not isinstance(locked_path, str) or not locked_path:
@@ -2456,7 +2462,10 @@ def _apply_to_yaml(
         node: Any = config_patch
         touched = True
         for part in locked_path.split("."):
-            if not isinstance(node, dict) or part not in node:
+            if not isinstance(node, dict):
+                # Replacing an ancestor also replaces its locked children.
+                break
+            if part not in node:
                 touched = False
                 break
             node = node[part]
@@ -2493,7 +2502,9 @@ def _restore_yaml(
         yaml_file.write_text(original_text, encoding="utf-8")
 
 
-async def _assert_effective_discovery_patch(uni_id: int, disc_patch: dict, db) -> None:
+async def _assert_effective_discovery_patch(
+    uni_id: int, disc_patch: dict, db, *, expected_config: Any = None,
+) -> None:
     """Reload the merged config and prove every approved URL field is effective."""
     from urllib.parse import urlparse
     from sqlalchemy import text
@@ -2517,13 +2528,22 @@ async def _assert_effective_discovery_patch(uni_id: int, disc_patch: dict, db) -
         university_id=uni_id,
         db_scrape_config=row["scrape_config"] or {},
         create_missing_stub=False,
+        strict=True,
     )
+    if expected_config is not None and hasattr(expected_config, "model_dump"):
+        before = expected_config.model_dump(exclude={"discovery"})
+        after = cfg.model_dump(exclude={"discovery"})
+        if before != after:
+            raise RuntimeError(
+                "Effective extraction, eligibility, or identity configuration changed "
+                "during discovery repair; acceptance refused."
+            )
     for field, expected in disc_patch.items():
         actual = getattr(cfg.discovery, field)
         if actual != expected:
             raise RuntimeError(
-                f"Effective config verification failed for discovery.{field}: "
-                f"expected {expected!r}, got {actual!r}"
+                f"Effective config verification failed for discovery.{field}; "
+                "the saved repair is shadowed or invalid."
             )
     if disc_patch.get("official_catalogue_fallback") and cfg.discovery.searchstax is not None:
         raise RuntimeError("The verified discovery strategy did not disable the unavailable course search.")
@@ -3304,6 +3324,7 @@ async def run_ai_repair_loop(
                         ctx["university_id"],
                         disc_patch,
                         db,
+                        expected_config=ctx.get("effective_config"),
                     )
                     patch_applied_ok = True
                     ctx["scrape_config_snapshot"] = db_applied

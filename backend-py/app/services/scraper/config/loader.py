@@ -324,11 +324,13 @@ def _select_uni_yaml(
     slug: str,
     university_id: int | None,
     scrape_url: str,
+    unis_dir: Path | None = None,
 ) -> tuple[Path, bool]:
     """Select a recipe without relying on database IDs being portable."""
-    shared = _UNIS_DIR / f"{slug}.yaml"
+    directory = unis_dir if unis_dir is not None else _UNIS_DIR
+    shared = directory / f"{slug}.yaml"
     exact = (
-        _UNIS_DIR / f"{slug}_{university_id}.yaml"
+        directory / f"{slug}_{university_id}.yaml"
         if university_id is not None
         else None
     )
@@ -343,7 +345,7 @@ def _select_uni_yaml(
                 verified_matches.append(shared)
             verified_matches.extend(
                 path
-                for path in _UNIS_DIR.glob(f"{slug}_*.yaml")
+                for path in directory.glob(f"{slug}_*.yaml")
                 if path != exact
                 and not _is_generated_stub(path)
                 and _hosts_match(scrape_host, _declared_yaml_hostname(path))
@@ -372,7 +374,7 @@ def _select_uni_yaml(
 
     matches = [
         path
-        for path in _UNIS_DIR.glob(f"{slug}_*.yaml")
+        for path in directory.glob(f"{slug}_*.yaml")
         if not _is_generated_stub(path)
         and _hosts_match(scrape_host, _declared_yaml_hostname(path))
     ]
@@ -544,6 +546,7 @@ def load_uni_config(
     university_id: int | None = None,
     db_scrape_config: dict[str, Any] | None = None,
     create_missing_stub: bool = True,
+    strict: bool = False,
 ) -> UniConfig:
     """Build a fully-merged UniConfig for one university.
 
@@ -709,6 +712,12 @@ def load_uni_config(
         if "discovery.official_catalogue_fallback" not in locked_config_values:
             merged.setdefault("discovery", {})["official_catalogue_fallback"] = False
 
+    # Restoring a locked fallback after a stale admin `false` must also restore
+    # the strategy's provider-disable invariant. Merge-time normalization alone
+    # happened before the locks were restored and can leave SearchStax enabled.
+    if merged.get("discovery", {}).get("official_catalogue_fallback") is True:
+        merged["discovery"] = _deep_merge({}, merged["discovery"])
+
     # 5. Inject identity fields (these are not in YAML, they come from the DB row)
     merged.pop("slug", None)
     merged.pop("name", None)
@@ -726,6 +735,8 @@ def load_uni_config(
             **merged,
         )
     except Exception as exc:
+        if strict:
+            raise ValueError("Effective scraper configuration is invalid.") from None
         log.error(
             "Failed to build UniConfig for slug=%r: %s — falling back to bare defaults",
             slug,
@@ -748,6 +759,7 @@ def get_config_for_host(
     university_id: int | None = None,
     db_scrape_config: dict[str, Any] | None = None,
     create_missing_stub: bool = True,
+    strict: bool = False,
 ) -> UniConfig:
     """Convenience wrapper: derive slug from hostname then call ``load_uni_config``."""
     slug = _hostname_to_slug(hostname)
@@ -758,4 +770,5 @@ def get_config_for_host(
         university_id=university_id,
         db_scrape_config=db_scrape_config,
         create_missing_stub=create_missing_stub,
+        strict=strict,
     )

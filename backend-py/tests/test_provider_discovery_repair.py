@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock
 
 import httpx
 import pytest
+import yaml
 
 from app.services.scraper import ai_repair_agent as agent, ai_repair_live as live
 from app.services.scraper.config.schema import DiscoveryConfig
@@ -22,8 +23,8 @@ from app.services.scraper import searchstax_hud
 def repair_context(**kwargs):
     cfg = config()
     cfg.discovery = DiscoveryConfig()
-    return context(effective_config=cfg, effective_discovery={},
-                   provider_failure=access_denied(), **kwargs)
+    return context(**{"effective_config": cfg, "effective_discovery": {},
+                      "provider_failure": access_denied(), **kwargs})
 
 
 def sitemap(urls):
@@ -155,6 +156,168 @@ def test_merged_reload_preserves_existing_leeds_degree_exception():
     assert cfg.extraction.staging.skip_degree_qualifier_check is True
 
 
+@pytest.mark.parametrize("university_id", [89, 2220])
+def test_saved_leeds_recipe_overrides_stale_provider_and_source(university_id):
+    stale = {"discovery": {
+        "official_catalogue_fallback": False, "sitemap_url": "https://obsolete.example/sitemap.xml",
+        "searchstax": {"endpoint": "https://provider.example/search", "links_only": True},
+    }}
+    cfg = get_config_for_host(
+        hostname="www.leedstrinity.ac.uk", name="Leeds Trinity University",
+        scrape_url="https://www.leedstrinity.ac.uk/courses/", university_id=university_id,
+        db_scrape_config={"auto_config": stale, "admin_config": stale},
+        create_missing_stub=False, strict=True,
+    )
+    assert cfg.discovery.official_catalogue_fallback is True
+    assert cfg.discovery.sitemap_url == "https://www.leedstrinity.ac.uk/sitemap.xml"
+    assert cfg.discovery.searchstax is None
+    assert cfg.extraction.staging.skip_degree_qualifier_check is True
+    assert cfg.extraction.fees.default_currency == "GBP"
+
+
+class PersistentConfigDb(FakeDb):
+    """Minimal transactional config store; reload queries observe actual writes."""
+    async def execute(self, statement, params):
+        if str(statement).startswith("UPDATE"):
+            expected = json.loads(params["expected"])
+            matches = expected == self.cfg
+            if matches:
+                self.cfg = json.loads(params["cfg"])
+                self.writes.append(params)
+            return SimpleNamespace(rowcount=int(matches))
+        return SimpleNamespace(mappings=lambda: SimpleNamespace(first=lambda: {
+            "name": "University", "scrape_url": SEED, "scrape_config": self.cfg,
+        }))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("recipe_kind", ["shared", "id", "generated_shadow"])
+async def test_validated_repair_is_saved_and_fresh_runtime_reloads_it(monkeypatch, tmp_path, recipe_kind):
+    from app.services.scraper.config import loader
+    monkeypatch.setattr(loader, "_UNIS_DIR", tmp_path)
+    monkeypatch.setattr(loader, "_RUNTIME_UNIS_DIR", tmp_path / "runtime")
+    baseline = {
+        "hostname_guard": "university.example",
+        "discovery": {"searchstax": {"endpoint": "https://provider.example/search", "links_only": True}},
+        "extraction": {"staging": {"skip_degree_qualifier_check": True}},
+    }
+    shared = tmp_path / "university.yaml"
+    shared.write_text(yaml.safe_dump(baseline))
+    path = tmp_path / "university_1.yaml" if recipe_kind == "id" else shared
+    if recipe_kind == "id":
+        path.write_text(yaml.safe_dump(baseline))
+    if recipe_kind == "generated_shadow":
+        from tests.test_config_yaml_portability import _generated_stub
+        (tmp_path / "university_1.yaml").write_text(_generated_stub(
+            "# Hostname: university.example\nextraction:\n  fees:\n    default_currency: GBP\n"
+        ))
+    db = PersistentConfigDb(cfg={"auto_config": {"discovery": baseline["discovery"]},
+                                 "admin_config": {"discovery": baseline["discovery"]}})
+    def reload():
+        return loader.get_config_for_host(
+            hostname="university.example", name="University", scrape_url=SEED,
+            university_id=1, db_scrape_config=db.cfg, create_missing_stub=False,
+        )
+    before = reload()
+    ctx = repair_context(
+        yaml_file=path, yaml_snapshot=path.read_text(), unis_dir=tmp_path,
+        scrape_config_snapshot=deepcopy(db.cfg), effective_config=before,
+        effective_discovery=before.discovery.model_dump(),
+    )
+    mock_loop(monkeypatch, ctx, {})
+    official_fetch(monkeypatch)
+    result = await agent.run_ai_repair_loop("job-live", db)
+    assert result["status"] == "completed", result.get("error")
+    assert accepted_live_probe(result), result["attempts"]
+    assert yaml.safe_load(path.read_text())["discovery"]["official_catalogue_fallback"]
+    fresh = reload()
+    assert fresh.discovery.searchstax is None
+    assert fresh.discovery.official_catalogue_fallback
+    assert fresh.model_dump(exclude={"discovery"}) == before.model_dump(exclude={"discovery"})
+
+
+def test_yaml_resolution_never_guesses_by_id_or_text_and_preserves_recipe(monkeypatch, tmp_path):
+    from app.services.scraper.config import loader
+    monkeypatch.setattr(loader, "_UNIS_DIR", tmp_path)
+    unrelated = tmp_path / "other_1.yaml"
+    unrelated.write_text("# university.example mentioned, but not this recipe\nextraction: {}\n")
+    original = unrelated.read_text()
+    path, _ = agent._apply_to_yaml(None, tmp_path, 1, SEED,
+                                   {"discovery": {"official_catalogue_fallback": True}},
+                                   expected_text=None)
+    assert path == tmp_path / "university.yaml"
+    assert unrelated.read_text() == original
+    assert loader._select_uni_yaml(slug="university", university_id=1, scrape_url=SEED)[0] == path
+
+
+@pytest.mark.parametrize("patch", [
+    {"discovery": None},
+    {"discovery": {"searchstax": None}},
+    {"discovery": {"searchstax": {"endpoint": "https://different.example"}}},
+])
+def test_yaml_locked_descendant_cannot_be_replaced(tmp_path, patch):
+    path = tmp_path / "university.yaml"
+    original = yaml.safe_dump({
+        "locked_config_paths": ["discovery.searchstax.endpoint"],
+        "discovery": {"searchstax": {"endpoint": "https://provider.example"}},
+    })
+    path.write_text(original)
+    with pytest.raises(RuntimeError, match="locks"):
+        agent._apply_to_yaml(path, tmp_path, 1, SEED, patch, expected_text=original)
+    assert path.read_text() == original
+
+
+def test_yaml_cas_apply_and_rollback_preserve_operator_changes(tmp_path):
+    path = tmp_path / "university.yaml"
+    path.write_text("operator: newer\n")
+    with pytest.raises(RuntimeError, match="changed during validation"):
+        agent._apply_to_yaml(path, tmp_path, 1, SEED, {"discovery": {}}, expected_text=None)
+    with pytest.raises(RuntimeError, match="rollback refused"):
+        agent._restore_yaml(path, None, expected_text="operator: old\n")
+    assert path.read_text() == "operator: newer\n"
+
+
+def test_repair_does_not_modify_hostname_mismatched_recipe(tmp_path):
+    path = tmp_path / "university.yaml"
+    original = "hostname_guard: different.example\nextraction: {}\n"
+    path.write_text(original)
+    with pytest.raises(RuntimeError, match="hostname"):
+        agent._apply_to_yaml(path, tmp_path, 1, SEED,
+                             {"discovery": {"official_catalogue_fallback": True}},
+                             expected_text=original)
+    assert path.read_text() == original
+
+
+@pytest.mark.asyncio
+async def test_locked_transport_refuses_fallback_and_restores_both_stores(monkeypatch, tmp_path):
+    from app.services.scraper.config import loader
+    monkeypatch.setattr(loader, "_UNIS_DIR", tmp_path)
+    monkeypatch.setattr(loader, "_RUNTIME_UNIS_DIR", tmp_path / "runtime")
+    path = tmp_path / "university.yaml"
+    original = yaml.safe_dump({
+        "hostname_guard": "university.example",
+        "locked_config_paths": ["discovery.searchstax"],
+        "discovery": {"searchstax": {"endpoint": "https://provider.example/search", "links_only": True}},
+    })
+    path.write_text(original)
+    cfg = loader.get_config_for_host(
+        hostname="university.example", name="University", scrape_url=SEED,
+        university_id=1, create_missing_stub=False,
+    )
+    ctx = repair_context(
+        yaml_file=path, yaml_snapshot=original, unis_dir=tmp_path,
+        effective_config=cfg, effective_discovery=cfg.discovery.model_dump(),
+    )
+    mock_loop(monkeypatch, ctx, {})
+    official_fetch(monkeypatch)
+    db = PersistentConfigDb()
+    result = await agent.run_ai_repair_loop("job-live", db)
+    assert result["status"] == "failed"
+    assert not accepted_live_probe(result)
+    assert db.cfg == {}
+    assert path.read_text() == original
+
+
 @pytest.mark.asyncio
 async def test_cas_loss_preserves_operator_config_and_restores_yaml(monkeypatch, tmp_path):
     ctx = repair_context(yaml_file=tmp_path / "university.yaml", unis_dir=tmp_path)
@@ -215,4 +378,26 @@ async def test_real_leeds_official_source_acceptance():
     report = await evidence.validate(cfg.discovery.model_dump(), patch, {})
     assert report["accepted"], report
     assert len(report["courses"]) >= 2 and evidence.pages_checked <= 12
-    assert cfg.discovery.searchstax is not None  # probe never mutates configuration
+    assert cfg.discovery.searchstax is None
+    assert cfg.discovery.official_catalogue_fallback is True
+    assert cfg.discovery.sitemap_url == evidence.fallback["source"]
+    # Exercise the normal-run discovery entry with a fresh config, without a
+    # repair failure context, evidence inheritance, or saved URL checkpoint.
+    from app.services.scraper.official_catalogue_repair import discover_official_catalogue
+    fresh_cfg = get_config_for_host(
+        hostname="www.leedstrinity.ac.uk", name="Leeds Trinity University",
+        scrape_url=url, university_id=89,
+        db_scrape_config={"admin_config": {"discovery": {
+            "official_catalogue_fallback": False,
+            "searchstax": {"endpoint": "https://provider.example/search", "links_only": True},
+        }}},
+        create_missing_stub=False, strict=True,
+    )
+    fresh = live.LiveRepairEvidence({"scrape_url": url, "effective_config": fresh_cfg})
+    catalogue = await discover_official_catalogue(fresh)
+    assert fresh_cfg.discovery.searchstax is None
+    assert catalogue["source"] == cfg.discovery.sitemap_url
+    assert set(report["courses"]).issubset(catalogue["candidates"])
+    for course_url in report["courses"]:
+        assert (await fresh.fetch(course_url))["classification"] == "course"
+    assert fresh.pages_checked <= 5
