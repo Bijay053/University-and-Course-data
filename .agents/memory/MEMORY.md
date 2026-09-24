@@ -101,7 +101,7 @@
 - [Autonomous config repair rollback](autonomous-config-repair-rollback.md) — validate without writes; fence both apply and compensating rollback against exact config documents.
 - [Automated repair normalization parity](automated-repair-normalization-parity.md) — quality detection, replay validation, and runtime assignment must share canonicalization and fail closed on valid-value misses.
 - [Snapshot canary cleanup and locking](snapshot-canary-safety.md) — delete exact S3 versions, verify absence, and use transaction-scoped advisory locks so pooled connections cannot strand monitors.
-- [Disposable AWS integration safety](disposable-aws-integration-safety.md) — validate every AWS principal’s account and require an explicit disposable-resource tag before destructive integration tests.
+- [Disposable AWS integration safety](disposable-aws-integration-safety.md) — verify account and ownership tags before destructive tests; hand off signed receipts before workspace recycling can lose them.
 - [Re-extraction warning lifecycle](reextract-warning-lifecycle.md) — clear only warnings whose condition the new payload proves resolved; preserve unrelated review warnings.
 - [Re-extraction evidence promotion](reextract-evidence-promotion.md) — equal values still refresh when selected evidence replaces previously unselected provenance.
 - [Targeted Fix progress](targeted-fix-progress.md) — count only previewed issue-field updates; job identity includes courses, target fields, and source review.

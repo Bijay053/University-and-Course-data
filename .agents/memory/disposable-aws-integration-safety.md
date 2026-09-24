@@ -13,6 +13,12 @@ SSM documents must wait for an explicit bootstrap-complete marker, use the appli
 
 Test the executable bodies of embedded SSM checks locally, not only their source strings. Prefer parameterized SQLite queries in Python over SQL nested inside multiple shell quoting layers.
 
+Hand off a signed rehearsal receipt to its destination within the same operation that creates it; do not rely on an ignored local file remaining available after a long background job.
+
+**Why:** A disposable rehearsal succeeded and deleted its stack, but a workspace recycle removed its ignored local proof before the separate production handoff. The signed proof could not safely be reconstructed, forcing an extra billable rehearsal.
+
+**How to apply:** Validate teardown and signature, then deliver the receipt to the protected destination before ending the background operation. If the operation is interrupted, verify the remote receipt and exact disposable-resource deletion before retrying.
+
 **Why:** A real rehearsal passed rotation and worker readiness but failed its final count check because shell escaping reached SQLite literally. Source-presence tests had passed without executing that check.
 
 **How to apply:** Extract the actual template check and exercise success, missing execution, and duplicate execution locally before provisioning another disposable database.
