@@ -203,6 +203,75 @@ async def test_exclusion_provenance_commits_with_ack_and_survives_batch_checkpoi
 
 
 @pytest.mark.asyncio
+async def test_restored_submitted_url_is_not_settled_before_resume():
+    db, job, policy, durable = memory()
+    submitted = {
+        "url": URL,
+        "name": "Accounting and Finance",
+    }
+    next_link = {"url": NEXT, "name": "Bachelor of Science"}
+    submitted_links = {
+        orch.canonical_course_url_key(URL): submitted,
+    }
+    # A stale catalogue recipe temporarily removes the exact report target.
+    # The checkpoint view must include the target that restoration will add
+    # back, otherwise resume filtering silently drops it as already settled.
+    checkpoint_retained = orch._report_checkpoint_retained_links(
+        [next_link],
+        submitted_links,
+        catalogue_filters_pending=True,
+    )
+    await orch.checkpoint_report_exclusions(
+        db,
+        job,
+        policy,
+        [submitted, next_link],
+        checkpoint_retained,
+    )
+
+    metadata = durable["discovered_config"]["autonomousVerification"]
+    assert metadata.get("completed_urls", []) == []
+    assert metadata.get("excluded_urls", []) == []
+    assert metadata.get("url_outcomes", {}) == {}
+    assert orch._prior_targeted_retry_resolved_urls(
+        durable["discovered_config"]
+    ) == []
+    assert remaining(durable) == [URL, NEXT]
+    assert orch._restore_submitted_report_links(
+        [next_link],
+        submitted_links,
+    ) == [next_link, submitted]
+
+
+@pytest.mark.asyncio
+async def test_unsafe_submitted_url_is_excluded_after_restoration_boundary():
+    db, job, policy, durable = memory()
+    unsafe = {"url": URL, "name": "Professional CPD workshop"}
+    safe = {"url": NEXT, "name": "Bachelor of Science"}
+    submitted_links = {
+        orch.canonical_course_url_key(URL): unsafe,
+    }
+    checkpoint_retained = orch._report_checkpoint_retained_links(
+        [safe],
+        submitted_links,
+        catalogue_filters_pending=False,
+    )
+    await orch.checkpoint_report_exclusions(
+        db,
+        job,
+        policy,
+        [unsafe, safe],
+        checkpoint_retained,
+    )
+
+    metadata = durable["discovered_config"]["autonomousVerification"]
+    assert metadata["completed_urls"] == [URL]
+    assert metadata["excluded_urls"] == [URL]
+    assert metadata["url_outcomes"] == {URL: "skipped"}
+    assert remaining(durable) == [NEXT]
+
+
+@pytest.mark.asyncio
 async def test_repeated_filter_does_not_reclassify_legacy_settled_checkpoint():
     db, job, policy, durable = memory()
     await checkpoint_report_urls(db, job, policy, [URL])

@@ -394,6 +394,16 @@ async def test_retry_revalidates_original_report_through_fresh_submission(monkey
             "course_urls": [],
             "catalogue_url": "https://uni.edu/programme/foundation-in-liberal-arts/",
             "eligibility_review": True,
+        }, "autonomousVerification": {
+            "completed_urls": [
+                "https://uni.edu/programme/foundation-in-liberal-arts/"
+            ],
+            "excluded_urls": [
+                "https://uni.edu/programme/foundation-in-liberal-arts/"
+            ],
+            "url_outcomes": {
+                "https://uni.edu/programme/foundation-in-liberal-arts/": "skipped"
+            },
         }},
     )
     rows = SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [previous]))
@@ -422,6 +432,21 @@ async def test_retry_revalidates_original_report_through_fresh_submission(monkey
     assert retried.catalogue_url is None
     assert retried.eligibility_review is True
     submit.assert_awaited_once_with("parent", retried, db, {"id": 12})
+
+    fresh_payload = report_payload(
+        SimpleNamespace(
+            runtime_job_id="parent",
+            university_id=7,
+            url="https://uni.edu/catalogue",
+        ),
+        retried,
+        "report_fresh",
+        12,
+    )
+    fresh_metadata = fresh_payload["autonomousVerification"]
+    assert "completed_urls" not in fresh_metadata
+    assert "excluded_urls" not in fresh_metadata
+    assert "url_outcomes" not in fresh_metadata
 
 
 @pytest.mark.asyncio

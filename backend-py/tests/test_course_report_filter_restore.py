@@ -1,4 +1,6 @@
-from app.services.scraper.orchestrator import _restore_submitted_report_links
+from app.services.scraper.orchestrator import (
+    _restore_submitted_report_links,
+)
 from app.services.scraper.url_identity import canonical_course_url_key
 
 

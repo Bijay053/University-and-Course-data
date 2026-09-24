@@ -218,6 +218,7 @@ describe("course report recovery", () => {
     render(<CourseReport jobId="parent" onReview={review} />);
 
     expect(await screen.findByText(/No recovered courses are available to review/)).toBeTruthy();
+    expect(screen.getByTestId("report-child-empty").textContent).toContain("Finished — no courses recovered");
     expect(screen.queryByTestId("button-review-report-child-empty")).toBeNull();
     expect(review).not.toHaveBeenCalled();
 

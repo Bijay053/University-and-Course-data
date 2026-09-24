@@ -145,6 +145,26 @@ def _restore_submitted_report_links(
     ]
 
 
+def _report_checkpoint_retained_links(
+    retained: list[dict],
+    submitted_links: dict[str, dict],
+    *,
+    catalogue_filters_pending: bool,
+) -> list[dict]:
+    """Do not settle a report target that a later step will restore.
+
+    Catalogue discovery filters are allowed to remove an exact submitted URL
+    from the working list temporarily.  Until their restoration boundary, the
+    durable exclusion checkpoint must view those URLs as retained; otherwise
+    the resume gate sees ``completed_urls`` and skips them after restoration.
+    Global pre-extraction and non-degree/eligibility guards remain outside this
+    exception.
+    """
+    if not catalogue_filters_pending:
+        return list(retained)
+    return _restore_submitted_report_links(retained, submitted_links)
+
+
 log = logging.getLogger(__name__)
 
 
@@ -5042,13 +5062,19 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 in _submitted_report_keys
             )
         }
+        _catalogue_report_filters_pending = True
 
         async def _checkpoint_filtered_report_links(retained):
             nonlocal _report_filter_links
-            await checkpoint_report_exclusions(
-                db, job, _verification, _report_filter_links, retained,
+            checkpoint_retained = _report_checkpoint_retained_links(
+                list(retained),
+                _direct_report_links,
+                catalogue_filters_pending=_catalogue_report_filters_pending,
             )
-            _report_filter_links = list(retained)
+            await checkpoint_report_exclusions(
+                db, job, _verification, _report_filter_links, checkpoint_retained,
+            )
+            _report_filter_links = checkpoint_retained
 
         # ── Domain Safety Guard ───────────────────────────────────────────────
         # Reject any discovered link whose apex domain differs from the scrape
@@ -5936,6 +5962,11 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                     kind="course_report_target_restored",
                     restored=len(_restored_report_links),
                 )
+        # From this boundary onward, submitted targets are back in the actual
+        # work set. Any global non-degree filter below is a real eligibility
+        # exclusion and must be checkpointed normally.
+        _catalogue_report_filters_pending = False
+        _report_filter_links = list(links)
 
         # Phase A.5f — shared non-degree candidate gate ─────────────────────────
         # Apply once after every discovery provider and URL/year filter has

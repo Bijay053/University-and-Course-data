@@ -300,7 +300,7 @@ export function CourseReport({ jobId, onReview, onStarted, openRequest = 0, pref
       return <article key={report.report_id ?? report.job_id} className="space-y-2 rounded border bg-background p-3 text-sm" data-testid={`report-${report.job_id}`}>
       <p className="flex items-center gap-2">
         {active && <Loader2 className="h-4 w-4 animate-spin text-primary" aria-hidden="true" />}
-        <strong>{report.request.kind === "missing" ? "Missing course recovery" : "Incorrect field recovery"}</strong> — {report.status}
+        <strong>{report.request.kind === "missing" ? "Missing course recovery" : "Incorrect field recovery"}</strong> — {report.status === "completed" && report.staged === 0 ? "Finished — no courses recovered" : report.status}
       </p>
       {active && <div
         className="space-y-1 rounded border border-blue-200 bg-blue-50 p-2 text-blue-950"
@@ -329,8 +329,8 @@ export function CourseReport({ jobId, onReview, onStarted, openRequest = 0, pref
         </div>
         <p className="text-[11px] text-blue-800">This updates automatically about every 15 seconds.</p>
       </div>}
-      {report.request.eligibility_review && <p className="text-xs">Eligibility review requested; only page-owned foundation/pathway evidence can recover this page.</p>}
-      {report.request.description && <p>{report.request.description}</p>}
+      {report.request.eligibility_review && <p className="text-xs">Eligibility review requested. Degree courses use the standard checks; foundation/pathway exceptions require evidence from the programme page.</p>}
+      {report.request.description && <p><strong>Reported issue:</strong> {report.request.description}</p>}
       {report.request.fields?.length ? <p>Reported fields: {report.request.fields.join(", ")}</p> : null}
       <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label="Recovery counts">
         <div className="rounded border p-2" data-testid={`report-processed-${report.job_id}`}>
