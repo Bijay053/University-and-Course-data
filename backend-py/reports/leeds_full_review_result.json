@@ -1,0 +1,109 @@
+{
+  "outcome": "guarded_release_succeeded_and_full_review_completed",
+  "supersedes": "leeds_full_review_release_blocked.json",
+  "release": {
+    "authorized_predecessor": "21e23676e579cc7dcc0678de3d81808548977a21",
+    "target": "4749a74cdc3668aea71d8db1db30555c237a0f2f",
+    "ssm_command_id": "eb06d0e6-620f-472c-86b4-52661b49d65b",
+    "entrypoint": "backend-py/deploy/guarded_release.sh",
+    "normal_fast_forward_push": true,
+    "worker_schema_read_only_check_passed": true,
+    "mandatory_rehearsal_and_restart_smoke_passed": true,
+    "consumer_pause_and_worker_job_idle_fence_passed": true,
+    "tracked_operator_recipe_preservation_verified": [
+      "canterbury_1759.yaml",
+      "law_1902.yaml",
+      "londonmet.yaml",
+      "mdx.yaml"
+    ],
+    "redundant_overlay_count": 0,
+    "api_and_celery_release_identity_verified": true,
+    "api_and_celery_active": true,
+    "api_health": "ok",
+    "public_frontend_target_marker_verified": true,
+    "public_frontend_asset": "/assets/index-DR7jZ-CL.js",
+    "public_url": "https://portal.agentsic.com",
+    "public_login_screenshot": "leeds-production-login.png"
+  },
+  "prior_job": {
+    "id": "job_608775069611",
+    "authenticated_status_before_start": "stopped",
+    "additional_stop_requested": false
+  },
+  "full_review": {
+    "university_id": 89,
+    "job_id": "job_fcbbaad4cef9",
+    "status": "completed",
+    "started_at": "2026-09-25T00:38:11.858100+00:00",
+    "completed_at": "2026-09-25T00:46:13.863796+00:00",
+    "discovered": 107,
+    "processed": 107,
+    "staged_pending": 103,
+    "skipped": 3,
+    "errors": 1,
+    "fetch_failed": 0,
+    "skip_reasons": {
+      "online_only": 1,
+      "part_time_only": 2
+    },
+    "error_evidence": [
+      "Stored gate_skip_counts.gemini_timeout=1",
+      "Persisted stage reason: per_course_timeout"
+    ],
+    "skipped_courses": [
+      {
+        "name": "MSc Health and Wellbeing",
+        "reason": "online_only"
+      },
+      {
+        "name": "Pg Cert Health and Wellbeing in the Workplace",
+        "reason": "part_time_only"
+      },
+      {
+        "name": "Pg Dip Forensic Psychology Practitioner",
+        "reason": "part_time_only"
+      }
+    ],
+    "fast_mode": false,
+    "fresh_discovery": true,
+    "fresh_extraction": true,
+    "saved_checkpoints": false,
+    "automatic_publish": false,
+    "automatic_repair": false,
+    "removal_reconciliation": false,
+    "verification_sample_cap": null,
+    "active_university_jobs_after_completion": 0
+  },
+  "preservation": {
+    "pending_before": 1,
+    "pending_after": 104,
+    "published_before": 0,
+    "published_after": 0,
+    "existing_pending_id": 40883,
+    "existing_pending_row_and_field_evidence_hashes_unchanged": true,
+    "missing_or_changed_baseline_rows": 0
+  },
+  "effective_configuration": {
+    "fresh_process_reload_before_and_after": true,
+    "resolved_yaml": "leedstrinity_2220.yaml",
+    "default_currency": "GBP",
+    "new_rows_with_currency_GBP": 103,
+    "skip_degree_qualifier_check": true,
+    "official_catalogue_fallback": true,
+    "searchstax_disabled_by_official_catalogue_fallback": true,
+    "global_gates": "Live online-only and part-time-only rejections demonstrate the degree-qualifier exception did not bypass these global staging gates."
+  },
+  "evidence": {
+    "baseline": "leeds_full_review_baseline.json",
+    "after": "leeds_full_review_after.json",
+    "after_sha256": "83876a8abd2a5775f1fecad1e264c3be4332b7415df3157a6103f9b55aa37e21",
+    "request": "leeds_full_review_start.json",
+    "persisted_policy_and_new_row_groups": "leeds_full_review_policy.json"
+  },
+  "limitations": [
+    "The run completed with one extraction timeout; it is not an error-free catalogue certification.",
+    "Persisted full_catalogue_verified remains false; no manual certification or completion override was applied.",
+    "This run demonstrates global online-only and part-time-only gate enforcement, not every possible gate branch.",
+    "New rows are pending review; source completeness and field accuracy remain review responsibilities."
+  ]
+}
