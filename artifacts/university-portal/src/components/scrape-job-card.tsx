@@ -338,16 +338,16 @@ type AIRepairAttempt = {
   confidence:            number;
   explanation:           string;
   patches_proposed?:     AIRepairPatch[];
-  patches_applied:       AIRepairPatch[];
-  validation_errors:     string[];
+  patches_applied?:      AIRepairPatch[] | null;
+  validation_errors?:    string[] | null;
   before_pass_count:     number;
   after_pass_count:      number;
   total_test_urls:       number;
-  rescued_sample:        string[];
+  rescued_sample?:       string[] | null;
   ai_cost_usd:           number;
   patch_applied_ok:      boolean;
   patch_error?:          string | null;
-  recipe_patch_applied?: string[];
+  recipe_patch_applied?: string[] | null;
   quality_before?:       QualityMetrics;
   quality_predicted?:    QualityMetrics;
   quality_after?:        QualityMetrics;
@@ -4352,6 +4352,13 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
 
                                 {/* Attempt cards */}
                                 {aiRepairSession.attempts.map((att, i) => {
+                                  // Failed attempts can terminate before simulation/validation
+                                  // populates these arrays. Keep their errors visible without
+                                  // treating missing evidence as an accepted repair.
+                                  const patchesApplied = att.patches_applied ?? [];
+                                  const validationErrors = att.validation_errors ?? [];
+                                  const rescuedSample = att.rescued_sample ?? [];
+                                  const recipePatchApplied = att.recipe_patch_applied ?? [];
                                   const sc       = att.success_criteria;
                                   const fills     = att.predicted_fills    ?? {};
                                   const qb        = att.quality_before     ?? {} as QualityMetrics;
@@ -4431,10 +4438,10 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
                                         <p className="text-gray-500 leading-relaxed">{att.explanation}</p>
 
                                         {/* ── Patches applied ── */}
-                                        {att.patches_applied.length > 0 && (
+                                        {patchesApplied.length > 0 && (
                                           <div className="mt-1">
                                             <span className="text-[9px] font-semibold text-gray-500 uppercase tracking-wide">Patches applied</span>
-                                            {att.patches_applied.map((p, j) => {
+                                            {patchesApplied.map((p, j) => {
                                               const isDiscovery = p.section === "discovery";
                                               const isRecipe    = p.section === "recipe";
                                               return (
@@ -4458,13 +4465,13 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
                                         )}
 
                                         {/* ── Rejected patches ── */}
-                                        {att.validation_errors?.length > 0 && (
+                                        {validationErrors.length > 0 && (
                                           <div className="mt-1 rounded px-1.5 py-1 bg-red-50 border border-red-100">
                                             <div className="text-[9px] font-semibold text-red-700 mb-0.5 flex items-center gap-1">
                                               <AlertTriangle className="w-2.5 h-2.5" />
-                                              {att.validation_errors.length} patch{att.validation_errors.length > 1 ? "es" : ""} rejected by safety validator
+                                              {validationErrors.length} patch{validationErrors.length > 1 ? "es" : ""} rejected by safety validator
                                             </div>
-                                            {att.validation_errors.map((err, k) => (
+                                            {validationErrors.map((err, k) => (
                                               <div key={k} className="font-mono text-[8.5px] text-red-600 break-all mt-0.5">• {err}</div>
                                             ))}
                                           </div>
@@ -4596,10 +4603,15 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
                                         )}
 
                                         {/* ── URL simulation — rescued sample ── */}
-                                        {att.rescued_sample.length > 0 && (
+                                        {att.patch_error && !validationErrors.includes(att.patch_error) && (
+                                          <p className="text-[9px] text-red-700">
+                                            Repair attempt failed: {att.patch_error}
+                                          </p>
+                                        )}
+                                        {rescuedSample.length > 0 && (
                                           <div className="text-[9px] text-green-600 space-y-0.5 mt-0.5">
                                             <span className="text-gray-400 font-semibold uppercase tracking-wide text-[8px]">Rescued URLs</span>
-                                            {att.rescued_sample.map((u, k) => (
+                                            {rescuedSample.map((u, k) => (
                                               <div key={k} className="font-mono truncate">✓ {u}</div>
                                             ))}
                                           </div>
@@ -4628,15 +4640,15 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
 
                                         {/* ── Patch save status ── */}
                                         <div className="text-[9px] text-gray-400 flex items-center gap-1 pt-0.5 border-t border-gray-50">
-                                          {att.patches_applied.length === 0
+                                          {patchesApplied.length === 0
                                             ? <><span className="opacity-60">No patches to save</span></>
                                             : att.patch_applied_ok
                                               ? <><CheckCheck className="w-2.5 h-2.5 text-green-500" /> Config saved to DB + YAML</>
                                               : <><AlertTriangle className="w-2.5 h-2.5 text-amber-500" /> Config save failed{att.patch_error ? `: ${att.patch_error}` : ""}</>
 
                                           }
-                                          {att.recipe_patch_applied && att.recipe_patch_applied.length > 0 && (
-                                            <span className="ml-1 text-teal-600">· Recipe: {att.recipe_patch_applied.join(", ")}</span>
+                                          {recipePatchApplied.length > 0 && (
+                                            <span className="ml-1 text-teal-600">· Recipe: {recipePatchApplied.join(", ")}</span>
                                           )}
                                         </div>
                                       </div>

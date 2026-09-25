@@ -945,6 +945,162 @@ def test_no_improvement_requires_independently_valid_recipe():
     assert not workflow.accepted_live_probe(evidence)
 
 
+def critical_recheck_session():
+    evidence = session(worker_claim="delivery", config_loop_done=True)
+    urls = ["https://university.test/course/a", "https://university.test/course/b"]
+    evidence.update(
+        status="completed",
+        quality_before={
+            "critical_quality_count": 2,
+            "critical_quality_rows": [{"url": url, "international_fee": 2070} for url in urls],
+        },
+        live_probe={
+            "accepted": True, "status": "accepted", "failures": 0,
+            "samples": [{"url": url, "classification": "course"} for url in urls],
+        },
+        attempts=[{
+            "outcome": "no_change", "root_cause": "fees",
+            "patches_proposed": [], "patches_applied": [],
+            "patch_applied_ok": False, "rollback_status": "unchanged",
+            "success_criteria": {"overall_ok": False, "critical_quality_ok": False},
+        }],
+    )
+    return evidence
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("detail", [
+    "'NoneType' object has no attribute 'get'",
+    "The rule changed 12 already-populated value(s).",
+])
+async def test_blocked_repair_retains_validation_reason_in_ui_contract(memory, detail):
+    evidence = critical_recheck_session()
+    evidence["status"] = "failed"
+    evidence["attempts"][-1].update(outcome="failed", validation_errors=[detail])
+    memory.evidence = copy.deepcopy(evidence)
+    result = await workflow.queue_verification(evidence, DB(memory))
+    assert result["autonomous"]["phase"] == "blocked"
+    assert detail in result["autonomous"]["reason"]
+    assert detail in result["final_verdict"]
+    assert detail in result["error"]
+    assert "No verification scrape was launched" in result["final_verdict"]
+    assert not memory.added
+
+
+def test_unchanged_critical_rows_can_request_verification_not_numeric_overwrite():
+    evidence = critical_recheck_session()
+    assert workflow.accepted_live_probe(evidence)
+    assert workflow.unchanged_critical_quality_recheck(evidence)
+    assert evidence["attempts"][0]["patch_applied_ok"] is False
+    assert evidence["quality_before"]["critical_quality_rows"][0]["international_fee"] == 2070
+
+
+@pytest.mark.parametrize("change", [
+    "no_critical_count", "no_affected_rows", "one_live_affected", "unrelated_live_course",
+    "reference_only", "probe_failure", "probe_unaccepted", "failed_session",
+    "proposal", "applied", "recipe_applied", "validation_errors", "rejected_previous",
+    "failed_live_validation", "rolled_back", "config_saved",
+])
+def test_critical_recheck_requires_proven_affected_courses_and_no_mutations(change):
+    evidence = critical_recheck_session()
+    last = evidence["attempts"][-1]
+    if change == "no_critical_count":
+        evidence["quality_before"]["critical_quality_count"] = 0
+    elif change == "no_affected_rows":
+        evidence["quality_before"]["critical_quality_rows"] = []
+    elif change == "one_live_affected":
+        evidence["live_probe"]["samples"].pop()
+    elif change == "unrelated_live_course":
+        evidence["live_probe"]["samples"][1]["url"] = "https://university.test/other"
+    elif change == "reference_only":
+        evidence["live_probe"]["samples"][1]["reference_only"] = True
+    elif change == "probe_failure":
+        evidence["live_probe"]["failures"] = 1
+    elif change == "probe_unaccepted":
+        evidence["live_probe"]["accepted"] = False
+    elif change == "failed_session":
+        evidence["status"] = "failed"
+    elif change == "proposal":
+        last["patches_proposed"] = [{"field": "international_fee"}]
+    elif change == "applied":
+        last["patch_applied_ok"] = True
+    elif change == "recipe_applied":
+        last["recipe_patch_applied"] = ["international_fee"]
+    elif change == "validation_errors":
+        last["validation_errors"] = ["unsafe replacement"]
+    elif change == "rejected_previous":
+        evidence["attempts"].insert(0, {"outcome": "rejected"})
+    elif change == "failed_live_validation":
+        last["live_validation"] = {"accepted": False}
+    elif change == "rolled_back":
+        last["rollback_status"] = "restored"
+    elif change == "config_saved":
+        last["applied_config"] = {"fees": {"default": 24000}}
+    assert not workflow.accepted_live_probe(evidence)
+
+
+@pytest.mark.asyncio
+async def test_critical_no_change_recheck_queues_one_normal_bounded_child(memory, monkeypatch):
+    evidence = critical_recheck_session()
+    evidence["final_verdict"] = "No safe config change identified."
+    memory.evidence = copy.deepcopy(evidence)
+    dispatch = AsyncMock(side_effect=lambda evidence, db: evidence)
+    monkeypatch.setattr(workflow, "dispatch_verification", dispatch)
+    await asyncio.gather(
+        workflow.queue_verification(copy.deepcopy(evidence), DB(memory)),
+        workflow.queue_verification(copy.deepcopy(evidence), DB(memory)),
+    )
+    assert len(memory.added) == 1
+    assert dispatch.await_count == 1
+    child = memory.added[0]
+    limits = child.request_payload["autonomousVerification"]
+    assert limits["max_courses"] == 50
+    assert limits["time_budget_seconds"] == workflow.VERIFY_SECONDS
+    assert limits["cost_cap_usd"] == workflow.TOTAL_VERIFY_COST_USD
+    assert child.request_payload["forceDiscovery"] is True
+    assert "courseUrls" not in child.request_payload
+    assert memory.evidence["status"] == "running"
+    assert memory.evidence["final_verdict"] is None
+    state = memory.evidence["autonomous"]
+    assert state["phase"] == "verification_queued"
+    assert state["verification_basis"] == "unchanged_config_critical_quality_recheck"
+    assert "not yet been verified" in state["reason"]
+    assert "comparison" not in state
+    workflow.agent.release_repair_lease.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("after,expected", [
+    (quality(critical_quality_count=2), "needs_review"),
+    (quality(critical_quality_count=0, fee_pct=0), "needs_review"),
+    (quality(critical_quality_count=0), "verified"),
+])
+async def test_critical_recheck_finishes_only_after_real_child_quality_comparison(
+    memory, monkeypatch, after, expected,
+):
+    evidence = critical_recheck_session()
+    evidence["quality_before"] = {
+        **quality(), **evidence["quality_before"],
+    }
+    memory.evidence = copy.deepcopy(evidence)
+    monkeypatch.setattr(
+        workflow, "dispatch_verification",
+        AsyncMock(side_effect=lambda evidence, db: evidence),
+    )
+    await workflow.queue_verification(evidence, DB(memory))
+    assert memory.evidence["autonomous"]["phase"] == "verification_queued"
+    child_id = memory.added[0].runtime_job_id
+    memory.jobs[child_id] = child(runtime_job_id=child_id)
+    monkeypatch.setattr(workflow.agent, "_quality_snapshot", AsyncMock(return_value=after))
+    result = await workflow.reconcile("parent", "session-1", DB(memory))
+    assert result["autonomous"]["phase"] == expected
+    comparison = result["autonomous"]["comparison"]
+    assert comparison["baseline"]["critical_quality_count"] == 2
+    assert comparison["verification"]["critical_quality_count"] == after["critical_quality_count"]
+    assert comparison["full_catalogue_verified"] is False
+    assert comparison["sample_verified"] is (expected == "verified")
+
+
 @pytest.mark.asyncio
 async def test_monitor_persists_same_worker_live_phase_and_evidence(monkeypatch):
     evidence = session(worker_claim="delivery", phase="repairing")

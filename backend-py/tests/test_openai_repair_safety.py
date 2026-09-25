@@ -25,6 +25,74 @@ from app.services.scraper.ai_repair_agent import (
 from app.services.scraper.config.loader import get_config_for_host
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("metadata", [None, {}])
+async def test_snapshot_rule_validation_handles_legacy_null_audience_evidence(monkeypatch, metadata):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    from app.services.scraper.ai_repair_agent import _validate_extraction_patch_on_snapshots
+    from app.services import snapshot_store
+
+    snapshots = [
+        SimpleNamespace(
+            course_url=f"https://university.example/course/{i}",
+            original_extraction={"international_fee": fee, "audience_evidence": metadata},
+            storage_path=f"snapshot-{i}",
+        )
+        for i, fee in enumerate([None, 24000])
+    ]
+    result = SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: snapshots))
+    db = SimpleNamespace(execute=AsyncMock(return_value=result))
+    monkeypatch.setattr(
+        snapshot_store, "download_snapshot",
+        AsyncMock(return_value=b"<main><p class='fee'>International tuition fee: 24000</p></main>"),
+    )
+    report = await _validate_extraction_patch_on_snapshots(
+        "parent", {"extraction_rules": {
+            "international_fee": {"css": ".fee", "regex": r"(\d+)", "confidence": .95},
+        }}, db,
+    )
+    assert report["accepted"] is True
+    assert report["reports"][0]["missing_filled"] == 1
+    assert report["reports"][0]["regressions"] == 0
+
+
+@pytest.mark.asyncio
+async def test_ulaw_stored_fee_proposal_safely_rejects_navigation_matches(monkeypatch):
+    """Minimal sanitized reproduction of the twelve stored ULaw HTML replays."""
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    from app.services.scraper.ai_repair_agent import _validate_extraction_patch_on_snapshots
+    from app.services import snapshot_store
+
+    snapshots = [
+        SimpleNamespace(
+            course_url=f"https://www.law.ac.uk/study/postgraduate/business/course-{i}/",
+            original_extraction={"international_fee": fee, "audience_evidence": None},
+            storage_path=f"snapshot-{i}",
+        )
+        for i, fee in enumerate([2070, 16900])
+    ]
+    result = SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: snapshots))
+    db = SimpleNamespace(execute=AsyncMock(return_value=result))
+    monkeypatch.setattr(snapshot_store, "download_snapshot", AsyncMock(return_value=(
+        "<nav><li>Study with us</li></nav><main><ul>"
+        "<li>International students London: £20,600</li></ul></main>"
+    ).encode()))
+    report = await _validate_extraction_patch_on_snapshots(
+        "parent", {"extraction_rules": {"international_fee": {
+            "css": "tr, li",
+            "regex": r"(?im)^\s*(?:London|Outside\s+London|Non-London)\s*:?\s*£\s*([0-9][0-9,]*)\b",
+            "confidence": .95,
+        }}}, db,
+    )
+    assert report["accepted"] is False
+    assert report["rules"] == {}
+    assert report["reports"][0]["valid_outputs"] == 0
+    assert report["reports"][0]["regressions"] == 2
+    assert report["reports"][0]["samples"][0]["after"] == "Study with us"
+
+
 def test_openai_can_clear_each_url_filter_gate() -> None:
     discovery, extraction, errors = _validate_and_build_config_patch(
         [

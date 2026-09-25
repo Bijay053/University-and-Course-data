@@ -392,6 +392,52 @@ async def claim(job_id: str, university_id: int, session_id: str, claim_id: str,
     return session
 
 
+def unchanged_critical_quality_recheck(session: dict) -> bool:
+    """Allow fresh extraction, never numeric substitution, of proven bad rows.
+
+    A deployed deterministic extractor/source fix may repair historical staged
+    data without any new AI config patch. The only way to establish that is the
+    ordinary isolated verification pipeline and its unchanged quality gates.
+    Require two freshly recognized *affected* courses and an entirely unchanged,
+    non-rejected config loop; an AI diagnosis alone cannot open this path.
+    """
+    probe = session.get("live_probe") or {}
+    before = session.get("quality_before") or {}
+    attempts = session.get("attempts") or []
+    count = before.get("critical_quality_count")
+    if (
+        session.get("status") != "completed"
+        or probe.get("accepted") is not True or probe.get("status") != "accepted"
+        or probe.get("failures")
+        or not isinstance(count, int) or count <= 0
+        or not attempts
+        or session.get("rollback_status") in {"failed", "restored"}
+    ):
+        return False
+    for attempt in attempts:
+        if (
+            attempt.get("outcome") != "no_change"
+            or attempt.get("validation_errors")
+            or attempt.get("patches_proposed") or attempt.get("patches_applied")
+            or attempt.get("recipe_patch_applied") or attempt.get("patch_applied_ok")
+            or attempt.get("applied_config") or attempt.get("applied_recipe")
+            or attempt.get("patch_error")
+            or attempt.get("rollback_status") not in {None, "unchanged"}
+            or (attempt.get("live_validation") or {}).get("accepted") is False
+        ):
+            return False
+    affected = {
+        row["url"] for row in before.get("critical_quality_rows") or []
+        if isinstance(row, dict) and row.get("url")
+    }
+    confirmed = {
+        row.get("url") for row in probe.get("samples") or []
+        if isinstance(row, dict) and row.get("classification") == "course"
+        and not row.get("reference_only") and row.get("url") in affected
+    }
+    return len(confirmed) >= 2
+
+
 def accepted_live_probe(session: dict) -> bool:
     probe = session.get("live_probe") or {}
     accepted = (
@@ -409,8 +455,9 @@ def accepted_live_probe(session: dict) -> bool:
         return False
     if last.get("outcome") == "accepted":
         return last.get("patch_applied_ok") is True and (last.get("live_validation") or {}).get("accepted") is True
-    # A known-valid current recipe is the sole no-improvement exception.
     # Rejected/stripped unsafe proposals must not piggyback on an initial probe.
+    # An unchanged loop may also test a deployed deterministic fix against
+    # proven historical critical failures, without treating the recipe as valid.
     criteria = last.get("success_criteria") or {}
     unchanged_valid_recipe = (
         criteria.get("overall_ok") is True
@@ -421,6 +468,7 @@ def accepted_live_probe(session: dict) -> bool:
         (last.get("live_validation") or {}).get("accepted") is True
         or last.get("root_cause") == "stale_job_evidence"
         or unchanged_valid_recipe
+        or unchanged_critical_quality_recheck(session)
     )
 
 
@@ -484,8 +532,25 @@ async def queue_verification(session: dict, db) -> dict:
     if not lease_owned:
         return await finish(session, db, "blocked", "Repair lease lost before verification.", failed=True)
     if not accepted_live_probe(session):
+        last_attempt = (session.get("attempts") or [{}])[-1]
+        validation_errors = last_attempt.get("validation_errors") or []
+        detail = "; ".join(str(error) for error in validation_errors if error)
+        detail = detail or str(last_attempt.get("patch_error") or "")
+        if detail:
+            reason = (
+                f"Repair validation did not pass: {detail[:1200]} "
+                "No verification scrape was launched."
+            )
+        elif (session.get("live_probe") or {}).get("accepted") is True:
+            reason = (
+                "Live course pages were confirmed, but no accepted repair or "
+                "eligible unchanged-config recheck was established. "
+                "No verification scrape was launched."
+            )
+        else:
+            reason = "Accepted live validation is required; no scrape launched."
         return await finish(
-            session, db, "blocked", "Accepted live validation is required; no scrape launched.",
+            session, db, "blocked", reason,
             failed=session.get("status") == "failed",
         )
     parent = await db.get(ScrapeRuntimeJob, session["job_id"])
@@ -514,6 +579,16 @@ async def queue_verification(session: dict, db) -> dict:
                   verification_job_ids=[child_id], verification_round=0,
                  verification_status=child.status, verification_queued_at=now(),
                  verification_requeues=0)
+    if unchanged_critical_quality_recheck(session):
+        state.update(
+            verification_basis="unchanged_config_critical_quality_recheck",
+            reason=(
+                "No configuration was changed. Fresh bounded extraction will "
+                "recheck recorded critical data-quality failures; improvement "
+                "has not yet been verified."
+            ),
+        )
+        session["final_verdict"] = None
     session.update(status="running", completed_at=None)
     # The row and idempotency binding are committed BEFORE delivery. Recovery
     # can redeliver this ID, but can never create another verification run.

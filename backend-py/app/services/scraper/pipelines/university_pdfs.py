@@ -1348,6 +1348,14 @@ def match_course_in_pdf_table(
 async def _parse_fee_pdf(url: str, country: str | None, emit=None) -> dict[str, Any]:
     if is_non_tuition_fee_pdf(url):
         log.warning("non-tuition fee PDF rejected before download: %s", url)
+        if emit:
+            await emit(
+                "status",
+                f"[PDF] Rejected non-tuition fee document: {url.split('/')[-1][:60]}",
+                phase="extract",
+                kind="pdf_non_tuition_rejected",
+                url=url,
+            )
         return {}
     raw = await _download_raw_pdf(url)
     if not raw:

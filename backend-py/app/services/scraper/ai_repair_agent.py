@@ -1022,18 +1022,18 @@ async def _validate_extraction_patch_on_snapshots(
         # is unsafe and must fail closed rather than fabricate a comparison.
         typed = [
             str(row.get("audience") or "").casefold()
-            or str(row.get("audience_evidence", {}).get("audience") or "").casefold()
+            or str((row.get("audience_evidence") or {}).get("audience") or "").casefold()
             for row in snapshot_rows
         ]
         typed = [
             value if value in {"domestic", "international"} else (
                 "international" if any(
                     str(item.get("audience") or "").casefold() == "international"
-                    for item in (row.get("audience_evidence", {}).get("evidence") or [])
+                    for item in ((row.get("audience_evidence") or {}).get("evidence") or [])
                     if isinstance(item, dict)
                 ) else "domestic" if any(
                     str(item.get("audience") or "").casefold() == "domestic"
-                    for item in (row.get("audience_evidence", {}).get("evidence") or [])
+                    for item in ((row.get("audience_evidence") or {}).get("evidence") or [])
                     if isinstance(item, dict)
                 ) else value
             )

@@ -84,6 +84,102 @@ def test_legitimate_degree_survives_title_and_cpd_path(title):
     assert result["fields"] and result["owned_html"]
 
 
+def test_late_international_prices_are_visible_to_repair_without_becoming_authority():
+    repeated = "".join(f"<p>Entry requirements option {i}: Bachelor degree</p>" for i in range(20))
+    mixed = ("International students (Overseas Fee Payer) London: £20,600 "
+             "(or £16,600 including a £4,000 International Bursary)")
+    html = course(extra=repeated + f"<p>{mixed}</p><p>Campus location: London</p>")
+    page = live.inspect_page(ONE, html, config())
+    assert len(page["fields"]) <= 12
+    assert any(mixed in field["text"] for field in page["fields"])
+    assert any("Campus location: London" in field["text"] for field in page["fields"])
+    # Revealing the evidence must not authorize a discounted/ambiguous value.
+    authority = live.field_authority_html("international_fee", page["owned_html"])
+    assert "20,600" not in authority
+    assert "16,600" not in authority
+
+
+@pytest.mark.asyncio
+async def test_probe_prioritizes_actual_critical_and_missing_location_rows():
+    missing = SEED + "/master-medical-law"
+    ctx = context(
+        repair_course_url_sample=[PARTNER],
+        critical_quality={
+            "affected_rows": [
+                {"url": ONE, "international_fee": 2070, "course_location": "London"},
+                {"url": TWO, "international_fee": 2070, "course_location": "London"},
+                {"url": missing, "international_fee": 2070, "course_location": None},
+            ],
+        },
+    )
+    evidence = live.LiveRepairEvidence(ctx)
+    visited = []
+
+    async def fetch(url):
+        visited.append(url)
+        evidence.pages_checked += 1
+        record = {"url": url, "classification": "course", "links": []}
+        evidence.records.append(record)
+        return record
+
+    evidence.fetch = fetch
+    await evidence.probe()
+    assert visited[:4] == [SEED, missing, ONE, TWO]
+    assert evidence.pages_checked <= 6
+
+
+def test_fee_source_links_are_official_reference_only():
+    page = live.inspect_page(ONE, course(extra="""
+        <a href="/fees">International fees and funding</a>
+        <a href="#fees">Full fees</a>
+        <a href="https://attacker.example/fees">Tuition fees</a>
+    """), config())
+    assert page["fee_source_links"] == ["https://university.example/fees"]
+
+
+def test_suspicious_populated_fee_is_not_overwritten_on_ai_assertion_alone():
+    # A low number plus an LLM diagnosis is not evidence that a particular
+    # replacement is the correct annual international tuition amount.
+    report = agent.validate_extraction_rule_on_samples(
+        "international_fee",
+        {"css": ".fee b", "confidence": .99},
+        [
+            {"url": url, "html": course(), "before": 2070, "invalid": True}
+            for url in (ONE, TWO)
+        ],
+    )
+    assert report["accepted"] is False
+    assert report["regressions"] == 2
+    assert report["invalid_corrected"] == 0
+
+
+@pytest.mark.asyncio
+async def test_course_linked_central_source_uses_only_remaining_probe_slot():
+    source = "https://university.example/fees"
+    evidence = live.LiveRepairEvidence(context(repair_course_url_sample=[ONE, TWO]))
+    visited = []
+
+    async def fetch(url):
+        visited.append(url)
+        evidence.pages_checked += 1
+        record = {
+            "url": url, "classification": "course" if url in (ONE, TWO) else "listing",
+            "links": [{"url": SEED + f"/listing-{i}"} for i in range(8)],
+            "fee_source_links": [source] if url == ONE else [],
+        }
+        evidence.records.append(record)
+        return record
+
+    evidence.fetch = fetch
+    result = await evidence.probe()
+    assert visited[:3] == [SEED, ONE, TWO]
+    assert visited[-1] == source
+    assert len(visited) == 6
+    assert source not in evidence.initial
+    assert result["samples"][-1]["reference_only"] is True
+    assert result["samples"][-1]["linked_from"] == ONE
+
+
 @pytest.mark.parametrize("html,expected", [
     (LISTING, "listing"),
     ("<main><h1>Our partners</h1><p>Bachelor of Laws tuition and duration</p></main>", "non_course"),
