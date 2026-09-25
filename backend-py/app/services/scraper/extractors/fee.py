@@ -2648,6 +2648,20 @@ def _from_otago_polytechnic_international_fee(
 async def extract(
     html: str, url: str, *, country: str | None = None
 ) -> list[ExtractionResult]:
+    from app.services.scraper.extractors.ulaw_fees import METHOD, parse_course_fees
+    ulaw_fee = parse_course_fees(html, url)
+    if ulaw_fee is not None:
+        import json
+        return [ExtractionResult(
+            field_key="international_fee",
+            value=ulaw_fee["international_fee"],
+            normalized={key: ulaw_fee[key] for key in (
+                "international_fee", "currency", "fee_year", "fee_term",
+            )},
+            confidence=0.99,
+            snippet=json.dumps(ulaw_fee, ensure_ascii=False),
+            method=METHOD,
+        )]
     # Link-only audience cards are authoritative negative evidence locally.
     # The shared central prefetch resolves their tuition, never the Home card.
     from app.services.scraper.international_schedule import leeds_trinity_link_only_fees

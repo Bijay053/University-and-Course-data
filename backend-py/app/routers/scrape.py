@@ -2473,6 +2473,7 @@ async def re_extract_staged(
     # course-specific central profile.
     central_data: dict | None = None
     central_config: dict = {}
+    _ulaw_defer_central = False
     try:
         import copy as _copy
         from urllib.parse import urlparse as _up
@@ -2480,6 +2481,12 @@ async def re_extract_staged(
         from app.services.scraper.central_pages import prefetch_central_pages
 
         hostname = _up(scrape_url).netloc if scrape_url else ""
+        _requested_fee_fields = set(body.target_fields) | set(body.force_fields)
+        _ulaw_defer_central = (
+            hostname in {"law.ac.uk", "www.law.ac.uk"}
+            and "international_fee" in _requested_fee_fields
+            and _requested_fee_fields <= {"international_fee", "fee_term", "fee_year", "currency"}
+        )
         if hostname:
             cfg = get_config_for_host(
                 hostname=hostname,
@@ -2508,10 +2515,11 @@ async def re_extract_staged(
             if english_cfg.central_page_pg and not central_pages.get("entryPagePG"):
                 central_pages["entryPagePG"] = english_cfg.central_page_pg
 
-            central_data = await prefetch_central_pages(
-                central_config,
-                university_id=body.university_id,
-            )
+            if not _ulaw_defer_central:
+                central_data = await prefetch_central_pages(
+                    central_config,
+                    university_id=body.university_id,
+                )
     except Exception as exc:
         log.warning(
             "Central-page prefetch failed for staged re-extraction uni=%s: %s",
@@ -2652,18 +2660,37 @@ async def re_extract_staged(
                 central_data = fresh_central
                 recovery_reason_code = "fresh_central_evidence_checked"
             try:
-                pass_out = await _asyncio.wait_for(
-                    _extract_only(
-                        {"url": url, "name": row.course_name or ""},
-                        country=country,
-                        ai_provider="openai",
-                        central_data=central_data,
-                    ),
-                    timeout=min(
-                        120.0,
-                        max(1.0, operation_deadline - _time.monotonic()),
-                    ),
-                )
+                pass_out = None
+                if (
+                    pass_number == 1
+                    and targeted_fields is not None
+                    and "international_fee" in targeted_fields
+                    and targeted_fields <= {"international_fee", "fee_year", "fee_term", "currency"}
+                ):
+                    from app.services.scraper.extractors.ulaw_fees import recover_course_fee_only
+                    pass_out = await recover_course_fee_only(url)
+                if pass_out is None:
+                    if _ulaw_defer_central and central_data is None and central_config.get("uniPages"):
+                        try:
+                            central_data = await _asyncio.wait_for(
+                                prefetch_central_pages(central_config, university_id=body.university_id),
+                                timeout=min(45.0, max(1.0, operation_deadline - _time.monotonic())),
+                            )
+                        except Exception as exc:
+                            log.warning("Deferred fee central recovery unavailable: %s", exc)
+                            central_data = {}
+                    pass_out = await _asyncio.wait_for(
+                        _extract_only(
+                            {"url": url, "name": row.course_name or ""},
+                            country=country,
+                            ai_provider="openai",
+                            central_data=central_data,
+                        ),
+                        timeout=min(
+                            120.0,
+                            max(1.0, operation_deadline - _time.monotonic()),
+                        ),
+                    )
             except Exception as exc:  # noqa: BLE001
                 last_error = f"extraction error: {exc}"
                 if pass_number == 1:
@@ -2739,6 +2766,13 @@ async def re_extract_staged(
             ]
             if not unresolved and not body.smart:
                 break
+            from app.services.scraper.extractors.ulaw_fees import validated_fee_variants
+            if (
+                targeted_fields is not None
+                and targeted_fields <= {"international_fee", "fee_year", "fee_term", "currency"}
+                and validated_fee_variants({"course_website": url, **payload})
+            ):
+                break
             if pass_number == 1:
                 from app.services.scraper.smart_fix import smart_retry_fields
 
@@ -2757,6 +2791,29 @@ async def re_extract_staged(
             results.append({"id": sc_id, "ok": False, "error": last_error})
             errors += 1
             continue
+
+        # ULaw publishes campus/year/route alternatives rather than one
+        # universal scalar. Keep that course-owned fee contract with a targeted
+        # fee refresh, without overwriting provenance for untouched fields.
+        from app.services.scraper.extractors.ulaw_fees import METHOD as _ULAW_FEE_METHOD, is_ulaw_course
+        _ulaw_fee_variants = (payload.get("extraction_method") or {}).get("fee_variants")
+        _ulaw_fee_refresh = (
+            is_ulaw_course(url)
+            and isinstance(_ulaw_fee_variants, dict)
+            and (targeted_fields is None or "international_fee" in targeted_fields)
+            and any(
+                item.get("method") == _ULAW_FEE_METHOD
+                for item in [*other_evidence.values(), *selected_evidence_by_field.values()]
+            )
+        )
+        _ulaw_variants_changed = False
+        if _ulaw_fee_refresh:
+            _ulaw_variants_changed = (row.extraction_method or {}).get("fee_variants") != _ulaw_fee_variants
+            _ulaw_fee_map = {
+                **(row.extraction_method or {}),
+                "international_fee": _ULAW_FEE_METHOD,
+                "fee_variants": _ulaw_fee_variants,
+            }
 
         if targeted_fields is not None:
             # A targeted Fix may use the full extraction pipeline for discovery,
@@ -2777,6 +2834,15 @@ async def re_extract_staged(
                 for signature, evidence in other_evidence.items()
                 if str(evidence.get("field_key") or "") in targeted_fields
             }
+        if _ulaw_fee_refresh:
+            payload["extraction_method"] = _ulaw_fee_map
+            payload["scrape_warnings"] = list(payload.get("scrape_warnings") or []) + (
+                ["international_fee_varies_by_campus"]
+                if _ulaw_fee_variants.get("status") == "range"
+                else ["international_fee_no_current_applicable_cohort"]
+                if _ulaw_fee_variants.get("status") == "unresolved"
+                else []
+            )
 
         # Re-apply the guard after combining extraction passes and narrowing a
         # targeted request.  This is the last boundary before values are
@@ -2818,6 +2884,14 @@ async def re_extract_staged(
         # Preserve unrelated historical warnings and add any warnings from this
         # attempt. Resolution is evaluated after applying the fresh fields.
         warning_candidates = list(row.scrape_warnings or [])
+        if _ulaw_fee_refresh:
+            warning_candidates = [
+                warning for warning in warning_candidates
+                if warning not in {
+                    "international_fee_varies_by_campus",
+                    "international_fee_no_current_applicable_cohort",
+                }
+            ]
         for warning in list(payload.pop("scrape_warnings", []) or []):
             if warning not in warning_candidates:
                 warning_candidates.append(warning)
@@ -2944,6 +3018,8 @@ async def re_extract_staged(
         progress_fields = (
             set(changed_fields) | provenance_changed_fields
         )
+        if _ulaw_variants_changed:
+            progress_fields.add("international_fee")
         if requirement_status_changed:
             old_academic_state = (
                 (previous_requirement_status or {}).get("academic") or {}
@@ -3869,12 +3945,15 @@ async def analyze_staged(
     courses_with_url = sum(1 for r in rows if r.course_website)
 
     issues: list[dict] = []
+    from app.services.scraper.extractors.ulaw_fees import validated_fee_variants
     for field, label in _ANALYZE_FIELDS:
         missing = sum(
             1
             for r in rows
-            if not getattr(r, field, None)
-            or (field == "course_location" and _winchester_descriptive_location(r))
+            if (
+                not getattr(r, field, None)
+                and not (field == "international_fee" and validated_fee_variants(r))
+            ) or (field == "course_location" and _winchester_descriptive_location(r))
         )
         if missing == 0:
             continue
@@ -5943,12 +6022,12 @@ async def get_course_quality_scores(
     rows = (await db.execute(
         text("""
             SELECT
-                id, course_name, international_fee, fee_term,
+                id, course_name, international_fee, fee_term, currency,
                 ielts_overall, ielts_reading, ielts_writing,
                 ielts_listening, ielts_speaking,
                 pte_overall, toefl_overall, cambridge_overall, duolingo_overall,
                 study_mode, degree_level, course_location, intake_months,
-                duration, duration_term, course_website
+                duration, duration_term, course_website, fee_year, extraction_method
             FROM scraped_courses
             WHERE university_id = :uni_id
               AND status IN ('pending', 'review')
@@ -5960,6 +6039,7 @@ async def get_course_quality_scores(
     # Issue code → short chip label shown in the table
     _CHIP: dict[str, str] = {
         "missing_international_fee":             "Missing Fee",
+        "international_fee_campus_review":       "Campus Fee Review",
         "domestic_fee_only_no_international":    "Domestic Fee Risk",
         "fee_too_low":                           "Fee Too Low",
         "fee_too_high":                          "Fee Too High",
@@ -5997,6 +6077,7 @@ async def get_course_quality_scores(
     _FIELD_CODES: dict[str, set[str]] = {
         "fee": {
             "missing_international_fee",
+            "international_fee_campus_review",
             "domestic_fee_only_no_international",
             "fee_too_low", "fee_too_high", "non_numeric_fee",
             "missing_international_fee_central_page",
@@ -6035,6 +6116,10 @@ async def get_course_quality_scores(
             "course_name":       row["course_name"],
             "international_fee": row["international_fee"],
             "fee_term":          row["fee_term"],
+            "fee_currency":      row["currency"],
+            "fee_year":          row.get("fee_year"),
+            "course_website":    row["course_website"],
+            "extraction_method": row.get("extraction_method"),
             "domestic_fee":      None,
             "ielts_overall":     row["ielts_overall"],
             "ielts_reading":     row["ielts_reading"],
@@ -6092,7 +6177,8 @@ async def get_course_quality_scores(
             has_warn = any(i.severity == "warning" for i in fi)
 
             if field_name == "fee":
-                fill = payload["international_fee"] is not None
+                from app.services.scraper.extractors.ulaw_fees import validated_fee_variants
+                fill = payload["international_fee"] is not None or bool(validated_fee_variants(payload))
             elif field_name == "ielts":
                 fill = any(
                     payload.get(k) is not None

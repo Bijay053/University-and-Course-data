@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { PublishedFeeVariants, feeVariantAuthority, feeVariantNeedsReview, type FeeVariantCarrier } from "@/components/published-fee-variants";
 import { shouldLoadForBackgroundJob } from "@/utils/scraping-poll-guard";
 import { mergeReextractFieldResults } from "@/utils/reextract-field-aggregation";
 import { useListUniversities } from "@workspace/api-client-react";
@@ -151,7 +152,7 @@ function resultFromCompletedStatus(data: ScrapeStatusResponse): ScrapeLog {
   };
 }
 
-type StagedCourse = {
+type StagedCourse = FeeVariantCarrier & {
   id: number;
   scrapeJobId: string;
   universityId: number;
@@ -2389,6 +2390,10 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
 
   const handleApproveSelected = async () => {
     if (!reviewJobId || selectedIds.size === 0) return;
+    if (stagedCourses.some(c => selectedIds.has(c.id) && feeVariantNeedsReview(c))) {
+      toast({ title: "Fee variant review required", description: "Resolve the applicable campus, year and study variant before approving these courses.", variant: "destructive" });
+      return;
+    }
 
     // Quality gate — warn before approving risky courses
     const blockedIds = Array.from(selectedIds).filter(
@@ -2457,6 +2462,11 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   };
 
   const handleApproveSingle = async (id: number) => {
+    const course = stagedCourses.find(c => c.id === id);
+    if (course && feeVariantNeedsReview(course)) {
+      toast({ title: "Fee variant review required", description: "Resolve the applicable campus, year and study variant before approving this course.", variant: "destructive" });
+      return;
+    }
     setApprovingId(id);
     try {
       const res = await fetch(`/api/scrape/staged/${id}/approve`, { method: "POST" });
@@ -3914,7 +3924,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                           {course.duration ? `${course.duration} ${course.durationTerm || ""}` : <span className="text-gray-300">-</span>}
                         </td>
                         <td className="p-2 text-right font-medium whitespace-nowrap">
-                          {course.internationalFee ? (() => {
+                          {feeVariantAuthority(course) ? <PublishedFeeVariants course={course} id={course.id} /> : course.internationalFee ? (() => {
                             const _CURR_MAP: Record<string, string> = { GBP: "£", USD: "$", EUR: "€", MYR: "RM", NZD: "NZ$", CAD: "CA$", SGD: "S$", AUD: "A$" };
                             const currSym = (course.currency && _CURR_MAP[course.currency]) ? _CURR_MAP[course.currency] : (course.currency ? `${course.currency} ` : "A$");
                             const isFullCourse = (course.feeTerm || "").toLowerCase().includes("full");
@@ -4097,8 +4107,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                                 variant="ghost"
                                 className={`h-7 w-7 ${qData && qData.score < 60 ? "text-gray-300 cursor-not-allowed" : "text-green-600 hover:bg-green-50"}`}
                                 onClick={qData && qData.score < 60 ? undefined : () => handleApproveSingle(course.id)}
-                                disabled={approvingId === course.id || (qData !== undefined && qData.score < 60)}
-                                title={qData && qData.score < 60 ? `Cannot approve — Data Quality Failure (score ${qData.score}%)` : "Approve and publish this course"}
+                                disabled={approvingId === course.id || feeVariantNeedsReview(course) || (qData !== undefined && qData.score < 60)}
+                                title={feeVariantNeedsReview(course) ? "Cannot approve — fee variant review required" : qData && qData.score < 60 ? `Cannot approve — Data Quality Failure (score ${qData.score}%)` : "Approve and publish this course"}
                               >
                                 {approvingId === course.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                               </Button>
@@ -4746,6 +4756,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
               </div>
               <div>
                 <label className="text-xs font-medium text-gray-500 mb-1 block">Fee Amount</label>
+                {feeVariantAuthority(editingCourse) && <PublishedFeeVariants course={editingCourse} id={`edit-${editingCourse.id}`} />}
                 <Input type="number" value={editingCourse.internationalFee ?? ""} onChange={(e) => setEditingCourse({ ...editingCourse, internationalFee: e.target.value ? parseFloat(e.target.value) : null })} />
               </div>
               <div className="flex gap-2">

@@ -179,6 +179,36 @@ function initialReview(): ScrapingInitialReviewState {
 }
 
 describe("Scraping repair reviewer", () => {
+  it("renders persisted campus alternatives in the main review and blocks scalar-free approval", async () => {
+    const review = initialReview();
+    const options = [17500, 19050].map((amount, index) => ({
+      amount, currency: "GBP", year: 2026, period: "Full Course",
+      campus: index ? "London" : "Outside London", study_variant: "Standard",
+      source_url: "https://www.law.ac.uk/study/postgraduate/business/msc-healthcare-management/",
+      snippet: "International Students | 2026 | Full Course",
+    }));
+    review.courses = [{
+      ...review.courses[0], internationalFee: null,
+      extraction_method: { fee_variants: { status: "range", selected: options, options } },
+    }] as ScrapingInitialReviewState["courses"];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ScrapingForTest initialReviewState={review} />);
+    expect(screen.getByTestId(`fee-summary-${review.courses[0].id}`).textContent)
+      .toBe("£17,500–£19,050 GBP · 2026 · Full Course");
+    const approve = screen.getByTitle("Cannot approve — fee variant review required") as HTMLButtonElement;
+    expect(approve.disabled).toBe(true);
+    await userEvent.click(approve);
+    expect(fetchMock.mock.calls.some(args => String(args[0]).endsWith("/approve"))).toBe(false);
+  });
+
   it.each([6.0, 6.5, null])("keeps available IELTS %s visible alongside Unverified", async (score) => {
     const review = initialReview();
     review.courses = [{

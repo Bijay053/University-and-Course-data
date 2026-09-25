@@ -412,7 +412,27 @@ def _check_course(
                 return thresh
         return 80_000.0  # conservative fallback
 
-    if intl_fee is None:
+    from app.services.scraper.extractors.ulaw_fees import validated_fee_variants
+    _owned_fee_variants = validated_fee_variants(payload)
+    if intl_fee is None and _owned_fee_variants:
+        add("warning", "international_fee_campus_review",
+            "Official international tuition recovered: campus prices differ; select and review the campus fee before publishing.")
+        # Recovery of a range must not waive existing low/high/domestic/period
+        # checks. Evaluate each official option with the unchanged scalar rules;
+        # never run missing-fee checks against an invented universal price.
+        _seen_variant_issues = set()
+        for option in _owned_fee_variants["selected"]:
+            candidate = {**payload, "international_fee": option["amount"]}
+            candidate.pop("extraction_method", None)
+            for issue in _check_course(
+                candidate, url, campus_allowlist, default_currency,
+                require_international_fee, crit_min_aud_override, warn_max_aud_override,
+            ):
+                signature = (issue.code, issue.message)
+                if "fee" in issue.code and signature not in _seen_variant_issues:
+                    issues.append(issue)
+                    _seen_variant_issues.add(signature)
+    elif intl_fee is None:
         # Detect CSP / domestic-only fee situation — when a domestic fee
         # (HECS / Commonwealth Supported Place) is present but no international
         # fee was extracted, it means the page only published domestic pricing.

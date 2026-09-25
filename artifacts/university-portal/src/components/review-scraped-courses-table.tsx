@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { PublishedFeeVariants, feeVariantAuthority, feeVariantSummary, type FeeVariantCarrier } from "@/components/published-fee-variants";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, ExternalLink, ChevronRight, ChevronDown, RefreshCw, RotateCcw, CheckCircle2, XCircle, Loader2, SearchX, FileSearch, Ban, Globe, FileWarning } from "lucide-react";
 
@@ -19,7 +20,7 @@ export type ReviewEvidenceItem = {
   selected: boolean;
 };
 
-export type ReviewStagedCourse = {
+export type ReviewStagedCourse = FeeVariantCarrier & {
   id: number;
   courseName: string | null;
   category: string | null;
@@ -96,6 +97,7 @@ interface Props {
 // ---------------------------------------------------------------------------
 
 function feeDisplay(c: ReviewStagedCourse) {
+  if (feeVariantAuthority(c)) return <PublishedFeeVariants course={c} id={c.id} />;
   if (c.internationalFee == null || c.internationalFee === "") return null;
   const _CURRENCY_SYMBOLS: Record<string, string> = {
     GBP: "£", USD: "$", EUR: "€", NZD: "NZ$", CAD: "CA$", SGD: "S$",
@@ -172,7 +174,7 @@ function finalValueForField(course: ReviewStagedCourse, fieldKey: string): strin
     }
     case "studyMode":         return v(course.studyMode);
     case "degreeLevel":       return v(course.degreeLevel);
-    case "internationalFee":  return course.internationalFee != null && course.internationalFee !== "" ? `${course.currency ?? "AUD"} ${course.internationalFee}` : null;
+    case "internationalFee":  return feeVariantSummary(course) ?? (course.internationalFee != null && course.internationalFee !== "" ? `${course.currency ?? "AUD"} ${course.internationalFee}` : null);
     case "ieltsOverall":      return v(course.ieltsOverall);
     case "pteOverall":        return v(course.pteOverall);
     case "toeflOverall":      return v(course.toeflOverall);
@@ -312,7 +314,8 @@ function EvidencePanel({ evidence, course }: { evidence: ReviewEvidenceItem[]; c
           const finalValue = course ? finalValueForField(course, fieldKey) : null;
           const selected = items.find((it) => it.selected) ?? null;
           const selectedValue = selected?.normalizedValue ?? selected?.candidateValue ?? null;
-          const mismatch = !!course && !looselyEqual(finalValue, selectedValue);
+          const hasPublishedAlternatives = !!course && toCamel(fieldKey) === "internationalFee" && !!feeVariantSummary(course);
+          const mismatch = !!course && !hasPublishedAlternatives && !looselyEqual(finalValue, selectedValue);
           return (
           <div key={fieldKey} className={`bg-white border rounded overflow-hidden ${mismatch ? "border-red-300" : "border-slate-200"}`}>
             <div className={`px-3 py-1.5 border-b text-xs font-mono font-semibold flex items-center gap-2 ${mismatch ? "bg-red-50 border-red-200 text-red-800" : "bg-slate-100 border-slate-200 text-slate-700"}`}>

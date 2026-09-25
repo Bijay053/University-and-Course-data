@@ -5458,13 +5458,22 @@ async def extract_course(
         # evidence of online-only delivery.  Downgrading would incorrectly
         # reject legitimate on-campus courses at the online_only guard.
         _has_extracted_fee = payload.get("international_fee") is not None
+        if not _has_extracted_fee:
+            # A course-owned international campus range is the same positive
+            # offering evidence as a scalar. Do not reject the course as
+            # online-only merely because no universal price was invented.
+            from app.services.scraper.extractors.ulaw_fees import parse_course_fees
+            _ulaw_offering_fee = parse_course_fees(html or "", url)
+            _has_extracted_fee = bool(
+                _ulaw_offering_fee and _ulaw_offering_fee.get("selected")
+            )
         if _has_extracted_fee:
             log.info(
                 "[STUDY_MODE OVERRIDE SKIPPED] course=%r — rule-only 'On Campus' "
                 "but international_fee=%r already extracted; location miss is a "
                 "scrape failure, not online delivery evidence. Keeping On Campus.",
                 payload.get("course_name") or url,
-                payload["international_fee"],
+                payload.get("international_fee"),
             )
         else:
             payload["study_mode"] = "Online"
@@ -11205,6 +11214,12 @@ async def extract_course(
             if _key in _apu_authoritative_values:
                 payload[_key] = _apu_authoritative_values[_key]
 
+    # Reapply course-owned ULaw audience/year/route authority atomically after
+    # every fallback. Broad-page candidates and domestic reject-keyword
+    # evidence must not detach the price from its selected cohort.
+    from app.services.scraper.extractors.ulaw_fees import apply_course_fee_authority
+    _ulaw_fee_authority = apply_course_fee_authority(html or "", url, payload, evidence)
+
     footer = build_course_page_provenance_footer(payload)
 
     # Build extraction_method provenance map.
@@ -11228,6 +11243,21 @@ async def extract_course(
     # Persist in payload so stage_course can store it without schema changes to
     # extract_course's callers (it is stripped in stage_course before DB write).
     _attach_extraction_method_map(payload, evidence)
+    if _ulaw_fee_authority:
+        payload.setdefault("extraction_method", {})["fee_variants"] = _ulaw_fee_authority
+        if _ulaw_fee_authority["status"] == "uniform":
+            payload["scrape_warnings"] = [
+                warning for warning in payload.get("scrape_warnings", [])
+                if warning != "fee_section_detected_fee_blank"
+            ]
+        if _ulaw_fee_authority["status"] != "uniform":
+            _fee_warning = (
+                "international_fee_varies_by_campus"
+                if _ulaw_fee_authority["status"] == "range"
+                else "international_fee_no_current_applicable_cohort"
+            )
+            if _fee_warning not in payload.setdefault("scrape_warnings", []):
+                payload["scrape_warnings"].append(_fee_warning)
 
     # ── Confidence scoring ─────────────────────────────────────────────────
     # Compute a 0-100 aggregate confidence score for this course payload based

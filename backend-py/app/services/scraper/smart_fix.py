@@ -68,9 +68,14 @@ async def refresh_central_recovery(config, targets, previous, timeout):
 
 def smart_retry_fields(targeted_fields, row, payload):
     """A new central profile cannot replace improvements from the first pass."""
+    from app.services.scraper.extractors.ulaw_fees import validated_fee_variants
+    owned_fee = validated_fee_variants({
+        "course_website": getattr(row, "course_website", None), **payload,
+    })
     return {
         field for field in targeted_fields
         if not payload.get(field) or payload.get(field) == getattr(row, field, None)
+        if not (field in {"international_fee", "fee_year", "fee_term", "currency"} and owned_fee)
     }
 
 
@@ -200,7 +205,18 @@ async def run_smart_batch(body, db):
             continue
         # Force corrections can change values without resolving an analyzer issue.
         before_issues = set(plan_targets(before["issues"], targets))
-        resolved = sorted(before_issues - unresolved)
+        authoritative_corrections = set()
+        if (
+            "international_fee" in body.force_fields
+            and "international_fee" in item.get("progress_fields", [])
+            and "international_fee" not in unresolved
+        ):
+            from app.models import ScrapedCourse
+            from app.services.scraper.extractors.ulaw_fees import validated_fee_variants
+            corrected_row = await db.get(ScrapedCourse, course_id)
+            if corrected_row is not None and validated_fee_variants(corrected_row):
+                authoritative_corrections.add("international_fee")
+        resolved = sorted((before_issues - unresolved) | authoritative_corrections)
         item.update({
             **base, "attempted": True,
             "resolved_fields": resolved, "unresolved_fields": sorted(unresolved),

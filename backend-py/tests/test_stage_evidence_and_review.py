@@ -27,6 +27,156 @@ from app.services.scraper.stage_course import stage_course
 from app.services.scraper.replay_extraction import restore_review_rows
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("smart", [False, True])
+async def test_ulaw_normal_targeted_reextract_persists_course_owned_range(monkeypatch, smart):
+    """Run the real extractor, staging and normal re-extract persistence path."""
+    import os
+    from pathlib import Path
+    from app.routers.scrape import ReExtractBody, re_extract_staged
+    from app.services.scraper.config.context import current_uni_config
+    from app.services.scraper.config.loader import load_uni_config
+    from app.services.scraper.pipelines.single_course import extract_course
+
+    uni_id = await _pick_university()
+    job_id = f"test_ulaw_range_{uuid.uuid4().hex[:10]}"
+    url = "https://www.law.ac.uk/study/postgraduate/business/msc-healthcare-management/"
+    html = """<html><main><h1>MSc Healthcare Management</h1>
+    <a role="tab" href="#f">International Students</a><div id="f"><table>
+    <tr><td>2026/27 Course Fees</td><td></td></tr>
+    <tr><td>London</td><td>£19,050 (or £16,050 including a £3,000 bursary)</td></tr>
+    <tr><td>Outside London</td><td>£17,500</td></tr></table></div></main></html>"""
+    # Optional replay of an unmodified current official Healthcare page. The
+    # ordinary suite remains deterministic/offline; acceptance uses the exact
+    # same full pipeline and DB assertions, not a separate parser-only harness.
+    if live_html_path := os.environ.get("ULAW_LIVE_HTML_FILE"):
+        html = Path(live_html_path).read_text()
+    cfg = load_uni_config(slug="law_1902", name="University of Law",
+                          scrape_url="https://www.law.ac.uk/study/", create_missing_stub=False)
+
+    async def no_ai(*args, **kwargs):
+        return {}, 0.0, 0, 0, {"skipped": True}
+
+    async def full_extract(link, **kwargs):
+        token = current_uni_config.set(cfg)
+        try:
+            return await extract_course(link["url"], html=html, country="United Kingdom", use_ai_fallback=False)
+        finally:
+            current_uni_config.reset(token)
+
+    async def no_central(*args, **kwargs):
+        return {}
+
+    async def no_fee_shortcut(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr("app.services.scraper.extractors.ulaw_fees.recover_course_fee_only", no_fee_shortcut)
+    monkeypatch.setattr("app.services.scraper.extractors.gemini_primary.extract_primary", no_ai)
+    monkeypatch.setattr("app.services.scraper.orchestrator._extract_only", full_extract)
+    monkeypatch.setattr("app.services.scraper.central_pages.prefetch_central_pages", no_central)
+    try:
+        fresh = await full_extract({"url": url})
+        async with AsyncSessionLocal() as db:
+            db.add(ScrapeRuntimeJob(runtime_job_id=job_id, university_id=uni_id, job_type="scrape", status="completed"))
+            await db.flush()
+            token = current_uni_config.set(cfg)
+            try:
+                staged = await stage_course(
+                    db, scrape_job_id=job_id, university_id=uni_id,
+                    course_name="MSc Healthcare Management", source_url=url,
+                    payload=fresh["payload"], evidence=fresh["evidence"],
+                )
+            finally:
+                current_uni_config.reset(token)
+            assert staged.saved, staged.reason
+            await db.commit()
+            row = await db.get(ScrapedCourse, staged.scraped_course_id)
+            assert row.extraction_method["fee_variants"]["status"] == "range"
+            # Legacy contaminated scalar and companions must be removed, while
+            # a targeted fee request cannot modify unrelated reviewer values.
+            row.international_fee = 16900
+            row.fee_term = "Annual"
+            row.fee_year = 2027
+            row.currency = "AUD"
+            row.course_location = "Reviewer verified campus"
+            row.ielts_overall = 7.5
+            row.extraction_method = {"ielts_overall": "manual"}
+            await db.commit()
+            result = await re_extract_staged(ReExtractBody(
+                ids=[row.id], universityId=uni_id,
+                smart=smart,
+                targetFields=["international_fee"], forceFields=["international_fee"],
+                forceReasons={"international_fee": "Official course international tab contradicts legacy domestic amount"},
+            ), db)
+            assert result["errors"] == 0, result
+            await db.refresh(row)
+            assert row.international_fee is None
+            assert row.fee_term == "Full Course"
+            assert row.fee_year == 2026
+            assert row.currency == "GBP"
+            assert row.extraction_method["fee_variants"]["status"] == "range"
+            assert row.extraction_method["ielts_overall"] == "manual"
+            assert row.course_location == "Reviewer verified campus"
+            assert row.ielts_overall == 7.5
+            assert row.status not in {"approved", "published"}
+            assert result["results"][0]["made_progress"] is True
+            evidence = (await db.execute(select(ScrapedFieldEvidence).where(
+                ScrapedFieldEvidence.scraped_course_id == row.id,
+                ScrapedFieldEvidence.field_key == "international_fee",
+            ))).scalars().all()
+            assert any("19,050" in (item.snippet or "") for item in evidence)
+            from app.routers.scrape import analyze_staged, _staged_row_to_dict
+            from app.services.auto_publish import should_auto_publish
+            from app.services.scraper.data_quality import _check_course
+            from app.services.scraper.smart_fix import run_smart_batch
+
+            analysis = await analyze_staged(ReExtractBody(ids=[row.id], universityId=uni_id), db)
+            assert not any(item["field"] == "international_fee" for item in analysis["issues"])
+            serialized = _staged_row_to_dict(row)
+            assert serialized["extractionMethod"]["fee_variants"]["status"] == "range"
+            assert serialized["extraction_method"] == serialized["extractionMethod"]
+            quality = _check_course(serialized, url)
+            codes = {item.code for item in quality}
+            assert "international_fee_campus_review" in codes
+            assert "missing_international_fee" not in codes
+            row.completeness = 100
+            decision = should_auto_publish(row)
+            assert not decision.auto_publish
+            assert "campus" in decision.reason.lower()
+
+            # The actual SmartFix analyzer→normal recovery→analyzer round-trip,
+            # not merely the endpoint's internal made_progress flag.
+            row.extraction_method = {"ielts_overall": "manual"}
+            await db.commit()
+            smart_result = await run_smart_batch(ReExtractBody(
+                ids=[row.id], universityId=uni_id, smart=True,
+                targetFields=["international_fee"],
+            ), db)
+            item = smart_result["results"][0]
+            assert item["resolved_fields"] == ["international_fee"], item
+            assert item["unresolved_fields"] == []
+            assert item["made_progress"] is True
+            assert item["reason_code"] == "issues_resolved"
+            again = await run_smart_batch(ReExtractBody(
+                ids=[row.id], universityId=uni_id, smart=True,
+                targetFields=["international_fee"],
+            ), db)
+            assert again["results"][0]["attempted"] is False
+            row.international_fee = 16900
+            row.extraction_method = {"ielts_overall": "manual"}
+            await db.commit()
+            correction = await run_smart_batch(ReExtractBody(
+                ids=[row.id], universityId=uni_id, smart=True,
+                targetFields=["international_fee"], forceFields=["international_fee"],
+                forceReasons={"international_fee": "The stored domestic scalar contradicts the official international course fee"},
+            ), db)
+            assert correction["results"][0]["resolved_fields"] == ["international_fee"]
+            assert correction["results"][0]["made_progress"] is True
+            assert row.auto_publish_status == "review"
+    finally:
+        await _cleanup(job_id)
+
+
 @pytest.fixture(autouse=True)
 async def _dispose_engine_per_test():
     await engine.dispose()
