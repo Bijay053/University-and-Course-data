@@ -248,3 +248,165 @@ async def test_quality_endpoint_marks_persisted_range_recovered_but_review_requi
     assert "missing_international_fee" not in codes
     assert "international_fee_campus_review" in codes
     assert fee["quality"] != "missing"
+
+
+# The entire authorized 85-row job, not a hand-picked sample. These are full
+# official HTML responses captured once on 2026-09-25 (no network in tests).
+# Amount expectations below are reviewed against the published fee panels.
+def _population():
+    import gzip
+    import json
+    from pathlib import Path
+    path = Path(__file__).parent / "fixtures" / "ulaw_live_85_20260925.json.gz"
+    with gzip.open(path, "rt") as handle:
+        return {row["id"]: row for row in json.load(handle)["rows"]}
+
+
+POPULATION = _population()
+EXPECTED = {}
+for ids, amounts, period, year in [
+    ([40987, 40988, 40989, 40990, 40991, 41008, 41026, 41030, 41036, 41037, 41038, 41064, 41065], [18100, 17200], "Annual", 2026),
+    ([40992], [22800, 20950], "Annual", 2026),
+    ([41022, 41024, 41025], [17550, 16700], "Annual", 2026),
+    ([41023], [18100, 17200], "Annual", 2027),
+    ([40993, 40994, 40995, 40996, 40997, 40998, 40999, 41000, 41002, 41009,
+      41010, 41011, 41012, 41013, 41014, 41015, 41016, 41027, 41028, 41034,
+      41040, 41041, 41042, 41043, 41044, 41045, 41046, 41047, 41048, 41049,
+      41050, 41051, 41057, 41058, 41059, 41060], [19600, 18250], "Full Course", 2026),
+    ([41003], [13150, 12200, 6600, 6150], "Full Course", 2026),
+    ([41004, 41005, 41006, 41007, 41029, 41031, 41032, 41054, 41071], [19050, 17500], "Full Course", 2026),
+    ([41017], [18850, 15150], "Full Course", 2026),
+    ([41018], [20550, 17400], "Full Course", 2026),
+    ([41019], [15450, 12450], "Full Course", 2026),
+    ([41033], [18500, 17000], "Full Course", 2025),
+    ([41035, 41039, 41053, 41063, 41067], [17500, 16500], "Full Course", 2026),
+    ([41052], [17550, 16700], "Full Course", 2026),
+    ([41055, 41068, 41069, 41070], [20600, 20600], "Full Course", 2026),
+    ([41056], [20100, 18700], "Full Course", 2027),
+    ([41061], [14150, 11350], "Full Course", 2026),
+    ([41062], [18100, 17200], "Full Course", 2026),
+    ([41066], [18650, 17700], "Full Course", 2027),
+]:
+    for course_id in ids:
+        assert course_id not in EXPECTED
+        EXPECTED[course_id] = (amounts, period, year)
+
+UNRESOLVED = {
+    41001: "LPC is closed to new applications and publishes no current tuition",
+    41020: "SQE1 preparation tuition has no explicit international applicability",
+    41021: "SQE2 preparation tuition has no explicit international applicability",
+}
+assert len(POPULATION) == 85
+assert set(EXPECTED) | set(UNRESOLVED) == set(POPULATION)
+assert len(EXPECTED) == 82
+
+
+@pytest.mark.parametrize("course_id", sorted(POPULATION))
+def test_complete_frozen_ulaw_population(course_id):
+    from app.services.scraper.extractors.ulaw_fees import METHOD, validated_fee_variants
+    from app.services.scraper.data_quality import _check_course
+
+    row = POPULATION[course_id]
+    result = parse_course_fees(row["html"], row["url"], today=TODAY)
+    if course_id in UNRESOLVED:
+        assert result is None, UNRESOLVED[course_id]
+        return
+    amounts, term, year = EXPECTED[course_id]
+    assert [o["amount"] for o in result["selected"]] == amounts
+    assert result["fee_term"] == term
+    assert result["fee_year"] == year
+    uniform = len(set(amounts)) == 1
+    assert result["status"] == ("uniform" if uniform else "range")
+    assert result["international_fee"] == (amounts[0] if uniform else None)
+    assert result["currency"] == "GBP"
+    assert all(o["source_url"] == row["url"] and o["snippet"] for o in result["options"])
+    stored = {
+        "course_website": row["url"], **{k: result[k] for k in
+        ("international_fee", "fee_year", "fee_term", "currency")},
+        "extraction_method": {"international_fee": METHOD, "fee_variants": result},
+    }
+    assert validated_fee_variants(stored) == result
+    codes = {issue.code for issue in _check_course(stored, row["url"])}
+    assert "missing_international_fee" not in codes
+    assert "fee_too_low" not in codes
+    assert ("international_fee_campus_review" in codes) == (not uniform)
+
+
+def test_live_population_preserves_campus_award_numeric_and_year_boundaries():
+    def parsed(course_id):
+        row = POPULATION[course_id]
+        return parse_course_fees(row["html"], row["url"], today=TODAY)
+    assert [o["campus"] for o in parsed(40990)["selected"]] == ["London", "Non London"]
+    assert [o["campus"] for o in parsed(41052)["selected"]] == ["London Bloomsbury", "Birmingham/Manchester"]
+    assert {o["study_variant"] for o in parsed(41003)["selected"]} == {"PG Dip", "PG Cert"}
+    assert {o["study_variant"] for o in parsed(41011)["selected"]} == {"LLM Master of Law (International)"}
+    maritime = parsed(41051)
+    assert [o["amount"] for o in maritime["selected"]] == [19600, 18250]
+    assert [(o["year"], o["amount"]) for o in maritime["options"]] == [
+        (2026, 19600), (2026, 18250), (2027, 20100), (2027, 18700),
+    ]
+    assert [o["amount"] for o in parsed(41063)["selected"]] == [17500, 16500]
+
+
+def test_bursary_applicability_is_course_and_year_scoped_not_a_global_default():
+    for course_id in (41017, 41019, 41061):
+        source = POPULATION[course_id]
+        result = parse_course_fees(source["html"], source["url"], today=TODAY)
+        assert {o["year"] for o in result["options"]} == {2026}
+        # Future unlabeled prices do not inherit a prior cohort's evidence.
+        future = parse_course_fees(source["html"], source["url"], today=date(2028, 9, 25))
+        assert future["status"] == "unresolved"
+    html = page(heading() + row("London", "£6,500"), label="Fees")
+    html += "<p>International scholarships and bursaries available</p><p>SRA exam fee £2,070</p>"
+    assert parse_course_fees(html, URL, today=TODAY) is None
+
+
+def test_top_up_period_does_not_borrow_an_unrelated_courses_duration():
+    url = "https://www.law.ac.uk/study/undergraduate/law/llb-law-top-up/"
+    html = page(heading() + row("London", "£18,100"), title="LLB Law (Top up)")
+    html += "<aside><p>Related business course: top up in one year</p></aside>"
+    assert parse_course_fees(html, url, today=TODAY)["fee_term"] is None
+    html += '<div id="overview"><p>Top up your law diploma in one year.</p></div>'
+    assert parse_course_fees(html, url, today=TODAY)["fee_term"] == "Full Course"
+
+
+@pytest.mark.asyncio
+async def test_all_live_population_fee_only_recovery_is_one_fetch_and_fee_only(monkeypatch):
+    import httpx
+    import app.services.scraper.extractors.ulaw_fees as module
+    from collections import Counter
+
+    class FrozenDate(date):
+        @classmethod
+        def today(cls):
+            return TODAY
+
+    monkeypatch.setattr(module, "date", FrozenDate)
+    urls = {row["url"]: row["html"] for row in POPULATION.values()}
+    fetched = Counter()
+
+    def transport(request):
+        url = str(request.url)
+        fetched[url] += 1
+        return httpx.Response(200, text=urls[url])
+
+    original = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: original(
+        **kwargs, transport=httpx.MockTransport(transport),
+    ))
+    states = Counter()
+    for course_id, row in POPULATION.items():
+        recovered = await module.recover_course_fee_only(row["url"])
+        if course_id in UNRESOLVED:
+            assert recovered is None
+            states["unresolved"] += 1
+            continue
+        authority = module.validated_fee_variants(recovered["payload"])
+        assert authority
+        states[authority["status"]] += 1
+        assert set(recovered["payload"]) == {
+            "course_website", "international_fee", "fee_year", "fee_term", "currency",
+            "extraction_method",
+        }
+    assert states == {"range": 78, "uniform": 4, "unresolved": 3}
+    assert len(fetched) == 85 and set(fetched.values()) == {1}

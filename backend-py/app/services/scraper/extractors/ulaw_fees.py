@@ -68,10 +68,17 @@ def validated_fee_variants(row) -> dict | None:
     return value
 _YEAR = re.compile(r"\b(20\d{2})/\d{2}\s+Course Fees?", re.I)
 _MONEY = re.compile(r"£\s*([\d,]+(?:\.\d{2})?)")
-_INTL = re.compile(r"^International\s+(?:Students|students|\(non-domestic\)\s*students)", re.I)
+_INTL = re.compile(
+    r"^(?:PG\s*(?:Dip|Cert)\s+)?(?:International\s+(?:Students|\(non-domestic\)\s*students)"
+    r"|Non[-\s]domestic(?:\s+students)?)\b", re.I,
+)
 _VARIANT = re.compile(
     r"(professional practice|foundation year|postgraduate diploma|postgraduate certificate|"
-    r"LLM Master of Laws)", re.I
+    r"PG\s*Dip|PG\s*Cert|LLM Master of Laws?)", re.I
+)
+_CAMPUS = (
+    r"Outside(?: of)? London|Non[- ]London|London(?: Bloomsbury| Moorgate| and Outside London)?"
+    r"|Birmingham/Manchester|All locations|All campuses"
 )
 _DATES = re.compile(
     r"between\s+(\d{1,2}\s+\w+\s+20\d{2})\s*[-–]\s*(\d{1,2}\s+\w+\s+20\d{2})",
@@ -106,8 +113,36 @@ def parse_course_fees(html: str, url: str, *, today: date | None = None) -> dict
     if not is_ulaw_course(url):
         return None
     soup = BeautifulSoup(html, "html.parser")
+    # Rich-text editors split digits across adjacent inline spans/strong tags
+    # (e.g. £1<span>6,500</span>, <strong>2</strong><strong>027/28</strong>).
+    # Preserve browser-visible adjacency before adding block-text separators.
+    for inline in soup.find_all(["span", "strong", "em", "u", "b", "i"]):
+        inline.unwrap()
+    soup.smooth()
     title = soup.find("h1")
     title_text = title.get_text(" ", strip=True) if title else ""
+    # A top-up is a complete award, not the annual price of a longer LLB.
+    # Require the course's own introduction to explicitly describe one year.
+    intro = " ".join(
+        node.get_text(" ", strip=True) for node in soup.find_all(["p", "li"])
+        if node.find_parent(id=["overview", "course-details-header-intro"])
+        and "top up" in node.get_text(" ", strip=True).lower().replace("-", " ")
+    )
+    top_up_total = bool(
+        re.search(r"top[\s-]*up", title_text, re.I)
+        and re.search(r"(?:one|1)[-\s]+year", intro, re.I)
+    )
+    if re.search(r"top[\s-]*up", title_text, re.I) and not top_up_total:
+        for heading in soup.find_all(["h2", "h3"]):
+            if heading.get_text(" ", strip=True).lower() == "course structure":
+                block = heading.find_parent(class_="accordionblock")
+                years = re.findall(r"\bYear\s+(\d+)\b", block.get_text(" ", strip=True)) if block else []
+                top_up_total = bool(years and set(years) == {"1"})
+    course_intro = soup.find(id="course-details-header-intro")
+    intro_text = course_intro.get_text(" ", strip=True) if course_intro else ""
+    joint_awards = bool(re.search(
+        r"Postgraduate Diploma and Postgraduate Certificate", intro_text, re.I,
+    ))
     panels = []
     for a in soup.select('a[role="tab"][href^="#"]'):
         label = a.get_text(" ", strip=True)
@@ -118,15 +153,33 @@ def parse_course_fees(html: str, url: str, *, today: date | None = None) -> dict
             panels.append((target, False))
     options = []
     for panel, international_panel in panels:
+        nodes = [
+            node for node in panel.find_all(["tr", "p", "li", "h3", "h4"])
+            if node.name == "tr" or not node.find_parent("tr")
+        ]
+        # A year's own fee-reduction note explicitly addresses international
+        # full-time students. This is not an institution-wide home-fee default.
+        cohort_international_notes = {}
+        note_year = None
+        for node in nodes:
+            text = node.get_text(" ", strip=True)
+            ym = _YEAR.search(text)
+            if ym:
+                note_year = int(ym[1])
+            elif note_year and re.search(
+                rf"^Full.time international students\b.*fee reduction.*{note_year}/\d{{2}}",
+                text, re.I,
+            ):
+                cohort_international_notes[note_year] = text
         year = None
         year_heading = ""
         variant = "Standard"
         audience = international_panel
+        audience_label = "International Students"
+        domestic_scope = False
         term = None
         # Paragraphs nested inside rows are read once, as part of that row.
-        for node in panel.find_all(["tr", "p", "li", "h3", "h4"]):
-            if node.name != "tr" and node.find_parent("tr"):
-                continue
+        for node in nodes:
             text = node.get_text(" ", strip=True)
             ym = _YEAR.search(text)
             if ym:
@@ -134,20 +187,34 @@ def parse_course_fees(html: str, url: str, *, today: date | None = None) -> dict
                 year_heading = text
                 variant = "Standard"
                 audience = international_panel
+                domestic_scope = False
+                audience_label = "International Students"
                 term = None
                 continue
-            if not _MONEY.search(text) and _VARIANT.search(text):
+            inline_award = re.match(r"^(PG\s*(?:Dip|Cert))\s+(?:Non[-\s]domestic|Domestic)", text, re.I)
+            if inline_award:
+                variant = inline_award[1]
+            elif not _MONEY.search(text) and _VARIANT.search(text):
                 variant = text.rstrip(": ")
                 continue
             if not international_panel:
                 if _INTL.match(text):
                     audience = True
+                    domestic_scope = False
+                    audience_label = _INTL.match(text)[0]
                     term = "Annual" if re.search(r"per year|annual", text, re.I) else None
-                elif re.match(r"(Domestic|UK|Home)\s", text, re.I):
+                elif re.match(r"(?:PG\s*(?:Dip|Cert)\s+)?(?:Domestic|UK|Home)\b", text, re.I):
                     audience = False
+                    domestic_scope = True
                 elif node.name == "p" and not _MONEY.search(text):
                     audience = False
-            if not audience or not year:
+            audience_note = ""
+            if not audience and not domestic_scope:
+                if re.search(r"\bor\s+£.*including a\s+£.*International Bursary", text, re.I):
+                    audience_note = "Published gross course fee with an explicit International Bursary alternative"
+                elif year in cohort_international_notes:
+                    audience_note = cohort_international_notes[year]
+            if not year or (not audience and not audience_note):
                 continue
             cells = node.find_all(["td", "th"], recursive=False) if node.name == "tr" else []
             pieces = [(cells[0].get_text(" ", strip=True), cells[-1].get_text(" ", strip=True))] if len(cells) >= 2 else []
@@ -155,15 +222,14 @@ def parse_course_fees(html: str, url: str, *, today: date | None = None) -> dict
                 # br-separated paragraphs and li campus rows use an explicit
                 # campus label. Stop at the next label, not at bursary amounts.
                 for match in re.finditer(
-                    r"(Outside London|Non-London|London(?: and Outside London)?|All locations|All campuses)"
-                    r"\s*:\s*(.*?)(?=(?:Outside London|Non-London|London)\s*:|$)",
+                    rf"({_CAMPUS})\s*:\s*(.*?)(?=(?:{_CAMPUS})\s*:|$)",
                     text, re.I,
                 ):
                     pieces.append((match[1], match[2]))
             for campus, price in pieces:
                 money = _MONEY.match(price.strip())
                 if not money or not re.fullmatch(
-                    r"London|Outside London|Non-London|London and Outside London|All locations|All campuses",
+                    _CAMPUS,
                     campus, re.I,
                 ):
                     continue
@@ -172,13 +238,18 @@ def parse_course_fees(html: str, url: str, *, today: date | None = None) -> dict
                 # annual semantics must be explicitly published, not assumed.
                 period = (
                     "Annual" if re.search(r"per year|per annum|annual", price, re.I)
-                    else term or ("Full Course" if "/postgraduate/" in url else None)
+                    else term or ("Full Course" if "/postgraduate/" in url or top_up_total else None)
                 )
+                snippet = f"International Students | {year_heading} | {variant} | {campus}: {price}"
+                if audience_note:
+                    snippet += f" | International applicability: {audience_note}"
+                elif "non-domestic" in audience_label.lower():
+                    snippet += f" | Published audience: {audience_label}"
                 options.append({
                     "amount": amount, "currency": "GBP", "campus": campus,
                     "study_variant": variant, "year": year, "period": period,
                     "source_url": url,
-                    "snippet": f"International Students | {year_heading} | {variant} | {campus}: {price}",
+                    "snippet": snippet,
                 })
     if not options:
         return None
@@ -205,8 +276,10 @@ def parse_course_fees(html: str, url: str, *, today: date | None = None) -> dict
     wants_foundation = bool(re.search("foundation", title_text, re.I))
     def applicable(o):
         v = o["study_variant"].lower()
-        if "postgraduate diploma" in v or "postgraduate certificate" in v:
-            return v.split(" law")[0] in title_text.lower()
+        if re.search(r"postgraduate diploma|pg\s*dip", v):
+            return joint_awards or bool(re.search(r"postgraduate diploma|pg\s*dip", title_text, re.I))
+        if re.search(r"postgraduate certificate|pg\s*cert", v):
+            return joint_awards or bool(re.search(r"postgraduate certificate|pg\s*cert", title_text, re.I))
         if "professional practice" in v:
             return wants_practice
         if "foundation" in v:
