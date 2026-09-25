@@ -1,6 +1,5 @@
 import { Fragment, useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { PublishedFeeVariants, feeVariantAuthority, feeVariantNeedsReview, type FeeVariantCarrier } from "@/components/published-fee-variants";
-import { prepareCampusReview } from "@/lib/prepare-campus-review";
+import { PublishedFeeVariants, feeVariantAuthority, type FeeVariantCarrier } from "@/components/published-fee-variants";
 import { shouldLoadForBackgroundJob } from "@/utils/scraping-poll-guard";
 import { mergeReextractFieldResults } from "@/utils/reextract-field-aggregation";
 import { useListUniversities } from "@workspace/api-client-react";
@@ -1076,7 +1075,6 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   const campusRequest = useRef<{ jobId: string; controller: AbortController } | null>(null);
   useEffect(() => () => { campusRequest.current?.controller.abort(); }, []);
   const [campusProgress, setCampusProgress] = useState<{ done: number; total: number } | null>(null);
-  const [campusIssues, setCampusIssues] = useState<Array<{ id: number; reason?: string }>>([]);
   useEffect(() => { stagedCoursesRef.current = stagedCourses; }, [stagedCourses]);
   const [courseQualityMap, setCourseQualityMap] = useState<Record<number, CourseQualityData>>({});
   const [qualityExpanded, setQualityExpanded] = useState<Set<number>>(new Set());
@@ -1714,15 +1712,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
           ? null
           : ((payload as { lastScrape?: typeof lastScrapeInfo }).lastScrape ?? null);
         if (lastScrape) setLastScrapeInfo(lastScrape);
-        const prepared = await prepareCampusReview(data, async () => {
-          const response = await fetch(`/api/scrape/staged/${jobId}`, { signal: controller.signal, credentials: "include", cache: "no-store" });
-          if (!response.ok) throw new Error(await getFetchErrorMessage(response));
-          const fresh = await response.json();
-          return (Array.isArray(fresh) ? fresh : fresh.courses ?? []).map(normalizeStagedCourse) as StagedCourse[];
-        }, (done, total) => { if (!controller.signal.aborted) setCampusProgress({ done, total }); }, controller.signal);
         if (controller.signal.aborted) return false;
-        setCampusIssues(prepared.issues);
-        const pending = prepared.rows.filter((c: StagedCourse) => c.status === "pending");
+        const pending = data.filter((c: StagedCourse) => c.status === "pending");
 
         // If this job has been cleared by a newer scrape, auto-load the latest instead.
         const _latestJobId = latestAvailableJobIdRef.current;
@@ -1737,11 +1728,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
           const previousIds = new Set(previous.map(course => course.id));
           const selectAll = switchingJobs || previous.length === 0
             || previous.every(course => current.has(course.id));
-          const excludedChildren = new Set(prepared.results
-            .filter(result => previousIds.has(result.id) && !current.has(result.id))
-            .flatMap(result => result.courseIds));
           return new Set(pending.filter(course =>
-            selectAll || (!excludedChildren.has(course.id) && (current.has(course.id) || !previousIds.has(course.id)))
+            selectAll || current.has(course.id) || !previousIds.has(course.id)
           ).map(course => course.id));
         });
         stagedCoursesRef.current = pending;
@@ -2442,11 +2430,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       const approvedIds = new Set<number>();
       const failures: Array<{ id: number; error: string }> = [];
       let approvedCount = 0;
-      let splitCount = 0;
       let cursor = 0;
       let done = 0;
-      // Each source and its generated campus siblings are atomic on the server.
-      // Limit parallel page fetches so an entire scrape cannot exceed the proxy timeout.
+      // Limit parallel requests so an entire scrape cannot exceed the proxy timeout.
       await Promise.all(Array.from({ length: Math.min(2, ids.length) }, async () => {
         while (cursor < ids.length) {
           const sourceId = ids[cursor++];
@@ -2459,11 +2445,11 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             });
             if (!res.ok) throw new Error(await getFetchErrorMessage(res));
             const data = await readResponseJson<{
-              approvedIds: number[]; approvedCount: number; splitCount: number;
+              approvedIds: number[]; approvedCount: number; splitCount?: number;
               failed: Array<{ id: number; error: string }>; attempted: number;
             }>(res);
             if (!data || !Array.isArray(data.approvedIds) || !Number.isInteger(data.approvedCount)
-              || !Number.isInteger(data.splitCount) || !Array.isArray(data.failed) || data.attempted !== 1) {
+              || !Array.isArray(data.failed) || data.attempted !== 1) {
               throw new Error("The server returned an invalid approval response. Refresh before trying again.");
             }
             if (data.failed.length || !data.approvedIds.includes(sourceId)) {
@@ -2471,7 +2457,6 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             } else {
               data.approvedIds.forEach(id => approvedIds.add(id));
               approvedCount += data.approvedCount;
-              splitCount += data.splitCount;
             }
           } catch (error) {
             failures.push({ id: sourceId, error: error instanceof Error ? error.message : "Approval request failed. Refresh before retrying." });
@@ -2497,7 +2482,6 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       toast({
         title: `${approvedCount} course(s) approved`,
         description: [
-          splitCount > 0 ? `${splitCount} course(s) safely split by campus fee automatically.` : "",
           remaining.size > 0 ? `${remaining.size} remain pending. ${failures.slice(0, 3).map(f => f.error).join(" · ") || "Refresh and review their source data."}` : "",
           !refreshed ? "Review could not be refreshed; reload the page to see current rows." : "",
         ].filter(Boolean).join(" ") || "Selected courses were published successfully.",
@@ -2518,11 +2502,6 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
 
   const handleApproveSingle = async (id: number) => {
     if (campusLoadBusy.current) return;
-    const course = stagedCourses.find(c => c.id === id);
-    if (course && feeVariantNeedsReview(course)) {
-      toast({ title: "Fee variant review required", description: "Resolve the applicable campus, year and study variant before approving this course.", variant: "destructive" });
-      return;
-    }
     setApprovingId(id);
     try {
       const res = await fetch(`/api/scrape/staged/${id}/approve`, { method: "POST" });
@@ -2532,7 +2511,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       } else {
         toast({ title: "Could not publish", description: await getFetchErrorMessage(res), variant: "destructive" });
       }
-    } catch {}
+    } catch (error) {
+      toast({ title: "Could not publish", description: error instanceof Error ? error.message : "Approval request failed.", variant: "destructive" });
+    }
     setApprovingId(null);
   };
 
@@ -3461,7 +3442,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       )}
 
       {campusProgress && stagedCourses.length === 0 && <p role="status" className="p-3 text-blue-700">
-        Preparing separate campus courses {campusProgress.done}/{campusProgress.total}…
+        Loading courses for review…
       </p>}
       {showReview && stagedCourses.length > 0 && (() => {
         const displayedCourses = qualitySortDesc
@@ -3493,10 +3474,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
 
         return (
         <Card className="border-2 border-green-100">
-          {campusProgress && <div role="status" className="p-3 text-blue-700">Preparing separate campus courses {campusProgress.done}/{campusProgress.total}…</div>}
-          {campusIssues.length > 0 && <div role="alert" className="p-3 text-amber-800">
-            {campusIssues.map(issue => <p key={issue.id}>Course {issue.id}: {issue.reason || "Campus evidence requires review."}</p>)}
-          </div>}
+          {campusProgress && <div role="status" className="p-3 text-blue-700">Loading courses for review…</div>}
           {latestAvailableJobId && latestAvailableJobId !== reviewJobId && (
             <div className="flex items-center justify-between gap-3 px-4 py-2 bg-blue-50 border-b border-blue-200 rounded-t-lg">
               <span className="text-xs font-medium text-blue-800">
@@ -3646,7 +3624,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                   className="bg-green-600 hover:bg-green-700 text-white"
                   onClick={handleApproveSelected}
                   disabled={selectedIds.size === 0 || approving || campusProgress !== null}
-                  title="Submit all selected courses; verified campus fees are split automatically, while ambiguous fees remain pending"
+                  title="Submit selected courses for approval; review location-specific fee evidence before publishing"
                 >
                   {approving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1" />}
                   {approving && approveProgress
@@ -3659,7 +3637,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
               Tick courses, then use <strong>Fix</strong> once to recover all detected missing requirements, <strong>Approve</strong> to publish, or <strong>Reject</strong> to discard.
             </p>
             <p className="text-sm text-muted-foreground" role="status">
-              Approve automatically splits verified campus-specific fees. Ambiguous fee options stay pending for source review; no fee is guessed.
+              One course can include multiple locations and their fee evidence. Review location-specific fees before approval; unresolved fees remain pending.
             </p>
           </CardHeader>
           <CardContent>
@@ -4199,8 +4177,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                                 variant="ghost"
                                 className={`h-7 w-7 ${qData && qData.score < 60 ? "text-gray-300 cursor-not-allowed" : "text-green-600 hover:bg-green-50"}`}
                                 onClick={qData && qData.score < 60 ? undefined : () => handleApproveSingle(course.id)}
-                                disabled={campusProgress !== null || approvingId === course.id || feeVariantNeedsReview(course) || (qData !== undefined && qData.score < 60)}
-                                title={feeVariantNeedsReview(course) ? "Cannot approve — fee variant review required" : qData && qData.score < 60 ? `Cannot approve — Data Quality Failure (score ${qData.score}%)` : "Approve and publish this course"}
+                                disabled={campusProgress !== null || approvingId === course.id || (qData !== undefined && qData.score < 60)}
+                                title={qData && qData.score < 60 ? `Cannot approve — Data Quality Failure (score ${qData.score}%)` : "Approve and publish this course"}
                               >
                                 {approvingId === course.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                               </Button>

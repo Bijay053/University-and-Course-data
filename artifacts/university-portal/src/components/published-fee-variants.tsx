@@ -53,7 +53,7 @@ function validOption(value: unknown): value is FeeOption {
     && typeof o.source_url === "string" && typeof o.snippet === "string";
 }
 
-/** Matching campus prices may be grouped automatically; other fee choices may not. */
+/** Detect different campus prices without changing staged course identity. */
 function autoCampusRange(authority: Record<string, unknown> | null): boolean {
   if (authority?.status !== "range" || !Array.isArray(authority.selected)
     || authority.selected.length < 2 || !authority.selected.every(validOption)) return false;
@@ -158,7 +158,7 @@ export function PublishedFeeVariants({ course, id }: {
       {(needsReview || !summary) && (
         <div className="text-xs text-amber-700" data-testid={`fee-review-${id}`}>
           {automaticCampusFees
-            ? "Campus prices differ. Approval checks course-owned campuses and groups verified fees automatically; unverified locations stay pending for review."
+            ? "Campus prices differ. Review the published options for each location; unverified fees stay pending."
             : summary
               ? "Published alternatives differ by year, billing period, or study route; automatic approval stays pending until the source can be verified."
               : "No applicable fee confirmed — source review required"}

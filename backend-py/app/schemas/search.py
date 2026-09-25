@@ -3,6 +3,15 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
+class SearchOffering(BaseModel):
+    id: str
+    location: str
+    feeAmount: float | None = None
+    feeCurrency: str | None = None
+    feeTerm: str | None = None
+    feeYear: int | None = None
+
+
 class SearchCourseRow(BaseModel):
     course_id: int
     course_name: str
@@ -16,6 +25,7 @@ class SearchCourseRow(BaseModel):
     ielts_overall: float | None = None
     intake_months: list[str] | None = None
     rank: float | None = None
+    offerings: list[SearchOffering] = Field(default_factory=list)
 
 
 class SearchCourseResponse(BaseModel):

@@ -16,6 +16,25 @@ from app.services.scraper.extractors.ulaw_fees import METHOD, validated_fee_vari
 URL = "https://www.law.ac.uk/study/postgraduate/business/msc-healthcare-management/"
 
 
+async def migrate_offerings_in_transaction(connection):
+    """Test-only additive DDL, always owned by a caller's rollback transaction."""
+    from sqlalchemy import text
+    has_column = (await connection.execute(text(
+        "SELECT 1 FROM information_schema.columns WHERE table_name='courses' AND column_name='offering_identity'"
+    ))).scalar()
+    if not has_column:
+        from alembic.migration import MigrationContext
+        from alembic.operations import Operations
+        path = Path(__file__).resolve().parents[1] / "alembic/versions/387_course_offerings.py"
+        spec = spec_from_file_location("offering_migration", path)
+        migration = module_from_spec(spec)
+        spec.loader.exec_module(migration)
+        def upgrade(sync_connection):
+            migration.op = Operations(MigrationContext.configure(sync_connection))
+            migration.upgrade()
+        await connection.run_sync(upgrade)
+
+
 def test_campus_migration_replaces_or_creates_missing_prior_index():
     path = Path(__file__).resolve().parents[1] / "alembic/versions/386_campus_fee_scope.py"
     spec = spec_from_file_location("campus_fee_scope_migration", path)
@@ -207,6 +226,9 @@ async def test_real_database_split_approve_rescrape_and_idempotency():
     engine = create_async_engine(configured_engine.url, poolclass=NullPool)
     async with engine.connect() as connection:
         transaction = await connection.begin()
+        # Exercise the additive migration inside this rollback-only transaction;
+        # no development or production schema/data changes survive the test.
+        await migrate_offerings_in_transaction(connection)
         async with AsyncSession(bind=connection, expire_on_commit=False, join_transaction_mode="create_savepoint") as db:
             uni = University(name=f"Campus fee test {uuid4()}", country="United Kingdom", city="London")
             db.add(uni)
@@ -245,13 +267,60 @@ async def test_real_database_split_approve_rescrape_and_idempotency():
             repeated = await split_campus_fees(_SplitCampusFeesBody(ids=ids), db, {"email": "test-reviewer"})
             assert repeated["created"] == repeated["split"] == 0
             live = [await approve_scraped_course(db, child, actor="test-reviewer") for child in children]
-            assert len({c["course_id"] for c in live}) == 4
+            assert len({c["course_id"] for c in live}) == 1
             courses = (await db.execute(select(Course).where(Course.university_id == uni.id))).scalars().all()
-            assert {c.course_location for c in courses} == {"London", "Birmingham", "Leeds", "Manchester"}
-            assert len(courses) == 4
+            assert len(courses) == 1
+            assert courses[0].name == values["course_name"]
+            assert set(courses[0].course_location.split(", ")) == {"London", "Birmingham", "Leeds", "Manchester"}
             fees = (await db.execute(select(Fee).where(Fee.course_id.in_([c.id for c in courses])))).scalars().all()
-            assert {fee.international_fee for fee in fees} == {17500, 19050}
-            assert all(fee.currency == "GBP" and fee.fee_year == 2026 and fee.fee_term == "Full Course" for fee in fees)
+            assert fees == []  # No misleading course-wide scalar tuition.
+            from app.models import CourseOffering
+            offerings = (await db.execute(select(CourseOffering).where(CourseOffering.course_id == courses[0].id))).scalars().all()
+            assert len(offerings) == 4
+            assert {o.fee_amount for o in offerings} == {17500, 19050}
+            assert all(o.fee_currency == "GBP" and o.fee_year == 2026 and o.fee_term == "Full Course" for o in offerings)
+            original_ids = {o.id for o in offerings}
+            from app.routers.search import search_courses
+            import json
+            response = await search_courses(db, university_id=uni.id, location="London", fee_max=18000, page=1, limit=20)
+            assert json.loads(response.body)["total"] == 0
+            response = await search_courses(db, university_id=uni.id, city="London", max_fee=18000, page=1, limit=20)
+            assert json.loads(response.body)["total"] == 0
+            response = await search_courses(db, university_id=uni.id, location="Leeds", fee_max=18000, page=1, limit=20)
+            result = json.loads(response.body)
+            assert result["total"] == 1
+            assert len(result["results"][0]["offerings"]) == 4
+            assert all(isinstance(o["id"], str) for o in result["results"][0]["offerings"])
+            from app.routers.courses import get_course, update_course
+            from app.schemas.course import CourseUpdate
+            detail = await get_course(courses[0].id, db)
+            assert len(detail.offerings) == 4
+            assert set(detail.locations) == {"London", "Birmingham", "Leeds", "Manchester"}
+            assert all(set(o.model_dump()) == {"id", "location"} for o in detail.offerings)
+            from app.routers.courses import list_courses
+            listing = await list_courses(
+                db, university_id=uni.id, q=None, degree_level=None, study_mode=None,
+                category=None, sub_category=None, status_filter=None, page=1, limit=20,
+            )
+            listed = json.loads(listing.body)["data"][0]
+            assert len(listed["offerings"]) == 4
+            assert all(set(o) == {"id", "location"} for o in listed["offerings"])
+            # Database constraints provide a backstop even if a caller bypasses
+            # the transaction advisory lock or tries to insert the same campus.
+            from sqlalchemy.exc import IntegrityError
+            with pytest.raises(IntegrityError):
+                async with db.begin_nested():
+                    db.add(Course(university_id=uni.id, name=values["course_name"],
+                                  offering_identity=courses[0].offering_identity))
+                    await db.flush()
+            for child in children:
+                repeated_approval = await approve_scraped_course(db, child, actor="test-reviewer")
+                assert repeated_approval["course_id"] == courses[0].id
+            await update_course(courses[0].id, CourseUpdate(description="Reviewed"), db, {})
+            from fastapi import HTTPException
+            with pytest.raises(HTTPException) as error:
+                await update_course(courses[0].id, CourseUpdate(course_location="London"), db, {})
+            assert error.value.status_code == 409
             payload = {k: v for k, v in row_values().items() if k not in {"course_name", "status"}}
             evidence = [{"field_key": "international_fee", "value": None, "method": METHOD, "source_url": URL, "snippet": "International Students | campus prices"}]
             staged = await stage_course(db, scrape_job_id=str(uuid4()), university_id=uni.id,
@@ -262,6 +331,18 @@ async def test_real_database_split_approve_rescrape_and_idempotency():
             assert {c.course_location for c in pending} == {"London", "Birmingham", "Leeds", "Manchester"}
             for child in pending:
                 await approve_scraped_course(db, child, actor="test-reviewer")
-            assert len((await db.execute(select(Course).where(Course.university_id == uni.id))).scalars().all()) == 4
+            assert len((await db.execute(select(Course).where(Course.university_id == uni.id))).scalars().all()) == 1
+            assert {o.id for o in (await db.execute(select(CourseOffering).where(CourseOffering.course_id == courses[0].id))).scalars().all()} == original_ids
+            # Existing published duplicates are never silently adopted/deleted.
+            db.add(Course(university_id=uni.id, name=values["course_name"] + " — London",
+                          course_website=URL))
+            await db.flush()
+            pending[0].status = "pending"
+            pending[0].course_id = None
+            await db.flush()
+            from app.services.scraper.approve_course import ApprovalValidationError
+            with pytest.raises(ApprovalValidationError, match="reviewed reconciliation"):
+                await approve_scraped_course(db, pending[0], actor="test-reviewer", commit=False)
+            assert len((await db.execute(select(Course).where(Course.university_id == uni.id))).scalars().all()) == 2
         await transaction.rollback()
     await engine.dispose()

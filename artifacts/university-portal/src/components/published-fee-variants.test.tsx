@@ -34,7 +34,7 @@ describe("persisted published fee alternatives", () => {
     render(<ReviewScrapedCoursesTable courses={[course()]} readOnly />);
     expect(screen.getByTestId("fee-summary-41").textContent).toBe("£17,500–£19,050 GBP · 2026 · Full Course");
     expect(screen.queryByTitle("Missing international fee")).toBeNull();
-    expect(screen.getByTestId("fee-review-41").textContent).toContain("unverified locations stay pending");
+    expect(screen.getByTestId("fee-review-41").textContent).toContain("unverified fees stay pending");
     fireEvent.click(screen.getByTestId("expand-fees-41"));
     const link = screen.getByTestId("fee-source-41-selected-0");
     expect(link.getAttribute("href")).toBe(source);
@@ -64,7 +64,7 @@ describe("persisted published fee alternatives", () => {
   it("does not ask for a fee choice for campus prices in one fee cohort", () => {
     const pending = course({ feeSelection: selection() });
     render(<PublishedFeeVariants course={pending} id={41} />);
-    expect(screen.getByTestId("fee-review-41").textContent).toContain("groups verified fees automatically");
+    expect(screen.getByTestId("fee-review-41").textContent).toContain("Review the published options for each location");
     expect(screen.queryByText("Choose a published fee before approval")).toBeNull();
     expect(screen.queryByTestId("fee-selection-41")).toBeNull();
     fireEvent.click(screen.getByTestId("expand-fees-41"));

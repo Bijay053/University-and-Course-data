@@ -96,6 +96,15 @@ course_search_view AS MATERIALIZED (
         latest_fee.international_fee,
         latest_fee.currency,
         latest_fee.fee_term,
+        latest_fee.fee_year,
+        COALESCE((
+            SELECT jsonb_agg(jsonb_build_object(
+                'id', o.id::text, 'location', o.location,
+                'feeAmount', o.fee_amount, 'feeCurrency', o.fee_currency,
+                'feeTerm', o.fee_term, 'feeYear', o.fee_year
+            ) ORDER BY o.location, o.id)
+            FROM course_offerings o WHERE o.course_id = c.id
+        ), '[]'::jsonb) AS offerings,
         NULL::real AS application_fee,
         course_intakes.intakes,
         english_scores.ielts_overall,
@@ -116,7 +125,7 @@ course_search_view AS MATERIALIZED (
     FROM courses c
     JOIN universities u ON u.id = c.university_id
     LEFT JOIN LATERAL (
-        SELECT f.international_fee, f.currency, f.fee_term
+        SELECT f.international_fee, f.currency, f.fee_term, f.fee_year
         FROM fees f
         WHERE f.course_id = c.id
         ORDER BY f.id DESC
@@ -229,11 +238,14 @@ async def search_courses(
         params["q"] = q
         params["ql"] = f"%{q.lower()}%"
         params["q_trgm"] = q.lower()
+    legacy_offering_filters = []
+    offering_filters = []
     if country:
         where.append("lower(c.university_country) = lower(:country)")
         params["country"] = country
     if city:
-        where.append("lower(c.university_city) = lower(:city)")
+        legacy_offering_filters.append("lower(c.university_city) = lower(:city)")
+        offering_filters.append("lower(o.location) = lower(:city)")
         params["city"] = city
     if university_id:
         where.append("c.university_id = :uid")
@@ -245,7 +257,8 @@ async def search_courses(
         where.append(":im = ANY(c.intakes)")
         params["im"] = intake_month
     if max_fee is not None:
-        where.append("(c.international_fee IS NULL OR c.international_fee <= :max_fee)")
+        legacy_offering_filters.append("(c.international_fee IS NULL OR c.international_fee <= :max_fee)")
+        offering_filters.append("o.fee_amount <= :max_fee")
         params["max_fee"] = max_fee
     if max_ielts is not None:
         where.append("(c.ielts_overall IS NULL OR c.ielts_overall <= :max_ielts)")
@@ -255,7 +268,7 @@ async def search_courses(
     # university_city OR a course_location string ("Sydney Campus"),
     # so OR them with case-insensitive ILIKE on both columns.
     if location and location.strip():
-        where.append(
+        legacy_offering_filters.append(
             "(lower(c.university_city) ILIKE :loc "
             "OR lower(c.course_location) ILIKE :loc "
             "OR word_similarity(:loc_trgm, lower(c.university_city)) > 0.3 "
@@ -263,6 +276,7 @@ async def search_courses(
         )
         params["loc"] = f"%{location.strip().lower()}%"
         params["loc_trgm"] = location.strip().lower()
+        offering_filters.append("lower(o.location) ILIKE :loc")
 
     # B5: intakes CSV → array overlap. Empty tokens after split are
     # ignored so "?intakes=" is a no-op rather than a "match nothing" bug.
@@ -277,11 +291,20 @@ async def search_courses(
     # courses) but only match the upper bound when the slider is at
     # its max — handled UI-side by omitting the param entirely.
     if fee_min is not None and fee_min > 0:
-        where.append("(c.international_fee IS NOT NULL AND c.international_fee >= :fee_min)")
+        legacy_offering_filters.append("(c.international_fee IS NOT NULL AND c.international_fee >= :fee_min)")
+        offering_filters.append("o.fee_amount >= :fee_min")
         params["fee_min"] = fee_min
     if fee_max is not None:
-        where.append("(c.international_fee IS NULL OR c.international_fee <= :fee_max)")
+        legacy_offering_filters.append("(c.international_fee IS NULL OR c.international_fee <= :fee_max)")
+        offering_filters.append("o.fee_amount <= :fee_max")
         params["fee_max"] = fee_max
+    if offering_filters:
+        where.append(
+            "((NOT EXISTS (SELECT 1 FROM course_offerings o WHERE o.course_id = c.id) AND "
+            + " AND ".join(legacy_offering_filters)
+            + ") OR EXISTS (SELECT 1 FROM course_offerings o WHERE o.course_id = c.id AND "
+            + " AND ".join(offering_filters) + "))"
+        )
 
     # B5: duration_years is pre-computed by the search CTE (real column
     # `duration_years`). NULL is treated as "matches" so courses with
@@ -499,6 +522,8 @@ async def search_courses(
                c.international_fee,
                c.currency,
                c.fee_term,
+               c.fee_year,
+               c.offerings,
                c.ielts_overall,
                c.pte_overall,
                c.toefl_overall,
@@ -560,6 +585,9 @@ async def search_courses(
 
         # Required by UI: id (alias for course_id)
         d["id"] = d.get("course_id")
+        # An empty array explicitly denotes a legacy unspecialized course;
+        # consumers may use its existing scalar location/fee fields.
+        d["offerings"] = d.get("offerings") or []
 
         # Required by UI: result.intakes (always array)
         d["intakes"] = d.get("intake_months") or []
@@ -593,7 +621,7 @@ async def search_courses(
         # Currency / fee_term / fee_yearly — UI reads them on the result
         d.setdefault("currency", "AUD")
         d.setdefault("fee_term", "Year")
-        if d.get("international_fee") is None:
+        if d.get("international_fee") is None and not d["offerings"]:
             d["international_fee"] = 0
             d["internationalFee"] = 0
         d.setdefault("international_fee_yearly", d.get("international_fee") or 0)
@@ -759,6 +787,7 @@ async def search_compare(
                     "website": r.get("university_website"),
                 },
                 "course_location": r.get("course_location"),
+                "offerings": r.get("offerings") or [],
                 "degree_level": r.get("degree_level"),
                 "category": r.get("category"),
                 "sub_category": r.get("sub_category"),

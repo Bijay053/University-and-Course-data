@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { prepareCampusReview } from "@/lib/prepare-campus-review";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRoute, Link, useLocation } from "wouter";
 import { useGetUniversity, getGetUniversityQueryKey, useListCourses, getListCoursesQueryKey } from "@workspace/api-client-react";
@@ -1118,7 +1117,6 @@ export default function UniversityDetail() {
   const [rawLoading, setRawLoading] = useState(false);
   const rawCampusRequest = useRef<AbortController | null>(null);
   const [rawCampusProgress, setRawCampusProgress] = useState<{ done: number; total: number } | null>(null);
-  const [rawCampusIssues, setRawCampusIssues] = useState<Array<{ id: number; reason?: string }>>([]);
   useEffect(() => () => rawCampusRequest.current?.abort(), []);
   const [editingCourse, setEditingCourse] = useState<StagedCourse | null>(null);
   const [editForm, setEditForm] = useState<EditForm | null>(null);
@@ -1210,7 +1208,6 @@ export default function UniversityDetail() {
       const approvedIds = new Set<number>();
       const failures: Array<{ id: number; error: string }> = [];
       let approvedCount = 0;
-      let splitCount = 0;
       let cursor = 0;
       let done = 0;
       await Promise.all(Array.from({ length: Math.min(2, ids.length) }, async () => {
@@ -1225,11 +1222,11 @@ export default function UniversityDetail() {
             });
             if (!res.ok) throw new Error(await getFetchErrorMessage(res));
             const data = await readResponseJson<{
-              approvedIds: number[]; approvedCount: number; splitCount: number;
+              approvedIds: number[]; approvedCount: number; splitCount?: number;
               failed: Array<{ id: number; error: string }>; attempted: number;
             }>(res);
             if (!data || !Array.isArray(data.approvedIds) || !Number.isInteger(data.approvedCount)
-              || !Number.isInteger(data.splitCount) || !Array.isArray(data.failed) || data.attempted !== 1) {
+              || !Array.isArray(data.failed) || data.attempted !== 1) {
               throw new Error("The server returned an invalid approval response. Refresh before trying again.");
             }
             if (data.failed.length || !data.approvedIds.includes(sourceId)) {
@@ -1237,7 +1234,6 @@ export default function UniversityDetail() {
             } else {
               data.approvedIds.forEach(id => approvedIds.add(id));
               approvedCount += data.approvedCount;
-              splitCount += data.splitCount;
             }
           } catch (error) {
             failures.push({ id: sourceId, error: error instanceof Error ? error.message : "Approval request failed. Refresh before retrying." });
@@ -1257,7 +1253,6 @@ export default function UniversityDetail() {
         title: force ? "Force approve complete" : "Bulk approve complete",
         description: [
           `${approvedCount} approved${force ? " (confidence gate bypassed)" : ""}.`,
-          splitCount > 0 ? `${splitCount} safely split by campus fee automatically.` : "",
           remaining.length > 0 ? `${remaining.length} left pending: ${failures.slice(0, 3).map(failure => failure.error).join(" · ") || "Review their source data."}` : "",
         ].filter(Boolean).join(" "),
         ...(remaining.length > 0 ? { variant: "destructive" as const } : {}),
@@ -1378,19 +1373,11 @@ export default function UniversityDetail() {
         return Array.isArray(data) ? data : [];
       };
       const data = await reload();
-      const prepared = await prepareCampusReview(data, reload, (done, total) => {
-        if (!controller.signal.aborted) setRawCampusProgress({ done, total });
-      }, controller.signal);
       if (controller.signal.aborted) return;
-      setRawData(prepared.rows);
-      setRawCampusIssues(prepared.issues);
+      setRawData(data);
       setRawSelectedIds(current => {
-        const next = new Set(current);
-        for (const result of prepared.results) {
-          if (current.has(result.id)) for (const child of result.courseIds) next.add(child);
-        }
-        const persistedIds = new Set(prepared.rows.map(row => row.id));
-        return new Set([...next].filter(rowId => persistedIds.has(rowId)));
+        const persistedIds = new Set(data.map(row => row.id));
+        return new Set([...current].filter(rowId => persistedIds.has(rowId)));
       });
     } catch {
       if (!controller.signal.aborted) toast({ title: "Error", description: "Failed to load raw data", variant: "destructive" });
@@ -3988,10 +3975,7 @@ export default function UniversityDetail() {
       {tab === "assessment" && <AssessmentPanel {...{ BASE, Button, COUNTRIES, ClipboardList, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Label, Pencil, Plus, Trash2, assessAddCountry, assessAddText, assessAdding, assessCountry, assessDeleteNote, assessDeleting, assessEditCountry, assessEditNote, assessEditText, assessEditing, assessLoading, assessNotes, assessShowAdd, id, loadAssessNotes, setAssessAddCountry, setAssessAddText, setAssessAdding, setAssessCountry, setAssessDeleteNote, setAssessDeleting, setAssessEditCountry, setAssessEditNote, setAssessEditText, setAssessEditing, setAssessShowAdd, toast }} />}
 
       {/* ── RAW DATA TAB ── */}
-      {tab === "rawdata" && rawCampusProgress && <p role="status">Preparing separate campus courses {rawCampusProgress.done}/{rawCampusProgress.total}…</p>}
-      {tab === "rawdata" && rawCampusIssues.length > 0 && <div role="alert" className="text-amber-800">
-        {rawCampusIssues.map(issue => <p key={issue.id}>Course {issue.id}: {issue.reason || "Campus evidence requires review."}</p>)}
-      </div>}
+      {tab === "rawdata" && rawCampusProgress && <p role="status">Loading courses for review…</p>}
       {tab === "rawdata" && <RawDataPanel {...{ AlertTriangle, Button, CheckCircle2, DEGREE_COLORS, Database, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, ExternalLink, GitMerge, Input, Loader2, Pencil, RefreshCw, Search, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, StatusBadge, Textarea, Trash2, Upload, XCircle, approvedCount, approvingId, bulkApproveProgress, bulkApproveRunning, bulkDeleteRawRunning, bulkMapRunning, bulkRejectFieldKey, bulkRejectReason, bulkRejectRunning, deletingId, fetchRawData, filteredRaw, forceApproveRowId, handleApprove, handleBulkApprove, handleBulkMap, handleBulkRejectSelected, handleDelete, handleImportAll, importingAll, mappedIds, num, openBackupMap, openEdit, pendingCount, rawData, rawLoading, rawSearch, rawSelectedIds, rawStatus, setBulkRejectFieldKey, setBulkRejectReason, setForceApproveRowId, setRawSearch, setRawSelectedIds, setRawStatus, setShowBulkDeleteRawConfirm, setShowBulkRejectConfirm, setShowDeleteAllRawConfirm, setShowForceApproveConfirm, showBulkRejectConfirm, showForceApproveConfirm, tableScrollRef, toggleRawSelect, toggleSelectAllRaw, txt }} />}
 
       {/* ── Shared mini horizontal scroll indicator (all tabs) ── */}

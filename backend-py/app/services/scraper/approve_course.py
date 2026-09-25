@@ -115,7 +115,8 @@ _ENGLISH_TESTS = (
 
 
 async def approve_scraped_course(
-    db: AsyncSession, sc: ScrapedCourse, *, actor: str = "system", commit: bool = True
+    db: AsyncSession, sc: ScrapedCourse, *, actor: str = "system", commit: bool = True,
+    offering_cohort: list[ScrapedCourse] | None = None,
 ) -> dict:
     """Idempotent: if a course with the same (university_id, name CI) exists,
     the row is updated rather than duplicated.
@@ -126,11 +127,28 @@ async def approve_scraped_course(
     every subsequent row in a batch fail (Week 5: Charles Sturt promotion gap).
     """
     from app.services.scraper.fee_selection import fee_selection, unresolved_fee_selection
+    if not sc.course_name or not sc.course_name.strip():
+        raise ApprovalValidationError(
+            f"scraped_course id={sc.id} has empty course_name; cannot promote"
+        )
+    if unresolved_fee_selection(sc):
+        raise ApprovalValidationError("Select a current published fee option before approval")
+    from app.services.scraper.replay_extraction import review_restore_lock_scope
+    await db.execute(
+        text("SELECT pg_advisory_xact_lock(hashtext(:scope))"),
+        {"scope": review_restore_lock_scope(sc.university_id)},
+    )
+    if sc.status == "approved" and sc.course_id:
+        return {"ok": True, "course_id": sc.course_id, "scraped_course_id": sc.id,
+                "auto_publish": False, "reason": "Already approved"}
     if isinstance(getattr(sc, "extraction_method", None), dict) and sc.extraction_method.get("fee_variants"):
         sc = (await db.execute(
             select(ScrapedCourse).where(ScrapedCourse.id == sc.id)
             .with_for_update().execution_options(populate_existing=True)
         )).scalar_one()
+        if sc.status == "approved" and sc.course_id:
+            return {"ok": True, "course_id": sc.course_id, "scraped_course_id": sc.id,
+                    "auto_publish": False, "reason": "Already approved"}
     if unresolved_fee_selection(sc):
         raise ApprovalValidationError("Select a current published fee option before approval")
     if not sc.course_name or not sc.course_name.strip():
@@ -153,7 +171,8 @@ async def approve_scraped_course(
     if scope:
         expected_locations = ", ".join(scope["locations"])
         expected_name = f"{scope['original_name']} — {expected_locations}"
-        if sc.course_location != expected_locations or sc.course_name != expected_name or sc.fee_scope_key != scope["key"]:
+        if (sc.course_location != expected_locations or sc.course_name != expected_name
+                or sc.fee_scope_key != scope["key"] or scope.get("source_url") != sc.course_website):
             raise ApprovalValidationError("Campus fee scope no longer matches the course; review required")
         if actor == "system":
             raise ApprovalValidationError("Campus fee groups require explicit reviewer approval")
@@ -168,13 +187,6 @@ async def approve_scraped_course(
     # Synchronize promotion with offline review-row restoration.  Otherwise a
     # restore could check for approved/published rows immediately before this
     # transaction creates one, leaving a duplicate pending row behind.
-    from app.services.scraper.replay_extraction import review_restore_lock_scope
-
-    await db.execute(
-        text("SELECT pg_advisory_xact_lock(hashtext(:scope))"),
-        {"scope": review_restore_lock_scope(sc.university_id)},
-    )
-
     from app.services.scraper.extractors.uel_variants import (
         is_uel_course_url, uel_source_url, uel_variant_key,
     )
@@ -184,21 +196,27 @@ async def approve_scraped_course(
         uel_variant_key(sc.course_website or "")
     )
     if scope:
-        # Names are intentionally location-qualified. Also require exact source
-        # and location ownership: a legacy unsplit parent is not this sibling.
+        from app.services.scraper.published_offerings import offering_identity
+        identity = offering_identity(sc, scope)
+        # The university advisory lock above serializes approvals across jobs;
+        # a unique persisted identity is the final database-level backstop.
         candidates = (
             await db.execute(
                 select(Course).where(
                     Course.university_id == sc.university_id,
-                    func.lower(Course.name) == sc.course_name.lower(),
-                    Course.course_location == sc.course_location,
                 )
             )
         ).scalars().all()
-        exact = [candidate for candidate in candidates
-                 if canonical_course_url_key(candidate.course_website) == canonical_course_url_key(sc.course_website)]
-        if len(exact) > 1:
-            raise ApprovalValidationError("Ambiguous existing campus course identity; review required")
+        exact = [candidate for candidate in candidates if candidate.offering_identity == identity]
+        legacy = [candidate for candidate in candidates
+                  if candidate.offering_identity is None
+                  and candidate.course_website == sc.course_website
+                  and (candidate.name.casefold() == scope["original_name"].casefold()
+                       or candidate.name.casefold().startswith(scope["original_name"].casefold() + " — "))]
+        if legacy:
+            raise ApprovalValidationError(
+                "Existing published campus records require reviewed reconciliation; no live IDs were merged."
+            )
         existing = exact[0] if exact else None
     elif _uel_variant:
         # Award names can change independently of route identity. Never merge a
@@ -243,6 +261,8 @@ async def approve_scraped_course(
         ).scalar_one_or_none()
 
     decision = should_auto_publish(sc)
+    if existing and existing.offering_identity and not scope:
+        raise ApprovalValidationError("Verified campus offerings require scoped evidence; review required")
 
     if existing:
         course = existing
@@ -253,7 +273,8 @@ async def approve_scraped_course(
     else:
         course = Course(
             university_id=sc.university_id,
-            name=sc.course_name,
+            name=scope["original_name"] if scope else sc.course_name,
+            offering_identity=identity if scope else None,
             status="active",
             approval_status="approved",
             approval_score=decision.score,
@@ -373,9 +394,12 @@ async def approve_scraped_course(
                 )
             )
 
-    if _uel_variant or sc.international_fee is not None:
+    if scope or _uel_variant or sc.international_fee is not None:
         await db.execute(Fee.__table__.delete().where(Fee.course_id == course.id))
-    if sc.international_fee is not None:
+    if scope:
+        from app.services.scraper.published_offerings import persist_offerings
+        await persist_offerings(db, course, sc, scope, cohort=offering_cohort)
+    elif sc.international_fee is not None:
         db.add(
             Fee(
                 course_id=course.id,

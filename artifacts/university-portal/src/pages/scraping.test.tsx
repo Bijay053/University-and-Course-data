@@ -179,7 +179,7 @@ function initialReview(): ScrapingInitialReviewState {
 }
 
 describe("Scraping repair reviewer", () => {
-  it("approves verified campus groups with one click, without manually splitting or choosing fees", async () => {
+  it("submits one staged course with multiple campus fees without choosing a fee", async () => {
     const review = initialReview();
     const selected = [17500, 19050].map((amount, index) => ({
       amount, currency: "GBP", year: 2026, period: "Full Course",
@@ -198,7 +198,7 @@ describe("Scraping repair reviewer", () => {
         expect(init?.method).toBe("POST");
         expect(JSON.parse(String(init?.body))).toEqual({ courseIds: [1], force: false });
         approved = true;
-        return jsonResponse({ approvedIds: [1, 52], approvedCount: 2, splitCount: 1, failed: [], attempted: 1 });
+        return jsonResponse({ approvedIds: [1], approvedCount: 1, failed: [], attempted: 1 });
       }
       if (url === "/api/scrape/staged/repair-job") return jsonResponse({ courses: approved ? [] : review.courses });
       if (url === "/api/import/history") return jsonResponse([]);
@@ -283,7 +283,7 @@ describe("Scraping repair reviewer", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     render(<ScrapingForTest initialReviewState={review} />);
-    expect(screen.getByText(/Approve automatically splits verified campus-specific fees/)).toBeTruthy();
+    expect(screen.getByText(/One course can include multiple locations and their fee evidence/)).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Approve (2)" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Approve (1)" }).hasAttribute("disabled")).toBe(false));
     expect(fetchMock.mock.calls.filter(([url]) => String(url) === "/api/scrape/staged/approve-selected")).toHaveLength(2);
@@ -350,7 +350,7 @@ describe("Scraping repair reviewer", () => {
     expect(maxActive).toBe(2);
   });
 
-  it("renders persisted campus alternatives in the main review and blocks scalar-free approval", async () => {
+  it("renders persisted campus fee evidence without requiring a manual fee choice", async () => {
     const review = initialReview();
     const options = [17500, 19050].map((amount, index) => ({
       amount, currency: "GBP", year: 2026, period: "Full Course",
@@ -374,11 +374,9 @@ describe("Scraping repair reviewer", () => {
     render(<ScrapingForTest initialReviewState={review} />);
     expect(screen.getByTestId(`fee-summary-${review.courses[0].id}`).textContent)
       .toBe("£17,500–£19,050 GBP · 2026 · Full Course");
-    const approve = screen.getByTitle("Cannot approve — fee variant review required") as HTMLButtonElement;
-    expect(approve.disabled).toBe(true);
-    await userEvent.click(approve);
-    await userEvent.click(screen.getByRole("button", { name: "Approve (1)" }));
-    expect(fetchMock.mock.calls.some(args => String(args[0]).endsWith("/approve"))).toBe(false);
+    const approve = screen.getByTitle("Approve and publish this course") as HTMLButtonElement;
+    expect(approve.disabled).toBe(false);
+    expect(screen.queryByText("Choose a published fee before approval")).toBeNull();
   });
 
   it("does not require manual fee choices and submits all unresolved rows to safe bulk approval", async () => {
@@ -719,27 +717,20 @@ describe("Scraping repair reviewer", () => {
     expect(screen.queryByText("Unrelated")).toBeNull();
   }, 20000);
 
-  it.each([false, true])("automatically prepares campus rows once and preserves deselection=%s", async (deselect) => {
+  it.each([false, true])("keeps multi-location staged courses as one row across refresh, deselection=%s", async (deselect) => {
     const review = initialReview();
     review.courses = [{
-      ...review.courses[0],
-      extractionMethod: { fee_variants: { status: "range", selected: [], options: [] } },
+      ...review.courses[0], courseLocation: "London, Leeds",
+      extractionMethod: { fee_variants: { status: "range", selected: [], options: [] },
+        campus_fee_scope: { locations: ["London", "Leeds"] } },
     }] as ScrapingInitialReviewState["courses"];
-    const children = [1, 2].map(id => ({
-      ...review.courses[0], id, courseName: `Campus offering ${id}`,
-      extractionMethod: { fee_variants: { status: "uniform" }, campus_fee_scope: { locations: [`Campus ${id}`] } },
-    }));
     let loaded = 0;
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url === "/api/import/history") return jsonResponse([]);
       if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
       if (url === "/api/scrape/staged/repair-job")
-        return jsonResponse({ courses: ++loaded === 1 ? review.courses : children });
-      if (url === "/api/scrape/staged/prepare-campus-courses") {
-        expect(JSON.parse(String(init?.body))).toEqual({ ids: [1] });
-        return jsonResponse({ results: [{ id: 1, status: "split", courseIds: [1, 2] }], created: 1, split: 1 });
-      }
+        return jsonResponse({ courses: review.courses.slice(0, ++loaded) });
       return jsonResponse({});
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -749,12 +740,12 @@ describe("Scraping repair reviewer", () => {
       await userEvent.click(within(tableRow).getByRole("checkbox"));
     }
     await userEvent.click(screen.getByTitle("Reload staged courses and refresh quality scores"));
-    await waitFor(() => expect(screen.getByRole("button", { name: `Approve (${deselect ? 0 : 2})` })).toBeTruthy());
-    expect(screen.getByText("2 pending")).toBeTruthy();
-    expect(screen.getByText("Campus offering 2")).toBeTruthy();
+    await waitFor(() => expect(screen.getByRole("button", { name: `Approve (${deselect ? 0 : 1})` })).toBeTruthy());
+    expect(screen.getByText("1 pending")).toBeTruthy();
+    expect(screen.getByText("London, Leeds")).toBeTruthy();
     await userEvent.click(screen.getByTitle("Reload staged courses and refresh quality scores"));
-    await waitFor(() => expect(loaded).toBe(3));
-    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/prepare-campus-courses"))).toHaveLength(1);
+    await waitFor(() => expect(loaded).toBe(2));
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/prepare-campus-courses"))).toHaveLength(0);
   });
 
   it("renders target field summaries from a completed background Fix job", async () => {

@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
+class CourseLocationOffering(BaseModel):
+    id: str
+    location: str
 
 
 class CourseBase(BaseModel):
@@ -35,6 +40,13 @@ class CourseCreate(CourseBase):
 
 
 class CourseUpdate(BaseModel):
+    @model_validator(mode="before")
+    @classmethod
+    def offerings_are_read_only(cls, value):
+        if isinstance(value, dict) and {"offerings", "locations"} & value.keys():
+            raise ValueError("Course offerings and locations are read-only; use evidence review")
+        return value
+
     name: str | None = None
     category: str | None = None
     sub_category: str | None = None
@@ -64,6 +76,8 @@ class CourseRead(CourseBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    offerings: list[CourseLocationOffering] = Field(default_factory=list)
+    locations: list[str] = Field(default_factory=list)
     status: str
     eligibility_status: str
     eligibility_reason: str | None = None

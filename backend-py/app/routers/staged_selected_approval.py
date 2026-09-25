@@ -6,7 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field, StrictBool, field_validator
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_db
@@ -67,6 +67,13 @@ async def approve_selected(
         if source_id in approved_ids:
             continue
         try:
+            university_id = (await db.execute(
+                select(ScrapedCourse.university_id).where(ScrapedCourse.id == source_id)
+            )).scalar_one_or_none()
+            if university_id is not None:
+                from app.services.scraper.replay_extraction import review_restore_lock_scope
+                await db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:scope))"),
+                                 {"scope": review_restore_lock_scope(university_id)})
             row = (await db.execute(
                 select(ScrapedCourse).where(ScrapedCourse.id == source_id)
                 .with_for_update().execution_options(populate_existing=True)
@@ -92,6 +99,24 @@ async def approve_selected(
                     raise ApprovalValidationError(split["reason"])
                 ids = split["courseIds"]
                 did_split = split["status"] == "split"
+                # Already-prepared legacy scopes are evidence rows, not separate
+                # approval identities. One action includes every proven sibling.
+                from app.services.scraper.campus_fee_split import SCOPE
+                from app.services.scraper.published_offerings import offering_identity
+                scope = (row.extraction_method or {}).get(SCOPE)
+                if scope:
+                    siblings = (await db.execute(select(ScrapedCourse).where(
+                        ScrapedCourse.university_id == row.university_id,
+                        ScrapedCourse.scrape_job_id == row.scrape_job_id,
+                        ScrapedCourse.status.in_(["pending", "review_ready"]),
+                    ).order_by(ScrapedCourse.id).with_for_update())).scalars().all()
+                    identity = offering_identity(row, scope)
+                    ids = [s.id for s in siblings
+                           if (s.extraction_method or {}).get(SCOPE)
+                           and (s.extraction_method[SCOPE].get("split_from_id") == scope.get("split_from_id"))
+                           and s.course_website == row.course_website
+                           and offering_identity(s, s.extraction_method[SCOPE]) == identity]
+            cohort = [await db.get(ScrapedCourse, child_id) for child_id in ids]
             for child_id in ids:
                 child = await db.get(ScrapedCourse, child_id)
                 if unresolved_fee_selection(child):
@@ -99,7 +124,7 @@ async def approve_selected(
                 _check_confidence(child, body.force)
                 if did_split:
                     await persist_staged_row_backup(db, child)
-                await approve_scraped_course(db, child, actor=actor, commit=False)
+                await approve_scraped_course(db, child, actor=actor, commit=False, offering_cohort=cohort)
             await db.commit()
             approved_ids.extend(ids)
             split_count += int(did_split)

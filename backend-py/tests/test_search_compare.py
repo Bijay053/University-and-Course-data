@@ -152,7 +152,11 @@ async def test_search_stays_fast_and_uses_child_indexes_at_catalogue_scale():
                 ) ON COMMIT DROP""",
                 """CREATE TEMP TABLE fees (
                     id integer, course_id integer, international_fee real,
-                    currency text, fee_term text
+                    currency text, fee_term text, fee_year integer
+                ) ON COMMIT DROP""",
+                """CREATE TEMP TABLE course_offerings (
+                    id integer, course_id integer, location text, fee_amount real,
+                    fee_currency text, fee_term text, fee_year integer
                 ) ON COMMIT DROP""",
                 """CREATE TEMP TABLE intakes (
                     course_id integer, intake_month text
@@ -211,7 +215,7 @@ async def test_search_stays_fast_and_uses_child_indexes_at_catalogue_scale():
             )
             await db.execute(
                 text(
-                    """INSERT INTO fees
+                    """INSERT INTO fees (id, course_id, international_fee, currency, fee_term)
                        SELECT (course_id * 2) + fee_number,
                               course_id,
                               30000 + course_id + fee_number,
@@ -389,7 +393,11 @@ async def test_search_cte_executes_against_production_base_table_shape():
                 ) ON COMMIT DROP""",
                 """CREATE TEMP TABLE fees (
                     id integer, course_id integer, international_fee real,
-                    currency text, fee_term text
+                    currency text, fee_term text, fee_year integer
+                ) ON COMMIT DROP""",
+                """CREATE TEMP TABLE course_offerings (
+                    id integer, course_id integer, location text, fee_amount real,
+                    fee_currency text, fee_term text, fee_year integer
                 ) ON COMMIT DROP""",
                 """CREATE TEMP TABLE intakes (
                     course_id integer, intake_month text
@@ -422,7 +430,7 @@ async def test_search_cte_executes_against_production_base_table_shape():
                            'active', 'approved')"""
             ))
             await db.execute(text(
-                "INSERT INTO fees VALUES (1, 10, 42000, 'AUD', 'Year')"
+                "INSERT INTO fees VALUES (1, 10, 42000, 'AUD', 'Year', 2026)"
             ))
             await db.execute(text(
                 "INSERT INTO intakes VALUES (10, 'February')"

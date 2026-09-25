@@ -11,7 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_user, get_db
 from app.models import Course, University
-from app.schemas.course import CourseCreate, CourseListResponse, CourseRead, CourseUpdate
+from app.schemas.course import CourseCreate, CourseListResponse, CourseRead, CourseUpdate, CourseLocationOffering
+from app.services.scraper.published_offerings import read_offerings
 
 router = APIRouter()
 
@@ -71,6 +72,7 @@ async def list_courses(
 
     # LEFT JOIN fees + add camelCase fields the UI expects
     course_ids = [r.id for r in rows]
+    offerings_map = await read_offerings(db, course_ids)
     fees_map: dict = {}
     eng_map: dict = {}
     if course_ids:
@@ -151,6 +153,9 @@ async def list_courses(
     out = []
     for r in rows:
         d = {col.name: getattr(r, col.name, None) for col in r.__table__.columns}
+        d.pop("offering_identity", None)
+        d["offerings"] = offerings_map[r.id]
+        d["locations"] = [o["location"] for o in d["offerings"]]
         from datetime import datetime as _dt
         for k, v in list(d.items()):
             if isinstance(v, _dt):
@@ -227,7 +232,10 @@ async def get_course(course_id: int, db: Annotated[AsyncSession, Depends(get_db)
     c = await db.get(Course, course_id)
     if not c:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
-    return CourseRead.model_validate(c)
+    result = CourseRead.model_validate(c)
+    result.offerings = [CourseLocationOffering(**o) for o in (await read_offerings(db, [c.id]))[c.id]]
+    result.locations = [o.location for o in result.offerings]
+    return result
 
 
 @router.post("/courses", response_model=CourseRead, status_code=status.HTTP_201_CREATED)
@@ -267,11 +275,21 @@ async def update_course(
     c = await db.get(Course, course_id)
     if not c:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    offerings = (await read_offerings(db, [c.id]))[c.id]
+    protected = {"name", "course_website", "degree_level", "course_location"}
+    if offerings and any(
+        key in body.model_fields_set and getattr(body, key) != getattr(c, key)
+        for key in protected
+    ):
+        raise HTTPException(status_code=409, detail="Verified campus offerings own course identity and location; review source evidence to change them.")
     for k, v in body.model_dump(exclude_none=True).items():
         setattr(c, k, v)
     await db.commit()
     await db.refresh(c)
-    return CourseRead.model_validate(c)
+    result = CourseRead.model_validate(c)
+    result.offerings = [CourseLocationOffering(**o) for o in offerings]
+    result.locations = [o["location"] for o in offerings]
+    return result
 
 
 @router.delete("/courses/{course_id}", status_code=status.HTTP_204_NO_CONTENT)

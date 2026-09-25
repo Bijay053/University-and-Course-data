@@ -20,11 +20,20 @@ const COMPARE_KEY = "courseCompareTray";
 const MAX_COMPARE = 5;
 
 type FacetItem = { id?: number | string; name: string; count: number };
+type CourseOffering = {
+  id: string;
+  location: string;
+  feeAmount: number | null;
+  feeCurrency: string | null;
+  feeTerm: string | null;
+  feeYear: number | null;
+};
 type CourseResult = {
   id: number;
   course_name: string;
   university: { id: number; name: string; logo_url: string | null; city: string | null; country: string | null; website: string | null; featured?: boolean; featured_priority?: number };
   course_location: string | null;
+  offerings?: CourseOffering[] | null;
   degree_level: string | null;
   category: string | null;
   sub_category: string | null;
@@ -106,6 +115,69 @@ function formatDuration(d: number | null, term: string | null) {
   const r = Math.round(d * 10) / 10;
   const display = r % 1 === 0 ? String(Math.round(r)) : String(r);
   return `${display} ${unit}${r !== 1 && !unit.endsWith("s") ? "s" : ""}`;
+}
+
+function offeringFee(offering: CourseOffering): string {
+  if (offering.feeAmount == null) return "Fee not published for this location";
+  const period = offering.feeTerm ? ` / ${offering.feeTerm}` : " (period not specified)";
+  return `${offering.feeCurrency || "Currency not specified"} ${offering.feeAmount.toLocaleString()}${period}${offering.feeYear != null ? ` · ${offering.feeYear}` : ""}`;
+}
+
+export function ResultLocationFee({ result, locationFilter }: { result: CourseResult; locationFilter: string }) {
+  const offerings = result.offerings ?? [];
+  const filter = locationFilter.trim().toLowerCase();
+  const [explicitSelection, setExplicitSelection] = useState<{ courseId: number; filter: string; offeringId: string } | null>(null);
+  // Only a changed course or search filter resets a choice; a refetch of the
+  // same course must not erase a location the user explicitly selected.
+  useEffect(() => setExplicitSelection(null), [result.id, filter]);
+  if (!offerings.length) {
+    const fee = formatFee(result.international_fee, result.currency, result.fee_term, result.international_fee_yearly);
+    return (
+      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-600">
+        {(result.course_location || result.university.city || result.university.country) && (
+          <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{result.course_location || [result.university.city, result.university.country].filter(Boolean).join(", ")}</span>
+        )}
+        {fee && <span className="flex items-center gap-1"><DollarSign className="w-3.5 h-3.5" />{fee}</span>}
+      </div>
+    );
+  }
+  const exactMatches = filter ? offerings.filter(o => o.location.trim().toLowerCase() === filter) : [];
+  const partialMatches = filter ? offerings.filter(o => o.location.toLowerCase().includes(filter)) : [];
+  const matchedOffering = exactMatches.length === 1 ? exactMatches[0]
+    : exactMatches.length > 1 ? null
+      : partialMatches.length === 1 ? partialMatches[0] : null;
+  // Explicit choices survive refetches of the same course, but not a changed location filter.
+  const selectedId = explicitSelection?.courseId === result.id && explicitSelection.filter === filter
+    && offerings.some(o => o.id === explicitSelection.offeringId)
+    ? explicitSelection.offeringId : matchedOffering?.id ?? "";
+  const selected = offerings.find(o => o.id === selectedId);
+  return (
+    <div className="mt-2 space-y-1 text-xs text-gray-600">
+      {offerings.length === 1 ? (
+        <div className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{offerings[0].location}</div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <MapPin className="w-3.5 h-3.5 shrink-0" />
+          <label htmlFor={`course-location-${result.id}`} className="font-medium">Location</label>
+          <select
+            id={`course-location-${result.id}`}
+            value={selectedId}
+            onChange={event => setExplicitSelection({ courseId: result.id, filter, offeringId: event.target.value })}
+            className="h-8 max-w-full rounded-md border border-gray-300 bg-white px-2 text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+          >
+            <option value="">Select a location</option>
+            {offerings.map(o => <option key={o.id} value={o.id}>{o.location}</option>)}
+          </select>
+        </div>
+      )}
+      <div className="flex items-center gap-1" aria-live="polite">
+        <DollarSign className="w-3.5 h-3.5" />
+        {offerings.length === 1
+          ? offeringFee(offerings[0])
+          : selected ? offeringFee(selected) : "Select a location to see its fee"}
+      </div>
+    </div>
+  );
 }
 
 export default function SearchPage() {
@@ -817,12 +889,8 @@ export default function SearchPage() {
             {(data?.results ?? []).map((r) => {
               const inTray = tray.includes(r.id);
               const trayFull = tray.length >= MAX_COMPARE && !inTray;
-              const fee = formatFee(r.international_fee, r.currency, r.fee_term, r.international_fee_yearly);
               const dur = formatDuration(r.duration, r.duration_term);
-              const cityCountry = r.course_location || [r.university.city, r.university.country].filter(Boolean).join(", ");
               const meta: Array<{ icon: React.ReactNode; text: string }> = [];
-              if (cityCountry) meta.push({ icon: <MapPin className="w-3.5 h-3.5" />, text: cityCountry });
-              if (fee) meta.push({ icon: <DollarSign className="w-3.5 h-3.5" />, text: fee });
               if (dur) meta.push({ icon: <Clock className="w-3.5 h-3.5" />, text: dur });
               if (r.intakes.length > 0) meta.push({ icon: <Calendar className="w-3.5 h-3.5" />, text: r.intakes.join(", ") });
 
@@ -856,6 +924,7 @@ export default function SearchPage() {
                           <BookOpen className="w-3.5 h-3.5" /> {r.university.name}
                         </p>
                       </Link>
+                      <ResultLocationFee result={r} locationFilter={location} />
                       {meta.length > 0 && (
                         <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-600">
                           {meta.map((m, i) => (
@@ -918,7 +987,7 @@ export default function SearchPage() {
                       </Link>
                       {r.course_url && (
                         <a href={r.course_url} target="_blank" rel="noreferrer" className="text-[11px] text-gray-500 hover:text-red-600 inline-flex items-center justify-center gap-1">
-                          <Globe2 className="w-3 h-3" /> Website
+                          <Globe2 className="w-3 h-3" /> University course website
                         </a>
                       )}
                     </div>

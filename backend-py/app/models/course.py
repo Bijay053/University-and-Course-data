@@ -16,6 +16,7 @@ class Course(Base):
         Integer, ForeignKey("universities.id", ondelete="CASCADE"), nullable=False
     )
     name: Mapped[str] = mapped_column(Text, nullable=False)
+    offering_identity: Mapped[str | None] = mapped_column(Text, unique=True)
     category: Mapped[str | None] = mapped_column(Text)
     sub_category: Mapped[str | None] = mapped_column(Text)
     course_website: Mapped[str | None] = mapped_column(Text)
