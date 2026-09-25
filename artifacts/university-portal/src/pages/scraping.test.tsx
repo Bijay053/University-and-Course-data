@@ -179,6 +179,49 @@ function initialReview(): ScrapingInitialReviewState {
 }
 
 describe("Scraping repair reviewer", () => {
+  it.each([false, true])("approves identical campus fees in a mixed selection and retains pending rows (failure=%s)", async (fail) => {
+    const review = initialReview();
+    const options = (amounts: number[]) => amounts.map((amount, index) => ({
+      amount, currency: "GBP", year: 2026, period: "Full Course",
+      campus: index ? "London" : "Outside London", study_variant: "Standard",
+      source_url: "https://www.law.ac.uk/study/postgraduate/business/mba/",
+      snippet: "International Students | 2026 | Full Course",
+    }));
+    review.courses = review.courses.slice(0, 2).map((course, index) => {
+      const selected = options(index ? [17500, 19050] : [20600, 20600]);
+      return {
+        ...course, internationalFee: index ? null : 20600,
+        extraction_method: { fee_variants: {
+          status: index ? "range" : "uniform", selected, options: selected,
+        } },
+      };
+    }) as ScrapingInitialReviewState["courses"];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/approve")) return fail
+        ? new Response(JSON.stringify({ detail: "Approval refused" }), { status: 409 })
+        : jsonResponse({ ok: true });
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ScrapingForTest initialReviewState={review} />);
+    expect(screen.getByText(/1 selected course\(s\) need fee-option review/)).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Approve (1)" }));
+    await waitFor(() => expect(fetchMock.mock.calls.filter(args => String(args[0]).endsWith("/approve")))
+      .toHaveLength(1));
+    expect(fetchMock.mock.calls.find(args => String(args[0]).endsWith("/approve"))?.[0])
+      .toBe("/api/scrape/staged/1/approve");
+    await waitFor(() => expect(screen.getByRole("button", { name: `Approve (${fail ? 1 : 0})` })
+      .hasAttribute("disabled")).toBe(false));
+    expect(screen.getByTestId("fee-summary-2")).toBeTruthy();
+    if (!fail) expect(screen.queryByTestId("fee-summary-1")).toBeNull();
+    expect(screen.getByText(/1 selected course\(s\) need fee-option review/)).toBeTruthy();
+  });
+
   it("renders persisted campus alternatives in the main review and blocks scalar-free approval", async () => {
     const review = initialReview();
     const options = [17500, 19050].map((amount, index) => ({
@@ -206,6 +249,7 @@ describe("Scraping repair reviewer", () => {
     const approve = screen.getByTitle("Cannot approve — fee variant review required") as HTMLButtonElement;
     expect(approve.disabled).toBe(true);
     await userEvent.click(approve);
+    await userEvent.click(screen.getByRole("button", { name: "Approve (0)" }));
     expect(fetchMock.mock.calls.some(args => String(args[0]).endsWith("/approve"))).toBe(false);
   });
 

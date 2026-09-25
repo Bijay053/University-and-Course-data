@@ -2388,15 +2388,21 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     }
   }, [scraping, activeJobId]);
 
+  const feeReviewSelectedIds = new Set(
+    stagedCourses.filter(c => selectedIds.has(c.id) && feeVariantNeedsReview(c)).map(c => c.id)
+  );
+  const approvalCandidateIds = stagedCourses
+    .filter(c => selectedIds.has(c.id) && !feeReviewSelectedIds.has(c.id)).map(c => c.id);
+
   const handleApproveSelected = async () => {
     if (!reviewJobId || selectedIds.size === 0) return;
-    if (stagedCourses.some(c => selectedIds.has(c.id) && feeVariantNeedsReview(c))) {
-      toast({ title: "Fee variant review required", description: "Resolve the applicable campus, year and study variant before approving these courses.", variant: "destructive" });
+    if (approvalCandidateIds.length === 0) {
+      toast({ title: "Selected courses need fee review", description: "No courses were published. These courses remain pending because their fee options are unresolved.", variant: "destructive" });
       return;
     }
 
     // Quality gate — warn before approving risky courses
-    const blockedIds = Array.from(selectedIds).filter(
+    const blockedIds = approvalCandidateIds.filter(
       (id) => courseQualityMap[id] !== undefined && courseQualityMap[id].score < 60
     );
     if (blockedIds.length > 0) {
@@ -2417,7 +2423,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     const failedIds = new Set<number>();
     const failedMessages: string[] = [];
 
-    for (const id of selectedIds) {
+    for (const id of approvalCandidateIds) {
       try {
         const res = await fetch(`/api/scrape/staged/${id}/approve`, { method: "POST" });
         if (res.ok) {
@@ -2432,7 +2438,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     }
 
     setStagedCourses((prev) => prev.filter((c) => !succeededIds.has(c.id)));
-    setSelectedIds(failedIds);
+    setSelectedIds(new Set([...feeReviewSelectedIds, ...failedIds]));
     setApproving(false);
     fetchJobs();
     if (uniData?.data) {
@@ -2447,13 +2453,14 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         })
       ).then(setUniStats);
     }
-    if (failedMessages.length > 0) {
-      toast({
-        title: `${failedIds.size} course(s) could not be published`,
-        description: failedMessages.slice(0, 3).join(" · "),
-        variant: "destructive",
-      });
-    }
+    toast({
+      title: `${succeededIds.size} course(s) approved`,
+      description: [
+        feeReviewSelectedIds.size > 0 ? `${feeReviewSelectedIds.size} left pending for fee-option review.` : "",
+        failedIds.size > 0 ? `${failedIds.size} could not be published. ${failedMessages.slice(0, 3).join(" · ") || "Check the connection and try again."}` : "",
+      ].filter(Boolean).join(" ") || "Selected courses were published successfully.",
+      ...(failedIds.size > 0 ? { variant: "destructive" as const } : {}),
+    });
   };
 
   const handleRejectSelected = async () => {
@@ -3560,16 +3567,23 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                   className="bg-green-600 hover:bg-green-700 text-white"
                   onClick={handleApproveSelected}
                   disabled={selectedIds.size === 0 || approving}
-                  title="Approve and publish selected courses"
+                  title="Approve selected courses that do not need fee-option review; other approval checks still apply"
                 >
                   {approving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1" />}
-                  Approve ({selectedIds.size})
+                  Approve ({approvalCandidateIds.length})
                 </Button>
               </div>
             </div>
             <p className="text-sm text-muted-foreground">
               Tick courses, then use <strong>Fix</strong> once to recover all detected missing requirements, <strong>Approve</strong> to publish, or <strong>Reject</strong> to discard.
             </p>
+            {feeReviewSelectedIds.size > 0 && (
+              <p className="text-sm text-amber-700" role="status">
+                {feeReviewSelectedIds.size} selected course(s) need fee-option review and will remain pending.
+                {" "}{approvalCandidateIds.length} other selected course(s) can be submitted for approval.
+                {" "}Identical fees across campuses do not require fee-option review.
+              </p>
+            )}
           </CardHeader>
           <CardContent>
             <DatedCatalogueReview courses={stagedCourses} />
