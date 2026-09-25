@@ -96,6 +96,200 @@ def evidence_snapshot(rows):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("reverse_order", [False, True], ids=["forward", "reverse"])
+async def test_bulk_approval_publishes_only_current_selected_fees(
+    isolated_fee_database, reverse_order,
+):
+    """Real selection and bulk routes, real promotion, schema-local records only."""
+    from app.routers.reviews import router as reviews_router
+
+    sessions = async_sessionmaker(
+        isolated_fee_database, expire_on_commit=False, autoflush=False,
+    )
+    cases = ["selected_range", "unresolved", "changed_year_period", "stale_source", "stale_tuple"]
+    if reverse_order:
+        cases.reverse()
+    ids, original_tuples, variants_by_case = {}, {}, {}
+    async with sessions() as db:
+        university = University(name="Disposable bulk fees", country="Test", city="Test")
+        db.add(university)
+        await db.flush()
+        university_id = university.id
+        for case in cases:
+            sc = course()
+            sc.id = None
+            sc.university_id = university_id
+            sc.scrape_job_id = f"bulk-selection-{case}"
+            # Distinct names prevent promotion's legitimate deduplication from
+            # conflating the synthetic courses, which share an official URL.
+            sc.course_name = f"MSc Healthcare Management {case}"
+            sc.ielts_overall = 6.5
+            sc.duration = 1
+            sc.intake_months = ["September"]
+            sc.study_mode = "Full-time"
+            sc.auto_publish_status = "pending_review"
+            db.add(sc)
+            await db.flush()
+            ids[case] = sc.id
+            original_tuples[case] = {key: getattr(sc, key) for key in FIELDS}
+            variants_by_case[case] = copy.deepcopy(sc.extraction_method["fee_variants"])
+            raw = json.dumps(variants_by_case[case], ensure_ascii=False)
+            db.add_all([
+                ScrapedFieldEvidence(
+                    scraped_course_id=sc.id, field_key="international_fee",
+                    source_url=URL, extraction_method=METHOD,
+                    snippet=raw[:1000], raw_text=raw,
+                ),
+                ScrapedFieldEvidence(
+                    scraped_course_id=sc.id, field_key="duration",
+                    source_url=URL, extraction_method="test_source",
+                    snippet="One year full-time", raw_text="Unrelated evidence",
+                ),
+            ])
+        await db.commit()
+
+    async def database():
+        async with sessions() as db:
+            yield db
+
+    async def reviewer():
+        return {"email": "bulk-reviewer@example.test", "permissions": ["staged.approve"]}
+
+    app = FastAPI()
+    app.include_router(router, prefix="/api/scrape")
+    app.include_router(reviews_router, prefix="/api/reviews")
+    app.dependency_overrides[get_db] = database
+    app.dependency_overrides[get_current_user] = reviewer
+    chosen_by_case = {}
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        for case in cases:
+            if case == "unresolved":
+                continue
+            async with sessions() as db:
+                state = fee_selection(await db.get(ScrapedCourse, ids[case]))
+            chosen = state["options"][2 if case == "changed_year_period" else 1]
+            chosen_by_case[case] = chosen
+            response = await client.post(
+                f"/api/scrape/staged/{ids[case]}/fee-selection",
+                json={"snapshotToken": state["snapshotToken"], "optionId": chosen["optionId"]},
+            )
+            assert response.status_code == 200, response.text
+
+        async with sessions() as db:
+            stale_source = await db.get(ScrapedCourse, ids["stale_source"])
+            metadata = copy.deepcopy(stale_source.extraction_method)
+            metadata["fee_variants"]["options"][2]["snippet"] += " updated source"
+            stale_source.extraction_method = metadata
+            stale_tuple = await db.get(ScrapedCourse, ids["stale_tuple"])
+            stale_tuple.fee_year = 2028
+            await db.commit()
+
+        # Snapshot committed data immediately before bulk approval. Failed rows
+        # must remain byte-for-byte equivalent at the mapped-column level.
+        async with sessions() as db:
+            before_rows = {
+                case: {
+                    column.name: copy.deepcopy(getattr(sc, column.name))
+                    for column in ScrapedCourse.__table__.columns
+                }
+                for case, sc in [
+                    (case, await db.get(ScrapedCourse, sc_id)) for case, sc_id in ids.items()
+                ]
+            }
+            before_evidence = evidence_snapshot((await db.execute(
+                select(ScrapedFieldEvidence).order_by(ScrapedFieldEvidence.id)
+            )).scalars().all())
+            before_audits = [
+                {column.name: copy.deepcopy(getattr(row, column.name))
+                 for column in CourseAuditLog.__table__.columns}
+                for row in (await db.execute(
+                    select(CourseAuditLog).order_by(CourseAuditLog.id)
+                )).scalars().all()
+            ]
+            assert len(before_audits) == 4
+            for case, chosen in chosen_by_case.items():
+                audit = next(a for a in before_audits if a["scraped_course_id"] == ids[case])
+                selection = before_rows[case]["extraction_method"]["fee_selection"]
+                proof = next(e for e in before_evidence
+                             if e["scraped_course_id"] == ids[case]
+                             and e["field_key"] == "international_fee")
+                assert audit["actor"] == selection["actor"] == "bulk-reviewer@example.test"
+                assert audit["source_evidence_id"] == selection["sourceEvidenceId"] == proof["id"]
+                assert audit["action"] == "fee_option_selected"
+                assert audit["field_key"] == "international_fee"
+                assert audit["course_id"] is None
+                assert json.loads(audit["old_value"]) == original_tuples[case]
+                assert json.loads(audit["new_value"]) == {
+                    "tuple": dict(zip(FIELDS, (
+                        chosen["amount"], chosen["currency"], chosen["year"], chosen["period"],
+                    ))),
+                    "selection": selection,
+                    "option": variants_by_case[case]["options"][
+                        2 if case == "changed_year_period" else 1
+                    ],
+                }
+
+        response = await client.post(
+            "/api/reviews/scraped-courses/bulk-approve",
+            params={"university_id": university_id, "status": "pending",
+                    "auto_publish_status": "pending_review", "dry_run": False, "limit": 10},
+        )
+        assert response.status_code == 200, response.text
+        result = response.json()
+        assert result["ok"] is True
+        assert result["approved"] == 2
+        assert result["failed"] == 3
+        invalid = {"unresolved", "stale_source", "stale_tuple"}
+        assert {failure["scraped_course_id"] for failure in result["failures"]} == {
+            ids[case] for case in invalid
+        }
+        assert all(failure["error"] == "Select a current published fee option before approval"
+                   for failure in result["failures"])
+
+    # Fresh session proves persisted promotion, not response counts or ORM cache.
+    async with sessions() as db:
+        published = (await db.execute(select(Course))).scalars().all()
+        fees = (await db.execute(select(Fee))).scalars().all()
+        assert len(published) == len(fees) == 2
+        published_ids = set()
+        for case, sc_id in ids.items():
+            saved = await db.get(ScrapedCourse, sc_id)
+            if case in invalid:
+                assert {
+                    column.name: getattr(saved, column.name)
+                    for column in ScrapedCourse.__table__.columns
+                } == before_rows[case]
+                assert saved.status == "pending" and saved.course_id is None
+                assert fee_selection(saved)["selectedOptionId"] is None
+                continue
+            chosen = chosen_by_case[case]
+            expected_tuple = dict(zip(FIELDS, (
+                chosen["amount"], chosen["currency"], chosen["year"], chosen["period"],
+            )))
+            assert {key: getattr(saved, key) for key in FIELDS} == expected_tuple
+            assert saved.status == "approved" and saved.reviewed_at is not None
+            assert saved.extraction_method == before_rows[case]["extraction_method"]
+            assert fee_selection(saved)["selectedOptionId"] == chosen["optionId"]
+            live = next(row for row in published if row.id == saved.course_id)
+            published_ids.add(live.id)
+            assert live.name == saved.course_name
+            assert live.university_id == university_id
+            assert live.last_edited_by == "bulk-reviewer@example.test"
+            fee = next(row for row in fees if row.course_id == live.id)
+            assert {key: getattr(fee, key) for key in FIELDS} == expected_tuple
+        assert published_ids == {row.id for row in published}
+        assert evidence_snapshot((await db.execute(
+            select(ScrapedFieldEvidence).order_by(ScrapedFieldEvidence.id)
+        )).scalars().all()) == before_evidence
+        assert [
+            {column.name: getattr(row, column.name) for column in CourseAuditLog.__table__.columns}
+            for row in (await db.execute(
+                select(CourseAuditLog).order_by(CourseAuditLog.id)
+            )).scalars().all()
+        ] == before_audits
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("first", [0, 1], ids=["first-option-wins", "second-option-wins"])
 async def test_simultaneous_same_snapshot_has_one_winner(isolated_fee_database, first):
     engine = isolated_fee_database
