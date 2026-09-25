@@ -5,9 +5,81 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastapi import HTTPException
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.exc import IntegrityError, OperationalError, StatementError
 
+from app.dependencies import get_current_user, get_db
 from app.routers.reviews import bulk_approve_scraped_courses
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("dry_run", [False, True], ids=["approval", "dry-run"])
+@pytest.mark.parametrize("error_type", [OperationalError, RuntimeError])
+async def test_candidate_query_failure_http_response_is_private(
+    fastapi_app, dry_run, error_type, monkeypatch,
+):
+    """Exercise the real app's routing, middleware and exception serialization."""
+    error = (
+        OperationalError(
+            statement="SELECT private_table WHERE payload=:payload",
+            params={"payload": "private-bound-value"},
+            orig=Exception("private-driver-detail"),
+        )
+        if error_type is OperationalError
+        else RuntimeError(
+            "SELECT private_table payload private-bound-value private-driver-detail"
+        )
+    )
+    db = SimpleNamespace(
+        execute=AsyncMock(side_effect=error),
+        get=AsyncMock(),
+        rollback=AsyncMock(),
+        commit=AsyncMock(),
+    )
+    approve = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.scraper.approve_course.approve_scraped_course", approve,
+    )
+
+    async def override_db():
+        yield db
+
+    async def override_user():
+        return {"email": "reviewer"}
+
+    # Restore existing overrides even if the request or an assertion fails.
+    monkeypatch.setitem(fastapi_app.dependency_overrides, get_db, override_db)
+    monkeypatch.setitem(fastapi_app.dependency_overrides, get_current_user, override_user)
+    transport = ASGITransport(app=fastapi_app, raise_app_exceptions=False)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/api/scraped-courses/bulk-approve",
+            params={
+                "university_id": 7,
+                "status": "pending",
+                "auto_publish_status": "ready",
+                "dry_run": str(dry_run).lower(),
+                "limit": 10,
+            },
+        )
+
+    assert response.status_code == 500
+    assert response.headers["content-type"] == "application/json"
+    assert response.json() == {
+        "detail": (
+            "The review batch could not be loaded because of an unexpected error. "
+            "Please try again or contact support if the problem continues."
+        ),
+    }
+    for private_detail in (
+        "SELECT", "private_table", "payload", "private-bound-value", "private-driver-detail",
+    ):
+        assert private_detail not in response.text
+    db.execute.assert_awaited_once()
+    db.rollback.assert_awaited_once()
+    db.get.assert_not_awaited()
+    db.commit.assert_not_awaited()
+    approve.assert_not_awaited()
 
 
 @pytest.mark.asyncio
