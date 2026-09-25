@@ -1,0 +1,16 @@
+{
+  "response": {
+    "job_id": "job_fcbbaad4cef9",
+    "scoped_rows": 0,
+    "critical_issues": 12,
+    "marked_ids": [],
+    "marked_count": 0
+  },
+  "review_response_keys": [
+    "courses",
+    "lastScrape",
+    "qualityBlocked"
+  ],
+  "normal_review_ids": [],
+  "marked_ids_excluded_from_normal_review": true
+}

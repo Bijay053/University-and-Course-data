@@ -1,0 +1,114 @@
+{
+  "outcome": "corrected_code_full_review_completed_with_quality_and_preservation_verified",
+  "production_revision": "6103d999cbc51d91563760d045afdc14e4c42549",
+  "job_id": "job_e63482db0495",
+  "university_id": 89,
+  "status": "completed",
+  "started_at": "2026-09-25T01:44:12.854549+00:00",
+  "completed_at": "2026-09-25T01:52:15.661116+00:00",
+  "request": {
+    "fullCatalogueReviewOnly": true,
+    "forceDiscovery": true,
+    "fastMode": false,
+    "bulkMode": false,
+    "reused": false
+  },
+  "counts": {
+    "discovered": 107,
+    "processed": 107,
+    "new_staged_pending": 103,
+    "new_normal_review_queue": 91,
+    "new_data_quality_failure": 12,
+    "skipped": 3,
+    "errors": 1,
+    "fetch_failed": 0,
+    "existing_pending_before": 104,
+    "pending_after": 207,
+    "published_before": 0,
+    "published_after": 0
+  },
+  "quality": {
+    "critical_issues": 12,
+    "affected_courses": 12,
+    "warnings": 41,
+    "critical_reasons": {
+      "missing_course_name": 1,
+      "missing_english_requirement": 11
+    },
+    "all12_quality_blocked_rows_still_pending": true,
+    "all12_excluded_from_authenticated_normal_job_review_queue": true,
+    "normal_queue_count_is_not_a_perfect_data_certification": true
+  },
+  "skip_reasons": {
+    "online_only": 1,
+    "part_time_only": 2
+  },
+  "error_evidence": {
+    "stage_reason": "per_course_timeout",
+    "job_errors": 1,
+    "stored_gemini_timeout_gate_count": 2,
+    "note": "Gate event count is not the same as final failed-course count."
+  },
+  "preservation": {
+    "baseline_rows_preserved_with_identical_full_row_and_field_evidence_hashes": 104,
+    "changed_existing_ids": [],
+    "missing_baseline_ids": [],
+    "new_ids_count": 103,
+    "baseline_owner_job": "job_85c7c87a3c31",
+    "new_rows_owner_job": "job_e63482db0495",
+    "published_courses_and_related_records_unchanged": true
+  },
+  "policy": {
+    "scope": "full_catalogue",
+    "fresh_discovery": true,
+    "fresh_extraction": true,
+    "saved_checkpoints": false,
+    "verification_sample_cap": null,
+    "preserve_existing": true,
+    "automatic_publish": false,
+    "automatic_repair": false,
+    "removal_reconciliation": false,
+    "full_catalogue_verified": false
+  },
+  "effective_configuration": {
+    "fresh_process_reload_before_and_after": true,
+    "unchanged": true,
+    "resolved_yaml": "leedstrinity_2220.yaml",
+    "default_currency": "GBP",
+    "skip_degree_qualifier_check": true,
+    "official_catalogue_fallback": true,
+    "searchstax_disabled_by_official_catalogue_fallback": true,
+    "global_online_and_part_time_gates_enforced": true
+  },
+  "evidence": {
+    "baseline": "leeds_final_baseline.json",
+    "baseline_sha256": "c462211e7203db17342bc1b390387a84eb9061ff69846acdff0cc4f7161834df",
+    "after": "leeds_final_after.json",
+    "after_sha256": "e931518a0a7d4e1596f572d3898a3acbe449c6fb6dc83e5793af4341682f318b",
+    "request": "leeds_final_start.json",
+    "authenticated_review_queue": "leeds_final_review_queue.json",
+    "baseline_ssm_command_id": "c1522fb8-b936-40de-863f-378fa1a57b47",
+    "after_ssm_command_id": "3e53806b-358d-48d8-b15e-ae6ffa62e97d",
+    "final_idle_release_counts_check": "4b0b9def-207f-499b-991c-f8050e48c8f1"
+  },
+  "operational_safety": {
+    "idle_before_start": true,
+    "active_jobs_after_completion": 0,
+    "other_jobs_stopped": 0,
+    "additional_deployments_for_this_final_run": 0,
+    "manual_sql_writes": 0,
+    "publishing_or_removal_actions": 0,
+    "post_run_quality_reconciliation_needed": false
+  },
+  "history": [
+    "Original review job_fcbbaad4cef9 ran on4749a74:107 processed,103 staged,3 skipped,1 error. Original baseline row40883 was preserved at that time.",
+    "Intervening normal job_85c7c87a3c31 replaced all104 original rows before safety reconciliation. Scoped reconciliation of the original job was therefore a no-op; unrelated rows were not restored.",
+    "This final full review on corrected6103d99 uses the intervening job's104 pending rows as its fresh preservation baseline and proves they all remain unchanged."
+  ],
+  "limitations": [
+    "Completed processing does not mean all107 candidates yielded usable courses:3 were excluded and1 timed out.",
+    "The103 staged rows include12 critical quality failures, correctly blocked from the normal review queue;91 remain in that queue.",
+    "Persisted full_catalogue_verified remainsfalse; no manual certification or completion override was applied.",
+    "No real-production automatic publishing tests were run."
+  ]
+}

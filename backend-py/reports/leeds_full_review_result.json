@@ -1,6 +1,12 @@
 {
   "outcome": "guarded_release_succeeded_and_full_review_completed",
   "supersedes": "leeds_full_review_release_blocked.json",
+  "safety_addendum": "leeds_quality_safety_addendum.json",
+  "current_production_release": "6103d999cbc51d91563760d045afdc14e4c42549",
+  "authoritative_final_verification": "leeds_final_corrected_verification.json",
+  "authoritative_final_job": "job_e63482db0495",
+  "authoritative_final_summary": "Corrected-code full review completed107/107:103 new pending rows, comprising91 normal-review and12 quality-blocked rows;3 global-gate skips;1 extraction error. All104 fresh-baseline rows and their evidence unchanged, pending207/published0. See authoritative final verification for current counts and hash proofs; sections below retain original run history.",
+  "historical_counts_note": "The release, run and preservation sections below describe the original completed run at4749a74, not current row ownership. That run staged103 rows but persisted12 critical quality issues. A later non-review-only job replaced all104 original pending rows before scoped quality reconciliation; see the safety addendum. Reconciliation marked0 rows because none remained owned by our job; current104 pending rows belong to the intervening job.",
   "release": {
     "authorized_predecessor": "21e23676e579cc7dcc0678de3d81808548977a21",
     "target": "4749a74cdc3668aea71d8db1db30555c237a0f2f",

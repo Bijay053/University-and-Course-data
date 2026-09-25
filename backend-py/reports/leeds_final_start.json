@@ -1,0 +1,16 @@
+{
+  "request": {
+    "universityId": 89,
+    "fullCatalogueReviewOnly": true,
+    "forceDiscovery": true,
+    "fastMode": false,
+    "bulkMode": false
+  },
+  "response": {
+    "jobId": "job_e63482db0495",
+    "runtimeJobId": "job_e63482db0495",
+    "status": "queued",
+    "reused": false,
+    "ok": true
+  }
+}
