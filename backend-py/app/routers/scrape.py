@@ -290,6 +290,25 @@ def _staged_row_to_dict(r) -> dict:
         d["eligibilityReason"] = _dec.reason
         d["eligibility_reason"] = _dec.reason
         d["autoPublishStatus"] = r.auto_publish_status  # not recomputed (needs DB)
+        # Existing policy assessments can also contain an obsolete null-fee
+        # completeness penalty. Reuse their conflict counts, never assume zero
+        # for an unassessed row. This is a read projection, not a DB mutation.
+        from app.services.scraper.extractors.ulaw_fees import validated_fee_variants
+        _fee_authority = validated_fee_variants(r)
+        _breakdown = d.get("pub_score_breakdown")
+        if (_fee_authority and _fee_authority["status"] == "range"
+                and isinstance(_breakdown, dict)
+                and all(type(_breakdown.get(key)) is int and _breakdown[key] >= 0
+                        for key in ("open_conflicts", "critical_conflicts"))):
+            from app.services.publishing_engine import compute_pub_score
+            _policy = compute_pub_score(r, _breakdown["open_conflicts"], _breakdown["critical_conflicts"])
+            for _snake, _camel_key, _key in (
+                ("pub_score", "pubScore", "score"),
+                ("pub_score_breakdown", "pubScoreBreakdown", "breakdown"),
+                ("pub_decision", "pubDecision", "decision"),
+                ("pub_decision_reason", "pubDecisionReason", "reason"),
+            ):
+                d[_snake] = d[_camel_key] = _policy[_key]
     except Exception:
         # Defensive fallback: surface stored values if recompute fails.
         d["eligibilityStatus"] = r.eligibility_status
@@ -6562,8 +6581,9 @@ async def diagnose_scrape_job(
     )).scalar_one() or 0)
 
     staged_count = len(staged_rows)
+    from app.services.scraper.completeness import compute_completeness
     avg_completeness = (
-        sum(r.completeness or 0 for r in staged_rows) / staged_count
+        sum(compute_completeness(r).score for r in staged_rows) / staged_count
         if staged_count else 0
     )
     # Detect location chrome (nav/footer garbage)
@@ -6578,6 +6598,7 @@ async def diagnose_scrape_job(
         if r.course_location and len(_NAV_HINTS.findall(r.course_location)) >= 2
     ]
     course_names = [r.course_name for r in staged_rows if r.course_name][:5]
+    from app.services.scraper.extractors.ulaw_fees import validated_fee_variants
     blank_fields = {}
     for r in staged_rows:
         for field, val in [
@@ -6588,7 +6609,7 @@ async def diagnose_scrape_job(
             ("duration", r.duration),
             ("ielts_overall", r.ielts_overall),
         ]:
-            if not val:
+            if not val and not (field == "international_fee" and validated_fee_variants(r)):
                 blank_fields[field] = blank_fields.get(field, 0) + 1
 
     # ── Per-level course count (deterministic — no AI needed) ─────────────────
@@ -7656,6 +7677,9 @@ async def extraction_quality_report(
     ]
 
     def _filled(r: ScrapedCourse, field: str) -> bool:
+        if field == "international_fee":
+            from app.services.scraper.completeness import _has_value
+            return _has_value(r, field)
         if field == "english_test":
             return _has_english(r)
         if field == "intake_months":
@@ -7775,7 +7799,7 @@ async def extraction_quality_report(
         })
 
     # 4. International fee blank
-    _fee_blank_cnt = sum(1 for r in rows if not r.international_fee or r.international_fee == 0)
+    _fee_blank_cnt = sum(1 for r in rows if not _filled(r, "international_fee"))
     if _fee_blank_cnt > 0:
         pct = _fee_blank_cnt / n * 100
         sev = "critical" if pct > 30 else "high" if pct > 10 else "medium"

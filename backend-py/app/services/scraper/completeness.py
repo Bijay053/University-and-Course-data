@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from app.config import settings
 from app.models import ScrapedCourse
 from app.services.scraper.requirement_status import effective_requirement_status
+from app.services.scraper.extractors.ulaw_fees import validated_fee_variants
 
 
 # (field_attr, human_label_for_warnings)
@@ -50,6 +51,10 @@ REVIEW_FIELDS: tuple[tuple[str, str], ...] = (
 
 
 def _has_value(sc: ScrapedCourse, attr: str) -> bool:
+    if attr == "international_fee" and validated_fee_variants(sc):
+        # An evidenced set of alternatives fills the fee slot, but it is
+        # deliberately not a universal scalar and must not authorize publish.
+        return True
     if attr == "__english__":
         alternatives = any(
             getattr(sc, k, None) is not None and (getattr(sc, k) or 0) > 0
@@ -122,6 +127,9 @@ def decide_eligibility(sc: ScrapedCourse, completeness: CompletenessResult) -> E
     (low-confidence fields the operator should double-check).
     """
     blockers: list[str] = []
+    fee_authority = validated_fee_variants(sc)
+    if fee_authority and fee_authority["status"] == "range":
+        blockers.append("international fee campus/award alternatives require review")
     for attr, label in _HARD_BLOCKERS:
         if not _has_value(sc, attr):
             blockers.append(label)

@@ -120,6 +120,22 @@ async def _analyse_last_job(uni_id: int, db: AsyncSession) -> dict[str, Any]:
         return {"status": "no_completed_job"}
 
     job_id, total_found, imported, errors, completed_at = job_row
+    # Validate complete source/tuple metadata in Python, rather than trusting a
+    # JSON status flag in SQL. These null scalars are known fee alternatives,
+    # not missing tuition; low-option plausibility checks remain independent.
+    from sqlalchemy import select
+    from app.models import ScrapedCourse
+    from app.services.scraper.extractors.ulaw_fees import validated_fee_variants
+    range_rows = (await db.execute(select(ScrapedCourse).where(
+        ScrapedCourse.scrape_job_id == job_id,
+        ScrapedCourse.international_fee.is_(None),
+        ScrapedCourse.extraction_method.is_not(None),
+        ScrapedCourse.course_website.like("%law.ac.uk/study/%"),
+    ))).scalars().all()
+    fee_ranges = {
+        row.id: authority for row in range_rows
+        if (authority := validated_fee_variants(row)) and authority["status"] == "range"
+    }
 
     cmp = (await db.execute(text("""
         SELECT
@@ -161,6 +177,12 @@ async def _analyse_last_job(uni_id: int, db: AsyncSession) -> dict[str, Any]:
         WHERE scrape_job_id = :jid
     """), {"jid": job_id})).fetchone()
 
+    cmp = list(cmp)
+    cmp[1] = int(cmp[1] or 0) + len(fee_ranges)
+    cmp[14] = int(cmp[14] or 0) + sum(
+        all(option["amount"] >= 10000 for option in authority["selected"])
+        for authority in fee_ranges.values()
+    )
     total = int(cmp[0] or 1)
 
     def _pct(n: Any) -> float:
@@ -245,7 +267,8 @@ async def _analyse_last_job(uni_id: int, db: AsyncSession) -> dict[str, Any]:
             study_mode,
             degree_level,
             -- Issue flags as integer scores for ranking
-            CASE WHEN international_fee IS NULL OR international_fee = 0 THEN 2
+            CASE WHEN id = ANY(CAST(:fee_range_ids AS integer[])) THEN 0
+                 WHEN international_fee IS NULL OR international_fee = 0 THEN 2
                  WHEN international_fee BETWEEN 1 AND 9999            THEN 1
                  ELSE 0 END                                           AS fee_score,
             CASE WHEN ielts_overall IS NULL OR ielts_overall = 0      THEN 2 ELSE 0 END AS ielts_score,
@@ -257,7 +280,8 @@ async def _analyse_last_job(uni_id: int, db: AsyncSession) -> dict[str, Any]:
         FROM scraped_courses
         WHERE scrape_job_id = :jid
         ORDER BY (
-            CASE WHEN international_fee IS NULL OR international_fee = 0 THEN 2
+            CASE WHEN id = ANY(CAST(:fee_range_ids AS integer[])) THEN 0
+                 WHEN international_fee IS NULL OR international_fee = 0 THEN 2
                  WHEN international_fee BETWEEN 1 AND 9999 THEN 1 ELSE 0 END +
             CASE WHEN ielts_overall IS NULL OR ielts_overall = 0 THEN 2 ELSE 0 END +
             CASE WHEN course_location IS NULL OR course_location = '' THEN 1
@@ -267,7 +291,7 @@ async def _analyse_last_job(uni_id: int, db: AsyncSession) -> dict[str, Any]:
             CASE WHEN degree_level IS NULL OR degree_level = '' THEN 1 ELSE 0 END
         ) DESC, course_name
         LIMIT 10
-    """), {"jid": job_id})).fetchall()
+    """), {"jid": job_id, "fee_range_ids": list(fee_ranges)})).fetchall()
 
     top_broken_courses = []
     for row in broken_rows:

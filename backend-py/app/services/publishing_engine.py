@@ -63,6 +63,12 @@ def compute_pub_score(
     < 70                        → hold
     """
     completeness = float(sc.completeness or 0)
+    from app.services.scraper.extractors.ulaw_fees import validated_fee_variants
+    fee_authority = validated_fee_variants(sc)
+    fee_range = bool(fee_authority and fee_authority["status"] == "range")
+    if fee_range:
+        from app.services.scraper.completeness import compute_completeness
+        completeness = float(compute_completeness(sc).score)
     confidence = float(
         sc.avg_verification_confidence
         or sc.eligibility_confidence
@@ -93,6 +99,11 @@ def compute_pub_score(
     else:
         decision = "hold"
         reason = f"Score {pub_score} < {_NEEDS_REVIEW_MIN} — insufficient completeness/confidence"
+
+    if fee_range:
+        if decision == "auto_publish":
+            decision = "needs_review"
+        reason += " | International fee campus/award alternatives require review"
 
     return {
         "score": pub_score,
