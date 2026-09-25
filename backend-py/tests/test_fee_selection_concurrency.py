@@ -16,6 +16,7 @@ import pytest_asyncio
 from fastapi import FastAPI, Request
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import func, select, text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
@@ -93,6 +94,120 @@ def evidence_snapshot(rows):
          for column in ScrapedFieldEvidence.__table__.columns}
         for row in rows
     ]
+
+
+@pytest.mark.asyncio
+async def test_staged_approval_precheck_failure_releases_fee_lock(
+    isolated_fee_database, caplog,
+):
+    """The route, not dependency teardown, must roll back its real row lock."""
+    def snapshot(row):
+        return {
+            column.name: copy.deepcopy(getattr(row, column.name))
+            for column in ScrapedCourse.__table__.columns
+        }
+
+    engine = isolated_fee_database
+    sessions = async_sessionmaker(engine, expire_on_commit=False, autoflush=False)
+    async with sessions() as db:
+        university = University(name="Disposable precheck failure", country="Test", city="Test")
+        db.add(university)
+        await db.flush()
+        sc = course()
+        sc.id = None
+        sc.university_id = university.id
+        db.add(sc)
+        await db.commit()
+        sc_id = sc.id
+        before = snapshot(sc)
+
+    error = RuntimeError("private-precheck-table private-bound-value")
+    lock_observed = False
+    transaction = None
+    async with engine.connect() as holder, engine.connect() as competitor:
+        holder_pid = (await holder.execute(text("SELECT pg_backend_pid()"))).scalar_one()
+        competitor_pid = (await competitor.execute(text("SELECT pg_backend_pid()"))).scalar_one()
+        assert holder_pid != competitor_pid
+        await holder.rollback()
+        await competitor.rollback()
+
+        class FailingPrecheckSession(AsyncSession):
+            async def execute(self, statement, *args, **kwargs):
+                nonlocal lock_observed, transaction
+                result = await super().execute(statement, *args, **kwargs)
+                if (
+                    getattr(statement, "_for_update_arg", None) is not None
+                    and "scraped_courses" in str(statement)
+                ):
+                    transaction = self.get_transaction()
+                    # NOWAIT proves this exact row is locked before the failure;
+                    # checking only after the response could pass without a lock.
+                    with pytest.raises(DBAPIError) as blocked:
+                        await competitor.execute(
+                            select(ScrapedCourse.id).where(ScrapedCourse.id == sc_id)
+                            .with_for_update(nowait=True)
+                        )
+                    assert blocked.value.orig.sqlstate == "55P03"
+                    await competitor.rollback()
+                    lock_observed = True
+                    # A flushed write distinguishes rollback from an accidental
+                    # commit that would also release the lock.
+                    await super().execute(
+                        ScrapedCourse.__table__.update()
+                        .where(ScrapedCourse.id == sc_id)
+                        .values(course_name="Uncommitted precheck mutation")
+                    )
+                    raise error
+                return result
+
+        async with FailingPrecheckSession(
+            bind=holder, expire_on_commit=False, autoflush=False,
+        ) as request_db:
+            async def database():
+                # Deliberately no close/rollback: inspect the still-open request
+                # session before any fixture or dependency cleanup can help.
+                yield request_db
+
+            async def reviewer():
+                return {"email": "reviewer@example.test", "permissions": ["staged.approve"]}
+
+            app = FastAPI()
+            app.include_router(router, prefix="/api/scrape")
+            app.dependency_overrides[get_db] = database
+            app.dependency_overrides[get_current_user] = reviewer
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                response = await client.post(f"/api/scrape/staged/{sc_id}/approve")
+
+            assert response.status_code == 500
+            assert response.json() == {
+                "detail": "Course approval could not be checked; the row remains pending.",
+            }
+            assert str(error) not in response.text
+            assert lock_observed
+            assert transaction is not None and not transaction.is_active
+            assert not request_db.in_transaction()
+            assert not holder.in_transaction()
+            # Both physical connections remain open; NOWAIT fails immediately
+            # if the route has left the original lock behind.
+            acquired = await competitor.execute(
+                select(ScrapedCourse.id).where(ScrapedCourse.id == sc_id)
+                .with_for_update(nowait=True)
+            )
+            assert acquired.scalar_one() == sc_id
+            await competitor.rollback()
+
+    async with sessions() as db:
+        saved = await db.get(ScrapedCourse, sc_id)
+        assert snapshot(saved) == before
+        assert saved.status == "pending" and saved.course_id is None
+        for model in (Course, Fee, CourseAuditLog):
+            assert (await db.execute(select(func.count()).select_from(model))).scalar_one() == 0
+    record = next(
+        record for record in caplog.records
+        if record.name == "app.routers.scrape" and "precheck" in record.message
+    )
+    assert f"staged row {sc_id}" in record.message
+    assert record.exc_info[1] is error
 
 
 @pytest.mark.asyncio
