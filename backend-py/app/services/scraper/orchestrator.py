@@ -33,6 +33,7 @@ from app.services.scraper.warning_rules import normalize_skip_reason_key
 from app.services.scraper.pipelines.single_course import extract_course
 from app.services.scraper.pipelines.university_pdfs import load_university_pdf_data
 from app.services.scraper.stage_course import stage_course
+from app.services.scraper.review_policy import prepare_full_catalogue_review, persist_review_policy, run_full_catalogue_review
 from app.services.scraper.autonomous_verification import (
     VerificationBudgetExceeded,
     cap_verification_links,
@@ -534,6 +535,7 @@ def _record_staged_quality_payload(
         {
             "payload": dict(payload),
             "url": source_url or payload.get("course_website") or "",
+            "scraped_course_id": getattr(stage_result, "scraped_course_id", None),
         }
     )
     return True
@@ -2228,11 +2230,14 @@ async def _run_scrape_entry(db: AsyncSession, runtime_job_id: str) -> dict:
 
     # Validate before any stale-row cleanup, discovery, or billable work.
     try:
+        full_review = prepare_full_catalogue_review(job)
         verification = await validate_verification(db, job)
     except ValueError as exc:
         job.status = "failed_degraded"
         job.error_message = str(exc)[:1000]
         job.completed_at = datetime.now(timezone.utc)
+        from app.services.scraper.review_policy import persist_review_outcome
+        persist_review_outcome(job, interrupted_by="ValueError")
         await db.commit()
         return {"ok": False, "reason": str(exc)}
     if verification:
@@ -2240,11 +2245,17 @@ async def _run_scrape_entry(db: AsyncSession, runtime_job_id: str) -> dict:
             db, job, verification,
             lambda: _run_claimed_scrape(db, job, verification),
         )
+    if full_review:
+        return await run_full_catalogue_review(
+            db, job, lambda: _run_claimed_scrape(db, job),
+        )
     return await _run_claimed_scrape(db, job)
 
 
 async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict:
     """Run the existing pipeline with optional internal isolation policy."""
+    _full_review = prepare_full_catalogue_review(job)
+    _preserve_review = bool(_verification) or _full_review
     runtime_job_id = job.runtime_job_id
     # Start per-job Scrape.do call counter.  All coroutines spawned within
     # this job share the same mutable dict via ContextVar, so gather() batches
@@ -2451,14 +2462,14 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             f"(job_id={runtime_job_id}, release_revision={_release_revision})",
             phase="queue", release_revision=_release_revision,
         )
-        if _verification or _targeted_retry:
+        if _preserve_review or _targeted_retry:
             await emit(
                 "status",
                 "Verification: preserved all existing review rows; fresh extraction"
-                if _verification else
+                if _preserve_review else
                 "Targeted retry: preserved pending review rows from the source job",
                 phase="cleanup", cleared=0,
-                kind="verification_preserve_review" if _verification
+                kind="verification_preserve_review" if _preserve_review
                 else "targeted_retry_preserve_review",
             )
         else:
@@ -2816,6 +2827,11 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             except Exception:  # noqa: BLE001
                 pass
         # Apply the internal bound AFTER every university/YAML override.
+        if _full_review:
+            # Discovery APIs accept integer bounds. Remove the runtime sample/
+            # catalogue truncation while retaining crawl/time/provider guards.
+            import sys
+            max_courses = sys.maxsize
         if _verification:
             max_courses = min(max_courses, _verification.max_courses)
         # C4 (fetch-layer brief): per-phase wall-clock marks for the ══ DONE ══
@@ -6492,7 +6508,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         if (
             settings.scrape_resume_enabled
             and not _safe_restart_smoke
-            and not _verification
+            and not _preserve_review
             and job.university_id
             and links
         ):
@@ -6798,7 +6814,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             # is expected and acceptable: each run's old↔new diff will still be
             # clean as long as the new code path is equivalent to the old one.
             from app.services.scraper.shadow.mode import is_shadow_enabled as _shadow_on
-            if not _verification and _shadow_on(uni_id):
+            if not _preserve_review and _shadow_on(uni_id):
                 from app.services.scraper.shadow.diff import diff_staged_runs as _diff_runs
                 from app.services.scraper.shadow.new_path import extract_new_path as _new_path
                 from app.services.scraper.shadow.report import write_shadow_report as _write_report
@@ -7535,7 +7551,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                             source_url=r.get("url"),
                             skip_url_block=_skip_url_block,
                             targeted_retry=_targeted_retry,
-                            preserve_existing=bool(_verification),
+                            preserve_existing=_preserve_review,
                         )
                         await checkpoint_report_urls(db, job, _verification, [r.get("url")])
                         _record_staged_quality_payload(
@@ -7641,6 +7657,12 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 # after staging/skip/error handling settles, not after fetch:
                 # cancellation between extraction and staging must remain work.
                 await checkpoint_report_urls(db, job, _verification, [link["url"] for link in _batch_links])
+            if _full_review:
+                persist_review_policy(
+                    job, counters=dict(summary), skip_reasons=dict(skip_reasons),
+                    outcome="running",
+                )
+                await db.commit()
             # Explicitly free the batch result list so GC can reclaim the
             # memory before the next batch's extraction begins.
             del results
@@ -7653,7 +7675,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         # Summary counters are updated in-place so recovered failures no longer
         # look unresolved.
         _ph_marks["sweep_start"] = time.monotonic()  # C4 phase timing
-        if _sweep_links and not _verification:
+        if _sweep_links and not _preserve_review:
             _sweep_max_items = max(
                 0,
                 int(getattr(_uni_cfg.extraction, "recovery_sweep_max_items", 100)),
@@ -7894,7 +7916,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                                     evidence=_sw_evidence,
                                     source_url=_sweep_url,
                                     targeted_retry=_targeted_retry,
-                                    preserve_existing=bool(_verification),
+                                    preserve_existing=_preserve_review,
                                 ),
                                 timeout=_remaining_stage_budget,
                             )
@@ -8133,7 +8155,16 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
 
             # Mark courses with critical data-quality issues so operators see
             # DATA QUALITY FAILURE in the Review UI instead of generic review.
-            if _dq_critical_urls and not _verification:
+            if _dq_critical_urls and _full_review:
+                from app.services.scraper.review_policy import annotate_review_quality
+                await annotate_review_quality(
+                    db, job_id=runtime_job_id, university_id=uni_id,
+                    row_ids=[item["scraped_course_id"] for item in _all_staged_dicts
+                             if item.get("scraped_course_id")],
+                    critical_urls=list(_dq_critical_urls),
+                )
+                await db.commit()
+            if _dq_critical_urls and not _preserve_review:
                 from sqlalchemy import update as _dq_upd, text as _dq_txt
                 from app.models import ScrapedCourse as _DqSC
 
@@ -8185,7 +8216,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         #              so subsequent runs skip re-discovery.
         try:
             from sqlalchemy import text as _qi_sql
-            _qi_row = None if _verification else (await db.execute(
+            _qi_row = None if _preserve_review else (await db.execute(
                 _qi_sql("""
                     SELECT
                         COUNT(*) AS total,
@@ -8448,7 +8479,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             course_count=_c1_course_n,
             expected_min_courses=locals().get("_c1_expected_min"),
         )
-        if not _verification and _c1_cacheable and _c1_cache_coverage_ok:
+        if not _preserve_review and _c1_cacheable and _c1_cache_coverage_ok:
             _c1_attempted = max(1, summary.get("discovered", 0))
             _c1_fail_rate = summary.get("fetch_failed", 0) / _c1_attempted
             if _c1_fail_rate < 0.30:
@@ -8820,7 +8851,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             job.status = _forced_status
         else:
             job.status = "completed" if finished_cleanly else "failed"
-        if not _verification and job.status == "completed" and _bypassed_resume_course_ids:
+        if not _preserve_review and job.status == "completed" and _bypassed_resume_course_ids:
             _discarded_resume_rows = await _discard_bypassed_resume_rows(
                 db, _bypassed_resume_course_ids
             )
@@ -8968,6 +8999,14 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         job.completed_at = datetime.now(timezone.utc)
         await db.commit()
         log.info("Scrape %s %s: %s", runtime_job_id, job.status, summary)
+
+        if _full_review:
+            persist_review_policy(
+                job, outcome=job.status, counters=dict(summary),
+                skip_reasons=dict(skip_reasons),
+            )
+            await db.commit()
+            return {"ok": job.status == "completed", **summary}
 
         if _verification:
             # Stop before ALL mutation/dispatch hooks: conflict repair,

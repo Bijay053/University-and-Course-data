@@ -1,0 +1,97 @@
+{
+  "job": {
+    "status": "completed",
+    "started_at": "2026-09-25 00:38:11.858100+00:00",
+    "completed_at": "2026-09-25 00:46:13.863796+00:00",
+    "fast_mode": false,
+    "full_review": true,
+    "force_discovery": true,
+    "review_policy": {
+      "scope": "full_catalogue",
+      "outcome": "completed",
+      "version": 1,
+      "counters": {
+        "errors": 1,
+        "staged": 103,
+        "skipped": 3,
+        "discovered": 107,
+        "fetch_failed": 0,
+        "discovered_raw": 107
+      },
+      "review_only": true,
+      "completed_at": "2026-09-25T00:46:13.863796+00:00",
+      "skip_reasons": {
+        "online_only": 1,
+        "part_time_only": 2
+      },
+      "error_message": null,
+      "interrupted_by": null,
+      "pipeline_stats": {
+        "after_block": 107,
+        "after_filter": 107,
+        "filter_config": {
+          "must_contain": [],
+          "allow_url_patterns": [
+            "^https://www\\.leedstrinity\\.ac\\.uk/courses/(undergraduate|postgraduate)/[^/?#]+/$"
+          ],
+          "block_url_patterns": [
+            "(?i)/(apprenticeships?|cpd(?:-and-short-courses)?|short-courses?|online)(/|$)"
+          ],
+          "course_detail_url_patterns": []
+        },
+        "dropped_sample": [],
+        "raw_discovered": 107,
+        "filter_drop_pct": 0,
+        "block_dropped_pct": 0,
+        "filter_drop_count": 0,
+        "block_dropped_count": 0,
+        "pre_block_discovered": 107,
+        "non_degree_prefetch_sample": [],
+        "non_degree_ai_calls_avoided": 0,
+        "non_degree_prefetch_skipped": 0,
+        "non_degree_browser_launches_avoided": 0
+      },
+      "duplicate_skips": 0,
+      "fresh_discovery": true,
+      "automatic_repair": false,
+      "fresh_extraction": true,
+      "automatic_publish": false,
+      "preserve_existing": true,
+      "saved_checkpoints": false,
+      "removal_reconciliation": false,
+      "full_catalogue_verified": false,
+      "verification_sample_cap": null
+    }
+  },
+  "new_row_groups": [
+    {
+      "status": "pending",
+      "currency": "GBP",
+      "study_mode": "Blended",
+      "study_load": "Full Time",
+      "count": 1
+    },
+    {
+      "status": "pending",
+      "currency": "GBP",
+      "study_mode": "On Campus",
+      "study_load": "Full Time",
+      "count": 43
+    },
+    {
+      "status": "pending",
+      "currency": "GBP",
+      "study_mode": "On Campus",
+      "study_load": null,
+      "count": 57
+    },
+    {
+      "status": "pending",
+      "currency": "GBP",
+      "study_mode": null,
+      "study_load": null,
+      "count": 2
+    }
+  ],
+  "active_university_jobs": 0
+}

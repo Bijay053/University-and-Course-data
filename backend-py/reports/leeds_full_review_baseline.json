@@ -1,0 +1,87 @@
+{
+  "catalogue_certification_note": "Observed counts do not certify catalogue completeness; require completed job evidence.",
+  "config": {
+    "extraction": {
+      "currency": {
+        "currency_override": null,
+        "default_currency": "GBP"
+      },
+      "degree_level_exception": true
+    },
+    "identity": {
+      "hostname": "www.leedstrinity.ac.uk",
+      "name": "Leeds Trinity University",
+      "slug": "leedstrinity",
+      "university_id": 89
+    },
+    "locked_recipe": {
+      "discovery": {
+        "allow_url_patterns": [
+          "^https://www\\.leedstrinity\\.ac\\.uk/courses/(undergraduate|postgraduate)/[^/?#]+/$"
+        ],
+        "always_browser_discover": false,
+        "block_url_patterns": [
+          "(?i)/(apprenticeships?|cpd(?:-and-short-courses)?|short-courses?|online)(/|$)"
+        ],
+        "must_contain": [],
+        "official_catalogue_fallback": true,
+        "sitemap_url": "https://www.leedstrinity.ac.uk/sitemap.xml",
+        "skip_browser_discovery": false
+      },
+      "locked_config_paths": [
+        "discovery.official_catalogue_fallback",
+        "discovery.sitemap_url",
+        "discovery.allow_url_patterns",
+        "discovery.block_url_patterns"
+      ],
+      "searchstax_status": {
+        "configured": false,
+        "disabled_by_official_catalogue_fallback": true,
+        "enabled": false
+      }
+    },
+    "yaml": {
+      "exists": true,
+      "id_specific": true,
+      "resolved_path": "/opt/university-portal/backend-py/scraper_config/unis/leedstrinity_2220.yaml",
+      "runtime_override_path": "/opt/university-portal/backend-py/scraper_config/runtime_unis/leedstrinity_2220.yaml"
+    }
+  },
+  "format": "full-review-evidence/v1",
+  "job": null,
+  "published_courses": {
+    "count": 0,
+    "rows": []
+  },
+  "read_only": true,
+  "scraped_courses": {
+    "count": 1,
+    "rows": [
+      {
+        "evidence_sha256": [
+          "14ee6f68e0a1aae995cea5723d21ff8bf48367084b17d1c9d89f883ec0425eb6",
+          "223a94febb0d07e4d4542b68a2709c8ec92d517a575851cfc820f488e0ac6269",
+          "256869419cace3a59c045a88fda7c5ff77fda293c9d14701fa1459e108c0dba0",
+          "2da9cfa6edbe22c09535954a93661d03e7dd222a84d8203be9c77a33959208e3",
+          "2ea661357e37e8c54f090c5b3e6539fb47befeca04cfc46c9264b134c1ecb957",
+          "43c34735e80f8ed148a6b0ebbb819cfa61ffa988e354d3126982986a92ee0033",
+          "50322f24aa806fb46ff65f8ffc228b207581ef9bf0b23945f177a73894e87fcd",
+          "66a1ce9dee0bbd384c7e7a7cf1bb11e1838151761e9342925bddeb6ed9af6fbf",
+          "7257f2e49c2dc5c678963b68492ec51d5b508380cc750c94f731c5b5d959b89e",
+          "7e2499f5424d8159300f30b1e02ac16c60dd5aeeb3e68c201d237bdfb2c5a9b3",
+          "89e2095749b314b00b488bcee0f89829bb0f0de1afeb033b040029bd71625e4b",
+          "b6df803191265684040e842690e0cbcf60de2e653446068a350dc9b0cae47a11",
+          "bb4c93d56b68998bba74ec15a901bc9e09b2b7aa92a68e3a84d749b8cf249817",
+          "bee9bfc7857e3bcdf9ac8f16dec6d32c4f9ca9462900adb3179131a36b478b23",
+          "c27bc7d9cba6c623996a7133c24cc348caeb1d514b1c5c712583e499a1561128",
+          "c71232288c8594e01a624347612711d2f28261a3bb8716c51b7c00fc219f8f2f",
+          "cd2f84940265bc893e7aab68786f0e4633b1aca0bb5910a38d6d578890133fc8",
+          "db52119b803c83c882b327cc00c5fbc99c8e2c647b23388a2a5bb236a2907f5b"
+        ],
+        "id": 40883,
+        "sha256": "393db29bdeaf84597f209196e17bd92621477b7a724e637382944226d922d600",
+        "status": "pending"
+      }
+    ]
+  }
+}

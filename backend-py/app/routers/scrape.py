@@ -630,6 +630,10 @@ async def start_scrape(
     await db.refresh(uni, attribute_names=["probe_status"])
     await _gate_probe_configuration(db, uni)
     if existing_job:
+        from app.services.scraper.review_policy import full_catalogue_review
+        if body.full_catalogue_review_only != full_catalogue_review(existing_job.request_payload):
+            await db.rollback()
+            raise HTTPException(status_code=409, detail="An incompatible scrape is already active")
         await db.commit()
         return ScrapeStartResponse(
             job_id=existing_job.runtime_job_id,
@@ -676,7 +680,8 @@ async def start_scrape(
             "academicRequirementsPage": body.academic_requirements_page or None,
             "defaultStudyMode": body.default_study_mode or None,
             # C1: bypass the 7-day discovery URL cache for this run.
-            "forceDiscovery": bool(body.force_discovery),
+            "forceDiscovery": bool(body.force_discovery or body.full_catalogue_review_only),
+            "fullCatalogueReviewOnly": body.full_catalogue_review_only,
             # Focused retries use these links directly and never rediscover the
             # university catalogue. Keep both casings for mixed worker support.
             "courseUrls": body.course_urls,
@@ -685,6 +690,9 @@ async def start_scrape(
             "browserRescueAttempted": body.browser_rescue_attempted,
         },
     )
+    if body.full_catalogue_review_only:
+        from app.services.scraper.review_policy import prepare_full_catalogue_review
+        prepare_full_catalogue_review(job)
     db.add(job)
     await db.commit()
 
@@ -823,6 +831,8 @@ async def _hard_stop_job(db: AsyncSession, job: ScrapeRuntimeJob) -> None:
             job.completed_at = _dt.now(_tz.utc)
         if not job.error_message:
             job.error_message = "Stopped by user"
+    from app.services.scraper.review_policy import persist_review_outcome
+    persist_review_outcome(job)
 
 
 @router.post("/jobs/{job_id}/stop")
@@ -910,7 +920,7 @@ def _job_quality_report(status: str, errors: int | None) -> dict:
             "errorCount": error_count,
         },
     }
-@router.get("/status/{job_id}")
+@router.get("/status/{job_id}", dependencies=[Depends(get_current_user)])
 async def get_status(
     job_id: str,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -1065,6 +1075,7 @@ async def get_status(
         # goes through /start, where normal university locking and resume
         # checkpoint filtering apply.
         "fastMode": bool(job.fast_mode),
+        "fullCatalogueReviewOnly": request_payload.get("fullCatalogueReviewOnly") is True,
         "feePageUrl": request_payload.get("feePage"),
         "requirementsPageUrl": request_payload.get("requirementsPage"),
         "browserRescueAttempted": bool(
@@ -1749,6 +1760,7 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
             "errors": job.errors or 0,
             "totalFound": job.total_found or 0,
             "current": job.current or 0,
+            "fullCatalogueReviewOnly": (job.request_payload or {}).get("fullCatalogueReviewOnly") is True,
             "startedAt": job.started_at.isoformat() if job.started_at else None,
             "completedAt": job.completed_at.isoformat() if job.completed_at else None,
             "errorMessage": provider_failure["message"] if provider_failure else job.error_message,
@@ -6292,6 +6304,44 @@ async def trigger_conflict_repair(
         "task_id": task.id,
         "message": "Conflict Repair queued — refresh in ~15 seconds to see results",
     }
+
+
+@router.post("/jobs/{job_id}/reconcile-review-quality")
+async def reconcile_review_quality(
+    job_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(require_permission("scraping.trigger"))],
+) -> dict:
+    """Apply stored critical evidence to this completed review-only job, only."""
+    from app.models import ScrapedCourse
+    from app.services.scraper.review_policy import full_catalogue_review, annotate_review_quality
+    job = (await db.execute(
+        select(ScrapeRuntimeJob).where(ScrapeRuntimeJob.runtime_job_id == job_id).with_for_update()
+    )).scalar_one_or_none()
+    if not job:
+        raise HTTPException(404, "Job not found")
+    if not full_catalogue_review(job.request_payload) or job.status not in (
+        "completed", "completed_with_errors",
+    ):
+        raise HTTPException(409, "Requires a completed full-catalogue review-only job")
+    evidence = (job.gate_skip_counts or {}).get("data_quality") or {}
+    issues = evidence.get("critical_issues")
+    if not isinstance(issues, list) or evidence.get("critical_count") != len(issues):
+        raise HTTPException(409, "Stored critical evidence is absent or truncated; refusing reconciliation")
+    urls = set(evidence.get("critical_urls") or [])
+    if len(urls) != evidence.get("affected_course_count"):
+        raise HTTPException(409, "Stored critical URL evidence is incomplete")
+    row_ids = list((await db.execute(select(ScrapedCourse.id).where(
+        ScrapedCourse.scrape_job_id == job_id,
+        ScrapedCourse.university_id == job.university_id,
+    ))).scalars())
+    changed = await annotate_review_quality(
+        db, job_id=job_id, university_id=job.university_id,
+        row_ids=row_ids, critical_urls=list(urls),
+    )
+    await db.commit()
+    return {"job_id": job_id, "scoped_rows": len(row_ids), "critical_issues": len(issues),
+            "marked_ids": changed, "marked_count": len(changed)}
 
 
 @router.post("/jobs/{job_id}/run-quality-optimizer", status_code=202)

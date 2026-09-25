@@ -118,6 +118,10 @@ async def test_staged_list_is_scoped_to_current_job_id():
 
 @pytest.mark.asyncio
 async def test_continuation_status_keeps_parent_rows_visible():
+    from jose import jwt
+
+    from app.config import settings
+
     uni_id = await _pick_university()
     parent_job_id = f"test_continue_parent_{uuid.uuid4().hex[:8]}"
     child_job_id = f"test_continue_child_{uuid.uuid4().hex[:8]}"
@@ -176,8 +180,15 @@ async def test_continuation_status_keeps_parent_rows_visible():
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
         ) as client:
-            response = await client.get(f"/api/scrape/status/{child_job_id}")
+            path = f"/api/scrape/status/{child_job_id}"
+            unauthenticated = await client.get(path)
+            token = jwt.encode(
+                {"sub": "review-reader", "permissions": ["scraping.view"]},
+                settings.session_secret, algorithm="HS256",
+            )
+            response = await client.get(path, headers={"Authorization": f"Bearer {token}"})
 
+        assert unauthenticated.status_code == 401
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["imported"] == 0

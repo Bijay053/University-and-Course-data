@@ -118,6 +118,9 @@ async def continuation_review_scope(
     def collect_scope_metadata(candidate: ScrapeRuntimeJob) -> None:
         nonlocal full_catalogue_scope
         payload = getattr(candidate, "request_payload", None) or {}
+        from app.services.scraper.review_policy import isolated_review
+        if isolated_review(payload):
+            full_catalogue_scope = False
         raw_resume_ids = payload.get("resumeCourseIds")
         if isinstance(raw_resume_ids, list):
             resume_course_ids.update(

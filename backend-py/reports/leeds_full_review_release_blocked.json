@@ -1,0 +1,33 @@
+{
+  "operation": "Leeds Trinity full-catalogue review deployment preflight",
+  "outcome": "blocked_before_deployment",
+  "workspace_target_revision": "2aa5ccf884ab4e354eb596f5cbdf0e1739e41c42",
+  "required_production_predecessor": "403ddde9ff0f5c233ade53457f3344efe3194a58",
+  "observed_production_revision": "21e23676e579cc7dcc0678de3d81808548977a21",
+  "reason": "The live production revision does not equal the expressly authorized exact predecessor. No revision fence was bypassed.",
+  "ssm_preflight_command_id": "5bfc760e-4baa-4b4e-9b4b-46992c30ecab",
+  "production_origin": "github.com/Bijay053/University-and-Course-data.git",
+  "public_portal": "https://portal.agentsic.com",
+  "university": {
+    "id": 89,
+    "name": "Leeds Trinity University",
+    "scrape_url": "https://www.leedstrinity.ac.uk",
+    "observed_pending_count": 1,
+    "observed_published_count": 0
+  },
+  "active_queued_or_running_jobs": 0,
+  "tracked_operator_recipe_edits_preserved": [
+    "backend-py/scraper_config/unis/canterbury_1759.yaml",
+    "backend-py/scraper_config/unis/law_1902.yaml",
+    "backend-py/scraper_config/unis/londonmet.yaml",
+    "backend-py/scraper_config/unis/mdx.yaml"
+  ],
+  "production_mutations_performed": [],
+  "full_review_started": false,
+  "full_review_completed": false,
+  "evidence_limitations": [
+    "Read-only SQL counts are preflight observations, not the requested full digest baseline.",
+    "Post-deployment effective-config and global-gate evidence was not captured because deployment was blocked."
+  ],
+  "required_next_step": "Investigate the unexpected live revision and obtain an updated exact-predecessor authorization before attempting a guarded release."
+}

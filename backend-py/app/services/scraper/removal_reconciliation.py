@@ -39,6 +39,9 @@ async def get_removal_reconciliation(db: AsyncSession, job_id: str) -> dict:
         resume_course_ids,
         full_catalogue_scope,
     ) = await continuation_review_scope(db, job_id)
+    from app.services.scraper.review_policy import isolated_review
+    if isolated_review(job.request_payload):
+        full_catalogue_scope = False
     if not chain or chain_university_id != job.university_id:
         raise ValueError("Scrape continuation chain is invalid")
 

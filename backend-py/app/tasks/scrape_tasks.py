@@ -892,6 +892,8 @@ async def _mark_failed(runtime_job_id: str, err: str) -> None:
             job.status = "failed"
             job.completed_at = datetime.now(timezone.utc)
             job.error_message = f"Scraping failed: {err[:200]}"
+            from app.services.scraper.review_policy import persist_review_outcome
+            persist_review_outcome(job, interrupted_by="worker_failure")
             await db.commit()
 
 
@@ -1387,6 +1389,9 @@ def repair_extractor(
                 "[repair_extractor] starting for uni_id=%s run=%s triggered_by=%r",
                 university_id, scrape_run_id, triggered_by,
             )
+            from app.services.scraper.review_policy import blocks_automatic_followup
+            if await blocks_automatic_followup(db, scrape_run_id):
+                return {"ok": False, "reason": "full_catalogue_review_only"}
 
             # 1. Compute per-field fill rates for this run
             # Signature: compute_field_fill_rates(scrape_run_id, db)
@@ -1554,6 +1559,9 @@ def run_quality_actions(
                 "cascade_repair=%s",
                 university_id, job_id, triggered_by, cascade_repair_fired,
             )
+            from app.services.scraper.review_policy import blocks_automatic_followup
+            if await blocks_automatic_followup(db, job_id):
+                return {"ok": False, "reason": "full_catalogue_review_only"}
 
             async def _persist_last_run(payload: dict) -> None:
                 """Write payload to universities.scrape_config['_p7_last_run'].
@@ -1668,6 +1676,9 @@ def repair_conflicts(
     async def _run() -> dict:
         async with AsyncSessionLocal() as db:
             from app.services.scraper.conflict_repair import repair_conflicts_for_job
+            from app.services.scraper.review_policy import blocks_automatic_followup
+            if await blocks_automatic_followup(db, job_id):
+                return {"ok": False, "reason": "full_catalogue_review_only"}
             result = await repair_conflicts_for_job(db, job_id)
             return {
                 "ok": True,

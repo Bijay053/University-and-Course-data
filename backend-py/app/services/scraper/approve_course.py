@@ -125,6 +125,13 @@ async def approve_scraped_course(
         raise ValueError(
             f"scraped_course id={sc.id} has empty course_name; cannot promote"
         )
+    from app.services.scraper.review_policy import blocks_automatic_followup
+    # Automated callers use the default system actor; authenticated review
+    # routes pass the operator identity (not necessarily the literal "human").
+    if actor == "system" and await blocks_automatic_followup(db, getattr(sc, "scrape_job_id", None)):
+        raise ValueError("Review-only source job forbids automatic promotion")
+    if actor == "system" and getattr(sc, "auto_publish_status", None) == "data_quality_failure":
+        raise ValueError("Critical data-quality failure forbids automatic promotion")
 
     # Synchronize promotion with offline review-row restoration.  Otherwise a
     # restore could check for approved/published rows immediately before this

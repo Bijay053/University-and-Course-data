@@ -99,6 +99,113 @@ it("renders a configuring start response as waiting without auto-retrying", asyn
   expect(sessionStorage.getItem("scrape_slot_2_startTime")).toBeNull();
 });
 
+describe("full catalogue review-only mode", () => {
+  it("posts a strict true flag and disables fast mode", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === "/api/scrape/start") {
+        return new Response(JSON.stringify({ detail: "Not started in this test." }), {
+          status: 422,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(React.createElement(ScrapeJobCard, {
+      slotId: 20,
+      slotIndex: 0,
+      universities: [{
+        id: 42,
+        name: "Test University",
+        scrapeUrl: "https://example.edu/courses",
+      }],
+      defaultUniversityId: 42,
+      onReviewReady: () => undefined,
+    }));
+
+    await userEvent.click(screen.getByRole("button", { name: "Advanced" }));
+    const reviewOnly = screen.getByRole("checkbox", { name: /Full catalogue review only/ });
+    await userEvent.click(reviewOnly);
+
+    expect(screen.getByRole("checkbox", { name: "Fast mode" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.getByText(/preserves existing reviews and all pending and published courses/i)).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("button", { name: "Start Scrape" }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/scrape/start",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+    const startCall = fetchMock.mock.calls.find(([input]) => String(input) === "/api/scrape/start");
+    const payload = JSON.parse(String(startCall?.[1]?.body));
+    expect(payload.fullCatalogueReviewOnly).toBe(true);
+    expect(payload.fastMode).toBeUndefined();
+  });
+
+  it("sends false by default without changing ordinary scrape behavior", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === "/api/scrape/start") {
+        return new Response(JSON.stringify({ detail: "Not started in this test." }), {
+          status: 422,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(React.createElement(ScrapeJobCard, {
+      slotId: 21,
+      slotIndex: 0,
+      universities: [{
+        id: 42,
+        name: "Test University",
+        scrapeUrl: "https://example.edu/courses",
+      }],
+      defaultUniversityId: 42,
+      onReviewReady: () => undefined,
+    }));
+
+    await userEvent.click(screen.getByRole("button", { name: "Start Scrape" }));
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.some(([input]) => String(input) === "/api/scrape/start")).toBe(true);
+    });
+    const startCall = fetchMock.mock.calls.find(([input]) => String(input) === "/api/scrape/start");
+    const payload = JSON.parse(String(startCall?.[1]?.body));
+    expect(payload.fullCatalogueReviewOnly).toBe(false);
+  });
+
+  it("shows the mode when restored from job metadata", async () => {
+    sessionStorage.setItem("scrape_slot_22_jobId", "review-only-job");
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/api/scrape/status/review-only-job")) {
+        return jsonResponse({
+          status: "failed",
+          universityName: "Test University",
+          fullCatalogueReviewOnly: true,
+          fastMode: false,
+          logs: [],
+        });
+      }
+      if (url.includes("/ai-repair-status")) return jsonResponse({ status: "not_started" });
+      if (url.includes("/staged/")) return jsonResponse([]);
+      return jsonResponse({});
+    }));
+
+    render(React.createElement(ScrapeJobCard, {
+      slotId: 22,
+      slotIndex: 0,
+      universities: [{ id: 42, name: "Test University" }],
+      onReviewReady: () => undefined,
+    }));
+
+    expect(await screen.findByText("Full catalogue review only")).toBeTruthy();
+  });
+});
+
 function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status: 200,
