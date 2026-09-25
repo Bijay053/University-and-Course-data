@@ -14,3 +14,9 @@ Published campus alternatives are recovered fee information, not a missing fee a
 **Why:** ULaw's flattened tabs both discarded real international fees and promoted a later-year domestic MBA amount. Most international offerings have different London/non-London prices, so a scalar-only success criterion misrepresented correctly recovered data.
 
 **How to apply:** Validate persisted alternatives against their selected source and fee companions, render the range and individual options, count verified recovery in Smart Fix, and retain explicit campus review before publication. Refresh affected staged rows through the normal API; releasing extractor code alone does not repair historical records.
+
+Preserve numeric continuity across inline markup before parsing tuition and academic years, without flattening audience or table boundaries.
+
+**Why:** ULaw splits visible amounts and years across adjacent spans. Inserting spaces made £16,500 look like £1 and broke year matching, even though the visible page was correct.
+
+**How to apply:** Include split-number markup in financial extraction tests and verify the final persisted amount against the complete published token, not just the first regex match.
