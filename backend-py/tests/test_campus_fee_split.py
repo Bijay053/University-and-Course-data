@@ -1,4 +1,7 @@
 from copy import deepcopy
+from importlib.util import module_from_spec, spec_from_file_location
+from pathlib import Path
+from unittest.mock import Mock
 from uuid import uuid4
 
 import pytest
@@ -11,6 +14,24 @@ from app.services.scraper.campus_fee_split import plan_campus_fees, scope_refres
 from app.services.scraper.extractors.ulaw_fees import METHOD, validated_fee_variants
 
 URL = "https://www.law.ac.uk/study/postgraduate/business/msc-healthcare-management/"
+
+
+def test_campus_migration_replaces_or_creates_missing_prior_index():
+    path = Path(__file__).resolve().parents[1] / "alembic/versions/386_campus_fee_scope.py"
+    spec = spec_from_file_location("campus_fee_scope_migration", path)
+    migration = module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    migration.op = Mock()
+    migration.upgrade()
+    migration.op.drop_index.assert_called_once_with(
+        "uq_scraped_courses_job_review_url_identity",
+        table_name="scraped_courses",
+        if_exists=True,
+    )
+    args, kwargs = migration.op.create_index.call_args
+    assert args[0] == "uq_scraped_courses_job_review_url_identity"
+    assert "fee_scope_key" in args[2]
+    assert kwargs["unique"] is True
 
 
 def row_values():

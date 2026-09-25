@@ -10,7 +10,10 @@ depends_on = None
 
 def upgrade():
     op.add_column("scraped_courses", sa.Column("fee_scope_key", sa.Text(), nullable=False, server_default=""))
-    op.drop_index("uq_scraped_courses_job_review_url_identity", table_name="scraped_courses")
+    # Some long-lived databases reached revision 385 without this older unique
+    # index. The new unique index must still be created (and will fail if its
+    # existing rows violate the identity contract).
+    op.drop_index("uq_scraped_courses_job_review_url_identity", table_name="scraped_courses", if_exists=True)
     op.create_index(
         "uq_scraped_courses_job_review_url_identity", "scraped_courses",
         ["university_id", "canonical_course_url", "scrape_job_id", "fee_scope_key"],
