@@ -69,6 +69,56 @@ def test_proven_campus_groups_and_equal_fee():
     assert len(plan_campus_fees(same)[0]) == 1
 
 
+def test_single_applicable_price_requires_exact_course_campus_authority():
+    row = row_values()
+    row["course_location"] = "London Bloomsbury"
+    assert not plan_campus_fees(row)[0]
+    proof = {
+        "method": "location.ulaw_course_authority", "source_url": URL,
+        "locations": ["London Bloomsbury"], "fee_year": 2026,
+        "fee_term": "Full Course", "study_variant": "Standard",
+        "snippet": "Course Key Facts: London Bloomsbury and Online",
+    }
+    row["extraction_method"]["campus_authority"] = proof
+    groups, reason = plan_campus_fees(row)
+    assert reason is None
+    assert len(groups) == 1 and groups[0]["amount"] == 19050
+    assert groups[0]["authority"]["status"] == "uniform"
+    for field, wrong in [("source_url", URL + "other"), ("locations", ["Birmingham"]),
+                         ("fee_year", 2027), ("fee_term", "Annual"), ("snippet", "")]:
+        bad = deepcopy(row)
+        bad["extraction_method"]["campus_authority"][field] = wrong
+        assert not plan_campus_fees(bad)[0]
+
+
+@pytest.mark.asyncio
+async def test_single_course_owned_campus_is_scoped_and_uniform_without_siblings():
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    from app.services.scraper.fee_selection import unresolved_fee_selection
+    values = row_values()
+    values["course_location"] = "London Bloomsbury"
+    values["extraction_method"]["campus_authority"] = {
+        "method": "location.ulaw_course_authority", "source_url": URL,
+        "locations": ["London Bloomsbury"], "fee_year": 2026,
+        "fee_term": "Full Course", "study_variant": "Standard",
+        "snippet": "Course Key Facts: London Bloomsbury and Online",
+    }
+    row = ScrapedCourse(id=123, **values)
+    db = SimpleNamespace(
+        execute=AsyncMock(return_value=SimpleNamespace(
+            scalars=lambda: SimpleNamespace(all=lambda: []))),
+        flush=AsyncMock(), add=Mock(),
+    )
+    result = await split_pending_course(db, row, actor="reviewer")
+    assert result["status"] == "split" and result["courseIds"] == [123]
+    assert row.international_fee == 19050 and row.fee_scope_key
+    assert not unresolved_fee_selection(row)
+    assert validated_fee_variants(row)["status"] == "uniform"
+    db.add.assert_not_called()
+    assert (await split_pending_course(db, row))["status"] == "unchanged"
+
+
 @pytest.mark.parametrize("change", ["missing", "unknown", "mixed_year", "mixed_period", "mixed_route", "conflict", "qualified"])
 def test_ambiguous_scopes_fail_closed(change):
     row = row_values()

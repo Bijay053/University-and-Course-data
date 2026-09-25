@@ -51,7 +51,17 @@ def plan_campus_fees(row):
     selected = authority["selected"]
     if len({(o["year"], o["period"], o["study_variant"]) for o in selected}) != 1:
         return [], "Years, fee periods or study routes differ; manual review is required."
-    if any(not any(_matches(o["campus"], c) for c in locations) for o in selected):
+    campus_proof = (get("extraction_method") or {}).get("campus_authority") or {}
+    course_owned = (
+        campus_proof.get("method") == "location.ulaw_course_authority"
+        and campus_proof.get("source_url") == get("course_website")
+        and {_norm(c) for c in campus_proof.get("locations", [])} == {_norm(c) for c in locations}
+        and campus_proof.get("fee_year") == authority["fee_year"]
+        and campus_proof.get("fee_term") == authority["fee_term"]
+        and campus_proof.get("study_variant") == selected[0]["study_variant"]
+        and bool(campus_proof.get("snippet"))
+    )
+    if not course_owned and any(not any(_matches(o["campus"], c) for c in locations) for o in selected):
         return [], "A published campus option cannot be mapped to this course's locations."
     groups = {}
     for campus in locations:
@@ -119,7 +129,7 @@ async def split_pending_course(db, row, *, actor="scraper"):
     groups, reason = plan_campus_fees(row)
     if not groups:
         return {"id": row.id, "status": "needs_review", "courseIds": [row.id], "reason": reason}
-    if len(groups) == 1:
+    if len(groups) == 1 and (row.extraction_method or {}).get("fee_variants", {}).get("status") != "range":
         return {"id": row.id, "status": "unchanged", "courseIds": [row.id], "reason": "Applicable campuses have the same fee."}
     evidence = (await db.execute(select(ScrapedFieldEvidence).where(
         ScrapedFieldEvidence.scraped_course_id == row.id,

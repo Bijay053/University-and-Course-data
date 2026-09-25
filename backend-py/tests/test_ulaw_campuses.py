@@ -43,6 +43,27 @@ def test_course_intake_tables_are_route_and_fee_cohort_owned():
     assert "February 2027" in result["snippet"]
 
 
+@pytest.mark.parametrize("title,heading", [
+    ("LLB International Law (Top up)", "International Law (Top up) (LLB)"),
+    ("LLB Law (Top up)", "LLB (Hons) Law (Top Up)"),
+    ("LLB Law with Psychology", "Law with Psychology (LLB)"),
+])
+def test_award_position_and_honours_template_variations(title, heading):
+    html = page(table(title=heading)).replace(f"<h1>{TITLE}</h1>", f"<h1>{title}</h1>")
+    assert parse_course_campuses(html, URL, course_name=title, fee_authority=parse_course_fees(html, URL))
+    assert not parse_course_campuses(
+        html.replace(heading, heading + " with Foundation Year"), URL,
+        course_name=title, fee_authority=parse_course_fees(html, URL),
+    )
+
+
+def test_singular_course_location_heading():
+    html = page('<section class="key-facts"><div class="key-facts__locations">'
+                '<h4>Location</h4><a href="/locations/london/moorgate/">London Moorgate</a>'
+                '</div></section>')
+    assert parse(html)["locations"] == ["London Moorgate"]
+
+
 @pytest.mark.parametrize("body", [
     table(title=TITLE + " with Professional Practice"),
     table(month="October 2027"),

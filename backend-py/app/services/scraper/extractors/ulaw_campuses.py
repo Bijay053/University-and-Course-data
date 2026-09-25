@@ -15,6 +15,14 @@ METHOD = "location.ulaw_course_authority"
 def _norm(value):
     return " ".join(re.sub(r"[^\w ]", " ", value.casefold()).split())
 
+def _route(value):
+    """The course template moves the award from the prefix to parentheses."""
+    value = _norm(re.sub(r"\(\s*Hons\s*\)", "", value, flags=re.I))
+    words = value.split()
+    if words and words[-1] in {"llb", "llm", "msc", "ma", "mba", "bsc", "ba"}:
+        words = [words[-1], *words[:-1]]
+    return " ".join(words)
+
 
 def parse_course_campuses(html, url, *, course_name=None, fee_authority=None):
     """Read exact-route intake tables or the course's own Key Facts.
@@ -70,7 +78,7 @@ def parse_course_campuses(html, url, *, course_name=None, fee_authority=None):
                 continue
             for table in panel.find_all("table"):
                 heading = table.find_previous(["h5", "h4", "h3"])
-                if heading is None or heading not in panel.descendants or _norm(heading.get_text(" ", strip=True)) != _norm(wanted):
+                if heading is None or heading not in panel.descendants or _route(heading.get_text(" ", strip=True)) != _route(wanted):
                     continue
                 names = [li.get_text(" ", strip=True) for li in table.select("tbody td li")]
                 locations.extend(names)
@@ -78,7 +86,7 @@ def parse_course_campuses(html, url, *, course_name=None, fee_authority=None):
     else:
         for block in soup.select(".key-facts .key-facts__locations"):
             heading = block.find(["h3", "h4"])
-            if not heading or _norm(heading.get_text(" ", strip=True)) != "locations":
+            if not heading or _norm(heading.get_text(" ", strip=True)) not in {"location", "locations"}:
                 continue
             for link in block.find_all("a", href=True):
                 target = urlparse(urljoin(url, link["href"]))
@@ -130,9 +138,8 @@ async def enrich_course_campuses(db, row):
 
     if (row.extraction_method or {}).get("campus_fee_scope"):
         return {"status": "unchanged"}
-    groups, _ = plan_campus_fees(row)
-    if groups:
-        return {"status": "unchanged"}
+    # An unscoped legacy row may contain an institution-default campus even
+    # when that happens to map to a price. Reverify course-owned evidence.
     old = validated_fee_variants(row)
     if not old or not is_ulaw_course(row.course_website):
         return {"status": "needs_review", "reason": "Verified course fee evidence is required."}
@@ -166,6 +173,7 @@ async def enrich_course_campuses(db, row):
         "course_website", "extraction_method", "international_fee", "currency", "fee_year", "fee_term",
     )}
     candidate["course_location"] = ", ".join(authority["locations"])
+    candidate["extraction_method"] = {**candidate["extraction_method"], "campus_authority": authority}
     groups, reason = plan_campus_fees(candidate)
     if not groups:
         return {"status": "needs_review", "reason": reason}

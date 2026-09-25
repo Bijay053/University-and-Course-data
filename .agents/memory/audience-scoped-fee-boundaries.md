@@ -13,7 +13,13 @@ Published campus alternatives are recovered fee information, not a missing fee a
 
 **Why:** ULaw's flattened tabs both discarded real international fees and promoted a later-year domestic MBA amount. Most international offerings have different London/non-London prices, so a scalar-only success criterion misrepresented correctly recovered data.
 
-**How to apply:** Validate persisted alternatives against their selected source and fee companions, render the range and individual options, count verified recovery in Smart Fix, and retain explicit campus review before publication. Refresh affected staged rows through the normal API; releasing extractor code alone does not repair historical records.
+**How to apply:** Validate persisted alternatives against their selected source and fee companions, render the range and individual options, and count verified recovery in Smart Fix. Reviewer approval may automatically resolve verified campus groups; ambiguity must still block publication. Refresh affected staged rows through the normal API; releasing extractor code alone does not repair historical records.
+
+Published campus price labels do not prove that a course is offered at every labelled campus.
+
+**Why:** ULaw London-only LLM pages include an outside-London price in a shared schedule. Treating every price as an offering both blocks valid London courses and risks inventing campuses from institution defaults.
+
+**How to apply:** Establish actual course-owned delivery locations for the same route/cohort before narrowing applicable prices. Allow one uniform campus group when that proof excludes the other prices; never narrow from a university-default location alone.
 
 Preserve numeric continuity across inline markup before parsing tuition and academic years, without flattening audience or table boundaries.
 

@@ -55,6 +55,25 @@ function validOption(value: unknown): value is FeeOption {
     && typeof o.source_url === "string" && typeof o.snippet === "string";
 }
 
+/** Matching campus prices may be grouped automatically; other fee choices may not. */
+function autoCampusRange(authority: Record<string, unknown> | null): boolean {
+  if (authority?.status !== "range" || !Array.isArray(authority.selected)
+    || authority.selected.length < 2 || !authority.selected.every(validOption)) return false;
+  const selected: FeeOption[] = authority.selected;
+  const [first] = selected;
+  const byCampus = new Map<string, number>();
+  for (const option of selected) {
+    const campus = option.campus.trim().toLowerCase();
+    if (!campus || !option.study_variant.trim()
+      || option.year !== first.year || option.period !== first.period
+      || option.study_variant.trim().toLowerCase() !== first.study_variant.trim().toLowerCase()
+      || option.currency !== first.currency) return false;
+    if (byCampus.has(campus) && byCampus.get(campus) !== option.amount) return false;
+    byCampus.set(campus, option.amount);
+  }
+  return byCampus.size > 1 && new Set(selected.map(option => option.amount)).size > 1;
+}
+
 export function feeVariantNeedsReview(course: FeeVariantCarrier) {
   const authority = feeVariantAuthority(course);
   if (!authority) return false;
@@ -147,6 +166,7 @@ export function PublishedFeeVariants({ course, id, readOnly = false, onCourseUpd
   const selected = Array.isArray(authority.selected) ? authority.selected.filter(validOption) : [];
   const options = Array.isArray(authority.options) ? authority.options.filter(validOption) : [];
   const needsReview = feeVariantNeedsReview(course);
+  const automaticCampusFees = autoCampusRange(authority);
   const renderOption = (option: FeeOption, index: number, section: string) => (
     <li key={`${section}-${index}`} className="border-t pt-2 mt-2" data-testid={`fee-option-${id}-${section}-${index}`}>
       <div className="font-medium">{money(option.amount)} GBP · {option.year} · {periodLabel(option.period)}</div>
@@ -167,17 +187,19 @@ export function PublishedFeeVariants({ course, id, readOnly = false, onCourseUpd
       </div>
       {(needsReview || !summary) && (
         <div className="text-xs text-amber-700" data-testid={`fee-review-${id}`}>
-          {summary ? "Known alternatives — variant review required" : "No applicable fee confirmed — review required"}
+          {automaticCampusFees
+            ? "Campus prices differ. Approval checks course-owned campuses and groups verified fees automatically; unverified locations stay pending for review."
+            : summary ? "Known alternatives — variant review required" : "No applicable fee confirmed — review required"}
         </div>
       )}
-      {selection?.selectedOptionId && (
+      {!automaticCampusFees && selection?.selectedOptionId && (
         <div className="text-xs text-green-700" data-testid={`fee-saved-${id}`}>
           Saved choice: {selection.options.find(o => o.optionId === selection.selectedOptionId)?.campus ?? "Selected option"}
           {" · "}{selection.options.find(o => o.optionId === selection.selectedOptionId)?.year}
           {" · "}{selection.options.find(o => o.optionId === selection.selectedOptionId)?.period}
         </div>
       )}
-      {!readOnly && selection && selection.options.length > 0 && (
+      {!readOnly && !automaticCampusFees && selection && selection.options.length > 0 && (
         <div className="mt-2 text-xs" data-testid={`fee-selection-${id}`}>
           <div className="font-semibold">Choose a published fee before approval</div>
           <div role="radiogroup" aria-label="Published fee options">

@@ -34,7 +34,7 @@ describe("persisted published fee alternatives", () => {
     render(<ReviewScrapedCoursesTable courses={[course()]} readOnly />);
     expect(screen.getByTestId("fee-summary-41").textContent).toBe("£17,500–£19,050 GBP · 2026 · Full Course");
     expect(screen.queryByTitle("Missing international fee")).toBeNull();
-    expect(screen.getByTestId("fee-review-41").textContent).toContain("variant review required");
+    expect(screen.getByTestId("fee-review-41").textContent).toContain("unverified locations stay pending");
     fireEvent.click(screen.getByTestId("expand-fees-41"));
     const link = screen.getByTestId("fee-source-41-selected-0");
     expect(link.getAttribute("href")).toBe(source);
@@ -59,6 +59,31 @@ describe("persisted published fee alternatives", () => {
   it("keeps different years and annual/full-course amounts separate", () => {
     const fees = authority([option(17200, "London", 2026, "Annual"), option(19050, "London", 2027, "Full Course")]);
     expect(feeVariantSummary({ feeVariants: fees })).toBe("£17,200 GBP · 2026 · Annual (per year); £19,050 GBP · 2027 · Full Course");
+  });
+
+  it("does not ask for a fee choice for campus prices in one fee cohort", () => {
+    const pending = course({ feeSelection: selection() });
+    render(<PublishedFeeVariants course={pending} id={41} />);
+    expect(screen.getByTestId("fee-review-41").textContent).toContain("groups verified fees automatically");
+    expect(screen.queryByText("Choose a published fee before approval")).toBeNull();
+    expect(screen.queryByTestId("fee-selection-41")).toBeNull();
+    fireEvent.click(screen.getByTestId("expand-fees-41"));
+    expect(screen.getByTestId("fee-option-41-selected-0").textContent).toContain("Outside London");
+    expect(screen.getByTestId("fee-option-41-selected-1").textContent).toContain("London");
+    expect(feeVariantNeedsReview(pending)).toBe(true);
+  });
+
+  it("retains manual selection for conflicting fee cohorts, routes, and campus evidence", () => {
+    const mixed = authority([option(17500, "London", 2026), option(19050, "London", 2027)]);
+    const { rerender } = render(<PublishedFeeVariants course={course({ feeVariants: mixed, feeSelection: selection() })} id={41} />);
+    expect(screen.getByText("Choose a published fee before approval")).toBeTruthy();
+    expect(screen.getByTestId("fee-review-41").textContent).toContain("variant review required");
+    const routes = authority([option(17500, "London"), { ...option(19050, "Outside London"), study_variant: "Professional Practice" }]);
+    rerender(<PublishedFeeVariants course={course({ feeVariants: routes, feeSelection: selection() })} id={41} />);
+    expect(screen.getByText("Choose a published fee before approval")).toBeTruthy();
+    const conflicting = authority([option(17500, "London"), option(19050, "London"), option(17000, "Outside London")]);
+    rerender(<PublishedFeeVariants course={course({ feeVariants: conflicting, feeSelection: selection() })} id={41} />);
+    expect(screen.getByText("Choose a published fee before approval")).toBeTruthy();
   });
 
   it("renders uniform MBA authority without substituting a domestic fee", () => {
@@ -100,9 +125,10 @@ describe("persisted published fee alternatives", () => {
   });
 
   it("requires an explicit option ID even when campus and amount are equal; persists on server confirmation", async () => {
-    const pending = course({ feeSelection: selection() });
+    const mixed = authority([option(17500, "London", 2026), option(17500, "London", 2027)]);
+    const pending = course({ feeVariants: mixed, feeSelection: selection() });
     expect(feeVariantNeedsReview(pending)).toBe(true);
-    const saved = course({ feeSelection: selection("london-full") });
+    const saved = course({ feeVariants: mixed, feeSelection: selection("london-full") });
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ success: true, course: saved }) });
     vi.stubGlobal("fetch", fetchMock);
     const updated = vi.fn();
@@ -124,7 +150,8 @@ describe("persisted published fee alternatives", () => {
   it("does not confirm stale failures, refreshes and requires another deliberate choice", async () => {
     const refresh = vi.fn();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 409, json: async () => ({ detail: "Stale snapshot" }) }));
-    render(<PublishedFeeVariants course={course({ feeSelection: selection() })} id={41} onRefresh={refresh} />);
+    const mixed = authority([option(17500, "London", 2026), option(17500, "London", 2027)]);
+    render(<PublishedFeeVariants course={course({ feeVariants: mixed, feeSelection: selection() })} id={41} onRefresh={refresh} />);
     fireEvent.click(screen.getByTestId("fee-choice-41-london-2027"));
     fireEvent.click(screen.getByTestId("save-fee-choice-41"));
     await waitFor(() => expect(screen.getByTestId("fee-error-41").textContent).toContain("Stale snapshot"));
