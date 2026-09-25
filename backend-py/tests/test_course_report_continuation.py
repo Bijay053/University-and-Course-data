@@ -303,11 +303,12 @@ def test_pipeline_checkpoints_after_handling_and_preserves_source_reviews():
     import inspect
     from app.services.scraper import orchestrator
 
-    source = inspect.getsource(orchestrator)
+    source = inspect.getsource(orchestrator._run_claimed_scrape)
     # Retain all known candidates before the helper that truncates links.
     freeze = source.index('"candidate_urls": list(dict.fromkeys([')
     expansion = source.index("links = await _expand_uel_course_links_for_run(", freeze)
     assert freeze < expansion
-    # Successful source review rows are isolated; report children must never
-    # use the normal cross-job deletion/replacement staging behavior.
-    assert source.count("preserve_existing=bool(_verification)") >= 2
+    # Both bounded verification children and full-catalogue review runs must
+    # stage without deleting or replacing source review rows.
+    assert "_preserve_review = bool(_verification) or _full_review" in source
+    assert source.count("preserve_existing=_preserve_review,") == 2

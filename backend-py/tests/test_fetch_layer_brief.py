@@ -20,6 +20,8 @@ from pathlib import Path
 import pytest
 import pytest_asyncio
 
+from tests.test_scrape_payload_compat import client_with_uni
+
 _SCRAPER_DIR = Path(__file__).resolve().parent.parent / "app" / "services" / "scraper"
 _ORCH_SRC = (_SCRAPER_DIR / "orchestrator.py").read_text(encoding="utf-8")
 
@@ -269,9 +271,26 @@ class TestDiscoveryUrlCacheC1:
         assert StartScrapeBody(university_id=1, force_discovery=True).force_discovery
         assert StartScrapeBody(universityId=1).force_discovery is False
 
-    def test_router_stores_force_discovery_in_request_payload(self):
-        src = Path("app/routers/scrape.py").read_text(encoding="utf-8")
-        assert '"forceDiscovery": bool(body.force_discovery)' in src
+    @pytest.mark.parametrize(
+        ("requested", "review", "expected"),
+        [(False, False, False), (True, False, True), (False, True, True)],
+    )
+    def test_router_stores_force_discovery_in_request_payload(
+        self, client_with_uni, monkeypatch, requested, review, expected,
+    ):
+        from unittest.mock import MagicMock
+
+        client, db = client_with_uni
+        monkeypatch.setattr("app.tasks.scrape_tasks.scrape_university", MagicMock())
+        monkeypatch.setattr("app.tasks.scrape_tasks.set_initial_dispatch_lock", MagicMock())
+        response = client.post("/api/scrape/start", json={
+            "universityId": 42,
+            "forceDiscovery": requested,
+            "fullCatalogueReviewOnly": review,
+        })
+        assert response.status_code == 202, response.text
+        assert len(db.added) == 1
+        assert db.added[0].request_payload["forceDiscovery"] is expected
 
     async def test_model_roundtrip_dev_db(self):
         from datetime import datetime, timezone
