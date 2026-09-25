@@ -299,13 +299,17 @@ async def _async_bulk_fix(runtime_job_id: str) -> None:
             await db.commit()
 
             try:
-                part = await re_extract_staged(
+                from app.services.scraper.smart_fix import run_smart_batch
+
+                extract_batch = run_smart_batch if payload.get("smart") else re_extract_staged
+                part = await extract_batch(
                     ReExtractBody(
                         ids=chunk,
                         universityId=university_id,
                         targetFields=sorted(target_fields),
                         forceFields=sorted(force_fields),
                         forceReasons=force_reasons,
+                        smart=bool(payload.get("smart")),
                     ),
                     db,
                 )
@@ -349,7 +353,13 @@ async def _async_bulk_fix(runtime_job_id: str) -> None:
                         for field in all_refreshed_fields
                         if field in target_fields
                     ]
-                if not item.get("ok") and "no course_website" in str(item.get("error") or ""):
+                if payload.get("smart") and item.get("ok") and not item.get("attempted"):
+                    item["outcome"] = (
+                        "already_resolved"
+                        if item.get("reason_code") == "already_resolved" else "skipped"
+                    )
+                    no_progress += 1
+                elif not item.get("ok") and "no course_website" in str(item.get("error") or ""):
                     item["outcome"] = "no_progress"
                     no_progress += 1
                 elif not item.get("ok"):

@@ -2376,6 +2376,7 @@ class ReExtractBody(BaseModel):
 
     ids: list[int] = Field(..., description="scraped_course IDs to re-extract (max 50)")
     university_id: int = Field(alias="universityId")
+    smart: bool = False
     target_fields: list[str] = Field(default_factory=list, alias="targetFields")
     force_fields: list[str] = Field(default_factory=list, alias="forceFields")
     force_reasons: dict[str, str] = Field(default_factory=dict, alias="forceReasons")
@@ -2471,6 +2472,7 @@ async def re_extract_staged(
     # to per-course/default English values even when the university publishes a
     # course-specific central profile.
     central_data: dict | None = None
+    central_config: dict = {}
     try:
         import copy as _copy
         from urllib.parse import urlparse as _up
@@ -2629,7 +2631,26 @@ async def re_extract_staged(
         extraction_passes = 0
         last_error = "extractor returned empty payload"
         retry_merge_fields: set[str] | None = None
+        recovery_reason_code: str | None = None
         for pass_number in range(1, 3):
+            if body.smart and pass_number == 2:
+                from app.services.scraper.smart_fix import refresh_central_recovery
+
+                try:
+                    fresh_central = await refresh_central_recovery(
+                        central_config, body.target_fields, central_data,
+                        operation_deadline - _time.monotonic(),
+                    )
+                except Exception:
+                    fresh_central = None
+                    recovery_reason_code = "central_source_unavailable"
+                if fresh_central is None:
+                    # No distinct relevant official evidence: do not repeat the
+                    # same extraction or broaden into unrelated fields.
+                    recovery_reason_code = recovery_reason_code or "no_distinct_central_evidence"
+                    break
+                central_data = fresh_central
+                recovery_reason_code = "fresh_central_evidence_checked"
             try:
                 pass_out = await _asyncio.wait_for(
                     _extract_only(
@@ -2716,10 +2737,15 @@ async def re_extract_staged(
                 if (field_key in force_targeted_fields or not getattr(row, field_key, None))
                 and not payload.get(field_key)
             ]
-            if not unresolved:
+            if not unresolved and not body.smart:
                 break
             if pass_number == 1:
-                retry_merge_fields = set(unresolved)
+                from app.services.scraper.smart_fix import smart_retry_fields
+
+                retry_merge_fields = (
+                    smart_retry_fields(targeted_fields or [], row, payload)
+                    if body.smart else set(unresolved)
+                )
                 if "international_fee" in retry_merge_fields:
                     retry_merge_fields.update({"fee_term", "fee_year", "currency"})
                 if "duration" in retry_merge_fields:
@@ -2946,6 +2972,7 @@ async def re_extract_staged(
             "new_completeness": row.completeness,
             "extraction_passes": extraction_passes,
             "ai_provider": "openai",
+            "recovery_reason_code": recovery_reason_code,
         }
         if not made_progress:
             result["reason"] = (
@@ -2971,6 +2998,7 @@ class StartBulkFixBody(BaseModel):
 
     ids: list[int] = Field(..., min_length=1, max_length=2000)
     university_id: int = Field(..., alias="universityId")
+    smart: bool = False
     source_job_id: str | None = Field(default=None, alias="sourceJobId")
     target_fields: list[str] = Field(
         default_factory=list,
@@ -3016,6 +3044,7 @@ def _bulk_fix_job_dict(job: ScrapeRuntimeJob) -> dict:
     counts = summary.get("counts") or {}
     return {
         "jobId": job.runtime_job_id,
+        "smart": bool((job.request_payload or {}).get("smart")),
         "sourceJobId": (job.request_payload or {}).get("sourceJobId"),
         "targetFields": (job.request_payload or {}).get("targetFields") or [],
         "forceFields": (job.request_payload or {}).get("forceFields") or [],
@@ -3025,9 +3054,19 @@ def _bulk_fix_job_dict(job: ScrapeRuntimeJob) -> dict:
         "queued": counts.get("queued", max(0, job.total_found - job.current)),
         "running": counts.get("running", 0),
         "completed": counts.get("completed", job.imported),
-        "noProgress": counts.get("noProgress", job.skipped),
+        "noProgress": sum(
+            r.get("outcome") == "no_progress" for r in summary.get("results") or []
+        ) if (job.request_payload or {}).get("smart") else counts.get("noProgress", job.skipped),
+        "alreadyResolved": sum(
+            r.get("outcome") == "already_resolved" for r in summary.get("results") or []
+        ),
+        "skipped": sum(r.get("outcome") == "skipped" for r in summary.get("results") or []),
         "failed": counts.get("failed", job.errors),
         "processed": job.current,
+        "attempted": sum(bool(r.get("attempted")) for r in summary.get("results") or [])
+        if (job.request_payload or {}).get("smart") else job.current,
+        "notAttempted": sum(not r.get("attempted") for r in summary.get("results") or [])
+        if (job.request_payload or {}).get("smart") else 0,
         "results": summary.get("results") or [],
         "errorMessage": job.error_message,
         "createdAt": job.created_at.isoformat() if job.created_at else None,
@@ -3043,10 +3082,12 @@ def _bulk_fix_request_matches(
     source_job_id: str | None,
     force_fields: list[str] | None = None,
     force_reasons: dict[str, str] | None = None,
+    smart: bool = False,
 ) -> bool:
     payload = job.request_payload or {}
     return (
-        set(payload.get("courseIds") or []) == set(course_ids)
+        bool(payload.get("smart", False)) == smart
+        and set(payload.get("courseIds") or []) == set(course_ids)
         and set(payload.get("targetFields") or []) == set(target_fields)
         and set(payload.get("forceFields") or []) == set(force_fields or [])
         and (payload.get("forceReasons") or {}) == (force_reasons or {})
@@ -3062,6 +3103,7 @@ def _matching_bulk_fix_job(
     source_job_id: str | None,
     force_fields: list[str] | None = None,
     force_reasons: dict[str, str] | None = None,
+    smart: bool = False,
 ) -> ScrapeRuntimeJob | None:
     return next(
         (
@@ -3074,6 +3116,7 @@ def _matching_bulk_fix_job(
                 force_fields=force_fields,
                 force_reasons=force_reasons,
                 source_job_id=source_job_id,
+                smart=smart,
             )
         ),
         None,
@@ -3129,6 +3172,7 @@ async def start_bulk_fix_job(
         force_fields=body.force_fields,
         force_reasons=body.force_reasons,
         source_job_id=body.source_job_id,
+        smart=body.smart,
     )
     if active:
         return _bulk_fix_job_dict(active)
@@ -3142,6 +3186,7 @@ async def start_bulk_fix_job(
         job_type="bulk_fix",
         status="queued",
         request_payload={
+            "smart": body.smart,
             "courseIds": found_ids,
             "sourceJobId": body.source_job_id,
             "targetFields": body.target_fields,

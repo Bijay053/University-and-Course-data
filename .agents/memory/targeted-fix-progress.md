@@ -32,3 +32,9 @@ An extractor correction for an existing nonblank value also needs a matching Fix
 **Why:** Winchester's corrected full title was extracted successfully, but the saved bare subject was not identified as defective, so targeted Fix excluded the name from persistence.
 
 **How to apply:** Test analysis → requested targets → persisted fields together. Detect the defect with bounded source evidence, and ensure it disappears after correction rather than rewriting unrelated fields.
+
+Smart Fix uses actual before/after issue resolution, not legacy value/provenance-change completion, and derives each course's targets from its own unresolved issues.
+
+**Why:** ULaw's bulk run counted many courses as completed through provenance changes while thirteen others repeated the same extraction twice. “Skipped” concealed attempted-but-unchanged results, and completion did not mean the requested gaps were fixed.
+
+**How to apply:** Keep attempted/no-progress separate from not-attempted and already-resolved. Retry only with distinct relevant official evidence within the shared deadline. Preserve first-pass gains; a disappeared row, failed extraction, or failed post-analysis cannot prove resolution. Persist mode and exact target identity so legacy and smart jobs cannot attach to each other.

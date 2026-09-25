@@ -9,6 +9,8 @@ import {
   annualFeeEquivalentForDisplay,
   formatRecoveryDiagnosticMessage,
   getFixResultHeading,
+  SmartFixDetails,
+  smartFixReportPrefill,
   isRequestedFixField,
   normalizeRequirementStatus,
   requirementRepairFields,
@@ -26,6 +28,64 @@ describe("annualFeeEquivalentForDisplay", () => {
   it("annualizes full-course fees lasting at least one year", () => {
     expect(annualFeeEquivalentForDisplay(48_000, 12, "Month")).toBe(48_000);
     expect(annualFeeEquivalentForDisplay(96_000, 2, "Year")).toBe(48_000);
+  });
+});
+
+describe("Smart Fix results contract", () => {
+  const issue = { field: "international_fee", label: "Fee", missing: 1, total: 1, current_pct: 0, expected_fill_pct: 0 };
+  const base = {
+    smart: true, total: 1, updated: 1, skipped: 0, errors: 0,
+    requestedFields: ["international_fee", "duration"],
+    afterAnalysisComplete: true, afterIssues: [],
+    courseResults: [{ id: 1, ok: true, outcome: "completed" as const, attempted: true, resolved_fields: ["duration"], unresolved_fields: ["international_fee"] }],
+  };
+  it("uses fresh issue analysis for partial, full, unchanged and failed results", () => {
+    expect(getFixResultHeading({ ...base, afterIssues: [issue] })).toBe("Partially successful");
+    expect(getFixResultHeading(base)).toBe("Successful");
+    expect(getFixResultHeading({ ...base, beforeIssues: [issue], afterIssues: [issue] })).toBe("No progress");
+    expect(getFixResultHeading({ ...base, updated: 0, errors: 1, courseResults: [] })).toBe("Failed");
+    expect(getFixResultHeading({ ...base, afterAnalysisComplete: false })).toBe("Resolution not verified");
+    expect(getFixResultHeading({ ...base, courseResults: [{ ...base.courseResults[0], unsupported_fields: ["score_type"] }] })).toBe("Partially successful");
+  });
+  it("groups explicit reasons, separates unattempted work, and only offers the indicated report action", async () => {
+    const onReport = vi.fn();
+    const row = { ...base.courseResults[0], outcome: "no_progress" as const, reason_code: "unresolved_after_official_recovery", next_action: "report_official_url", target_fields: ["duration", "international_fee"] };
+    render(<SmartFixDetails result={{
+      ...base, afterIssues: [issue], attempted: 2, notAttempted: 1,
+      courseResults: [
+        row,
+        { ...row, id: 2, next_action: undefined },
+        { id: 3, ok: true, outcome: "skipped", attempted: false, reason_code: "unsupported_targets", unsupported_fields: ["score_type"] },
+      ],
+    }} onReport={onReport} />);
+    expect(screen.getByText("Attempted — unchanged: Selected issues remain after official-source recovery (2)")).toBeTruthy();
+    expect(screen.getByText("Not attempted: Selected fields have no supported automatic check (1)")).toBeTruthy();
+    expect(screen.getByText("1 selected issues remaining in fresh analysis")).toBeTruthy();
+    const user = userEvent.setup();
+    await user.click(screen.getByText("Attempted — unchanged: Selected issues remain after official-source recovery (2)"));
+    expect(screen.getAllByRole("button", { name: "Report official URL" })).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "Report official URL" }));
+    expect(onReport).toHaveBeenCalledWith(row);
+    expect(smartFixReportPrefill(row, { courseName: "Science", courseWebsite: "https://uni.test/science" })).toEqual({
+      courseName: "Science", courseUrl: "https://uni.test/science", fields: ["other"],
+      description: "Smart Fix: Science. Please verify these unresolved fields using the exact official source: International Fee.",
+    });
+  });
+  it("renders sparse smart results without inventing a next action", () => {
+    render(<SmartFixDetails result={{ ...base, courseResults: [{ id: 4, ok: false, outcome: "failed" }] }} onReport={vi.fn()} />);
+    expect(screen.getByText("Failed: No detailed reason supplied (1)")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Report official URL" })).toBeNull();
+  });
+  it.each(["initial_analysis_failed", "post_analysis_failed", "course_changed_during_fix"])("does not count saved values as resolution after %s", async (reason_code) => {
+    const row = { id: 9, ok: false, outcome: "failed" as const, reason_code,
+      resolved_fields: [], updated_fields: ["international_fee"], attempted: true };
+    const result = { ...base, errors: 1, updated: 0, courseResults: [row] };
+    expect(getFixResultHeading(result)).toBe("Resolution not verified");
+    render(<SmartFixDetails result={result} />);
+    await userEvent.setup().click(screen.getByText(/Failed: .*resolution unverified; recheck/));
+    expect(screen.getByText("Resolved: Not verified — recheck this course")).toBeTruthy();
+    expect(screen.getByText("Saved value changes (not verified as issue resolution): International Fee")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Report official URL" })).toBeNull();
   });
 });
 
@@ -242,9 +302,9 @@ describe("Scraping repair reviewer", () => {
 
     const user = userEvent.setup();
     render(<ScrapingForTest initialReviewState={review} />);
-    await user.click(screen.getByRole("button", { name: "Fix (1)" }));
-    const dialog = await screen.findByRole("dialog", { name: "Review Before Fixing" });
-    await user.click(within(dialog).getByRole("button", { name: "Confirm Fix (1)" }));
+    await user.click(screen.getByRole("button", { name: "Smart Fix (1)" }));
+    const dialog = await screen.findByRole("dialog", { name: "Review Before Smart Fix" });
+    await user.click(within(dialog).getByRole("button", { name: "Confirm Smart Fix (1)" }));
     await waitFor(() => expect(requestBody).not.toBeNull());
     expect(requestBody).toMatchObject({
       ids: [1],
@@ -483,12 +543,12 @@ describe("Scraping repair reviewer", () => {
     const selectAll = screen.getAllByRole("checkbox")[0];
     await user.click(selectAll);
     await user.click(selectAll);
-    await user.click(screen.getByRole("button", { name: "Fix (51)" }));
+    await user.click(screen.getByRole("button", { name: "Smart Fix (51)" }));
     const previewDialog = await screen.findByRole("dialog", {
-      name: "Review Before Fixing",
+      name: "Review Before Smart Fix",
       description: "Review the pending re-extraction action before applying it to the selected courses.",
     });
-    await user.click(within(previewDialog).getByRole("button", { name: "Confirm Fix (51)" }));
+    await user.click(within(previewDialog).getByRole("button", { name: "Confirm Smart Fix (51)" }));
 
     const dialog = await screen.findByRole("dialog", {
       name: "Fix Results",
@@ -508,6 +568,7 @@ describe("Scraping repair reviewer", () => {
 
     expect(fixBodies).toHaveLength(1);
     expect(fixBodies[0]).toEqual({
+      smart: true,
       ids: Array.from({ length: 51 }, (_, index) => index + 1),
       universityId: 7,
       sourceJobId: "repair-job",
@@ -593,6 +654,48 @@ describe("Scraping repair reviewer", () => {
     expect(within(dialog).getByText("Course 3 — Course page timed out")).toBeTruthy();
   });
 
+  it("restores the exact Smart Fix review, analyzes its IDs, and opens a prefilled official URL report", async () => {
+    const review = initialReview();
+    localStorage.setItem("activeBulkFixJob", "smart-restored");
+    localStorage.setItem("bulkFixBefore:smart-restored", JSON.stringify([
+      { field: "international_fee", label: "Fee", missing: 1, total: 1, current_pct: 0, expected_fill_pct: 0 },
+    ]));
+    const analyses: unknown[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
+      if (url === "/api/scrape/staged/repair-job") return jsonResponse(review.courses);
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      if (url === "/api/scrape/staged/analyze") {
+        analyses.push(JSON.parse(String(init?.body)));
+        return jsonResponse({ total: 1, courses_with_url: 1, issues: [{ field: "international_fee", label: "Fee", missing: 1 }] });
+      }
+      if (url === "/api/scrape/staged/fix-jobs/smart-restored") return jsonResponse({
+        jobId: "smart-restored", sourceJobId: "repair-job", smart: true,
+        targetFields: ["international_fee"], status: "completed", total: 1,
+        queued: 0, running: 0, completed: 0, noProgress: 1, failed: 0,
+        processed: 1, attempted: 1, notAttempted: 0, skipped: 0, alreadyResolved: 0,
+        results: [{ id: 1, ok: true, attempted: true, outcome: "no_progress",
+          target_fields: ["international_fee"], resolved_fields: [], unresolved_fields: ["international_fee"],
+          reason_code: "unresolved_after_official_recovery", next_action: "report_official_url" }],
+      });
+      return jsonResponse({});
+    }));
+    const user = userEvent.setup();
+    render(<ScrapingForTest initialReviewState={review} />);
+    await user.click(await screen.findByRole("button", { name: "View Fix results" }));
+    const dialog = await screen.findByRole("dialog", { name: "Fix Results" });
+    expect(within(dialog).getByText("No progress")).toBeTruthy();
+    expect(within(dialog).getByText("Before vs After")).toBeTruthy();
+    expect(analyses).toEqual([{ ids: [1], universityId: 7 }]);
+    await user.click(within(dialog).getByText("Attempted — unchanged: Selected issues remain after official-source recovery (1)"));
+    await user.click(within(dialog).getByRole("button", { name: "Report official URL" }));
+    expect(await screen.findByDisplayValue("https://example.test/courses/1")).toBeTruthy();
+    expect((screen.getByTestId("input-report-description") as HTMLTextAreaElement).value).toContain("International Fee");
+  });
+
   it("requires reasons for forced fields and sends them with the union of detected targets", async () => {
     const review = initialReview();
     const fixBodies: Array<{
@@ -641,9 +744,9 @@ describe("Scraping repair reviewer", () => {
     const selectAll = screen.getAllByRole("checkbox")[0];
     await user.click(selectAll);
     await user.click(selectAll);
-    await user.click(screen.getByRole("button", { name: "Fix (51)" }));
+    await user.click(screen.getByRole("button", { name: "Smart Fix (51)" }));
 
-    const previewDialog = await screen.findByRole("dialog", { name: "Review Before Fixing" });
+    const previewDialog = await screen.findByRole("dialog", { name: "Review Before Smart Fix" });
     expect(previewDialog.classList.contains("h-[calc(100dvh-2rem)]")).toBe(true);
     expect(previewDialog.classList.contains("max-h-[calc(100dvh-2rem)]")).toBe(true);
     expect(previewDialog.classList.contains("overflow-hidden")).toBe(true);
@@ -654,7 +757,7 @@ describe("Scraping repair reviewer", () => {
     await user.click(within(previewDialog).getByLabelText("Force English Requirements"));
     await user.click(within(previewDialog).getByLabelText("Force Intake"));
 
-    const confirmButton = within(previewDialog).getByRole("button", { name: "Confirm Fix (51)" });
+    const confirmButton = within(previewDialog).getByRole("button", { name: "Confirm Smart Fix (51)" });
     expect((confirmButton as HTMLButtonElement).disabled).toBe(true);
     const reasonInputs = within(previewDialog).getAllByLabelText(/Correction reason/);
     fireEvent.change(reasonInputs[0], { target: { value: "Published fee is outdated" } });
@@ -667,10 +770,11 @@ describe("Scraping repair reviewer", () => {
     await waitFor(() => expect(fixBodies).toHaveLength(1));
     await user.keyboard("{Escape}");
     await waitFor(() => {
-      expect(screen.queryByRole("dialog", { name: "Review Before Fixing" })).toBeNull();
+      expect(screen.queryByRole("dialog", { name: "Review Before Smart Fix" })).toBeNull();
     });
     expect(localStorage.getItem("activeBulkFixJob")).toBe("forced-fix");
     expect(fixBodies[0]).toMatchObject({
+      smart: true,
       targetFields: [
         "ielts_overall",
         "international_fee",

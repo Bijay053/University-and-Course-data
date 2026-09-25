@@ -34,6 +34,40 @@ class _Session:
 
 
 @pytest.mark.asyncio
+async def test_smart_worker_distinguishes_attempts_from_skips(monkeypatch):
+    from unittest.mock import AsyncMock
+    from app.services.scraper import job_claim, smart_fix
+    from app.tasks import scrape_tasks
+    from app.routers.scrape import _bulk_fix_job_dict
+
+    job = SimpleNamespace(
+        runtime_job_id="fix-smart", request_payload={
+            "courseIds": [1, 2, 3], "targetFields": ["duration"], "smart": True,
+        }, approval_summary={}, university_id=7, current=0, imported=0,
+        skipped=0, errors=0, total_found=3, heartbeat_at=None, status="queued",
+        completed_at=None, created_at=None, error_message=None,
+    )
+    monkeypatch.setattr(scrape_tasks, "AsyncSessionLocal", lambda: _Session(job))
+    monkeypatch.setattr(job_claim, "claim_runtime_job", AsyncMock(return_value=True))
+    runner = AsyncMock(return_value={"results": [
+        {"id": 1, "ok": True, "attempted": False, "reason_code": "already_resolved"},
+        {"id": 2, "ok": True, "attempted": False, "reason_code": "missing_official_url"},
+        {"id": 3, "ok": True, "attempted": True, "made_progress": False},
+    ]})
+    monkeypatch.setattr(smart_fix, "run_smart_batch", runner)
+    await scrape_tasks._async_bulk_fix("fix-smart")
+    response = _bulk_fix_job_dict(job)
+    assert response["smart"]
+    assert response["attempted"] == 1
+    assert response["notAttempted"] == 2
+    assert response["noProgress"] == 1
+    assert response["alreadyResolved"] == 1
+    assert response["skipped"] == 1
+    assert response["completed"] == 0
+    assert response["processed"] == 3
+
+
+@pytest.mark.asyncio
 async def test_bulk_fix_persists_post_batch_counts_and_audit_metadata(monkeypatch):
     from app.routers import scrape as scrape_router
     from app.services.scraper import job_claim

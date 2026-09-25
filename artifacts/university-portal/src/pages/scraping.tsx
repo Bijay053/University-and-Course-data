@@ -437,6 +437,11 @@ interface FixAnalysis {
   issues: FixIssue[];
 }
 interface FixResults {
+  smart?: boolean;
+  courseResults?: BulkFixJob["results"];
+  attempted?: number;
+  notAttempted?: number;
+  alreadyResolved?: number;
   total: number;
   updated: number;
   skipped: number;
@@ -459,6 +464,12 @@ interface FixResults {
   requestedFields: string[];
 }
 interface BulkFixJob {
+  smart?: boolean;
+  universityId?: number;
+  attempted?: number;
+  notAttempted?: number;
+  alreadyResolved?: number;
+  skipped?: number;
   jobId: string;
   sourceJobId: string | null;
   targetFields: string[];
@@ -474,7 +485,15 @@ interface BulkFixJob {
     id: number;
     course_name?: string | null;
     ok: boolean;
-    outcome: "completed" | "no_progress" | "failed";
+    outcome: "completed" | "no_progress" | "failed" | "skipped" | "already_resolved";
+    target_fields?: string[];
+    resolved_fields?: string[];
+    unresolved_fields?: string[];
+    unsupported_fields?: string[];
+    attempted?: boolean;
+    reason_code?: string;
+    next_action?: string;
+    recovery_reason_code?: string;
     updated_fields?: string[];
     refreshed_evidence_fields?: string[];
     extraction_passes?: number;
@@ -487,6 +506,87 @@ interface BulkFixJob {
 
 const isCompletedFixStatus = (status: string) =>
   status === "completed" || status === "completed_with_errors";
+
+const UNVERIFIED_FIX_REASONS = new Set([
+  "initial_analysis_failed", "post_analysis_failed", "course_changed_during_fix",
+]);
+
+export function smartFixReportPrefill(
+  row: BulkFixJob["results"][number],
+  course: { courseName: string; courseWebsite?: string | null },
+): CourseReportPrefillCourse {
+  const fields = row.unresolved_fields ?? row.target_fields ?? [];
+  return {
+    courseName: course.courseName,
+    courseUrl: course.courseWebsite,
+    fields: Array.from(new Set(fields.map((field) =>
+      field.startsWith("ielts") || field === "english_requirements" ? "english" as const : "other" as const,
+    ))),
+    description: `Smart Fix: ${course.courseName}. Please verify these unresolved fields using the exact official source: ${fields.map((field) => FIX_FIELD_LABELS[field] ?? field).join(", ")}.`,
+  };
+}
+
+export function SmartFixDetails({ result, onReport }: {
+  result: Pick<FixResults, "courseResults" | "attempted" | "notAttempted" | "alreadyResolved" | "updated" | "afterAnalysisComplete" | "afterIssues" | "requestedFields">;
+  onReport?: (row: BulkFixJob["results"][number]) => void;
+}) {
+  const rows = result.courseResults ?? [];
+  const reasons: Record<string, string> = {
+    course_not_found: "Course no longer exists",
+    unsupported_targets: "Selected fields have no supported automatic check",
+    already_resolved: "No unresolved selected issues at start",
+    budget_exhausted: "Recovery time budget exhausted",
+    missing_official_url: "No saved official course URL",
+    source_recovery_failed: "Official-source recovery failed",
+    unresolved_after_official_recovery: "Selected issues remain after official-source recovery",
+    issues_resolved: "Selected issues resolved",
+    correction_requires_review: "Correction needs manual source review",
+    initial_analysis_failed: "Initial issue analysis failed — resolution unverified; recheck",
+    post_analysis_failed: "Post-fix analysis failed — changes may be saved; resolution unverified; recheck",
+    course_changed_during_fix: "Course changed during repair — resolution unverified; recheck",
+  };
+  const groups = new Map<string, typeof rows>();
+  for (const row of rows) {
+    const state = row.attempted === false ? "Not attempted" : row.outcome === "failed" ? "Failed" : row.outcome === "no_progress" ? "Attempted — unchanged" : row.attempted ? "Attempted" : "Attempt status unavailable";
+    const reason = reasons[row.reason_code ?? ""] ?? row.reason ?? row.error ?? row.reason_code ?? "No detailed reason supplied";
+    const key = `${state}: ${reason}`;
+    groups.set(key, [...(groups.get(key) ?? []), row]);
+  }
+  const remaining = result.afterIssues.filter((issue) => result.requestedFields.includes(issue.field)).reduce((sum, issue) => sum + issue.missing, 0);
+  const fieldList = (fields?: string[]) => fields?.length ? fields.map((field) => FIX_FIELD_LABELS[field] ?? field).join(", ") : "None reported";
+  return (
+    <div className="space-y-3 text-sm" data-testid="smart-fix-details">
+      <p>{result.updated} courses with at least one issue resolved — not necessarily all issues.</p>
+      <p>{result.attempted ?? rows.filter((row) => row.attempted).length} attempted · {result.notAttempted ?? rows.filter((row) => row.attempted === false).length} not attempted · {result.alreadyResolved ?? 0} already resolved at start</p>
+      <p>{result.afterAnalysisComplete ? `${remaining} selected issues remaining in fresh analysis` : "Remaining issues could not be verified. Refresh and review again."}</p>
+      <p className="text-muted-foreground">Nothing is published automatically. Review values and sources before accepting changes.</p>
+      {Array.from(groups, ([reason, courses]) => (
+        <details key={reason} className="rounded border p-2">
+          <summary className="cursor-pointer" data-testid={`smart-reason-${courses[0].id}`}>{reason} ({courses.length})</summary>
+          <div className="max-h-60 overflow-y-auto space-y-3 pt-2">
+            {courses.map((row) => (
+              <div key={row.id} className="border-t pt-2" data-testid={`smart-course-${row.id}`}>
+                <p className="font-medium">{row.course_name ?? `Course ${row.id}`}</p>
+                <p>Target fields: {fieldList(row.target_fields)}</p>
+                <p>Resolved: {UNVERIFIED_FIX_REASONS.has(row.reason_code ?? "") ? "Not verified — recheck this course" : fieldList(row.resolved_fields)}</p>
+                <p>Unresolved: {fieldList(row.unresolved_fields)}</p>
+                {UNVERIFIED_FIX_REASONS.has(row.reason_code ?? "") && !!row.updated_fields?.length && (
+                  <p>Saved value changes (not verified as issue resolution): {fieldList(row.updated_fields)}</p>
+                )}
+                {!!row.unsupported_fields?.length && <p>Unsupported automatic checks: {fieldList(row.unsupported_fields)}</p>}
+                {(row.error || row.reason) && <p>{row.error ?? row.reason}</p>}
+                {row.recovery_reason_code && <p>Recovery: {row.recovery_reason_code.replaceAll("_", " ")}</p>}
+                {onReport && row.next_action === "report_official_url" && (
+                  <Button type="button" variant="outline" size="sm" data-testid={`report-smart-course-${row.id}`} onClick={() => onReport(row)}>Report official URL</Button>
+                )}
+              </div>
+            ))}
+          </div>
+        </details>
+      ))}
+    </div>
+  );
+}
 
 const FORCEABLE_FIX_FIELDS = [
   { field: "international_fee", label: "International Fee" },
@@ -510,6 +610,8 @@ export function annualFeeEquivalentForDisplay(
 }
 
 export function getFixResultHeading(result: {
+  smart?: boolean;
+  courseResults?: BulkFixJob["results"];
   total: number;
   updated: number;
   skipped: number;
@@ -520,6 +622,17 @@ export function getFixResultHeading(result: {
   requestedFields?: string[];
   valueUpdatedFields?: string[];
 }): string {
+  if (result.smart) {
+    if (result.courseResults?.some((row) => UNVERIFIED_FIX_REASONS.has(row.reason_code ?? ""))) return "Resolution not verified";
+    if (!result.afterAnalysisComplete) return "Resolution not verified";
+    const resolved = result.beforeIssues?.length
+      ? result.beforeIssues.reduce((sum, issue) => sum + issue.missing - (result.afterIssues?.find((after) => after.field === issue.field)?.missing ?? 0), 0)
+      : (result.courseResults ?? []).reduce((sum, row) => sum + (row.resolved_fields?.length ?? 0), 0);
+    const remaining = (result.afterIssues ?? []).filter((issue) => result.requestedFields?.includes(issue.field)).reduce((sum, issue) => sum + issue.missing, 0);
+    const unsupported = (result.courseResults ?? []).some((row) => row.unsupported_fields?.length);
+    if (resolved <= 0) return result.errors > 0 ? "Failed" : "No progress";
+    return remaining || unsupported || result.errors ? "Partially successful" : "Successful";
+  }
   if (result.afterAnalysisComplete && result.beforeIssues?.length) {
     const beforeMissing = result.beforeIssues.reduce((sum, issue) => sum + issue.missing, 0);
     const afterMissing = result.beforeIssues.reduce(
@@ -2577,6 +2690,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         credentials: "include",
         body: JSON.stringify({
           ids,
+          smart: true,
           universityId: uniId,
           sourceJobId: reviewJobId,
           targetFields: Array.from(new Set([
@@ -2594,6 +2708,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       const job: BulkFixJob = await res.json();
       setBulkFixJob(job);
       localStorage.setItem("activeBulkFixJob", job.jobId);
+      localStorage.setItem(`bulkFixBefore:${job.jobId}`, JSON.stringify(fixAnalysis.issues));
+      localStorage.setItem(`bulkFixUniversity:${job.jobId}`, String(uniId));
       setFixProgress({ completed: job.processed, total: job.total });
       toast({
         title: "Fix started in the background",
@@ -2610,13 +2726,19 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     job: BulkFixJob,
     beforeIssues: FixIssue[] = [],
   ) => {
+    if (!beforeIssues.length) {
+      try {
+        beforeIssues = JSON.parse(localStorage.getItem(`bulkFixBefore:${job.jobId}`) ?? "[]");
+      } catch { beforeIssues = []; }
+    }
     const valueUpdatedFields = new Set<string>();
     const provenanceOnlyFields = new Set<string>();
     mergeReextractFieldResults({ valueUpdatedFields, provenanceOnlyFields }, job.results);
     const resultIds = job.results
       .map((result) => Number(result.id))
       .filter((id) => Number.isInteger(id));
-    const uniId = reviewUniversityId();
+    const savedUniversity = Number(localStorage.getItem(`bulkFixUniversity:${job.jobId}`));
+    const uniId = job.universityId ?? (savedUniversity > 0 ? savedUniversity : reviewUniversityId());
     let afterIssues: FixIssue[] = [];
     let afterAnalysisComplete = false;
     if (resultIds.length > 0 && uniId != null) {
@@ -2628,9 +2750,14 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       }
     }
     setFixResults({
+      smart: job.smart,
+      courseResults: job.results,
+      attempted: job.attempted,
+      notAttempted: job.notAttempted,
+      alreadyResolved: job.alreadyResolved,
       total: job.total,
       updated: job.completed,
-      skipped: job.noProgress,
+      skipped: job.smart ? (job.skipped ?? 0) : job.noProgress,
       errors: job.failed,
       noProgressResults: job.results
         .filter((result) => result.outcome === "no_progress")
@@ -2661,13 +2788,14 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   useEffect(() => {
     const savedJobId = localStorage.getItem("activeBulkFixJob");
     if (!savedJobId) return;
+    let cancelled = false;
     fetch(`/api/scrape/staged/fix-jobs/${savedJobId}`, {
       credentials: "include",
       cache: "no-store",
     })
       .then((res) => res.ok ? res.json() : null)
       .then((job: BulkFixJob | null) => {
-        if (!job?.jobId || !job.status) return;
+        if (cancelled || !job?.jobId || !job.status || (reviewJobId && job.sourceJobId !== reviewJobId)) return;
         setBulkFixJob(job);
         if (["queued", "running"].includes(job.status)) {
           setFixingSelected(true);
@@ -2675,10 +2803,13 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         }
       })
       .catch(() => {});
-  }, []);
+    return () => { cancelled = true; };
+  }, [reviewJobId]);
 
   useEffect(() => {
     if (!reviewJobId || stagedCourses.length === 0) return;
+    let cancelled = false;
+    setBulkFixJob((current) => current?.sourceJobId === reviewJobId ? current : null);
     const universityId = stagedCourses[0]?.universityId;
     if (!universityId) return;
     fetch(`/api/scrape/staged/fix-jobs?universityId=${universityId}&sourceJobId=${encodeURIComponent(reviewJobId)}`, {
@@ -2687,7 +2818,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     })
       .then((res) => res.ok ? res.json() : null)
       .then((job: BulkFixJob | null) => {
-        if (job?.jobId && job.status) {
+        if (!cancelled && job?.jobId && job.status && job.sourceJobId === reviewJobId) {
           setBulkFixJob(job);
           localStorage.setItem("activeBulkFixJob", job.jobId);
           if (["queued", "running"].includes(job.status)) {
@@ -2697,6 +2828,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         }
       })
       .catch(() => {});
+    return () => { cancelled = true; };
   }, [reviewJobId, stagedCourses.length]);
 
   useEffect(() => {
@@ -2713,7 +2845,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         setFixProgress({ completed: job.processed, total: job.total });
         if (!["queued", "running"].includes(job.status)) {
           window.clearInterval(timer);
-          await openCompletedFixResults(job, fixAnalysis?.issues ?? []);
+          await openCompletedFixResults(job);
           setFixingSelected(false);
           setFixProgress(null);
           setShowFixPreviewDialog(false);
@@ -3219,8 +3351,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
               <span>{bulkFixJob.queued} queued</span>
               <span>{bulkFixJob.running} running</span>
-              <span className="text-green-700">{bulkFixJob.completed} completed</span>
-              <span>{bulkFixJob.noProgress} no progress</span>
+              <span className="text-green-700">{bulkFixJob.completed} {bulkFixJob.smart ? "with issues resolved" : "completed"}</span>
+              <span>{bulkFixJob.noProgress} {bulkFixJob.smart ? "attempted unchanged" : "no progress"}</span>
+              {bulkFixJob.smart && <span>{bulkFixJob.notAttempted ?? 0} not attempted · {bulkFixJob.skipped ?? 0} skipped · {bulkFixJob.alreadyResolved ?? 0} already resolved</span>}
               <span className="text-red-700">{bulkFixJob.failed} failed</span>
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
@@ -3400,7 +3533,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                   }
                 >
                   {(fixingSelected || analyzingFix) ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}
-                  Fix ({selectedIds.size})
+                  Smart Fix ({selectedIds.size})
                 </Button>
                 <Button
                   size="sm"
@@ -3463,8 +3596,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                 <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
                   <span>{bulkFixJob.queued} queued</span>
                   <span>{bulkFixJob.running} running</span>
-                  <span className="text-green-700">{bulkFixJob.completed} completed</span>
-                  <span className="text-gray-600">{bulkFixJob.noProgress} no progress</span>
+                  <span className="text-green-700">{bulkFixJob.completed} {bulkFixJob.smart ? "with issues resolved" : "completed"}</span>
+                  <span className="text-gray-600">{bulkFixJob.noProgress} {bulkFixJob.smart ? "attempted unchanged" : "no progress"}</span>
+                  {bulkFixJob.smart && <span>{bulkFixJob.notAttempted ?? 0} not attempted · {bulkFixJob.skipped ?? 0} skipped · {bulkFixJob.alreadyResolved ?? 0} already resolved</span>}
                   <span className="text-red-700">{bulkFixJob.failed} failed</span>
                 </div>
                 {bulkFixJob.errorMessage && (
@@ -4162,7 +4296,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
           <DialogHeader className="shrink-0 pr-6">
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-blue-600" />
-              Review Before Fixing
+              Review Before Smart Fix
             </DialogTitle>
             <DialogDescription>
               Review the pending re-extraction action before applying it to the selected courses.
@@ -4211,14 +4345,14 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                   };
                   return (
                     <p className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
-                      The repair will verify all unresolved requirements: {requirementFields.map((field) => labels[field] ?? field).join(", ")}.
+                      Selected requirement fields: {requirementFields.map((field) => labels[field] ?? field).join(", ")}. Unsupported automatic checks will be reported separately.
                     </p>
                   );
                 })()}
               </div>
 
               <div className="text-sm text-muted-foreground border-t pt-3">
-                <strong>Action:</strong> Re-extract {fixAnalysis.courses_with_url} of {fixAnalysis.total} courses using current recipe rules. OpenAI will attempt to fill missing fields and retry unresolved fee, location, intake, or duration once.
+                <strong>Action:</strong> Smart Fix checks selected issues against saved official course sources and current extraction rules. Where configured, it can refresh central fee and English-requirement evidence. It does not search the general web. Unsupported checks and unavailable evidence are reported separately. Review changes before publishing.
               </div>
 
               <div className="border-t pt-3 space-y-3">
@@ -4278,33 +4412,14 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                   <div>Background Fix progress: <strong>{fixProgress.completed} of {fixProgress.total}</strong> processed.</div>
                   {bulkFixJob && (
                     <div className="mt-1 text-xs">
-                      {bulkFixJob.queued} queued · {bulkFixJob.running} running · {bulkFixJob.completed} completed · {bulkFixJob.noProgress} no progress · {bulkFixJob.failed} failed
+                      {bulkFixJob.queued} queued · {bulkFixJob.running} running · {bulkFixJob.completed} {bulkFixJob.smart ? "with issues resolved" : "completed"} · {bulkFixJob.noProgress} {bulkFixJob.smart ? "attempted unchanged" : "no progress"} · {bulkFixJob.failed} failed
+                      {bulkFixJob.smart && ` · ${bulkFixJob.notAttempted ?? 0} not attempted`}
                     </div>
                   )}
                   <div className="mt-1 text-xs">You can close this page. The repair will keep running.</div>
                 </div>
               )}
 
-              {fixAnalysis.issues.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Expected Improvement</p>
-                  <div className="space-y-2.5">
-                    {fixAnalysis.issues.slice(0, 4).map(issue => (
-                      <div key={issue.field} className="space-y-1">
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>{issue.label.replace("Missing ", "")}</span>
-                          <span>{issue.current_pct}% → ~{issue.expected_fill_pct}% complete</span>
-                        </div>
-                        <div className="h-2 rounded-full bg-muted overflow-hidden flex">
-                          <div className="h-full bg-green-500 rounded-l-full transition-all" style={{ width: `${issue.current_pct}%` }} />
-                          <div className="h-full bg-green-200 transition-all" style={{ width: `${Math.max(0, issue.expected_fill_pct - issue.current_pct)}%` }} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2 italic">Estimates based on typical fill rates. Actual results vary by university.</p>
-                </div>
-              )}
             </div>
           )}
           <DialogFooter className="shrink-0 gap-2 border-t bg-background pt-4 sm:gap-0">
@@ -4322,7 +4437,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
               {fixingSelected ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
               {fixingSelected && fixProgress
                 ? `Fixing ${fixProgress.completed}/${fixProgress.total}`
-                : `Confirm Fix (${fixAnalysis?.total ?? 0})`}
+                : `Confirm Smart Fix (${fixAnalysis?.total ?? 0})`}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -4330,7 +4445,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
 
       {/* ── Fix Selected: Results Dialog ────────────────────────────────────── */}
       <Dialog open={showFixResultsDialog} onOpenChange={(o) => { if (!o) setShowFixResultsDialog(false); }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-blue-600" />
@@ -4344,7 +4459,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             <div className="space-y-4">
               <div className="bg-muted/50 rounded-lg p-3 flex items-center justify-between text-sm">
                 <div className="flex items-center gap-3">
-                  <span className="font-medium">Processed {fixResults.total - fixResults.errors} of {fixResults.total}</span>
+                  <span className="font-medium">Processed {fixResults.smart ? fixResults.total : fixResults.total - fixResults.errors} of {fixResults.total}</span>
                   {fixResults.skipped > 0 && <span className="text-muted-foreground">· {fixResults.skipped} skipped</span>}
                   {fixResults.errors > 0 && <span className="text-red-600">· {fixResults.errors} failed</span>}
                 </div>
@@ -4363,11 +4478,25 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
 
               {getFixResultHeading(fixResults) === "No progress" && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                  The requested fields are still missing. Other metadata or source changes did not fix the selected issues.
+                  {fixResults.smart
+                    ? "No selected issue resolution was verified. See the grouped reasons below for unchanged, skipped or already-resolved work."
+                    : "The requested fields are still missing. Other metadata or source changes did not fix the selected issues."}
                 </div>
               )}
 
-              {fixResults.noProgressResults.length > 0 && (
+              {fixResults.smart && (
+                <SmartFixDetails
+                  result={fixResults}
+                  onReport={reviewJobId && bulkFixJob?.sourceJobId === reviewJobId ? (row) => {
+                    const course = stagedCourses.find((course) => course.id === row.id);
+                    if (!course) return;
+                    setRequirementRecoveryCourses([smartFixReportPrefill(row, course)]);
+                    setShowFixResultsDialog(false);
+                    setRequirementRecoveryRequest((current) => current + 1);
+                  } : undefined}
+                />
+              )}
+              {!fixResults.smart && fixResults.noProgressResults.length > 0 && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">No progress</p>
                   <div className="mt-2 space-y-1 text-sm text-amber-800">
@@ -4383,7 +4512,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                 </div>
               )}
 
-              {fixResults.failedResults.length > 0 && (
+              {!fixResults.smart && fixResults.failedResults.length > 0 && (
                 <div className="rounded-lg border border-red-200 bg-red-50 p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-red-800">Failed</p>
                   <div className="mt-2 space-y-1 text-sm text-red-800">
@@ -4446,7 +4575,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                             <tr key={before.field} className={idx > 0 ? "border-t" : ""}>
                               <td className="px-3 py-2 text-xs">{FIX_FIELD_LABELS[before.field] ?? before.label}</td>
                               <td className="text-center px-3 py-2 text-xs text-red-600">{before.missing} missing</td>
-                              <td className="text-center px-3 py-2 text-xs text-green-700">{afterMissing} missing</td>
+                              <td className="text-center px-3 py-2 text-xs text-green-700">{fixResults.afterAnalysisComplete ? `${afterMissing} missing` : "Not verified"}</td>
                               <td className="text-center px-3 py-2 text-xs font-medium">
                                 {improvement > 0 ? (
                                   <span className="text-green-600">−{improvement} ✓</span>
