@@ -5225,8 +5225,11 @@ async def staged_approve(
     except HTTPException:
         raise
     except Exception as exc:
-        await db.rollback()
         log.exception("Approval precheck failed for staged row %s", sc_id)
+        try:
+            await db.rollback()
+        except Exception:
+            log.exception("Approval precheck rollback failed for staged row %s", sc_id)
         raise HTTPException(status_code=500, detail="Course approval could not be checked; the row remains pending.") from exc
 
     # Promote to the live courses table (creates/updates Course record, sets course_id)
@@ -5248,8 +5251,11 @@ async def staged_approve(
         # must never become approved through the legacy fallback.
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
-        await db.rollback()
         log.exception("Course promotion failed for staged row %s", sc_id)
+        try:
+            await db.rollback()
+        except Exception:
+            log.exception("Course promotion rollback failed for staged row %s", sc_id)
         raise HTTPException(status_code=500, detail="Course publication failed; the row remains pending.") from exc
 
 
