@@ -14,6 +14,20 @@ revision can be run through Alembic Operations without falsely stamping its
 unexecuted ancestors. Advance the ledger only when every intermediate schema
 contract is independently verified present; otherwise retain it until reconciled.
 
+The reverse drift also occurs: a ledger at the expected revision does not
+prove that an earlier unique index exists. Inventory the actual indexes and
+check for duplicate active identities before replacing an index in a release
+migration.
+
+**Why:** A production database at the expected predecessor revision lacked
+the older unique course-review URL index. An unconditional index drop would
+fail the new campus-fee migration before any application update.
+
+**How to apply:** Query pg_indexes and the intended uniqueness grouping
+read-only on the exact production database before a schema release. Make an
+absent old index an explicit, reviewed migration case; still require creating
+the new unique index to fail if existing rows violate its contract.
+
 **Why:** A guarded release found the worker-fencing schema present while the
 migration ledger still described a much older schema. Blindly upgrading the
 whole chain would replay unrelated data and schema transformations.
