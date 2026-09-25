@@ -325,6 +325,49 @@ describe("Scraping repair reviewer", () => {
     expect(fetchMock.mock.calls.some(args => String(args[0]).endsWith("/approve"))).toBe(false);
   });
 
+  it("saves an exact fee option before enabling normal single and bulk approval", async () => {
+    const review = initialReview();
+    const published = [
+      { optionId: "annual-2026", amount: 17500, currency: "GBP", year: 2026, period: "Annual", campus: "London", studyVariant: "Standard", sourceUrl: "https://law.ac.uk/fees", snippet: "Annual 2026" },
+      { optionId: "full-2027", amount: 17500, currency: "GBP", year: 2027, period: "Full Course", campus: "London", studyVariant: "Standard", sourceUrl: "https://law.ac.uk/fees", snippet: "Full course 2027" },
+    ];
+    const extraction = { fee_variants: { status: "range", selected: published.map(o => ({
+      amount: o.amount, currency: o.currency, year: o.year, period: o.period,
+      campus: o.campus, study_variant: o.studyVariant, source_url: o.sourceUrl, snippet: o.snippet,
+    })), options: [] } };
+    review.courses = review.courses.slice(0, 2).map(c => ({
+      ...c, extraction_method: extraction,
+      feeSelection: { snapshotToken: `token-${c.id}`, options: published, selectedOptionId: null },
+    })) as ScrapingInitialReviewState["courses"];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/fee-selection")) {
+        const { optionId } = JSON.parse(String(init?.body));
+        return jsonResponse({ success: true, course: {
+          ...review.courses.find(c => url.includes(`/${c.id}/`)),
+          internationalFee: 17500, currency: "GBP", feeYear: 2027, feeTerm: "Full Course",
+          feeSelection: { snapshotToken: "token-1", options: published, selectedOptionId: optionId },
+        } });
+      }
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ScrapingForTest initialReviewState={review} />);
+    expect(screen.getByRole("button", { name: "Approve (0)" })).toBeTruthy();
+    fireEvent.click(screen.getByTestId("fee-choice-1-full-2027"));
+    expect(screen.getByRole("button", { name: "Approve (0)" })).toBeTruthy();
+    fireEvent.click(screen.getByTestId("save-fee-choice-1"));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Approve (1)" })).toBeTruthy());
+    expect(screen.getByTitle("Cannot approve — fee variant review required")).toBeTruthy(); // second row
+    await userEvent.click(screen.getByRole("button", { name: "Approve (1)" }));
+    await waitFor(() => expect(fetchMock.mock.calls.filter(args => String(args[0]).endsWith("/approve"))).toHaveLength(1));
+    expect(fetchMock.mock.calls.find(args => String(args[0]).endsWith("/approve"))?.[0]).toBe("/api/scrape/staged/1/approve");
+  });
+
   it.each([6.0, 6.5, null])("keeps available IELTS %s visible alongside Unverified", async (score) => {
     const review = initialReview();
     review.courses = [{

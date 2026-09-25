@@ -128,7 +128,8 @@ def decide_eligibility(sc: ScrapedCourse, completeness: CompletenessResult) -> E
     """
     blockers: list[str] = []
     fee_authority = validated_fee_variants(sc)
-    if fee_authority and fee_authority["status"] == "range":
+    from app.services.scraper.fee_selection import unresolved_fee_selection
+    if unresolved_fee_selection(sc):
         blockers.append("international fee campus/award alternatives require review")
     for attr, label in _HARD_BLOCKERS:
         if not _has_value(sc, attr):

@@ -96,8 +96,9 @@ interface Props {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function feeDisplay(c: ReviewStagedCourse) {
-  if (feeVariantAuthority(c)) return <PublishedFeeVariants course={c} id={c.id} />;
+function feeDisplay(c: ReviewStagedCourse, readOnly?: boolean, onUpdated?: (course: ReviewStagedCourse) => void, onRefresh?: () => void) {
+  if (feeVariantAuthority(c)) return <PublishedFeeVariants course={c} id={c.id} readOnly={readOnly}
+    onCourseUpdated={updated => onUpdated?.(updated as ReviewStagedCourse)} onRefresh={onRefresh} />;
   if (c.internationalFee == null || c.internationalFee === "") return null;
   const _CURRENCY_SYMBOLS: Record<string, string> = {
     GBP: "£", USD: "$", EUR: "€", NZD: "NZ$", CAD: "CA$", SGD: "S$",
@@ -833,6 +834,12 @@ function RecoveryPanel({ courseId, readOnly, onAction }: { courseId: number; rea
 // ---------------------------------------------------------------------------
 
 export function ReviewScrapedCoursesTable({ courses, universityName, readOnly, showEvidence, universityId, onRescrape, onCourseUpdated }: Props) {
+  const [updatedCourses, setUpdatedCourses] = useState<Record<number, ReviewStagedCourse>>({});
+  useEffect(() => setUpdatedCourses({}), [courses]);
+  const handleFeeUpdated = (updated: ReviewStagedCourse) => {
+    setUpdatedCourses(prev => ({ ...prev, [updated.id]: updated }));
+    onCourseUpdated?.();
+  };
   const [rescraping, setRescraping] = useState<Set<number>>(new Set());
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [recoveryOpen, setRecoveryOpen] = useState<Set<number>>(new Set());
@@ -1027,7 +1034,7 @@ export function ReviewScrapedCoursesTable({ courses, universityName, readOnly, s
                       })() : <span className="text-gray-300">-</span>}
                     </td>
                     <td className="p-2 text-right font-medium whitespace-nowrap align-top">
-                      {feeDisplay(course) ?? <MissingBadge title="Missing international fee" />}
+                      {feeDisplay(updatedCourses[course.id] ?? course, readOnly, handleFeeUpdated, onCourseUpdated) ?? <MissingBadge title="Missing international fee" />}
                     </td>
                     <td className="p-2 text-center align-top">
                       {course.ieltsOverall != null && course.ieltsOverall !== "" ? (

@@ -76,7 +76,10 @@ async def approve_scraped_course(
     sc = await db.get(ScrapedCourse, sc_id)
     if not sc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
-    result = await _approve(db, sc, actor=user.get("email", "admin"))
+    try:
+        result = await _approve(db, sc, actor=user.get("email", "admin"))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return result
 
 

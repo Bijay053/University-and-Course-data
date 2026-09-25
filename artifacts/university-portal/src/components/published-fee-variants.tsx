@@ -1,9 +1,28 @@
+import { useEffect, useState } from "react";
+
+export type FeeSelection = {
+  snapshotToken: string;
+  options: Array<{
+    optionId: string;
+    amount: number;
+    currency: string;
+    year: number;
+    period: string | null;
+    campus: string;
+    studyVariant: string;
+    sourceUrl: string;
+    snippet: string;
+  }>;
+  selectedOptionId: string | null;
+};
+
 /** Persisted scraper authority, not an inferred scalar fee. */
 export type FeeVariantCarrier = {
   feeVariants?: unknown;
   fee_variants?: unknown;
   extractionMethod?: unknown;
   extraction_method?: unknown;
+  feeSelection?: FeeSelection | null;
 };
 
 type FeeOption = {
@@ -38,7 +57,10 @@ function validOption(value: unknown): value is FeeOption {
 
 export function feeVariantNeedsReview(course: FeeVariantCarrier) {
   const authority = feeVariantAuthority(course);
-  return !!authority && (authority.status !== "uniform" || !feeVariantSummary(course));
+  if (!authority) return false;
+  if (authority.status === "uniform" && !!feeVariantSummary(course)) return false;
+  return !course.feeSelection?.selectedOptionId
+    || !course.feeSelection.options.some(o => o.optionId === course.feeSelection?.selectedOptionId);
 }
 
 const money = (amount: number) => `£${amount.toLocaleString("en-GB", { maximumFractionDigits: 2 })}`;
@@ -70,7 +92,55 @@ function safeSource(value: string): string | undefined {
   } catch { return undefined; }
 }
 
-export function PublishedFeeVariants({ course, id }: { course: FeeVariantCarrier; id: number | string }) {
+export function PublishedFeeVariants({ course, id, readOnly = false, onCourseUpdated, onRefresh }: {
+  course: FeeVariantCarrier; id: number | string; readOnly?: boolean;
+  onCourseUpdated?: (course: FeeVariantCarrier & { id: number }) => void;
+  onRefresh?: () => void | Promise<unknown>;
+}) {
+  const selection = course.feeSelection;
+  const [chosenId, setChosenId] = useState<string | null>(selection?.selectedOptionId ?? null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
+  useEffect(() => {
+    setChosenId(selection?.selectedOptionId ?? null);
+    setError(null);
+    setConfirmed(false);
+  }, [selection?.snapshotToken, selection?.selectedOptionId]);
+  const save = async () => {
+    if (!selection || !chosenId || saving || chosenId === selection.selectedOptionId) return;
+    setSaving(true);
+    setError(null);
+    setConfirmed(false);
+    try {
+      const res = await fetch(`/api/scrape/staged/${id}/fee-selection`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ snapshotToken: selection.snapshotToken, optionId: chosenId }),
+      });
+      if (!res.ok) {
+        let message = `Unable to save fee choice (${res.status}).`;
+        try {
+          const body = await res.json();
+          message = typeof body.detail === "string" ? body.detail : message;
+        } catch { /* keep the HTTP error */ }
+        if (res.status === 409) {
+          message += " Fee options changed. Refresh and choose again.";
+          await onRefresh?.();
+        }
+        setError(message);
+        return;
+      }
+      const body = await res.json() as { success?: boolean; course?: FeeVariantCarrier & { id: number } };
+      if (!body.success || !body.course) throw new Error("Server did not confirm the saved fee choice.");
+      onCourseUpdated?.(body.course);
+      setConfirmed(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save fee choice.");
+    } finally {
+      setSaving(false);
+    }
+  };
   const authority = feeVariantAuthority(course);
   if (!authority) return null;
   const summary = feeVariantSummary(course);
@@ -98,6 +168,43 @@ export function PublishedFeeVariants({ course, id }: { course: FeeVariantCarrier
       {(needsReview || !summary) && (
         <div className="text-xs text-amber-700" data-testid={`fee-review-${id}`}>
           {summary ? "Known alternatives — variant review required" : "No applicable fee confirmed — review required"}
+        </div>
+      )}
+      {selection?.selectedOptionId && (
+        <div className="text-xs text-green-700" data-testid={`fee-saved-${id}`}>
+          Saved choice: {selection.options.find(o => o.optionId === selection.selectedOptionId)?.campus ?? "Selected option"}
+          {" · "}{selection.options.find(o => o.optionId === selection.selectedOptionId)?.year}
+          {" · "}{selection.options.find(o => o.optionId === selection.selectedOptionId)?.period}
+        </div>
+      )}
+      {!readOnly && selection && selection.options.length > 0 && (
+        <div className="mt-2 text-xs" data-testid={`fee-selection-${id}`}>
+          <div className="font-semibold">Choose a published fee before approval</div>
+          <div role="radiogroup" aria-label="Published fee options">
+            {selection.options.map((o) => (
+              <label key={o.optionId} className="flex items-start gap-1 py-1">
+                <input type="radio" name={`fee-choice-${id}`} value={o.optionId}
+                  data-testid={`fee-choice-${id}-${o.optionId}`}
+                  checked={chosenId === o.optionId} disabled={saving}
+                  onChange={() => { setChosenId(o.optionId); setConfirmed(false); }} />
+                <span>{money(o.amount)} {o.currency} · {o.campus} · {o.studyVariant} · {o.year} · {periodLabel(o.period)}
+                  <span className="block text-slate-500">{o.snippet}</span>
+                  {safeSource(o.sourceUrl) && <a href={o.sourceUrl} target="_blank" rel="noopener noreferrer"
+                    onClick={e => e.stopPropagation()} data-testid={`fee-choice-source-${id}-${o.optionId}`}
+                    className="text-blue-600 underline break-all">{o.sourceUrl}</a>}
+                </span>
+              </label>
+            ))}
+          </div>
+          <button type="button" onClick={save} disabled={saving || !chosenId || chosenId === selection.selectedOptionId}
+            data-testid={`save-fee-choice-${id}`} className="border rounded px-2 py-1 bg-blue-600 text-white disabled:opacity-50">
+            {saving ? "Saving…" : "Save fee choice"}
+          </button>
+          {confirmed && <div className="text-green-700" data-testid={`fee-confirmation-${id}`}>Fee choice saved.</div>}
+          {error && <div role="alert" className="text-red-700" data-testid={`fee-error-${id}`}>
+            {error} <button type="button" onClick={() => void onRefresh?.()} data-testid={`refresh-fee-${id}`}
+              className="underline">Refresh fee options</button>
+          </div>}
         </div>
       )}
       <details className="text-xs mt-1">

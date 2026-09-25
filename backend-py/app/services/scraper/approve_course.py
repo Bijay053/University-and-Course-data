@@ -121,6 +121,14 @@ async def approve_scraped_course(
     on ``None.lower()``, which then poisoned the SQLAlchemy session and made
     every subsequent row in a batch fail (Week 5: Charles Sturt promotion gap).
     """
+    from app.services.scraper.fee_selection import unresolved_fee_selection
+    if isinstance(getattr(sc, "extraction_method", None), dict) and sc.extraction_method.get("fee_variants"):
+        sc = (await db.execute(
+            select(ScrapedCourse).where(ScrapedCourse.id == sc.id)
+            .with_for_update().execution_options(populate_existing=True)
+        )).scalar_one()
+    if unresolved_fee_selection(sc):
+        raise ValueError("Select a current published fee option before approval")
     if not sc.course_name or not sc.course_name.strip():
         raise ValueError(
             f"scraped_course id={sc.id} has empty course_name; cannot promote"

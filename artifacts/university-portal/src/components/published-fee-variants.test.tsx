@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { PublishedFeeVariants, feeVariantSummary, feeVariantNeedsReview } from "./published-fee-variants";
 import { ReviewScrapedCoursesTable, type ReviewStagedCourse } from "./review-scraped-courses-table";
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 const source = "https://www.law.ac.uk/study/postgraduate/business/msc-healthcare-management/";
 const option = (amount: number, campus: string, year = 2026, period = "Full Course") => ({
   amount, currency: "GBP", campus, year, period, study_variant: "Standard",
@@ -15,6 +15,15 @@ const authority = (selected = [option(17500, "Outside London"), option(19050, "L
   selected, options: [...selected, option(21000, "London", 2027)],
 });
 const carrier = { extractionMethod: { fee_variants: authority() } };
+const selection = (selectedOptionId: string | null = null) => ({
+  snapshotToken: "snapshot-2026",
+  selectedOptionId,
+  options: [
+    { optionId: "london-annual", amount: 17500, currency: "GBP", campus: "London", studyVariant: "Standard", year: 2026, period: "Annual", sourceUrl: source, snippet: "2026 annual" },
+    { optionId: "london-full", amount: 17500, currency: "GBP", campus: "London", studyVariant: "Standard", year: 2026, period: "Full Course", sourceUrl: source, snippet: "2026 full course" },
+    { optionId: "london-2027", amount: 17500, currency: "GBP", campus: "London", studyVariant: "Standard", year: 2027, period: "Annual", sourceUrl: source, snippet: "2027 annual" },
+  ],
+});
 const course = (extra: object = {}) => ({
   id: 41, courseName: "MSc Healthcare Management", internationalFee: null,
   ...carrier, ...extra,
@@ -88,5 +97,44 @@ describe("persisted published fee alternatives", () => {
     render(<PublishedFeeVariants course={{ feeVariants: fees }} id="unsafe" />);
     expect(screen.queryByTestId("fee-source-unsafe-selected-0")).toBeNull();
     expect(feeVariantSummary({ feeVariants: { ...fees, selected: [{ amount: "17500" }] } })).toBeNull();
+  });
+
+  it("requires an explicit option ID even when campus and amount are equal; persists on server confirmation", async () => {
+    const pending = course({ feeSelection: selection() });
+    expect(feeVariantNeedsReview(pending)).toBe(true);
+    const saved = course({ feeSelection: selection("london-full") });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ success: true, course: saved }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const updated = vi.fn();
+    const { rerender } = render(<PublishedFeeVariants course={pending} id={41} onCourseUpdated={updated} />);
+    expect(screen.queryByTestId("fee-confirmation-41")).toBeNull();
+    fireEvent.click(screen.getByTestId("fee-choice-41-london-full"));
+    expect(screen.queryByTestId("fee-confirmation-41")).toBeNull();
+    fireEvent.click(screen.getByTestId("save-fee-choice-41"));
+    await waitFor(() => expect(updated).toHaveBeenCalledWith(saved));
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ snapshotToken: "snapshot-2026", optionId: "london-full" });
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/scrape/staged/41/fee-selection");
+    expect(screen.getByTestId("fee-confirmation-41")).toBeTruthy();
+    rerender(<PublishedFeeVariants course={saved} id={41} onCourseUpdated={updated} />);
+    expect(screen.getByTestId("fee-saved-41").textContent).toContain("Full Course");
+    expect(feeVariantNeedsReview(saved)).toBe(false);
+    expect(screen.getByTestId("save-fee-choice-41").hasAttribute("disabled")).toBe(true);
+  });
+
+  it("does not confirm stale failures, refreshes and requires another deliberate choice", async () => {
+    const refresh = vi.fn();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 409, json: async () => ({ detail: "Stale snapshot" }) }));
+    render(<PublishedFeeVariants course={course({ feeSelection: selection() })} id={41} onRefresh={refresh} />);
+    fireEvent.click(screen.getByTestId("fee-choice-41-london-2027"));
+    fireEvent.click(screen.getByTestId("save-fee-choice-41"));
+    await waitFor(() => expect(screen.getByTestId("fee-error-41").textContent).toContain("Stale snapshot"));
+    expect(refresh).toHaveBeenCalled();
+    expect(screen.queryByTestId("fee-confirmation-41")).toBeNull();
+  });
+
+  it("keeps historic review readonly, and leaves uniform fees eligible without a choice", () => {
+    render(<ReviewScrapedCoursesTable courses={[course({ feeSelection: selection() })]} readOnly />);
+    expect(screen.queryByTestId("save-fee-choice-41")).toBeNull();
+    expect(feeVariantNeedsReview({ feeVariants: { ...authority([option(20600, "All campuses")]), status: "uniform" } })).toBe(false);
   });
 });

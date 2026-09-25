@@ -152,3 +152,4 @@
 - [Resume count semantics](resume-count-semantics.md) — settled URLs are not imports; same-child rows must not be added twice during database reconciliation.
 - [Settled URL outcome semantics](settled-url-outcome-semantics.md) — completed URL checkpoints include errors; recovery must use outcome provenance before resolving or suppressing work.
 - [Pytest asyncio isolation](pytest-asyncio-isolation.md) — session-loop defaults can hide pool reuse failures; loop-independent suites need test-owned connections.
+- [Evidence proof persistence](evidence-proof-persistence.md) — test authority after real persistence; truncated display excerpts cannot prove omitted alternatives.

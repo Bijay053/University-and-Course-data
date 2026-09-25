@@ -266,6 +266,8 @@ def _staged_row_to_dict(r) -> dict:
     d["studyMode"] = r.study_mode
     d["feeTerm"] = r.fee_term
     d["feeYear"] = r.fee_year
+    from app.services.scraper.fee_selection import fee_selection
+    d["feeSelection"] = fee_selection(r)
     from app.services.scraper.requirement_status import public_requirement_status
 
     # Additive API contract. Internal proof fingerprints stay server-side.
@@ -5042,6 +5044,108 @@ async def staged_dedup(
     return {"ok": True, "deleted": result.rowcount or 0}
 
 
+class _FeeSelectionBody(BaseModel):
+    snapshotToken: str = Field(min_length=1, max_length=128)
+    optionId: str = Field(min_length=1, max_length=128)
+
+    model_config = {"extra": "forbid"}
+
+
+@router.post("/staged/{sc_id}/fee-selection")
+async def staged_fee_selection(
+    sc_id: int,
+    body: _FeeSelectionBody,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict, Depends(require_permission("staged.approve"))],
+) -> dict:
+    from datetime import datetime, timezone
+    from app.models import ScrapedCourse, ScrapedFieldEvidence, CourseAuditLog
+    from app.services.scraper.fee_selection import FIELDS, digest, fee_selection, source_options
+    from app.services.scraper.extractors.ulaw_fees import METHOD
+    from app.services.scraper.completeness import compute_completeness, decide_eligibility
+
+    # Lock before validation, refreshing any identity-map copy. A competing
+    # selection waits, then sees the new token; it cannot overwrite it.
+    sc = (await db.execute(select(ScrapedCourse).where(ScrapedCourse.id == sc_id)
+          .with_for_update().execution_options(populate_existing=True))).scalar_one_or_none()
+    if sc is None:
+        raise HTTPException(404, "Staged course not found")
+    if sc.status != "pending" or sc.course_id:
+        raise HTTPException(409, "Only unpublished pending courses can select fees")
+    state = fee_selection(sc)
+    if not state:
+        raise HTTPException(422, "No valid source-backed fee options")
+    if body.snapshotToken != state["snapshotToken"]:
+        raise HTTPException(409, "Fee snapshot changed; refresh before selecting")
+    option = next((o for o in source_options(sc) if digest(o) == body.optionId), None)
+    if option is None:
+        raise HTTPException(422, "Option does not belong to the current fee snapshot")
+    evidence = (await db.execute(select(ScrapedFieldEvidence).where(
+        ScrapedFieldEvidence.scraped_course_id == sc_id,
+        ScrapedFieldEvidence.field_key == "international_fee",
+        ScrapedFieldEvidence.extraction_method == METHOD,
+    ))).scalars().all()
+    metadata = dict(sc.extraction_method)
+    proof = None
+    for item in evidence:
+        try:
+            if (item.source_url == sc.course_website
+                    and json.loads(getattr(item, "raw_text", None) or item.snippet or "") == metadata["fee_variants"]):
+                proof = item
+                break
+        except (ValueError, TypeError):
+            continue
+    if proof is None:
+        # Before full raw_text persistence, the structured evidence was cut at
+        # 1000 characters. A matching prefix is NOT proof of the hidden options.
+        # Re-fetch and re-extract the official course, requiring exact agreement
+        # with the current stored snapshot before repairing legacy evidence.
+        legacy = next((item for item in evidence if
+            item.source_url == sc.course_website
+            and not getattr(item, "raw_text", None)
+            and isinstance(item.snippet, str) and len(item.snippet) == 1000
+        ), None)
+        if legacy is not None:
+            from app.services.scraper.extractors.ulaw_fees import recover_course_fee_only
+            recovered = await recover_course_fee_only(sc.course_website)
+            fresh = ((recovered or {}).get("payload") or {}).get("extraction_method") or {}
+            if fresh.get("fee_variants") == metadata["fee_variants"]:
+                full = json.dumps(fresh["fee_variants"], ensure_ascii=False)
+                # Legacy excerpts were produced by this same serializer.
+                if full[:1000] == legacy.snippet:
+                    legacy.raw_text = full
+                    proof = legacy
+    if proof is None:
+        raise HTTPException(422, "Current source evidence is missing or no longer matches; re-extract this course before selecting a fee")
+    before = {key: getattr(sc, key) for key in FIELDS}
+    after = dict(zip(FIELDS, (option["amount"], option["currency"], option["year"], option["period"])))
+    choice = {
+        "optionId": body.optionId,
+        "sourceFingerprint": digest({"url": sc.course_website, "variants": metadata["fee_variants"]}),
+        "revision": str(uuid.uuid4()), "actor": user.get("email") or str(user.get("id")),
+        "selectedAt": datetime.now(timezone.utc).isoformat(),
+        "sourceEvidenceId": proof.id,
+    }
+    metadata["fee_selection"] = choice
+    sc.extraction_method = metadata
+    for key, value in after.items():
+        setattr(sc, key, value)
+    comp = compute_completeness(sc)
+    decision = decide_eligibility(sc, comp)
+    sc.completeness = comp.score
+    sc.eligibility_status = decision.status
+    sc.eligibility_reason = decision.reason
+    db.add(CourseAuditLog(
+        scraped_course_id=sc.id, source_evidence_id=proof.id,
+        field_key="international_fee", action="fee_option_selected",
+        old_value=json.dumps(before), new_value=json.dumps({"tuple": after, "selection": choice, "option": option}),
+        reason="Reviewer selected a published source fee option", actor=choice["actor"],
+    ))
+    await db.commit()
+    await db.refresh(sc)
+    return {"success": True, "course": _staged_row_to_dict(sc)}
+
+
 @router.post("/staged/{sc_id}/approve")
 async def staged_approve(
     sc_id: int,
@@ -5061,6 +5165,10 @@ async def staged_approve(
     sc = await db.get(ScrapedCourse, sc_id)
     if not sc:
         raise HTTPException(status_code=404, detail="Not found")
+
+    from app.services.scraper.fee_selection import unresolved_fee_selection
+    if unresolved_fee_selection(sc):
+        raise HTTPException(422, "Select a current published fee option before approval")
 
     # ── Data-integrity gate ────────────────────────────────────────────────
     # Block approval when the course is clearly incomplete: no fee AND no
@@ -5115,6 +5223,10 @@ async def staged_approve(
             "confidence": _cg["score"],
             "course_id": result.get("course_id"),
         }
+    except ValueError as exc:
+        # Validation failures (including a concurrent fee-source change)
+        # must never become approved through the legacy fallback.
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
         await db.rollback()
         if isinstance(exc, ValueError):

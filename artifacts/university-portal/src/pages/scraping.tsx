@@ -3018,20 +3018,49 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     } catch {}
   };
 
+  const refreshFeeCourse = async (id: number) => {
+    if (!reviewJobId) return;
+    const res = await fetch(`/api/scrape/staged/${reviewJobId}`, { credentials: "include", cache: "no-store" });
+    if (!res.ok) throw new Error(await getFetchErrorMessage(res));
+    const payload = await readResponseJson<StagedCourse[] | { courses: StagedCourse[] }>(res);
+    const courses = Array.isArray(payload) ? payload : payload?.courses ?? [];
+    const fresh = courses.find(c => c.id === id);
+    if (!fresh) throw new Error("Course is no longer pending review.");
+    const normalized = normalizeStagedCourse(fresh);
+    setStagedCourses(prev => prev.map(c => c.id === id ? normalized : c));
+    setEditingCourse(prev => prev?.id === id ? normalized : prev);
+  };
+
+  const handleFeeCourseUpdated = (updated: FeeVariantCarrier & { id: number }) => {
+    const course = normalizeStagedCourse(updated as StagedCourse);
+    setStagedCourses(prev => prev.map(c => c.id === course.id ? course : c));
+    setEditingCourse(prev => prev?.id === course.id ? { ...prev, ...course } : prev);
+    void refreshFeeCourse(course.id).catch(err => {
+      toast({ title: "Fee saved, but refresh failed", description: String(err), variant: "destructive" });
+    });
+    fetchJobs();
+  };
+
   const handleSaveEdit = async () => {
     if (!editingCourse) return;
+    const feeProtected = !!feeVariantAuthority(editingCourse);
+    const original = stagedCourses.find(c => c.id === editingCourse.id);
+    const editPayload = feeProtected && original
+      ? { ...editingCourse, internationalFee: original.internationalFee, currency: original.currency,
+          feeTerm: original.feeTerm, feeYear: original.feeYear, feeSelection: original.feeSelection }
+      : editingCourse;
     try {
       const res = await fetch(`/api/scrape/staged/${editingCourse.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editingCourse),
+        body: JSON.stringify(editPayload),
       });
       if (!res.ok) {
         toast({ title: "Save failed", description: await getFetchErrorMessage(res), variant: "destructive" });
         return;
       }
       const data = await readResponseJson<{ course?: StagedCourse }>(res);
-      const updatedCourse = data?.course ?? editingCourse;
+      const updatedCourse = data?.course ?? editPayload;
       setStagedCourses((prev) => prev.map((c) => c.id === editingCourse.id ? updatedCourse : c));
       setEditingCourse(null);
     } catch {}
@@ -4007,7 +4036,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                           {course.duration ? `${course.duration} ${course.durationTerm || ""}` : <span className="text-gray-300">-</span>}
                         </td>
                         <td className="p-2 text-right font-medium whitespace-nowrap">
-                          {feeVariantAuthority(course) ? <PublishedFeeVariants course={course} id={course.id} /> : course.internationalFee ? (() => {
+                          {feeVariantAuthority(course) ? <PublishedFeeVariants course={course} id={course.id}
+                            onCourseUpdated={handleFeeCourseUpdated} onRefresh={() => refreshFeeCourse(course.id)} /> : course.internationalFee ? (() => {
                             const _CURR_MAP: Record<string, string> = { GBP: "£", USD: "$", EUR: "€", MYR: "RM", NZD: "NZ$", CAD: "CA$", SGD: "S$", AUD: "A$" };
                             const currSym = (course.currency && _CURR_MAP[course.currency]) ? _CURR_MAP[course.currency] : (course.currency ? `${course.currency} ` : "A$");
                             const isFullCourse = (course.feeTerm || "").toLowerCase().includes("full");
@@ -4839,13 +4869,14 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
               </div>
               <div>
                 <label className="text-xs font-medium text-gray-500 mb-1 block">Fee Amount</label>
-                {feeVariantAuthority(editingCourse) && <PublishedFeeVariants course={editingCourse} id={`edit-${editingCourse.id}`} />}
-                <Input type="number" value={editingCourse.internationalFee ?? ""} onChange={(e) => setEditingCourse({ ...editingCourse, internationalFee: e.target.value ? parseFloat(e.target.value) : null })} />
+                 {feeVariantAuthority(editingCourse) && <PublishedFeeVariants course={editingCourse} id={editingCourse.id}
+                   onCourseUpdated={handleFeeCourseUpdated} onRefresh={() => refreshFeeCourse(editingCourse.id)} />}
+                 <Input type="number" disabled={!!feeVariantAuthority(editingCourse)} value={editingCourse.internationalFee ?? ""} onChange={(e) => setEditingCourse({ ...editingCourse, internationalFee: e.target.value ? parseFloat(e.target.value) : null })} />
               </div>
               <div className="flex gap-2">
                 <div className="flex-1">
                   <label className="text-xs font-medium text-gray-500 mb-1 block">Currency</label>
-                  <Select value={editingCourse.currency || ""} onValueChange={(v) => setEditingCourse({ ...editingCourse, currency: v || null })}>
+                   <Select disabled={!!feeVariantAuthority(editingCourse)} value={editingCourse.currency || ""} onValueChange={(v) => setEditingCourse({ ...editingCourse, currency: v || null })}>
                     <SelectTrigger><SelectValue placeholder="Currency" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="AUD">AUD — Australian Dollar</SelectItem>
@@ -4877,7 +4908,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                 </div>
                 <div className="flex-1">
                   <label className="text-xs font-medium text-gray-500 mb-1 block">Fee Term</label>
-                  <Select value={editingCourse.feeTerm || ""} onValueChange={(v) => setEditingCourse({ ...editingCourse, feeTerm: v || null })}>
+                   <Select disabled={!!feeVariantAuthority(editingCourse)} value={editingCourse.feeTerm || ""} onValueChange={(v) => setEditingCourse({ ...editingCourse, feeTerm: v || null })}>
                     <SelectTrigger><SelectValue placeholder="Term" /></SelectTrigger>
                     <SelectContent className="w-[24rem] max-w-[calc(100vw-1rem)]">
                       <div className="grid grid-cols-2 gap-x-1">

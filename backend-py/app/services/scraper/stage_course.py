@@ -238,6 +238,12 @@ async def _persist_evidence(
                 "page_type": ev.get("page_type"),
                 "extraction_method": (ev.get("method") or "unknown")[:200],
                 "snippet": (ev.get("snippet") or None) and str(ev["snippet"])[:1000],
+                # ULaw's structured authority contains every campus/year tuple.
+                # Keep the UI excerpt bounded, but never truncate source proof.
+                "raw_text": (
+                    str(ev["snippet"]) if ev.get("method") == "fee.ulaw_course_authority"
+                    and field_key == "international_fee" and ev.get("snippet") else None
+                ),
                 "confidence": (
                     (lambda c: None if not math.isfinite(c) else c)(float(ev["confidence"]))
                     if isinstance(ev.get("confidence"), (int, float))
