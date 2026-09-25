@@ -57,16 +57,16 @@ def test_proven_campus_groups_and_equal_fee():
     row = row_values()
     groups, reason = plan_campus_fees(row)
     assert reason is None
-    assert [(g["amount"], g["locations"]) for g in groups] == [
-        (19050, ["London"]), (17500, ["Birmingham", "Leeds", "Manchester"]),
-    ]
+    assert {(g["amount"], tuple(g["locations"])) for g in groups} == {
+        (19050, ("London",)), (17500, ("Birmingham",)), (17500, ("Leeds",)), (17500, ("Manchester",)),
+    }
     same = deepcopy(row)
     authority = same["extraction_method"]["fee_variants"]
     for option in authority["selected"]:
         option["amount"] = 20600
     authority.update(status="uniform", international_fee=20600)
     same["international_fee"] = 20600
-    assert len(plan_campus_fees(same)[0]) == 1
+    assert len(plan_campus_fees(same)[0]) == 4
 
 
 def test_single_applicable_price_requires_exact_course_campus_authority():
@@ -183,13 +183,15 @@ async def test_uniform_and_published_rows_are_never_split():
     assert (await split_pending_course(None, row))["status"] == "unchanged"
     assert row.course_name == "MSc Healthcare Management"
     row.status = "pending"
+    row.course_location = "London"
     authority = row.extraction_method["fee_variants"]
     for option in authority["selected"]:
         option["amount"] = 20600
     authority.update(status="uniform", international_fee=20600)
     row.international_fee = 20600
+    authority["selected"] = authority["selected"][:1]
     assert (await split_pending_course(None, row))["status"] == "unchanged"
-    assert row.course_location == "London, Birmingham, Leeds, Manchester"
+    assert row.course_location == "London"
 
 
 @pytest.mark.asyncio
@@ -223,12 +225,12 @@ async def test_real_database_split_approve_rescrape_and_idempotency():
             await persist_staged_row_backup(db, row)
             await db.flush()
             result = await split_campus_fees(_SplitCampusFeesBody(ids=[row.id]), db, {"email": "test-reviewer"})
-            assert result["created"] == 1 and result["split"] == 1
+            assert result["created"] == 3 and result["split"] == 1
             ids = result["results"][0]["courseIds"]
             children = (await db.execute(select(ScrapedCourse).where(ScrapedCourse.id.in_(ids)).order_by(ScrapedCourse.id))).scalars().all()
-            assert len(children) == 2
+            assert len(children) == 4
             assert {c.canonical_course_url for c in children} == {children[0].canonical_course_url}
-            assert len({c.fee_scope_key for c in children}) == 2
+            assert len({c.fee_scope_key for c in children}) == 4
             assert all(c.status == "pending" and validated_fee_variants(c) for c in children)
             assert all(len(c.extraction_method["fee_variants"]["options"]) == 2 for c in children)
             snapshots = (await db.execute(select(PageSnapshot).where(PageSnapshot.scrape_job_id == job_id))).scalars().all()
@@ -243,10 +245,10 @@ async def test_real_database_split_approve_rescrape_and_idempotency():
             repeated = await split_campus_fees(_SplitCampusFeesBody(ids=ids), db, {"email": "test-reviewer"})
             assert repeated["created"] == repeated["split"] == 0
             live = [await approve_scraped_course(db, child, actor="test-reviewer") for child in children]
-            assert len({c["course_id"] for c in live}) == 2
+            assert len({c["course_id"] for c in live}) == 4
             courses = (await db.execute(select(Course).where(Course.university_id == uni.id))).scalars().all()
-            assert {c.course_location for c in courses} == {"London", "Birmingham, Leeds, Manchester"}
-            assert len(courses) == 2
+            assert {c.course_location for c in courses} == {"London", "Birmingham", "Leeds", "Manchester"}
+            assert len(courses) == 4
             fees = (await db.execute(select(Fee).where(Fee.course_id.in_([c.id for c in courses])))).scalars().all()
             assert {fee.international_fee for fee in fees} == {17500, 19050}
             assert all(fee.currency == "GBP" and fee.fee_year == 2026 and fee.fee_term == "Full Course" for fee in fees)
@@ -256,10 +258,10 @@ async def test_real_database_split_approve_rescrape_and_idempotency():
                                         course_name=values["course_name"], payload=payload, evidence=evidence, source_url=URL)
             assert staged.saved, staged.reason
             pending = (await db.execute(select(ScrapedCourse).where(ScrapedCourse.university_id == uni.id, ScrapedCourse.status == "pending"))).scalars().all()
-            assert len(pending) == 2
-            assert {c.course_location for c in pending} == {"London", "Birmingham, Leeds, Manchester"}
+            assert len(pending) == 4
+            assert {c.course_location for c in pending} == {"London", "Birmingham", "Leeds", "Manchester"}
             for child in pending:
                 await approve_scraped_course(db, child, actor="test-reviewer")
-            assert len((await db.execute(select(Course).where(Course.university_id == uni.id))).scalars().all()) == 2
+            assert len((await db.execute(select(Course).where(Course.university_id == uni.id))).scalars().all()) == 4
         await transaction.rollback()
     await engine.dispose()

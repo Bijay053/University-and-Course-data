@@ -1,5 +1,3 @@
-import { useEffect, useState } from "react";
-
 export type FeeSelection = {
   snapshotToken: string;
   options: Array<{
@@ -111,55 +109,11 @@ function safeSource(value: string): string | undefined {
   } catch { return undefined; }
 }
 
-export function PublishedFeeVariants({ course, id, readOnly = false, onCourseUpdated, onRefresh }: {
+export function PublishedFeeVariants({ course, id }: {
   course: FeeVariantCarrier; id: number | string; readOnly?: boolean;
   onCourseUpdated?: (course: FeeVariantCarrier & { id: number }) => void;
   onRefresh?: () => void | Promise<unknown>;
 }) {
-  const selection = course.feeSelection;
-  const [chosenId, setChosenId] = useState<string | null>(selection?.selectedOptionId ?? null);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [confirmed, setConfirmed] = useState(false);
-  useEffect(() => {
-    setChosenId(selection?.selectedOptionId ?? null);
-    setError(null);
-    setConfirmed(false);
-  }, [selection?.snapshotToken, selection?.selectedOptionId]);
-  const save = async () => {
-    if (!selection || !chosenId || saving || chosenId === selection.selectedOptionId) return;
-    setSaving(true);
-    setError(null);
-    setConfirmed(false);
-    try {
-      const res = await fetch(`/api/scrape/staged/${id}/fee-selection`, {
-        method: "POST", credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ snapshotToken: selection.snapshotToken, optionId: chosenId }),
-      });
-      if (!res.ok) {
-        let message = `Unable to save fee choice (${res.status}).`;
-        try {
-          const body = await res.json();
-          message = typeof body.detail === "string" ? body.detail : message;
-        } catch { /* keep the HTTP error */ }
-        if (res.status === 409) {
-          message += " Fee options changed. Refresh and choose again.";
-          await onRefresh?.();
-        }
-        setError(message);
-        return;
-      }
-      const body = await res.json() as { success?: boolean; course?: FeeVariantCarrier & { id: number } };
-      if (!body.success || !body.course) throw new Error("Server did not confirm the saved fee choice.");
-      onCourseUpdated?.(body.course);
-      setConfirmed(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to save fee choice.");
-    } finally {
-      setSaving(false);
-    }
-  };
   const authority = feeVariantAuthority(course);
   if (!authority) return null;
   const summary = feeVariantSummary(course);
@@ -167,6 +121,16 @@ export function PublishedFeeVariants({ course, id, readOnly = false, onCourseUpd
   const options = Array.isArray(authority.options) ? authority.options.filter(validOption) : [];
   const needsReview = feeVariantNeedsReview(course);
   const automaticCampusFees = autoCampusRange(authority);
+  const metadata = record(course.extractionMethod) ?? record(course.extraction_method);
+  const scope = record(metadata?.campus_fee_scope);
+  const scopedLocations = Array.isArray(scope?.locations) && scope.locations.every(location =>
+    typeof location === "string" && location.trim())
+    ? scope.locations as string[] : null;
+  const assignedOption = authority.status === "uniform" && selected.length
+    && selected.every(option => option.amount === selected[0].amount
+      && option.year === selected[0].year && option.period === selected[0].period
+      && option.study_variant === selected[0].study_variant)
+    ? selected[0] : null;
   const renderOption = (option: FeeOption, index: number, section: string) => (
     <li key={`${section}-${index}`} className="border-t pt-2 mt-2" data-testid={`fee-option-${id}-${section}-${index}`}>
       <div className="font-medium">{money(option.amount)} GBP · {option.year} · {periodLabel(option.period)}</div>
@@ -185,48 +149,19 @@ export function PublishedFeeVariants({ course, id, readOnly = false, onCourseUpd
       <div className="text-green-700 font-medium" data-testid={`fee-summary-${id}`}>
         {summary ?? "Published fee unresolved"}
       </div>
+      {assignedOption && (
+        <div className="text-xs text-slate-600" data-testid={`fee-assigned-${id}`}>
+          Applicable to {scopedLocations?.join(", ") ?? [...new Set(selected.map(option => option.campus))].join(", ")}
+          {" · "}{assignedOption.study_variant} · {assignedOption.year} · {periodLabel(assignedOption.period)}
+        </div>
+      )}
       {(needsReview || !summary) && (
         <div className="text-xs text-amber-700" data-testid={`fee-review-${id}`}>
           {automaticCampusFees
             ? "Campus prices differ. Approval checks course-owned campuses and groups verified fees automatically; unverified locations stay pending for review."
-            : summary ? "Known alternatives — variant review required" : "No applicable fee confirmed — review required"}
-        </div>
-      )}
-      {!automaticCampusFees && selection?.selectedOptionId && (
-        <div className="text-xs text-green-700" data-testid={`fee-saved-${id}`}>
-          Saved choice: {selection.options.find(o => o.optionId === selection.selectedOptionId)?.campus ?? "Selected option"}
-          {" · "}{selection.options.find(o => o.optionId === selection.selectedOptionId)?.year}
-          {" · "}{selection.options.find(o => o.optionId === selection.selectedOptionId)?.period}
-        </div>
-      )}
-      {!readOnly && !automaticCampusFees && selection && selection.options.length > 0 && (
-        <div className="mt-2 text-xs" data-testid={`fee-selection-${id}`}>
-          <div className="font-semibold">Choose a published fee before approval</div>
-          <div role="radiogroup" aria-label="Published fee options">
-            {selection.options.map((o) => (
-              <label key={o.optionId} className="flex items-start gap-1 py-1">
-                <input type="radio" name={`fee-choice-${id}`} value={o.optionId}
-                  data-testid={`fee-choice-${id}-${o.optionId}`}
-                  checked={chosenId === o.optionId} disabled={saving}
-                  onChange={() => { setChosenId(o.optionId); setConfirmed(false); }} />
-                <span>{money(o.amount)} {o.currency} · {o.campus} · {o.studyVariant} · {o.year} · {periodLabel(o.period)}
-                  <span className="block text-slate-500">{o.snippet}</span>
-                  {safeSource(o.sourceUrl) && <a href={o.sourceUrl} target="_blank" rel="noopener noreferrer"
-                    onClick={e => e.stopPropagation()} data-testid={`fee-choice-source-${id}-${o.optionId}`}
-                    className="text-blue-600 underline break-all">{o.sourceUrl}</a>}
-                </span>
-              </label>
-            ))}
-          </div>
-          <button type="button" onClick={save} disabled={saving || !chosenId || chosenId === selection.selectedOptionId}
-            data-testid={`save-fee-choice-${id}`} className="border rounded px-2 py-1 bg-blue-600 text-white disabled:opacity-50">
-            {saving ? "Saving…" : "Save fee choice"}
-          </button>
-          {confirmed && <div className="text-green-700" data-testid={`fee-confirmation-${id}`}>Fee choice saved.</div>}
-          {error && <div role="alert" className="text-red-700" data-testid={`fee-error-${id}`}>
-            {error} <button type="button" onClick={() => void onRefresh?.()} data-testid={`refresh-fee-${id}`}
-              className="underline">Refresh fee options</button>
-          </div>}
+            : summary
+              ? "Published alternatives differ by year, billing period, or study route; automatic approval stays pending until the source can be verified."
+              : "No applicable fee confirmed — source review required"}
         </div>
       )}
       <details className="text-xs mt-1">

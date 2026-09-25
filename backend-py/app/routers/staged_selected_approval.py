@@ -82,7 +82,7 @@ async def approve_selected(
                 raise ApprovalValidationError("Only pending courses can be approved.")
             ids = [source_id]
             did_split = False
-            if unresolved_fee_selection(row):
+            if (row.extraction_method or {}).get("fee_variants"):
                 from app.services.scraper.extractors.ulaw_campuses import enrich_course_campuses
                 resolution = await enrich_course_campuses(db, row)
                 if resolution["status"] == "needs_review":

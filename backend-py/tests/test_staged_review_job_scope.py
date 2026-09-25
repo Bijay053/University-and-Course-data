@@ -45,6 +45,27 @@ class _FakeDb:
         return _Rows()
 
 
+def test_job_review_preserves_campus_siblings_but_deduplicates_same_scope(monkeypatch):
+    async def no_op(*args, **kwargs):
+        pass
+
+    rows = [
+        SimpleNamespace(id=i, university_id=42, canonical_course_url="https://uni.test/course",
+                        fee_scope_key=scope, course_name="Same course", auto_publish_status="review")
+        for i, scope in [(144, "london"), (143, "birmingham"), (142, "london")]
+    ]
+
+    class Db(_FakeDb):
+        async def execute(self, statement):
+            return SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: rows))
+
+    monkeypatch.setattr(scrape, "_staged_row_to_dict", lambda row: {"id": row.id})
+    monkeypatch.setattr(scrape, "_attach_evidence_bulk", no_op)
+    monkeypatch.setattr(scrape, "_attach_recovery_counts_bulk", no_op)
+    result = asyncio.run(scrape.staged_one("job_current", Db()))
+    assert result["courses"] == [{"id": 144}, {"id": 143}]
+
+
 def test_job_review_does_not_include_older_pending_rows(monkeypatch):
     """A completed scrape's review request is strictly scoped to its job ID."""
     async def _no_op(*_args, **_kwargs):

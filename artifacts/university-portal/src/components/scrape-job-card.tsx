@@ -492,6 +492,8 @@ export type ScrapeJobCardProps = {
   universities: UniOption[];
   /** Optional university to preselect when opening a new card. */
   defaultUniversityId?: number;
+  /** Persisted visible review rows override the completion-time snapshot. */
+  currentReview?: { jobId: string; count: number };
   onReviewReady: (jobId: string, uniName: string, force?: boolean) => void;
   onReportStarted?: () => void;
   onRemove?: () => void;
@@ -599,7 +601,7 @@ function UniPicker({ value, onChange, universities, disabled }: {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversityId, onReviewReady, onReportStarted, onRemove, canRemove, forceResetKey }: ScrapeJobCardProps) {
+export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversityId, currentReview, onReviewReady, onReportStarted, onRemove, canRemove, forceResetKey }: ScrapeJobCardProps) {
   const { toast } = useToast();
   const { can } = useCan();
   const slotKey = `scrape_slot_${slotId}_jobId`;
@@ -644,6 +646,8 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
   // rows still awaiting a decision, so keep its count independently.
   const [pendingReviewCount, setPendingReviewCount] = useState<number | null>(null);
   const pendingReviewCountJobRef = useRef<string | null>(null);
+  const visiblePendingReviewCount = currentReview?.jobId === completedJobId
+    ? currentReview.count : pendingReviewCount;
   const [continuingUnresolved, setContinuingUnresolved] = useState(false);
   const [browserRescueAttempted, setBrowserRescueAttempted] = useState(false);
   const [isContinuationJob, setIsContinuationJob] = useState(false);
@@ -4789,16 +4793,16 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
                     : `Continue ${continuableUnresolvedCount ?? ""} new unresolved`}
                 </Button>
               )}
-              {completedJobId && hasReviewableCourses(resultSummary, pendingReviewCount) && (
+              {completedJobId && hasReviewableCourses(resultSummary, visiblePendingReviewCount) && (
                 <Button
                   onClick={() => completedJobId && onReviewReady(completedJobId, uniName, true)}
                   className="flex-1 bg-green-600 hover:bg-green-700 h-9"
                   size="sm"
                 >
                   <Eye className="w-3.5 h-3.5 mr-1.5" />
-                  {pendingReviewCount === null
+                  {visiblePendingReviewCount === null
                     ? "Review pending courses"
-                    : `Review ${pendingReviewCount} Course${pendingReviewCount === 1 ? "" : "s"}`}
+                    : `Review ${visiblePendingReviewCount} Course${visiblePendingReviewCount === 1 ? "" : "s"}`}
                 </Button>
               )}
               <Button onClick={resetToIdle} variant="outline" size="sm" className="h-9">

@@ -149,9 +149,9 @@ The database schema includes tables for `universities`, `courses`, `intakes`, `f
 
 ### Campus-specific tuition
 
-When the official source clearly assigns different tuition to actual course locations, retain all offerings as separate course entries grouped by fee—not one arbitrarily selected campus or an unresolved combined price range. For example, Healthcare Management is London at £19,050 and Birmingham/Leeds/Manchester together at £17,500, both for the published 2026 full-course period. Equal-price campuses remain grouped. Never invent locations, mix fee years or billing periods, or apply bursary-discounted prices as gross tuition. Ambiguous mappings stay pending for review, and splitting must not approve courses automatically.
+Retain each verified actual campus offering as a separate course entry, even when several campuses share a fee. For example, Healthcare Management has a London entry at £19,050 and separate Birmingham, Leeds and Manchester entries at £17,500 each for the published 2026 full-course period. Never invent locations, mix fee years or billing periods, or apply bursary-discounted prices as gross tuition. Ambiguous mappings stay pending for review, and preparation must not approve courses automatically. Review counts and selection must use persisted campus-scoped entries, not URL-only deduplication or original discovery counts. Do not display manual fee-choice radio buttons.
 
-Reviewer approval must handle verified campus-fee grouping automatically, without a separate manual split or fee-selection step. One Approve action may recover course-owned campus evidence, split the source, and approve every verified sibling atomically. This is explicit reviewer approval, not unattended system publishing. Unverifiable evidence stays pending with a reason.
+Review loading prepares verified campus entries automatically, without a separate manual split or fee-selection step. One Approve action may recover course-owned campus evidence, split the source, and approve every verified sibling atomically. This is explicit reviewer approval, not unattended system publishing. Unverifiable evidence stays pending with a reason.
 
 ### Deployment Architecture
 

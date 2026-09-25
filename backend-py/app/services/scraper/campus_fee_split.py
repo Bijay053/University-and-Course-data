@@ -70,7 +70,7 @@ def plan_campus_fees(row):
         if len(prices) != 1:
             return [], f"Fee for {campus} is missing or conflicting."
         amount = next(iter(prices))
-        group = groups.setdefault(amount, {"locations": [], "selected": [], "amount": amount})
+        group = groups.setdefault(_norm(campus), {"locations": [], "selected": [], "amount": amount})
         group["locations"].append(campus)
         for option in options:
             if option not in group["selected"]:
@@ -101,6 +101,7 @@ def _apply_group(row, group, original_name, original_locations):
             "source_url": row.course_website,
         },
     }
+    row.extraction_method.pop("fee_selection", None)
     row.scrape_warnings = [w for w in (row.scrape_warnings or []) if w != "international_fee_varies_by_campus"]
     row.status = "pending"
     if row.auto_publish_status != "data_quality_failure":
@@ -124,7 +125,14 @@ async def split_pending_course(db, row, *, actor="scraper"):
     from app.models import ScrapedCourse, ScrapedFieldEvidence, FieldConflict
     if row.status not in {"pending", "review_ready"}:
         return {"id": row.id, "status": "unchanged", "courseIds": [row.id], "reason": "Only pending courses can be split."}
-    if (row.extraction_method or {}).get(SCOPE):
+    scope = (row.extraction_method or {}).get(SCOPE)
+    if scope and (
+        scope.get("source_url") != row.course_website
+        or {_norm(c) for c in scope.get("locations", [])} != {_norm(c) for c in _locations(row.course_location)}
+        or scope.get("key") != row.fee_scope_key
+    ):
+        return {"id": row.id, "status": "needs_review", "courseIds": [row.id], "reason": "Stored campus scope no longer matches this course."}
+    if scope and len(scope.get("locations", [])) == 1:
         return {"id": row.id, "status": "unchanged", "courseIds": [row.id], "reason": "Already split by campus."}
     groups, reason = plan_campus_fees(row)
     if not groups:
@@ -139,7 +147,8 @@ async def split_pending_course(db, row, *, actor="scraper"):
     ))).scalars().all()
     values = {c.name: deepcopy(getattr(row, c.name)) for c in ScrapedCourse.__table__.columns
               if c.name not in {"id", "created_at", "canonical_course_url"}}
-    name, locations = row.course_name, row.course_location
+    name = scope["original_name"] if scope else row.course_name
+    locations = scope["original_locations"] if scope else row.course_location
     children = [row]
     for group in groups[1:]:
         child = ScrapedCourse(**deepcopy(values))

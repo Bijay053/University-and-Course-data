@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { PublishedFeeVariants, feeVariantAuthority, feeVariantNeedsReview, type FeeVariantCarrier } from "@/components/published-fee-variants";
+import { prepareCampusReview } from "@/lib/prepare-campus-review";
 import { shouldLoadForBackgroundJob } from "@/utils/scraping-poll-guard";
 import { mergeReextractFieldResults } from "@/utils/reextract-field-aggregation";
 import { useListUniversities } from "@workspace/api-client-react";
@@ -1070,6 +1071,13 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   const [stagedCourses, setStagedCourses] = useState<StagedCourse[]>(
     () => (initialReviewState?.courses ?? []).map((course) => normalizeStagedCourse(course)),
   );
+  const stagedCoursesRef = useRef(stagedCourses);
+  const campusLoadBusy = useRef(false);
+  const campusRequest = useRef<{ jobId: string; controller: AbortController } | null>(null);
+  useEffect(() => () => { campusRequest.current?.controller.abort(); }, []);
+  const [campusProgress, setCampusProgress] = useState<{ done: number; total: number } | null>(null);
+  const [campusIssues, setCampusIssues] = useState<Array<{ id: number; reason?: string }>>([]);
+  useEffect(() => { stagedCoursesRef.current = stagedCourses; }, [stagedCourses]);
   const [courseQualityMap, setCourseQualityMap] = useState<Record<number, CourseQualityData>>({});
   const [qualityExpanded, setQualityExpanded] = useState<Set<number>>(new Set());
   const [qualitySortDesc, setQualitySortDesc] = useState(false);
@@ -1680,8 +1688,15 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   }, []);
 
   const loadStagedCourses = useCallback(async (jobId: string, allowLatestFallback = true): Promise<boolean> => {
+    if (campusLoadBusy.current && campusRequest.current?.jobId === jobId) return false;
+    campusRequest.current?.controller.abort();
+    const controller = new AbortController();
+    campusRequest.current = { jobId, controller };
+    campusLoadBusy.current = true;
+    setCampusProgress({ done: 0, total: 0 });
     try {
       const res = await fetch(`/api/scrape/staged/${jobId}`, {
+        signal: controller.signal,
         credentials: "include",
         cache: "no-store",
       });
@@ -1689,6 +1704,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         throw new Error(await getFetchErrorMessage(res));
       }
       const payload = await readResponseJson<unknown>(res);
+      if (controller.signal.aborted) return false;
       if (!payload) return false;
         const data: StagedCourse[] = (Array.isArray(payload)
           ? (payload as StagedCourse[])
@@ -1698,23 +1714,42 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
           ? null
           : ((payload as { lastScrape?: typeof lastScrapeInfo }).lastScrape ?? null);
         if (lastScrape) setLastScrapeInfo(lastScrape);
-        const pending = data.filter((c: StagedCourse) => c.status === "pending");
+        const prepared = await prepareCampusReview(data, async () => {
+          const response = await fetch(`/api/scrape/staged/${jobId}`, { signal: controller.signal, credentials: "include", cache: "no-store" });
+          if (!response.ok) throw new Error(await getFetchErrorMessage(response));
+          const fresh = await response.json();
+          return (Array.isArray(fresh) ? fresh : fresh.courses ?? []).map(normalizeStagedCourse) as StagedCourse[];
+        }, (done, total) => { if (!controller.signal.aborted) setCampusProgress({ done, total }); }, controller.signal);
+        if (controller.signal.aborted) return false;
+        setCampusIssues(prepared.issues);
+        const pending = prepared.rows.filter((c: StagedCourse) => c.status === "pending");
 
         // If this job has been cleared by a newer scrape, auto-load the latest instead.
         const _latestJobId = latestAvailableJobIdRef.current;
         if (allowLatestFallback && pending.length === 0 && _latestJobId && _latestJobId !== jobId) {
+          campusLoadBusy.current = false;
           return loadStagedCourses(_latestJobId);
         }
 
+        const switchingJobs = reviewJobIdRef.current !== jobId;
+        const previous = stagedCoursesRef.current;
+        setSelectedIds(current => {
+          const previousIds = new Set(previous.map(course => course.id));
+          const selectAll = switchingJobs || previous.length === 0
+            || previous.every(course => current.has(course.id));
+          const excludedChildren = new Set(prepared.results
+            .filter(result => previousIds.has(result.id) && !current.has(result.id))
+            .flatMap(result => result.courseIds));
+          return new Set(pending.filter(course =>
+            selectAll || (!excludedChildren.has(course.id) && (current.has(course.id) || !previousIds.has(course.id)))
+          ).map(course => course.id));
+        });
+        stagedCoursesRef.current = pending;
         setStagedCourses(pending);
+        reviewJobIdRef.current = jobId;
         setReviewJobId(jobId);
         setShowReview(true);
         if (pending.length > 0) setLatestAvailableJobId(null);
-        setSelectedIds((current) => {
-          if (current.size === 0) return new Set(pending.map((course) => course.id));
-          const pendingIds = new Set(pending.map((course) => course.id));
-          return new Set(Array.from(current).filter((id) => pendingIds.has(id)));
-        });
         fetch(`/api/scrape/jobs/${jobId}/removal-reconciliation`, { credentials: "include", cache: "no-store" })
           .then((r) => r.ok ? r.json() : null)
           .then((reconciliation: RemovalReconciliation | null) => setRemovalReconciliation(reconciliation))
@@ -1725,7 +1760,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
           fetch(`/api/scrape/universities/${uniId}/course-quality`, { credentials: "include" })
             .then((r) => r.ok ? r.json() : null)
             .then((qData: { courses?: CourseQualityData[] } | null) => {
-              if (!qData?.courses) return;
+              if (controller.signal.aborted || !qData?.courses) return;
               const map: Record<number, CourseQualityData> = {};
               for (const q of qData.courses) map[q.id] = q;
               setCourseQualityMap(map);
@@ -1737,6 +1772,11 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     } catch (error) {
       console.error(`Failed to load staged courses for ${jobId}`, error);
       return false;
+    } finally {
+      if (campusRequest.current?.controller === controller) {
+        campusLoadBusy.current = false;
+        if (!controller.signal.aborted) setCampusProgress(null);
+      }
     }
   }, []);
 
@@ -2390,6 +2430,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   }, [scraping, activeJobId]);
 
   const handleApproveSelected = async () => {
+    if (campusLoadBusy.current) return;
     if (!reviewJobId || selectedIds.size === 0 || approving) return;
     const ids = stagedCourses.filter(c => selectedIds.has(c.id)).map(c => c.id);
     if (ids.length === 0) return;
@@ -2476,6 +2517,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   };
 
   const handleApproveSingle = async (id: number) => {
+    if (campusLoadBusy.current) return;
     const course = stagedCourses.find(c => c.id === id);
     if (course && feeVariantNeedsReview(course)) {
       toast({ title: "Fee variant review required", description: "Resolve the applicable campus, year and study variant before approving this course.", variant: "destructive" });
@@ -2891,17 +2933,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       const res = await fetch(`/api/scrape/staged/dedup/${uniId}`, { method: "POST" });
       if (res.ok) {
         const { deleted } = await res.json();
-        if (deleted > 0) {
-          setStagedCourses((prev) => {
-            const byName = new Map<string, StagedCourse>();
-            for (const c of prev) {
-              const key = c.courseName.toLowerCase().trim();
-              const existing = byName.get(key);
-              if (!existing || c.id > existing.id) byName.set(key, c);
-            }
-            return Array.from(byName.values());
-          });
-        }
+        if (deleted > 0 && reviewJobId) await loadStagedCourses(reviewJobId, false);
         toast({ title: `Removed ${deleted} duplicate course(s)`, description: "The list now shows only the newest copy of each course." });
       } else {
         toast({ title: "Dedup failed", description: await getFetchErrorMessage(res), variant: "destructive" });
@@ -3253,6 +3285,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
               slotId={id}
               slotIndex={index}
               universities={uniData?.data || []}
+              currentReview={reviewJobId ? { jobId: reviewJobId, count: stagedCourses.length } : undefined}
               onReviewReady={handleReviewReady}
               onReportStarted={() => void fetchHistory()}
               onRemove={() => removeSlot(id)}
@@ -3427,6 +3460,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         </Card>
       )}
 
+      {campusProgress && stagedCourses.length === 0 && <p role="status" className="p-3 text-blue-700">
+        Preparing separate campus courses {campusProgress.done}/{campusProgress.total}…
+      </p>}
       {showReview && stagedCourses.length > 0 && (() => {
         const displayedCourses = qualitySortDesc
           ? [...stagedCourses].sort((a, b) => {
@@ -3437,7 +3473,10 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
           : stagedCourses;
 
         // Root causes: aggregate issue labels across all scored courses
-        const qualityEntries = Object.values(courseQualityMap);
+        // University quality includes other jobs/statuses. Review summaries
+        // must describe only the persisted rows actually displayed here.
+        const qualityEntries = stagedCourses.flatMap(course =>
+          courseQualityMap[course.id] ? [courseQualityMap[course.id]] : []);
         const causeCounts: Record<string, { count: number; severity: string }> = {};
         for (const qd of qualityEntries) {
           for (const issue of qd.issues) {
@@ -3454,6 +3493,10 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
 
         return (
         <Card className="border-2 border-green-100">
+          {campusProgress && <div role="status" className="p-3 text-blue-700">Preparing separate campus courses {campusProgress.done}/{campusProgress.total}…</div>}
+          {campusIssues.length > 0 && <div role="alert" className="p-3 text-amber-800">
+            {campusIssues.map(issue => <p key={issue.id}>Course {issue.id}: {issue.reason || "Campus evidence requires review."}</p>)}
+          </div>}
           {latestAvailableJobId && latestAvailableJobId !== reviewJobId && (
             <div className="flex items-center justify-between gap-3 px-4 py-2 bg-blue-50 border-b border-blue-200 rounded-t-lg">
               <span className="text-xs font-medium text-blue-800">
@@ -3489,7 +3532,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                 </CardTitle>
                 {lastScrapeInfo && (
                   <p className="text-xs text-gray-500 mt-1">
-                    Last scrape: <span className="font-medium text-gray-700">
+                    Original scrape: <span className="font-medium text-gray-700">
                       {lastScrapeInfo.staged} courses staged in{" "}
                       {lastScrapeInfo.durationMs != null
                         ? lastScrapeInfo.durationMs >= 3600000
@@ -3602,7 +3645,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                   size="sm"
                   className="bg-green-600 hover:bg-green-700 text-white"
                   onClick={handleApproveSelected}
-                  disabled={selectedIds.size === 0 || approving}
+                  disabled={selectedIds.size === 0 || approving || campusProgress !== null}
                   title="Submit all selected courses; verified campus fees are split automatically, while ambiguous fees remain pending"
                 >
                   {approving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1" />}
@@ -4156,7 +4199,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                                 variant="ghost"
                                 className={`h-7 w-7 ${qData && qData.score < 60 ? "text-gray-300 cursor-not-allowed" : "text-green-600 hover:bg-green-50"}`}
                                 onClick={qData && qData.score < 60 ? undefined : () => handleApproveSingle(course.id)}
-                                disabled={approvingId === course.id || feeVariantNeedsReview(course) || (qData !== undefined && qData.score < 60)}
+                                disabled={campusProgress !== null || approvingId === course.id || feeVariantNeedsReview(course) || (qData !== undefined && qData.score < 60)}
                                 title={feeVariantNeedsReview(course) ? "Cannot approve — fee variant review required" : qData && qData.score < 60 ? `Cannot approve — Data Quality Failure (score ${qData.score}%)` : "Approve and publish this course"}
                               >
                                 {approvingId === course.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}

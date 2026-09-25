@@ -97,16 +97,16 @@ async def test_all_siblings_mixed_ambiguous_and_retry(db, campuses):
     _, bad = await seed(db, course_location=None)
     result = await route.approve_selected(route.ApproveSelectedBody(courseIds=[good, bad]), db, {"email": "reviewer"})
     assert result["attempted"] == 2
-    assert result["approvedCount"] == 2 and result["splitCount"] == 1
+    assert result["approvedCount"] == 4 and result["splitCount"] == 1
     assert result["failed"][0]["id"] == bad
     courses = (await db.execute(select(Course).where(Course.university_id == uni))).scalars().all()
-    assert {c.course_location for c in courses} == {"London", "Birmingham, Leeds, Manchester"}
+    assert {c.course_location for c in courses} == {"London", "Birmingham", "Leeds", "Manchester"}
     fees = (await db.execute(select(Fee).where(Fee.course_id.in_([c.id for c in courses])))).scalars().all()
     assert {f.international_fee for f in fees} == {17500, 19050}
     assert (await db.get(ScrapedCourse, bad)).status == "pending"
     repeated = await route.approve_selected(route.ApproveSelectedBody(courseIds=result["approvedIds"]), db, {"email": "reviewer"})
     assert repeated["approvedIds"] == result["approvedIds"] and repeated["splitCount"] == 0
-    assert len((await db.execute(select(Course).where(Course.university_id == uni))).scalars().all()) == 2
+    assert len((await db.execute(select(Course).where(Course.university_id == uni))).scalars().all()) == 4
 
 
 @pytest.mark.asyncio
@@ -119,10 +119,10 @@ async def test_equal_campus_prices_do_not_require_split(db, campuses):
     values["international_fee"] = 20600
     uni, row_id = await seed(db, **values)
     result = await route.approve_selected(route.ApproveSelectedBody(courseIds=[row_id]), db, {"email": "reviewer"})
-    assert result == {"approvedIds": [row_id], "approvedCount": 1, "splitCount": 0, "failed": [], "attempted": 1}
-    campuses.assert_not_awaited()
+    assert result["approvedCount"] == 4 and result["splitCount"] == 1 and not result["failed"]
+    campuses.assert_awaited_once()
     courses = (await db.execute(select(Course).where(Course.university_id == uni))).scalars().all()
-    assert len(courses) == 1 and courses[0].course_location == values["course_location"]
+    assert len(courses) == 4 and all("," not in c.course_location for c in courses)
 
 
 @pytest.mark.asyncio
@@ -170,7 +170,7 @@ async def test_verified_source_enrichment_precedes_partition(db, campuses):
 
     campuses.side_effect = verified_campuses
     result = await route.approve_selected(route.ApproveSelectedBody(courseIds=[row_id]), db, {"email": "reviewer"})
-    assert result["approvedCount"] == 2 and result["splitCount"] == 1
+    assert result["approvedCount"] == 4 and result["splitCount"] == 1
     assert not result["failed"]
     for child_id in result["approvedIds"]:
         child = await db.get(ScrapedCourse, child_id)

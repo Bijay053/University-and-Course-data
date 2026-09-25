@@ -132,7 +132,7 @@ export function RawDataPanel(props: RawDataPanelProps) {
                 </Button>
                 <Button
                   size="sm"
-                  disabled={bulkMapRunning || bulkApproveRunning}
+                  disabled={rawLoading || bulkMapRunning || bulkApproveRunning}
                   onClick={() => handleBulkApprove(false)}
                   className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
                 >

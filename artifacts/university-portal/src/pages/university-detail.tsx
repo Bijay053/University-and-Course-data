@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { prepareCampusReview } from "@/lib/prepare-campus-review";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRoute, Link, useLocation } from "wouter";
 import { useGetUniversity, getGetUniversityQueryKey, useListCourses, getListCoursesQueryKey } from "@workspace/api-client-react";
@@ -1115,6 +1116,10 @@ export default function UniversityDetail() {
   const [rawSearch, setRawSearch] = useState("");
   const [rawData, setRawData] = useState<StagedCourse[]>([]);
   const [rawLoading, setRawLoading] = useState(false);
+  const rawCampusRequest = useRef<AbortController | null>(null);
+  const [rawCampusProgress, setRawCampusProgress] = useState<{ done: number; total: number } | null>(null);
+  const [rawCampusIssues, setRawCampusIssues] = useState<Array<{ id: number; reason?: string }>>([]);
+  useEffect(() => () => rawCampusRequest.current?.abort(), []);
   const [editingCourse, setEditingCourse] = useState<StagedCourse | null>(null);
   const [editForm, setEditForm] = useState<EditForm | null>(null);
   const [saving, setSaving] = useState(false);
@@ -1196,6 +1201,7 @@ export default function UniversityDetail() {
   };
 
   const handleBulkApprove = async (force = false) => {
+    if (rawCampusProgress) return;
     if (rawSelectedIds.size === 0 || bulkApproveRunning) return;
     setBulkApproveRunning(true);
     const ids = Array.from(rawSelectedIds);
@@ -1359,15 +1365,40 @@ export default function UniversityDetail() {
 
   const fetchRawData = useCallback(async () => {
     if (!id) return;
+    rawCampusRequest.current?.abort();
+    const controller = new AbortController();
+    rawCampusRequest.current = controller;
     setRawLoading(true);
+    setRawCampusProgress({ done: 0, total: 0 });
     try {
-      const res = await fetch(`${BASE}/api/scrape/staged?universityId=${id}&status=${rawStatus}`);
-      const data = await res.json();
-      setRawData(Array.isArray(data) ? data : []);
+      const reload = async (): Promise<StagedCourse[]> => {
+        const res = await fetch(`${BASE}/api/scrape/staged?universityId=${id}&status=${rawStatus}`, { signal: controller.signal, cache: "no-store" });
+        if (!res.ok) throw new Error(`Cannot load courses (${res.status})`);
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      };
+      const data = await reload();
+      const prepared = await prepareCampusReview(data, reload, (done, total) => {
+        if (!controller.signal.aborted) setRawCampusProgress({ done, total });
+      }, controller.signal);
+      if (controller.signal.aborted) return;
+      setRawData(prepared.rows);
+      setRawCampusIssues(prepared.issues);
+      setRawSelectedIds(current => {
+        const next = new Set(current);
+        for (const result of prepared.results) {
+          if (current.has(result.id)) for (const child of result.courseIds) next.add(child);
+        }
+        const persistedIds = new Set(prepared.rows.map(row => row.id));
+        return new Set([...next].filter(rowId => persistedIds.has(rowId)));
+      });
     } catch {
-      toast({ title: "Error", description: "Failed to load raw data", variant: "destructive" });
+      if (!controller.signal.aborted) toast({ title: "Error", description: "Failed to load raw data", variant: "destructive" });
     } finally {
-      setRawLoading(false);
+      if (!controller.signal.aborted) {
+        setRawLoading(false);
+        setRawCampusProgress(null);
+      }
     }
   }, [id, rawStatus, toast]);
 
@@ -1459,6 +1490,7 @@ export default function UniversityDetail() {
   };
 
   async function handleApprove(courseId: number, force = false) {
+    if (rawCampusProgress) return;
     setApprovingId(courseId);
     try {
       const res = await fetch(`${BASE}/api/scrape/staged/${courseId}/approve`, {
@@ -3956,6 +3988,10 @@ export default function UniversityDetail() {
       {tab === "assessment" && <AssessmentPanel {...{ BASE, Button, COUNTRIES, ClipboardList, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Label, Pencil, Plus, Trash2, assessAddCountry, assessAddText, assessAdding, assessCountry, assessDeleteNote, assessDeleting, assessEditCountry, assessEditNote, assessEditText, assessEditing, assessLoading, assessNotes, assessShowAdd, id, loadAssessNotes, setAssessAddCountry, setAssessAddText, setAssessAdding, setAssessCountry, setAssessDeleteNote, setAssessDeleting, setAssessEditCountry, setAssessEditNote, setAssessEditText, setAssessEditing, setAssessShowAdd, toast }} />}
 
       {/* ── RAW DATA TAB ── */}
+      {tab === "rawdata" && rawCampusProgress && <p role="status">Preparing separate campus courses {rawCampusProgress.done}/{rawCampusProgress.total}…</p>}
+      {tab === "rawdata" && rawCampusIssues.length > 0 && <div role="alert" className="text-amber-800">
+        {rawCampusIssues.map(issue => <p key={issue.id}>Course {issue.id}: {issue.reason || "Campus evidence requires review."}</p>)}
+      </div>}
       {tab === "rawdata" && <RawDataPanel {...{ AlertTriangle, Button, CheckCircle2, DEGREE_COLORS, Database, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, ExternalLink, GitMerge, Input, Loader2, Pencil, RefreshCw, Search, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, StatusBadge, Textarea, Trash2, Upload, XCircle, approvedCount, approvingId, bulkApproveProgress, bulkApproveRunning, bulkDeleteRawRunning, bulkMapRunning, bulkRejectFieldKey, bulkRejectReason, bulkRejectRunning, deletingId, fetchRawData, filteredRaw, forceApproveRowId, handleApprove, handleBulkApprove, handleBulkMap, handleBulkRejectSelected, handleDelete, handleImportAll, importingAll, mappedIds, num, openBackupMap, openEdit, pendingCount, rawData, rawLoading, rawSearch, rawSelectedIds, rawStatus, setBulkRejectFieldKey, setBulkRejectReason, setForceApproveRowId, setRawSearch, setRawSelectedIds, setRawStatus, setShowBulkDeleteRawConfirm, setShowBulkRejectConfirm, setShowDeleteAllRawConfirm, setShowForceApproveConfirm, showBulkRejectConfirm, showForceApproveConfirm, tableScrollRef, toggleRawSelect, toggleSelectAllRaw, txt }} />}
 
       {/* ── Shared mini horizontal scroll indicator (all tabs) ── */}

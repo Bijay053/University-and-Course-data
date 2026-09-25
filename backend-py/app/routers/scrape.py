@@ -42,6 +42,8 @@ from app.services.scraper.auto_repair_candidates import (
 router = APIRouter()
 router.include_router(course_reports_router)
 router.include_router(selected_approval_router)
+from app.routers.staged_campus_preparation import router as campus_preparation_router
+router.include_router(campus_preparation_router)
 
 log = logging.getLogger(__name__)
 
@@ -4272,14 +4274,16 @@ async def staged_one(
         # without deleting or mutating the preserved history.
         from app.services.scraper.url_identity import canonical_course_url_key
         deduped_rows = []
-        seen_review_urls: set[tuple[int, str]] = set()
+        seen_review_urls: set[tuple[int, str, str]] = set()
         for row in rows:
             canonical_url = (
                 getattr(row, "canonical_course_url", None)
                 or canonical_course_url_key(getattr(row, "course_website", None))
             )
             if canonical_url:
-                identity = (row.university_id, canonical_url)
+                # Campus offerings share the source URL but are distinct review
+                # identities. Only collapse repeated copies of the same scope.
+                identity = (row.university_id, canonical_url, getattr(row, "fee_scope_key", None) or "")
                 if identity in seen_review_urls:
                     continue
                 seen_review_urls.add(identity)
