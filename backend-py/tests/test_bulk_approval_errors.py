@@ -1,4 +1,4 @@
-"""Database failures are diagnostic in logs, not in reviewer responses."""
+"""Unexpected failures are diagnostic in logs, not in reviewer responses."""
 import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -10,13 +10,19 @@ from app.routers.reviews import bulk_approve_scraped_courses
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("error_type", [IntegrityError, OperationalError, StatementError])
+@pytest.mark.parametrize("error_type", [
+    IntegrityError, OperationalError, StatementError,
+    RuntimeError, ValueError, TypeError, KeyError,
+])
 async def test_database_errors_are_safe_and_batch_continues(error_type, monkeypatch, caplog):
+    is_database_error = error_type in (IntegrityError, OperationalError, StatementError)
     error = error_type(
         statement="INSERT INTO private_table VALUES (:payload)",
         params={"payload": "private-bound-value"},
         orig=Exception("private-driver-detail"),
         **({"message": "private-driver-detail"} if error_type is StatementError else {}),
+    ) if is_database_error else error_type(
+        "INSERT private_table payload private-bound-value private-driver-detail"
     )
     rows = [SimpleNamespace(id=41), SimpleNamespace(id=42)]
     result = Mock()
@@ -39,7 +45,7 @@ async def test_database_errors_are_safe_and_batch_continues(error_type, monkeypa
     assert response["failures"] == [{
         "scraped_course_id": 41,
         "error": (
-            "This course could not be published because of a database error. "
+            f"This course could not be published because of {'a database' if is_database_error else 'an unexpected'} error. "
             "Please try again or contact support if the problem continues."
         ),
     }]
@@ -52,3 +58,42 @@ async def test_database_errors_are_safe_and_batch_continues(error_type, monkeypa
     record = next(r for r in caplog.records if r.name == "app.routers.reviews")
     assert "sc_id=41 uni=7" in record.message
     assert record.exc_info[1] is error
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("unresolved,message", [
+    (True, "Select a current published fee option before approval"),
+    (False, "Resolve the published fee options before approving this course"),
+])
+async def test_real_fee_validation_messages_remain_actionable(unresolved, message, monkeypatch):
+    sc = SimpleNamespace(
+        id=41, course_name="Example course",
+        extraction_method={"fee_variants": {"status": "unresolved"}},
+    )
+    result = Mock()
+    result.scalars.return_value.all.return_value = [sc]
+    result.scalar_one.return_value = sc
+    db = SimpleNamespace(
+        execute=AsyncMock(return_value=result),
+        get=AsyncMock(return_value=sc),
+        rollback=AsyncMock(),
+        commit=AsyncMock(),
+    )
+    # Exercise the real approval service's rejection types, not a mocked error.
+    monkeypatch.setattr(
+        "app.services.scraper.fee_selection.unresolved_fee_selection",
+        lambda row: unresolved,
+    )
+    monkeypatch.setattr(
+        "app.services.scraper.fee_selection.fee_selection", lambda row: None,
+    )
+
+    response = await bulk_approve_scraped_courses(
+        db, {"email": "reviewer"}, 7, "pending", "ready", False, 10,
+    )
+
+    assert response["approved"] == 0
+    assert response["failed"] == 1
+    assert response["failures"] == [{"scraped_course_id": 41, "error": message}]
+    db.rollback.assert_awaited_once()
+    db.commit.assert_not_awaited()

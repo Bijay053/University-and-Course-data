@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies import get_current_user, get_db
 from app.models import ScrapedCourse, University
 from app.services.scraper.response_sanitizer import sanitize_scraped_row
+from app.services.scraper.approve_course import ApprovalValidationError
 
 log = logging.getLogger(__name__)
 
@@ -187,12 +188,18 @@ async def bulk_approve_scraped_courses(
                 sc_id, university_id, exc,
                 exc_info=True,
             )
-            error = (
-                "This course could not be published because of a database error. "
-                "Please try again or contact support if the problem continues."
-                if isinstance(exc, SQLAlchemyError)
-                else str(exc)
-            )
+            if isinstance(exc, ApprovalValidationError):
+                error = str(exc)
+            elif isinstance(exc, SQLAlchemyError):
+                error = (
+                    "This course could not be published because of a database error. "
+                    "Please try again or contact support if the problem continues."
+                )
+            else:
+                error = (
+                    "This course could not be published because of an unexpected error. "
+                    "Please try again or contact support if the problem continues."
+                )
             failed.append({"scraped_course_id": sc_id, "error": error})
 
     return {

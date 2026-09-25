@@ -28,6 +28,10 @@ from app.services.sub_category_matcher import resolve_sub_category
 import re
 
 
+class ApprovalValidationError(ValueError):
+    """Intentional approval rejection whose message is safe for reviewers."""
+
+
 _ACADEMIC_MAPPING_BY_DEGREE = {
     "master": "bachelors_equivalent",
     "master's": "bachelors_equivalent",
@@ -116,7 +120,7 @@ async def approve_scraped_course(
     """Idempotent: if a course with the same (university_id, name CI) exists,
     the row is updated rather than duplicated.
 
-    Raises ``ValueError`` if ``sc.course_name`` is None or empty — historically
+    Raises ``ApprovalValidationError`` if ``sc.course_name`` is None or empty — historically
     this crashed at the case-insensitive lookup with a confusing AttributeError
     on ``None.lower()``, which then poisoned the SQLAlchemy session and made
     every subsequent row in a batch fail (Week 5: Charles Sturt promotion gap).
@@ -128,9 +132,9 @@ async def approve_scraped_course(
             .with_for_update().execution_options(populate_existing=True)
         )).scalar_one()
     if unresolved_fee_selection(sc):
-        raise ValueError("Select a current published fee option before approval")
+        raise ApprovalValidationError("Select a current published fee option before approval")
     if not sc.course_name or not sc.course_name.strip():
-        raise ValueError(
+        raise ApprovalValidationError(
             f"scraped_course id={sc.id} has empty course_name; cannot promote"
         )
     from app.services.scraper.extractors.ulaw_fees import validated_fee_variants
@@ -144,22 +148,22 @@ async def approve_scraped_course(
     if fee_authority and not (selected_fee and selected_fee["selectedOptionId"]) and (
         fee_authority.get("status") != "uniform" or not validated_fee_variants(sc)
     ):
-        raise ValueError("Resolve the published fee options before approving this course")
+        raise ApprovalValidationError("Resolve the published fee options before approving this course")
     scope = fee_metadata.get(SCOPE)
     if scope:
         expected_locations = ", ".join(scope["locations"])
         expected_name = f"{scope['original_name']} — {expected_locations}"
         if sc.course_location != expected_locations or sc.course_name != expected_name or sc.fee_scope_key != scope["key"]:
-            raise ValueError("Campus fee scope no longer matches the course; review required")
+            raise ApprovalValidationError("Campus fee scope no longer matches the course; review required")
         if actor == "system":
-            raise ValueError("Campus fee groups require explicit reviewer approval")
+            raise ApprovalValidationError("Campus fee groups require explicit reviewer approval")
     from app.services.scraper.review_policy import blocks_automatic_followup
     # Automated callers use the default system actor; authenticated review
     # routes pass the operator identity (not necessarily the literal "human").
     if actor == "system" and await blocks_automatic_followup(db, getattr(sc, "scrape_job_id", None)):
-        raise ValueError("Review-only source job forbids automatic promotion")
+        raise ApprovalValidationError("Review-only source job forbids automatic promotion")
     if actor == "system" and getattr(sc, "auto_publish_status", None) == "data_quality_failure":
-        raise ValueError("Critical data-quality failure forbids automatic promotion")
+        raise ApprovalValidationError("Critical data-quality failure forbids automatic promotion")
 
     # Synchronize promotion with offline review-row restoration.  Otherwise a
     # restore could check for approved/published rows immediately before this
@@ -194,7 +198,7 @@ async def approve_scraped_course(
         exact = [candidate for candidate in candidates
                  if canonical_course_url_key(candidate.course_website) == canonical_course_url_key(sc.course_website)]
         if len(exact) > 1:
-            raise ValueError("Ambiguous existing campus course identity; review required")
+            raise ApprovalValidationError("Ambiguous existing campus course identity; review required")
         existing = exact[0] if exact else None
     elif _uel_variant:
         # Award names can change independently of route identity. Never merge a
@@ -211,7 +215,7 @@ async def approve_scraped_course(
             if canonical_course_url_key(candidate.course_website) == identity
         ]
         if len(exact) > 1:
-            raise ValueError("Ambiguous UEL variant identity; manual review required")
+            raise ApprovalValidationError("Ambiguous UEL variant identity; manual review required")
         existing = exact[0] if exact else None
         if existing is None:
             # Adopt a legacy parent only when BOTH the exact canonical source
@@ -226,7 +230,7 @@ async def approve_scraped_course(
                 and " ".join(candidate.name.split()).casefold() == normalized_name
             ]
             if len(legacy) > 1:
-                raise ValueError("Ambiguous legacy UEL course identity; manual review required")
+                raise ApprovalValidationError("Ambiguous legacy UEL course identity; manual review required")
             existing = legacy[0] if legacy else None
     else:
         existing = (
