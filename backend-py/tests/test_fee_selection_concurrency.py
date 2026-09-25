@@ -9,6 +9,7 @@ import copy
 import json
 import os
 import uuid
+from contextlib import aclosing
 
 import pytest
 import pytest_asyncio
@@ -21,7 +22,11 @@ from sqlalchemy.pool import NullPool
 from app.config import settings
 from app.database import Base, postgres_tls_connect_args
 from app.dependencies import get_current_user, get_db
-from app.models import Course, CourseAuditLog, ScrapedCourse, ScrapedFieldEvidence, University
+from app.models import (
+    AcademicRequirement, Course, CourseAuditLog, EnglishRequirement, Fee,
+    Intake, ScrapedCourse, ScrapedFieldEvidence, University,
+)
+from app.models.sub_category import CourseSubCategory
 from app.routers.scrape import router
 from app.services.scraper.fee_selection import FIELDS, fee_selection
 from tests.test_fee_selection import METHOD, URL, course
@@ -54,7 +59,8 @@ async def isolated_fee_database():
             await connection.execute(text(f'CREATE SCHEMA "{schema}"'))
         tables = {
             model.__table__ for model in
-            (University, Course, ScrapedCourse, ScrapedFieldEvidence, CourseAuditLog)
+            (University, Course, ScrapedCourse, ScrapedFieldEvidence, CourseAuditLog,
+             Fee, EnglishRequirement, Intake, AcademicRequirement, CourseSubCategory)
         }
         # Include FK dependencies without creating unrelated application tables.
         while True:
@@ -246,3 +252,224 @@ async def test_simultaneous_same_snapshot_has_one_winner(isolated_fee_database, 
         assert evidence_snapshot(evidence) == before_evidence
         assert saved.status == "pending" and saved.course_id is None
         assert (await db.execute(select(func.count()).select_from(Course))).scalar_one() == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("approval_path", ["route", "service"])
+@pytest.mark.parametrize("first,option_index", [
+    ("approve", 2),
+    ("select", 3),
+    ("select", 2),
+], ids=["approval-first", "selection-first-compatible", "selection-first-invalidates-approval"])
+async def test_fee_selection_contends_with_approval(
+    isolated_fee_database, approval_path, first, option_index,
+):
+    """Exercise real writers, including a deliberately stale ORM identity map.
+
+    A uniform source can be approved before any reviewer selection. Another
+    campus with the identical tuple remains approvable; selecting a different
+    year/period fails the promotion service's source-authority validation.
+    Neither outcome may publish the old cached tuple after selection commits.
+    """
+    from app.routers.scrape import _FeeSelectionBody, staged_fee_selection
+    from app.services.scraper.approve_course import approve_scraped_course
+
+    engine = isolated_fee_database
+    sessions = async_sessionmaker(engine, expire_on_commit=False, autoflush=False)
+    async with sessions() as db:
+        university = University(name="Disposable approval race", country="Test", city="Test")
+        db.add(university)
+        await db.flush()
+        sc = course()
+        sc.id = None
+        sc.university_id = university.id
+        variants = copy.deepcopy(sc.extraction_method["fee_variants"])
+        variants.update(status="uniform", selected=variants["options"][:1], international_fee=19050)
+        sc.extraction_method = {"international_fee": METHOD, "fee_variants": variants}
+        sc.international_fee = 19050
+        sc.ielts_overall = 6.5
+        sc.duration = 1
+        sc.intake_months = ["September"]
+        sc.study_mode = "Full-time"
+        db.add(sc)
+        await db.flush()
+        raw = json.dumps(variants, ensure_ascii=False)
+        proof = ScrapedFieldEvidence(
+            scraped_course_id=sc.id, field_key="international_fee",
+            source_url=URL, extraction_method=METHOD, snippet=raw[:1000], raw_text=raw,
+        )
+        db.add(proof)
+        await db.commit()
+        await db.refresh(sc)
+        sc_id, proof_id = sc.id, proof.id
+        state = fee_selection(sc)
+        before_tuple = {key: getattr(sc, key) for key in FIELDS}
+        before_evidence = evidence_snapshot([proof])
+
+    second = "select" if first == "approve" else "approve"
+    locked, release, waiting = asyncio.Event(), asyncio.Event(), asyncio.Event()
+    pids = {}
+    stale_objects = {}
+
+    class ContendingSession(AsyncSession):
+        async def execute(self, statement, *args, **kwargs):
+            is_row_lock = (
+                getattr(statement, "_for_update_arg", None) is not None
+                and "scraped_courses" in str(statement)
+            )
+            actor = self.info["actor"]
+            if is_row_lock and actor == second:
+                waiting.set()
+            result = await super().execute(statement, *args, **kwargs)
+            if is_row_lock and actor == first:
+                locked.set()
+                await asyncio.wait_for(release.wait(), timeout=10)
+            return result
+
+    async def database(request: Request):
+        actor = request.headers["x-test-reviewer"]
+        async with ContendingSession(
+            engine, expire_on_commit=False, autoflush=False, info={"actor": actor},
+        ) as db:
+            pids[actor] = (await db.execute(text("SELECT pg_backend_pid()"))).scalar_one()
+            # Strong references ensure SQLAlchemy cannot evict these old rows.
+            stale_objects[actor] = await db.get(ScrapedCourse, sc_id)
+            assert fee_selection(stale_objects[actor])["snapshotToken"] == state["snapshotToken"]
+            try:
+                yield db
+            finally:
+                await db.rollback()
+
+    async def reviewer(request: Request):
+        return {"email": request.headers["x-test-reviewer"] + "@example.test",
+                "permissions": ["staged.approve"]}
+
+    app = FastAPI()
+    app.include_router(router, prefix="/api/scrape")
+    app.dependency_overrides[get_db] = database
+    app.dependency_overrides[get_current_user] = reviewer
+
+    # A private adapter uses the same isolated dependency but calls the real
+    # promotion service directly, covering non-route callers without mocking it.
+    @app.post("/service-approve")
+    async def service_approve(request: Request):
+        from fastapi import HTTPException
+        async with aclosing(database(request)) as dependency:
+            async for db in dependency:
+                try:
+                    return await approve_scraped_course(
+                        db, stale_objects["approve"], actor="approve@example.test",
+                    )
+                except ValueError as exc:
+                    raise HTTPException(422, str(exc)) from exc
+
+    chosen = state["options"][option_index]
+    tasks = []
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        def submit(actor):
+            path = f"/api/scrape/staged/{sc_id}/fee-selection" if actor == "select" else (
+                f"/api/scrape/staged/{sc_id}/approve" if approval_path == "route" else "/service-approve"
+            )
+            body = {"snapshotToken": state["snapshotToken"], "optionId": chosen["optionId"]} if actor == "select" else {}
+            return asyncio.create_task(client.post(path, headers={"x-test-reviewer": actor}, json=body))
+
+        async def wait_for_signal(signal, task):
+            signal_task = asyncio.create_task(signal.wait())
+            try:
+                done, _ = await asyncio.wait(
+                    [signal_task, task], timeout=10, return_when=asyncio.FIRST_COMPLETED,
+                )
+                if task in done:
+                    response = await task
+                    pytest.fail(f"Writer exited before contention: {response.status_code} {response.text}")
+                assert signal_task in done, "Writer did not reach its row lock"
+            finally:
+                signal_task.cancel()
+                await asyncio.gather(signal_task, return_exceptions=True)
+
+        try:
+            tasks.append(submit(first))
+            await wait_for_signal(locked, tasks[0])
+            tasks.append(submit(second))
+            await wait_for_signal(waiting, tasks[1])
+            assert pids[first] != pids[second]
+
+            async def observe_block():
+                async with engine.connect() as observer:
+                    while not (await observer.execute(text(
+                        "SELECT :holder = ANY(pg_blocking_pids(:waiter))"
+                    ), {"holder": pids[first], "waiter": pids[second]})).scalar_one():
+                        assert not tasks[1].done(), "Competing writer bypassed the row lock"
+                        await asyncio.sleep(0.01)
+
+            await asyncio.wait_for(observe_block(), timeout=5)
+            release.set()
+            responses = dict(zip([first, second], await asyncio.wait_for(
+                asyncio.gather(*tasks), timeout=10,
+            )))
+        finally:
+            release.set()
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+    approved = first == "approve" or option_index == 3
+    selected = first == "select"
+    assert responses["approve"].status_code == (200 if approved else 422), responses["approve"].text
+    assert responses["select"].status_code == (200 if selected else 409), responses["select"].text
+    if not selected:
+        assert responses["select"].json()["detail"] == "Only unpublished pending courses can select fees"
+    if not approved:
+        assert responses["approve"].json()["detail"] == "Resolve the published fee options before approving this course"
+    expected_tuple = dict(zip(FIELDS, (
+        chosen["amount"], chosen["currency"], chosen["year"], chosen["period"],
+    ))) if selected else before_tuple
+
+    async with sessions() as db:
+        saved = await db.get(ScrapedCourse, sc_id)
+        assert {key: getattr(saved, key) for key in FIELDS} == expected_tuple
+        assert saved.extraction_method["fee_variants"] == variants
+        assert saved.status == ("approved" if approved else "pending")
+        assert fee_selection(saved)["selectedOptionId"] == (chosen["optionId"] if selected else None)
+        published = (await db.execute(select(Course))).scalars().all()
+        fees = (await db.execute(select(Fee))).scalars().all()
+        assert len(published) == len(fees) == int(approved)
+        if approved:
+            assert saved.course_id == published[0].id == fees[0].course_id
+            assert published[0].last_edited_by == "approve@example.test"
+            assert {key: getattr(fees[0], key) for key in FIELDS} == expected_tuple
+        else:
+            assert saved.course_id is None
+        audits = (await db.execute(select(CourseAuditLog))).scalars().all()
+        assert len(audits) == int(selected)
+        if selected:
+            audit = audits[0]
+            selection = saved.extraction_method["fee_selection"]
+            assert audit.action == "fee_option_selected"
+            assert audit.actor == selection["actor"] == "select@example.test"
+            assert audit.scraped_course_id == sc_id and audit.course_id is None
+            assert audit.source_evidence_id == selection["sourceEvidenceId"] == proof_id
+            assert audit.field_key == "international_fee"
+            assert json.loads(audit.old_value) == before_tuple
+            assert json.loads(audit.new_value) == {
+                "tuple": expected_tuple, "selection": selection,
+                "option": variants["options"][option_index],
+            }
+        else:
+            assert "fee_selection" not in saved.extraction_method
+        evidence = (await db.execute(select(ScrapedFieldEvidence))).scalars().all()
+        assert evidence_snapshot(evidence) == before_evidence
+
+        # After a rejected approval the successful review remains retryable,
+        # but the old client token must not overwrite its tuple or add an audit.
+        if not approved:
+            from fastapi import HTTPException
+            with pytest.raises(HTTPException) as exc:
+                await staged_fee_selection(sc_id, _FeeSelectionBody(
+                    snapshotToken=state["snapshotToken"],
+                    optionId=state["options"][0]["optionId"],
+                ), db, {"email": "stale@example.test"})
+            assert exc.value.status_code == 409
+            await db.rollback()
+            assert (await db.execute(select(func.count()).select_from(CourseAuditLog))).scalar_one() == 1
