@@ -5221,7 +5221,10 @@ async def staged_approve(
         )
 
     # Promote to the live courses table (creates/updates Course record, sets course_id)
-    from app.services.scraper.approve_course import approve_scraped_course as _promote
+    from app.services.scraper.approve_course import (
+        ApprovalValidationError,
+        approve_scraped_course as _promote,
+    )
     try:
         result = await _promote(db, sc, actor=user.get("email", "admin"))
         return {
@@ -5231,14 +5234,12 @@ async def staged_approve(
             "confidence": _cg["score"],
             "course_id": result.get("course_id"),
         }
-    except ValueError as exc:
+    except ApprovalValidationError as exc:
         # Validation failures (including a concurrent fee-source change)
         # must never become approved through the legacy fallback.
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
         await db.rollback()
-        if isinstance(exc, ValueError):
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
         log.exception("Course promotion failed for staged row %s", sc_id)
         raise HTTPException(status_code=500, detail="Course publication failed; the row remains pending.") from exc
 
