@@ -9519,6 +9519,18 @@ async def extract_course(
             )
             if _course_owned_massey_fee:
                 _central_fee_priority = False
+            # Correct a demonstrated Home-card leak, not arbitrary populated
+            # deterministic tuition. Only the linked, audience-owned schedule
+            # can replace it; an unmatched record remains unresolved.
+            from app.services.scraper.international_schedule import leeds_trinity_link_only_fees
+            _home_card_fees = leeds_trinity_link_only_fees(html, url)
+            if _home_card_fees is not None and payload.get("international_fee") in _home_card_fees:
+                payload["international_fee"] = None
+                _fee_missing = True
+                _central_fee_priority = True
+                evidence[:] = [
+                    e for e in evidence if e.get("field_key") != "international_fee"
+                ]
             if (_fee_missing or _central_fee_priority) and _central_fees:
                 _course_name_for_fee = payload.get("course_name") or ""
                 _central_fee_exact_only = False
@@ -9544,6 +9556,21 @@ async def extract_course(
                     course_aliases=_central_fee_course_aliases,
                 )
                 if matched and _fee_confidence != "none":
+                    if _fee_missing and matched.get("schedule_semantics") == "leeds-trinity-current-v1":
+                        _central_fee_priority = True
+                        payload["fee_term"] = matched.get("per")
+                        from app.services.scraper.international_schedule import leeds_trinity_study_year
+                        _selected_study_year = leeds_trinity_study_year(html)
+                        if _selected_study_year and _selected_study_year != matched.get("fee_year"):
+                            _fee_year_warning = (
+                                f"international_fee_year_mismatch: selected study year "
+                                f"{_selected_study_year}; published international tuition "
+                                f"year {matched.get('fee_year')}. Review before applying "
+                                "this fee to the selected intake."
+                            )
+                            payload.setdefault("scrape_warnings", [])
+                            if _fee_year_warning not in payload["scrape_warnings"]:
+                                payload["scrape_warnings"].append(_fee_year_warning)
                     _central_fee_match_found = _central_fee_match_has_usable_tuition(
                         matched,
                         _fee_confidence,
@@ -9685,8 +9712,8 @@ async def extract_course(
                                     else _confidence_numeric
                                 ),
                                 "method": f"central_page:fees:{_fee_confidence}",
-                                "source_url": _central_fee_url or url,
-                                "snippet": f"central_page fee: {_k}={_v}",
+                                "source_url": matched.get("source_url") or _central_fee_url or url,
+                                "snippet": matched.get("snippet") or f"central_page fee: {_k}={_v}",
                             })
                             _filled_fee_keys.append(_k)
                         if emit and _filled_fee_keys:

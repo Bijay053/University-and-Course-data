@@ -2648,6 +2648,11 @@ def _from_otago_polytechnic_international_fee(
 async def extract(
     html: str, url: str, *, country: str | None = None
 ) -> list[ExtractionResult]:
+    # Link-only audience cards are authoritative negative evidence locally.
+    # The shared central prefetch resolves their tuition, never the Home card.
+    from app.services.scraper.international_schedule import leeds_trinity_link_only_fees
+    if leeds_trinity_link_only_fees(html, url) is not None:
+        return []
     from app.services.scraper.cccu_embedded_facts import (
         extract_cccu_embedded_facts,
     )

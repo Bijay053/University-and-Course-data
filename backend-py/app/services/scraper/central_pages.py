@@ -283,6 +283,11 @@ def _parse_fee_page_html(html: str, page_url: str) -> list[CentralFeeRecord]:
         log.warning("central_pages: HTML parse error on %s: %s", page_url, exc)
         return []
 
+    from app.services.scraper.international_schedule import parse_leeds_trinity_schedule
+
+    scoped_records = parse_leeds_trinity_schedule(soup, page_url)
+    if scoped_records is not None:
+        return scoped_records
     records: list[CentralFeeRecord] = []
     page_host = (urlparse(page_url).hostname or "").lower()
     is_sit_fee_schedule = page_host in {"sit.ac.nz", "www.sit.ac.nz"}
@@ -1788,6 +1793,11 @@ async def _fetch_with_browser_fallback(url: str) -> str | None:
 
 _CACHE_TTL_DAYS = 30
 _ENGLISH_CACHE_SCHEMA_VERSION = 10
+_FEE_CACHE_SCHEMA_VERSION = 2
+
+
+def _fee_cache_is_current(parsed_data: dict[str, Any]) -> bool:
+    return parsed_data.get("_fee_parser_version") == _FEE_CACHE_SCHEMA_VERSION
 
 
 def _is_non_tuition_central_fee_pdf(
@@ -1844,6 +1854,8 @@ async def _cache_get(
                 )
             )
             if row is None:
+                return None
+            if page_type == "fee_schedule" and not _fee_cache_is_current(row.parsed_data or {}):
                 return None
             if expected_url and not _cache_source_matches(row.url, expected_url):
                 log.info(
@@ -1923,6 +1935,8 @@ async def _cache_set(
         from app.database import AsyncSessionLocal
         from app.models.central_page_cache import CentralPageCache
 
+        if page_type == "fee_schedule":
+            parsed_data = {**parsed_data, "_fee_parser_version": _FEE_CACHE_SCHEMA_VERSION}
         now = datetime.now(timezone.utc)
         expires = now + timedelta(days=ttl_days)
         async with AsyncSessionLocal() as session:
@@ -3140,7 +3154,8 @@ async def discover_fee_url_from_course_pages(
         try:
             html = await fetch_html(url)
             if html:
-                found = _extract_fee_link_candidates(html, base_domain)
+                from app.services.scraper.international_schedule import explicit_international_fee_links
+                found = explicit_international_fee_links(html, url) or _extract_fee_link_candidates(html, base_domain)
                 # Deduplicate within a single page so nav bars don't inflate counts.
                 votes.update(set(found))
         except Exception as exc:
@@ -3207,6 +3222,11 @@ def match_central_fee(
     """
     if not central_fees or not course_name:
         return None, "none"
+    from app.services.scraper.international_schedule import match_scoped_schedule
+
+    scoped_match = match_scoped_schedule(course_name, central_fees, degree_level, course_url)
+    if scoped_match is not None:
+        return scoped_match
 
     try:
         from rapidfuzz import fuzz as _rfuzz

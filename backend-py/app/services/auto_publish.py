@@ -92,6 +92,15 @@ def should_auto_publish(sc: ScrapedCourse) -> AutoPublishDecision:
     score = float(sc.decision_score or 0)
 
     # ── Hard-required field checks ────────────────────────────────────────
+    if any(
+        str(warning).startswith("international_fee_year_mismatch:")
+        for warning in (sc.scrape_warnings or [])
+    ):
+        return AutoPublishDecision(
+            False,
+            "International tuition year differs from selected study year; review required",
+            score,
+        )
     if "dated_catalogue_page_review" in set(sc.scrape_warnings or []):
         return AutoPublishDecision(
             False,
