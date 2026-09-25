@@ -20,3 +20,9 @@ An idle worker inspection is not proof that the broker will remain empty through
 **Why:** An interrupted university-setup recovery passed active/reserved/scheduled checks but found a queued repair monitor after shutdown. Such monitors can schedule more work; their presence is not automatically harmless maintenance.
 
 **How to apply:** Keep the state unchanged when queue ownership is unresolved and restore services on every abort. If considering an exception, verify the exact queued task's durable workflow identity and behavior rather than assuming a successful smoke test makes it safe.
+
+An absent legacy task ID does not make targeted recovery permanently impossible: authoritative termination of the entire original execution environment can substitute for that ID.
+
+**Why:** Ulster's setup predated durable probe ownership. Successful systemd control-group stop/start transitions, exhaustive process/cgroup inspection, and a single-host loopback-only broker proved the original execution was gone; repeated broker scans and producer checks found no replacement delivery. Requiring a nonexistent original ID would have blocked recovery indefinitely.
+
+**How to apply:** Establish topology and complete termination evidence, account for queued/unacknowledged work and every possible producer, then immediately recheck ownership under the university lock. Compare-and-set only the exact unchanged orphan marker, retain an audit, and issue one ordinary setup request. Never substitute age or a single idle inspection for this proof; setup completion does not certify course discovery.
