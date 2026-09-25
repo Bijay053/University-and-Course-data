@@ -33,6 +33,7 @@ Bugs this guards against (production triage list):
 from __future__ import annotations
 
 import io
+import uuid
 from typing import Any
 
 import httpx
@@ -46,7 +47,7 @@ from app.main import app
 
 
 # ─── Route table builder ─────────────────────────────────────────────────
-def _routes(ids: dict[str, int]) -> list[tuple[str, str, dict[str, Any] | None]]:
+def _routes(ids: dict[str, int | str]) -> list[tuple[str, str, dict[str, Any] | None]]:
     """Build the (method, path, body) list using real IDs from the seed."""
     u = ids["uni_id"]
     c = ids["course_id"]
@@ -74,7 +75,7 @@ def _routes(ids: dict[str, int]) -> list[tuple[str, str, dict[str, Any] | None]]
             f"/api/universities/{u}/bulk-academic",
             {
                 "courseIds": [c],
-                "academicLevel": "Route Parity Level",
+                "academicLevel": ids["academic_level"],
                 "academicScore": 80,
                 "scoreType": "Percentage",
                 "academicCountry": "Bhutan",  # unique → no dup-409
@@ -97,7 +98,7 @@ def _routes(ids: dict[str, int]) -> list[tuple[str, str, dict[str, Any] | None]]
             "POST",
             f"/api/courses/{c}/academic-requirements",
             {
-                "academicLevel": "Route Parity Level",
+                "academicLevel": ids["academic_level"],
                 "academicScore": 75,
                 "academicCountry": "Nepal",
             },
@@ -126,17 +127,17 @@ def _routes(ids: dict[str, int]) -> list[tuple[str, str, dict[str, Any] | None]]
         ("PATCH", f"/api/fees/{ids['fee_id']}", {"internationalFee": 27000}),
         # Settings — Bug L
         ("GET", "/api/settings/acronyms", None),
-        ("POST", "/api/settings/acronyms", {"acronym": "ROUTEPARITY", "note": "x"}),
+        ("POST", "/api/settings/acronyms", {"acronym": ids["acronym"], "note": "x"}),
         ("GET", "/api/settings/academic-levels", None),
         (
             "POST",
             "/api/settings/academic-levels",
-            {"name": "Route Parity Level", "sortOrder": 999},
+            {"name": ids["academic_level"], "sortOrder": 999},
         ),
         (
             "POST",
             "/api/settings/academic-levels/reorder",
-            {"items": [{"id": 1, "sortOrder": 1}]},
+            {"items": [{"id": ids["academic_level_option_id"], "sortOrder": 1}]},
         ),
         # Scrape — Bug Q + repair + backup
         (
@@ -164,16 +165,20 @@ def _routes(ids: dict[str, int]) -> list[tuple[str, str, dict[str, Any] | None]]
 
 
 # ─── DB helpers (run inside the same loop as the test) ───────────────────
-async def _seed_setup() -> dict[str, int]:
+async def _seed_setup() -> dict[str, int | str]:
+    suffix = uuid.uuid4().hex[:12]
+    academic_level = f"Route Parity Level {suffix}"
+    acronym = f"ROUTEPARITY{suffix.upper()}"
     async with AsyncSessionLocal() as db:
         academic_level_option_id = (
             await db.execute(
                 text(
                     "INSERT INTO academic_level_options (name, sort_order) "
-                    "VALUES ('Route Parity Level', 999) "
+                    "VALUES (:name, 999) "
                     "ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name "
                     "RETURNING id"
-                )
+                ),
+                {"name": academic_level},
             )
         ).scalar_one()
         uni_id = (
@@ -182,7 +187,7 @@ async def _seed_setup() -> dict[str, int]:
                     "INSERT INTO universities (name, country, city) "
                     "VALUES (:n, 'Australia', 'Sydney') RETURNING id"
                 ),
-                {"n": "ROUTE_PARITY_TEST_UNI"},
+                {"n": f"ROUTE_PARITY_TEST_UNI_{suffix}"},
             )
         ).scalar_one()
         course_id = (
@@ -246,9 +251,9 @@ async def _seed_setup() -> dict[str, int]:
                 text(
                     "INSERT INTO scraped_courses "
                     "(scrape_job_id, university_id, course_name, status) "
-                    "VALUES ('route-parity-test', :u, :n, 'pending') RETURNING id"
+                    "VALUES (:job_id, :u, :n, 'pending') RETURNING id"
                 ),
-                {"u": uni_id, "n": "Route Parity Staged"},
+                {"job_id": f"route-parity-test-{suffix}", "u": uni_id, "n": "Route Parity Staged"},
             )
         ).scalar_one()
         await db.commit()
@@ -261,10 +266,13 @@ async def _seed_setup() -> dict[str, int]:
             "int_id": int_id,
             "fee_id": fee_id,
             "sc_id": sc_id,
+            "academic_level_option_id": academic_level_option_id,
+            "academic_level": academic_level,
+            "acronym": acronym,
         }
 
 
-async def _seed_teardown(ids: dict[str, int]) -> None:
+async def _seed_teardown(ids: dict[str, int | str]) -> None:
     async with AsyncSessionLocal() as db:
         # FK cascades clear all child rows, so dropping the university and
         # the staged row is enough.
@@ -274,15 +282,13 @@ async def _seed_teardown(ids: dict[str, int]) -> None:
         await db.execute(
             text("DELETE FROM universities WHERE id = :i"), {"i": ids["uni_id"]}
         )
-        # Best-effort cleanup of the parity acronym + academic level
-        # we may have inserted via the smoke loop.
         await db.execute(
-            text("DELETE FROM course_acronym_options WHERE acronym = 'ROUTEPARITY'")
+            text("DELETE FROM course_acronym_options WHERE acronym = :acronym"),
+            {"acronym": ids["acronym"]},
         )
         await db.execute(
-            text(
-                "DELETE FROM academic_level_options WHERE name = 'Route Parity Level'"
-            )
+            text("DELETE FROM academic_level_options WHERE id = :id"),
+            {"id": ids["academic_level_option_id"]},
         )
         await db.commit()
 
@@ -311,6 +317,9 @@ def test_every_route_is_in_the_app_route_table() -> None:
         "int_id": 1,
         "fee_id": 1,
         "sc_id": 1,
+        "academic_level_option_id": 1,
+        "academic_level": "Route Parity Level",
+        "acronym": "ROUTEPARITY",
     }
     missing: list[str] = []
     for method, path, _ in _routes(fake_ids):
@@ -408,7 +417,7 @@ async def test_routes_smoke() -> None:
                 f"/api/universities/{u}/bulk-academic",
                 json={
                     "courseIds": [c],
-                    "academicLevel": "Route Parity Level",
+                    "academicLevel": ids["academic_level"],
                     "academicScore": 75,
                     "academicCountry": "India",  # duplicate of seed row
                 },

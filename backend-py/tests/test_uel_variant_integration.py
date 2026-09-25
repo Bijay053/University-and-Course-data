@@ -652,6 +652,7 @@ async def test_ambiguous_legacy_parent_requires_review():
     sc = SimpleNamespace(
         id=1, university_id=69, course_name="Mechanical Engineering MSc",
         course_website=URL + "?uel_variant=msc",
+        extraction_method={},
     )
     with pytest.raises(ValueError, match="Ambiguous legacy UEL"):
         await approve_scraped_course(db, sc)

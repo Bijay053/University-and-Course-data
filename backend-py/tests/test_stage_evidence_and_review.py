@@ -1241,8 +1241,8 @@ async def test_re_extract_clears_legacy_rolling_intake_without_touching_other_fi
 async def test_re_extract_refreshes_unchanged_fee_from_newer_canonical_page(monkeypatch):
     uni_id = await _pick_university()
     job_id = f"test_reextract_same_ev_{uuid.uuid4().hex[:10]}"
-    old_url = "https://example.edu/courses/2025/computer-science"
-    new_url = "https://example.edu/courses/2026/computer-science"
+    old_url = f"https://example.edu/courses/2025/{job_id}"
+    new_url = f"https://example.edu/courses/2026/{job_id}"
     try:
         async with AsyncSessionLocal() as db:
             staged = await stage_course(
@@ -1298,6 +1298,14 @@ async def test_re_extract_refreshes_unchanged_fee_from_newer_canonical_page(monk
         monkeypatch.setattr(
             "app.services.scraper.orchestrator._extract_only",
             _fake_extract_only,
+        )
+
+        async def _fake_prefetch_central_pages(*_args, **_kwargs):
+            return {}
+
+        monkeypatch.setattr(
+            "app.services.scraper.central_pages.prefetch_central_pages",
+            _fake_prefetch_central_pages,
         )
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"

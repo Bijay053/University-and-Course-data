@@ -305,6 +305,8 @@ async def test_history_exposes_persisted_catalogue_guard() -> None:
 @pytest.mark.asyncio
 async def test_history_filters_release_mixed_status_university_and_pagination() -> None:
     prefix = f"test_release_filter_{uuid.uuid4().hex[:12]}"
+    matching_release = f"{prefix}_a"
+    other_release = f"{prefix}_b"
     job_ids = [f"{prefix}_{suffix}" for suffix in ("match_old", "match_new", "other_release", "other_uni")]
     transport = httpx.ASGITransport(app=app)
     await engine.dispose()
@@ -317,10 +319,10 @@ async def test_history_filters_release_mixed_status_university_and_pagination() 
                 pytest.skip("history filter test requires two universities")
             primary_university_id, other_university_id = university_ids
             db.add_all([
-                _job(runtime_job_id=job_ids[0], university_id=primary_university_id, release_revision="release-filter-a"),
-                _job(runtime_job_id=job_ids[1], university_id=primary_university_id, release_revision="release-filter-a"),
-                _job(runtime_job_id=job_ids[2], university_id=primary_university_id, release_revision="release-filter-b"),
-                _job(runtime_job_id=job_ids[3], university_id=other_university_id, release_revision="release-filter-a"),
+                _job(runtime_job_id=job_ids[0], university_id=primary_university_id, release_revision=matching_release),
+                _job(runtime_job_id=job_ids[1], university_id=primary_university_id, release_revision=matching_release),
+                _job(runtime_job_id=job_ids[2], university_id=primary_university_id, release_revision=other_release),
+                _job(runtime_job_id=job_ids[3], university_id=other_university_id, release_revision=matching_release),
             ])
             await db.flush()
             for job_id in (job_ids[0], job_ids[1], job_ids[3]):
@@ -340,7 +342,7 @@ async def test_history_filters_release_mixed_status_university_and_pagination() 
             response = await client.get(
                 "/api/scrape/history",
                 params={
-                    "release_revision": "release-filter-a",
+                    "release_revision": matching_release,
                     "mixed_release": "true",
                     "university_id": primary_university_id,
                     "limit": 1,
@@ -355,7 +357,7 @@ async def test_history_filters_release_mixed_status_university_and_pagination() 
         assert payload["offset"] == 1
         assert len(payload["runs"]) == 1
         assert payload["runs"][0]["runtimeJobId"] in job_ids[:2]
-        assert payload["runs"][0]["releaseRevision"] == "release-filter-a"
+        assert payload["runs"][0]["releaseRevision"] == matching_release
         assert payload["runs"][0]["universityId"] == primary_university_id
         assert payload["runs"][0]["releaseWarnings"][0]["ruleId"] == "mixed_release_execution"
     finally:

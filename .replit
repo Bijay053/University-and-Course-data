@@ -60,6 +60,10 @@ args = "academic-level-migration"
 task = "workflow.run"
 args = "dated-catalogue-history-scale"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "fee-selection-concurrency"
+
 [[workflows.workflow]]
 name = "backend-py: FastAPI"
 author = "agent"
@@ -178,6 +182,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd backend-py && PYTHONPATH=. python -m pytest tests/test_winchester_catalogue_review.py::test_dated_catalogue_history_production_shape_latency_size_and_query_gate -q -c /dev/null -p no:cacheprovider"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "fee-selection-concurrency"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend-py && ALLOW_ISOLATED_FEE_SELECTION_TESTS=1 python -m pytest tests/test_fee_selection_concurrency.py -q"
 
 [workflows.workflow.metadata]
 isValidation = true

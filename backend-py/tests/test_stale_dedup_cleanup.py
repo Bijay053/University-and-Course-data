@@ -619,7 +619,7 @@ async def test_review_url_unique_index_preserves_cross_job_lookup_prefix():
     normalized = " ".join(index_definition.split())
     assert "UNIQUE INDEX" in normalized
     assert (
-        "(university_id, canonical_course_url, scrape_job_id)" in normalized
+        "(university_id, canonical_course_url, scrape_job_id, fee_scope_key)" in normalized
     ), "canonical URL must precede scrape job so cross-job alias cleanup stays index-backed"
     assert "status <> ALL" in normalized or "status NOT IN" in normalized
 
