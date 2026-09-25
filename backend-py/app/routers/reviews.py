@@ -6,6 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from sqlalchemy import desc, func, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_user, get_db
@@ -184,8 +185,15 @@ async def bulk_approve_scraped_courses(
             log.warning(
                 "bulk_approve: failed sc_id=%s uni=%s: %s",
                 sc_id, university_id, exc,
+                exc_info=True,
             )
-            failed.append({"scraped_course_id": sc_id, "error": str(exc)})
+            error = (
+                "This course could not be published because of a database error. "
+                "Please try again or contact support if the problem continues."
+                if isinstance(exc, SQLAlchemyError)
+                else str(exc)
+            )
+            failed.append({"scraped_course_id": sc_id, "error": error})
 
     return {
         "ok": True,

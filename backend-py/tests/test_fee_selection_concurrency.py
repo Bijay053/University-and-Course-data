@@ -96,7 +96,7 @@ def evidence_snapshot(rows):
 
 
 @pytest.mark.asyncio
-async def test_bulk_approval_recovers_after_real_fee_constraint_error(isolated_fee_database):
+async def test_bulk_approval_recovers_after_real_fee_constraint_error(isolated_fee_database, caplog):
     """A failed replacement must restore deleted fees and not poison later rows."""
     from app.routers.reviews import router as reviews_router
 
@@ -184,8 +184,23 @@ async def test_bulk_approval_recovers_after_real_fee_constraint_error(isolated_f
     assert result["failed"] == 1
     assert len(result["failures"]) == 1
     assert result["failures"][0]["scraped_course_id"] == ids[1]
-    assert "test_replacement_fee_rejected" in result["failures"][0]["error"]
-    assert "CheckViolationError" in result["failures"][0]["error"]
+    assert result["failures"][0]["error"] == (
+        "This course could not be published because of a database error. "
+        "Please try again or contact support if the problem continues."
+    )
+    for private_detail in (
+        "test_replacement_fee_rejected", "CheckViolationError",
+        "INSERT INTO", "[SQL:", "[parameters:", "19000", "GBP",
+    ):
+        assert private_detail not in response.text
+    diagnostic = next(
+        record for record in caplog.records
+        if record.name == "app.routers.reviews" and f"failed sc_id={ids[1]}" in record.message
+    )
+    assert f"uni={university_id}" in diagnostic.message
+    assert diagnostic.exc_info is not None
+    assert "test_replacement_fee_rejected" in caplog.text
+    assert "[parameters:" in caplog.text
 
     async with sessions() as db:
         assert snapshot(await db.get(Course, existing_id)) == before_course
