@@ -15,6 +15,7 @@ from app.models import (
     AcademicRequirement,
     AcademicLevelOption,
     Course,
+    CourseIdAlias,
     EnglishRequirement,
     Fee,
     Intake,
@@ -259,6 +260,34 @@ async def approve_scraped_course(
                 )
             )
         ).scalar_one_or_none()
+
+    # Never reactivate or overwrite the preserved legacy row through a later
+    # scrape approval. Historical resource routes and foreign keys continue to
+    # refer to that original ID; reviewers must explicitly review the canonical
+    # course rather than silently republishing the alias as a second result.
+    if existing and await db.get(CourseIdAlias, existing.id):
+        raise ApprovalValidationError(
+            "This published course ID is an alias; review its canonical course instead."
+        )
+    if existing is None and sc.course_website:
+        aliased_sources = (
+            await db.execute(
+                select(Course)
+                .join(
+                    CourseIdAlias,
+                    CourseIdAlias.alias_course_id == Course.id,
+                )
+                .where(Course.university_id == sc.university_id)
+            )
+        ).scalars().all()
+        source_identity = canonical_course_url_key(sc.course_website)
+        if source_identity and any(
+            canonical_course_url_key(candidate.course_website) == source_identity
+            for candidate in aliased_sources
+        ):
+            raise ApprovalValidationError(
+                "This source belongs to a preserved legacy course alias; review its canonical course instead."
+            )
 
     decision = should_auto_publish(sc)
     if existing and existing.offering_identity and not scope:

@@ -29,6 +29,7 @@ from app.schemas.search import (
     SearchOptionsResponse,
     SearchStatsResponse,
 )
+from app.services.course_id_aliases import COURSE_ALIAS_EXCLUSION_SQL
 
 log = logging.getLogger(__name__)
 
@@ -59,7 +60,7 @@ async def ensure_search_indexes(db: AsyncSession) -> None:
 # the materialized view that the removed Node API used to create. Naming the
 # CTE ``course_search_view`` lets the existing list, count, and compare queries
 # remain identical while always reflecting newly approved course data.
-_COURSE_SEARCH_CTE = """
+_COURSE_SEARCH_CTE = f"""
 course_search_view AS MATERIALIZED (
     SELECT
         c.id,
@@ -174,6 +175,7 @@ course_search_view AS MATERIALIZED (
     ) latest_academic ON TRUE
     WHERE coalesce(c.status, 'active') = 'active'
       AND coalesce(c.approval_status, 'approved') = 'approved'
+      AND {COURSE_ALIAS_EXCLUSION_SQL}
 )
 """
 
@@ -846,8 +848,10 @@ async def search_options(db: Annotated[AsyncSession, Depends(get_db)]) -> Search
             (
                 await db.execute(
                     text(
-                        "SELECT DISTINCT degree_level FROM courses "
-                        "WHERE degree_level IS NOT NULL ORDER BY degree_level"
+                        "SELECT DISTINCT c.degree_level FROM courses c "
+                        "WHERE c.degree_level IS NOT NULL AND "
+                        + COURSE_ALIAS_EXCLUSION_SQL
+                        + " ORDER BY c.degree_level"
                     )
                 )
             )
@@ -908,7 +912,10 @@ async def search_stats(db: Annotated[AsyncSession, Depends(get_db)]) -> SearchSt
         total_unis = (await db.execute(text("SELECT COUNT(*) FROM universities"))).scalar_one()
         total_courses = (
             await db.execute(
-                text("SELECT COUNT(*) FROM courses WHERE status = 'active'")
+                text(
+                    "SELECT COUNT(*) FROM courses c "
+                    "WHERE c.status = 'active' AND " + COURSE_ALIAS_EXCLUSION_SQL
+                )
             )
         ).scalar_one()
         countries = (
@@ -925,8 +932,8 @@ async def search_stats(db: Annotated[AsyncSession, Depends(get_db)]) -> SearchSt
         uwc = (
             await db.execute(
                 text(
-                    "SELECT COUNT(DISTINCT university_id) FROM courses "
-                    "WHERE status = 'active'"
+                    "SELECT COUNT(DISTINCT c.university_id) FROM courses c "
+                    "WHERE c.status = 'active' AND " + COURSE_ALIAS_EXCLUSION_SQL
                 )
             )
         ).scalar_one()

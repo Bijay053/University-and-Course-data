@@ -14,6 +14,7 @@ from app.models.assessment_note import AssessmentNote
 from app.models.audit import CourseAuditLog
 from app.models.bulk_session import BulkSession
 from app.models.course import Course
+from app.models.course_id_alias import CourseIdAlias
 from app.models.english_requirement import EnglishRequirement
 from app.models.evidence import ScrapedFieldEvidence
 from app.models.fee import Fee
@@ -62,6 +63,7 @@ __all__ = [
     "AssessmentNote",
     "BulkSession",
     "Course",
+    "CourseIdAlias",
     "CourseAcronymOption",
     "CourseAuditLog",
     "CourseFieldApproval",

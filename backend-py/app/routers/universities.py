@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_user, get_db
 from app.models import Course, University, UniversityLocation
+from app.services.course_id_aliases import exclude_aliased_courses
 from app.permissions import require_permission
 from app.schemas.course import CourseListResponse, CourseRead
 from app.schemas.university import (
@@ -1220,7 +1221,7 @@ async def get_university(uni_id: int, db: Annotated[AsyncSession, Depends(get_db
     u = await db.get(University, uni_id)
     if not u:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="University not found")
-    cc_stmt = select(func.count(Course.id)).where(
+    cc_stmt = exclude_aliased_courses(select(func.count(Course.id))).where(
         Course.university_id == uni_id,
         Course.status == "active",
     )
@@ -1239,7 +1240,9 @@ async def get_university_courses(
     u = await db.get(University, uni_id)
     if not u:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="University not found")
-    stmt = select(Course).where(Course.university_id == uni_id)
+    stmt = exclude_aliased_courses(
+        select(Course).where(Course.university_id == uni_id)
+    )
     if status_filter and status_filter.lower() != "all":
         stmt = stmt.where(Course.status == status_filter)
     elif not status_filter:

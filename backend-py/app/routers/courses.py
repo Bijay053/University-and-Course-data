@@ -11,7 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_user, get_db
 from app.models import Course, University
+from app.models.course_id_alias import CourseIdAlias
 from app.schemas.course import CourseCreate, CourseListResponse, CourseRead, CourseUpdate, CourseLocationOffering
+from app.services.course_id_aliases import (
+    CourseAliasChainError,
+    exclude_aliased_courses,
+    resolve_course_id,
+)
 from app.services.scraper.published_offerings import read_offerings
 
 router = APIRouter()
@@ -43,6 +49,7 @@ async def list_courses(
     limit: int = Query(default=50, ge=1, le=10000),
 ) -> CourseListResponse:
     stmt = select(Course).join(University, Course.university_id == University.id)
+    stmt = exclude_aliased_courses(stmt)
     if university_id:
         stmt = stmt.where(Course.university_id == university_id)
     if q:
@@ -227,12 +234,24 @@ async def list_courses(
     return JSONResponse(content={"data": out, "total": int(total), "page": page, "limit": limit})
 
 
-@router.get("/courses/{course_id}", response_model=CourseRead)
+@router.get(
+    "/courses/{course_id}",
+    response_model=CourseRead,
+    response_model_exclude_unset=True,
+)
 async def get_course(course_id: int, db: Annotated[AsyncSession, Depends(get_db)]) -> CourseRead:
-    c = await db.get(Course, course_id)
+    # The detail compatibility endpoint resolves legacy IDs; per-course child
+    # resource routers deliberately continue to use the historical FK ID.
+    try:
+        canonical_id, was_alias = await resolve_course_id(db, course_id)
+    except CourseAliasChainError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    c = await db.get(Course, canonical_id)
     if not c:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
     result = CourseRead.model_validate(c)
+    if was_alias:
+        result.requestedCourseId = course_id
     result.offerings = [CourseLocationOffering(**o) for o in (await read_offerings(db, [c.id]))[c.id]]
     result.locations = [o.location for o in result.offerings]
     return result
@@ -272,6 +291,11 @@ async def update_course(
     db: Annotated[AsyncSession, Depends(get_db)],
     _user: Annotated[dict, Depends(get_current_user)],
 ) -> CourseRead:
+    if await db.get(CourseIdAlias, course_id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This legacy course ID is an alias; edit the canonical course instead.",
+        )
     c = await db.get(Course, course_id)
     if not c:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
@@ -298,6 +322,11 @@ async def delete_course(
     db: Annotated[AsyncSession, Depends(get_db)],
     _user: Annotated[dict, Depends(get_current_user)],
 ) -> None:
+    if await db.get(CourseIdAlias, course_id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This legacy course ID is an alias and cannot be deleted.",
+        )
     c = await db.get(Course, course_id)
     if not c:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
@@ -316,6 +345,18 @@ async def bulk_delete_courses(
     ids = list(body.get("course_ids", []))
     if not ids:
         return {"deleted": 0}
+    aliases = (
+        await db.execute(
+            select(CourseIdAlias.alias_course_id).where(
+                CourseIdAlias.alias_course_id.in_(ids)
+            )
+        )
+    ).scalars().all()
+    if aliases:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Bulk delete includes legacy course alias IDs; resolve them explicitly first.",
+        )
     result = await db.execute(
         sa_text("DELETE FROM courses WHERE id = ANY(:ids) RETURNING id"),
         {"ids": ids},

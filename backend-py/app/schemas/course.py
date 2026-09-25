@@ -76,6 +76,7 @@ class CourseRead(CourseBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    requestedCourseId: int | None = None
     offerings: list[CourseLocationOffering] = Field(default_factory=list)
     locations: list[str] = Field(default_factory=list)
     status: str
