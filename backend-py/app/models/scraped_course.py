@@ -37,6 +37,7 @@ class ScrapedCourse(Base):
             "university_id",
             "canonical_course_url",
             "scrape_job_id",
+            "fee_scope_key",
             unique=True,
             postgresql_where=text("status NOT IN ('approved', 'published')"),
         ),
@@ -55,6 +56,7 @@ class ScrapedCourse(Base):
     sub_category: Mapped[str | None] = mapped_column(Text)
     course_website: Mapped[str | None] = mapped_column(Text)
     canonical_course_url: Mapped[str | None] = mapped_column(Text)
+    fee_scope_key: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
     duration: Mapped[float | None] = mapped_column(Numeric(6, 2))
     duration_term: Mapped[str | None] = mapped_column(Text)
     study_mode: Mapped[str | None] = mapped_column(Text)

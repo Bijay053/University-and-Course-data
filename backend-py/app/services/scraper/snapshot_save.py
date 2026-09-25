@@ -131,12 +131,14 @@ async def persist_staged_row_backup(
     if not course_url:
         return False
 
+    from sqlalchemy import func
     result = await db.execute(
         select(PageSnapshot)
         .where(
             PageSnapshot.scrape_job_id == sc.scrape_job_id,
             PageSnapshot.snapshot_type == "staged_row",
             PageSnapshot.course_url == course_url,
+            func.coalesce(PageSnapshot.original_extraction["fee_scope_key"].astext, "") == (getattr(sc, "fee_scope_key", "") or ""),
         )
         .order_by(PageSnapshot.id.desc())
         .limit(1)

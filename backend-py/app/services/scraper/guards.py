@@ -1332,6 +1332,7 @@ def should_stage_course(
     # If the university has a centralized fee page, the fee may simply not
     # be listed for this specific course yet — stage for human review instead
     # of auto-rejecting.  International fees on a separate page are legitimate.
+    from app.services.scraper.extractors.ulaw_fees import validated_fee_variants
     if payload.get("international_fee") is None:
         # Hard block: fee.py's structured-table extractor found a real fee
         # table on THIS course's own page and confirmed it has Home/Part-time
@@ -1351,6 +1352,10 @@ def should_stage_course(
                 source_url,
             )
             return (False, "no_international_fee")
+        if validated_fee_variants({
+            **payload, "course_website": payload.get("course_website") or source_url,
+        }):
+            return (True, "accepted")
         # Escape hatch 1: university has a central fee page — the per-course
         # fee may legitimately not appear on the individual page.
         if payload.get("has_central_fee_page"):

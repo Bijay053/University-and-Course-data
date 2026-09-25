@@ -179,6 +179,78 @@ function initialReview(): ScrapingInitialReviewState {
 }
 
 describe("Scraping repair reviewer", () => {
+  it("splits selected ambiguous campus fees into persisted pending rows, retains both selections, and never publishes them", async () => {
+    const review = initialReview();
+    const selected = [17500, 19050].map((amount, index) => ({
+      amount, currency: "GBP", year: 2026, period: "Full Course",
+      campus: index ? "London" : "Outside London", study_variant: "Standard",
+      source_url: "https://www.law.ac.uk/study/postgraduate/business/msc-healthcare-management/",
+      snippet: "International Students | 2026 | Full Course",
+    }));
+    review.courses = [{
+      ...review.courses[0], internationalFee: null,
+      extraction_method: { fee_variants: { status: "range", selected, options: selected } },
+    }] as ScrapingInitialReviewState["courses"];
+    const london = {
+      ...review.courses[0], id: 51, courseName: "MSc Healthcare Management — London",
+      internationalFee: 19050, courseLocation: "London",
+      extraction_method: { fee_variants: { status: "uniform", selected: [selected[1]], options: selected } },
+    };
+    const other = {
+      ...review.courses[0], id: 52, courseName: "MSc Healthcare Management — Other locations",
+      internationalFee: 17500, courseLocation: "Birmingham, Leeds, Manchester",
+      extraction_method: { fee_variants: { status: "uniform", selected: [selected[0]], options: selected } },
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/scrape/staged/split-campus-fees") {
+        expect(init?.method).toBe("POST");
+        expect(JSON.parse(String(init?.body))).toEqual({ ids: [1] });
+        return jsonResponse({ split: 1, created: 2, results: [{ id: 1, status: "split", courseIds: [51, 52] }] });
+      }
+      if (url === "/api/scrape/staged/repair-job") return jsonResponse({ courses: [london, other] });
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ScrapingForTest initialReviewState={review} />);
+    await userEvent.click(screen.getByTestId("button-split-campus-fees"));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Approve (2)" })).toBeTruthy());
+    expect(screen.getByTestId("fee-summary-51").textContent).toContain("£19,050");
+    expect(screen.getByTestId("fee-summary-52").textContent).toContain("£17,500");
+    expect(screen.queryByTestId("fee-summary-1")).toBeNull();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/approve"))).toBe(false);
+  });
+
+  it("leaves an unmatched course pending when the server cannot safely split its locations", async () => {
+    const review = initialReview();
+    review.courses = [{
+      ...review.courses[0], internationalFee: null,
+      extraction_method: { fee_variants: { status: "range", selected: [], options: [] } },
+    }] as ScrapingInitialReviewState["courses"];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/scrape/staged/split-campus-fees")
+        return jsonResponse({ split: 0, created: 0, results: [{ id: 1, status: "needs_review", courseIds: [], reason: "Campus mapping is ambiguous" }] });
+      if (url === "/api/scrape/staged/repair-job") return jsonResponse({ courses: review.courses });
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ScrapingForTest initialReviewState={review} />);
+    await userEvent.click(screen.getByTestId("button-split-campus-fees"));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url) === "/api/scrape/staged/repair-job")).toBe(true));
+    expect(screen.getByRole("button", { name: "Approve (0)" })).toBeTruthy();
+    expect(screen.getByTestId("button-split-campus-fees")).toBeTruthy();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/approve"))).toBe(false);
+  });
+
   it.each([false, true])("approves identical campus fees in a mixed selection and retains pending rows (failure=%s)", async (fail) => {
     const review = initialReview();
     const options = (amounts: number[]) => amounts.map((amount, index) => ({

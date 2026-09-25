@@ -1190,7 +1190,13 @@ async def stage_course(
         # continuation can reconstruct the row without re-fetching the page.
         from app.services.scraper.snapshot_save import persist_staged_row_backup
 
+        from app.services.scraper.campus_fee_split import split_pending_course
+        campus_split = await split_pending_course(db, sc)
         await persist_staged_row_backup(db, sc, source_url=source_url)
+        if campus_split["status"] == "split":
+            for child_id in campus_split["courseIds"][1:]:
+                child = await db.get(ScrapedCourse, child_id)
+                await persist_staged_row_backup(db, child, source_url=source_url)
         await db.commit()
     except Exception as exc:  # noqa: BLE001
         await db.rollback()
@@ -1205,5 +1211,7 @@ async def stage_course(
             "evidence_rows": evidence_count,
             "completeness": sc.completeness,
             "conflicts": conflicts_written,
+            "staged_course_ids": campus_split["courseIds"],
+            "campus_fee_split": campus_split["status"] == "split",
         },
     )

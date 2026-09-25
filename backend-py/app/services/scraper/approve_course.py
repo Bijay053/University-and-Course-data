@@ -125,6 +125,22 @@ async def approve_scraped_course(
         raise ValueError(
             f"scraped_course id={sc.id} has empty course_name; cannot promote"
         )
+    from app.services.scraper.extractors.ulaw_fees import validated_fee_variants
+    from app.services.scraper.campus_fee_split import SCOPE
+    fee_metadata = sc.extraction_method or {}
+    fee_authority = fee_metadata.get("fee_variants")
+    if fee_authority and (
+        fee_authority.get("status") != "uniform" or not validated_fee_variants(sc)
+    ):
+        raise ValueError("Resolve the published fee options before approving this course")
+    scope = fee_metadata.get(SCOPE)
+    if scope:
+        expected_locations = ", ".join(scope["locations"])
+        expected_name = f"{scope['original_name']} — {expected_locations}"
+        if sc.course_location != expected_locations or sc.course_name != expected_name or sc.fee_scope_key != scope["key"]:
+            raise ValueError("Campus fee scope no longer matches the course; review required")
+        if actor == "system":
+            raise ValueError("Campus fee groups require explicit reviewer approval")
     from app.services.scraper.review_policy import blocks_automatic_followup
     # Automated callers use the default system actor; authenticated review
     # routes pass the operator identity (not necessarily the literal "human").
@@ -151,7 +167,24 @@ async def approve_scraped_course(
     _uel_variant = is_uel_course_url(sc.course_website or "") and bool(
         uel_variant_key(sc.course_website or "")
     )
-    if _uel_variant:
+    if scope:
+        # Names are intentionally location-qualified. Also require exact source
+        # and location ownership: a legacy unsplit parent is not this sibling.
+        candidates = (
+            await db.execute(
+                select(Course).where(
+                    Course.university_id == sc.university_id,
+                    func.lower(Course.name) == sc.course_name.lower(),
+                    Course.course_location == sc.course_location,
+                )
+            )
+        ).scalars().all()
+        exact = [candidate for candidate in candidates
+                 if canonical_course_url_key(candidate.course_website) == canonical_course_url_key(sc.course_website)]
+        if len(exact) > 1:
+            raise ValueError("Ambiguous existing campus course identity; review required")
+        existing = exact[0] if exact else None
+    elif _uel_variant:
         # Award names can change independently of route identity. Never merge a
         # selected route into its sibling (or a legacy undifferentiated parent)
         # merely because the two display names happen to match.

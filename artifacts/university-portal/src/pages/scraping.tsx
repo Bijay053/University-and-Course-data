@@ -1091,6 +1091,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   const [rejectFieldKey, setRejectFieldKey] = useState("general");
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [splittingCampusFees, setSplittingCampusFees] = useState(false);
   const [approvingId, setApprovingId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(
     () => new Set(initialReviewState?.courses.map((course) => course.id) ?? []),
@@ -2391,8 +2392,64 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   const feeReviewSelectedIds = new Set(
     stagedCourses.filter(c => selectedIds.has(c.id) && feeVariantNeedsReview(c)).map(c => c.id)
   );
+  const campusFeeSplitIds = stagedCourses
+    .filter(c => selectedIds.has(c.id) && feeVariantAuthority(c)?.status === "range")
+    .map(c => c.id);
   const approvalCandidateIds = stagedCourses
     .filter(c => selectedIds.has(c.id) && !feeReviewSelectedIds.has(c.id)).map(c => c.id);
+
+  const handleSplitCampusFees = async () => {
+    if (!reviewJobId || campusFeeSplitIds.length === 0 || splittingCampusFees) return;
+    setSplittingCampusFees(true);
+    try {
+      const res = await fetch("/api/scrape/staged/split-campus-fees", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: campusFeeSplitIds }),
+      });
+      if (!res.ok) throw new Error(await getFetchErrorMessage(res));
+      const data = await readResponseJson<{
+        results: Array<{ id: number; status: "split" | "unchanged" | "needs_review"; courseIds: number[]; reason?: string }>;
+        created: number;
+        split: number;
+      }>(res);
+      if (!data || !Array.isArray(data.results) || !Number.isInteger(data.split) || !Number.isInteger(data.created)) {
+        throw new Error("The server returned an invalid campus fee split response.");
+      }
+      const splitResults = data.results.filter(result =>
+        result.status === "split" && campusFeeSplitIds.includes(result.id)
+        && Array.isArray(result.courseIds) && result.courseIds.every(Number.isInteger));
+      setSelectedIds(previous => {
+        const next = new Set(previous);
+        for (const result of splitResults) {
+          next.delete(result.id);
+          result.courseIds.forEach(id => next.add(id));
+        }
+        return next;
+      });
+      // Refresh persisted rows rather than guessing their fee or campus in the browser.
+      const refreshed = await loadStagedCourses(reviewJobId, false);
+      if (!refreshed) throw new Error("The changed courses could not be refreshed. Reload the review to see the current rows.");
+      const unresolved = data.results.filter(result => result.status !== "split");
+      toast({
+        title: `${data.split} course(s) split by campus fee`,
+        description: [
+          `${data.created} location-specific course row(s) created. Review them before approving.`,
+          unresolved.length > 0 ? `${unresolved.length} left unchanged for review. ${unresolved.slice(0, 2).map(r => r.reason).filter(Boolean).join(" · ")}` : "",
+        ].filter(Boolean).join(" "),
+        ...(unresolved.length > 0 ? { variant: "destructive" as const } : {}),
+      });
+    } catch (error) {
+      toast({
+        title: "Campus fee split could not finish",
+        description: error instanceof Error ? error.message : "Please refresh the review and try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSplittingCampusFees(false);
+    }
+  };
 
   const handleApproveSelected = async () => {
     if (!reviewJobId || selectedIds.size === 0) return;
@@ -3557,16 +3614,27 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                   variant="outline"
                   className="text-red-600 border-red-200 hover:bg-red-50"
                   onClick={handleRejectSelected}
-                  disabled={selectedIds.size === 0 || approving}
+                  disabled={selectedIds.size === 0 || approving || splittingCampusFees}
                 >
                   <XCircle className="w-4 h-4 mr-1" />
                   Reject ({selectedIds.size})
                 </Button>
                 <Button
                   size="sm"
+                  variant="outline"
+                  onClick={handleSplitCampusFees}
+                  disabled={campusFeeSplitIds.length === 0 || splittingCampusFees || approving || fixingSelected || analyzingFix}
+                  title="Create separate pending course rows for each safely matched campus fee; unmatched courses remain pending for review"
+                  data-testid="button-split-campus-fees"
+                >
+                  {splittingCampusFees && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+                  Split by campus fees ({campusFeeSplitIds.length})
+                </Button>
+                <Button
+                  size="sm"
                   className="bg-green-600 hover:bg-green-700 text-white"
                   onClick={handleApproveSelected}
-                  disabled={selectedIds.size === 0 || approving}
+                  disabled={selectedIds.size === 0 || approving || splittingCampusFees}
                   title="Approve selected courses that do not need fee-option review; other approval checks still apply"
                 >
                   {approving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1" />}
@@ -3581,6 +3649,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
               <p className="text-sm text-amber-700" role="status">
                 {feeReviewSelectedIds.size} selected course(s) need fee-option review and will remain pending.
                 {" "}{approvalCandidateIds.length} other selected course(s) can be submitted for approval.
+                {" "}{campusFeeSplitIds.length > 0 ? "Use Split by campus fees to create separate pending rows where the source evidence safely matches each course location." : ""}
                 {" "}Identical fees across campuses do not require fee-option review.
               </p>
             )}

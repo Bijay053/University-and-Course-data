@@ -95,6 +95,8 @@ def should_auto_publish(sc: ScrapedCourse) -> AutoPublishDecision:
     from app.services.scraper.extractors.ulaw_fees import validated_fee_variants
     fee_variants = validated_fee_variants(sc)
     fee_metadata = getattr(sc, "extraction_method", None)
+    if isinstance(fee_metadata, dict) and fee_metadata.get("campus_fee_scope"):
+        return AutoPublishDecision(False, "Campus fee groups require explicit reviewer approval", score)
     declared_variants = fee_metadata.get("fee_variants") if isinstance(fee_metadata, dict) else None
     if (
         (fee_variants and fee_variants["status"] == "range")

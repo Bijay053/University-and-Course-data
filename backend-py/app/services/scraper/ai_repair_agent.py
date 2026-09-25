@@ -1559,6 +1559,7 @@ async def _run_extraction_scan(
             text(
                 f"UPDATE scraped_courses SET course_location = NULL "
                 f"WHERE {_base_where} AND course_location IS NOT NULL "
+                f"AND COALESCE(fee_scope_key, '') = '' "
                 f"AND LOWER(course_location) LIKE LOWER(:rv)"
             ),
             {**_base_params, "rv": f"%{val}%"},
@@ -1667,24 +1668,47 @@ async def _run_extraction_scan(
             continue
         try:
             result = await extract_course(url=url, use_ai_fallback=False)
+            from sqlalchemy import select
+            from app.models import ScrapedCourse
+            from app.services.scraper.campus_fee_split import scope_refresh_payload
+
+            current = (await db.execute(
+                select(ScrapedCourse).where(
+                    ScrapedCourse.id == row["id"],
+                    ScrapedCourse.university_id == uni_id,
+                    ScrapedCourse.scrape_job_id == job_id,
+                ).with_for_update().execution_options(populate_existing=True)
+            )).scalar_one_or_none()
+            if current is None or current.course_website != url:
+                raise RuntimeError("Repair source changed during extraction; result not applied.")
+            if current.status not in {"pending", "review", "approved"}:
+                raise RuntimeError("Repair row is no longer eligible; result not applied.")
+            if current.fee_scope_key and not (current.extraction_method or {}).get("campus_fee_scope"):
+                raise RuntimeError("Campus scope metadata missing; repair not applied.")
+            result = scope_refresh_payload(current, result)
             update: dict[str, Any] = {}
-            if row["international_fee"] is None and result.get("international_fee") is not None:
+            if current.international_fee is None and result.get("international_fee") is not None:
                 update["international_fee"] = result["international_fee"]
                 fills["fee_fills"] += 1
-            if row["ielts_overall"] is None and result.get("ielts_overall") is not None:
+            if current.ielts_overall is None and result.get("ielts_overall") is not None:
                 update["ielts_overall"] = result["ielts_overall"]
                 fills["ielts_fills"] += 1
-            if row["study_mode"] is None and result.get("study_mode") is not None:
+            if current.study_mode is None and result.get("study_mode") is not None:
                 update["study_mode"] = result["study_mode"]
                 fills["mode_fills"] += 1
+            if current.fee_scope_key:
+                for key in ("international_fee", "extraction_method", "scrape_warnings",
+                            "fee_year", "fee_term", "currency"):
+                    if key in result:
+                        update[key] = result[key]
+                if "campus_fee_scope_requires_review" in (result.get("scrape_warnings") or []):
+                    update["auto_publish_status"] = "review"
             if update:
-                clauses = ", ".join(f"{k}=:{k}" for k in update)
-                await db.execute(
-                    text(f"UPDATE scraped_courses SET {clauses} WHERE id=:rid"),
-                    {"rid": row["id"], **update},
-                )
+                for key, value in update.items():
+                    setattr(current, key, value)
         except Exception as exc:
             log.warning("extraction_scan: url=%s error=%s", url, exc)
+            fills.setdefault("errors", []).append({"url": url, "reason": str(exc)})
 
     await db.commit()
     return fills

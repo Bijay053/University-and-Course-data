@@ -127,6 +127,27 @@ def _integrity_error(constraint_name):
     return IntegrityError("insert", {}, orig)
 
 
+def test_restore_same_url_campus_backups_keep_both_scopes():
+    snapshots = [
+        _snapshot(
+            index, "parent", "https://uni.test/course", f"Course — {campus}", fee,
+            snapshot_type="staged_row", snapshot_schema="staged_row_v1",
+            extra={"fee_scope_key": campus.lower(), "course_location": campus},
+        )
+        for index, campus, fee in [(1, "London", 19050), (2, "Manchester", 17500)]
+    ]
+    db = _FakeDb({"parent": _job("parent")}, snapshots)
+    result = asyncio.run(restore_review_rows("parent", commit=True, db=db))
+    assert result["restored"] == 2
+    assert {row.fee_scope_key: row.international_fee for row in db.added} == {
+        "london": 19050, "manchester": 17500,
+    }
+    db.staged = db.added[:]
+    result = asyncio.run(restore_review_rows("parent", commit=True, db=db))
+    assert result["restored"] == 0
+    assert result["skipped_existing"] == 2
+
+
 def test_restore_duplicate_review_url_collision_is_reported_as_skipped():
     db = _FakeDb(
         {"parent": _job("parent")},

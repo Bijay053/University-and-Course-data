@@ -267,18 +267,25 @@ async def restore_review_rows(
 
         # Newest snapshot per source-job/URL wins, while ancestry order remains
         # meaningful for provenance.
-        unique: dict[tuple[str, str], PageSnapshot] = {}
+        unique: dict[tuple[str, str, str], PageSnapshot] = {}
         for snap in snapshots:
             extraction = snap.original_extraction
             if not isinstance(extraction, dict) or not extraction.get("course_name"):
                 continue
-            unique.setdefault((snap.scrape_job_id, snap.course_url), snap)
+            unique.setdefault((
+                snap.scrape_job_id, snap.course_url,
+                str(extraction.get("fee_scope_key") or ""),
+            ), snap)
 
         staged_rows = list((await db.execute(
             select(ScrapedCourse).where(ScrapedCourse.university_id == university_id)
         )).scalars().all())
         occupied_urls = {
             canonical_course_url_key(row.course_website)
+            for row in staged_rows if row.course_website
+        }
+        occupied_scopes = {
+            (canonical_course_url_key(row.course_website), getattr(row, "fee_scope_key", "") or "")
             for row in staged_rows if row.course_website
         }
         occupied_names = {
@@ -290,6 +297,10 @@ async def restore_review_rows(
         published_rows = list((await db.execute(
             select(Course).where(Course.university_id == university_id)
         )).scalars().all())
+        published_identities = {
+            (canonical_course_url_key(row.course_website), (row.name or "").strip().casefold())
+            for row in published_rows if row.course_website
+        }
         occupied_urls.update(
             canonical_course_url_key(row.course_website)
             for row in published_rows if row.course_website
@@ -326,6 +337,7 @@ async def restore_review_rows(
             name = str(data.get("course_name") or "").strip()
             restored_url = str(data.get("course_website") or snap.course_url or "").strip()
             normalized_url = canonical_course_url_key(restored_url)
+            fee_scope_key = str(data.get("fee_scope_key") or "")
             if not name:
                 skipped_unusable += 1
                 continue
@@ -337,7 +349,14 @@ async def restore_review_rows(
             # need the broader name fallback because their fetched URL may not
             # be the final canonical course URL.
             if (
-                normalized_url in occupied_urls
+                (
+                    (
+                        (normalized_url, fee_scope_key) in occupied_scopes
+                        or (normalized_url, name.casefold()) in published_identities
+                    )
+                    if is_exact_backup and fee_scope_key
+                    else normalized_url in occupied_urls
+                )
                 or (not is_exact_backup and name.casefold() in occupied_names)
             ):
                 skipped_existing += 1
@@ -368,6 +387,7 @@ async def restore_review_rows(
                     skipped_existing += 1
                     continue
             occupied_urls.add(normalized_url)
+            occupied_scopes.add((normalized_url, fee_scope_key))
             occupied_names.add(name.casefold())
             restored += 1
             restored_rows.append({
@@ -490,6 +510,25 @@ def _audience_review_from_html(
     }
 
 
+def _scoped_replay_values(row: ScrapedCourse, payload: dict[str, Any]) -> dict[str, Any]:
+    """Keep page evidence shared, but preserve every staged child's identity."""
+    from app.services.scraper.campus_fee_split import scope_refresh_payload
+
+    scoped = scope_refresh_payload(row, payload)
+    allowed = set(_DIFF_FIELDS)
+    if getattr(row, "fee_scope_key", "") or (row.extraction_method or {}).get("campus_fee_scope"):
+        allowed.difference_update({"course_name", "course_location"})
+        allowed.update({
+            "extraction_method", "scrape_warnings", "fee_year", "fee_term", "currency",
+        })
+        if not (row.extraction_method or {}).get("campus_fee_scope"):
+            raise ValueError(f"Campus scope metadata missing for staged row {row.id}; replay not applied.")
+    values = {key: value for key, value in scoped.items() if key in allowed}
+    if "campus_fee_scope_requires_review" in (values.get("scrape_warnings") or []):
+        values["auto_publish_status"] = "review"
+    return values
+
+
 async def _replay_job_inner(
     scrape_job_id: str,
     *,
@@ -586,12 +625,17 @@ async def _replay_job_inner(
 
     # ── 3. Load existing staged courses for commit path only ─────────────────
     # We only need scraped_courses when commit=True (to apply new values).
-    staged: dict[str, ScrapedCourse] = {}
+    staged: dict[str, list[ScrapedCourse]] = {}
     if commit:
         sc_result = await db.execute(
-            select(ScrapedCourse).where(ScrapedCourse.scrape_job_id == scrape_job_id)
+            select(ScrapedCourse).where(
+                ScrapedCourse.scrape_job_id == scrape_job_id,
+                ScrapedCourse.university_id == university_id,
+            ).order_by(ScrapedCourse.id).with_for_update()
+            .execution_options(populate_existing=True)
         )
-        staged = {sc.course_url: sc for sc in sc_result.scalars().all()}
+        for sc in sc_result.scalars().all():
+            staged.setdefault(canonical_course_url_key(sc.course_website), []).append(sc)
 
     # ── 4. Replay extraction ─────────────────────────────────────────────────
     from app.services.scraper.pipelines.single_course import extract_course
@@ -600,6 +644,7 @@ async def _replay_job_inner(
     diffs: list[dict] = []
     audience_reviews: list[dict] = []
     replayed = changed = unchanged = errors = 0
+    applied_rows: set[int] = set()
 
     # Concurrency cap: S3 download + extraction share one semaphore.
     # IMPORTANT: keep the download *inside* the semaphore.  If downloads run
@@ -662,9 +707,10 @@ async def _replay_job_inner(
             # Fallback: if snapshot predates original_extraction column,
             # fall back to scraped_courses (graceful degradation).
             if not old_data:
-                old_sc = staged.get(snap.course_url) if commit else None
-                if old_sc:
-                    old_data = {f: getattr(old_sc, f, None) for f in _DIFF_FIELDS}
+                old_rows = staged.get(canonical_course_url_key(snap.course_url), [])
+                # A scoped child is not a baseline for the broad page.
+                if len(old_rows) == 1 and not getattr(old_rows[0], "fee_scope_key", ""):
+                    old_data = {f: getattr(old_rows[0], f, None) for f in _DIFF_FIELDS}
 
             diff = _diff_course(old_data, new_data)
             audience_review = (
@@ -691,17 +737,26 @@ async def _replay_job_inner(
                     "changes": diff,
                     "new_name": new_data.get("course_name", ""),
                 })
-                if commit:
-                    old_sc = staged.get(snap.course_url)
-                    if old_sc:
-                        for field, change in diff.items():
-                            try:
-                                setattr(old_sc, field, change["new"])
-                            except Exception:
-                                pass
-                        old_sc.updated_at = datetime.now(timezone.utc)
             else:
                 unchanged += 1
+            if commit:
+                # Prepare the entire fanout before writing. Row locks above
+                # fence source edits and concurrent splitting until commit.
+                updates = []
+                for row in staged.get(canonical_course_url_key(snap.course_url), []):
+                    scoped_child = bool(getattr(row, "fee_scope_key", "") or
+                                        (row.extraction_method or {}).get("campus_fee_scope"))
+                    payload = new_data if scoped_child else {
+                        field: change["new"] for field, change in diff.items()
+                    }
+                    updates.append((row, _scoped_replay_values(row, payload)))
+                for row, values in updates:
+                    if not values:
+                        continue
+                    for field, value in values.items():
+                        setattr(row, field, value)
+                    row.updated_at = datetime.now(timezone.utc)
+                    applied_rows.add(row.id)
 
         except Exception as exc:
             log.warning("[REPLAY] error replaying %s: %s", snap.course_url, exc)
@@ -716,13 +771,14 @@ async def _replay_job_inner(
             f"Done: {changed} changed, {unchanged} unchanged, {errors} error(s).",
         )
 
-    if commit and changed > 0:
+    if commit and applied_rows:
         try:
             await db.commit()
             log.info("[REPLAY] committed %d updated rows", changed)
         except Exception as exc:
             log.warning("[REPLAY] commit failed: %s", exc)
             await db.rollback()
+            raise
 
     return {
         "job_id": scrape_job_id,
@@ -735,7 +791,7 @@ async def _replay_job_inner(
         "audience_reviews": audience_reviews,
         "message": (
             f"Replay complete: {changed} changed, {unchanged} unchanged, {errors} errors."
-            + (" Changes committed." if commit and changed > 0 else "")
+            + (" Changes committed." if commit and applied_rows else "")
         ),
     }
 
@@ -750,7 +806,12 @@ def _replay_from_json(raw_bytes: bytes, url: str) -> dict[str, Any]:
     try:
         payload = json.loads(raw_bytes.decode("utf-8", errors="replace"))
         # Payload is already in extracted-field format from the provider
-        return {f: payload.get(f) for f in _DIFF_FIELDS}
+        return {
+            **{f: payload.get(f) for f in _DIFF_FIELDS},
+            **{f: payload[f] for f in (
+                "extraction_method", "scrape_warnings", "fee_year", "fee_term", "currency",
+            ) if f in payload},
+        }
     except Exception as exc:
         log.warning("[REPLAY] json decode failed for %s: %s", url, exc)
-        return {}
+        raise ValueError(f"Invalid replay JSON for {url}") from exc

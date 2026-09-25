@@ -104,6 +104,10 @@ def compute_pub_score(
         if decision == "auto_publish":
             decision = "needs_review"
         reason += " | International fee campus/award alternatives require review"
+    if (getattr(sc, "extraction_method", None) or {}).get("campus_fee_scope"):
+        if decision == "auto_publish":
+            decision = "needs_review"
+        reason += " | Campus fee groups require explicit reviewer approval"
 
     return {
         "score": pub_score,

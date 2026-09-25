@@ -147,6 +147,10 @@ Canvas-reported bug: "HNC Building Studies should be rejected because it is part
 
 The database schema includes tables for `universities`, `courses`, `intakes`, `fees`, `english_requirements`, `academic_requirements`, `scholarships`, `scraping_jobs`, `scraping_changes`, `scraped_courses` (staging), and `import_jobs`.
 
+### Campus-specific tuition
+
+When the official source clearly assigns different tuition to actual course locations, retain all offerings as separate course entries grouped by fee—not one arbitrarily selected campus or an unresolved combined price range. For example, Healthcare Management is London at £19,050 and Birmingham/Leeds/Manchester together at £17,500, both for the published 2026 full-course period. Equal-price campuses remain grouped. Never invent locations, mix fee years or billing periods, or apply bursary-discounted prices as gross tuition. Ambiguous mappings stay pending for review, and splitting must not approve courses automatically.
+
 ### Deployment Architecture
 
 - **Production Server**: AWS EC2 instance `i-03547b132b6aa4ffb` (`university-portal-production`), managed through AWS Systems Manager Session Manager / Run Command. Direct SSH from Replit may be blocked; use SSM instead of the retired DigitalOcean host.

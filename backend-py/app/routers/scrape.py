@@ -2915,6 +2915,11 @@ async def re_extract_staged(
             if warning not in warning_candidates:
                 warning_candidates.append(warning)
 
+        # A sibling owns only its selected course campuses, even when a fresh
+        # source extraction returns the entire parent page's alternatives.
+        from app.services.scraper.campus_fee_split import scope_refresh_payload
+        payload = scope_refresh_payload(row, payload)
+
         # Apply payload fields to the existing row.
         changed_fields: list[str] = []
         for field_key, val in payload.items():
@@ -3935,6 +3940,56 @@ async def decide_dated_catalogue_review(
     return _dated_catalogue_response(
         row, history_count=await _dated_history_count(db, row.id)
     )
+
+
+class _SplitCampusFeesBody(BaseModel):
+    ids: list[int] = Field(min_length=1, max_length=2000)
+
+    @field_validator("ids", mode="before")
+    @classmethod
+    def validate_ids(cls, value):
+        if not isinstance(value, list) or len(value) > 2000 or any(type(i) is not int or i <= 0 for i in value):
+            raise ValueError("ids must contain positive integer course IDs")
+        return list(dict.fromkeys(value))
+
+
+@router.post("/staged/split-campus-fees")
+async def split_campus_fees(
+    body: _SplitCampusFeesBody,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[dict, Depends(require_permission("staged.approve"))],
+) -> dict:
+    """Split all proven campus price groups, never publish or discard a group."""
+    from app.models import ScrapedCourse
+    from app.services.scraper.campus_fee_split import split_pending_course
+    rows = (await db.execute(
+        select(ScrapedCourse).where(ScrapedCourse.id.in_(body.ids))
+        .order_by(ScrapedCourse.id).with_for_update()
+    )).scalars().all()
+    by_id = {row.id: row for row in rows}
+    results = []
+    try:
+        for row_id in body.ids:
+            row = by_id.get(row_id)
+            if row is None:
+                results.append({"id": row_id, "status": "needs_review", "courseIds": [], "reason": "Course not found."})
+            else:
+                result = await split_pending_course(db, row, actor=user.get("email", "reviewer"))
+                results.append(result)
+                if result["status"] == "split":
+                    from app.services.scraper.snapshot_save import persist_staged_row_backup
+                    for child_id in result["courseIds"]:
+                        child = await db.get(ScrapedCourse, child_id)
+                        await persist_staged_row_backup(db, child)
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+    return {
+        "results": results,
+        "split": sum(r["status"] == "split" for r in results),
+        "created": sum(len(r["courseIds"]) - 1 for r in results if r["status"] == "split"),
+    }
 
 
 @router.post("/staged/analyze")
@@ -4969,7 +5024,7 @@ async def staged_dedup(
         WHERE id IN (
             SELECT id FROM (
                 SELECT id, ROW_NUMBER() OVER (
-                    PARTITION BY university_id,
+                    PARTITION BY university_id, fee_scope_key,
                         LOWER(RTRIM(
                             CASE WHEN POSITION('#' IN course_website) > 0
                                  THEN LEFT(course_website, POSITION('#' IN course_website) - 1)
@@ -4979,7 +5034,7 @@ async def staged_dedup(
                     ORDER BY created_at DESC
                 ) AS rn
                 FROM scraped_courses
-                WHERE university_id = :uid
+                WHERE university_id = :uid AND status NOT IN ('approved', 'published')
             ) t WHERE t.rn > 1
         )
     """), {"uid": university_id})
@@ -5061,17 +5116,11 @@ async def staged_approve(
             "course_id": result.get("course_id"),
         }
     except Exception as exc:
-        # Fallback: at minimum mark as approved even if promotion fails
-        sc.status = "approved"
-        sc.reviewed_at = datetime.now(timezone.utc)
-        await db.commit()
-        return {
-            "ok": True,
-            "id": sc_id,
-            "status": "approved",
-            "confidence": _cg["score"],
-            "promote_error": str(exc),
-        }
+        await db.rollback()
+        if isinstance(exc, ValueError):
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        log.exception("Course promotion failed for staged row %s", sc_id)
+        raise HTTPException(status_code=500, detail="Course publication failed; the row remains pending.") from exc
 
 
 @router.get("/jobs/{job_id}/removal-reconciliation")
