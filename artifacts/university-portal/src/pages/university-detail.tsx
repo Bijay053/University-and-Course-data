@@ -12,6 +12,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { getFetchErrorMessage, readResponseJson } from "@/lib/readResponseJson";
 import * as XLSX from "xlsx";
 import {
   Building2, MapPin, Globe, Search, ChevronLeft, ChevronRight, X,
@@ -1195,60 +1196,72 @@ export default function UniversityDetail() {
   };
 
   const handleBulkApprove = async (force = false) => {
-    if (rawSelectedIds.size === 0) return;
+    if (rawSelectedIds.size === 0 || bulkApproveRunning) return;
     setBulkApproveRunning(true);
     const ids = Array.from(rawSelectedIds);
     setBulkApproveProgress({ done: 0, total: ids.length });
-    let approved = 0; let confidenceBlocked = 0; let otherFailed = 0;
-    let done = 0;
-
-    const approveOne = async (courseId: number) => {
-      try {
-        const res = await fetch(`${BASE}/api/scrape/staged/${courseId}/approve`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ force }),
-        });
-        if (res.ok) {
-          approved++;
-        } else {
-          const data = await res.json().catch(() => ({}));
-          if (data?.detail?.error === "confidence_too_low") confidenceBlocked++;
-          else otherFailed++;
+    try {
+      const approvedIds = new Set<number>();
+      const failures: Array<{ id: number; error: string }> = [];
+      let approvedCount = 0;
+      let splitCount = 0;
+      let cursor = 0;
+      let done = 0;
+      await Promise.all(Array.from({ length: Math.min(2, ids.length) }, async () => {
+        while (cursor < ids.length) {
+          const sourceId = ids[cursor++];
+          try {
+            const res = await fetch(`${BASE}/api/scrape/staged/approve-selected`, {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ courseIds: [sourceId], force }),
+            });
+            if (!res.ok) throw new Error(await getFetchErrorMessage(res));
+            const data = await readResponseJson<{
+              approvedIds: number[]; approvedCount: number; splitCount: number;
+              failed: Array<{ id: number; error: string }>; attempted: number;
+            }>(res);
+            if (!data || !Array.isArray(data.approvedIds) || !Number.isInteger(data.approvedCount)
+              || !Number.isInteger(data.splitCount) || !Array.isArray(data.failed) || data.attempted !== 1) {
+              throw new Error("The server returned an invalid approval response. Refresh before trying again.");
+            }
+            if (data.failed.length || !data.approvedIds.includes(sourceId)) {
+              failures.push({ id: sourceId, error: data.failed[0]?.error || "Approval not confirmed; refresh before retrying." });
+            } else {
+              data.approvedIds.forEach(id => approvedIds.add(id));
+              approvedCount += data.approvedCount;
+              splitCount += data.splitCount;
+            }
+          } catch (error) {
+            failures.push({ id: sourceId, error: error instanceof Error ? error.message : "Approval request failed. Refresh before retrying." });
+          } finally {
+            setBulkApproveProgress({ done: ++done, total: ids.length });
+          }
         }
-      } catch { otherFailed++; }
-      done++;
-      setBulkApproveProgress({ done, total: ids.length });
-    };
-
-    // Run with a bounded concurrency pool so 300+ rows finish in seconds
-    // instead of one-at-a-time. 8 in flight keeps the API responsive.
-    const CONCURRENCY = 8;
-    let cursor = 0;
-    const worker = async () => {
-      while (cursor < ids.length) {
-        const idx = cursor++;
-        await approveOne(ids[idx]);
+      }));
+      const remaining = ids.filter(courseId => !approvedIds.has(courseId));
+      setRawSelectedIds(new Set(remaining));
+      await fetchRawData();
+      if (approvedCount > 0) {
+        await queryClient.invalidateQueries({ queryKey: getListCoursesQueryKey({ universityId: id, limit: 500 }) });
+        await queryClient.invalidateQueries({ queryKey: getGetUniversityQueryKey(id) });
       }
-    };
-    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, ids.length) }, worker));
-
-    const failParts: string[] = [];
-    if (confidenceBlocked > 0) failParts.push(`${confidenceBlocked} blocked (low confidence)`);
-    if (otherFailed > 0) failParts.push(`${otherFailed} failed`);
-    toast({
-      title: force ? "Force approve complete" : "Bulk approve complete",
-      description: `${approved} approved${force ? " (gate bypassed)" : ""}${failParts.length ? `, ${failParts.join(", ")}` : ""}`,
-      variant: approved === 0 && failParts.length > 0 ? "destructive" : "default",
-    });
-    setRawSelectedIds(new Set());
-    await fetchRawData();
-    if (approved > 0) {
-      await queryClient.invalidateQueries({ queryKey: getListCoursesQueryKey({ universityId: id, limit: 500 }) });
-      await queryClient.invalidateQueries({ queryKey: getGetUniversityQueryKey(id) });
+      toast({
+        title: force ? "Force approve complete" : "Bulk approve complete",
+        description: [
+          `${approvedCount} approved${force ? " (confidence gate bypassed)" : ""}.`,
+          splitCount > 0 ? `${splitCount} safely split by campus fee automatically.` : "",
+          remaining.length > 0 ? `${remaining.length} left pending: ${failures.slice(0, 3).map(failure => failure.error).join(" · ") || "Review their source data."}` : "",
+        ].filter(Boolean).join(" "),
+        ...(remaining.length > 0 ? { variant: "destructive" as const } : {}),
+      });
+    } catch (error) {
+      toast({ title: "Bulk approve failed", description: error instanceof Error ? error.message : "Refresh and try again.", variant: "destructive" });
+    } finally {
+      setBulkApproveRunning(false);
+      setBulkApproveProgress({ done: 0, total: 0 });
     }
-    setBulkApproveRunning(false);
-    setBulkApproveProgress({ done: 0, total: 0 });
   };
 
   const handleBulkRejectSelected = async () => {

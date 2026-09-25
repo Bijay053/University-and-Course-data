@@ -1091,7 +1091,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   const [rejectFieldKey, setRejectFieldKey] = useState("general");
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
   const [approving, setApproving] = useState(false);
-  const [splittingCampusFees, setSplittingCampusFees] = useState(false);
+  const [approveProgress, setApproveProgress] = useState<{ done: number; total: number } | null>(null);
   const [approvingId, setApprovingId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(
     () => new Set(initialReviewState?.courses.map((course) => course.id) ?? []),
@@ -2389,135 +2389,85 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     }
   }, [scraping, activeJobId]);
 
-  const feeReviewSelectedIds = new Set(
-    stagedCourses.filter(c => selectedIds.has(c.id) && feeVariantNeedsReview(c)).map(c => c.id)
-  );
-  const campusFeeSplitIds = stagedCourses
-    .filter(c => selectedIds.has(c.id) && feeVariantAuthority(c)?.status === "range")
-    .map(c => c.id);
-  const approvalCandidateIds = stagedCourses
-    .filter(c => selectedIds.has(c.id) && !feeReviewSelectedIds.has(c.id)).map(c => c.id);
-
-  const handleSplitCampusFees = async () => {
-    if (!reviewJobId || campusFeeSplitIds.length === 0 || splittingCampusFees) return;
-    setSplittingCampusFees(true);
-    try {
-      const res = await fetch("/api/scrape/staged/split-campus-fees", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: campusFeeSplitIds }),
-      });
-      if (!res.ok) throw new Error(await getFetchErrorMessage(res));
-      const data = await readResponseJson<{
-        results: Array<{ id: number; status: "split" | "unchanged" | "needs_review"; courseIds: number[]; reason?: string }>;
-        created: number;
-        split: number;
-      }>(res);
-      if (!data || !Array.isArray(data.results) || !Number.isInteger(data.split) || !Number.isInteger(data.created)) {
-        throw new Error("The server returned an invalid campus fee split response.");
-      }
-      const splitResults = data.results.filter(result =>
-        result.status === "split" && campusFeeSplitIds.includes(result.id)
-        && Array.isArray(result.courseIds) && result.courseIds.every(Number.isInteger));
-      setSelectedIds(previous => {
-        const next = new Set(previous);
-        for (const result of splitResults) {
-          next.delete(result.id);
-          result.courseIds.forEach(id => next.add(id));
-        }
-        return next;
-      });
-      // Refresh persisted rows rather than guessing their fee or campus in the browser.
-      const refreshed = await loadStagedCourses(reviewJobId, false);
-      if (!refreshed) throw new Error("The changed courses could not be refreshed. Reload the review to see the current rows.");
-      const unresolved = data.results.filter(result => result.status !== "split");
-      toast({
-        title: `${data.split} course(s) split by campus fee`,
-        description: [
-          `${data.created} location-specific course row(s) created. Review them before approving.`,
-          unresolved.length > 0 ? `${unresolved.length} left unchanged for review. ${unresolved.slice(0, 2).map(r => r.reason).filter(Boolean).join(" · ")}` : "",
-        ].filter(Boolean).join(" "),
-        ...(unresolved.length > 0 ? { variant: "destructive" as const } : {}),
-      });
-    } catch (error) {
-      toast({
-        title: "Campus fee split could not finish",
-        description: error instanceof Error ? error.message : "Please refresh the review and try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setSplittingCampusFees(false);
-    }
-  };
-
   const handleApproveSelected = async () => {
-    if (!reviewJobId || selectedIds.size === 0) return;
-    if (approvalCandidateIds.length === 0) {
-      toast({ title: "Selected courses need fee review", description: "No courses were published. These courses remain pending because their fee options are unresolved.", variant: "destructive" });
-      return;
-    }
+    if (!reviewJobId || selectedIds.size === 0 || approving) return;
+    const ids = stagedCourses.filter(c => selectedIds.has(c.id)).map(c => c.id);
+    if (ids.length === 0) return;
 
-    // Quality gate — warn before approving risky courses
-    const blockedIds = approvalCandidateIds.filter(
-      (id) => courseQualityMap[id] !== undefined && courseQualityMap[id].score < 60
-    );
-    if (blockedIds.length > 0) {
-      const names = blockedIds
-        .slice(0, 3)
-        .map((id) => stagedCourses.find((c) => c.id === id)?.courseName ?? `#${id}`)
-        .join(", ");
-      toast({
-        title: `⛔ ${blockedIds.length} course${blockedIds.length > 1 ? "s" : ""} flagged: Data Quality Failure`,
-        description: `Score < 60%. ${names}${blockedIds.length > 3 ? ` +${blockedIds.length - 3} more` : ""}. Fix issues or deselect before approving.`,
-        variant: "destructive",
-      });
-      return;
-    }
-
+    // Submit every selection; the server evaluates quality and confidence for each row.
     setApproving(true);
-    const succeededIds = new Set<number>();
-    const failedIds = new Set<number>();
-    const failedMessages: string[] = [];
-
-    for (const id of approvalCandidateIds) {
-      try {
-        const res = await fetch(`/api/scrape/staged/${id}/approve`, { method: "POST" });
-        if (res.ok) {
-          succeededIds.add(id);
-        } else {
-          failedIds.add(id);
-          failedMessages.push(await getFetchErrorMessage(res));
-        }
-      } catch {
-        failedIds.add(id);
-      }
-    }
-
-    setStagedCourses((prev) => prev.filter((c) => !succeededIds.has(c.id)));
-    setSelectedIds(new Set([...feeReviewSelectedIds, ...failedIds]));
-    setApproving(false);
-    fetchJobs();
-    if (uniData?.data) {
-      Promise.all(
-        uniData.data.map(async (u) => {
-          const res = await fetch(`/api/courses?universityId=${u.id}&limit=1`);
-          if (!res.ok) {
-            return { id: u.id, name: u.name, country: u.country, city: u.city, courseCount: 0 };
+    setApproveProgress({ done: 0, total: ids.length });
+    try {
+      const approvedIds = new Set<number>();
+      const failures: Array<{ id: number; error: string }> = [];
+      let approvedCount = 0;
+      let splitCount = 0;
+      let cursor = 0;
+      let done = 0;
+      // Each source and its generated campus siblings are atomic on the server.
+      // Limit parallel page fetches so an entire scrape cannot exceed the proxy timeout.
+      await Promise.all(Array.from({ length: Math.min(2, ids.length) }, async () => {
+        while (cursor < ids.length) {
+          const sourceId = ids[cursor++];
+          try {
+            const res = await fetch("/api/scrape/staged/approve-selected", {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ courseIds: [sourceId], force: false }),
+            });
+            if (!res.ok) throw new Error(await getFetchErrorMessage(res));
+            const data = await readResponseJson<{
+              approvedIds: number[]; approvedCount: number; splitCount: number;
+              failed: Array<{ id: number; error: string }>; attempted: number;
+            }>(res);
+            if (!data || !Array.isArray(data.approvedIds) || !Number.isInteger(data.approvedCount)
+              || !Number.isInteger(data.splitCount) || !Array.isArray(data.failed) || data.attempted !== 1) {
+              throw new Error("The server returned an invalid approval response. Refresh before trying again.");
+            }
+            if (data.failed.length || !data.approvedIds.includes(sourceId)) {
+              failures.push({ id: sourceId, error: data.failed[0]?.error || "Approval not confirmed; refresh before retrying." });
+            } else {
+              data.approvedIds.forEach(id => approvedIds.add(id));
+              approvedCount += data.approvedCount;
+              splitCount += data.splitCount;
+            }
+          } catch (error) {
+            failures.push({ id: sourceId, error: error instanceof Error ? error.message : "Approval request failed. Refresh before retrying." });
+          } finally {
+            setApproveProgress({ done: ++done, total: ids.length });
           }
+        }
+      }));
+      const remaining = new Set(ids.filter(id => !approvedIds.has(id)));
+      setStagedCourses(prev => prev.filter(course => !approvedIds.has(course.id)));
+      setSelectedIds(remaining);
+      const refreshed = await loadStagedCourses(reviewJobId, false);
+      setSelectedIds(remaining);
+      fetchJobs();
+      if (uniData?.data) {
+        void Promise.all(uniData.data.map(async u => {
+          const res = await fetch(`/api/courses?universityId=${u.id}&limit=1`);
+          if (!res.ok) return { id: u.id, name: u.name, country: u.country, city: u.city, courseCount: 0 };
           const d = await readResponseJson<{ total?: number }>(res);
           return { id: u.id, name: u.name, country: u.country, city: u.city, courseCount: d?.total ?? 0 };
-        })
-      ).then(setUniStats);
+        })).then(setUniStats).catch(() => {});
+      }
+      toast({
+        title: `${approvedCount} course(s) approved`,
+        description: [
+          splitCount > 0 ? `${splitCount} course(s) safely split by campus fee automatically.` : "",
+          remaining.size > 0 ? `${remaining.size} remain pending. ${failures.slice(0, 3).map(f => f.error).join(" · ") || "Refresh and review their source data."}` : "",
+          !refreshed ? "Review could not be refreshed; reload the page to see current rows." : "",
+        ].filter(Boolean).join(" ") || "Selected courses were published successfully.",
+        ...((remaining.size > 0 || !refreshed) ? { variant: "destructive" as const } : {}),
+      });
+    } catch (error) {
+      toast({ title: "Approval could not finish", description: error instanceof Error ? error.message : "Refresh and try again.", variant: "destructive" });
+    } finally {
+      setApproving(false);
+      setApproveProgress(null);
     }
-    toast({
-      title: `${succeededIds.size} course(s) approved`,
-      description: [
-        feeReviewSelectedIds.size > 0 ? `${feeReviewSelectedIds.size} left pending for fee-option review.` : "",
-        failedIds.size > 0 ? `${failedIds.size} could not be published. ${failedMessages.slice(0, 3).join(" · ") || "Check the connection and try again."}` : "",
-      ].filter(Boolean).join(" ") || "Selected courses were published successfully.",
-      ...(failedIds.size > 0 ? { variant: "destructive" as const } : {}),
-    });
   };
 
   const handleRejectSelected = async () => {
@@ -3643,45 +3593,31 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                   variant="outline"
                   className="text-red-600 border-red-200 hover:bg-red-50"
                   onClick={handleRejectSelected}
-                  disabled={selectedIds.size === 0 || approving || splittingCampusFees}
+                  disabled={selectedIds.size === 0 || approving}
                 >
                   <XCircle className="w-4 h-4 mr-1" />
                   Reject ({selectedIds.size})
                 </Button>
                 <Button
                   size="sm"
-                  variant="outline"
-                  onClick={handleSplitCampusFees}
-                  disabled={campusFeeSplitIds.length === 0 || splittingCampusFees || approving || fixingSelected || analyzingFix}
-                  title="Create separate pending course rows for each safely matched campus fee; unmatched courses remain pending for review"
-                  data-testid="button-split-campus-fees"
-                >
-                  {splittingCampusFees && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
-                  Split by campus fees ({campusFeeSplitIds.length})
-                </Button>
-                <Button
-                  size="sm"
                   className="bg-green-600 hover:bg-green-700 text-white"
                   onClick={handleApproveSelected}
-                  disabled={selectedIds.size === 0 || approving || splittingCampusFees}
-                  title="Approve selected courses that do not need fee-option review; other approval checks still apply"
+                  disabled={selectedIds.size === 0 || approving}
+                  title="Submit all selected courses; verified campus fees are split automatically, while ambiguous fees remain pending"
                 >
                   {approving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1" />}
-                  Approve ({approvalCandidateIds.length})
+                  {approving && approveProgress
+                    ? `Approving ${approveProgress.done}/${approveProgress.total}…`
+                    : `Approve (${selectedIds.size})`}
                 </Button>
               </div>
             </div>
             <p className="text-sm text-muted-foreground">
               Tick courses, then use <strong>Fix</strong> once to recover all detected missing requirements, <strong>Approve</strong> to publish, or <strong>Reject</strong> to discard.
             </p>
-            {feeReviewSelectedIds.size > 0 && (
-              <p className="text-sm text-amber-700" role="status">
-                {feeReviewSelectedIds.size} selected course(s) need fee-option review and will remain pending.
-                {" "}{approvalCandidateIds.length} other selected course(s) can be submitted for approval.
-                {" "}{campusFeeSplitIds.length > 0 ? "Use Split by campus fees to create separate pending rows where the source evidence safely matches each course location." : ""}
-                {" "}Identical fees across campuses do not require fee-option review.
-              </p>
-            )}
+            <p className="text-sm text-muted-foreground" role="status">
+              Approve automatically splits verified campus-specific fees. Ambiguous fee options stay pending for source review; no fee is guessed.
+            </p>
           </CardHeader>
           <CardContent>
             <DatedCatalogueReview courses={stagedCourses} />

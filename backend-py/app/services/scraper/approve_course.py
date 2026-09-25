@@ -115,7 +115,7 @@ _ENGLISH_TESTS = (
 
 
 async def approve_scraped_course(
-    db: AsyncSession, sc: ScrapedCourse, *, actor: str = "system"
+    db: AsyncSession, sc: ScrapedCourse, *, actor: str = "system", commit: bool = True
 ) -> dict:
     """Idempotent: if a course with the same (university_id, name CI) exists,
     the row is updated rather than duplicated.
@@ -412,8 +412,13 @@ async def approve_scraped_course(
     sc.reviewed_at = datetime.now(timezone.utc)
     sc.course_id = course.id
 
-    await db.commit()
-    await db.refresh(course)
+    # Selected approval owns the whole parent/sibling transaction. Existing
+    # callers retain the historical commit behavior.
+    if commit:
+        await db.commit()
+        await db.refresh(course)
+    else:
+        await db.flush()
     return {
         "ok": True,
         "course_id": course.id,

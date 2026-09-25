@@ -11219,6 +11219,10 @@ async def extract_course(
     # evidence must not detach the price from its selected cohort.
     from app.services.scraper.extractors.ulaw_fees import apply_course_fee_authority
     _ulaw_fee_authority = apply_course_fee_authority(html or "", url, payload, evidence)
+    _ulaw_campus_authority = None
+    if _ulaw_fee_authority:
+        from app.services.scraper.extractors.ulaw_campuses import apply_course_campus_authority
+        _ulaw_campus_authority = apply_course_campus_authority(html or "", url, payload, evidence, _ulaw_fee_authority)
 
     footer = build_course_page_provenance_footer(payload)
 
@@ -11243,6 +11247,8 @@ async def extract_course(
     # Persist in payload so stage_course can store it without schema changes to
     # extract_course's callers (it is stripped in stage_course before DB write).
     _attach_extraction_method_map(payload, evidence)
+    if _ulaw_campus_authority:
+        payload.setdefault("extraction_method", {})["campus_authority"] = _ulaw_campus_authority
     if _ulaw_fee_authority:
         payload.setdefault("extraction_method", {})["fee_variants"] = _ulaw_fee_authority
         if _ulaw_fee_authority["status"] == "uniform":

@@ -24,6 +24,7 @@ from app.dependencies import get_current_user, get_db
 from app.models import ScrapeRuntimeJob, University
 from app.permissions import require_permission
 from app.routers.scrape_reports import router as course_reports_router
+from app.routers.staged_selected_approval import router as selected_approval_router
 from app.schemas.scrape import (
     BulkScrapeBody,
     BulkScrapeResponse,
@@ -40,6 +41,7 @@ from app.services.scraper.auto_repair_candidates import (
 
 router = APIRouter()
 router.include_router(course_reports_router)
+router.include_router(selected_approval_router)
 
 log = logging.getLogger(__name__)
 
