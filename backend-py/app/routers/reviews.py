@@ -80,8 +80,17 @@ async def approve_scraped_course(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     try:
         result = await _approve(db, sc, actor=user.get("email", "admin"))
-    except ValueError as exc:
+    except ApprovalValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except ValueError as exc:
+        log.exception("Unexpected approval error for staged row %s", sc_id)
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "This course could not be published because of an unexpected error. "
+                "Please try again or contact support if the problem continues."
+            ),
+        ) from exc
     return result
 
 
