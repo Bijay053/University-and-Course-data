@@ -4,9 +4,55 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError, OperationalError, StatementError
 
 from app.routers.reviews import bulk_approve_scraped_courses
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("dry_run", [False, True])
+@pytest.mark.parametrize("error_type", [OperationalError, RuntimeError])
+async def test_candidate_query_failure_is_sanitized_and_rolls_back(
+    dry_run, error_type, monkeypatch, caplog,
+):
+    if error_type is OperationalError:
+        error = OperationalError(
+            statement="SELECT private_table WHERE payload=:payload",
+            params={"payload": "private-bound-value"},
+            orig=Exception("private-driver-detail"),
+        )
+    else:
+        error = RuntimeError("SELECT private_table payload private-bound-value private-driver-detail")
+    db = SimpleNamespace(
+        execute=AsyncMock(side_effect=error),
+        get=AsyncMock(),
+        rollback=AsyncMock(),
+    )
+    approve = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.scraper.approve_course.approve_scraped_course", approve,
+    )
+
+    with pytest.raises(HTTPException) as raised:
+        await bulk_approve_scraped_courses(
+            db, {"email": "reviewer"}, 7, "pending", "ready", dry_run, 10,
+        )
+
+    assert raised.value.status_code == 500
+    assert raised.value.detail == (
+        "The review batch could not be loaded because of an unexpected error. "
+        "Please try again or contact support if the problem continues."
+    )
+    for private_detail in ("SELECT", "private_table", "payload", "private-bound-value", "private-driver-detail"):
+        assert private_detail not in json.dumps({"detail": raised.value.detail})
+        assert private_detail in caplog.text
+    db.rollback.assert_awaited_once()
+    db.get.assert_not_awaited()
+    approve.assert_not_awaited()
+    record = next(r for r in caplog.records if r.name == "app.routers.reviews")
+    assert "failed to load candidates uni=7" in record.message
+    assert record.exc_info[1] is error
 
 
 @pytest.mark.asyncio

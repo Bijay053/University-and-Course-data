@@ -167,7 +167,18 @@ async def bulk_approve_scraped_courses(
         .order_by(ScrapedCourse.id)
         .limit(limit)
     )
-    rows = (await db.execute(stmt)).scalars().all()
+    try:
+        rows = (await db.execute(stmt)).scalars().all()
+    except Exception as exc:  # noqa: BLE001 — do not expose query or driver details
+        log.exception("bulk_approve: failed to load candidates uni=%s", university_id)
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "The review batch could not be loaded because of an unexpected error. "
+                "Please try again or contact support if the problem continues."
+            ),
+        ) from exc
 
     if dry_run:
         return {
