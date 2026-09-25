@@ -96,6 +96,121 @@ def evidence_snapshot(rows):
 
 
 @pytest.mark.asyncio
+async def test_bulk_approval_recovers_after_real_fee_constraint_error(isolated_fee_database):
+    """A failed replacement must restore deleted fees and not poison later rows."""
+    from app.routers.reviews import router as reviews_router
+
+    sessions = async_sessionmaker(
+        isolated_fee_database, expire_on_commit=False, autoflush=False,
+    )
+
+    def snapshot(row):
+        return {
+            column.name: copy.deepcopy(getattr(row, column.name))
+            for column in row.__table__.columns
+        }
+
+    ids = []
+    async with sessions() as db:
+        university = University(name="Disposable constraint batch", country="Test", city="Test")
+        db.add(university)
+        await db.flush()
+        university_id = university.id
+        existing = Course(name="MSc Constraint middle", university_id=university_id)
+        db.add(existing)
+        await db.flush()
+        existing_id = existing.id
+        old_fee = Fee(
+            course_id=existing_id, international_fee=12000,
+            currency="GBP", fee_year=2025, fee_term="Annual",
+        )
+        db.add(old_fee)
+        for label in ("before", "middle", "after"):
+            sc = ScrapedCourse(
+                university_id=university_id, scrape_job_id="constraint-batch",
+                course_name=f"MSc Constraint {label}", status="pending",
+                auto_publish_status="pending_review",
+                course_website=f"https://example.test/courses/{label}",
+                international_fee=19000, currency="GBP", fee_year=2026,
+                fee_term="Annual", duration=1, ielts_overall=6.5,
+                intake_months=["September"], study_mode="Full-time",
+                extraction_method={"international_fee": "test_source"},
+            )
+            db.add(sc)
+            await db.flush()
+            ids.append(sc.id)
+            db.add(ScrapedFieldEvidence(
+                scraped_course_id=sc.id, field_key="international_fee",
+                source_url=sc.course_website, extraction_method="test_source",
+                snippet="International annual tuition £19000",
+                raw_text="International annual tuition £19000; original source evidence",
+            ))
+        await db.commit()
+        # Schema-local constraint fails the real INSERT only after promotion
+        # has deleted this existing course's old fee. No service is mocked.
+        await db.execute(text(
+            "ALTER TABLE fees ADD CONSTRAINT test_replacement_fee_rejected "
+            f"CHECK (course_id <> {existing_id} OR international_fee = 12000)"
+        ))
+        await db.commit()
+        before_course = snapshot(await db.get(Course, existing_id))
+        before_fee = snapshot(old_fee)
+        before_staged = snapshot(await db.get(ScrapedCourse, ids[1]))
+        before_evidence = evidence_snapshot((await db.execute(
+            select(ScrapedFieldEvidence).order_by(ScrapedFieldEvidence.id)
+        )).scalars().all())
+
+    async def database():
+        async with sessions() as db:
+            yield db
+
+    async def reviewer():
+        return {"email": "constraint-reviewer@example.test", "permissions": ["staged.approve"]}
+
+    app = FastAPI()
+    app.include_router(reviews_router, prefix="/api/reviews")
+    app.dependency_overrides[get_db] = database
+    app.dependency_overrides[get_current_user] = reviewer
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post(
+            "/api/reviews/scraped-courses/bulk-approve",
+            params={"university_id": university_id, "status": "pending",
+                    "auto_publish_status": "pending_review", "dry_run": False, "limit": 10},
+        )
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["ok"] is True
+    assert result["approved"] == 2
+    assert result["failed"] == 1
+    assert len(result["failures"]) == 1
+    assert result["failures"][0]["scraped_course_id"] == ids[1]
+    assert "test_replacement_fee_rejected" in result["failures"][0]["error"]
+    assert "CheckViolationError" in result["failures"][0]["error"]
+
+    async with sessions() as db:
+        assert snapshot(await db.get(Course, existing_id)) == before_course
+        assert snapshot(await db.get(Fee, before_fee["id"])) == before_fee
+        assert snapshot(await db.get(ScrapedCourse, ids[1])) == before_staged
+        assert evidence_snapshot((await db.execute(
+            select(ScrapedFieldEvidence).order_by(ScrapedFieldEvidence.id)
+        )).scalars().all()) == before_evidence
+        for sc_id in (ids[0], ids[2]):
+            saved = await db.get(ScrapedCourse, sc_id)
+            assert saved.status == "approved" and saved.reviewed_at is not None
+            live = await db.get(Course, saved.course_id)
+            assert live.name == saved.course_name
+            assert live.last_edited_by == "constraint-reviewer@example.test"
+            fee = (await db.execute(
+                select(Fee).where(Fee.course_id == live.id)
+            )).scalar_one()
+            assert {key: getattr(fee, key) for key in FIELDS} == {
+                key: getattr(saved, key) for key in FIELDS
+            }
+        assert (await db.execute(select(func.count()).select_from(Course))).scalar_one() == 3
+        assert (await db.execute(select(func.count()).select_from(Fee))).scalar_one() == 3
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("reverse_order", [False, True], ids=["forward", "reverse"])
 async def test_bulk_approval_publishes_only_current_selected_fees(
     isolated_fee_database, reverse_order,

@@ -170,16 +170,22 @@ async def bulk_approve_scraped_courses(
     approved: list[dict] = []
     failed: list[dict] = []
 
-    for sc in rows:
+    # Rollback expires every loaded ORM row, including its primary key. Keep
+    # plain IDs so error reporting and the next iteration never lazy-load from
+    # a failed transaction (or outside SQLAlchemy's async greenlet).
+    row_ids = [sc.id for sc in rows]
+    for sc_id in row_ids:
         try:
+            sc = await db.get(ScrapedCourse, sc_id)
             result = await _approve(db, sc, actor=actor)
-            approved.append({"scraped_course_id": sc.id, "course_id": result.get("course_id")})
+            approved.append({"scraped_course_id": sc_id, "course_id": result.get("course_id")})
         except Exception as exc:  # noqa: BLE001
+            await db.rollback()
             log.warning(
                 "bulk_approve: failed sc_id=%s uni=%s: %s",
-                sc.id, university_id, exc,
+                sc_id, university_id, exc,
             )
-            failed.append({"scraped_course_id": sc.id, "error": str(exc)})
+            failed.append({"scraped_course_id": sc_id, "error": str(exc)})
 
     return {
         "ok": True,
