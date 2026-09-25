@@ -8,6 +8,22 @@ credential. When an authorized preservation commit is created there, transfer
 the commit to the authenticated workspace as a bounded Git bundle and push
 from the workspace rather than copying credentials onto the server.
 
+If a release precondition changes unexpectedly while working (for example,
+the migration ledger advances before a fenced migration begins), treat it as
+potential concurrent release activity. Stop rather than repeating the write;
+inspect the resulting schema, checkout, release process, and consumer state,
+then verify the other transaction's outcome before taking further action.
+
+**Why:** Independently initiated production work can pass earlier read-only
+checks and then apply the same prerequisite during a later operator's release
+window. A stale assumption about the predecessor is not a reason to force
+another migration or restart.
+
+**How to apply:** Make migrations require an exact predecessor inside the
+transaction. On mismatch, let the transaction abort, restore any paused
+consumers, and observe whether the separate guarded release finishes before
+considering another attempt.
+
 Production's Alembic ledger can lag schema changes already present. Inspect
 the actual schema before replaying a migration chain. An isolated additive
 revision can be run through Alembic Operations without falsely stamping its
