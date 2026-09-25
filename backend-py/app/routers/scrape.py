@@ -5162,63 +5162,70 @@ async def staged_approve(
     from app.models import ScrapedCourse
     from datetime import datetime, timezone
     force = bool((body or {}).get("force", False))
-    sc = await db.get(ScrapedCourse, sc_id)
-    if not sc:
-        raise HTTPException(status_code=404, detail="Not found")
+    try:
+        sc = await db.get(ScrapedCourse, sc_id)
+        if not sc:
+            raise HTTPException(status_code=404, detail="Not found")
 
-    if isinstance(sc.extraction_method, dict) and sc.extraction_method.get("fee_variants"):
-        # Validate the committed selection after any competing writer finishes,
-        # rather than rejecting a stale, unresolved range from the identity map.
-        sc = (await db.execute(
-            select(ScrapedCourse).where(ScrapedCourse.id == sc_id)
-            .with_for_update().execution_options(populate_existing=True)
-        )).scalar_one()
+        if isinstance(sc.extraction_method, dict) and sc.extraction_method.get("fee_variants"):
+            # Validate the committed selection after any competing writer finishes,
+            # rather than rejecting a stale, unresolved range from the identity map.
+            sc = (await db.execute(
+                select(ScrapedCourse).where(ScrapedCourse.id == sc_id)
+                .with_for_update().execution_options(populate_existing=True)
+            )).scalar_one()
 
-    from app.services.scraper.fee_selection import unresolved_fee_selection
-    if unresolved_fee_selection(sc):
-        raise HTTPException(422, "Select a current published fee option before approval")
+        from app.services.scraper.fee_selection import unresolved_fee_selection
+        if unresolved_fee_selection(sc):
+            raise HTTPException(422, "Select a current published fee option before approval")
 
-    # ── Data-integrity gate ────────────────────────────────────────────────
-    # Block approval when the course is clearly incomplete: no fee AND no
-    # english test AND no central-fee-page flag.  Courses missing only one
-    # field (score 60-79) are still approvable — the operator has decided
-    # the partial data is acceptable.  Courses missing two or more critical
-    # fields (score < 60) should not have been staged; if they slipped
-    # through (e.g. staged before this gate was added), block here too.
-    from app.services.scraper.confidence import score_payload as _sp
-    _payload_snap = {
-        "international_fee":  sc.international_fee,
-        "has_central_fee_page": getattr(sc, "has_central_fee_page", None),
-        "ielts_overall":      sc.ielts_overall,
-        "pte_overall":        sc.pte_overall,
-        "toefl_overall":      sc.toefl_overall,
-        "cambridge_overall":  getattr(sc, "cambridge_overall", None),
-        "duolingo_overall":   getattr(sc, "duolingo_overall", None),
-        "duration":           sc.duration,
-        "intake_months":      sc.intake_months,
-        "study_mode":         sc.study_mode,
-    }
-    _cg = _sp(_payload_snap)
-    if _cg["score"] < 60 and not force:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "error": "confidence_too_low",
-                "message": (
-                    f"Cannot approve: confidence score {_cg['score']}/100 is below the 60-point "
-                    f"minimum. Missing fields: {', '.join(_cg.get('missing', []))}. "
-                    "Fix the missing data in the edit panel before approving."
-                ),
-                "score": _cg["score"],
-                "missing": _cg.get("missing", []),
-            },
-        )
-    if _cg["score"] < 60 and force:
-        log.warning(
-            "staged_approve: FORCE-approving sc_id=%s with confidence %s/100 "
-            "(missing: %s) — operator override",
-            sc_id, _cg["score"], ", ".join(_cg.get("missing", [])),
-        )
+        # ── Data-integrity gate ────────────────────────────────────────────
+        # Block approval when the course is clearly incomplete: no fee AND no
+        # english test AND no central-fee-page flag.  Courses missing only one
+        # field (score 60-79) are still approvable — the operator has decided
+        # the partial data is acceptable.  Courses missing two or more critical
+        # fields (score < 60) should not have been staged; if they slipped
+        # through (e.g. staged before this gate was added), block here too.
+        from app.services.scraper.confidence import score_payload as _sp
+        _payload_snap = {
+            "international_fee":  sc.international_fee,
+            "has_central_fee_page": getattr(sc, "has_central_fee_page", None),
+            "ielts_overall":      sc.ielts_overall,
+            "pte_overall":        sc.pte_overall,
+            "toefl_overall":      sc.toefl_overall,
+            "cambridge_overall":  getattr(sc, "cambridge_overall", None),
+            "duolingo_overall":   getattr(sc, "duolingo_overall", None),
+            "duration":           sc.duration,
+            "intake_months":      sc.intake_months,
+            "study_mode":         sc.study_mode,
+        }
+        _cg = _sp(_payload_snap)
+        if _cg["score"] < 60 and not force:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "error": "confidence_too_low",
+                    "message": (
+                        f"Cannot approve: confidence score {_cg['score']}/100 is below the 60-point "
+                        f"minimum. Missing fields: {', '.join(_cg.get('missing', []))}. "
+                        "Fix the missing data in the edit panel before approving."
+                    ),
+                    "score": _cg["score"],
+                    "missing": _cg.get("missing", []),
+                },
+            )
+        if _cg["score"] < 60 and force:
+            log.warning(
+                "staged_approve: FORCE-approving sc_id=%s with confidence %s/100 "
+                "(missing: %s) — operator override",
+                sc_id, _cg["score"], ", ".join(_cg.get("missing", [])),
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        await db.rollback()
+        log.exception("Approval precheck failed for staged row %s", sc_id)
+        raise HTTPException(status_code=500, detail="Course approval could not be checked; the row remains pending.") from exc
 
     # Promote to the live courses table (creates/updates Course record, sets course_id)
     from app.services.scraper.approve_course import (

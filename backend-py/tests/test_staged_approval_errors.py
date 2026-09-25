@@ -74,3 +74,99 @@ def test_staged_approval_hides_unexpected_error_and_logs_traceback(
     assert "staged row 41" in record.message
     assert record.exc_info[1] is error
     assert private_detail in caplog.text
+
+
+@pytest.mark.parametrize("phase", ["lookup", "fee_lock", "score"])
+def test_staged_approval_precheck_failure_rolls_back_and_hides_details(
+    approval_client, monkeypatch, caplog, phase,
+):
+    client, db, sc = approval_client
+    error = RuntimeError("private-table private-bound-value")
+    promote = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.scraper.approve_course.approve_scraped_course", promote,
+    )
+    if phase == "lookup":
+        db.get.side_effect = error
+    elif phase == "fee_lock":
+        sc.extraction_method = {"fee_variants": {"status": "range"}}
+        db.execute = AsyncMock(side_effect=error)
+    else:
+        def fail_score(_payload):
+            raise error
+        monkeypatch.setattr("app.services.scraper.confidence.score_payload", fail_score)
+
+    response = client.post("/api/scrape/staged/41/approve")
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "detail": "Course approval could not be checked; the row remains pending.",
+    }
+    assert str(error) not in response.text
+    db.rollback.assert_awaited_once()
+    promote.assert_not_awaited()
+    if phase == "fee_lock":
+        db.execute.assert_awaited_once()
+        statement = db.execute.await_args.args[0]
+        assert statement._for_update_arg is not None
+    record = next(
+        r for r in caplog.records
+        if r.name == "app.routers.scrape" and r.exc_info and "precheck" in r.message
+    )
+    assert "staged row 41" in record.message
+    assert record.exc_info[1] is error
+    assert str(error) in caplog.text
+
+
+def test_staged_approval_missing_row_keeps_404_guidance(approval_client):
+    client, db, _ = approval_client
+    db.get.return_value = None
+
+    response = client.post("/api/scrape/staged/41/approve")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not found"}
+    db.rollback.assert_not_awaited()
+
+
+def test_staged_approval_unresolved_fee_keeps_422_guidance(
+    approval_client, monkeypatch,
+):
+    client, db, sc = approval_client
+    monkeypatch.setattr(
+        "app.services.scraper.fee_selection.unresolved_fee_selection",
+        lambda row: True,
+    )
+
+    response = client.post("/api/scrape/staged/41/approve")
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "detail": "Select a current published fee option before approval",
+    }
+    db.rollback.assert_not_awaited()
+
+
+def test_staged_approval_low_confidence_keeps_422_guidance(
+    approval_client, monkeypatch,
+):
+    client, db, _ = approval_client
+    monkeypatch.setattr(
+        "app.services.scraper.confidence.score_payload",
+        lambda payload: {"score": 40, "missing": ["international_fee"]},
+    )
+
+    response = client.post("/api/scrape/staged/41/approve")
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == {
+        "error": "confidence_too_low",
+        "message": (
+            "Cannot approve: confidence score 40/100 is below the 60-point "
+            "minimum. Missing fields: international_fee. "
+            "Fix the missing data in the edit panel before approving."
+        ),
+        "score": 40,
+        "missing": ["international_fee"],
+    }
+    db.rollback.assert_not_awaited()
