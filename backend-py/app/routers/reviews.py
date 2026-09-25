@@ -75,15 +75,15 @@ async def approve_scraped_course(
     Bug #1 case-insensitive dedup logic."""
     from app.services.scraper.approve_course import approve_scraped_course as _approve
 
-    sc = await db.get(ScrapedCourse, sc_id)
-    if not sc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     try:
-        result = await _approve(db, sc, actor=user.get("email", "admin"))
+        sc = await db.get(ScrapedCourse, sc_id)
+        if sc:
+            result = await _approve(db, sc, actor=user.get("email", "admin"))
     except ApprovalValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    except ValueError as exc:
+    except Exception as exc:  # noqa: BLE001 — do not expose service/database failures
         log.exception("Unexpected approval error for staged row %s", sc_id)
+        await db.rollback()
         raise HTTPException(
             status_code=500,
             detail=(
@@ -91,6 +91,8 @@ async def approve_scraped_course(
                 "Please try again or contact support if the problem continues."
             ),
         ) from exc
+    if not sc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     return result
 
 
