@@ -50,6 +50,7 @@ import { AcademicPanel } from "./university-detail/academic-panel";
 import { ScholarshipsPanel } from "./university-detail/scholarships-panel";
 import { AssessmentPanel } from "./university-detail/assessment-panel";
 import { RawDataPanel } from "./university-detail/rawdata-panel";
+import { groupLegacyCampusRows } from "@/utils/legacy-campus-groups";
 import { LocationsPanel } from "./university-detail/locations-panel";
 
 const ALL = "__all__";
@@ -140,6 +141,8 @@ export type StagedCourse = {
   scholarship?: string | null;
   completeness?: number | null;
   scrape_job_id?: string | null;
+  extraction_method?: unknown;
+  extractionMethod?: unknown;
   course_id?: number | null;
   created_at?: string | null;
 };
@@ -1149,11 +1152,8 @@ export default function UniversityDetail() {
   const [bulkRejectReason, setBulkRejectReason] = useState("");
   const [bulkRejectFieldKey, setBulkRejectFieldKey] = useState("general");
 
-  const toggleRawSelect = (id: number) =>
-    setRawSelectedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
-
   const toggleSelectAllRaw = () => {
-    const allIds = filteredRaw.map(c => c.id);
+    const allIds = filteredRaw.map(course => course.id);
     const allSelected = allIds.length > 0 && allIds.every(id => rawSelectedIds.has(id));
     setRawSelectedIds(allSelected ? new Set() : new Set(allIds));
   };
@@ -1198,11 +1198,15 @@ export default function UniversityDetail() {
     }
   };
 
-  const handleBulkApprove = async (force = false) => {
+  const handleBulkApprove = async (force = false, explicitIds?: number[]) => {
     if (rawCampusProgress) return;
-    if (rawSelectedIds.size === 0 || bulkApproveRunning) return;
+    if ((rawSelectedIds.size === 0 && !explicitIds?.length) || bulkApproveRunning) return;
     setBulkApproveRunning(true);
-    const ids = Array.from(rawSelectedIds);
+    const ids = explicitIds ?? Array.from(rawSelectedIds);
+    const requested = new Set(ids);
+    const batches = groupLegacyCampusRows(rawData)
+      .map(group => group.ids.filter(courseId => requested.has(courseId)))
+      .filter(batch => batch.length > 0);
     setBulkApproveProgress({ done: 0, total: ids.length });
     try {
       const approvedIds = new Set<number>();
@@ -1210,15 +1214,15 @@ export default function UniversityDetail() {
       let approvedCount = 0;
       let cursor = 0;
       let done = 0;
-      await Promise.all(Array.from({ length: Math.min(2, ids.length) }, async () => {
-        while (cursor < ids.length) {
-          const sourceId = ids[cursor++];
+      await Promise.all(Array.from({ length: Math.min(2, batches.length) }, async () => {
+        while (cursor < batches.length) {
+          const batch = batches[cursor++];
           try {
             const res = await fetch(`${BASE}/api/scrape/staged/approve-selected`, {
               method: "POST",
               credentials: "include",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ courseIds: [sourceId], force }),
+              body: JSON.stringify({ courseIds: batch, force }),
             });
             if (!res.ok) throw new Error(await getFetchErrorMessage(res));
             const data = await readResponseJson<{
@@ -1226,19 +1230,22 @@ export default function UniversityDetail() {
               failed: Array<{ id: number; error: string }>; attempted: number;
             }>(res);
             if (!data || !Array.isArray(data.approvedIds) || !Number.isInteger(data.approvedCount)
-              || !Array.isArray(data.failed) || data.attempted !== 1) {
+              || !Array.isArray(data.failed) || data.attempted !== batch.length) {
               throw new Error("The server returned an invalid approval response. Refresh before trying again.");
             }
-            if (data.failed.length || !data.approvedIds.includes(sourceId)) {
-              failures.push({ id: sourceId, error: data.failed[0]?.error || "Approval not confirmed; refresh before retrying." });
-            } else {
-              data.approvedIds.forEach(id => approvedIds.add(id));
-              approvedCount += data.approvedCount;
+            data.approvedIds.filter(courseId => requested.has(courseId)).forEach(courseId => approvedIds.add(courseId));
+            approvedCount += data.approvedCount;
+            for (const courseId of batch) {
+              if (!data.approvedIds.includes(courseId)) {
+                const failure = data.failed.find(item => item.id === courseId) ?? data.failed[0];
+                failures.push({ id: courseId, error: failure?.error || "Approval not confirmed; refresh before retrying." });
+              }
             }
           } catch (error) {
-            failures.push({ id: sourceId, error: error instanceof Error ? error.message : "Approval request failed. Refresh before retrying." });
+            batch.forEach(courseId => failures.push({ id: courseId, error: error instanceof Error ? error.message : "Approval request failed. Refresh before retrying." }));
           } finally {
-            setBulkApproveProgress({ done: ++done, total: ids.length });
+            done += batch.length;
+            setBulkApproveProgress({ done, total: ids.length });
           }
         }
       }));
@@ -3976,7 +3983,7 @@ export default function UniversityDetail() {
 
       {/* ── RAW DATA TAB ── */}
       {tab === "rawdata" && rawCampusProgress && <p role="status">Loading courses for review…</p>}
-      {tab === "rawdata" && <RawDataPanel {...{ AlertTriangle, Button, CheckCircle2, DEGREE_COLORS, Database, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, ExternalLink, GitMerge, Input, Loader2, Pencil, RefreshCw, Search, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, StatusBadge, Textarea, Trash2, Upload, XCircle, approvedCount, approvingId, bulkApproveProgress, bulkApproveRunning, bulkDeleteRawRunning, bulkMapRunning, bulkRejectFieldKey, bulkRejectReason, bulkRejectRunning, deletingId, fetchRawData, filteredRaw, forceApproveRowId, handleApprove, handleBulkApprove, handleBulkMap, handleBulkRejectSelected, handleDelete, handleImportAll, importingAll, mappedIds, num, openBackupMap, openEdit, pendingCount, rawData, rawLoading, rawSearch, rawSelectedIds, rawStatus, setBulkRejectFieldKey, setBulkRejectReason, setForceApproveRowId, setRawSearch, setRawSelectedIds, setRawStatus, setShowBulkDeleteRawConfirm, setShowBulkRejectConfirm, setShowDeleteAllRawConfirm, setShowForceApproveConfirm, showBulkRejectConfirm, showForceApproveConfirm, tableScrollRef, toggleRawSelect, toggleSelectAllRaw, txt }} />}
+      {tab === "rawdata" && <RawDataPanel {...{ AlertTriangle, Button, CheckCircle2, DEGREE_COLORS, Database, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, ExternalLink, GitMerge, Input, Loader2, Pencil, RefreshCw, Search, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, StatusBadge, Textarea, Trash2, Upload, XCircle, approvedCount, approvingId, bulkApproveProgress, bulkApproveRunning, bulkDeleteRawRunning, bulkMapRunning, bulkRejectFieldKey, bulkRejectReason, bulkRejectRunning, deletingId, fetchRawData, filteredRaw, forceApproveRowId, handleApprove, handleBulkApprove, handleBulkMap, handleBulkRejectSelected, handleDelete, handleImportAll, importingAll, mappedIds, num, openBackupMap, openEdit, pendingCount, rawData, rawLoading, rawSearch, rawSelectedIds, rawStatus, setBulkRejectFieldKey, setBulkRejectReason, setForceApproveRowId, setRawSearch, setRawSelectedIds, setRawStatus, setShowBulkDeleteRawConfirm, setShowBulkRejectConfirm, setShowDeleteAllRawConfirm, setShowForceApproveConfirm, showBulkRejectConfirm, showForceApproveConfirm, tableScrollRef, toggleSelectAllRaw, txt }} />}
 
       {/* ── Shared mini horizontal scroll indicator (all tabs) ── */}
       {tab !== "scholarships" && hasOverflow && (

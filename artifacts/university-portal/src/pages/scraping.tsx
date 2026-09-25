@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState, useRef, useCallback, useMemo } from "rea
 import { PublishedFeeVariants, feeVariantAuthority, type FeeVariantCarrier } from "@/components/published-fee-variants";
 import { shouldLoadForBackgroundJob } from "@/utils/scraping-poll-guard";
 import { mergeReextractFieldResults } from "@/utils/reextract-field-aggregation";
+import { groupLegacyCampusRows } from "@/utils/legacy-campus-groups";
 import { useListUniversities } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -210,6 +211,8 @@ type StagedCourse = FeeVariantCarrier & {
   completeness: number | null;
   notes: string | null;
   scrapeWarnings: string[] | null;
+  extractionMethod?: unknown;
+  extraction_method?: unknown;
   createdAt: string;
 };
 
@@ -1100,7 +1103,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   const [approveProgress, setApproveProgress] = useState<{ done: number; total: number } | null>(null);
   const [approvingId, setApprovingId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(
-    () => new Set(initialReviewState?.courses.map((course) => course.id) ?? []),
+    () => new Set(groupLegacyCampusRows(initialReviewState?.courses ?? [])
+      .filter(group => group.ids.length === 1).map(group => group.course.id)),
   );
   const [removalReconciliation, setRemovalReconciliation] = useState<RemovalReconciliation | null>(null);
   const [removalDecisionId, setRemovalDecisionId] = useState<number | null>(null);
@@ -1724,12 +1728,15 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
 
         const switchingJobs = reviewJobIdRef.current !== jobId;
         const previous = stagedCoursesRef.current;
+        const groupedIds = new Set(groupLegacyCampusRows(pending)
+          .filter(group => group.ids.length > 1).flatMap(group => group.ids));
         setSelectedIds(current => {
           const previousIds = new Set(previous.map(course => course.id));
           const selectAll = switchingJobs || previous.length === 0
             || previous.every(course => current.has(course.id));
           return new Set(pending.filter(course =>
-            selectAll || current.has(course.id) || !previousIds.has(course.id)
+            !groupedIds.has(course.id)
+            && (selectAll || current.has(course.id) || !previousIds.has(course.id))
           ).map(course => course.id));
         });
         stagedCoursesRef.current = pending;
@@ -2417,13 +2424,18 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     }
   }, [scraping, activeJobId]);
 
-  const handleApproveSelected = async () => {
+  const handleApproveSelected = async (explicitIds?: number[]) => {
     if (campusLoadBusy.current) return;
-    if (!reviewJobId || selectedIds.size === 0 || approving) return;
-    const ids = stagedCourses.filter(c => selectedIds.has(c.id)).map(c => c.id);
+    if (!reviewJobId || (selectedIds.size === 0 && !explicitIds?.length) || approving) return;
+    const ids = explicitIds ?? stagedCourses.filter(c => selectedIds.has(c.id)).map(c => c.id);
     if (ids.length === 0) return;
+    const requested = new Set(ids);
+    const batches = groupLegacyCampusRows(stagedCourses)
+      .map(group => group.ids.filter(id => requested.has(id)))
+      .filter(batch => batch.length > 0);
 
-    // Submit every selection; the server evaluates quality and confidence for each row.
+    // Submit every selected member together for explicitly-linked campus groups;
+    // the endpoint can resolve sibling rows and reports per-ID partial failures.
     setApproving(true);
     setApproveProgress({ done: 0, total: ids.length });
     try {
@@ -2433,15 +2445,15 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       let cursor = 0;
       let done = 0;
       // Limit parallel requests so an entire scrape cannot exceed the proxy timeout.
-      await Promise.all(Array.from({ length: Math.min(2, ids.length) }, async () => {
-        while (cursor < ids.length) {
-          const sourceId = ids[cursor++];
+      await Promise.all(Array.from({ length: Math.min(2, batches.length) }, async () => {
+        while (cursor < batches.length) {
+          const batch = batches[cursor++];
           try {
             const res = await fetch("/api/scrape/staged/approve-selected", {
               method: "POST",
               credentials: "include",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ courseIds: [sourceId], force: false }),
+              body: JSON.stringify({ courseIds: batch, force: false }),
             });
             if (!res.ok) throw new Error(await getFetchErrorMessage(res));
             const data = await readResponseJson<{
@@ -2449,19 +2461,23 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
               failed: Array<{ id: number; error: string }>; attempted: number;
             }>(res);
             if (!data || !Array.isArray(data.approvedIds) || !Number.isInteger(data.approvedCount)
-              || !Array.isArray(data.failed) || data.attempted !== 1) {
+              || !Array.isArray(data.failed) || data.attempted !== batch.length) {
               throw new Error("The server returned an invalid approval response. Refresh before trying again.");
             }
-            if (data.failed.length || !data.approvedIds.includes(sourceId)) {
-              failures.push({ id: sourceId, error: data.failed[0]?.error || "Approval not confirmed; refresh before retrying." });
-            } else {
-              data.approvedIds.forEach(id => approvedIds.add(id));
-              approvedCount += data.approvedCount;
+            const successful = data.approvedIds.filter(id => requested.has(id));
+            successful.forEach(id => approvedIds.add(id));
+            approvedCount += data.approvedCount;
+            for (const id of batch) {
+              if (!data.approvedIds.includes(id)) {
+                const failure = data.failed.find(item => item.id === id) ?? data.failed[0];
+                failures.push({ id, error: failure?.error || "Approval not confirmed; refresh before retrying." });
+              }
             }
           } catch (error) {
-            failures.push({ id: sourceId, error: error instanceof Error ? error.message : "Approval request failed. Refresh before retrying." });
+            batch.forEach(id => failures.push({ id, error: error instanceof Error ? error.message : "Approval request failed. Refresh before retrying." }));
           } finally {
-            setApproveProgress({ done: ++done, total: ids.length });
+            done += batch.length;
+            setApproveProgress({ done, total: ids.length });
           }
         }
       }));
@@ -2500,7 +2516,11 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     setRejectingIds(Array.from(selectedIds));
   };
 
-  const handleApproveSingle = async (id: number) => {
+  const handleApproveSingle = async (id: number, memberIds: number[] = [id]) => {
+    if (memberIds.length > 1) {
+      await handleApproveSelected(memberIds);
+      return;
+    }
     if (campusLoadBusy.current) return;
     setApprovingId(id);
     try {
@@ -2517,8 +2537,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     setApprovingId(null);
   };
 
-  const handleRejectSingle = async (id: number) => {
-    setRejectingIds([id]);
+  const handleRejectSingle = async (ids: number[]) => {
+    setRejectingIds(ids);
   };
 
   const [clearingRejected, setClearingRejected] = useState(false);
@@ -3445,13 +3465,14 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         Loading courses for review…
       </p>}
       {showReview && stagedCourses.length > 0 && (() => {
-        const displayedCourses = qualitySortDesc
-          ? [...stagedCourses].sort((a, b) => {
-              const qa = courseQualityMap[a.id]?.score ?? 100;
-              const qb = courseQualityMap[b.id]?.score ?? 100;
+        const logicalGroups = groupLegacyCampusRows(stagedCourses);
+        const displayedGroups = qualitySortDesc
+          ? [...logicalGroups].sort((a, b) => {
+              const qa = courseQualityMap[a.course.id]?.score ?? 100;
+              const qb = courseQualityMap[b.course.id]?.score ?? 100;
               return qa - qb; // ascending = worst first
             })
-          : stagedCourses;
+          : logicalGroups;
 
         // Root causes: aggregate issue labels across all scored courses
         // University quality includes other jobs/statuses. Review summaries
@@ -3496,7 +3517,13 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Eye className="w-5 h-5 text-green-600" />
                   Review Scraped Courses
-                  <Badge className="bg-blue-100 text-blue-700">{stagedCourses.length} pending</Badge>
+                  <Badge className="bg-blue-100 text-blue-700" data-testid="text-review-logical-course-count">
+                    {logicalGroups.length} courses
+                  </Badge>
+                  <Badge variant="outline" data-testid="text-review-entry-count">
+                    {stagedCourses.length} pending
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">review entries</span>
                   {selectedUniversityName && (
                     <Badge
                       variant="outline"
@@ -3622,7 +3649,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                 <Button
                   size="sm"
                   className="bg-green-600 hover:bg-green-700 text-white"
-                  onClick={handleApproveSelected}
+                  onClick={() => handleApproveSelected()}
                   disabled={selectedIds.size === 0 || approving || campusProgress !== null}
                   title="Submit selected courses for approval; review location-specific fee evidence before publishing"
                 >
@@ -3774,17 +3801,40 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {displayedCourses.map((course) => {
+                    {displayedGroups.map(({ course: sourceCourse, members, ids }) => {
+                      const locations = [...new Set(members.map(member => member.courseLocation?.trim()).filter((value): value is string => Boolean(value)))];
+                      const course = locations.length > 1 ? { ...sourceCourse, courseLocation: locations.join(", ") } : sourceCourse;
                       const qData = courseQualityMap[course.id];
                       const qExpanded = qualityExpanded.has(course.id);
+                      const groupSelected = ids.every(id => selectedIds.has(id));
+                      const selectedFeeLines = members.flatMap(member => {
+                        const extraction = (member.extractionMethod ?? member.extraction_method) as Record<string, unknown> | null | undefined;
+                        const authority = (member.feeVariants ?? member.fee_variants ?? extraction?.fee_variants) as Record<string, unknown> | null | undefined;
+                        const selected = Array.isArray(authority?.selected) ? authority.selected as Record<string, unknown>[] : [];
+                        if (selected.length) return selected.map(option => ({
+                          location: String(option.campus ?? member.courseLocation ?? "Location"),
+                          amount: typeof option.amount === "number" ? option.amount : null,
+                          currency: String(option.currency ?? member.currency ?? "AUD"),
+                          term: String(option.period ?? member.feeTerm ?? "yr"),
+                          year: option.year,
+                        }));
+                        return member.internationalFee == null ? [] : [{
+                          location: member.courseLocation ?? "Location",
+                          amount: member.internationalFee,
+                          currency: member.currency ?? "AUD",
+                          term: member.feeTerm ?? "yr",
+                          year: member.feeYear,
+                        }];
+                      });
                       return (<Fragment key={course.id}>
-                      <tr className={`hover:bg-gray-50 ${selectedIds.has(course.id) ? "bg-blue-50/50" : ""}`}>
+                      <tr className={`hover:bg-gray-50 ${groupSelected ? "bg-blue-50/50" : ""}`} data-testid={`row-logical-course-${course.id}`}>
                         <td className="p-2">
                           <input
                             type="checkbox"
-                            checked={selectedIds.has(course.id)}
-                            onChange={() => toggleSelect(course.id)}
+                            checked={groupSelected}
+                            onChange={() => ids.forEach(toggleSelect)}
                             className="rounded border-gray-300"
+                            data-testid={`checkbox-logical-course-${course.id}`}
                           />
                         </td>
                         <td className="p-2">
@@ -3993,7 +4043,16 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                           {course.duration ? `${course.duration} ${course.durationTerm || ""}` : <span className="text-gray-300">-</span>}
                         </td>
                         <td className="p-2 text-right font-medium whitespace-nowrap">
-                          {feeVariantAuthority(course) ? <PublishedFeeVariants course={course} id={course.id}
+                          {members.length > 1 ? (
+                            <div className="space-y-1 text-left text-xs" data-testid={`text-campus-fees-${course.id}`}>
+                              {selectedFeeLines.map((fee, index) => (
+                                <div key={`${fee.location}-${fee.year}-${index}`} className="text-green-700">
+                                  <span className="font-medium">{fee.location}:</span> {fee.currency} {fee.amount?.toLocaleString() ?? "fee pending"}{fee.term ? ` / ${fee.term}` : ""}{fee.year ? ` · ${fee.year}` : ""}
+                                </div>
+                              ))}
+                              {!selectedFeeLines.length && <span className="text-amber-600">Fees need review</span>}
+                            </div>
+                          ) : feeVariantAuthority(course) ? <PublishedFeeVariants course={course} id={course.id}
                             onCourseUpdated={handleFeeCourseUpdated} onRefresh={() => refreshFeeCourse(course.id)} /> : course.internationalFee ? (() => {
                             const _CURR_MAP: Record<string, string> = { GBP: "£", USD: "$", EUR: "€", MYR: "RM", NZD: "NZ$", CAD: "CA$", SGD: "S$", AUD: "A$" };
                             const currSym = (course.currency && _CURR_MAP[course.currency]) ? _CURR_MAP[course.currency] : (course.currency ? `${course.currency} ` : "A$");
@@ -4176,9 +4235,10 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                                 size="icon"
                                 variant="ghost"
                                 className={`h-7 w-7 ${qData && qData.score < 60 ? "text-gray-300 cursor-not-allowed" : "text-green-600 hover:bg-green-50"}`}
-                                onClick={qData && qData.score < 60 ? undefined : () => handleApproveSingle(course.id)}
+                                onClick={qData && qData.score < 60 ? undefined : () => handleApproveSingle(course.id, ids)}
                                 disabled={campusProgress !== null || approvingId === course.id || (qData !== undefined && qData.score < 60)}
                                 title={qData && qData.score < 60 ? `Cannot approve — Data Quality Failure (score ${qData.score}%)` : "Approve and publish this course"}
+                                data-testid={`button-approve-logical-course-${course.id}`}
                               >
                                 {approvingId === course.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                               </Button>
@@ -4186,8 +4246,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                                 size="icon"
                                 variant="ghost"
                                 className="h-7 w-7 text-red-600 hover:bg-red-50"
-                                onClick={() => handleRejectSingle(course.id)}
+                                onClick={() => handleRejectSingle(ids)}
                                 title="Reject"
+                                data-testid={`button-reject-logical-course-${course.id}`}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </Button>

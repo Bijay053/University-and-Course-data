@@ -57,15 +57,15 @@ type ApprovalResult = {
   approvedIds: number[]; approvedCount: number; splitCount: number;
   failed: Array<{ id: number; error: string }>; attempted: number;
 };
-function renderPage(approval?: (sourceId: number, force: boolean) => ApprovalResult) {
+function renderPage(approval?: (sourceId: number, force: boolean) => ApprovalResult, legacyCampusSplit = false) {
   const approvedSources = new Set<number>();
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.endsWith("/api/scrape/staged/approve-selected")) {
       const { courseIds, force } = JSON.parse(String(init?.body));
       const response = approval?.(courseIds[0], force);
-      if (response?.approvedIds.includes(courseIds[0])) approvedSources.add(courseIds[0]);
-      return new Response(JSON.stringify(response), { status: 200, headers: { "Content-Type": "application/json" } });
+      response?.approvedIds.forEach(id => approvedSources.add(id));
+      return new Response(JSON.stringify(response ? { ...response, attempted: courseIds.length } : response), { status: 200, headers: { "Content-Type": "application/json" } });
     }
     const body = url.includes("/scholarship-courses")
       ? [{ id: 42, name: "Accessible Course", degreeLevel: "Bachelor", category: "Business", scholarships: [{ id: 8, name: "Merit Award", details: "For strong applicants", eligibilityCriteria: "International students", amount: 5000, percentage: null, currency: "AUD" }] }]
@@ -77,8 +77,26 @@ function renderPage(approval?: (sourceId: number, force: boolean) => ApprovalRes
       ? [{ id: 11, universityId: 7, displayName: "City Campus", fullAddress: "1 Campus Way", city: "Sydney", stateRegion: "NSW", country: "Australia", latitude: -33.86, longitude: 151.2, courseCount: 1, isVerified: true }]
       : url.includes("/scrape/staged")
       ? (approval ? [
-          { id: 12, course_name: "Staged Accessible Course", status: "pending", completeness: 45 },
-          { id: 13, course_name: "Campus-fee Course", status: "pending", completeness: 70 },
+          {
+            id: 12, university_id: 7, scrape_job_id: "campus-job", course_name: legacyCampusSplit ? "MSc Healthcare Management" : "Staged Accessible Course",
+            course_website: "https://example.edu/msc-healthcare-management", course_location: "Manchester",
+            degree_level: "Master", fee_year: 2026, fee_term: "Annual", currency: "GBP", international_fee: 18000,
+            extraction_method: legacyCampusSplit ? {
+              campus_fee_scope: { split_from_id: 12, original_name: "MSc Healthcare Management" },
+              fee_variants: { selected: [{ campus: "Manchester", amount: 18000, year: 2026, period: "Annual", study_variant: "Standard" }] },
+            } : undefined,
+            status: "pending", completeness: 45,
+          },
+          {
+            id: 13, university_id: 7, scrape_job_id: "campus-job", course_name: legacyCampusSplit ? "MSc Healthcare Management" : "Campus-fee Course",
+            course_website: "https://example.edu/msc-healthcare-management", course_location: "Birmingham",
+            degree_level: "Master", fee_year: 2026, fee_term: "Annual", currency: "GBP", international_fee: 19500,
+            extraction_method: legacyCampusSplit ? {
+              campus_fee_scope: { split_from_id: 12, original_name: "MSc Healthcare Management" },
+              fee_variants: { selected: [{ campus: "Birmingham", amount: 19500, year: 2026, period: "Annual", study_variant: "Standard" }] },
+            } : undefined,
+            status: "pending", completeness: 70,
+          },
         ].filter(c => !approvedSources.has(c.id)) : [{ id: 12, course_name: "Staged Accessible Course", status: "pending", completeness: 45 }])
       : url.includes("/repair/missing/")
       ? { courses: [] }
@@ -115,6 +133,27 @@ async function expectDialogAndClose(
 }
 
 describe("University Detail dialogs", () => {
+  it("shows legacy campus splits once and expands bulk approval to both persisted IDs", async () => {
+    const user = userEvent.setup();
+    const { fetchMock } = renderPage(() => ({
+      approvedIds: [12, 13], approvedCount: 2, splitCount: 0, failed: [], attempted: 2,
+    }), true);
+    await openTab(user, "Raw Data");
+    expect(await screen.findByText("MSc Healthcare Management")).toBeTruthy();
+    expect(screen.getAllByTestId("row-raw-logical-course-12")).toHaveLength(1);
+    expect(screen.getByText("1 courses · 2 review entries")).toBeTruthy();
+    expect(screen.getByTestId("text-raw-campus-fees-12").textContent).toContain("Manchester");
+    expect(screen.getByTestId("text-raw-campus-fees-12").textContent).toContain("Birmingham");
+    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByRole("button", { name: "Approve (2)" }));
+    await waitFor(() => {
+      const ids = fetchMock.mock.calls
+        .filter(([url]) => String(url).endsWith("/api/scrape/staged/approve-selected"))
+        .flatMap(([, init]) => JSON.parse(String(init?.body)).courseIds as number[]);
+      expect(ids).toEqual(expect.arrayContaining([12, 13]));
+    });
+  });
+
   it("approves all selected IDs in one request, retaining ambiguous campus rows", async () => {
     const user = userEvent.setup();
     const { fetchMock } = renderPage(sourceId => sourceId === 12

@@ -179,6 +179,59 @@ function initialReview(): ScrapingInitialReviewState {
 }
 
 describe("Scraping repair reviewer", () => {
+  it("shows linked Manchester/Birmingham campus rows as one unselected course and approves both staged IDs", async () => {
+    const review = initialReview();
+    const makeCampusRow = (id: number, courseLocation: string, fee: number) => ({
+      ...review.courses[0],
+      id,
+      courseName: "MSc Healthcare Management",
+      courseWebsite: "https://www.law.ac.uk/study/postgraduate/business/msc-healthcare-management/",
+      courseLocation,
+      degreeLevel: "Master",
+      internationalFee: fee,
+      currency: "GBP",
+      feeTerm: "Annual",
+      feeYear: 2026,
+      extraction_method: {
+        campus_fee_scope: { split_from_id: 190, original_name: "MSc Healthcare Management" },
+        fee_variants: {
+          selected: [{ amount: fee, currency: "GBP", year: 2026, period: "Annual", campus: courseLocation, study_variant: "Standard" }],
+        },
+      },
+    });
+    review.courses = [makeCampusRow(101, "Manchester", 18000), makeCampusRow(102, "Birmingham", 19500)] as ScrapingInitialReviewState["courses"];
+    let submittedIds: number[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/scrape/staged/approve-selected") {
+        const courseIds = JSON.parse(String(init?.body)).courseIds as number[];
+        submittedIds.push(...courseIds);
+        return jsonResponse({ approvedIds: submittedIds, approvedCount: submittedIds.length, failed: [], attempted: courseIds.length });
+      }
+      if (url === "/api/scrape/staged/repair-job") return jsonResponse({ courses: review.courses });
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ScrapingForTest initialReviewState={review} />);
+    expect(screen.getByTestId("text-review-logical-course-count").textContent).toContain("1 courses");
+    expect(screen.getByTestId("text-review-entry-count").textContent).toContain("2 pending");
+    expect(screen.getByText("review entries")).toBeTruthy();
+    expect(screen.getByTestId("text-campus-fees-101").textContent).toContain("Manchester:");
+    expect(screen.getByTestId("text-campus-fees-101").textContent).toContain("18,000");
+    expect(screen.getByTestId("text-campus-fees-101").textContent).toContain("Birmingham:");
+    expect(screen.getByTestId("text-campus-fees-101").textContent).toContain("19,500");
+    const checkbox = screen.getByTestId("checkbox-logical-course-101") as HTMLInputElement;
+    expect(checkbox.checked).toBe(false);
+    await userEvent.click(checkbox);
+    expect((screen.getByRole("button", { name: "Approve (2)" }) as HTMLButtonElement).disabled).toBe(false);
+    await userEvent.click(screen.getByRole("button", { name: "Approve (2)" }));
+    await waitFor(() => expect(submittedIds.sort()).toEqual([101, 102]));
+  });
+
   it("submits one staged course with multiple campus fees without choosing a fee", async () => {
     const review = initialReview();
     const selected = [17500, 19050].map((amount, index) => ({

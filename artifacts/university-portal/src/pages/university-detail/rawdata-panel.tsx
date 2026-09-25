@@ -1,5 +1,6 @@
 import React from "react";
 import type { StagedCourse } from "../university-detail";
+import { groupLegacyCampusRows } from "../../utils/legacy-campus-groups";
 
 type Setter<T> = React.Dispatch<React.SetStateAction<T>>;
 interface RawDataPanelProps {
@@ -17,11 +18,11 @@ interface RawDataPanelProps {
   rawData: StagedCourse[]; rawLoading: boolean; rawSearch: string; rawSelectedIds: Set<number>;
   rawStatus: "all" | "pending" | "approved"; showBulkRejectConfirm: boolean; showForceApproveConfirm: boolean;
   fetchRawData: () => Promise<void>; handleApprove: (id: number, force?: boolean) => Promise<void>;
-  handleBulkApprove: (force?: boolean) => Promise<void>; handleBulkMap: (forceOverwrite: boolean) => Promise<void>;
+  handleBulkApprove: (force?: boolean, ids?: number[]) => Promise<void>; handleBulkMap: (forceOverwrite: boolean) => Promise<void>;
   handleBulkRejectSelected: () => Promise<void>; handleDelete: (id: number) => void; handleImportAll: () => void;
   num: (value: number | null | undefined) => number | "—"; openBackupMap: (course: StagedCourse) => Promise<void>;
   openEdit: (course: StagedCourse) => void; tableScrollRef: React.RefObject<HTMLDivElement | null>;
-  toggleRawSelect: (id: number) => void; toggleSelectAllRaw: () => void; txt: (value: string | null | undefined) => string;
+  toggleSelectAllRaw: () => void; txt: (value: string | null | undefined) => string;
   setBulkRejectFieldKey: Setter<string>; setBulkRejectReason: Setter<string>; setForceApproveRowId: Setter<number | null>;
   setRawSearch: Setter<string>; setRawSelectedIds: Setter<Set<number>>; setRawStatus: Setter<"all" | "pending" | "approved">;
   setShowBulkDeleteRawConfirm: Setter<boolean>; setShowBulkRejectConfirm: Setter<boolean>; setShowDeleteAllRawConfirm: Setter<boolean>;
@@ -29,7 +30,16 @@ interface RawDataPanelProps {
 }
 
 export function RawDataPanel(props: RawDataPanelProps) {
-  const { AlertTriangle, Button, CheckCircle2, DEGREE_COLORS, Database, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, ExternalLink, GitMerge, Input, Loader2, Pencil, RefreshCw, Search, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, StatusBadge, Textarea, Trash2, Upload, XCircle, approvedCount, approvingId, bulkApproveProgress, bulkApproveRunning, bulkDeleteRawRunning, bulkMapRunning, bulkRejectFieldKey, bulkRejectReason, bulkRejectRunning, deletingId, fetchRawData, filteredRaw, forceApproveRowId, handleApprove, handleBulkApprove, handleBulkMap, handleBulkRejectSelected, handleDelete, handleImportAll, importingAll, mappedIds, num, openBackupMap, openEdit, pendingCount, rawData, rawLoading, rawSearch, rawSelectedIds, rawStatus, setBulkRejectFieldKey, setBulkRejectReason, setForceApproveRowId, setRawSearch, setRawSelectedIds, setRawStatus, setShowBulkDeleteRawConfirm, setShowBulkRejectConfirm, setShowDeleteAllRawConfirm, setShowForceApproveConfirm, showBulkRejectConfirm, showForceApproveConfirm, tableScrollRef, toggleRawSelect, toggleSelectAllRaw, txt } = props;
+  const { AlertTriangle, Button, CheckCircle2, DEGREE_COLORS, Database, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, ExternalLink, GitMerge, Input, Loader2, Pencil, RefreshCw, Search, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, StatusBadge, Textarea, Trash2, Upload, XCircle, approvedCount, approvingId, bulkApproveProgress, bulkApproveRunning, bulkDeleteRawRunning, bulkMapRunning, bulkRejectFieldKey, bulkRejectReason, bulkRejectRunning, deletingId, fetchRawData, filteredRaw, forceApproveRowId, handleApprove, handleBulkApprove, handleBulkMap, handleBulkRejectSelected, handleDelete, handleImportAll, importingAll, mappedIds, num, openBackupMap, openEdit, pendingCount, rawData, rawLoading, rawSearch, rawSelectedIds, rawStatus, setBulkRejectFieldKey, setBulkRejectReason, setForceApproveRowId, setRawSearch, setRawSelectedIds, setRawStatus, setShowBulkDeleteRawConfirm, setShowBulkRejectConfirm, setShowDeleteAllRawConfirm, setShowForceApproveConfirm, showBulkRejectConfirm, showForceApproveConfirm, tableScrollRef, toggleSelectAllRaw, txt } = props;
+  const filteredIds = new Set(filteredRaw.map(course => course.id));
+  const logicalGroups = groupLegacyCampusRows(rawData)
+    .filter(group => group.members.some(member => filteredIds.has(member.id)));
+  const toggleGroupSelection = (ids: number[]) => setRawSelectedIds(previous => {
+    const next = new Set(previous);
+    const allSelected = ids.every(id => next.has(id));
+    ids.forEach(id => allSelected ? next.delete(id) : next.add(id));
+    return next;
+  });
   return (
         <div className="space-y-4">
           {/* Toolbar */}
@@ -69,7 +79,7 @@ export function RawDataPanel(props: RawDataPanelProps) {
             </div>
 
             <span className="text-sm text-muted-foreground">
-              {filteredRaw.length} course{filteredRaw.length !== 1 ? "s" : ""}
+              {logicalGroups.length} courses · {filteredRaw.length} review entries
             </span>
 
             <div className="ml-auto flex gap-2">
@@ -389,7 +399,7 @@ export function RawDataPanel(props: RawDataPanelProps) {
                         <input
                           type="checkbox"
                           className="cursor-pointer rounded"
-                          checked={filteredRaw.length > 0 && filteredRaw.every(c => rawSelectedIds.has(c.id))}
+                          checked={filteredRaw.length > 0 && filteredRaw.every(course => rawSelectedIds.has(course.id))}
                           onChange={toggleSelectAllRaw}
                           title="Select all"
                         />
@@ -432,9 +442,32 @@ export function RawDataPanel(props: RawDataPanelProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {filteredRaw.map((c, idx) => (
+                  {logicalGroups.map(({ course: c, members, ids }, idx) => {
+                    const locations = [...new Set(members.map(member => member.course_location?.trim()).filter((value): value is string => Boolean(value)))];
+                    const feeLines = members.flatMap(member => {
+                      const extraction = (member.extraction_method ?? member.extractionMethod) as Record<string, unknown> | null | undefined;
+                      const authority = (extraction?.fee_variants ?? (member as unknown as Record<string, unknown>).fee_variants) as Record<string, unknown> | null | undefined;
+                      const selected = Array.isArray(authority?.selected) ? authority.selected as Record<string, unknown>[] : [];
+                      if (selected.length) return selected.map(option => ({
+                        location: String(option.campus ?? member.course_location ?? "Location"),
+                        amount: typeof option.amount === "number" ? option.amount : null,
+                        currency: String(option.currency ?? member.currency ?? "AUD"),
+                        term: String(option.period ?? member.fee_term ?? "yr"),
+                        year: option.year,
+                      }));
+                      return member.international_fee == null ? [] : [{
+                        location: member.course_location ?? "Location",
+                        amount: member.international_fee,
+                        currency: member.currency ?? "AUD",
+                        term: member.fee_term ?? "yr",
+                        year: member.fee_year,
+                      }];
+                    });
+                    const selectedGroup = ids.every(id => rawSelectedIds.has(id));
+                    return (
                     <tr
                       key={c.id}
+                      data-testid={`row-raw-logical-course-${c.id}`}
                       className={`transition-colors ${
                         c.status === "approved" ? "bg-green-50/30 hover:bg-green-50/50" :
                         c.status === "rejected" ? "bg-red-50/30 hover:bg-red-50/50" :
@@ -449,8 +482,9 @@ export function RawDataPanel(props: RawDataPanelProps) {
                           <input
                             type="checkbox"
                             className="cursor-pointer rounded shrink-0"
-                            checked={rawSelectedIds.has(c.id)}
-                            onChange={() => toggleRawSelect(c.id)}
+                            checked={selectedGroup}
+                            onChange={() => toggleGroupSelection(ids)}
+                            data-testid={`checkbox-raw-logical-course-${c.id}`}
                           />
                           <span>{idx + 1}</span>
                         </div>
@@ -461,6 +495,7 @@ export function RawDataPanel(props: RawDataPanelProps) {
                       }`} style={{ left: 52 }}>
                         <div className="flex items-center gap-1.5">
                           <span className="line-clamp-1 max-w-[200px]">{c.course_name}</span>
+                          {members.length > 1 && <span className="text-[10px] text-slate-500">{members.length} campus entries</span>}
                           {c.course_website && (
                             <a href={c.course_website} target="_blank" rel="noreferrer" className="text-blue-400 shrink-0">
                               <ExternalLink className="w-3 h-3" />
@@ -480,8 +515,14 @@ export function RawDataPanel(props: RawDataPanelProps) {
                       <td className="px-2 py-2 text-gray-600">{num(c.duration)}</td>
                       <td className="px-2 py-2 text-gray-500">{txt(c.duration_term)}</td>
                       <td className="px-2 py-2 text-gray-500">{txt(c.study_mode)}</td>
-                      <td className="px-2 py-2 text-blue-600 border-r">{txt(c.course_location)}</td>
-                      <td className="px-2 py-2 text-amber-700 font-medium">{c.international_fee ? c.international_fee.toLocaleString() : "—"}</td>
+                      <td className="px-2 py-2 text-blue-600 border-r">{locations.length > 1 ? locations.join(", ") : txt(c.course_location)}</td>
+                      <td className="px-2 py-2 text-amber-700 font-medium">
+                        {members.length > 1 ? <div className="space-y-1" data-testid={`text-raw-campus-fees-${c.id}`}>
+                          {feeLines.length ? feeLines.map((fee, feeIndex) => <div key={`${fee.location}-${fee.year}-${feeIndex}`}>
+                            {fee.location}: {fee.currency} {fee.amount?.toLocaleString() ?? "fee pending"}{fee.term ? ` / ${fee.term}` : ""}{fee.year ? ` · ${fee.year}` : ""}
+                          </div>) : "Fees need review"}
+                        </div> : c.international_fee ? c.international_fee.toLocaleString() : "—"}
+                      </td>
                       <td className="px-2 py-2 text-amber-600">{txt(c.fee_term)}</td>
                       <td className="px-2 py-2 text-amber-600">{c.fee_year ?? "—"}</td>
                       <td className="px-2 py-2 text-amber-600 border-r">{txt(c.currency)}</td>
@@ -530,17 +571,28 @@ export function RawDataPanel(props: RawDataPanelProps) {
                                 <GitMerge className="w-3.5 h-3.5" />
                               </button>
                               <button
-                                onClick={() => handleApprove(c.id)}
+                                onClick={() => {
+                                  if (members.length === 1) void handleApprove(c.id);
+                                  else void handleBulkApprove(false, ids);
+                                }}
                                 disabled={approvingId === c.id}
                                 title="Approve & Import"
+                                data-testid={`button-approve-raw-course-${c.id}`}
                                 className="p-1 rounded hover:bg-green-100 text-green-600 disabled:opacity-40 cursor-pointer"
                               >
                                 <CheckCircle2 className="w-3.5 h-3.5" />
                               </button>
                               <button
-                                onClick={() => setForceApproveRowId(c.id)}
+                                onClick={() => {
+                                  if (members.length === 1) setForceApproveRowId(c.id);
+                                  else {
+                                    setRawSelectedIds(previous => new Set([...previous, ...ids]));
+                                    setShowForceApproveConfirm(true);
+                                  }
+                                }}
                                 disabled={approvingId === c.id}
                                 title="Force Approve (bypass confidence gate)"
+                                data-testid={`button-force-approve-raw-course-${c.id}`}
                                 className="p-1 rounded hover:bg-amber-100 text-amber-600 disabled:opacity-40 cursor-pointer"
                               >
                                 <AlertTriangle className="w-3.5 h-3.5" />
@@ -548,9 +600,16 @@ export function RawDataPanel(props: RawDataPanelProps) {
                             </>
                           )}
                           <button
-                            onClick={() => handleDelete(c.id)}
+                            onClick={() => {
+                              if (members.length === 1) handleDelete(c.id);
+                              else {
+                                setRawSelectedIds(previous => new Set([...previous, ...ids]));
+                                setShowBulkDeleteRawConfirm(true);
+                              }
+                            }}
                             disabled={deletingId === c.id}
                             title="Delete"
+                            data-testid={`button-delete-raw-course-${c.id}`}
                             className="p-1 rounded hover:bg-red-100 text-red-500 disabled:opacity-40 cursor-pointer"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -558,7 +617,8 @@ export function RawDataPanel(props: RawDataPanelProps) {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
