@@ -174,6 +174,49 @@ async def test_saved_choice_does_not_waive_confidence_gate():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("source_status", ["uniform", "range"])
+@pytest.mark.parametrize("mutation", [
+    "amount", "currency", "year", "period", "url", "method", "options",
+    "fingerprint", "option_id",
+])
+async def test_real_promotion_rejects_invalidated_selection(source_status, mutation):
+    from app.services.scraper.approve_course import approve_scraped_course
+
+    sc = course()
+    if source_status == "uniform":
+        variants = sc.extraction_method["fee_variants"]
+        variants.update(status="uniform", selected=variants["options"][:1],
+                        international_fee=19050)
+        sc.international_fee = 19050
+    db = DB(sc)
+    state = fee_selection(sc)
+    await staged_fee_selection(sc.id, _FeeSelectionBody(
+        snapshotToken=state["snapshotToken"], optionId=state["options"][2]["optionId"],
+    ), db, {"email": "reviewer"})
+    if mutation in {"amount", "currency", "year", "period", "url"}:
+        key, value = {
+            "amount": ("international_fee", 1),
+            "currency": ("currency", "USD"),
+            "year": ("fee_year", 2030),
+            "period": ("fee_term", "Full Course"),
+            "url": ("course_website", URL + "unrelated/"),
+        }[mutation]
+        setattr(sc, key, value)
+    elif mutation == "method":
+        sc.extraction_method["international_fee"] = "untrusted"
+    elif mutation == "options":
+        sc.extraction_method["fee_variants"]["options"][2]["snippet"] += " changed"
+    else:
+        key = "sourceFingerprint" if mutation == "fingerprint" else "optionId"
+        sc.extraction_method["fee_selection"][key] = "stale"
+
+    with pytest.raises(ValueError, match="Select a current published fee option"):
+        await approve_scraped_course(db, sc, actor="reviewer")
+    assert db.commit.await_count == 1  # Only the original selection committed.
+    assert len(db.audit) == 1
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("permissions,expected", [(None, 401), ([], 403), (["staged.view"], 403), (["staged.approve"], 200)])
 async def test_http_authentication_and_permission(permissions, expected):
     from fastapi import FastAPI

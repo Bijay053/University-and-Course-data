@@ -121,7 +121,7 @@ async def approve_scraped_course(
     on ``None.lower()``, which then poisoned the SQLAlchemy session and made
     every subsequent row in a batch fail (Week 5: Charles Sturt promotion gap).
     """
-    from app.services.scraper.fee_selection import unresolved_fee_selection
+    from app.services.scraper.fee_selection import fee_selection, unresolved_fee_selection
     if isinstance(getattr(sc, "extraction_method", None), dict) and sc.extraction_method.get("fee_variants"):
         sc = (await db.execute(
             select(ScrapedCourse).where(ScrapedCourse.id == sc.id)
@@ -137,7 +137,11 @@ async def approve_scraped_course(
     from app.services.scraper.campus_fee_split import SCOPE
     fee_metadata = sc.extraction_method or {}
     fee_authority = fee_metadata.get("fee_variants")
-    if fee_authority and (
+    # A reviewer may choose a source-owned alternative outside the extractor's
+    # original uniform tuple (or resolve a range). Validate its fingerprint and
+    # entire current tuple, not merely the presence of selection metadata.
+    selected_fee = fee_selection(sc) if fee_authority else None
+    if fee_authority and not (selected_fee and selected_fee["selectedOptionId"]) and (
         fee_authority.get("status") != "uniform" or not validated_fee_variants(sc)
     ):
         raise ValueError("Resolve the published fee options before approving this course")

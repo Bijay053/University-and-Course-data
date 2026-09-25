@@ -256,20 +256,24 @@ async def test_simultaneous_same_snapshot_has_one_winner(isolated_fee_database, 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("approval_path", ["route", "service"])
-@pytest.mark.parametrize("first,option_index", [
-    ("approve", 2),
-    ("select", 3),
-    ("select", 2),
-], ids=["approval-first", "selection-first-compatible", "selection-first-invalidates-approval"])
+@pytest.mark.parametrize("first,option_index,source_status", [
+    ("approve", 2, "uniform"),
+    ("select", 3, "uniform"),
+    ("select", 2, "uniform"),
+    ("select", 1, "uniform"),
+    ("select", 2, "range"),
+    ("select", 1, "range"),
+], ids=["approval-first", "selection-first-compatible", "selection-first-year-period",
+        "selection-first-amount", "range-selection-year-period", "range-selection-amount"])
 async def test_fee_selection_contends_with_approval(
-    isolated_fee_database, approval_path, first, option_index,
+    isolated_fee_database, approval_path, first, option_index, source_status,
 ):
     """Exercise real writers, including a deliberately stale ORM identity map.
 
     A uniform source can be approved before any reviewer selection. Another
-    campus with the identical tuple remains approvable; selecting a different
-    year/period fails the promotion service's source-authority validation.
-    Neither outcome may publish the old cached tuple after selection commits.
+    campus, amount or year/period is approvable after a source-backed selection,
+    including an originally unresolved range. Approval must never publish the
+    old cached tuple after selection commits.
     """
     from app.routers.scrape import _FeeSelectionBody, staged_fee_selection
     from app.services.scraper.approve_course import approve_scraped_course
@@ -284,9 +288,10 @@ async def test_fee_selection_contends_with_approval(
         sc.id = None
         sc.university_id = university.id
         variants = copy.deepcopy(sc.extraction_method["fee_variants"])
-        variants.update(status="uniform", selected=variants["options"][:1], international_fee=19050)
+        if source_status == "uniform":
+            variants.update(status="uniform", selected=variants["options"][:1], international_fee=19050)
         sc.extraction_method = {"international_fee": METHOD, "fee_variants": variants}
-        sc.international_fee = 19050
+        sc.international_fee = variants["international_fee"]
         sc.ielts_overall = 6.5
         sc.duration = 1
         sc.intake_months = ["September"]
@@ -414,14 +419,11 @@ async def test_fee_selection_contends_with_approval(
                     task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
 
-    approved = first == "approve" or option_index == 3
     selected = first == "select"
-    assert responses["approve"].status_code == (200 if approved else 422), responses["approve"].text
+    assert responses["approve"].status_code == 200, responses["approve"].text
     assert responses["select"].status_code == (200 if selected else 409), responses["select"].text
     if not selected:
         assert responses["select"].json()["detail"] == "Only unpublished pending courses can select fees"
-    if not approved:
-        assert responses["approve"].json()["detail"] == "Resolve the published fee options before approving this course"
     expected_tuple = dict(zip(FIELDS, (
         chosen["amount"], chosen["currency"], chosen["year"], chosen["period"],
     ))) if selected else before_tuple
@@ -430,17 +432,14 @@ async def test_fee_selection_contends_with_approval(
         saved = await db.get(ScrapedCourse, sc_id)
         assert {key: getattr(saved, key) for key in FIELDS} == expected_tuple
         assert saved.extraction_method["fee_variants"] == variants
-        assert saved.status == ("approved" if approved else "pending")
+        assert saved.status == "approved"
         assert fee_selection(saved)["selectedOptionId"] == (chosen["optionId"] if selected else None)
         published = (await db.execute(select(Course))).scalars().all()
         fees = (await db.execute(select(Fee))).scalars().all()
-        assert len(published) == len(fees) == int(approved)
-        if approved:
-            assert saved.course_id == published[0].id == fees[0].course_id
-            assert published[0].last_edited_by == "approve@example.test"
-            assert {key: getattr(fees[0], key) for key in FIELDS} == expected_tuple
-        else:
-            assert saved.course_id is None
+        assert len(published) == len(fees) == 1
+        assert saved.course_id == published[0].id == fees[0].course_id
+        assert published[0].last_edited_by == "approve@example.test"
+        assert {key: getattr(fees[0], key) for key in FIELDS} == expected_tuple
         audits = (await db.execute(select(CourseAuditLog))).scalars().all()
         assert len(audits) == int(selected)
         if selected:
@@ -461,15 +460,16 @@ async def test_fee_selection_contends_with_approval(
         evidence = (await db.execute(select(ScrapedFieldEvidence))).scalars().all()
         assert evidence_snapshot(evidence) == before_evidence
 
-        # After a rejected approval the successful review remains retryable,
-        # but the old client token must not overwrite its tuple or add an audit.
-        if not approved:
+        # Neither an old nor a current token can mutate the published fee.
+        if selected:
             from fastapi import HTTPException
-            with pytest.raises(HTTPException) as exc:
-                await staged_fee_selection(sc_id, _FeeSelectionBody(
-                    snapshotToken=state["snapshotToken"],
-                    optionId=state["options"][0]["optionId"],
-                ), db, {"email": "stale@example.test"})
-            assert exc.value.status_code == 409
+            for token in (state["snapshotToken"], fee_selection(saved)["snapshotToken"]):
+                with pytest.raises(HTTPException) as exc:
+                    await staged_fee_selection(sc_id, _FeeSelectionBody(
+                        snapshotToken=token,
+                        optionId=state["options"][0]["optionId"],
+                    ), db, {"email": "stale@example.test"})
+                assert exc.value.status_code == 409
+                assert exc.value.detail == "Only unpublished pending courses can select fees"
             await db.rollback()
             assert (await db.execute(select(func.count()).select_from(CourseAuditLog))).scalar_one() == 1

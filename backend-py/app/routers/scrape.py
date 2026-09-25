@@ -5166,6 +5166,14 @@ async def staged_approve(
     if not sc:
         raise HTTPException(status_code=404, detail="Not found")
 
+    if isinstance(sc.extraction_method, dict) and sc.extraction_method.get("fee_variants"):
+        # Validate the committed selection after any competing writer finishes,
+        # rather than rejecting a stale, unresolved range from the identity map.
+        sc = (await db.execute(
+            select(ScrapedCourse).where(ScrapedCourse.id == sc_id)
+            .with_for_update().execution_options(populate_existing=True)
+        )).scalar_one()
+
     from app.services.scraper.fee_selection import unresolved_fee_selection
     if unresolved_fee_selection(sc):
         raise HTTPException(422, "Select a current published fee option before approval")
