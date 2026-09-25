@@ -655,18 +655,50 @@ async def test_actual_startup_cleanup_interleavings_preserve_new_generation(
 
 
 def test_shared_lock_callers_do_not_bypass_atomic_helpers():
+    import ast
     import inspect
+    from pathlib import Path
     from app.services.scraper import repair, orchestrator
     from app.tasks import celery_app
     repair_source = inspect.getsource(repair.run_repair)
     assert "replace_legacy_university_lock(" in repair_source
     assert "release_legacy_university_lock(" in repair_source
     assert "_uni_lock_redis.delete(" not in repair_source
-    orchestrator_source = inspect.getsource(orchestrator._run_claimed_scrape)
-    assert "acquire_legacy_global_slot(" in orchestrator_source
-    assert "release_legacy_global_slot(" in orchestrator_source
-    assert "ZREMRANGEBYSCORE" not in orchestrator_source
-    assert "_global_slot_redis.zrem(" not in orchestrator_source
+    # Follow the entry point's local call graph, including lambda callbacks
+    # passed to review/verification wrappers. A source slice of one wrapper
+    # silently stops covering the pipeline when that wrapper is extracted.
+    tree = ast.parse(Path(orchestrator.__file__).read_text())
+    functions = {
+        node.name: node for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    pending = ["run_scrape"]
+    visited = set()
+    pipeline_nodes = []
+    while pending:
+        name = pending.pop()
+        if name in visited:
+            continue
+        visited.add(name)
+        nodes = list(ast.walk(functions[name]))
+        pipeline_nodes.extend(nodes)
+        pending.extend(
+            node.func.id for node in nodes
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+            and node.func.id in functions and node.func.id not in visited
+        )
+    calls = {
+        ast.unparse(node.func) for node in pipeline_nodes
+        if isinstance(node, ast.Call)
+    }
+    assert "fenced_redis_locks.acquire_legacy_global_slot" in calls
+    assert "fenced_redis_locks.release_legacy_global_slot" in calls
+    assert "_global_slot_redis.zrem" not in calls
+    assert not any(
+        isinstance(node, ast.Constant) and isinstance(node.value, str)
+        and "ZREMRANGEBYSCORE" in node.value.upper()
+        for node in pipeline_nodes
+    )
     assert "_r.delete(" not in inspect.getsource(celery_app.on_worker_ready)
 
 
