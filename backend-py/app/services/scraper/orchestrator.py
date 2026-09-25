@@ -535,6 +535,7 @@ def _record_staged_quality_payload(
         {
             "payload": dict(payload),
             "url": source_url or payload.get("course_website") or "",
+            "scraped_course_id": getattr(stage_result, "scraped_course_id", None),
         }
     )
     return True
@@ -8154,6 +8155,15 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
 
             # Mark courses with critical data-quality issues so operators see
             # DATA QUALITY FAILURE in the Review UI instead of generic review.
+            if _dq_critical_urls and _full_review:
+                from app.services.scraper.review_policy import annotate_review_quality
+                await annotate_review_quality(
+                    db, job_id=runtime_job_id, university_id=uni_id,
+                    row_ids=[item["scraped_course_id"] for item in _all_staged_dicts
+                             if item.get("scraped_course_id")],
+                    critical_urls=list(_dq_critical_urls),
+                )
+                await db.commit()
             if _dq_critical_urls and not _preserve_review:
                 from sqlalchemy import update as _dq_upd, text as _dq_txt
                 from app.models import ScrapedCourse as _DqSC

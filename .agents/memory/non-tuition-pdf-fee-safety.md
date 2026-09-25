@@ -11,6 +11,6 @@ Documents explicitly dedicated to incidental, ancillary, non-tuition, SSAF, appl
 
 A source rejection alone does not correct historical staged values.
 
-**Why:** ULaw's graduate-visa FAQ supplied a two-year immigration health surcharge as tuition. An AI explanation misidentified it as an instalment; only the actual PDF proved the source contamination.
+**Why:** An AI explanation can misclassify the purpose of a published amount. Only the actual selected source establishes whether that amount is tuition; rejecting it does not replace values already staged.
 
 **How to apply:** Verify the selected source, not the AI explanation. Re-extract using the ordinary isolated verification pipeline; missing replacement tuition is still a review failure, not successful repair. A no-change config loop can test a deployed deterministic correction only with recorded critical failures and fresh affected-course evidence; rejected proposals cannot use that route.

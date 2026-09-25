@@ -179,12 +179,15 @@ async def run_publishing_pass(
 
     for sc in courses:
         try:
+            from app.services.scraper.review_policy import blocks_automatic_followup
+            if await blocks_automatic_followup(db, sc.scrape_job_id):
+                continue
             scored = await score_course(sc, db)
             counts["scored"] += 1
 
             if scored["decision"] == "auto_publish":
                 try:
-                    await approve_scraped_course(sc.id, db)
+                    await approve_scraped_course(db, sc)
                     db.add(_ledger_entry(sc, "auto_published", "system", scored["reason"]))
                     counts["auto_published"] += 1
                 except Exception as e:
@@ -464,6 +467,7 @@ async def get_review_queue(
         .where(
             ScrapedCourse.status.in_(["pending", "review"]),
             ScrapedCourse.pub_decision.in_(["needs_review", "hold", "auto_publish"]),
+            ScrapedCourse.auto_publish_status != "data_quality_failure",
         )
         .order_by(
             # hold → needs_review → auto_publish; within band, highest score first

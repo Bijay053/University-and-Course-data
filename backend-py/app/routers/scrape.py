@@ -6306,6 +6306,44 @@ async def trigger_conflict_repair(
     }
 
 
+@router.post("/jobs/{job_id}/reconcile-review-quality")
+async def reconcile_review_quality(
+    job_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(require_permission("scraping.trigger"))],
+) -> dict:
+    """Apply stored critical evidence to this completed review-only job, only."""
+    from app.models import ScrapedCourse
+    from app.services.scraper.review_policy import full_catalogue_review, annotate_review_quality
+    job = (await db.execute(
+        select(ScrapeRuntimeJob).where(ScrapeRuntimeJob.runtime_job_id == job_id).with_for_update()
+    )).scalar_one_or_none()
+    if not job:
+        raise HTTPException(404, "Job not found")
+    if not full_catalogue_review(job.request_payload) or job.status not in (
+        "completed", "completed_with_errors",
+    ):
+        raise HTTPException(409, "Requires a completed full-catalogue review-only job")
+    evidence = (job.gate_skip_counts or {}).get("data_quality") or {}
+    issues = evidence.get("critical_issues")
+    if not isinstance(issues, list) or evidence.get("critical_count") != len(issues):
+        raise HTTPException(409, "Stored critical evidence is absent or truncated; refusing reconciliation")
+    urls = set(evidence.get("critical_urls") or [])
+    if len(urls) != evidence.get("affected_course_count"):
+        raise HTTPException(409, "Stored critical URL evidence is incomplete")
+    row_ids = list((await db.execute(select(ScrapedCourse.id).where(
+        ScrapedCourse.scrape_job_id == job_id,
+        ScrapedCourse.university_id == job.university_id,
+    ))).scalars())
+    changed = await annotate_review_quality(
+        db, job_id=job_id, university_id=job.university_id,
+        row_ids=row_ids, critical_urls=list(urls),
+    )
+    await db.commit()
+    return {"job_id": job_id, "scoped_rows": len(row_ids), "critical_issues": len(issues),
+            "marked_ids": changed, "marked_count": len(changed)}
+
+
 @router.post("/jobs/{job_id}/run-quality-optimizer", status_code=202)
 async def trigger_job_quality_optimizer(
     job_id: str,

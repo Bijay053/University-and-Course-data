@@ -59,7 +59,7 @@ def test_quality_input_contains_only_payloads_that_staging_saved():
     assert _record_staged_quality_payload(
         staged_payloads,
         saved,
-        SimpleNamespace(saved=True),
+        SimpleNamespace(saved=True, scraped_course_id=71),
         source_url="https://example.edu/eligible",
     )
 
@@ -71,6 +71,7 @@ def test_quality_input_contains_only_payloads_that_staging_saved():
                 "international_fee": 19_000,
             },
             "url": "https://example.edu/eligible",
+            "scraped_course_id": 71,
         }
     ]
 

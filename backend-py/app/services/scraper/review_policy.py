@@ -63,8 +63,34 @@ async def blocks_automatic_followup(db, job_id) -> bool:
     if not job_id:
         return False
     from app.models import ScrapeRuntimeJob
-    job = await db.get(ScrapeRuntimeJob, job_id)
-    return bool(job and full_catalogue_review(job.request_payload))
+    job = await db.get(ScrapeRuntimeJob, job_id, populate_existing=True)
+    return bool(job and (
+        full_catalogue_review(job.request_payload)
+        or (getattr(job, "discovered_config", None) or {}).get("fullCatalogueReviewPolicy", {}).get("review_only") is True
+    ))
+
+
+async def annotate_review_quality(db, *, job_id, university_id, row_ids, critical_urls):
+    """Only annotate explicitly identified, still-pending rows owned by this job.
+
+    Never reparent, publish, delete, or update extraction data. Caller commits.
+    """
+    from sqlalchemy import update
+    from app.models import ScrapedCourse
+    if not row_ids or not critical_urls:
+        return []
+    result = await db.execute(
+        update(ScrapedCourse).where(
+            ScrapedCourse.id.in_(row_ids),
+            ScrapedCourse.scrape_job_id == job_id,
+            ScrapedCourse.university_id == university_id,
+            ScrapedCourse.status.in_(["pending", "review"]),
+            ScrapedCourse.auto_publish_status.in_(["review", "pending_review", "ready"]),
+            ScrapedCourse.course_website.in_(critical_urls),
+        ).values(auto_publish_status="data_quality_failure")
+        .returning(ScrapedCourse.id)
+    )
+    return list(result.scalars())
 
 
 async def run_full_catalogue_review(db, job, run):
