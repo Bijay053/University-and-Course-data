@@ -22,15 +22,27 @@ def approved_manifest(mapping_path=APPROVED_MAPPING):
     map_sha = hashlib.sha256(mapping_bytes).hexdigest()
     groups = []
     staged_id = 1
+    overlap_component_signatures = []
     for group_index, approved in enumerate(source["groups"]):
         members, mappings = [], []
+        ids = approved["ids"]
+        if approved["parent"] in apply_tool.REVISED_UNIONS:
+            chunks = [list(chunk) for chunk in (
+                ids[:2], ids[2:4], ids[4:],
+            )]
+        else:
+            chunks = [list(ids)]
+        overlap_component_signatures.extend(chunks)
+        component_by_id = {
+            course_id: component_index
+            for component_index, chunk in enumerate(chunks)
+            for course_id in chunk
+        }
         for member_index, course_id in enumerate(approved["ids"]):
             location = f"Campus {course_id}"
             evidence_id = staged_id
             staged_id += 1
-            split_id = approved["parent"] + (
-                10000 if member_index == 0 or group_index >= 19 else 20000
-            )
+            split_id = approved["parent"] + 10000 + component_by_id[course_id]
             route_fingerprint = "sha256:" + hashlib.sha256(
                 approved["source"].encode()
             ).hexdigest()
@@ -50,6 +62,9 @@ def approved_manifest(mapping_path=APPROVED_MAPPING):
                     "source_fee": source_fee,
                 }],
                 "source_fee": source_fee,
+                "study_variant": "Standard",
+                "study_mode": "Full-time",
+                "degree_level": "Master",
                 "precondition_sha256": "b" * 64,
                 "source_route_sha256": route_fingerprint,
                 "evidence_rows": [{
@@ -61,6 +76,17 @@ def approved_manifest(mapping_path=APPROVED_MAPPING):
                     "selected_for_offering": True,
                 }],
             })
+            if group_index < 15 and member_index == 0:
+                duplicate_id = staged_id
+                staged_id += 1
+                members[-1]["evidence_rows"].append({
+                    "staged_row_id": duplicate_id,
+                    "evidence_precondition_sha256": "e" * 64,
+                    "scrape_job_id": "job-" + str(approved["parent"]),
+                    "split_from_id": approved["parent"] + 30000,
+                    "source_route_sha256": route_fingerprint,
+                    "selected_for_offering": False,
+                })
             mappings.append({
                 "old_course_id": course_id, "canonical_course_id": approved["parent"],
                 "offering_location": location, "offering_locations": [location],
@@ -81,7 +107,7 @@ def approved_manifest(mapping_path=APPROVED_MAPPING):
                 })
             ],
             "member_count": len(members),
-            "evidence_row_count": len(members),
+            "evidence_row_count": sum(len(member["evidence_rows"]) for member in members),
             "course_ids": list(approved["ids"]),
             "proposed_canonical_course_id": approved["parent"],
             "proposed_mapping": mappings,
@@ -98,11 +124,18 @@ def approved_manifest(mapping_path=APPROVED_MAPPING):
         "production_writes_performed": False,
         "apply_implemented": True,
         "manifest_digest_scope": "canonical JSON excluding manifest_sha256 and approval",
-        "expected_scope": {"raw_families": 119, "groups": 100, "course_ids": 307},
+        "expected_scope": {
+            "raw_families": 119, "overlap_components": 104,
+            "groups": 100, "course_ids": 307,
+        },
         "approved_mapping_sha256": map_sha,
         "external_reference_scope": "out_of_scope_preserve_original_course_ids",
         "observed_scope": {
-            "raw_families": 119, "groups": 100, "unique_course_ids": 307,
+            "raw_families": 119, "overlap_components": 104,
+            "groups": 100, "unique_course_ids": 307,
+            "overlap_component_signatures": sorted(
+                overlap_component_signatures, key=lambda signature: tuple(signature)
+            ),
             "approved_family_signature_count": 119,
             "additional_approved_id_families": 0,
             "preview_candidate_groups": 100, "preview_candidate_course_ids": 307,
@@ -147,7 +180,7 @@ def test_authoritative_mapping_fingerprint_and_all_explicit_rows_are_required(tm
     approved = load(tmp_path, value)
     assert len(approved["groups"]) == 100
     assert len(approved["course_ids"]) == 307
-    assert len(approved["staged_ids"]) == 307
+    assert len(approved["staged_ids"]) == 322
     assert approved["manifest"]["external_reference_scan_complete"] is False
 
 
@@ -160,6 +193,87 @@ def test_mismatched_mapping_ids_or_group_identity_refuse(tmp_path):
         assert "authoritative approved JSON" in str(exc)
     else:
         raise AssertionError("manifest IDs must match approved mapping")
+
+
+def _set_member_campus(group, course_id, campus, *, fee=None):
+    member = next(item for item in group["members"] if item["course_id"] == course_id)
+    mapping = next(
+        item for item in group["proposed_mapping"]
+        if item["old_course_id"] == course_id
+    )
+    member["location"] = campus
+    member["locations"] = [campus]
+    mapping["offering_location"] = campus
+    mapping["offering_locations"] = [campus]
+    if fee is not None:
+        member["source_fee"] = dict(fee)
+        mapping["source_fee"] = dict(fee)
+    member["location_evidence"] = [{
+        "location": campus,
+        "staged_row_id": member["staged_row_id"],
+        "evidence_precondition_sha256":
+            member["evidence_rows"][0]["evidence_precondition_sha256"],
+        "source_route_sha256": member["source_route_sha256"],
+        "source_fee": member["source_fee"],
+    }]
+
+
+def test_apply_manifest_rejects_conflicting_duplicate_campus_fees(tmp_path):
+    value, _ = approved_manifest()
+    group = next(item for item in value["groups"]
+                 if item["proposed_canonical_course_id"] == 9389)
+    fee_a = {"amount": 17500, "currency": "GBP", "fee_year": 2026,
+             "fee_term": "Full Course"}
+    fee_b = {**fee_a, "amount": 17501}
+    _set_member_campus(group, 9389, "Birmingham", fee=fee_a)
+    _set_member_campus(group, 9408, "Birmingham", fee=fee_b)
+    try:
+        load(tmp_path, value)
+    except apply_tool.ApplyRefused as exc:
+        assert "exact reviewed fee/study match" in str(exc)
+    else:
+        raise AssertionError("a duplicate campus with a conflicting fee must be refused")
+
+
+def test_apply_manifest_rejects_unreviewed_extra_duplicate_campus(tmp_path):
+    value, _ = approved_manifest()
+    group = next(item for item in value["groups"]
+                 if item["proposed_canonical_course_id"] == 9389)
+    fee = {"amount": 17500, "currency": "GBP", "fee_year": 2026,
+           "fee_term": "Full Course"}
+    _set_member_campus(group, 9389, "London Moorgate", fee=fee)
+    _set_member_campus(group, 9408, "London Moorgate", fee=fee)
+    try:
+        load(tmp_path, value)
+    except apply_tool.ApplyRefused as exc:
+        assert "exact reviewed fee/study match" in str(exc)
+    else:
+        raise AssertionError("an unreviewed duplicate campus label must be refused")
+
+
+def test_apply_manifest_rejects_raw_family_crossing_approved_parents(tmp_path):
+    value, _ = approved_manifest()
+    first = next(item for item in value["groups"]
+                 if item["proposed_canonical_course_id"] == 9389)
+    second = next(item for item in value["groups"]
+                  if item["proposed_canonical_course_id"] == 9396)
+    source_family = first["members"][0]["evidence_rows"][0]
+    target_family = second["members"][0]["evidence_rows"][0]
+    target_family["scrape_job_id"] = source_family["scrape_job_id"]
+    target_family["split_from_id"] = source_family["split_from_id"]
+    second["source_families"].append({
+        "scrape_job_id": source_family["scrape_job_id"],
+        "split_from_id": source_family["split_from_id"],
+    })
+    second["source_families"].sort(
+        key=lambda item: (item["scrape_job_id"], item["split_from_id"])
+    )
+    try:
+        load(tmp_path, value)
+    except apply_tool.ApplyRefused as exc:
+        assert "one raw per-job family is split" in str(exc)
+    else:
+        raise AssertionError("a source family crossing approved parents must be refused")
 
 
 def test_external_scan_is_out_of_scope_not_a_no_conflicts_attestation(tmp_path):

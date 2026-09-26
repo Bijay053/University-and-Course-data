@@ -102,6 +102,87 @@ def manifest_for(snapshot, expected_families=1, award="MSc Data Science"):
             }],
         }, approved_mapping_sha256="a" * 64, expected_groups=1,
         expected_course_ids=2, expected_families=expected_families,
+        expected_components=1,
+    )
+
+
+def revised_union_snapshot(groups):
+    rows, courses, mapping_groups = [], [], []
+    staged_id = 20_000
+    for group_index, (parent, ids, award, source, campuses, amount) in enumerate(groups):
+        route_hash = "sha256:" + preview.hashlib.sha256(source.encode()).hexdigest()
+        mapping_groups.append({
+            "parent": parent, "ids": ids, "award": award, "source": source,
+        })
+        for index, (course_id, location) in enumerate(zip(ids, campuses)):
+            component_index = index // 2
+            split_id = parent + 10_000 + component_index
+            base = copy.deepcopy(sample_snapshot()["evidence_rows"][0])
+            staged_id += 1
+            base.update({
+                "id": staged_id, "status": "published", "university_id": 92,
+                "scrape_job_id": f"job-{group_index}-{component_index}",
+                "course_id": course_id,
+                "course_name": f"{award} — {location}", "course_location": location,
+                "course_website": route_hash, "degree_level": "Master",
+                "study_mode": "Full-time", "fee_scope_key": f"scope-{course_id}",
+                "international_fee": amount, "fee_year": 2026,
+                "fee_term": "Full Course", "currency": "GBP",
+            })
+            scope = base["extraction_method"]["campus_fee_scope"]
+            scope.update({
+                "original_name": award, "locations": [location],
+                "key": f"scope-{course_id}", "source_url": route_hash,
+                "split_from_id": split_id,
+            })
+            variants = base["extraction_method"]["fee_variants"]
+            variants["selected"] = [{
+                "study_variant": "Standard", "campus": location,
+                "amount": amount, "currency": "GBP", "year": 2026,
+                "period": "Full Course", "source_url": route_hash,
+            }]
+            rows.append(base)
+            course = copy.deepcopy(sample_snapshot()["courses"][0])
+            course.update({
+                "id": course_id, "name": f"{award} — {location}",
+                "course_website": route_hash, "course_location": location,
+                "degree_level": "Master", "study_mode": "Full-time",
+                "legacy_fee_rows": [{
+                    "id": 30_000 + course_id, "amount": amount,
+                    "currency": "GBP", "fee_year": 2026,
+                    "fee_term": "Full Course",
+                }],
+            })
+            courses.append(course)
+    return ({
+        "schema_version": 1, "reference_scan_complete": True,
+        "external_reference_scan_complete": False,
+        "evidence_rows": rows, "courses": courses,
+    }, {
+        "schema_version": 1, "university_id": 92,
+        "approval": "explicit reviewed test unions", "groups": mapping_groups,
+    })
+
+
+REVISED_GROUP_FIXTURES = [
+    (9389, [9389, 9408, 9645, 9646, 9647, 9648],
+     "MSc Healthcare Management", "https://example.edu/healthcare",
+     ["Birmingham", "Birmingham", "Leeds", "Leeds", "Manchester", "Manchester"], 17500),
+    (9396, [9396, 9421, 9608, 9675, 9676],
+     "LLM International Criminal Law", "https://example.edu/criminal-law",
+     ["Birmingham", "Birmingham", "Manchester", "Manchester", "Manchester"], 18250),
+]
+
+
+def revised_manifest(groups=REVISED_GROUP_FIXTURES):
+    snapshot, mapping = revised_union_snapshot(groups)
+    family_count, components = preview._connected_components(snapshot["evidence_rows"])
+    return preview.build_review_manifest(
+        snapshot, approved_mapping=mapping, approved_mapping_sha256="f" * 64,
+        expected_groups=len(groups),
+        expected_course_ids=sum(len(group[1]) for group in groups),
+        expected_families=family_count,
+        expected_components=len(components),
     )
 
 
@@ -119,6 +200,75 @@ def test_safe_group_is_a_review_candidate_with_explicit_mapping_and_hashes():
                for member in group["members"])
     assert manifest["production_writes_performed"] is False
     assert manifest["apply_implemented"] is True
+
+
+def test_only_exact_reviewed_unions_allow_identical_duplicate_campuses():
+    manifest = revised_manifest()
+    assert [group["course_ids"] for group in manifest["groups"]] == [
+        list(REVISED_GROUP_FIXTURES[0][1]), list(REVISED_GROUP_FIXTURES[1][1]),
+    ]
+    assert all(group["eligibility"] == "preview_candidate" for group in manifest["groups"])
+    assert manifest["observed_scope"]["overlap_components"] == 6
+    assert manifest["observed_scope"]["groups"] == 2
+    assert preview._norm("London") != preview._norm("London Moorgate")
+    assert preview._norm("London") != preview._norm("London Bloomsbury")
+
+
+def test_revised_union_rejects_duplicate_campus_fee_conflict():
+    snapshot, mapping = revised_union_snapshot(REVISED_GROUP_FIXTURES)
+    conflict = next(
+        row for row in snapshot["evidence_rows"]
+        if row["course_id"] == 9408
+    )
+    conflict["international_fee"] = 17_501
+    conflict["extraction_method"]["fee_variants"]["selected"][0]["amount"] = 17_501
+    next(course for course in snapshot["courses"] if course["id"] == 9408)[
+        "legacy_fee_rows"
+    ][0]["amount"] = 17_501
+    family_count, components = preview._connected_components(snapshot["evidence_rows"])
+    manifest = preview.build_review_manifest(
+        snapshot, approved_mapping=mapping, approved_mapping_sha256="f" * 64,
+        expected_groups=2, expected_course_ids=11, expected_families=family_count,
+        expected_components=len(components),
+    )
+    first = manifest["groups"][0]
+    assert first["eligibility"] == "blocked"
+    assert any("campus is assigned to multiple approved IDs" in reason
+               for reason in first["blocking_reasons"])
+
+
+def test_revised_union_rejects_cross_parent_overlap_family():
+    snapshot, mapping = revised_union_snapshot(REVISED_GROUP_FIXTURES)
+    second_parent_row = next(
+        row for row in snapshot["evidence_rows"] if row["course_id"] == 9396
+    )
+    first_parent_row = next(
+        row for row in snapshot["evidence_rows"] if row["course_id"] == 9389
+    )
+    second_parent_row["scrape_job_id"] = first_parent_row["scrape_job_id"]
+    second_parent_row["extraction_method"]["campus_fee_scope"]["split_from_id"] = (
+        first_parent_row["extraction_method"]["campus_fee_scope"]["split_from_id"]
+    )
+    family_count, components = preview._connected_components(snapshot["evidence_rows"])
+    manifest = preview.build_review_manifest(
+        snapshot, approved_mapping=mapping, approved_mapping_sha256="f" * 64,
+        expected_groups=2, expected_course_ids=11, expected_families=family_count,
+        expected_components=len(components),
+    )
+    assert all(group["eligibility"] == "blocked" for group in manifest["groups"])
+    assert any("component differs" in reason
+               for group in manifest["groups"] for reason in group["blocking_reasons"])
+
+
+def test_revised_union_rejects_duplicate_extra_campus_label():
+    altered = copy.deepcopy(REVISED_GROUP_FIXTURES)
+    altered[0][4][0] = "London Moorgate"
+    altered[0][4][1] = "London Moorgate"
+    manifest = revised_manifest(altered)
+    first = manifest["groups"][0]
+    assert first["eligibility"] == "blocked"
+    assert any("campus is assigned to multiple approved IDs" in reason
+               for reason in first["blocking_reasons"])
 
 
 def test_legacy_fee_mismatch_blocks_repricing_before_preview_approval():
@@ -583,6 +733,7 @@ def test_same_award_and_source_do_not_merge_disjoint_approved_groups():
     manifest = preview.build_review_manifest(
         snapshot, approved_mapping=mapping, approved_mapping_sha256="a" * 64,
         expected_groups=2, expected_course_ids=4, expected_families=2,
+        expected_components=2,
     )
     assert manifest["observed_scope"]["groups"] == 2
     assert [group["course_ids"] for group in manifest["groups"]] == [[901, 902], [903, 904]]
@@ -601,6 +752,7 @@ def test_current_overlap_component_mismatch_with_approved_ids_is_blocked():
     manifest = preview.build_review_manifest(
         snapshot, approved_mapping=wrong_mapping, approved_mapping_sha256="a" * 64,
         expected_groups=1, expected_course_ids=2, expected_families=1,
+        expected_components=1,
     )
     assert manifest["groups"][0]["eligibility"] == "blocked"
     assert any("differs from approved JSON" in reason

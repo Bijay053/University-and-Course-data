@@ -2,9 +2,11 @@
 """Dry-run or explicitly apply the reviewed task #629 course-ID mapping.
 
 This command never discovers mapping members. The approved JSON mapping is
-authoritative for 100 logical components, 307 existing IDs, 207 aliases, award
-names, and source URLs. The enriched manifest explicitly fingerprints every
-staged row across at least the 119-family approved baseline. The live database is
+authoritative for 100 logical groups, 307 existing IDs, 207 aliases, award
+names, and source URLs. The reviewed inventory has 104 overlap components,
+partitioned only through explicit approved group membership. The enriched
+manifest explicitly fingerprints every staged row across at least the 119-family
+approved baseline. The live database is
 consulted solely to verify those exact IDs and reject stale/conflicting evidence.
 External application-portal references are explicitly out of scope; old course
 IDs and course rows are preserved, without claiming an external scan completed.
@@ -41,6 +43,8 @@ from course_duplicate_snapshot_export import (
     _simple_counts,
 )
 from course_duplicate_preview import (
+    EXPECTED_OVERLAP_COMPONENTS,
+    REVISED_UNIONS,
     _identity_degree_level,
     _is_allowed_regional_fee_label,
     _regional_fee_kind,
@@ -160,10 +164,12 @@ def load_approved_manifest(path: Path, expected_file_sha: str,
     if manifest.get("approved_mapping_sha256") != expected_mapping_sha:
         raise ApplyRefused("manifest was not generated from the explicitly approved mapping file")
     if manifest.get("expected_scope") != {
-            "raw_families": 119, "groups": EXPECTED_GROUPS, "course_ids": EXPECTED_COURSE_IDS}:
+            "raw_families": 119, "overlap_components": EXPECTED_OVERLAP_COMPONENTS,
+            "groups": EXPECTED_GROUPS, "course_ids": EXPECTED_COURSE_IDS}:
         raise ApplyRefused("manifest expected scope is not the approved task #629 cohort")
     observed = manifest.get("observed_scope")
     if (not isinstance(observed, dict) or observed.get("groups") != EXPECTED_GROUPS
+            or observed.get("overlap_components") != EXPECTED_OVERLAP_COMPONENTS
             or not isinstance(observed.get("raw_families"), int)
             or isinstance(observed.get("raw_families"), bool)
             or not 119 <= observed["raw_families"] <= 500
@@ -172,7 +178,8 @@ def load_approved_manifest(path: Path, expected_file_sha: str,
             or observed.get("coverage_matches_expected") is not True):
         raise ApplyRefused(
             "review report does not certify a verified 119+ family inventory / "
-            f"{EXPECTED_GROUPS} components / {EXPECTED_COURSE_IDS} IDs"
+            f"{EXPECTED_OVERLAP_COMPONENTS} overlap components / "
+            f"{EXPECTED_GROUPS} approved groups / {EXPECTED_COURSE_IDS} IDs"
         )
     approval = manifest.get("approval")
     if not isinstance(approval, dict) or approval.get("status") != "approved":
@@ -260,7 +267,7 @@ def load_approved_manifest(path: Path, expected_file_sha: str,
                 raise ApplyRefused("all IDs must map directly to the lowest existing course ID")
             map_by_id[old_id] = mapping
         member_ids = set()
-        group_locations: set[str] = set()
+        group_locations: dict[str, dict[str, Any]] = {}
         group_families: set[tuple[int, str, int]] = set()
         for member in members:
             course_id = _integer(member.get("course_id"), "member course_id")
@@ -277,9 +284,41 @@ def load_approved_manifest(path: Path, expected_file_sha: str,
                     or map_by_id[course_id].get("offering_locations") != locations):
                 raise ApplyRefused("approved mapping does not explicitly bind every scoped campus")
             normalized_locations = {_norm(location) for location in locations}
-            if group_locations.intersection(normalized_locations):
-                raise ApplyRefused("two approved IDs claim the same offering campus")
-            group_locations.update(normalized_locations)
+            source_fee = map_by_id[course_id].get("source_fee")
+            if member.get("source_fee") != source_fee:
+                raise ApplyRefused("member fee differs from its explicit reviewed mapping fee")
+            if (not isinstance(member.get("study_variant"), str)
+                    or not isinstance(member.get("study_mode"), str)
+                    or not isinstance(member.get("degree_level"), str)):
+                raise ApplyRefused("reviewed member is missing its study identity")
+            for location in normalized_locations:
+                previous = group_locations.get(location)
+                if previous is not None:
+                    reviewed_union = REVISED_UNIONS.get(canonical_id)
+                    if (reviewed_union is None
+                            or tuple(source_group["ids"]) != reviewed_union["ids"]
+                            or location not in reviewed_union["duplicate_campuses"]
+                            or previous["source_fee"] != source_fee
+                            or previous["study_variant"] != member.get("study_variant")
+                            or previous["study_mode"] != member.get("study_mode")
+                            or previous["degree_level"] != member.get("degree_level")
+                            or not isinstance(source_fee, dict)
+                            or source_fee.get("amount") != reviewed_union["amount"]
+                            or source_fee.get("currency") != "GBP"
+                            or source_fee.get("fee_year") != 2026
+                            or source_fee.get("fee_term") != "Full Course"
+                            or _norm(member.get("study_variant")) != "standard"):
+                        raise ApplyRefused(
+                            f"duplicate offering campus {location} is not an exact reviewed fee/study match"
+                        )
+                else:
+                    group_locations[location] = {
+                        "course_id": course_id,
+                        "source_fee": source_fee,
+                        "study_variant": member.get("study_variant"),
+                        "study_mode": member.get("study_mode"),
+                        "degree_level": member.get("degree_level"),
+                    }
             if member.get("source_route_sha256") != approved_route_fingerprint:
                 raise ApplyRefused("member source route differs from authoritative approved JSON")
             if not isinstance(member.get("precondition_sha256"), str) or not re.fullmatch(
@@ -354,6 +393,51 @@ def load_approved_manifest(path: Path, expected_file_sha: str,
         course_id: group["parent"]
         for group in approved_mapping["groups"] for course_id in group["ids"]
     }
+    family_records = list(family_course_ids.items())
+    family_roots = list(range(len(family_records)))
+
+    def find_family(index):
+        while family_roots[index] != index:
+            family_roots[index] = family_roots[family_roots[index]]
+            index = family_roots[index]
+        return index
+
+    course_family_owner = {}
+    for index, (_, course_ids) in enumerate(family_records):
+        for course_id in course_ids:
+            if course_id in course_family_owner:
+                left, right = find_family(index), find_family(course_family_owner[course_id])
+                if left != right:
+                    family_roots[max(left, right)] = min(left, right)
+            else:
+                course_family_owner[course_id] = index
+    reconstructed_components = defaultdict(set)
+    for index, (_, course_ids) in enumerate(family_records):
+        reconstructed_components[find_family(index)].update(course_ids)
+    component_signatures = sorted(
+        (sorted(ids) for ids in reconstructed_components.values()),
+        key=lambda signature: tuple(signature),
+    )
+    if (observed.get("overlap_component_signatures") != component_signatures
+            or len(component_signatures) != EXPECTED_OVERLAP_COMPONENTS):
+        raise ApplyRefused(
+            "manifest overlap-component topology differs from independently reconstructed evidence families"
+        )
+    component_members_by_parent = defaultdict(list)
+    for signature in component_signatures:
+        parents = {approved_parent_by_id.get(course_id) for course_id in signature}
+        if len(parents) != 1 or None in parents:
+            raise ApplyRefused("observed overlap component crosses or escapes approved mapping groups")
+        component_members_by_parent[next(iter(parents))].append(set(signature))
+    for approved_group in approved_mapping["groups"]:
+        parent = approved_group["parent"]
+        parts = component_members_by_parent.get(parent, [])
+        expected_parts = 3 if parent in REVISED_UNIONS else 1
+        if (len(parts) != expected_parts
+                or set().union(*parts) != set(approved_group["ids"])):
+            raise ApplyRefused(
+                "observed overlap components do not partition exactly one approved mapping group"
+            )
     if (any(
                 not signature
                 or any(course_id not in approved_parent_by_id for course_id in signature)
@@ -896,6 +980,10 @@ async def _verify_and_plan(conn, approved: dict, *, lock: bool = False) -> list[
             )
             variant = (stage["extraction_method"]["fee_variants"]["selected"][0]
                        ["study_variant"])
+            if (_norm(member.get("study_variant")) != _norm(variant)
+                    or _norm(member.get("study_mode")) != _norm(stage.get("study_mode"))
+                    or _norm(member.get("degree_level")) != _norm(stage.get("degree_level"))):
+                raise ApplyRefused("live study identity differs from the reviewed member")
             original_award = scope.get("original_name")
             route = stage["course_website"]
             if (course["university_id"] != university_id
@@ -962,10 +1050,31 @@ async def _verify_and_plan(conn, approved: dict, *, lock: bool = False) -> list[
             for campus in scope_locations:
                 key = _norm(campus)
                 if key in locations:
-                    raise ApplyRefused(
-                        f"multiple approved courses claim offering campus {campus}"
-                    )
-                locations[key] = (campus, stage)
+                    previous = locations[key]
+                    reviewed_union = REVISED_UNIONS.get(canonical_id)
+                    if (reviewed_union is None
+                            or key not in reviewed_union["duplicate_campuses"]
+                            or previous["course_id"] == course["id"]
+                            or previous["fee"] != live_fee
+                            or previous["identity"] != (
+                                variant, stage["study_mode"], stage["degree_level"],
+                            )
+                            or live_fee.get("amount") != reviewed_union["amount"]
+                            or live_fee.get("currency") != "GBP"
+                            or live_fee.get("fee_year") != 2026
+                            or live_fee.get("fee_term") != "Full Course"
+                            or _norm(variant) != "standard"):
+                        raise ApplyRefused(
+                            f"duplicate offering campus {campus} is not an exact reviewed fee/study match"
+                        )
+                else:
+                    locations[key] = {
+                        "campus": campus,
+                        "stage": stage,
+                        "course_id": course["id"],
+                        "fee": live_fee,
+                        "identity": (variant, stage["study_mode"], stage["degree_level"]),
+                    }
             identity_values.add((
                 university_id, route, original_award,
                 _identity_degree_level(stage["degree_level"], original_award), variant,
@@ -976,10 +1085,7 @@ async def _verify_and_plan(conn, approved: dict, *, lock: bool = False) -> list[
             for member in group["members"]
             for location in member["locations"]
         }
-        if (len(identity_values) != 1 or set(locations) != expected_locations
-                or len(expected_locations) != sum(
-                    len(member["locations"]) for member in group["members"]
-                )):
+        if len(identity_values) != 1 or set(locations) != expected_locations:
             raise ApplyRefused("group identity or campus uniqueness is inconsistent")
         from app.services.scraper.published_offerings import offering_identity
         identity_row = rows[0]

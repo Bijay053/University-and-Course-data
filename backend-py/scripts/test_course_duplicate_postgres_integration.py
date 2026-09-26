@@ -161,18 +161,30 @@ def _fixture(mapping: dict):
                 degree, published_degree = "Master's", "Master"
             else:
                 degree = published_degree = "Master"
-            if group_index == 0 and course_id == 9389:
-                scope_locations = ["Birmingham", "Leeds", "Manchester"]
-                location = ", ".join(scope_locations)
-                name_location = "Birmingham"
-                fee_campus = "Outside London"
-                fee = 13_500.0
-            elif group_index == 0 and course_id == 9408:
-                location = "London"
-                scope_locations = ["London"]
+            fee_term = "Annual"
+            if group["parent"] == 9389:
+                campus_by_id = dict(zip(member_ids, (
+                    "Birmingham", "Birmingham", "Leeds", "Leeds",
+                    "Manchester", "Manchester",
+                )))
+                location = campus_by_id[course_id]
+                scope_locations = [location]
                 name_location = location
-                fee_campus = "London"
-                fee = float(10_000 + (course_id % 1_000))
+                fee_campus = location
+                fee = 17_500.0
+                fee_term = "Full Course"
+                variant = "Standard"
+            elif group["parent"] == 9396:
+                campus_by_id = dict(zip(member_ids, (
+                    "Birmingham", "Birmingham", "Manchester", "Manchester", "Manchester",
+                )))
+                location = campus_by_id[course_id]
+                scope_locations = [location]
+                name_location = location
+                fee_campus = location
+                fee = 18_250.0
+                fee_term = "Full Course"
+                variant = "Standard"
             elif group_index == 1 and course_id == group["parent"]:
                 location = "Hull"
                 scope_locations = ["Hull"]
@@ -219,15 +231,20 @@ def _fixture(mapping: dict):
                 "reference_counts": {}, "outside_reference_count": 0,
                 "existing_offering_count": 0, "alias_count": 0,
             })
-            family_records = [("job-base", group["parent"])]
-            # Nineteen duplicate per-job families deliberately overlap the
-            # same component ID, making 119 baseline families but 100 components.
-            if group_index < 19 and course_id == member_ids[0]:
-                family_records.append((f"job-overlap-{group_index}", group["parent"]))
+            if group["parent"] in preview.REVISED_UNIONS:
+                component_index = member_ids.index(course_id) // 2
+                split_id = group["parent"] + 10_000 + component_index
+            else:
+                split_id = group["parent"] + 10_000
+            family_records = [(f"job-base-{group_index}", split_id)]
+            # Fifteen extra per-job families overlap an existing ID. The
+            # approved inventory therefore has 119 families but 104 components.
+            if group_index < 15 and course_id == member_ids[0]:
+                family_records.append((f"job-overlap-{group_index}", split_id))
             for job_id, split_id in family_records:
                 option = {
                     "amount": fee, "currency": "GBP", "campus": fee_campus,
-                    "study_variant": variant, "year": 2026, "period": "Annual",
+                    "study_variant": variant, "year": 2026, "period": fee_term,
                     "source_url": group["source"],
                     "snippet": f"International Students | 2026 | {variant} | {location}: £{fee}",
                 }
@@ -244,14 +261,14 @@ def _fixture(mapping: dict):
                     "course_location": location, "course_website": group["source"],
                     "degree_level": degree, "study_mode": "Full-time",
                     "international_fee": fee, "fee_year": 2026,
-                    "fee_term": "Annual", "currency": "GBP",
+                    "fee_term": fee_term, "currency": "GBP",
                     "fee_scope_key": scope["key"],
                     "extraction_method": {
                         "campus_fee_scope": scope,
                         "international_fee": "fee.ulaw_course_authority",
                         "fee_variants": {
                             "status": "uniform", "selected": [option], "options": [option],
-                            "fee_year": 2026, "fee_term": "Annual", "currency": "GBP",
+                            "fee_year": 2026, "fee_term": fee_term, "currency": "GBP",
                             "international_fee": fee,
                         },
                     },
@@ -259,7 +276,7 @@ def _fixture(mapping: dict):
                 staged_id += 1
 
     assert len(all_ids) == 307 and len(set(all_ids)) == 307
-    assert len(evidence_rows) == 326
+    assert len(evidence_rows) == 322
     repeated_courses = set()
     repeat_sources = []
     for row in evidence_rows:
@@ -504,10 +521,54 @@ def test_integration_fixture_models_119_overlapping_families_and_variant_identit
     ]
     family_count, components = preview._connected_components(approved_rows)
     assert family_count == 146
-    assert len(components) == 100
+    assert len(components) == 104
+    component_ids = [
+        {row["course_id"] for row in component}
+        for component in components
+    ]
+    mapping_parent_by_id = {
+        course_id: group["parent"]
+        for group in mapping["groups"] for course_id in group["ids"]
+    }
+    assert all(len({mapping_parent_by_id[course_id] for course_id in ids}) == 1
+               for ids in component_ids)
+    assert sum(
+        1 for ids in component_ids if mapping_parent_by_id[next(iter(ids))] == 9389
+    ) == 3
+    assert sum(
+        1 for ids in component_ids if mapping_parent_by_id[next(iter(ids))] == 9396
+    ) == 3
+    for parent, expected_campuses, expected_fee in (
+        (9389, {"Birmingham", "Leeds", "Manchester"}, 17_500.0),
+        (9396, {"Birmingham", "Manchester"}, 18_250.0),
+    ):
+        approved_group = next(group for group in mapping["groups"]
+                              if group["parent"] == parent)
+        group_rows = {
+            row["course_id"]: row for row in approved_rows
+            if row["course_id"] in approved_group["ids"]
+        }
+        campus_counts = {}
+        tuple_by_campus = {}
+        for row in group_rows.values():
+            campus = row["course_location"]
+            campus_counts[campus] = campus_counts.get(campus, 0) + 1
+            selected = row["extraction_method"]["fee_variants"]["selected"][0]
+            tuple_by_campus.setdefault(campus, set()).add((
+                row["course_website"], row["international_fee"], row["currency"],
+                row["fee_year"], row["fee_term"], selected["study_variant"],
+            ))
+            assert row["international_fee"] == expected_fee
+            assert row["currency"] == "GBP" and row["fee_year"] == 2026
+            assert row["fee_term"] == "Full Course"
+            assert selected["study_variant"] == "Standard"
+        assert {campus for campus, count in campus_counts.items() if count > 1} == expected_campuses
+        assert all(len(values) == 1 for values in tuple_by_campus.values())
+    assert preview._norm("London") != preview._norm("London Moorgate")
+    assert preview._norm("London") != preview._norm("London Bloomsbury")
     total_families, total_components = preview._connected_components(snapshot["evidence_rows"])
     assert total_families == 171
-    assert len(total_components) == 125
+    assert len(total_components) == 129
     award_sources = {}
     for index, group in enumerate(mapping["groups"]):
         key = (group["award"], group["source"])

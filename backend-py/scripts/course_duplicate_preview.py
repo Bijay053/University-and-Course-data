@@ -39,11 +39,27 @@ SCHEMA_VERSION = 1
 EXPECTED_RAW_FAMILIES = 119
 EXPECTED_GROUPS = 100
 EXPECTED_COURSE_IDS = 307
+EXPECTED_OVERLAP_COMPONENTS = 104
 MAX_INPUT_BYTES = 32 * 1024 * 1024
 MAX_EVIDENCE_ROWS = 20_000
 MAX_COURSES = 10_000
 SCOPE_KEY = "campus_fee_scope"
 COUNT_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
+
+# These are the only newly approved unions. Their exact membership is
+# authoritative; matching award names never creates or extends a union.
+REVISED_UNIONS = {
+    9389: {
+        "ids": (9389, 9408, 9645, 9646, 9647, 9648),
+        "duplicate_campuses": {"birmingham", "leeds", "manchester"},
+        "amount": 17500,
+    },
+    9396: {
+        "ids": (9396, 9421, 9608, 9675, 9676),
+        "duplicate_campuses": {"birmingham", "manchester"},
+        "amount": 18250,
+    },
+}
 
 
 class SnapshotError(ValueError):
@@ -328,6 +344,13 @@ def validate_approved_mapping(value: Any, *, expected_groups: int = EXPECTED_GRO
             "parent": raw["parent"], "ids": sorted(ids),
             "award": raw["award"], "source": raw["source"],
         })
+    by_parent = {group["parent"]: tuple(group["ids"]) for group in cleaned}
+    if expected_groups == EXPECTED_GROUPS and expected_course_ids == EXPECTED_COURSE_IDS:
+        for parent, reviewed in REVISED_UNIONS.items():
+            if by_parent.get(parent) != reviewed["ids"]:
+                raise SnapshotError(
+                    f"revised union {parent} must contain exactly its explicitly reviewed IDs"
+                )
     if (len(seen) != expected_course_ids
             or sum(len(group["ids"]) - 1 for group in cleaned) != expected_aliases):
         raise SnapshotError(
@@ -579,7 +602,7 @@ def _component_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[
         reasons.append("connected component IDs differ from approved JSON mapping")
     route_hash = "sha256:" + hashlib.sha256(approved["source"].encode("utf-8")).hexdigest()
     identities = set()
-    seen_locations: dict[str, int] = {}
+    seen_locations: dict[str, tuple[int, tuple[Any, ...]]] = {}
     regional_scopes: dict[str, set[str]] = {}
     regional_fees: dict[str, set[str]] = defaultdict(set)
     slash_alias_checks: list[tuple[frozenset[str], set[str], str]] = []
@@ -599,6 +622,7 @@ def _component_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[
         row_locations = set()
         row_scope_sets = set()
         row_fees = set()
+        campus_identity: tuple[Any, ...] | None = None
         evidence_rows = []
         for row in evidence:
             scope = _scope_evidence(row) or {}
@@ -673,6 +697,10 @@ def _component_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[
             )
             row_identities.add(identity)
             identities.add(identity)
+            campus_identity = (
+                identity, fee.get("amount"), fee.get("currency"),
+                fee.get("fee_year"), fee.get("fee_term"),
+            )
             row_fees.add(_canonical_json(fee))
             evidence_rows.append({
                 "staged_row_id": row["id"],
@@ -693,9 +721,25 @@ def _component_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[
                 f"staged fee differs from, or lacks, the published legacy fee for course ID {cid}"
             )
         for location in row_locations:
-            if location in seen_locations:
-                reasons.append(f"campus is assigned to multiple approved IDs: {location}")
-            seen_locations[location] = cid
+            previous = seen_locations.get(location)
+            if previous is not None and previous[0] != cid:
+                reviewed = REVISED_UNIONS.get(approved["parent"])
+                allowed = (
+                    reviewed is not None
+                    and tuple(sorted(approved["ids"])) == reviewed["ids"]
+                    and location in reviewed["duplicate_campuses"]
+                    and previous[1] == campus_identity
+                    and campus_identity is not None
+                    and campus_identity[1:] == (
+                        reviewed["amount"], "GBP", 2026, "Full Course",
+                    )
+                    and _norm(campus_identity[0][4]) == "standard"
+                )
+                if not allowed:
+                    reasons.append(f"campus is assigned to multiple approved IDs: {location}")
+            elif previous is not None and previous[1] != campus_identity:
+                reasons.append(f"cross-run campus identity/fee conflict for course ID {cid}")
+            seen_locations[location] = (cid, campus_identity)
         if course.get("offering_identity"):
             reasons.append(f"course {cid} already has offering_identity")
         if course.get("existing_offering_count") != 0:
@@ -741,6 +785,9 @@ def _component_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[
                 for location in offering_locations
             ],
             "source_fee": source_fee,
+            "study_variant": _selected_study_variant(representative)[0],
+            "study_mode": representative.get("study_mode"),
+            "degree_level": representative.get("degree_level"),
             "precondition_sha256": _row_hash(course),
             "source_route_sha256": route_fingerprint,
             "evidence_rows": evidence_rows,
@@ -861,7 +908,8 @@ def build_review_manifest(snapshot: dict[str, Any], *,
                           approved_mapping_sha256: str,
                           expected_groups: int = EXPECTED_GROUPS,
                           expected_course_ids: int = EXPECTED_COURSE_IDS,
-                          expected_families: int = EXPECTED_RAW_FAMILIES) -> dict[str, Any]:
+                          expected_families: int = EXPECTED_RAW_FAMILIES,
+                          expected_components: int = EXPECTED_OVERLAP_COMPONENTS) -> dict[str, Any]:
     """Create a deterministic preview manifest; performs no I/O or database access."""
     snapshot = _validate_snapshot(snapshot)
     approved_mapping = validate_approved_mapping(
@@ -909,6 +957,9 @@ def build_review_manifest(snapshot: dict[str, Any], *,
          if isinstance(row.get("course_id"), int) and not isinstance(row.get("course_id"), bool)}
         for component in components
     ]
+    component_signatures = sorted(
+        (sorted(ids) for ids in component_ids), key=lambda signature: tuple(signature)
+    )
     observed_ids = set().union(*component_ids) if component_ids else set()
     family_course_ids: dict[tuple[int, str, int], set[int]] = defaultdict(set)
     for row in candidate_rows:
@@ -939,9 +990,35 @@ def build_review_manifest(snapshot: dict[str, Any], *,
     extra_conflicts, unknown_extra_rows = _related_extra_ids(
         extra_rows, candidate_rows, approved_mapping["groups"],
     )
+    approved_ids_by_parent = {
+        group["parent"]: set(group["ids"]) for group in approved_mapping["groups"]
+    }
+    parent_by_id = {
+        course_id: parent
+        for parent, ids in approved_ids_by_parent.items() for course_id in ids
+    }
+    component_assignments = [
+        {parent_by_id.get(course_id) for course_id in ids}
+        for ids in component_ids
+    ]
+    components_match_mapping = all(
+        ids and len(parents) == 1 and None not in parents
+        and ids.issubset(approved_ids_by_parent[next(iter(parents))])
+        for ids, parents in zip(component_ids, component_assignments)
+    )
+    group_component_counts = defaultdict(int)
+    for parents in component_assignments:
+        if len(parents) == 1 and None not in parents:
+            group_component_counts[next(iter(parents))] += 1
+    component_partition_ok = components_match_mapping and all(
+        group_component_counts[parent] == 1
+        for parent in approved_ids_by_parent
+        if parent not in REVISED_UNIONS
+    )
     coverage_ok = (
         family_inventory_ok
-        and len(components) == expected_groups
+        and component_partition_ok
+        and len(components) == expected_components
         and len(observed_ids) == expected_course_ids
         and observed_ids == approved_ids
         and snapshot.get("raw_family_count", exporter_family_count) == exporter_family_count
@@ -955,7 +1032,7 @@ def build_review_manifest(snapshot: dict[str, Any], *,
             component for component, ids in zip(components, component_ids)
             if ids.intersection(target_ids)
         ]
-        rows = matching[0] if matching else []
+        rows = [row for component in matching for row in component]
         component_member_ids = {
             row["course_id"] for row in rows
             if isinstance(row.get("course_id"), int) and not isinstance(row.get("course_id"), bool)
@@ -963,12 +1040,24 @@ def build_review_manifest(snapshot: dict[str, Any], *,
         members, reasons = _component_reason(rows, courses_by_id, snapshot, {
             **approved, "university_id": approved_mapping["university_id"],
         })
-        if len(matching) != 1 or component_member_ids != target_ids:
+        expected_component_count = group_component_counts.get(approved["parent"], 0)
+        component_count_ok = (
+            expected_component_count == (
+                3 if approved["parent"] in REVISED_UNIONS else 1
+            )
+            and all(
+                ids.issubset(target_ids)
+                for ids, parents in zip(component_ids, component_assignments)
+                if approved["parent"] in parents
+            )
+        )
+        if not component_count_ok or component_member_ids != target_ids:
             reasons.append("overlap-connected component differs from approved JSON ID group")
         if not coverage_ok:
             reasons.append(
                 f"approved-ID inventory must match the {expected_families}-family baseline / "
-                f"{expected_groups} components / {expected_course_ids} IDs; excess families must repeat approved-ID signatures"
+                f"{expected_components} overlap components / {expected_groups} approved groups / "
+                f"{expected_course_ids} IDs; components and families must stay inside exactly one approved group"
             )
         if extra_conflicts.get(approved["parent"]):
             ids_text = ", ".join(str(value) for value in sorted(
@@ -1030,6 +1119,7 @@ def build_review_manifest(snapshot: dict[str, Any], *,
         "manifest_digest_scope": "sha256 of canonical JSON object excluding manifest_sha256",
         "expected_scope": {
             "raw_families": expected_families,
+            "overlap_components": expected_components,
             "groups": expected_groups,
             "course_ids": expected_course_ids,
         },
@@ -1039,7 +1129,9 @@ def build_review_manifest(snapshot: dict[str, Any], *,
             "raw_families": family_count,
             "approved_family_signature_count": len(family_signatures),
             "additional_approved_id_families": max(0, family_count - expected_families),
-            "groups": len(components),
+            "overlap_components": len(components),
+            "groups": len(approved_mapping["groups"]),
+            "overlap_component_signatures": component_signatures,
             "exporter_raw_families": snapshot.get(
                 "raw_family_count", exporter_family_count
             ),
@@ -1073,7 +1165,7 @@ def build_review_manifest(snapshot: dict[str, Any], *,
         "groups": groups,
         "review_instructions": [
             f"The approved JSON file is authoritative for the {expected_groups} logical groups, awards, URLs, and {expected_course_ids} IDs.",
-            "The 119-family baseline may grow only through additional families containing approved IDs from one mapped component; all rows must agree on identity, cohort, and campuses.",
+            f"The inventory must contain {expected_components} observed overlap components partitioned by the explicit mapping into {expected_groups} approved groups; the {expected_families}-family baseline may grow only through family subsets within one approved group.",
             "Review every staged row fingerprint, source fee, campus, and cross-run cohort before applying.",
             f"All original course IDs and course rows are retained; {expected_course_ids - expected_groups} aliases are compatibility mappings only.",
             "External application-portal references are explicitly out of scope and were not scanned or cleared.",
