@@ -18,3 +18,16 @@ published identities collided despite no conflicting fee or study-mode values.
 function before asking for approval or making any write. If collapsing groups
 would change the reviewed membership, obtain a revised exact approval; never
 weaken the unique identity check or hide old IDs to force the apply through.
+
+Also inventory singleton legacy published records against the incoming staged
+review, not only duplicate groups.
+
+**Why:** A successful duplicate reconciliation still left new approval blocked
+by previously excluded singletons lacking a published offering identity. Those
+records need a separately reviewed identity adoption, not a duplicate merge or
+a bypass of the legacy-collision guard.
+
+**How to apply:** Before promising that reconciliation unblocks the whole scrape,
+run approval preflight for every incoming identity, including standalone awards.
+Count public identities rather than physical campus evidence rows, and do not
+force low-confidence records through merely to reach the displayed group count.
