@@ -7,7 +7,7 @@ file. Never include secrets or personal data in the input export.
 
 Snapshot contract:
   * top level: schema_version=1, reference_scan_complete,
-    external_reference_scan_complete, evidence_rows[], courses[]
+    external_reference_scan_complete=false, evidence_rows[], courses[]
   * evidence rows: approved/published scraped_courses values including `id`,
     `course_id`, `university_id`, `scrape_job_id`, source/name/location/fee fields,
     `fee_scope_key`, and `extraction_method` with campus_fee_scope and
@@ -17,8 +17,10 @@ Snapshot contract:
     alias_count. Counts must cover every known referencing FK and alias/offering
     table; certify reference_scan_complete only after that full scan.
 
-The exporter is intentionally separate from this preview. No exporter or live
-database query is run by this script, and an incomplete export blocks candidates.
+The approved_law_legacy_mapping.json file controls logical IDs. Per-job split
+families are connected only by overlapping course IDs. External portal
+references are out of scope; old course IDs are retained and are never deleted.
+The exporter is intentionally separate; no database query is run here.
 """
 from __future__ import annotations
 
@@ -34,8 +36,9 @@ from typing import Any
 
 
 SCHEMA_VERSION = 1
-EXPECTED_GROUPS = 119
-EXPECTED_COURSE_IDS = 335
+EXPECTED_RAW_FAMILIES = 119
+EXPECTED_GROUPS = 102
+EXPECTED_COURSE_IDS = 305
 MAX_INPUT_BYTES = 32 * 1024 * 1024
 MAX_EVIDENCE_ROWS = 20_000
 MAX_COURSES = 10_000
@@ -82,6 +85,15 @@ def _selected_study_variant(evidence: dict[str, Any]) -> tuple[str | None, str |
     variants = [entry.get("study_variant") for entry in selected if isinstance(entry, dict)]
     if len(variants) != len(selected) or any(not isinstance(v, str) or not v.strip() for v in variants):
         return None, "ambiguous study-variant evidence"
+    scope = (evidence.get("extraction_method") or {}).get("campus_fee_scope") or {}
+    locations = scope.get("locations")
+    if not isinstance(locations, list) or len(locations) != 1 or not isinstance(locations[0], str):
+        return None, "fee option cannot be bound to one scoped campus"
+    campus_values = [entry.get("campus") for entry in selected if isinstance(entry, dict)]
+    if (len(campus_values) != len(selected)
+            or any(not isinstance(campus, str) or _norm(campus) != _norm(locations[0])
+                   for campus in campus_values)):
+        return None, "selected fee option campus differs from scoped campus"
     if len(set(variants)) != 1:
         return None, "multiple study variants in one source row"
     return variants[0], None
@@ -143,6 +155,89 @@ def _scope_evidence(evidence: dict[str, Any]) -> dict[str, Any] | None:
     return scope if isinstance(scope, dict) else None
 
 
+def validate_approved_mapping(value: Any, *, expected_groups: int = EXPECTED_GROUPS,
+                              expected_course_ids: int = EXPECTED_COURSE_IDS,
+                              expected_aliases: int = 203) -> dict[str, Any]:
+    """Validate the user-approved ID/source manifest, not a scrape-derived guess."""
+    if not isinstance(value, dict) or value.get("schema_version") != 1:
+        raise SnapshotError("approved mapping must be schema_version 1 JSON")
+    if value.get("university_id") != 92 or not isinstance(value.get("approval"), str):
+        raise SnapshotError("approved mapping university/approval attestation is invalid")
+    groups = value.get("groups")
+    if not isinstance(groups, list) or len(groups) != expected_groups:
+        raise SnapshotError(f"approved mapping must contain {expected_groups} logical groups")
+    seen: set[int] = set()
+    cleaned = []
+    for raw in groups:
+        if not isinstance(raw, dict):
+            raise SnapshotError("approved mapping group must be an object")
+        ids = raw.get("ids")
+        if (not isinstance(ids, list) or len(ids) < 2
+                or any(not isinstance(i, int) or isinstance(i, bool) or i < 1 for i in ids)
+                or len(ids) != len(set(ids))):
+            raise SnapshotError("approved IDs must be unique positive integers")
+        if seen.intersection(ids):
+            raise SnapshotError("approved groups overlap; each course ID must map exactly once")
+        seen.update(ids)
+        if raw.get("parent") != min(ids):
+            raise SnapshotError("approved parent must be the lowest existing ID")
+        if (not isinstance(raw.get("award"), str) or not raw["award"].strip()
+                or not isinstance(raw.get("source"), str)
+                or not re.fullmatch(r"https?://[^ ]+", raw["source"])):
+            raise SnapshotError("approved group requires its exact award and source URL")
+        cleaned.append({
+            "parent": raw["parent"], "ids": sorted(ids),
+            "award": raw["award"], "source": raw["source"],
+        })
+    if (len(seen) != expected_course_ids
+            or sum(len(group["ids"]) - 1 for group in cleaned) != expected_aliases):
+        raise SnapshotError(
+            f"approved mapping must contain {expected_course_ids} IDs and {expected_aliases} aliases"
+        )
+    return {
+        "schema_version": 1, "university_id": 92,
+        "approval": value["approval"], "groups": cleaned,
+    }
+
+
+def _connected_components(rows: list[dict[str, Any]]) -> tuple[int, list[list[dict[str, Any]]]]:
+    families: dict[tuple[int, str, int], list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        scope = _scope_evidence(row) or {}
+        split_id = scope.get("split_from_id")
+        if (isinstance(split_id, int) and not isinstance(split_id, bool)
+                and split_id > 0 and isinstance(row.get("university_id"), int)):
+            job_id = row.get("scrape_job_id")
+            families[(row["university_id"], job_id if isinstance(job_id, str) else "", split_id)].append(row)
+    roots = {key: key for key in families}
+
+    def find(key):
+        while roots[key] != key:
+            roots[key] = roots[roots[key]]
+            key = roots[key]
+        return key
+
+    def union(left, right):
+        left, right = find(left), find(right)
+        if left != right:
+            roots[max(left, right)] = min(left, right)
+
+    owner: dict[tuple[int, int], tuple[int, str, int]] = {}
+    for key, family_rows in families.items():
+        for row in family_rows:
+            cid = row.get("course_id")
+            if isinstance(cid, int) and not isinstance(cid, bool):
+                cid_key = (key[0], cid)
+                if cid_key in owner:
+                    union(key, owner[cid_key])
+                else:
+                    owner[cid_key] = key
+    components: dict[tuple[int, int], list[dict[str, Any]]] = defaultdict(list)
+    for key, family_rows in families.items():
+        components[find(key)].extend(family_rows)
+    return len(families), list(components.values())
+
+
 def _validate_snapshot(snapshot: Any) -> dict[str, Any]:
     if not isinstance(snapshot, dict) or snapshot.get("schema_version") != SCHEMA_VERSION:
         raise SnapshotError(f"snapshot schema_version must be {SCHEMA_VERSION}")
@@ -150,6 +245,8 @@ def _validate_snapshot(snapshot: Any) -> dict[str, Any]:
     courses = snapshot.get("courses")
     if not isinstance(evidence, list) or not isinstance(courses, list):
         raise SnapshotError("snapshot must contain evidence_rows and courses arrays")
+    if snapshot.get("external_reference_scan_complete") is not False:
+        raise SnapshotError("external application references are out of scope and must remain unscanned")
     if len(evidence) > MAX_EVIDENCE_ROWS or len(courses) > MAX_COURSES:
         raise SnapshotError("snapshot exceeds bounded row limits")
     if not all(isinstance(row, dict) for row in evidence + courses):
@@ -211,6 +308,8 @@ def _group_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[str,
             reasons.append(f"course {course_id} is not active/published")
         if row.get("university_id") != course.get("university_id"):
             reasons.append(f"university mismatch for course {course_id}")
+        if _norm(course.get("course_location")) != _norm(row.get("course_location")):
+            reasons.append(f"campus location mismatch for course {course_id}")
 
         source = row.get("course_website")
         if not source or scope.get("source_url") != source or course.get("course_website") != source:
@@ -223,7 +322,6 @@ def _group_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[str,
 
         fee_variants = (row.get("extraction_method") or {}).get("fee_variants") or {}
         identities["university_id"].add(_canonical_json(row.get("university_id")).decode())
-        identities["scrape_job_id"].add(_canonical_json(row.get("scrape_job_id")).decode())
         identities["source_route"].add(_canonical_json(source).decode())
         identities["original_name"].add(_canonical_json(original_name).decode())
         identities["degree_level"].add(_canonical_json(row.get("degree_level")).decode())
@@ -258,14 +356,10 @@ def _group_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[str,
             reasons.append(f"invalid source fee values for staged row {row['id']}")
         if row.get("fee_scope_key") != scope.get("key") or not scope.get("key"):
             reasons.append(f"campus scope key mismatch for staged row {row['id']}")
-        if scope.get("split_from_id") != rows[0]["_split_from_id"]:
-            reasons.append(f"split lineage mismatch for staged row {row['id']}")
 
         ref_scan_complete = snapshot.get("reference_scan_complete") is True
         if not ref_scan_complete:
             reasons.append("foreign-key reference scan is not certified complete")
-        if snapshot.get("external_reference_scan_complete") is not True:
-            reasons.append("external application/reference scan is not certified complete")
         reference_counts = _safe_counts(course.get("reference_counts"))
         if reference_counts is None:
             reasons.append(f"foreign-key counts missing for course {course_id}")
@@ -319,15 +413,168 @@ def _group_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[str,
     return members, unique_reasons
 
 
+def _component_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[str, Any]],
+                      snapshot: dict[str, Any], approved: dict[str, Any]
+                      ) -> tuple[list[dict[str, Any]], list[str]]:
+    """Validate repeated per-job evidence as one approved connected identity."""
+    reasons: list[str] = []
+    rows_by_course: dict[int, list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        cid = row.get("course_id")
+        if isinstance(cid, int) and not isinstance(cid, bool):
+            rows_by_course[cid].append(row)
+    expected_ids = set(approved["ids"])
+    if set(rows_by_course) != expected_ids:
+        reasons.append("connected component IDs differ from approved JSON mapping")
+    route_hash = "sha256:" + hashlib.sha256(approved["source"].encode("utf-8")).hexdigest()
+    identities = set()
+    seen_locations: dict[str, int] = {}
+    members = []
+
+    for cid in approved["ids"]:
+        course = courses_by_id.get(cid)
+        evidence = sorted(rows_by_course.get(cid, []), key=lambda item: item["id"])
+        if not evidence:
+            reasons.append(f"approved course ID {cid} has no staged evidence")
+            continue
+        if course is None:
+            reasons.append(f"approved course ID {cid} is missing")
+            continue
+        row_identities = set()
+        row_locations = set()
+        row_fees = set()
+        evidence_rows = []
+        for row in evidence:
+            scope = _scope_evidence(row) or {}
+            variant, variant_error = _selected_study_variant(row)
+            if variant_error:
+                reasons.append(f"staged row {row['id']}: {variant_error}")
+            if row.get("university_id") != approved.get("university_id"):
+                reasons.append(f"university mismatch for staged row {row['id']}")
+            if scope.get("original_name") != approved["award"]:
+                reasons.append(f"award differs from approved JSON for staged row {row['id']}")
+            if (row.get("course_website") != route_hash
+                    or scope.get("source_url") != route_hash
+                    or course.get("course_website") != route_hash):
+                reasons.append(f"exact source URL differs from approved ID {cid}")
+            if row.get("status") not in {"approved", "published"}:
+                reasons.append(f"staged row {row['id']} is not approved/published")
+            locations = scope.get("locations")
+            if (not isinstance(locations, list) or len(locations) != 1
+                    or not isinstance(locations[0], str) or not locations[0].strip()):
+                reasons.append(f"staged row {row['id']} has ambiguous campus evidence")
+                location = None
+            else:
+                location = locations[0].strip()
+                if _norm(location) != _norm(row.get("course_location")):
+                    reasons.append(f"scope/staged campus mismatch at row {row['id']}")
+                row_locations.add(_norm(location))
+            if row.get("course_name") != f"{approved['award']} — {row.get('course_location', '')}":
+                reasons.append(f"staged award name mismatch at row {row['id']}")
+            if (course.get("status") != "active" or course.get("approval_status") != "approved"
+                    or course.get("university_id") != approved.get("university_id")
+                    or _norm(course.get("name")) != _norm(approved["award"])
+                    or _norm(course.get("course_location")) != _norm(row.get("course_location"))
+                    or _norm(course.get("degree_level")) != _norm(row.get("degree_level"))
+                    or _norm(course.get("study_mode")) != _norm(row.get("study_mode"))):
+                reasons.append(f"current Course properties mismatch for ID {cid}")
+            if not all(isinstance(row.get(field), str) and row[field].strip()
+                       for field in ("degree_level", "study_mode", "scrape_job_id")):
+                reasons.append(f"staged row {row['id']} has incomplete identity fields")
+            fee_authority = (row.get("extraction_method") or {}).get("fee_variants") or {}
+            if fee_authority.get("status") != "uniform":
+                reasons.append(f"staged row {row['id']} lacks uniform fee authority")
+            fee = _safe_fee(row)
+            if (any(value is None for value in fee.values())
+                    or row.get("international_fee") is None
+                    or not row.get("fee_year") or not row.get("fee_term") or not row.get("currency")):
+                reasons.append(f"staged row {row['id']} has incomplete fee cohort")
+            if (scope.get("key") != row.get("fee_scope_key") or not scope.get("key")
+                    or not isinstance(scope.get("split_from_id"), int)):
+                reasons.append(f"staged row {row['id']} has invalid campus_fee_scope")
+            identity = (
+                row.get("university_id"), row.get("course_website"), approved["award"],
+                row.get("degree_level"), variant, row.get("study_mode"),
+                row.get("fee_year"), row.get("fee_term"), row.get("currency"),
+            )
+            row_identities.add(identity)
+            identities.add(identity)
+            row_fees.add(_canonical_json(fee))
+            evidence_rows.append({
+                "staged_row_id": row["id"],
+                "evidence_precondition_sha256": _row_hash(row),
+                "scrape_job_id": row.get("scrape_job_id"),
+                "split_from_id": scope.get("split_from_id"),
+                "source_route_sha256": "sha256:" + hashlib.sha256(
+                    approved["source"].encode()
+                ).hexdigest(),
+                "selected_for_offering": False,
+            })
+        if len(row_identities) != 1:
+            reasons.append(f"cross-run identity/cohort conflict for course ID {cid}")
+        if len(row_locations) != 1 or len(row_fees) != 1:
+            reasons.append(f"cross-run campus or fee conflict for course ID {cid}")
+        location = next(iter(row_locations), None)
+        if location:
+            if location in seen_locations:
+                reasons.append(f"campus is assigned to multiple approved IDs: {location}")
+            seen_locations[location] = cid
+        if course.get("offering_identity"):
+            reasons.append(f"course {cid} already has offering_identity")
+        if course.get("existing_offering_count") != 0:
+            reasons.append(f"course {cid} already has published offerings")
+        if course.get("alias_count") != 0:
+            reasons.append(f"course {cid} already participates in an alias")
+        if (course.get("outside_reference_count") != 0
+                or _safe_counts(course.get("reference_counts")) is None
+                or _safe_counts(course.get("field_approval_counts")) is None):
+            reasons.append(f"course {cid} has incomplete/outside local FK safeguards")
+        # Every listed observation is fingerprinted. The largest staged-row ID
+        # is an explicit, deterministic representative only after all runs agree.
+        representative = evidence[-1]
+        for evidence_row in evidence_rows:
+            evidence_row["selected_for_offering"] = (
+                evidence_row["staged_row_id"] == representative["id"]
+            )
+        members.append({
+            "course_id": cid,
+            "staged_row_id": representative["id"],
+            "location": representative.get("course_location"),
+            "source_fee": _safe_fee(representative),
+            "precondition_sha256": _row_hash(course),
+            "source_route_sha256": "sha256:" + hashlib.sha256(
+                approved["source"].encode()
+            ).hexdigest(),
+            "evidence_rows": evidence_rows,
+        })
+    if len(identities) > 1:
+        reasons.append("component rows differ in exact source/cohort/degree/variant/study mode")
+    if snapshot.get("reference_scan_complete") is not True:
+        reasons.append("local PostgreSQL FK census is incomplete")
+    # external_reference_scan_complete remains false by design. This task
+    # explicitly retains every old course ID; it does not claim portal coverage.
+    return members, list(dict.fromkeys(reasons))
+
+
 def build_review_manifest(snapshot: dict[str, Any], *,
+                          approved_mapping: dict[str, Any],
+                          approved_mapping_sha256: str,
                           expected_groups: int = EXPECTED_GROUPS,
-                          expected_course_ids: int = EXPECTED_COURSE_IDS) -> dict[str, Any]:
+                          expected_course_ids: int = EXPECTED_COURSE_IDS,
+                          expected_families: int = EXPECTED_RAW_FAMILIES) -> dict[str, Any]:
     """Create a deterministic preview manifest; performs no I/O or database access."""
     snapshot = _validate_snapshot(snapshot)
+    approved_mapping = validate_approved_mapping(
+        approved_mapping, expected_groups=expected_groups,
+        expected_course_ids=expected_course_ids,
+        expected_aliases=expected_course_ids - expected_groups,
+    )
+    if not isinstance(approved_mapping_sha256, str) or not re.fullmatch(
+            r"[0-9a-f]{64}", approved_mapping_sha256):
+        raise SnapshotError("approved mapping requires its exact file SHA-256")
     courses_by_id = {row["id"]: row for row in snapshot["courses"]}
-    buckets: dict[tuple[int, int], list[dict[str, Any]]] = defaultdict(list)
     ignored = 0
-
+    candidate_rows = []
     for row in snapshot["evidence_rows"]:
         scope = _scope_evidence(row)
         if (row.get("status") not in {"approved", "published"} or not scope
@@ -337,45 +584,77 @@ def build_review_manifest(snapshot: dict[str, Any], *,
                 or scope.get("split_from_id") < 1):
             ignored += 1
             continue
-        # Keep the private helper only in memory; it is never emitted.
-        row = dict(row)
-        row["_split_from_id"] = scope["split_from_id"]
-        university_id = row.get("university_id")
-        if not isinstance(university_id, int) or isinstance(university_id, bool):
+        if (not isinstance(row.get("university_id"), int)
+                or isinstance(row.get("university_id"), bool)
+                or row.get("university_id") != approved_mapping["university_id"]):
             ignored += 1
             continue
-        buckets[(university_id, scope["split_from_id"])].append(row)
-
-    observed_ids = {
-        row.get("course_id")
-        for group in buckets.values() for row in group
-        if isinstance(row.get("course_id"), int)
-    }
-    coverage_ok = (len(buckets) == expected_groups and len(observed_ids) == expected_course_ids)
+        candidate_row = dict(row)
+        candidate_row["_split_from_id"] = scope["split_from_id"]
+        candidate_rows.append(candidate_row)
+    family_count, components = _connected_components(candidate_rows)
+    component_ids = [
+        {row["course_id"] for row in component
+         if isinstance(row.get("course_id"), int) and not isinstance(row.get("course_id"), bool)}
+        for component in components
+    ]
+    observed_ids = set().union(*component_ids) if component_ids else set()
+    approved_ids = {cid for group in approved_mapping["groups"] for cid in group["ids"]}
+    coverage_ok = (
+        family_count == expected_families
+        and len(components) == expected_groups
+        and len(observed_ids) == expected_course_ids
+        and observed_ids == approved_ids
+        and snapshot.get("raw_family_count", family_count) == family_count
+        and snapshot.get("logical_component_count", len(components)) == len(components)
+    )
     groups = []
-    for (university_id, split_from_id), rows in sorted(buckets.items()):
-        members, reasons = _group_reason(rows, courses_by_id, snapshot)
-        if len(rows) < 2:
-            reasons.append("split group has fewer than two published members")
+    for approved in approved_mapping["groups"]:
+        target_ids = set(approved["ids"])
+        matching = [
+            component for component, ids in zip(components, component_ids)
+            if ids.intersection(target_ids)
+        ]
+        rows = matching[0] if matching else []
+        component_member_ids = {
+            row["course_id"] for row in rows
+            if isinstance(row.get("course_id"), int) and not isinstance(row.get("course_id"), bool)
+        }
+        members, reasons = _component_reason(rows, courses_by_id, snapshot, {
+            **approved, "university_id": approved_mapping["university_id"],
+        })
+        if len(matching) != 1 or component_member_ids != target_ids:
+            reasons.append("overlap-connected component differs from approved JSON ID group")
         if not coverage_ok:
-            reasons.append("snapshot coverage does not match required 119-group/335-ID cohort")
-
-        member_ids = sorted({m["course_id"] for m in members})
-        canonical_id = min(member_ids) if member_ids else None
+            reasons.append("snapshot coverage must be 119 families / 102 components / 305 approved IDs")
+        member_ids = sorted(target_ids)
+        canonical_id = approved["parent"]
         mapping = [
             {
                 "old_course_id": m["course_id"],
-                "canonical_course_id": canonical_id,
+                "canonical_course_id": approved["parent"],
                 "offering_location": m["location"],
                 "source_fee": m["source_fee"],
             }
             for m in sorted(members, key=lambda item: item["course_id"])
         ]
-        safe = not reasons and len(mapping) == len(rows)
+        safe = not reasons and len(mapping) == len(target_ids)
+        source_families = sorted({
+            (row.get("scrape_job_id"), (scope := _scope_evidence(row) or {}).get("split_from_id"))
+            for row in rows
+            if isinstance((scope := _scope_evidence(row) or {}).get("split_from_id"), int)
+        })
+        source_families = [
+            {"scrape_job_id": job_id, "split_from_id": split_id}
+            for job_id, split_id in source_families
+        ]
         groups.append({
-            "university_id": university_id,
-            "split_from_id": split_from_id,
-            "member_count": len(rows),
+            "university_id": approved_mapping["university_id"],
+            "approved_award": approved["award"],
+            "approved_source_sha256": hashlib.sha256(approved["source"].encode()).hexdigest(),
+            "source_families": source_families,
+            "member_count": len(member_ids),
+            "evidence_row_count": sum(len(member.get("evidence_rows", [])) for member in members),
             "course_ids": member_ids,
             "proposed_canonical_course_id": canonical_id if safe else None,
             "proposed_mapping": mapping if safe else [],
@@ -394,30 +673,40 @@ def build_review_manifest(snapshot: dict[str, Any], *,
         "generated_from_snapshot_sha256": _sha256(snapshot),
         "approval_required": True,
         "production_writes_performed": False,
-        "apply_implemented": False,
+        "apply_implemented": True,
         "manifest_digest_scope": "sha256 of canonical JSON object excluding manifest_sha256",
         "expected_scope": {
+            "raw_families": expected_families,
             "groups": expected_groups,
             "course_ids": expected_course_ids,
         },
+        "approved_mapping_sha256": approved_mapping_sha256,
+        "external_reference_scope": "out_of_scope_preserve_original_course_ids",
         "observed_scope": {
-            "groups": len(buckets),
+            "raw_families": family_count,
+            "groups": len(components),
+            "exporter_raw_families": snapshot.get("raw_family_count", family_count),
+            "exporter_logical_components": snapshot.get(
+                "logical_component_count", len(components)
+            ),
             "unique_course_ids": len(observed_ids),
             "preview_candidate_groups": safe_count,
             "preview_candidate_course_ids": safe_ids,
             "blocked_groups": len(groups) - safe_count,
             "ignored_evidence_rows": ignored,
+            "coverage_matches_approved_mapping": coverage_ok,
             "coverage_matches_expected": coverage_ok,
         },
         "reference_scan_complete": snapshot.get("reference_scan_complete") is True,
         "external_reference_scan_complete": snapshot.get("external_reference_scan_complete") is True,
         "groups": groups,
         "review_instructions": [
-            "Review every proposed mapping and source fee; this manifest does not approve any mapping.",
-            "Canonical IDs are proposed as the smallest existing approved course ID in a fully validated group.",
-            "No course ID is deleted or rewritten by this preview.",
-            "External consumers are not covered by the local PostgreSQL FK census; an external-reference review is required.",
-            "Do not create an apply command until alias/FK compatibility and the external application-portal contract are reviewed.",
+            "The approved JSON file is authoritative for the 102 logical groups, awards, URLs, and 305 IDs.",
+            "The 119 per-job families are joined only by overlapping course IDs; award/source similarity never merges groups.",
+            "Review every staged row fingerprint, source fee, campus, and cross-run cohort before applying.",
+            "All original course IDs and course rows are retained; 203 aliases are compatibility mappings only.",
+            "External application-portal references are explicitly out of scope and were not scanned or cleared.",
+            "Final approval must bind this manifest digest, the approved mapping digest, reviewer, revision, scope, and preserve-ID out-of-scope policy.",
         ],
     }
     manifest["manifest_sha256"] = _sha256(manifest)
@@ -448,15 +737,26 @@ def load_snapshot(path: str | Path) -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--snapshot", required=True, help="bounded, operator-prepared JSON export")
+    parser.add_argument(
+        "--approved-mapping",
+        default=str(Path(__file__).with_name("approved_law_legacy_mapping.json")),
+        help="authoritative Task #629 mapping JSON (default: sibling approved mapping)",
+    )
     parser.add_argument("--out", required=True, help="local path for the review manifest JSON")
     args = parser.parse_args(argv)
     try:
         snapshot = load_snapshot(args.snapshot)
-        manifest = build_review_manifest(snapshot)
+        mapping_path = Path(args.approved_mapping)
+        mapping_bytes = mapping_path.read_bytes()
+        approved_mapping = json.loads(mapping_bytes.decode("utf-8"))
+        manifest = build_review_manifest(
+            snapshot, approved_mapping=approved_mapping,
+            approved_mapping_sha256=hashlib.sha256(mapping_bytes).hexdigest(),
+        )
         output = Path(args.out)
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    except (OSError, SnapshotError) as exc:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, SnapshotError) as exc:
         print(f"course duplicate preview refused: {exc}", file=sys.stderr)
         return 2
     print(json.dumps({

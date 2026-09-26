@@ -140,6 +140,13 @@ async def approve_scraped_course(
         {"scope": review_restore_lock_scope(sc.university_id)},
     )
     if sc.status == "approved" and sc.course_id:
+        # Do not let the idempotent fast path report success for a preserved
+        # legacy ID after reviewed reconciliation. The normal lookup below
+        # also blocks aliases, but it is intentionally bypassed here.
+        if await db.get(CourseIdAlias, sc.course_id):
+            raise ApprovalValidationError(
+                "This published course ID is an alias; review its canonical course instead."
+            )
         return {"ok": True, "course_id": sc.course_id, "scraped_course_id": sc.id,
                 "auto_publish": False, "reason": "Already approved"}
     if isinstance(getattr(sc, "extraction_method", None), dict) and sc.extraction_method.get("fee_variants"):
@@ -148,6 +155,10 @@ async def approve_scraped_course(
             .with_for_update().execution_options(populate_existing=True)
         )).scalar_one()
         if sc.status == "approved" and sc.course_id:
+            if await db.get(CourseIdAlias, sc.course_id):
+                raise ApprovalValidationError(
+                    "This published course ID is an alias; review its canonical course instead."
+                )
             return {"ok": True, "course_id": sc.course_id, "scraped_course_id": sc.id,
                     "auto_publish": False, "reason": "Already approved"}
     if unresolved_fee_selection(sc):

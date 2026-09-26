@@ -59,14 +59,19 @@ def test_scope_and_fee_variant_projection_omits_unapproved_json_keys():
     }, "sha256:" + "a" * 64)
     variant = exporter._json_safe_fee_variant({
         "status": "uniform",
-        "selected": [{"study_variant": "Standard", "amount": 100, "private": "x"}],
+        "selected": [{
+            "study_variant": "Standard", "campus": "London", "amount": 100, "private": "x"
+        }],
         "internal_note": "private",
     })
     assert scope == {
         "original_name": "MSc Data Science", "locations": ["London"], "key": "scope",
         "source_url": "sha256:" + "a" * 64, "split_from_id": 42,
     }
-    assert variant == {"status": "uniform", "selected": [{"study_variant": "Standard"}]}
+    assert variant == {
+        "status": "uniform",
+        "selected": [{"study_variant": "Standard", "campus": "London"}],
+    }
 
 
 def test_candidate_query_is_parameterized_and_projects_only_allowed_fields():
@@ -94,14 +99,14 @@ def test_candidate_query_is_parameterized_and_projects_only_allowed_fields():
         },
         "fee_variants": {
             "status": "uniform",
-            "selected": [{"study_variant": "Standard", "amount": 10000}],
+            "selected": [{"study_variant": "Standard", "campus": "London", "amount": 10000}],
             "private": "do not export",
         },
         "notes": "do not select",
     }])
     rows = asyncio.run(exporter._candidate_evidence(fake))
     statement, params = fake.calls[0]
-    assert params == {"approved": "approved", "published": "published", "row_limit": 2001}
+    assert params == {"approved": "approved", "published": "published", "row_limit": 2001, "university_id": 92}
     assert "status IN (:approved, :published)" in statement
     assert "LIMIT :row_limit" in statement
     assert "notes" not in statement
@@ -109,6 +114,7 @@ def test_candidate_query_is_parameterized_and_projects_only_allowed_fields():
     assert route not in str(rows)
     assert "split_actor" not in str(rows)
     assert "amount" not in str(rows[0]["extraction_method"]["fee_variants"])
+    assert rows[0]["extraction_method"]["fee_variants"]["selected"][0]["campus"] == "London"
 
 
 def test_unknown_or_composite_course_foreign_keys_fail_closed():

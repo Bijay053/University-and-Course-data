@@ -27,6 +27,7 @@ MAX_EVIDENCE_ROWS = 2_000
 MAX_COURSE_ROWS = 1_000
 MAX_OUTPUT_BYTES = 16 * 1024 * 1024
 MAX_SNAPSHOT_GROUPS = 500
+TARGET_UNIVERSITY_ID = 92
 MAX_REFERENCE_CONSTRAINTS = 128
 
 # New FK sources must be reviewed before they can be classified as known
@@ -96,6 +97,8 @@ def _json_safe_fee_variant(raw: Any) -> dict[str, Any]:
                 variant = item.get("study_variant")
                 safe_selected.append({
                     "study_variant": _safe_label(variant, "study variant"),
+                    "campus": _safe_label(item.get("campus"), "fee option campus",
+                                          max_length=200),
                 })
     status = raw.get("status")
     return {
@@ -138,6 +141,7 @@ async def _candidate_evidence(conn: AsyncConnection) -> list[dict[str, Any]]:
                extraction_method->'fee_variants' AS fee_variants
           FROM scraped_courses
          WHERE status IN (:approved, :published)
+           AND university_id = :university_id
            AND jsonb_typeof(extraction_method->'campus_fee_scope') = 'object'
            AND (extraction_method->'campus_fee_scope') ? 'original_name'
            AND (extraction_method->'campus_fee_scope') ? 'split_from_id'
@@ -148,6 +152,7 @@ async def _candidate_evidence(conn: AsyncConnection) -> list[dict[str, Any]]:
     result = await conn.execute(statement, {
         "approved": "approved",
         "published": "published",
+        "university_id": TARGET_UNIVERSITY_ID,
         "row_limit": MAX_EVIDENCE_ROWS + 1,
     })
     rows = [dict(row) for row in result.mappings().all()]
@@ -191,7 +196,8 @@ async def _courses(conn: AsyncConnection, course_ids: list[int]) -> dict[int, di
         return {}
     stmt = text("""
         SELECT id, university_id, name, course_website, degree_level, study_mode,
-               status, approval_status, (offering_identity IS NOT NULL) AS has_offering_identity
+               course_location, status, approval_status,
+               (offering_identity IS NOT NULL) AS has_offering_identity
           FROM courses
          WHERE id IN :course_ids
     """).bindparams(bindparam("course_ids", expanding=True))
@@ -204,6 +210,7 @@ async def _courses(conn: AsyncConnection, course_ids: list[int]) -> dict[int, di
         row["name"] = _safe_label(row["name"], "published award name")
         row["degree_level"] = _safe_label(row["degree_level"], "published degree")
         row["study_mode"] = _safe_label(row["study_mode"], "published study mode")
+        row["course_location"] = _safe_label(row["course_location"], "published location")
         row["course_website"] = _digest_route(row.get("course_website"))
         row["offering_identity"] = "present" if row.pop("has_offering_identity") else None
         output[row["id"]] = row
@@ -363,17 +370,35 @@ async def _outside_pathway_counts(
     result: dict[int, int] = defaultdict(int)
     if not course_ids:
         return result
-    memberships: dict[tuple[int, int], set[int]] = defaultdict(set)
+    memberships: dict[tuple[int, str, int], set[int]] = defaultdict(set)
     for row in evidence_rows:
         scope = row["extraction_method"]["campus_fee_scope"] or {}
         split_from = scope.get("split_from_id")
         cid = row.get("course_id")
         if isinstance(split_from, int) and not isinstance(split_from, bool) and isinstance(cid, int):
-            memberships[(row["university_id"], split_from)].add(cid)
-    course_group = {}
-    for group, members in memberships.items():
+            memberships[(row["university_id"], row["scrape_job_id"], split_from)].add(cid)
+    parent = {family: family for family in memberships}
+
+    def find(family):
+        while parent[family] != family:
+            parent[family] = parent[parent[family]]
+            family = parent[family]
+        return family
+
+    owner = {}
+    for family, members in memberships.items():
         for course_id in members:
-            course_group[course_id] = group
+            key = (family[0], course_id)
+            if key in owner:
+                left, right = find(family), find(owner[key])
+                if left != right:
+                    parent[max(left, right)] = min(left, right)
+            else:
+                owner[key] = family
+    course_group = {}
+    for family, members in memberships.items():
+        for course_id in members:
+            course_group[course_id] = find(family)
 
     stmt = text("""
         SELECT id, source_course_id, target_course_id
@@ -404,9 +429,35 @@ async def build_snapshot(conn: AsyncConnection) -> dict[str, Any]:
         split_from = scope.get("split_from_id")
         if not isinstance(split_from, int) or isinstance(split_from, bool):
             raise ExportRefused("campus split lineage is malformed")
-        group_keys.add((row["university_id"], split_from))
+        group_keys.add((row["university_id"], row["scrape_job_id"], split_from))
     if len(group_keys) > MAX_SNAPSHOT_GROUPS:
         raise ExportRefused(f"group count exceeds {MAX_SNAPSHOT_GROUPS}")
+    # Count overlap-connected logical groups independently from the 119
+    # per-job families; split_from_id is not a logical-group identifier.
+    family_ids = {family: set() for family in group_keys}
+    for row in evidence_rows:
+        scope = row["extraction_method"]["campus_fee_scope"] or {}
+        family_ids[(row["university_id"], row["scrape_job_id"],
+                    scope["split_from_id"])].add(row["course_id"])
+    family_parent = {family: family for family in group_keys}
+
+    def family_find(family):
+        while family_parent[family] != family:
+            family_parent[family] = family_parent[family_parent[family]]
+            family = family_parent[family]
+        return family
+
+    course_owner = {}
+    for family, members in family_ids.items():
+        for course_id in members:
+            key = (family[0], course_id)
+            if key in course_owner:
+                left, right = family_find(family), family_find(course_owner[key])
+                if left != right:
+                    family_parent[max(left, right)] = min(left, right)
+            else:
+                course_owner[key] = family
+    logical_component_count = len({family_find(family) for family in group_keys})
     if len(evidence_rows) > MAX_EVIDENCE_ROWS:
         raise ExportRefused("evidence row bound exceeded")
 
@@ -440,10 +491,11 @@ async def build_snapshot(conn: AsyncConnection) -> dict[str, Any]:
         "schema_version": SCHEMA_VERSION,
         "captured_at": datetime.now(timezone.utc).isoformat(),
         "reference_scan_complete": True,
-        # The known external application portal is not in this database. A
-        # PostgreSQL FK scan cannot certify its references, so downstream
-        # preview must block every group until portal-owner review is supplied.
+        # External application-portal references are explicitly out of scope;
+        # this flag is factual, not a blocker or a claim of a completed scan.
         "external_reference_scan_complete": False,
+        "raw_family_count": len(group_keys),
+        "logical_component_count": logical_component_count,
         "evidence_rows": evidence_rows,
         "courses": [courses[course_id] for course_id in sorted(courses)],
     }

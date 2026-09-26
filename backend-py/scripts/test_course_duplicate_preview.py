@@ -17,6 +17,8 @@ SPEC.loader.exec_module(preview)
 def sample_snapshot():
     rows = []
     courses = []
+    source = "https://example.edu/courses/data-science?year=2026"
+    route_hash = "sha256:" + preview.hashlib.sha256(source.encode()).hexdigest()
     for offset, (location, fee) in enumerate((("London", 18000), ("Leeds", 17000)), 1):
         course_id = 900 + offset
         staged_id = 700 + offset
@@ -24,13 +26,13 @@ def sample_snapshot():
             "original_name": "MSc Data Science",
             "locations": [location],
             "key": f"scope-{offset}",
-            "source_url": "https://example.edu/courses/data-science?year=2026",
+            "source_url": route_hash,
             "split_from_id": 700,
         }
         rows.append({
             "id": staged_id,
             "status": "published",
-            "university_id": 12,
+            "university_id": 92,
             "scrape_job_id": "job-abc",
             "course_id": course_id,
             "course_name": f"MSc Data Science — {location}",
@@ -38,6 +40,7 @@ def sample_snapshot():
             "course_website": scope["source_url"],
             "degree_level": "Master",
             "study_mode": "Full-time",
+            "course_location": location,
             "fee_scope_key": scope["key"],
             "international_fee": fee,
             "fee_year": 2026,
@@ -47,18 +50,19 @@ def sample_snapshot():
                 "campus_fee_scope": scope,
                 "fee_variants": {
                     "status": "uniform",
-                    "selected": [{"study_variant": "Standard"}],
+                    "selected": [{"study_variant": "Standard", "campus": location}],
                 },
                 "private_payload": "SHOULD_NOT_APPEAR",
             },
         })
         courses.append({
             "id": course_id,
-            "university_id": 12,
+            "university_id": 92,
             "name": "MSc Data Science",
             "course_website": scope["source_url"],
             "degree_level": "Master",
             "study_mode": "Full-time",
+            "course_location": location,
             "status": "active",
             "approval_status": "approved",
             "offering_identity": None,
@@ -73,15 +77,22 @@ def sample_snapshot():
         "snapshot_id": "offline-test",
         "captured_at": "2026-09-25T00:00:00Z",
         "reference_scan_complete": True,
-        "external_reference_scan_complete": True,
+        "external_reference_scan_complete": False,
         "evidence_rows": rows,
         "courses": courses,
     }
 
 
-def manifest_for(snapshot):
+def manifest_for(snapshot, expected_families=1):
     return preview.build_review_manifest(
-        snapshot, expected_groups=1, expected_course_ids=2,
+        snapshot, approved_mapping={
+            "schema_version": 1, "university_id": 92, "approval": "approved test map",
+            "groups": [{
+                "parent": 901, "ids": [901, 902], "award": "MSc Data Science",
+                "source": "https://example.edu/courses/data-science?year=2026",
+            }],
+        }, approved_mapping_sha256="a" * 64, expected_groups=1,
+        expected_course_ids=2, expected_families=expected_families,
     )
 
 
@@ -95,8 +106,10 @@ def test_safe_group_is_a_review_candidate_with_explicit_mapping_and_hashes():
             for m in group["proposed_mapping"]] == [(901, 901), (902, 901)]
     assert group["proposed_mapping"][1]["source_fee"]["amount"] == 17000
     assert all(len(member["precondition_sha256"]) == 64 for member in group["members"])
+    assert all(member["source_route_sha256"].startswith("sha256:")
+               for member in group["members"])
     assert manifest["production_writes_performed"] is False
-    assert manifest["apply_implemented"] is False
+    assert manifest["apply_implemented"] is True
 
 
 def test_conflicting_fees_for_same_location_are_blocked():
@@ -114,20 +127,19 @@ def test_conflicting_fees_for_same_location_are_blocked():
     course = copy.deepcopy(snapshot["courses"][1])
     course["id"] = 903
     snapshot["courses"].append(course)
-    manifest = preview.build_review_manifest(snapshot, expected_groups=1, expected_course_ids=3)
+    manifest = manifest_for(snapshot)
     group = manifest["groups"][0]
     assert group["eligibility"] == "blocked"
-    assert any("duplicate location" in reason for reason in group["blocking_reasons"])
-    assert any("conflicting fees" in reason for reason in group["blocking_reasons"])
+    assert any("component IDs differ" in reason for reason in group["blocking_reasons"])
     assert group["proposed_mapping"] == []
 
 
 def test_unsafe_identity_alias_offering_and_outside_reference_block_group():
     mutations = [
-        ("outside_reference_count", 1, "outside references"),
-        ("alias_count", 1, "alias"),
+        ("outside_reference_count", 1, "outside local FK"),
+        ("alias_count", 1, "participates in an alias"),
         ("existing_offering_count", 1, "published offerings"),
-        ("offering_identity", "existing-identity", "offering identity"),
+        ("offering_identity", "existing-identity", "offering_identity"),
     ]
     for field, value, reason_text in mutations:
         snapshot = sample_snapshot()
@@ -156,21 +168,31 @@ def test_ambiguous_award_route_study_variant_or_cohort_blocks_group():
     assert manifest_for(snapshot)["groups"][0]["eligibility"] == "blocked"
 
 
+def test_selected_fee_variant_must_belong_to_exact_scoped_campus():
+    snapshot = sample_snapshot()
+    snapshot["evidence_rows"][0]["extraction_method"]["fee_variants"]["selected"][0][
+        "campus"
+    ] = "Manchester"
+    group = manifest_for(snapshot)["groups"][0]
+    assert group["eligibility"] == "blocked"
+    assert any("selected fee option campus differs" in reason
+               for reason in group["blocking_reasons"])
+
+
 def test_incomplete_reference_scan_and_wrong_scope_coverage_block():
     snapshot = sample_snapshot()
     snapshot["reference_scan_complete"] = False
     group = manifest_for(snapshot)["groups"][0]
     assert group["eligibility"] == "blocked"
-    assert any("reference scan" in reason for reason in group["blocking_reasons"])
+    assert any("FK census" in reason for reason in group["blocking_reasons"])
 
     snapshot = sample_snapshot()
     snapshot["external_reference_scan_complete"] = False
     group = manifest_for(snapshot)["groups"][0]
-    assert group["eligibility"] == "blocked"
-    assert any("external application" in reason for reason in group["blocking_reasons"])
+    assert group["eligibility"] == "preview_candidate"
 
     snapshot = sample_snapshot()
-    manifest = preview.build_review_manifest(snapshot, expected_groups=119, expected_course_ids=335)
+    manifest = manifest_for(snapshot, expected_families=119)
     assert manifest["observed_scope"]["coverage_matches_expected"] is False
     assert manifest["groups"][0]["eligibility"] == "blocked"
 
@@ -186,7 +208,7 @@ def test_manifest_is_json_safe_and_does_not_emit_extraction_payload_or_route():
 
 def test_invalid_snapshot_and_duplicate_primary_keys_refuse():
     try:
-        preview.build_review_manifest({"schema_version": 0})
+        preview._validate_snapshot({"schema_version": 0})
     except preview.SnapshotError:
         pass
     else:
@@ -199,3 +221,85 @@ def test_invalid_snapshot_and_duplicate_primary_keys_refuse():
         pass
     else:
         raise AssertionError("duplicate course IDs must be refused")
+
+
+def test_overlapping_per_job_families_resolve_to_one_approved_component():
+    snapshot = sample_snapshot()
+    overlap = copy.deepcopy(snapshot["evidence_rows"][0])
+    overlap["id"] = 703
+    overlap["scrape_job_id"] = "job-second-run"
+    overlap["extraction_method"]["campus_fee_scope"]["split_from_id"] = 701
+    snapshot["evidence_rows"].append(overlap)
+    manifest = manifest_for(snapshot, expected_families=2)
+    group = manifest["groups"][0]
+    assert manifest["observed_scope"]["raw_families"] == 2
+    assert manifest["observed_scope"]["groups"] == 1
+    assert group["eligibility"] == "preview_candidate"
+    assert group["source_families"] == [
+        {"scrape_job_id": "job-abc", "split_from_id": 700},
+        {"scrape_job_id": "job-second-run", "split_from_id": 701},
+    ]
+    assert group["evidence_row_count"] == 3
+    assert len(group["members"][0]["evidence_rows"]) == 2
+
+
+def test_same_award_and_source_do_not_merge_disjoint_approved_groups():
+    snapshot = sample_snapshot()
+    source = "https://example.edu/courses/data-science?year=2026"
+    for course_id, staged_id, location in ((903, 704, "Bristol"), (904, 705, "York")):
+        row = copy.deepcopy(snapshot["evidence_rows"][0])
+        row.update({
+            "id": staged_id, "course_id": course_id, "course_location": location,
+            "course_name": f"MSc Data Science — {location}", "scrape_job_id": "job-other",
+        })
+        scope = row["extraction_method"]["campus_fee_scope"]
+        scope.update({"split_from_id": 701, "locations": [location], "key": f"scope-{course_id}"})
+        row["fee_scope_key"] = scope["key"]
+        row["extraction_method"]["fee_variants"]["selected"][0]["campus"] = location
+        snapshot["evidence_rows"].append(row)
+        course = copy.deepcopy(snapshot["courses"][0])
+        course.update({"id": course_id, "course_location": location})
+        snapshot["courses"].append(course)
+    mapping = {
+        "schema_version": 1, "university_id": 92, "approval": "approved test map",
+        "groups": [
+            {"parent": 901, "ids": [901, 902], "award": "MSc Data Science", "source": source},
+            {"parent": 903, "ids": [903, 904], "award": "MSc Data Science", "source": source},
+        ],
+    }
+    manifest = preview.build_review_manifest(
+        snapshot, approved_mapping=mapping, approved_mapping_sha256="a" * 64,
+        expected_groups=2, expected_course_ids=4, expected_families=2,
+    )
+    assert manifest["observed_scope"]["groups"] == 2
+    assert [group["course_ids"] for group in manifest["groups"]] == [[901, 902], [903, 904]]
+    assert all(group["eligibility"] == "preview_candidate" for group in manifest["groups"])
+
+
+def test_current_overlap_component_mismatch_with_approved_ids_is_blocked():
+    snapshot = sample_snapshot()
+    source = "https://example.edu/courses/data-science?year=2026"
+    wrong_mapping = {
+        "schema_version": 1, "university_id": 92, "approval": "approved test map",
+        "groups": [{
+            "parent": 901, "ids": [901, 903], "award": "MSc Data Science", "source": source,
+        }],
+    }
+    manifest = preview.build_review_manifest(
+        snapshot, approved_mapping=wrong_mapping, approved_mapping_sha256="a" * 64,
+        expected_groups=1, expected_course_ids=2, expected_families=1,
+    )
+    assert manifest["groups"][0]["eligibility"] == "blocked"
+    assert any("differs from approved JSON" in reason
+               for reason in manifest["groups"][0]["blocking_reasons"])
+
+
+def test_external_application_scan_cannot_be_claimed_by_local_preview():
+    snapshot = sample_snapshot()
+    snapshot["external_reference_scan_complete"] = True
+    try:
+        manifest_for(snapshot)
+    except preview.SnapshotError as exc:
+        assert "out of scope" in str(exc)
+    else:
+        raise AssertionError("local snapshot must not claim external portal coverage")

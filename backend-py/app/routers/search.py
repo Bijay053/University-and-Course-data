@@ -94,10 +94,11 @@ course_search_view AS MATERIALIZED (
         u.website AS university_website,
         coalesce(u.featured, FALSE) AS featured,
         coalesce(u.featured_priority, 0) AS featured_priority,
-        latest_fee.international_fee,
-        latest_fee.currency,
-        latest_fee.fee_term,
-        latest_fee.fee_year,
+        COALESCE(latest_fee.international_fee, offering_fee.international_fee)
+            AS international_fee,
+        COALESCE(latest_fee.currency, offering_fee.currency) AS currency,
+        COALESCE(latest_fee.fee_term, offering_fee.fee_term) AS fee_term,
+        COALESCE(latest_fee.fee_year, offering_fee.fee_year) AS fee_year,
         COALESCE((
             SELECT jsonb_agg(jsonb_build_object(
                 'id', o.id::text, 'location', o.location,
@@ -132,6 +133,15 @@ course_search_view AS MATERIALIZED (
         ORDER BY f.id DESC
         LIMIT 1
     ) latest_fee ON TRUE
+    LEFT JOIN LATERAL (
+        SELECT o.fee_amount AS international_fee, o.fee_currency AS currency,
+               o.fee_term, o.fee_year
+          FROM course_offerings o
+         WHERE o.course_id = c.id
+         ORDER BY o.fee_year DESC NULLS LAST, o.fee_amount ASC NULLS LAST,
+                  o.location, o.id
+         LIMIT 1
+    ) offering_fee ON TRUE
     LEFT JOIN LATERAL (
         SELECT array_agg(
             DISTINCT i.intake_month ORDER BY i.intake_month
