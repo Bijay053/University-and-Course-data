@@ -147,13 +147,18 @@ def _fixture(mapping: dict):
     all_ids = []
     group_first_pair = []
     for group_index, group in enumerate(mapping["groups"]):
-        degree = "Master"
         variant = f"Isolated integration variant {group_index + 1}"
         member_ids = list(group["ids"])
         if len(member_ids) >= 2 and not group_first_pair:
             group_first_pair = member_ids[:2]
         for course_id in member_ids:
             all_ids.append(course_id)
+            if group["award"] == "LLB International Law":
+                degree, published_degree = "Bachelor's", "Bachelor"
+            elif course_id in {9389, 9547}:
+                degree, published_degree = "Master's", "Master"
+            else:
+                degree = published_degree = "Master"
             if group_index == 0 and course_id == 9389:
                 scope_locations = ["Birmingham", "Leeds", "Manchester"]
                 location = ", ".join(scope_locations)
@@ -166,6 +171,12 @@ def _fixture(mapping: dict):
                 name_location = location
                 fee_campus = "London"
                 fee = float(10_000 + (course_id % 1_000))
+            elif group_index == 1 and course_id == group["parent"]:
+                location = "Hull"
+                scope_locations = ["Hull"]
+                name_location = location
+                fee_campus = "Outside London"
+                fee = float(10_000 + (course_id % 1_000))
             else:
                 location = f"Canary campus {course_id}"
                 scope_locations = [location]
@@ -175,7 +186,7 @@ def _fixture(mapping: dict):
             course_rows.append({
                 "id": course_id, "university_id": 92,
                 "name": f"{group['award']} — {name_location}",
-                "course_website": group["source"], "degree_level": degree,
+                "course_website": group["source"], "degree_level": published_degree,
                 "study_mode": "Full-time", "course_location": location,
                 "status": "active", "approval_status": "approved",
                 "offering_identity": None, "field_approval_counts": {"name": 1},
@@ -184,7 +195,7 @@ def _fixture(mapping: dict):
             })
             family_records = [("job-base", group["parent"])]
             # Seventeen duplicate per-job families deliberately overlap the
-            # same component ID, making 119 raw families but 102 components.
+            # same component ID, making 119 baseline families but 102 components.
             if group_index < 17 and course_id == member_ids[0]:
                 family_records.append((f"job-overlap-{group_index}", group["parent"]))
             for job_id, split_id in family_records:
@@ -223,6 +234,20 @@ def _fixture(mapping: dict):
 
     assert len(all_ids) == 305 and len(set(all_ids)) == 305
     assert len(evidence_rows) == 322
+    repeated_courses = set()
+    repeat_sources = []
+    for row in evidence_rows:
+        if row["course_id"] not in repeated_courses:
+            repeat_sources.append(row)
+            repeated_courses.add(row["course_id"])
+        if len(repeat_sources) == 27:
+            break
+    for repeat_index, source_row in enumerate(repeat_sources):
+        repeated = dict(source_row)
+        repeated["id"] = staged_id
+        repeated["scrape_job_id"] = f"approved-repeat-{repeat_index}"
+        evidence_rows.append(repeated)
+        staged_id += 1
     for extra_index in range(25):
         course_id = 910_000 + extra_index
         location = f"Unrelated campus {extra_index + 1}"
@@ -238,7 +263,7 @@ def _fixture(mapping: dict):
             "reference_counts": {}, "outside_reference_count": 0,
             "existing_offering_count": 0, "alias_count": 0,
         })
-        family_count = 3 if extra_index < 2 else 2
+        family_count = 1
         for family_index in range(family_count):
             job_id = f"unrelated-job-{extra_index}-{family_index}"
             scope = {
@@ -357,7 +382,7 @@ def _reviewed_manifest(snapshot: dict, mapping: dict, mapping_sha: str, path: Pa
     manifest = preview.build_review_manifest(
         snapshot, approved_mapping=mapping, approved_mapping_sha256=mapping_sha,
     )
-    assert manifest["observed_scope"]["raw_families"] == 119
+    assert manifest["observed_scope"]["raw_families"] == 146
     assert manifest["observed_scope"]["groups"] == 102
     assert manifest["observed_scope"]["unique_course_ids"] == 305
     assert manifest["observed_scope"]["preview_candidate_groups"] == 102
@@ -452,7 +477,7 @@ def test_integration_fixture_models_119_overlapping_families_and_variant_identit
         row for row in snapshot["evidence_rows"] if row["course_id"] in approved_ids
     ]
     family_count, components = preview._connected_components(approved_rows)
-    assert family_count == 119
+    assert family_count == 146
     assert len(components) == 102
     total_families, total_components = preview._connected_components(snapshot["evidence_rows"])
     assert total_families == 171
@@ -509,7 +534,8 @@ def test_task629_end_to_end_canary_schema():
                     exported, mapping, mapping_sha, manifest_path,
                 )
                 observed = approved["manifest"]["observed_scope"]
-                assert observed["raw_families"] == 119
+                assert observed["raw_families"] == 146
+                assert observed["additional_approved_id_families"] == 27
                 assert observed["groups"] == 102
                 assert observed["unique_course_ids"] == 305
                 assert observed["extra_course_ids"] == 25
@@ -665,6 +691,11 @@ def test_task629_end_to_end_canary_schema():
                         SELECT location, fee_amount FROM course_offerings
                          WHERE course_id = :course_id ORDER BY location
                     """), {"course_id": group_zero_id})).mappings().all()
+                    hull_course_id = mapping["groups"][1]["parent"]
+                    hull_offerings = (await conn.execute(text("""
+                        SELECT location, fee_amount FROM course_offerings
+                         WHERE course_id = :course_id ORDER BY location
+                    """), {"course_id": hull_course_id})).mappings().all()
                 assert course_count == 305
                 assert alias_count == 203
                 assert pathway_count == (1 if internal_pathway else 0)
@@ -694,6 +725,15 @@ def test_task629_end_to_end_canary_schema():
                 assert {row["location"]: row["fee_amount"]
                         for row in group_zero_offerings} == expected_group_zero_prices
                 assert len(group_zero_offerings) == len(expected_group_zero_prices) == 4
+                expected_hull_fee = next(
+                    row["international_fee"] for row in evidence_rows
+                    if row["course_id"] == hull_course_id
+                )
+                hull_prices = {
+                    row["location"]: row["fee_amount"] for row in hull_offerings
+                }
+                assert hull_prices["Hull"] == expected_hull_fee
+                assert sum(row["location"] == "Hull" for row in hull_offerings) == 1
 
                 from app.routers.search import search_courses
 

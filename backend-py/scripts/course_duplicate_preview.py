@@ -65,6 +65,20 @@ def _norm(value: Any) -> str:
     return " ".join(str(value or "").casefold().split())
 
 
+def _canonical_degree_level(value: Any) -> str:
+    from app.services.scraper.published_offerings import canonical_degree_level
+
+    return canonical_degree_level(value)
+
+
+def _is_allowed_regional_fee_label(label: str, locations: tuple[str, ...]) -> bool:
+    return (
+        _norm(label) == "outside london"
+        and bool(locations)
+        and all("london" not in _norm(location) for location in locations)
+    )
+
+
 def _as_int(value: Any, label: str) -> int:
     if isinstance(value, bool):
         raise SnapshotError(f"{label} must be an integer")
@@ -133,9 +147,12 @@ def _fee_campus_binding(
         # selected authority is a validated uniform fee matching the stored
         # amount/cohort/route. The apply path revalidates raw options with
         # validated_fee_variants before any write.
-        if len(campus_keys) != 1 or len(location_keys) < 2 or not exact_authority:
+        label = next(iter(campus_keys), "")
+        if (len(campus_keys) != 1
+                or not _is_allowed_regional_fee_label(label, location_values)
+                or not exact_authority):
             return None, "selected fee option campus differs from scoped campus", (), None
-        regional_label = next(iter(campus_keys))
+        regional_label = label
     elif not scope_keys.issubset(campus_keys) or not exact_authority:
         return None, "selected fee option campus differs from scoped campus", (), None
     if len(set(variants)) != 1:
@@ -370,9 +387,7 @@ def _group_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[str,
                 reasons.append(f"location evidence does not match staged row {row['id']}")
             if regional_label:
                 scope_locations = {_norm(value) for value in scoped_locations}
-                previous_scope = regional_scopes.setdefault(regional_label, scope_locations)
-                if previous_scope != scope_locations:
-                    reasons.append(f"regional fee scope changed across rows for {regional_label}")
+                regional_scopes.setdefault(regional_label, set()).update(scope_locations)
                 regional_fees[regional_label].add(_canonical_json(_safe_fee(row)).decode())
 
         course_id = row.get("course_id")
@@ -561,11 +576,7 @@ def _component_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[
                 row_locations.update(scope_keys)
                 if regional_label:
                     scope_locations = set(scope_keys)
-                    previous_scope = regional_scopes.setdefault(regional_label, scope_locations)
-                    if previous_scope != scope_locations:
-                        reasons.append(
-                            f"regional fee scope changed across rows for {regional_label}"
-                        )
+                    regional_scopes.setdefault(regional_label, set()).update(scope_locations)
                     regional_fees[regional_label].add(
                         _canonical_json(_safe_fee(row)).decode()
                     )
@@ -581,7 +592,8 @@ def _component_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[
                     or not _published_award_name_matches(
                         course.get("name"), approved["award"], scoped_locations)
                     or _norm(course.get("course_location")) != _norm(row.get("course_location"))
-                    or _norm(course.get("degree_level")) != _norm(row.get("degree_level"))
+                    or _canonical_degree_level(course.get("degree_level"))
+                    != _canonical_degree_level(row.get("degree_level"))
                     or _norm(course.get("study_mode")) != _norm(row.get("study_mode"))):
                 reasons.append(f"current Course properties mismatch for ID {cid}")
             if not all(isinstance(row.get(field), str) and row[field].strip()
@@ -600,7 +612,7 @@ def _component_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[
                 reasons.append(f"staged row {row['id']} has invalid campus_fee_scope")
             identity = (
                 row.get("university_id"), row.get("course_website"), approved["award"],
-                row.get("degree_level"), variant, row.get("study_mode"),
+                _canonical_degree_level(row.get("degree_level")), variant, row.get("study_mode"),
                 row.get("fee_year"), row.get("fee_term"), row.get("currency"),
             )
             row_identities.add(identity)
@@ -712,7 +724,7 @@ def _related_extra_ids(
         extra_variant, _ = _selected_study_variant(extra)
         extra_route = extra.get("course_website")
         extra_award = _norm(extra_scope.get("original_name"))
-        extra_degree = _norm(extra.get("degree_level"))
+        extra_degree = _canonical_degree_level(extra.get("degree_level"))
         extra_family = (
             extra.get("university_id"), extra.get("scrape_job_id"),
             extra_scope.get("split_from_id"),
@@ -754,7 +766,7 @@ def _related_extra_ids(
                 same_route_award_degree = (
                     extra_route == row.get("course_website")
                     and extra_award == _norm(scope.get("original_name"))
-                    and extra_degree == _norm(row.get("degree_level"))
+                    and extra_degree == _canonical_degree_level(row.get("degree_level"))
                 )
                 identity_match = (
                     same_route_award_degree
@@ -831,11 +843,37 @@ def build_review_manifest(snapshot: dict[str, Any], *,
         for component in components
     ]
     observed_ids = set().union(*component_ids) if component_ids else set()
+    family_course_ids: dict[tuple[int, str, int], set[int]] = defaultdict(set)
+    for row in candidate_rows:
+        scope = _scope_evidence(row) or {}
+        family_key = (
+            row.get("university_id"), row.get("scrape_job_id"),
+            scope.get("split_from_id"),
+        )
+        if (isinstance(family_key[0], int) and isinstance(family_key[1], str)
+                and isinstance(family_key[2], int)):
+            family_course_ids[family_key].add(row["course_id"])
+    approved_parent_by_id = {
+        course_id: group["parent"]
+        for group in approved_mapping["groups"] for course_id in group["ids"]
+    }
+    family_signatures = {
+        tuple(sorted(course_ids)) for course_ids in family_course_ids.values()
+    }
+    family_signatures_match_mapping = all(
+        course_ids and len({approved_parent_by_id.get(course_id) for course_id in course_ids}) == 1
+        and all(course_id in approved_parent_by_id for course_id in course_ids)
+        for course_ids in (set(signature) for signature in family_signatures)
+    )
+    family_inventory_ok = (
+        family_count >= expected_families
+        and family_signatures_match_mapping
+    )
     extra_conflicts, unknown_extra_rows = _related_extra_ids(
         extra_rows, candidate_rows, approved_mapping["groups"],
     )
     coverage_ok = (
-        family_count == expected_families
+        family_inventory_ok
         and len(components) == expected_groups
         and len(observed_ids) == expected_course_ids
         and observed_ids == approved_ids
@@ -862,7 +900,8 @@ def build_review_manifest(snapshot: dict[str, Any], *,
             reasons.append("overlap-connected component differs from approved JSON ID group")
         if not coverage_ok:
             reasons.append(
-                "approved-ID inventory must match 119 families / 102 components / 305 IDs"
+                "approved-ID inventory must match the 119-family baseline / 102 components / "
+                "305 IDs; excess families must repeat approved-ID signatures"
             )
         if extra_conflicts.get(approved["parent"]):
             ids_text = ", ".join(str(value) for value in sorted(
@@ -931,6 +970,8 @@ def build_review_manifest(snapshot: dict[str, Any], *,
         "external_reference_scope": "out_of_scope_preserve_original_course_ids",
         "observed_scope": {
             "raw_families": family_count,
+            "approved_family_signature_count": len(family_signatures),
+            "additional_approved_id_families": max(0, family_count - expected_families),
             "groups": len(components),
             "exporter_raw_families": snapshot.get(
                 "raw_family_count", exporter_family_count
@@ -965,7 +1006,7 @@ def build_review_manifest(snapshot: dict[str, Any], *,
         "groups": groups,
         "review_instructions": [
             "The approved JSON file is authoritative for the 102 logical groups, awards, URLs, and 305 IDs.",
-            "The 119 per-job families are joined only by overlapping course IDs; award/source similarity never merges groups.",
+            "The 119-family baseline may grow only through additional families containing approved IDs from one mapped component; all rows must agree on identity, cohort, and campuses.",
             "Review every staged row fingerprint, source fee, campus, and cross-run cohort before applying.",
             "All original course IDs and course rows are retained; 203 aliases are compatibility mappings only.",
             "External application-portal references are explicitly out of scope and were not scanned or cleared.",

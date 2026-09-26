@@ -103,6 +103,8 @@ def approved_manifest(mapping_path=APPROVED_MAPPING):
         "external_reference_scope": "out_of_scope_preserve_original_course_ids",
         "observed_scope": {
             "raw_families": 119, "groups": 102, "unique_course_ids": 305,
+            "approved_family_signature_count": 119,
+            "additional_approved_id_families": 0,
             "preview_candidate_groups": 102, "preview_candidate_course_ids": 305,
             "blocked_groups": 0, "ignored_evidence_rows": 0,
             "coverage_matches_approved_mapping": True, "coverage_matches_expected": True,

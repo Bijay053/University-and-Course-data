@@ -4,7 +4,7 @@
 This command never discovers mapping members. The approved JSON mapping is
 authoritative for 102 logical components, 305 existing IDs, 203 aliases, award
 names, and source URLs. The enriched manifest explicitly fingerprints every
-staged row across the 119 overlapping per-job families. The live database is
+staged row across at least the 119-family approved baseline. The live database is
 consulted solely to verify those exact IDs and reject stale/conflicting evidence.
 External application-portal references are explicitly out of scope; old course
 IDs and course rows are preserved, without claiming an external scan completed.
@@ -92,6 +92,12 @@ def _norm(value: Any) -> str:
     return " ".join(str(value or "").casefold().split())
 
 
+def _canonical_degree_level(value: Any) -> str:
+    from app.services.scraper.published_offerings import canonical_degree_level
+
+    return canonical_degree_level(value)
+
+
 def _same_amount(left: Any, right: Any) -> bool:
     try:
         return Decimal(str(left)) == Decimal(str(right))
@@ -157,11 +163,16 @@ def load_approved_manifest(path: Path, expected_file_sha: str,
         raise ApplyRefused("manifest expected scope is not the approved task #629 cohort")
     observed = manifest.get("observed_scope")
     if (not isinstance(observed, dict) or observed.get("groups") != EXPECTED_GROUPS
-            or observed.get("raw_families") != 119
+            or not isinstance(observed.get("raw_families"), int)
+            or isinstance(observed.get("raw_families"), bool)
+            or not 119 <= observed["raw_families"] <= 500
             or observed.get("unique_course_ids") != EXPECTED_COURSE_IDS
             or observed.get("coverage_matches_approved_mapping") is not True
             or observed.get("coverage_matches_expected") is not True):
-        raise ApplyRefused("review report does not certify 119 families / 102 components / 305 IDs")
+        raise ApplyRefused(
+            "review report does not certify a verified 119+ family inventory / "
+            "102 components / 305 IDs"
+        )
     approval = manifest.get("approval")
     if not isinstance(approval, dict) or approval.get("status") != "approved":
         raise ApplyRefused("manifest does not contain explicit reviewer approval")
@@ -198,6 +209,7 @@ def load_approved_manifest(path: Path, expected_file_sha: str,
     all_staged: list[int] = []
     seen_parents: set[int] = set()
     seen_raw_families: set[tuple[int, str, int]] = set()
+    family_course_ids: dict[tuple[int, str, int], set[int]] = defaultdict(set)
     normalized_groups = []
     for group in groups:
         if not isinstance(group, dict) or group.get("eligibility") != "preview_candidate":
@@ -281,7 +293,9 @@ def load_approved_manifest(path: Path, expected_file_sha: str,
                 job_id = evidence.get("scrape_job_id")
                 if not isinstance(job_id, str) or not job_id.strip():
                     raise ApplyRefused("evidence family must identify its scrape job")
-                group_families.add((university_id, job_id, split_id))
+                family_key = (university_id, job_id, split_id)
+                group_families.add(family_key)
+                family_course_ids.setdefault(family_key, set()).add(course_id)
                 evidence_hash = evidence.get("evidence_precondition_sha256")
                 if not isinstance(evidence_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", evidence_hash):
                     raise ApplyRefused("staged evidence row is missing its fingerprint")
@@ -329,9 +343,28 @@ def load_approved_manifest(path: Path, expected_file_sha: str,
         if not isinstance(group.get("blocking_reasons"), list) or group["blocking_reasons"]:
             raise ApplyRefused("approved group has blocking reasons")
         normalized_groups.append(group)
+    family_signatures = {
+        tuple(sorted(course_ids)) for course_ids in family_course_ids.values()
+    }
+    approved_parent_by_id = {
+        course_id: group["parent"]
+        for group in approved_mapping["groups"] for course_id in group["ids"]
+    }
+    if (any(
+                not signature
+                or any(course_id not in approved_parent_by_id for course_id in signature)
+                or len({approved_parent_by_id[course_id] for course_id in signature}) != 1
+                for signature in family_signatures
+            )
+            or observed.get("approved_family_signature_count") != len(family_signatures)
+            or observed.get("additional_approved_id_families")
+            != max(0, observed["raw_families"] - 119)):
+        raise ApplyRefused(
+            "excess per-job families must contain only approved IDs from one mapped component"
+        )
     if (len(seen_parents) != EXPECTED_GROUPS
             or len(set(all_courses)) != EXPECTED_COURSE_IDS
-            or len(seen_raw_families) != 119
+            or len(seen_raw_families) != observed["raw_families"]
             or len(all_staged) < EXPECTED_COURSE_IDS
             or len(set(all_staged)) != len(all_staged)):
         raise ApplyRefused("manifest must identify all 305 IDs and every unique staged evidence row")
@@ -472,15 +505,29 @@ def _group_evidence(group: dict[str, Any], rows: dict[int, dict[str, Any]]) -> t
                     f"staged row {row['id']} has invalid selected fee-option campus"
                 )
             campus_keys = {_norm(campus) for campus in selected_campuses}
+            exact_authority = (
+                authority.get("status") == "uniform"
+                and isinstance(source_url, str)
+                and all(
+                    _same_amount(item.get("amount"), row.get("international_fee"))
+                    and item.get("currency") == row.get("currency")
+                    and item.get("year") == row.get("fee_year")
+                    and item.get("period") == row.get("fee_term")
+                    and item.get("source_url") == source_url
+                    for item in selected
+                )
+            )
             regional_label = None
             if not campus_keys.issubset(scope_location_keys):
-                if (len(campus_keys) != 1 or len(scope_location_keys) < 2
-                        or authority.get("status") != "uniform"):
+                label = next(iter(campus_keys), "")
+                if (len(campus_keys) != 1 or not exact_authority
+                        or label != "outside london"
+                        or any("london" in key for key in scope_location_keys)):
                     raise ApplyRefused(
                         f"staged row {row['id']} selected fee option is not bound to scoped campuses"
                     )
-                regional_label = next(iter(campus_keys))
-            elif not scope_location_keys.issubset(campus_keys):
+                regional_label = label
+            elif not scope_location_keys.issubset(campus_keys) or not exact_authority:
                 raise ApplyRefused(
                     f"staged row {row['id']} selected fee options do not cover every scoped campus"
                 )
@@ -511,7 +558,8 @@ def _group_evidence(group: dict[str, Any], rows: dict[int, dict[str, Any]]) -> t
                 raise ApplyRefused(f"staged row {row['id']} has an incomplete fee cohort")
             identity = (
                 row["university_id"], row["course_website"], _norm(scope.get("original_name")),
-                _norm(row["degree_level"]), next(iter(variants)), _norm(row["study_mode"]),
+                _canonical_degree_level(row["degree_level"]),
+                next(iter(variants)), _norm(row["study_mode"]),
                 row["fee_year"], row["fee_term"], row["currency"],
             )
             identities.add(identity)
@@ -521,13 +569,7 @@ def _group_evidence(group: dict[str, Any], rows: dict[int, dict[str, Any]]) -> t
             )
             fees_by_course.setdefault(member["course_id"], set()).add(fee_key)
             if regional_label:
-                previous_scope = regional_scopes.setdefault(
-                    regional_label, scope_location_keys
-                )
-                if previous_scope != scope_location_keys:
-                    raise ApplyRefused(
-                        f"regional fee label {regional_label} has inconsistent scoped locations"
-                    )
+                regional_scopes.setdefault(regional_label, set()).update(scope_location_keys)
                 regional_fees[regional_label].add(fee_key)
             if evidence.get("selected_for_offering") is True:
                 selected_rows.append(row)
@@ -673,8 +715,8 @@ async def _conflicting_evidence(conn, groups, approved_staged_ids: set[int],
                     candidate.get("course_website") == sample.get("course_website")
                     and _norm(scope.get("original_name"))
                     == _norm(sample_scope.get("original_name"))
-                    and _norm(candidate.get("degree_level"))
-                    == _norm(sample.get("degree_level"))
+                    and _canonical_degree_level(candidate.get("degree_level"))
+                    == _canonical_degree_level(sample.get("degree_level"))
                     and bool(candidate_locations.intersection(sample_locations))
                 )
                 if same_award_route_campus:
@@ -684,7 +726,8 @@ async def _conflicting_evidence(conn, groups, approved_staged_ids: set[int],
                 if (
                     candidate.get("course_website") == sample.get("course_website")
                     and _norm(scope.get("original_name")) == _norm(sample_scope.get("original_name"))
-                    and _norm(candidate.get("degree_level")) == _norm(sample.get("degree_level"))
+                    and _canonical_degree_level(candidate.get("degree_level"))
+                    == _canonical_degree_level(sample.get("degree_level"))
                     and len(candidate_variants) == 1
                     and len(sample_variants) == 1
                     and candidate_variants == sample_variants
@@ -832,7 +875,8 @@ async def _verify_and_plan(conn, approved: dict, *, lock: bool = False) -> list[
             if (course["course_website"] != route
                     or not _published_award_name_matches(
                         course["name"], original_award, scope_locations)
-                    or _norm(course.get("degree_level")) != _norm(stage.get("degree_level"))
+                    or _canonical_degree_level(course.get("degree_level"))
+                    != _canonical_degree_level(stage.get("degree_level"))
                     or _norm(course.get("study_mode")) != _norm(stage.get("study_mode"))
                     or _norm(course.get("course_location")) != _norm(stage.get("course_location"))):
                 raise ApplyRefused(f"current Course identity properties differ for ID {course['id']}")
@@ -887,7 +931,8 @@ async def _verify_and_plan(conn, approved: dict, *, lock: bool = False) -> list[
                     )
                 locations[key] = (campus, stage)
             identity_values.add((
-                university_id, route, original_award, stage["degree_level"], variant,
+                university_id, route, original_award,
+                _canonical_degree_level(stage["degree_level"]), variant,
                 stage["study_mode"], stage["fee_year"], stage["fee_term"], stage["currency"],
             ))
         expected_locations = {
@@ -918,7 +963,8 @@ async def _verify_and_plan(conn, approved: dict, *, lock: bool = False) -> list[
         for existing in existing_identity_rows:
             if (_published_award_name_matches(
                         existing["name"], original_award, existing.get("course_location"))
-                    and _norm(existing["degree_level"]) == _norm(identity_row["degree_level"])
+                    and _canonical_degree_level(existing["degree_level"])
+                    == _canonical_degree_level(identity_row["degree_level"])
                     and existing["id"] not in approved_course_ids):
                 if existing.get("offering_identity") == identity:
                     raise ApplyRefused(
@@ -941,8 +987,8 @@ async def _verify_and_plan(conn, approved: dict, *, lock: bool = False) -> list[
                     scope = (candidate.get("extraction_method") or {}).get(SCOPE) or {}
                     if (_norm(scope.get("original_name")) != _norm(original_award)
                             or candidate.get("university_id") != university_id
-                            or _norm(candidate.get("degree_level"))
-                               != _norm(identity_row["degree_level"])):
+                            or _canonical_degree_level(candidate.get("degree_level"))
+                               != _canonical_degree_level(identity_row["degree_level"])):
                         continue
                     selected = ((candidate.get("extraction_method") or {}).get(
                         "fee_variants", {}

@@ -185,6 +185,24 @@ def test_ambiguous_award_route_study_variant_or_cohort_blocks_group():
     assert manifest_for(snapshot)["groups"][0]["eligibility"] == "blocked"
 
 
+def test_authoritative_degree_canonicalizer_accepts_only_known_suffix_equivalents():
+    for published_degree, staged_degree in (
+        ("Master", "Master's"),
+        ("Bachelor", "Bachelor's"),
+    ):
+        snapshot = sample_snapshot()
+        for course, row in zip(snapshot["courses"], snapshot["evidence_rows"]):
+            course["degree_level"] = published_degree
+            row["degree_level"] = staged_degree
+        assert manifest_for(snapshot)["groups"][0]["eligibility"] == "preview_candidate"
+
+    snapshot = sample_snapshot()
+    for course, row in zip(snapshot["courses"], snapshot["evidence_rows"]):
+        course["degree_level"] = "Master"
+        row["degree_level"] = "Master Degree"
+    assert manifest_for(snapshot)["groups"][0]["eligibility"] == "blocked"
+
+
 def test_selected_fee_variant_must_belong_to_exact_scoped_campus():
     snapshot = sample_snapshot()
     snapshot["evidence_rows"][0]["extraction_method"]["fee_variants"]["selected"][0][
@@ -236,6 +254,38 @@ def test_verified_regional_fee_binds_multiple_scope_campuses_and_legacy_course_n
     }
     assert len(proposed_locations) == len(set(proposed_locations)) == 4
     assert regional_member["source_fee"]["amount"] == 18000
+
+
+def test_outside_london_authority_can_bind_one_explicit_hull_campus():
+    snapshot = sample_snapshot()
+    row, course = snapshot["evidence_rows"][0], snapshot["courses"][0]
+    row["course_location"] = "Hull"
+    row["course_name"] = "MSc Data Science — Hull"
+    row["extraction_method"]["campus_fee_scope"]["locations"] = ["Hull"]
+    course["course_location"] = "Hull"
+    course["name"] = "MSc Data Science — Hull"
+    row["extraction_method"]["fee_variants"]["selected"][0].update({
+        "campus": "Outside London", "amount": row["international_fee"],
+        "currency": row["currency"], "year": row["fee_year"],
+        "period": row["fee_term"], "source_url": row["course_website"],
+    })
+    group = manifest_for(snapshot)["groups"][0]
+    assert group["eligibility"] == "preview_candidate"
+    hull = next(member for member in group["members"] if member["course_id"] == 901)
+    assert hull["locations"] == ["Hull"]
+    assert hull["source_fee"]["amount"] == snapshot["evidence_rows"][0]["international_fee"]
+
+
+def test_arbitrary_regional_labels_and_london_scope_are_rejected():
+    for label, location in (("Outside London Campus", "Hull"), ("Outside London", "London")):
+        snapshot = sample_snapshot()
+        row, course = snapshot["evidence_rows"][0], snapshot["courses"][0]
+        row["course_location"] = location
+        row["extraction_method"]["campus_fee_scope"]["locations"] = [location]
+        course["course_location"] = location
+        row["extraction_method"]["fee_variants"]["selected"][0]["campus"] = label
+        group = manifest_for(snapshot)["groups"][0]
+        assert group["eligibility"] == "blocked"
 
 
 def test_regional_fee_binding_blocks_stale_amount_and_out_of_scope_campus():
