@@ -5,7 +5,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 
-revision = "389_course_identity_reconciliation_audit"
+revision = "389_course_identity_audit"
 down_revision = "388_course_id_aliases"
 branch_labels = None
 depends_on = None

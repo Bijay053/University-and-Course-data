@@ -221,7 +221,7 @@ async def _seed(engine, course_rows: list[dict], evidence_rows: list[dict],
             await conn.execute(text(statement))
         await conn.execute(text(
             "INSERT INTO alembic_version(version_num) VALUES "
-            "('389_course_identity_reconciliation_audit')"
+            "('389_course_identity_audit')"
         ))
         await conn.execute(text("""
             INSERT INTO universities(id, name, city, country, website, featured, featured_priority)

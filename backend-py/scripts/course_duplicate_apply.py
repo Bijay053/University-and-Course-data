@@ -840,7 +840,7 @@ async def _run(approved: dict, *, apply: bool, actor: str, expected_database: st
                     version = (await conn.execute(text(
                         "SELECT version_num FROM alembic_version"
                     ))).scalar_one_or_none()
-                    if version != "389_course_identity_reconciliation_audit":
+                    if version != "389_course_identity_audit":
                         raise ApplyRefused("required audit migration 389 is not the live schema head")
                     plans = await _verify_and_plan(conn, approved, lock=True)
                     plan_digest = sha256([{
