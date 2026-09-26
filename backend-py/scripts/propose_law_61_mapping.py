@@ -289,6 +289,7 @@ def build_proposal(mapping: dict[str, Any], mapping_digest: str,
     # Campus repeats across old parents are safe only when spelling and the
     # complete fee tuple agree exactly after normalized-campus matching.
     output_groups = []
+    campus_audits_by_parent = {}
     for cluster in EXPECTED_PARENTS:
         target_parent = cluster[0]
         source_groups = [original_by_parent[parent] for parent in cluster]
@@ -324,6 +325,36 @@ def build_proposal(mapping: dict[str, Any], mapping_digest: str,
                     f"fee conflict for duplicate normalized campus {campus_key!r} "
                     f"in cluster {cluster}"
                 )
+        campus_audit = []
+        for campus_key, observations in sorted(campus_observations.items()):
+            label = observations[0][0]
+            fee = observations[0][1]
+            historical_ids = sorted({course_id for _, _, course_id in observations})
+            staged_ids = set()
+            for course_id in historical_ids:
+                member = members_by_course[course_id]
+                staged_id = member.get("staged_row_id")
+                if isinstance(staged_id, int) and not isinstance(staged_id, bool):
+                    staged_ids.add(staged_id)
+                evidence_rows = member.get("evidence_rows")
+                if isinstance(evidence_rows, list):
+                    staged_ids.update(
+                        row["staged_row_id"] for row in evidence_rows
+                        if isinstance(row, dict)
+                        and isinstance(row.get("staged_row_id"), int)
+                        and not isinstance(row.get("staged_row_id"), bool)
+                    )
+            campus_audit.append({
+                "normalized_label": campus_key,
+                "actual_label": label,
+                "amount": fee[0],
+                "currency": fee[1],
+                "year": fee[2],
+                "term": fee[3],
+                "source_historical_course_ids": historical_ids,
+                "staged_evidence_ids": sorted(staged_ids),
+            })
+        campus_audits_by_parent[target_parent] = campus_audit
         output_groups.append({
             "parent": target_parent,
             "ids": sorted(cluster_ids),
@@ -384,7 +415,8 @@ def build_proposal(mapping: dict[str, Any], mapping_digest: str,
         "counts": proposal["summary"],
         "clusters": [
             {"parent": row["parent"], "merged_original_parents": row["merged_original_parents"],
-             "historical_ids": row["ids"], "award": row["award"]}
+             "historical_ids": row["ids"], "award": row["award"],
+             "verified_campus_fees": campus_audits_by_parent[row["parent"]]}
             for row in output_groups
         ],
         "review_instruction": (

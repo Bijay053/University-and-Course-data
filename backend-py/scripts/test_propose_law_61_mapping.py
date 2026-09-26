@@ -21,12 +21,16 @@ def fixture():
         for index, cluster in enumerate(proposal.EXPECTED_PARENTS)
         for parent in cluster
     }
+    shared_campus_ids = set()
+    for parent in proposal.EXPECTED_PARENTS[5]:
+        parent_group = next(group for group in mapping["groups"] if group["parent"] == parent)
+        shared_campus_ids.add(parent_group["ids"][0])
     for original in mapping["groups"]:
         parent = original["parent"]
         route = "sha256:" + hashlib.sha256(original["source"].encode()).hexdigest()
         members = []
         for course_id in original["ids"]:
-            campus = f"Campus {course_id}"
+            campus = "Shared Campus" if course_id in shared_campus_ids else f"Campus {course_id}"
             fee = {"amount": 20000, "currency": "GBP", "fee_year": 2026,
                    "fee_term": "Full Course"}
             members.append({
@@ -38,6 +42,8 @@ def fixture():
                 "study_variant": variant_by_parent[parent],
                 "study_mode": "On Campus",
                 "degree_level": "Bachelor",
+                "staged_row_id": course_id + 50000,
+                "evidence_rows": [{"staged_row_id": course_id + 50000}],
             })
             inventory.append({
                 "id": course_id, "university_id": 92,
@@ -112,6 +118,28 @@ def test_builds_deterministic_61_group_311_id_proposal():
     assert summary["human_review_required"] is True
     assert first["unscoped_aliases"] == mapping["unscoped_aliases"]
     assert sum(len(group["ids"]) for group in first["groups"]) == 307
+    duplicate_campus = next(cluster for cluster in summary["clusters"]
+                            if cluster["merged_original_parents"] == [9399, 9547])
+    audited = next(campus for campus in duplicate_campus["verified_campus_fees"]
+                   if campus["normalized_label"] == "shared campus")
+    assert audited == {
+        "normalized_label": "shared campus",
+        "actual_label": "Shared Campus",
+        "amount": 20000,
+        "currency": "GBP",
+        "year": 2026,
+        "term": "Full Course",
+        "source_historical_course_ids": sorted(shared_id for shared_id in [
+            next(g for g in mapping["groups"] if g["parent"] == parent)["ids"][0]
+            for parent in [9399, 9547]
+        ]),
+        "staged_evidence_ids": sorted(
+            course_id + 50000 for course_id in [
+                next(g for g in mapping["groups"] if g["parent"] == parent)["ids"][0]
+                for parent in [9399, 9547]
+            ]
+        ),
+    }
 
 
 def test_rejects_original_mapping_sha_drift(tmp_path):
