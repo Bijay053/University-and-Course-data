@@ -220,9 +220,9 @@ def _fixture(mapping: dict):
                 "existing_offering_count": 0, "alias_count": 0,
             })
             family_records = [("job-base", group["parent"])]
-            # Seventeen duplicate per-job families deliberately overlap the
-            # same component ID, making 119 baseline families but 102 components.
-            if group_index < 17 and course_id == member_ids[0]:
+            # Nineteen duplicate per-job families deliberately overlap the
+            # same component ID, making 119 baseline families but 100 components.
+            if group_index < 19 and course_id == member_ids[0]:
                 family_records.append((f"job-overlap-{group_index}", group["parent"]))
             for job_id, split_id in family_records:
                 option = {
@@ -258,8 +258,8 @@ def _fixture(mapping: dict):
                 })
                 staged_id += 1
 
-    assert len(all_ids) == 305 and len(set(all_ids)) == 305
-    assert len(evidence_rows) == 322
+    assert len(all_ids) == 307 and len(set(all_ids)) == 307
+    assert len(evidence_rows) == 326
     repeated_courses = set()
     repeat_sources = []
     for row in evidence_rows:
@@ -325,7 +325,7 @@ def _fixture(mapping: dict):
     return {
         "schema_version": 1, "reference_scan_complete": True,
         "external_reference_scan_complete": False,
-        "raw_family_count": 171, "logical_component_count": 127,
+        "raw_family_count": 171, "logical_component_count": 125,
         "evidence_rows": evidence_rows, "courses": course_rows,
     }, course_rows, evidence_rows, group_first_pair
 
@@ -409,14 +409,14 @@ def _reviewed_manifest(snapshot: dict, mapping: dict, mapping_sha: str, path: Pa
         snapshot, approved_mapping=mapping, approved_mapping_sha256=mapping_sha,
     )
     assert manifest["observed_scope"]["raw_families"] == 146
-    assert manifest["observed_scope"]["groups"] == 102
-    assert manifest["observed_scope"]["unique_course_ids"] == 305
-    assert manifest["observed_scope"]["preview_candidate_groups"] == 102
+    assert manifest["observed_scope"]["groups"] == 100
+    assert manifest["observed_scope"]["unique_course_ids"] == 307
+    assert manifest["observed_scope"]["preview_candidate_groups"] == 100
     assert all(group["eligibility"] == "preview_candidate" for group in manifest["groups"])
     manifest["approval"] = {
         "status": "approved", "revision": "629-isolated-integration-r1",
         "approved_by": "isolated PostgreSQL integration test",
-        "approved_scope": {"groups": 102, "course_ids": 305, "aliases": 203},
+        "approved_scope": {"groups": 100, "course_ids": 307, "aliases": 207},
         "approved_mapping_sha256": mapping_sha,
         "external_reference_scope": "out_of_scope_preserve_original_course_ids",
     }
@@ -504,15 +504,32 @@ def test_integration_fixture_models_119_overlapping_families_and_variant_identit
     ]
     family_count, components = preview._connected_components(approved_rows)
     assert family_count == 146
-    assert len(components) == 102
+    assert len(components) == 100
     total_families, total_components = preview._connected_components(snapshot["evidence_rows"])
     assert total_families == 171
-    assert len(total_components) == 127
+    assert len(total_components) == 125
     award_sources = {}
     for index, group in enumerate(mapping["groups"]):
         key = (group["award"], group["source"])
         award_sources.setdefault(key, set()).add(f"Isolated integration variant {index + 1}")
-    assert sum(len(variants) > 1 for variants in award_sources.values()) == 35
+    assert sum(len(variants) > 1 for variants in award_sources.values()) == 33
+
+
+def test_approved_mapping_contains_only_the_two_reviewed_group_merges():
+    mapping = json.loads(MAPPING_PATH.read_text(encoding="utf-8"))
+    groups = mapping["groups"]
+    by_parent = {group["parent"]: group for group in groups}
+
+    assert len(groups) == 100
+    assert by_parent[9389]["ids"] == [9389, 9408, 9645, 9646, 9647, 9648]
+    assert by_parent[9396]["ids"] == [9396, 9421, 9608, 9675, 9676]
+    assert not {9645, 9648, 9608, 9676} & set(by_parent)
+    changed_ids = {9645, 9648, 9608, 9676}
+    assert {
+        group["parent"] for group in groups
+        if changed_ids.intersection(group["ids"])
+    } == {9389, 9396}
+    assert len(groups) - 2 == 98
 
 
 @pytest.mark.integration
@@ -553,7 +570,7 @@ def test_task629_end_to_end_canary_schema():
                     ))
                     exported = await exporter.build_snapshot(conn)
             assert exported["raw_family_count"] == 171
-            assert exported["logical_component_count"] == 127
+            assert exported["logical_component_count"] == 125
             manifest_path = SCRIPT_DIR / f".task629-integration-{schema}.json"
             try:
                 approved = _reviewed_manifest(
@@ -562,8 +579,8 @@ def test_task629_end_to_end_canary_schema():
                 observed = approved["manifest"]["observed_scope"]
                 assert observed["raw_families"] == 146
                 assert observed["additional_approved_id_families"] == 27
-                assert observed["groups"] == 102
-                assert observed["unique_course_ids"] == 305
+                assert observed["groups"] == 100
+                assert observed["unique_course_ids"] == 307
                 assert observed["extra_course_ids"] == 25
                 assert observed["excluded_unrelated_course_ids"] == list(range(910_000, 910_025))
                 assert observed["related_extra_course_ids"] == []
@@ -739,8 +756,8 @@ def test_task629_end_to_end_canary_schema():
                         SELECT location, fee_amount FROM course_offerings
                          WHERE course_id = :course_id
                     """), {"course_id": slash_course_id})).mappings().all()
-                assert course_count == 305
-                assert alias_count == 203
+                assert course_count == 307
+                assert alias_count == 207
                 assert pathway_count == (1 if internal_pathway else 0)
                 assert fee_rows == 0
                 expected_offering_count = sum(
@@ -752,7 +769,7 @@ def test_task629_end_to_end_canary_schema():
                     })
                     for group in mapping["groups"]
                 )
-                assert offer_rows == expected_offering_count == 307
+                assert offer_rows == expected_offering_count == 309
                 assert duplicate_offering_campuses == 0
                 expected_group_zero_prices = {
                     location: next(
@@ -767,7 +784,7 @@ def test_task629_end_to_end_canary_schema():
                 }
                 assert {row["location"]: row["fee_amount"]
                         for row in group_zero_offerings} == expected_group_zero_prices
-                assert len(group_zero_offerings) == len(expected_group_zero_prices) == 4
+                assert len(group_zero_offerings) == len(expected_group_zero_prices) == 8
                 expected_hull_fee = next(
                     row["international_fee"] for row in evidence_rows
                     if row["course_id"] == hull_course_id

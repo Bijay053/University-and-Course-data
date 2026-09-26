@@ -1,13 +1,17 @@
 {
   "schema_version": 1,
-  "approval": "User approved the linked mapping of 102 courses and 203 retained old-ID aliases",
+  "approval": "User approved the revised mapping of 100 courses and 207 retained old-ID aliases after two new published IDs linked four earlier groups",
   "university_id": 92,
   "groups": [
     {
       "parent": 9389,
       "ids": [
         9389,
-        9408
+        9408,
+        9645,
+        9646,
+        9647,
+        9648
       ],
       "award": "MSc Healthcare Management",
       "source": "https://www.law.ac.uk/study/postgraduate/business/msc-healthcare-management/"
@@ -36,7 +40,10 @@
       "parent": 9396,
       "ids": [
         9396,
-        9421
+        9421,
+        9608,
+        9675,
+        9676
       ],
       "award": "LLM International Criminal Law",
       "source": "https://www.law.ac.uk/study/postgraduate/law/llm-international-criminal-law/"
@@ -872,15 +879,6 @@
       "source": "https://www.law.ac.uk/study/postgraduate/business/msc-business-analytics/"
     },
     {
-      "parent": 9608,
-      "ids": [
-        9608,
-        9675
-      ],
-      "award": "LLM International Criminal Law",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-international-criminal-law/"
-    },
-    {
       "parent": 9609,
       "ids": [
         9609,
@@ -1011,16 +1009,6 @@
       ],
       "award": "MBA with Healthcare Management",
       "source": "https://www.law.ac.uk/study/postgraduate/business/mba-with-healthcare-management/"
-    },
-    {
-      "parent": 9645,
-      "ids": [
-        9645,
-        9646,
-        9647
-      ],
-      "award": "MSc Healthcare Management",
-      "source": "https://www.law.ac.uk/study/postgraduate/business/msc-healthcare-management/"
     }
   ]
 }

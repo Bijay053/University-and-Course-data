@@ -29,7 +29,7 @@ def approved_manifest(mapping_path=APPROVED_MAPPING):
             evidence_id = staged_id
             staged_id += 1
             split_id = approved["parent"] + (
-                10000 if member_index == 0 or group_index >= 17 else 20000
+                10000 if member_index == 0 or group_index >= 19 else 20000
             )
             route_fingerprint = "sha256:" + hashlib.sha256(
                 approved["source"].encode()
@@ -98,14 +98,14 @@ def approved_manifest(mapping_path=APPROVED_MAPPING):
         "production_writes_performed": False,
         "apply_implemented": True,
         "manifest_digest_scope": "canonical JSON excluding manifest_sha256 and approval",
-        "expected_scope": {"raw_families": 119, "groups": 102, "course_ids": 305},
+        "expected_scope": {"raw_families": 119, "groups": 100, "course_ids": 307},
         "approved_mapping_sha256": map_sha,
         "external_reference_scope": "out_of_scope_preserve_original_course_ids",
         "observed_scope": {
-            "raw_families": 119, "groups": 102, "unique_course_ids": 305,
+            "raw_families": 119, "groups": 100, "unique_course_ids": 307,
             "approved_family_signature_count": 119,
             "additional_approved_id_families": 0,
-            "preview_candidate_groups": 102, "preview_candidate_course_ids": 305,
+            "preview_candidate_groups": 100, "preview_candidate_course_ids": 307,
             "blocked_groups": 0, "ignored_evidence_rows": 0,
             "coverage_matches_approved_mapping": True, "coverage_matches_expected": True,
         },
@@ -118,7 +118,7 @@ def approved_manifest(mapping_path=APPROVED_MAPPING):
         "status": "approved",
         "revision": "629-r1",
         "approved_by": "Task #629 mapping reviewer",
-        "approved_scope": {"groups": 102, "course_ids": 305, "aliases": 203},
+        "approved_scope": {"groups": 100, "course_ids": 307, "aliases": 207},
         "approved_mapping_sha256": map_sha,
         "external_reference_scope": "out_of_scope_preserve_original_course_ids",
     }
@@ -145,9 +145,9 @@ def load(tmp_path, value):
 def test_authoritative_mapping_fingerprint_and_all_explicit_rows_are_required(tmp_path):
     value, _ = approved_manifest()
     approved = load(tmp_path, value)
-    assert len(approved["groups"]) == 102
-    assert len(approved["course_ids"]) == 305
-    assert len(approved["staged_ids"]) == 305
+    assert len(approved["groups"]) == 100
+    assert len(approved["course_ids"]) == 307
+    assert len(approved["staged_ids"]) == 307
     assert approved["manifest"]["external_reference_scan_complete"] is False
 
 

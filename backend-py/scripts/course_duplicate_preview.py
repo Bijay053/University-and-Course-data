@@ -37,8 +37,8 @@ from typing import Any
 
 SCHEMA_VERSION = 1
 EXPECTED_RAW_FAMILIES = 119
-EXPECTED_GROUPS = 102
-EXPECTED_COURSE_IDS = 305
+EXPECTED_GROUPS = 100
+EXPECTED_COURSE_IDS = 307
 MAX_INPUT_BYTES = 32 * 1024 * 1024
 MAX_EVIDENCE_ROWS = 20_000
 MAX_COURSES = 10_000
@@ -296,7 +296,7 @@ def _scope_evidence(evidence: dict[str, Any]) -> dict[str, Any] | None:
 
 def validate_approved_mapping(value: Any, *, expected_groups: int = EXPECTED_GROUPS,
                               expected_course_ids: int = EXPECTED_COURSE_IDS,
-                              expected_aliases: int = 203) -> dict[str, Any]:
+                              expected_aliases: int = 207) -> dict[str, Any]:
     """Validate the user-approved ID/source manifest, not a scrape-derived guess."""
     if not isinstance(value, dict) or value.get("schema_version") != 1:
         raise SnapshotError("approved mapping must be schema_version 1 JSON")
@@ -967,8 +967,8 @@ def build_review_manifest(snapshot: dict[str, Any], *,
             reasons.append("overlap-connected component differs from approved JSON ID group")
         if not coverage_ok:
             reasons.append(
-                "approved-ID inventory must match the 119-family baseline / 102 components / "
-                "305 IDs; excess families must repeat approved-ID signatures"
+                f"approved-ID inventory must match the {expected_families}-family baseline / "
+                f"{expected_groups} components / {expected_course_ids} IDs; excess families must repeat approved-ID signatures"
             )
         if extra_conflicts.get(approved["parent"]):
             ids_text = ", ".join(str(value) for value in sorted(
@@ -1072,10 +1072,10 @@ def build_review_manifest(snapshot: dict[str, Any], *,
         "external_reference_scan_complete": snapshot.get("external_reference_scan_complete") is True,
         "groups": groups,
         "review_instructions": [
-            "The approved JSON file is authoritative for the 102 logical groups, awards, URLs, and 305 IDs.",
+            f"The approved JSON file is authoritative for the {expected_groups} logical groups, awards, URLs, and {expected_course_ids} IDs.",
             "The 119-family baseline may grow only through additional families containing approved IDs from one mapped component; all rows must agree on identity, cohort, and campuses.",
             "Review every staged row fingerprint, source fee, campus, and cross-run cohort before applying.",
-            "All original course IDs and course rows are retained; 203 aliases are compatibility mappings only.",
+            f"All original course IDs and course rows are retained; {expected_course_ids - expected_groups} aliases are compatibility mappings only.",
             "External application-portal references are explicitly out of scope and were not scanned or cleared.",
             "Final approval must bind this manifest digest, the approved mapping digest, reviewer, revision, scope, and preserve-ID out-of-scope policy.",
         ],

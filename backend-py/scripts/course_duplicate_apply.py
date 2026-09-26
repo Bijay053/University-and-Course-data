@@ -2,7 +2,7 @@
 """Dry-run or explicitly apply the reviewed task #629 course-ID mapping.
 
 This command never discovers mapping members. The approved JSON mapping is
-authoritative for 102 logical components, 305 existing IDs, 203 aliases, award
+authoritative for 100 logical components, 307 existing IDs, 207 aliases, award
 names, and source URLs. The enriched manifest explicitly fingerprints every
 staged row across at least the 119-family approved baseline. The live database is
 consulted solely to verify those exact IDs and reject stale/conflicting evidence.
@@ -50,9 +50,9 @@ from course_duplicate_preview import (
 )
 
 
-EXPECTED_GROUPS = 102
-EXPECTED_COURSE_IDS = 305
-EXPECTED_ALIAS_COUNT = 203
+EXPECTED_GROUPS = 100
+EXPECTED_COURSE_IDS = 307
+EXPECTED_ALIAS_COUNT = 207
 MANIFEST_VERSION = 1
 SCOPE = "campus_fee_scope"
 IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_$]*$")
@@ -160,7 +160,7 @@ def load_approved_manifest(path: Path, expected_file_sha: str,
     if manifest.get("approved_mapping_sha256") != expected_mapping_sha:
         raise ApplyRefused("manifest was not generated from the explicitly approved mapping file")
     if manifest.get("expected_scope") != {
-            "raw_families": 119, "groups": 102, "course_ids": 305}:
+            "raw_families": 119, "groups": EXPECTED_GROUPS, "course_ids": EXPECTED_COURSE_IDS}:
         raise ApplyRefused("manifest expected scope is not the approved task #629 cohort")
     observed = manifest.get("observed_scope")
     if (not isinstance(observed, dict) or observed.get("groups") != EXPECTED_GROUPS
@@ -172,7 +172,7 @@ def load_approved_manifest(path: Path, expected_file_sha: str,
             or observed.get("coverage_matches_expected") is not True):
         raise ApplyRefused(
             "review report does not certify a verified 119+ family inventory / "
-            "102 components / 305 IDs"
+            f"{EXPECTED_GROUPS} components / {EXPECTED_COURSE_IDS} IDs"
         )
     approval = manifest.get("approval")
     if not isinstance(approval, dict) or approval.get("status") != "approved":
@@ -203,7 +203,10 @@ def load_approved_manifest(path: Path, expected_file_sha: str,
         "aliases": EXPECTED_ALIAS_COUNT,
     }
     if approval.get("approved_scope") != expected_scope:
-        raise ApplyRefused("approval scope must explicitly certify 102 groups, 305 IDs, 203 aliases")
+        raise ApplyRefused(
+            f"approval scope must explicitly certify {EXPECTED_GROUPS} groups, "
+            f"{EXPECTED_COURSE_IDS} IDs, {EXPECTED_ALIAS_COUNT} aliases"
+        )
 
     approved_by_parent = {group["parent"]: group for group in approved_mapping["groups"]}
     all_courses: list[int] = []
@@ -368,7 +371,9 @@ def load_approved_manifest(path: Path, expected_file_sha: str,
             or len(seen_raw_families) != observed["raw_families"]
             or len(all_staged) < EXPECTED_COURSE_IDS
             or len(set(all_staged)) != len(all_staged)):
-        raise ApplyRefused("manifest must identify all 305 IDs and every unique staged evidence row")
+        raise ApplyRefused(
+            f"manifest must identify all {EXPECTED_COURSE_IDS} IDs and every unique staged evidence row"
+        )
     return {
         "manifest": manifest,
         "groups": normalized_groups,
