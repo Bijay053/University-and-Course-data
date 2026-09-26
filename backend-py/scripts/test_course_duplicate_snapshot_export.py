@@ -70,7 +70,11 @@ def test_scope_and_fee_variant_projection_omits_unapproved_json_keys():
     }
     assert variant == {
         "status": "uniform",
-        "selected": [{"study_variant": "Standard", "campus": "London"}],
+        "selected": [{
+            "study_variant": "Standard", "campus": "London", "amount": 100,
+            "currency": None, "year": None, "period": None, "source_url": None,
+        }],
+        "validated_uniform_authority": False,
     }
 
 
@@ -113,8 +117,13 @@ def test_candidate_query_is_parameterized_and_projects_only_allowed_fields():
     assert rows[0]["course_website"].startswith("sha256:")
     assert route not in str(rows)
     assert "split_actor" not in str(rows)
-    assert "amount" not in str(rows[0]["extraction_method"]["fee_variants"])
-    assert rows[0]["extraction_method"]["fee_variants"]["selected"][0]["campus"] == "London"
+    selected = rows[0]["extraction_method"]["fee_variants"]["selected"][0]
+    assert selected["campus"] == "London"
+    assert selected["amount"] == 10000
+    assert rows[0]["extraction_method"]["fee_variants"][
+        "validated_uniform_authority"
+    ] is False
+    assert "private" not in str(rows[0]["extraction_method"]["fee_variants"])
 
 
 def test_unknown_or_composite_course_foreign_keys_fail_closed():

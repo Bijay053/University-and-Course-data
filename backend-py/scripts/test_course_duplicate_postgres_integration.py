@@ -154,10 +154,27 @@ def _fixture(mapping: dict):
             group_first_pair = member_ids[:2]
         for course_id in member_ids:
             all_ids.append(course_id)
-            location = f"Canary campus {course_id}"
-            fee = float(10_000 + (course_id % 1_000))
+            if group_index == 0 and course_id == 9389:
+                scope_locations = ["Birmingham", "Leeds", "Manchester"]
+                location = ", ".join(scope_locations)
+                name_location = "Birmingham"
+                fee_campus = "Outside London"
+                fee = 13_500.0
+            elif group_index == 0 and course_id == 9408:
+                location = "London"
+                scope_locations = ["London"]
+                name_location = location
+                fee_campus = "London"
+                fee = float(10_000 + (course_id % 1_000))
+            else:
+                location = f"Canary campus {course_id}"
+                scope_locations = [location]
+                name_location = location
+                fee_campus = location
+                fee = float(10_000 + (course_id % 1_000))
             course_rows.append({
-                "id": course_id, "university_id": 92, "name": group["award"],
+                "id": course_id, "university_id": 92,
+                "name": f"{group['award']} — {name_location}",
                 "course_website": group["source"], "degree_level": degree,
                 "study_mode": "Full-time", "course_location": location,
                 "status": "active", "approval_status": "approved",
@@ -172,13 +189,13 @@ def _fixture(mapping: dict):
                 family_records.append((f"job-overlap-{group_index}", group["parent"]))
             for job_id, split_id in family_records:
                 option = {
-                    "amount": fee, "currency": "GBP", "campus": location,
+                    "amount": fee, "currency": "GBP", "campus": fee_campus,
                     "study_variant": variant, "year": 2026, "period": "Annual",
                     "source_url": group["source"],
                     "snippet": f"International Students | 2026 | {variant} | {location}: £{fee}",
                 }
                 scope = {
-                    "original_name": group["award"], "locations": [location],
+                    "original_name": group["award"], "locations": scope_locations,
                     "key": f"scope-{course_id}", "source_url": group["source"],
                     "split_from_id": split_id,
                 }
@@ -186,7 +203,7 @@ def _fixture(mapping: dict):
                     "id": staged_id, "scrape_job_id": job_id,
                     "university_id": 92, "course_id": course_id,
                     "status": "published",
-                    "course_name": f"{group['award']} — {location}",
+                    "course_name": f"{group['award']} — {name_location}",
                     "course_location": location, "course_website": group["source"],
                     "degree_level": degree, "study_mode": "Full-time",
                     "international_fee": fee, "fee_year": 2026,
@@ -206,10 +223,58 @@ def _fixture(mapping: dict):
 
     assert len(all_ids) == 305 and len(set(all_ids)) == 305
     assert len(evidence_rows) == 322
+    for extra_index in range(25):
+        course_id = 910_000 + extra_index
+        location = f"Unrelated campus {extra_index + 1}"
+        award = f"Unrelated course family {extra_index + 1}"
+        source = f"https://unrelated.example.test/courses/{extra_index + 1}"
+        fee = float(20_000 + extra_index)
+        course_rows.append({
+            "id": course_id, "university_id": 92, "name": f"{award} — {location}",
+            "course_website": source, "degree_level": "Master",
+            "study_mode": "Full-time", "course_location": location,
+            "status": "active", "approval_status": "approved",
+            "offering_identity": None, "field_approval_counts": {"name": 1},
+            "reference_counts": {}, "outside_reference_count": 0,
+            "existing_offering_count": 0, "alias_count": 0,
+        })
+        family_count = 3 if extra_index < 2 else 2
+        for family_index in range(family_count):
+            job_id = f"unrelated-job-{extra_index}-{family_index}"
+            scope = {
+                "original_name": award, "locations": [location],
+                "key": f"unrelated-scope-{course_id}",
+                "source_url": source, "split_from_id": course_id,
+            }
+            option = {
+                "amount": fee, "currency": "GBP", "campus": location,
+                "study_variant": f"Unrelated variant {extra_index + 1}",
+                "year": 2026, "period": "Annual", "source_url": source,
+                "snippet": f"International Students | 2026 | {award} | {location}: £{fee}",
+            }
+            evidence_rows.append({
+                "id": staged_id, "scrape_job_id": job_id, "university_id": 92,
+                "course_id": course_id, "status": "published",
+                "course_name": f"{award} — {location}", "course_location": location,
+                "course_website": source, "degree_level": "Master",
+                "study_mode": "Full-time", "international_fee": fee,
+                "fee_year": 2026, "fee_term": "Annual", "currency": "GBP",
+                "fee_scope_key": scope["key"],
+                "extraction_method": {
+                    "campus_fee_scope": scope,
+                    "international_fee": "fee.ulaw_course_authority",
+                    "fee_variants": {
+                        "status": "uniform", "selected": [option], "options": [option],
+                        "fee_year": 2026, "fee_term": "Annual", "currency": "GBP",
+                        "international_fee": fee,
+                    },
+                },
+            })
+            staged_id += 1
     return {
         "schema_version": 1, "reference_scan_complete": True,
         "external_reference_scan_complete": False,
-        "raw_family_count": 119, "logical_component_count": 102,
+        "raw_family_count": 171, "logical_component_count": 127,
         "evidence_rows": evidence_rows, "courses": course_rows,
     }, course_rows, evidence_rows, group_first_pair
 
@@ -261,10 +326,17 @@ async def _seed(engine, course_rows: list[dict], evidence_rows: list[dict],
                  CAST(:extraction_method AS jsonb))
         """), stage_payloads)
         fee_rows = []
+        staged_fee_by_course = {
+            row["course_id"]: row for row in evidence_rows
+        }
         for row in course_rows:
+            source_fee = staged_fee_by_course[row["id"]]
             fee_rows.append({
-                "course_id": row["id"], "international_fee": float(10_000 + row["id"] % 1_000),
-                "currency": "GBP", "fee_term": "Annual", "fee_year": 2026,
+                "course_id": row["id"],
+                "international_fee": source_fee["international_fee"],
+                "currency": source_fee["currency"],
+                "fee_term": source_fee["fee_term"],
+                "fee_year": source_fee["fee_year"],
             })
         await conn.execute(text("""
             INSERT INTO fees(course_id, international_fee, currency, fee_term, fee_year)
@@ -375,9 +447,16 @@ def test_integration_fixture_models_119_overlapping_families_and_variant_identit
     mapping_bytes = MAPPING_PATH.read_bytes()
     mapping = json.loads(mapping_bytes)
     snapshot, _, _, _ = _fixture(mapping)
-    family_count, components = preview._connected_components(snapshot["evidence_rows"])
+    approved_ids = {course_id for group in mapping["groups"] for course_id in group["ids"]}
+    approved_rows = [
+        row for row in snapshot["evidence_rows"] if row["course_id"] in approved_ids
+    ]
+    family_count, components = preview._connected_components(approved_rows)
     assert family_count == 119
     assert len(components) == 102
+    total_families, total_components = preview._connected_components(snapshot["evidence_rows"])
+    assert total_families == 171
+    assert len(total_components) == 127
     award_sources = {}
     for index, group in enumerate(mapping["groups"]):
         key = (group["award"], group["source"])
@@ -422,13 +501,20 @@ def test_task629_end_to_end_canary_schema():
                         "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY"
                     ))
                     exported = await exporter.build_snapshot(conn)
-            assert exported["raw_family_count"] == 119
-            assert exported["logical_component_count"] == 102
+            assert exported["raw_family_count"] == 171
+            assert exported["logical_component_count"] == 127
             manifest_path = SCRIPT_DIR / f".task629-integration-{schema}.json"
             try:
                 approved = _reviewed_manifest(
                     exported, mapping, mapping_sha, manifest_path,
                 )
+                observed = approved["manifest"]["observed_scope"]
+                assert observed["raw_families"] == 119
+                assert observed["groups"] == 102
+                assert observed["unique_course_ids"] == 305
+                assert observed["extra_course_ids"] == 25
+                assert observed["excluded_unrelated_course_ids"] == list(range(910_000, 910_025))
+                assert observed["related_extra_course_ids"] == []
                 duplicate_group = mapping["groups"][0]
                 mapped_variant = f"Isolated integration variant 1"
                 await _insert_unreviewed_same_award_course(
@@ -442,6 +528,85 @@ def test_task629_end_to_end_canary_schema():
                         _test_schema=schema,
                     )
                 await _remove_unreviewed_course(test_engine, 900_001)
+
+                await _insert_unreviewed_same_award_course(
+                    test_engine, duplicate_group, course_id=900_003,
+                    staged_id=900_103, variant="Different full-time variant",
+                )
+                async with test_engine.begin() as conn:
+                    await conn.execute(text("""
+                        UPDATE courses SET course_location = 'Leeds' WHERE id = 900003
+                    """))
+                    await conn.execute(text("""
+                        UPDATE scraped_courses
+                           SET course_location = 'Leeds',
+                               course_name = :course_name,
+                               extraction_method = jsonb_set(
+                                   extraction_method,
+                                   '{campus_fee_scope,locations}',
+                                   '["Birmingham","Leeds","Manchester"]'::jsonb
+                               )
+                         WHERE id = 900103
+                    """), {
+                        "course_name": f"{duplicate_group['award']} — Leeds",
+                    })
+                with pytest.raises(apply_tool.ApplyRefused, match="award/source/campus scope"):
+                    await apply_tool._run(
+                        approved, apply=False, actor="", expected_database=db_name,
+                        confirm_write=False, _test_database_url=database_url,
+                        _test_schema=schema,
+                    )
+                await _remove_unreviewed_course(test_engine, 900_003)
+
+                stale_row = evidence_rows[0]
+                original_metadata = json.dumps(stale_row["extraction_method"])
+                async with test_engine.begin() as conn:
+                    await conn.execute(text("""
+                        UPDATE scraped_courses
+                           SET extraction_method = jsonb_set(
+                               extraction_method,
+                               '{fee_variants,selected,0,amount}',
+                               to_jsonb(international_fee + 1)
+                           )
+                         WHERE id = :id
+                    """), {"id": stale_row["id"]})
+                with pytest.raises(apply_tool.ApplyRefused, match="changed after review"):
+                    await apply_tool._run(
+                        approved, apply=False, actor="", expected_database=db_name,
+                        confirm_write=False, _test_database_url=database_url,
+                        _test_schema=schema,
+                    )
+                async with test_engine.begin() as conn:
+                    await conn.execute(text("""
+                        UPDATE scraped_courses SET extraction_method = CAST(:metadata AS jsonb)
+                         WHERE id = :id
+                    """), {"id": stale_row["id"], "metadata": original_metadata})
+
+                legacy_course_id = 9389
+                original_legacy_fee = next(
+                    row["international_fee"] for row in evidence_rows
+                    if row["course_id"] == legacy_course_id
+                )
+                async with test_engine.begin() as conn:
+                    await conn.execute(text("""
+                        UPDATE fees SET international_fee = international_fee + 1
+                         WHERE course_id = :course_id
+                    """), {"course_id": legacy_course_id})
+                with pytest.raises(apply_tool.ApplyRefused, match="published legacy fee differs"):
+                    await apply_tool._run(
+                        approved, apply=False, actor="", expected_database=db_name,
+                        confirm_write=False, _test_database_url=database_url,
+                        _test_schema=schema,
+                    )
+                async with test_engine.connect() as conn:
+                    assert (await conn.execute(text(
+                        "SELECT count(*) FROM course_offerings"
+                    ))).scalar_one() == 0
+                async with test_engine.begin() as conn:
+                    await conn.execute(text("""
+                        UPDATE fees SET international_fee = :amount
+                         WHERE course_id = :course_id
+                    """), {"course_id": legacy_course_id, "amount": original_legacy_fee})
 
                 alternate_variant_course = 900_002
                 await _insert_unreviewed_same_award_course(
@@ -487,11 +652,48 @@ def test_task629_end_to_end_canary_schema():
                     offer_rows = (await conn.execute(text(
                         "SELECT count(*) FROM course_offerings"
                     ))).scalar_one()
+                    duplicate_offering_campuses = (await conn.execute(text("""
+                        SELECT count(*) FROM (
+                            SELECT course_id, location_key
+                              FROM course_offerings
+                             GROUP BY course_id, location_key
+                            HAVING count(*) > 1
+                        ) duplicate_campuses
+                    """))).scalar_one()
+                    group_zero_id = duplicate_group["parent"]
+                    group_zero_offerings = (await conn.execute(text("""
+                        SELECT location, fee_amount FROM course_offerings
+                         WHERE course_id = :course_id ORDER BY location
+                    """), {"course_id": group_zero_id})).mappings().all()
                 assert course_count == 305
                 assert alias_count == 203
                 assert pathway_count == (1 if internal_pathway else 0)
                 assert fee_rows == 0
-                assert offer_rows == 305
+                expected_offering_count = sum(
+                    len({
+                        location
+                        for course_id in group["ids"]
+                        for row in evidence_rows if row["course_id"] == course_id
+                        for location in row["extraction_method"]["campus_fee_scope"]["locations"]
+                    })
+                    for group in mapping["groups"]
+                )
+                assert offer_rows == expected_offering_count == 307
+                assert duplicate_offering_campuses == 0
+                expected_group_zero_prices = {
+                    location: next(
+                        row["international_fee"] for row in evidence_rows
+                        if row["course_id"] == course_id
+                    )
+                    for course_id in duplicate_group["ids"]
+                    for location in next(
+                        row["extraction_method"]["campus_fee_scope"]["locations"]
+                        for row in evidence_rows if row["course_id"] == course_id
+                    )
+                }
+                assert {row["location"]: row["fee_amount"]
+                        for row in group_zero_offerings} == expected_group_zero_prices
+                assert len(group_zero_offerings) == len(expected_group_zero_prices) == 4
 
                 from app.routers.search import search_courses
 

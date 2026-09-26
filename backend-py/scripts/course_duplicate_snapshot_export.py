@@ -13,6 +13,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 import re
 import ssl
 import sys
@@ -86,24 +87,42 @@ def _safe_label(value: Any, label: str, *, max_length: int = 500) -> str | None:
     return value
 
 
-def _json_safe_fee_variant(raw: Any) -> dict[str, Any]:
+def _json_safe_fee_variant(raw: Any, *, authority_verified: bool = False) -> dict[str, Any]:
     if not isinstance(raw, dict):
-        return {"status": None, "selected": []}
+        return {
+            "status": None, "selected": [],
+            "validated_uniform_authority": False,
+        }
     selected = raw.get("selected")
     safe_selected = []
     if isinstance(selected, list):
         for item in selected:
             if isinstance(item, dict):
                 variant = item.get("study_variant")
+                amount = item.get("amount")
+                if (isinstance(amount, bool) or not isinstance(amount, (int, float))
+                        or not math.isfinite(amount)):
+                    amount = None
+                year = item.get("year")
+                if not isinstance(year, int) or isinstance(year, bool):
+                    year = None
                 safe_selected.append({
                     "study_variant": _safe_label(variant, "study variant"),
                     "campus": _safe_label(item.get("campus"), "fee option campus",
                                           max_length=200),
+                    "amount": amount,
+                    "currency": _safe_label(item.get("currency"), "fee option currency",
+                                            max_length=3),
+                    "year": year,
+                    "period": _safe_label(item.get("period"), "fee option period",
+                                          max_length=40),
+                    "source_url": _digest_route(item.get("source_url")),
                 })
     status = raw.get("status")
     return {
         "status": _safe_label(status, "fee evidence status", max_length=40),
         "selected": safe_selected,
+        "validated_uniform_authority": authority_verified,
     }
 
 
@@ -138,7 +157,8 @@ async def _candidate_evidence(conn: AsyncConnection) -> list[dict[str, Any]]:
                course_location, course_website, degree_level, study_mode,
                international_fee, fee_year, fee_term, currency, fee_scope_key,
                extraction_method->'campus_fee_scope' AS campus_fee_scope,
-               extraction_method->'fee_variants' AS fee_variants
+                extraction_method->'fee_variants' AS fee_variants,
+                extraction_method->>'international_fee' AS fee_authority_method
           FROM scraped_courses
          WHERE status IN (:approved, :published)
            AND university_id = :university_id
@@ -163,7 +183,20 @@ async def _candidate_evidence(conn: AsyncConnection) -> list[dict[str, Any]]:
     for row in rows:
         route_hash = _digest_route(row.get("course_website"))
         scope = _json_safe_scope(row.get("campus_fee_scope"), route_hash)
-        variants = _json_safe_fee_variant(row.get("fee_variants"))
+        from app.services.scraper.extractors.ulaw_fees import validated_fee_variants
+
+        validation_row = dict(row)
+        validation_row["extraction_method"] = {
+            "international_fee": row.get("fee_authority_method"),
+            "fee_variants": row.get("fee_variants"),
+        }
+        validated_authority = validated_fee_variants(validation_row)
+        variants = _json_safe_fee_variant(
+            row.get("fee_variants"),
+            authority_verified=bool(
+                validated_authority and validated_authority.get("status") == "uniform"
+            ),
+        )
         currency = _safe_label(row.get("currency"), "fee currency", max_length=3)
         if currency is not None and not re.fullmatch(r"[A-Z]{3}", currency):
             raise ExportRefused("fee currency is outside the safe three-letter format")
@@ -248,6 +281,47 @@ async def _simple_counts(conn: AsyncConnection, table: str, column: str,
     ).bindparams(bindparam("course_ids", expanding=True))
     result = await conn.execute(stmt, {"course_ids": course_ids})
     return {row["course_id"]: int(row["row_count"]) for row in result.mappings()}
+
+
+def _safe_legacy_fee_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    safe_rows = []
+    for row in sorted(rows, key=lambda item: item["id"]):
+        amount = row.get("international_fee")
+        try:
+            amount = float(amount) if amount is not None else None
+        except (TypeError, ValueError, OverflowError):
+            amount = None
+        if amount is not None and not math.isfinite(amount):
+            amount = None
+        safe_rows.append({
+            "id": row["id"],
+            "amount": amount,
+            "currency": _safe_label(row.get("currency"), "legacy fee currency", max_length=3),
+            "fee_term": _safe_label(row.get("fee_term"), "legacy fee term", max_length=40),
+            "fee_year": row.get("fee_year"),
+        })
+    return safe_rows
+
+
+async def _legacy_fee_rows(
+    conn: AsyncConnection, course_ids: list[int],
+) -> dict[int, list[dict[str, Any]]]:
+    if not course_ids:
+        return {}
+    stmt = text("""
+        SELECT id, course_id, international_fee, currency, fee_term, fee_year
+          FROM fees
+         WHERE course_id IN :course_ids
+         ORDER BY course_id, id
+    """).bindparams(bindparam("course_ids", expanding=True))
+    rows = (await conn.execute(stmt, {"course_ids": course_ids})).mappings().all()
+    grouped: dict[int, list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        grouped[row["course_id"]].append(dict(row))
+    return {
+        course_id: _safe_legacy_fee_rows(fee_rows)
+        for course_id, fee_rows in grouped.items()
+    }
 
 
 async def _alias_counts(conn: AsyncConnection, course_ids: list[int]) -> dict[int, int]:
@@ -469,6 +543,7 @@ async def build_snapshot(conn: AsyncConnection) -> dict[str, Any]:
         raise ExportRefused(f"published course count exceeds {MAX_COURSE_ROWS}")
 
     courses = await _courses(conn, course_ids)
+    legacy_fees = await _legacy_fee_rows(conn, course_ids)
     approvals = await _field_approval_counts(conn, course_ids)
     offerings = await _simple_counts(conn, "course_offerings", "course_id", course_ids)
     aliases = await _alias_counts(conn, course_ids)
@@ -486,6 +561,7 @@ async def build_snapshot(conn: AsyncConnection) -> dict[str, Any]:
         course["outside_reference_count"] = int(outside.get(course_id, 0))
         course["existing_offering_count"] = int(offerings.get(course_id, 0))
         course["alias_count"] = int(aliases.get(course_id, 0))
+        course["legacy_fee_rows"] = legacy_fees.get(course_id, [])
 
     return {
         "schema_version": SCHEMA_VERSION,

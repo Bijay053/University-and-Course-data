@@ -50,7 +50,12 @@ def sample_snapshot():
                 "campus_fee_scope": scope,
                 "fee_variants": {
                     "status": "uniform",
-                    "selected": [{"study_variant": "Standard", "campus": location}],
+                    "selected": [{
+                        "study_variant": "Standard", "campus": location,
+                        "amount": fee, "currency": "GBP", "year": 2026,
+                        "period": "Annual", "source_url": scope["source_url"],
+                    }],
+                    "validated_uniform_authority": True,
                 },
                 "private_payload": "SHOULD_NOT_APPEAR",
             },
@@ -71,6 +76,10 @@ def sample_snapshot():
             "outside_reference_count": 0,
             "existing_offering_count": 0,
             "alias_count": 0,
+            "legacy_fee_rows": [{
+                "id": 1000 + course_id, "amount": fee,
+                "currency": "GBP", "fee_year": 2026, "fee_term": "Annual",
+            }],
         })
     return {
         "schema_version": 1,
@@ -112,6 +121,14 @@ def test_safe_group_is_a_review_candidate_with_explicit_mapping_and_hashes():
     assert manifest["apply_implemented"] is True
 
 
+def test_legacy_fee_mismatch_blocks_repricing_before_preview_approval():
+    snapshot = sample_snapshot()
+    snapshot["courses"][0]["legacy_fee_rows"][0]["amount"] += 1
+    group = manifest_for(snapshot)["groups"][0]
+    assert group["eligibility"] == "blocked"
+    assert any("published legacy fee" in reason for reason in group["blocking_reasons"])
+
+
 def test_conflicting_fees_for_same_location_are_blocked():
     snapshot = sample_snapshot()
     duplicate = copy.deepcopy(snapshot["evidence_rows"][1])
@@ -130,7 +147,7 @@ def test_conflicting_fees_for_same_location_are_blocked():
     manifest = manifest_for(snapshot)
     group = manifest["groups"][0]
     assert group["eligibility"] == "blocked"
-    assert any("component IDs differ" in reason for reason in group["blocking_reasons"])
+    assert any("out-of-map course IDs" in reason for reason in group["blocking_reasons"])
     assert group["proposed_mapping"] == []
 
 
@@ -177,6 +194,125 @@ def test_selected_fee_variant_must_belong_to_exact_scoped_campus():
     assert group["eligibility"] == "blocked"
     assert any("selected fee option campus differs" in reason
                for reason in group["blocking_reasons"])
+
+
+def test_verified_regional_fee_binds_multiple_scope_campuses_and_legacy_course_names():
+    snapshot = sample_snapshot()
+    locations = ["Birmingham", "Leeds", "Manchester"]
+    row, course = snapshot["evidence_rows"][0], snapshot["courses"][0]
+    joined = ", ".join(locations)
+    row["course_location"] = joined
+    row["course_name"] = "MSc Data Science — Birmingham"
+    row["international_fee"] = 18000
+    row["extraction_method"]["campus_fee_scope"]["locations"] = locations
+    course["course_location"] = joined
+    course["name"] = "MSc Data Science — Birmingham"
+    course["legacy_fee_rows"][0]["amount"] = 18000
+    selected = row["extraction_method"]["fee_variants"]["selected"][0]
+    selected.update({
+        "campus": "Outside London", "amount": 18000, "currency": "GBP",
+        "year": 2026, "period": "Annual", "source_url": row["course_website"],
+    })
+
+    row, course = snapshot["evidence_rows"][1], snapshot["courses"][1]
+    row["course_location"] = "London"
+    row["course_name"] = "MSc Data Science — London"
+    row["extraction_method"]["campus_fee_scope"]["locations"] = ["London"]
+    course["course_location"] = "London"
+    course["name"] = "MSc Data Science — London"
+    row["extraction_method"]["fee_variants"]["selected"][0]["campus"] = "London"
+    group = manifest_for(snapshot)["groups"][0]
+    assert group["eligibility"] == "preview_candidate"
+    regional_member = next(member for member in group["members"] if member["course_id"] == 901)
+    assert regional_member["location"] == joined
+    assert regional_member["locations"] == locations
+    assert [proof["location"] for proof in regional_member["location_evidence"]] == locations
+    proposed_locations = [
+        location for mapping in group["proposed_mapping"]
+        for location in mapping["offering_locations"]
+    ]
+    assert set(proposed_locations) == {
+        "Birmingham", "Leeds", "Manchester", "London",
+    }
+    assert len(proposed_locations) == len(set(proposed_locations)) == 4
+    assert regional_member["source_fee"]["amount"] == 18000
+
+
+def test_regional_fee_binding_blocks_stale_amount_and_out_of_scope_campus():
+    snapshot = sample_snapshot()
+    row = snapshot["evidence_rows"][0]
+    row["course_location"] = "Birmingham, Leeds, Manchester"
+    row["extraction_method"]["campus_fee_scope"]["locations"] = [
+        "Birmingham", "Leeds", "Manchester",
+    ]
+    selected = row["extraction_method"]["fee_variants"]["selected"][0]
+    selected.update({
+        "campus": "Outside London", "amount": row["international_fee"] + 1,
+        "currency": "GBP", "year": 2026, "period": "Annual",
+        "source_url": row["course_website"],
+    })
+    row["extraction_method"]["fee_variants"]["validated_uniform_authority"] = True
+    group = manifest_for(snapshot)["groups"][0]
+    assert group["eligibility"] == "blocked"
+
+    snapshot = sample_snapshot()
+    row = snapshot["evidence_rows"][0]
+    course = snapshot["courses"][0]
+    row["course_location"] = "Birmingham"
+    row["extraction_method"]["campus_fee_scope"]["locations"] = [
+        "Birmingham", "Leeds", "Manchester",
+    ]
+    course["course_location"] = "Birmingham"
+    selected = row["extraction_method"]["fee_variants"]["selected"][0]
+    selected.update({
+        "campus": "Outside London", "amount": row["international_fee"],
+        "currency": row["currency"], "year": row["fee_year"],
+        "period": row["fee_term"], "source_url": row["course_website"],
+    })
+    group = manifest_for(snapshot)["groups"][0]
+    assert group["eligibility"] == "blocked"
+    assert any("outside its authoritative scope locations" in reason
+               for reason in group["blocking_reasons"])
+
+    snapshot = sample_snapshot()
+    row = snapshot["evidence_rows"][0]
+    row["course_location"] = "York"
+    row["extraction_method"]["campus_fee_scope"]["locations"] = [
+        "Birmingham", "Leeds", "Manchester",
+    ]
+    group = manifest_for(snapshot)["groups"][0]
+    assert group["eligibility"] == "blocked"
+
+
+def test_unrelated_extra_id_is_inventory_only_but_related_extra_id_blocks():
+    snapshot = sample_snapshot()
+    extra = copy.deepcopy(snapshot["evidence_rows"][0])
+    extra.update({
+        "id": 704, "course_id": 903, "course_location": "Bristol",
+        "course_name": "MSc Unrelated — Bristol",
+        "course_website": "sha256:" + preview.hashlib.sha256(
+            b"https://other.example.edu/course"
+        ).hexdigest(),
+        "scrape_job_id": "job-extra",
+    })
+    extra_scope = extra["extraction_method"]["campus_fee_scope"]
+    extra_scope.update({
+        "original_name": "MSc Unrelated", "locations": ["Bristol"],
+        "source_url": extra["course_website"], "split_from_id": 903,
+    })
+    extra_scope["key"] = extra["fee_scope_key"] = "extra-scope"
+    extra["extraction_method"]["fee_variants"]["selected"][0]["campus"] = "Bristol"
+    snapshot["evidence_rows"].append(extra)
+    extra_course = copy.deepcopy(snapshot["courses"][0])
+    extra_course.update({
+        "id": 903, "name": "MSc Unrelated — Bristol",
+        "course_location": "Bristol", "course_website": extra["course_website"],
+    })
+    snapshot["courses"].append(extra_course)
+    manifest = manifest_for(snapshot)
+    assert manifest["groups"][0]["eligibility"] == "preview_candidate"
+    assert manifest["observed_scope"]["extra_course_ids"] == 1
+    assert manifest["observed_scope"]["excluded_unrelated_course_ids"] == [903]
 
 
 def test_incomplete_reference_scan_and_wrong_scope_coverage_block():

@@ -31,32 +31,40 @@ def approved_manifest(mapping_path=APPROVED_MAPPING):
             split_id = approved["parent"] + (
                 10000 if member_index == 0 or group_index >= 17 else 20000
             )
+            route_fingerprint = "sha256:" + hashlib.sha256(
+                approved["source"].encode()
+            ).hexdigest()
+            source_fee = {
+                "amount": 12000, "currency": "GBP", "fee_year": 2026,
+                "fee_term": "Annual",
+            }
             members.append({
                 "course_id": course_id,
                 "staged_row_id": evidence_id,
                 "location": location,
-                "source_fee": {
-                    "amount": 12000, "currency": "GBP", "fee_year": 2026,
-                    "fee_term": "Annual",
-                },
+                "locations": [location],
+                "location_evidence": [{
+                    "location": location, "staged_row_id": evidence_id,
+                    "evidence_precondition_sha256": "c" * 64,
+                    "source_route_sha256": route_fingerprint,
+                    "source_fee": source_fee,
+                }],
+                "source_fee": source_fee,
                 "precondition_sha256": "b" * 64,
-                "source_route_sha256": "sha256:" + hashlib.sha256(
-                    approved["source"].encode()
-                ).hexdigest(),
+                "source_route_sha256": route_fingerprint,
                 "evidence_rows": [{
                     "staged_row_id": evidence_id,
                     "evidence_precondition_sha256": "c" * 64,
                     "scrape_job_id": "job-" + str(approved["parent"]),
                     "split_from_id": split_id,
-                    "source_route_sha256": "sha256:" + hashlib.sha256(
-                        approved["source"].encode()
-                    ).hexdigest(),
+                    "source_route_sha256": route_fingerprint,
                     "selected_for_offering": True,
                 }],
             })
             mappings.append({
                 "old_course_id": course_id, "canonical_course_id": approved["parent"],
-                "offering_location": location, "source_fee": members[-1]["source_fee"],
+                "offering_location": location, "offering_locations": [location],
+                "source_fee": members[-1]["source_fee"],
             })
         groups.append({
             "university_id": 92,

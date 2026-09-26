@@ -77,26 +77,83 @@ def _as_int(value: Any, label: str) -> int:
     return result
 
 
-def _selected_study_variant(evidence: dict[str, Any]) -> tuple[str | None, str | None]:
+def _fee_campus_binding(
+    evidence: dict[str, Any],
+) -> tuple[str | None, str | None, tuple[str, ...], str | None]:
     authority = (evidence.get("extraction_method") or {}).get("fee_variants") or {}
     selected = authority.get("selected")
     if not isinstance(selected, list) or not selected:
-        return None, "missing selected study-variant evidence"
+        return None, "missing selected study-variant evidence", (), None
     variants = [entry.get("study_variant") for entry in selected if isinstance(entry, dict)]
     if len(variants) != len(selected) or any(not isinstance(v, str) or not v.strip() for v in variants):
-        return None, "ambiguous study-variant evidence"
+        return None, "ambiguous study-variant evidence", (), None
     scope = (evidence.get("extraction_method") or {}).get("campus_fee_scope") or {}
     locations = scope.get("locations")
-    if not isinstance(locations, list) or len(locations) != 1 or not isinstance(locations[0], str):
-        return None, "fee option cannot be bound to one scoped campus"
+    if (not isinstance(locations, list) or not locations
+            or any(not isinstance(value, str) or not value.strip() for value in locations)):
+        return None, "fee option cannot be bound to scoped campus evidence", (), None
+    location_values = tuple(value.strip() for value in locations)
+    location_keys = tuple(_norm(value) for value in location_values)
+    if len(set(location_keys)) != len(location_keys):
+        return None, "duplicate campus in scoped location evidence", (), None
+    course_location = evidence.get("course_location")
+    expected_location = ", ".join(location_values)
+    if (not isinstance(course_location, str)
+            or _norm(course_location) != _norm(expected_location)):
+        return None, "staged campus is outside its authoritative scope locations", (), None
     campus_values = [entry.get("campus") for entry in selected if isinstance(entry, dict)]
-    if (len(campus_values) != len(selected)
-            or any(not isinstance(campus, str) or _norm(campus) != _norm(locations[0])
-                   for campus in campus_values)):
-        return None, "selected fee option campus differs from scoped campus"
+    if len(campus_values) != len(selected) or any(
+            not isinstance(campus, str) or not campus.strip() for campus in campus_values):
+        return None, "selected fee option has invalid campus evidence", (), None
+    campus_keys = {_norm(campus) for campus in campus_values}
+    scope_keys = set(location_keys)
+    row_route = evidence.get("course_website")
+    fee = evidence.get("international_fee")
+    exact_authority = (
+        authority.get("status") == "uniform"
+        and authority.get("validated_uniform_authority") is True
+        and isinstance(row_route, str)
+        and isinstance(fee, (int, float)) and not isinstance(fee, bool)
+        and all(
+            isinstance(entry, dict)
+            and isinstance(entry.get("amount"), (int, float))
+            and not isinstance(entry.get("amount"), bool)
+            and entry.get("amount") == fee
+            and entry.get("currency") == evidence.get("currency")
+            and entry.get("year") == evidence.get("fee_year")
+            and entry.get("period") == evidence.get("fee_term")
+            and entry.get("source_url") == row_route
+            for entry in selected
+        )
+    )
+    regional_label = None
+    if not campus_keys.issubset(scope_keys):
+        # A regional label can bind to multiple concrete locations only when
+        # the extraction scope explicitly lists those locations and the
+        # selected authority is a validated uniform fee matching the stored
+        # amount/cohort/route. The apply path revalidates raw options with
+        # validated_fee_variants before any write.
+        if len(campus_keys) != 1 or len(location_keys) < 2 or not exact_authority:
+            return None, "selected fee option campus differs from scoped campus", (), None
+        regional_label = next(iter(campus_keys))
+    elif not scope_keys.issubset(campus_keys) or not exact_authority:
+        return None, "selected fee option campus differs from scoped campus", (), None
     if len(set(variants)) != 1:
-        return None, "multiple study variants in one source row"
-    return variants[0], None
+        return None, "multiple study variants in one source row", (), None
+    return variants[0], None, location_values, regional_label
+
+
+def _published_award_name_matches(name: Any, award: Any, locations: tuple[str, ...]) -> bool:
+    if not isinstance(name, str) or not isinstance(award, str):
+        return False
+    accepted = {_norm(award), _norm(f"{award} — {', '.join(locations)}")}
+    accepted.update(_norm(f"{award} — {location}") for location in locations)
+    return _norm(name) in accepted
+
+
+def _selected_study_variant(evidence: dict[str, Any]) -> tuple[str | None, str | None]:
+    variant, error, _, _ = _fee_campus_binding(evidence)
+    return variant, error
 
 
 def _safe_fee(evidence: dict[str, Any]) -> dict[str, Any]:
@@ -120,6 +177,26 @@ def _safe_fee(evidence: dict[str, Any]) -> dict[str, Any]:
         "fee_year": fee_year,
         "fee_term": fee_term,
     }
+
+
+def _legacy_fee_rows_match(course: dict[str, Any], staged: dict[str, Any]) -> bool:
+    legacy_rows = course.get("legacy_fee_rows")
+    if not isinstance(legacy_rows, list) or not legacy_rows:
+        return False
+    expected = _safe_fee(staged)
+    if any(value is None for value in expected.values()):
+        return False
+    for legacy in legacy_rows:
+        if not isinstance(legacy, dict):
+            return False
+        if ({
+                "amount": legacy.get("amount"),
+                "currency": legacy.get("currency"),
+                "fee_year": legacy.get("fee_year"),
+                "fee_term": legacy.get("fee_term"),
+        } != expected):
+            return False
+    return True
 
 
 def _row_hash(row: dict[str, Any]) -> str:
@@ -268,20 +345,20 @@ def _group_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[str,
     identities: dict[str, set[Any]] = defaultdict(set)
     seen_locations: dict[str, int] = {}
     fee_by_location: dict[str, Any] = {}
+    regional_scopes: dict[str, set[str]] = {}
+    regional_fees: dict[str, set[str]] = defaultdict(set)
     course_ids: set[int] = set()
 
     for row in rows:
         scope = _scope_evidence(row) or {}
-        variant, variant_error = _selected_study_variant(row)
+        variant, variant_error, scoped_locations, regional_label = _fee_campus_binding(row)
         if variant_error:
             reasons.append(variant_error)
-        location_values = scope.get("locations")
-        if (not isinstance(location_values, list) or len(location_values) != 1
-                or not isinstance(location_values[0], str) or not location_values[0].strip()):
+        if not scoped_locations:
             reasons.append("ambiguous or non-unique location evidence")
             location = None
         else:
-            location = location_values[0].strip()
+            location = str(row.get("course_location") or "").strip()
             location_key = _norm(location)
             if location_key in seen_locations:
                 reasons.append(f"duplicate location evidence: {location}")
@@ -289,8 +366,14 @@ def _group_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[str,
                     reasons.append(f"conflicting fees for location: {location}")
             seen_locations[location_key] = row["id"]
             fee_by_location[location_key] = row.get("international_fee")
-            if _norm(row.get("course_location")) != location_key:
+            if location_key not in {_norm(value) for value in scoped_locations}:
                 reasons.append(f"location evidence does not match staged row {row['id']}")
+            if regional_label:
+                scope_locations = {_norm(value) for value in scoped_locations}
+                previous_scope = regional_scopes.setdefault(regional_label, scope_locations)
+                if previous_scope != scope_locations:
+                    reasons.append(f"regional fee scope changed across rows for {regional_label}")
+                regional_fees[regional_label].add(_canonical_json(_safe_fee(row)).decode())
 
         course_id = row.get("course_id")
         course = (courses_by_id.get(course_id)
@@ -340,7 +423,10 @@ def _group_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[str,
             reasons.append(f"missing scrape job for staged row {row['id']}")
         if not isinstance(row.get("study_mode"), str) or not row["study_mode"].strip():
             reasons.append(f"missing study-mode identity for staged row {row['id']}")
-        if isinstance(original_name, str) and _norm(course.get("name")) != _norm(original_name):
+        if (isinstance(original_name, str) and _norm(course.get("name")) not in {
+                _norm(original_name),
+                _norm(f"{original_name} — {course.get('course_location', '')}"),
+        }):
             reasons.append(f"ambiguous published award name for course {course_id}")
 
         # The source's validated cohort values must agree with the top-level
@@ -403,6 +489,9 @@ def _group_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[str,
     for identity_name, values in identities.items():
         if len(values) != 1:
             reasons.append(f"ambiguous {identity_name} within split group")
+    for regional_label, scoped in regional_scopes.items():
+        if len(regional_fees[regional_label]) != 1:
+            reasons.append(f"regional fee label {regional_label} has conflicting stored fee values")
     if len(course_ids) != len(rows):
         reasons.append("split group does not map one-to-one to distinct published course IDs")
 
@@ -429,6 +518,8 @@ def _component_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[
     route_hash = "sha256:" + hashlib.sha256(approved["source"].encode("utf-8")).hexdigest()
     identities = set()
     seen_locations: dict[str, int] = {}
+    regional_scopes: dict[str, set[str]] = {}
+    regional_fees: dict[str, set[str]] = defaultdict(set)
     members = []
 
     for cid in approved["ids"]:
@@ -442,11 +533,12 @@ def _component_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[
             continue
         row_identities = set()
         row_locations = set()
+        row_scope_sets = set()
         row_fees = set()
         evidence_rows = []
         for row in evidence:
             scope = _scope_evidence(row) or {}
-            variant, variant_error = _selected_study_variant(row)
+            variant, variant_error, scoped_locations, regional_label = _fee_campus_binding(row)
             if variant_error:
                 reasons.append(f"staged row {row['id']}: {variant_error}")
             if row.get("university_id") != approved.get("university_id"):
@@ -459,21 +551,35 @@ def _component_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[
                 reasons.append(f"exact source URL differs from approved ID {cid}")
             if row.get("status") not in {"approved", "published"}:
                 reasons.append(f"staged row {row['id']} is not approved/published")
-            locations = scope.get("locations")
-            if (not isinstance(locations, list) or len(locations) != 1
-                    or not isinstance(locations[0], str) or not locations[0].strip()):
+            if not scoped_locations:
                 reasons.append(f"staged row {row['id']} has ambiguous campus evidence")
                 location = None
             else:
-                location = locations[0].strip()
-                if _norm(location) != _norm(row.get("course_location")):
-                    reasons.append(f"scope/staged campus mismatch at row {row['id']}")
-                row_locations.add(_norm(location))
-            if row.get("course_name") != f"{approved['award']} — {row.get('course_location', '')}":
+                location = str(row.get("course_location") or "").strip()
+                scope_keys = tuple(_norm(value) for value in scoped_locations)
+                row_scope_sets.add(scope_keys)
+                row_locations.update(scope_keys)
+                if regional_label:
+                    scope_locations = set(scope_keys)
+                    previous_scope = regional_scopes.setdefault(regional_label, scope_locations)
+                    if previous_scope != scope_locations:
+                        reasons.append(
+                            f"regional fee scope changed across rows for {regional_label}"
+                        )
+                    regional_fees[regional_label].add(
+                        _canonical_json(_safe_fee(row)).decode()
+                    )
+            accepted_staged_names = {
+                _norm(f"{approved['award']} — {', '.join(scoped_locations)}"),
+                *(_norm(f"{approved['award']} — {location}")
+                  for location in scoped_locations),
+            }
+            if _norm(row.get("course_name")) not in accepted_staged_names:
                 reasons.append(f"staged award name mismatch at row {row['id']}")
             if (course.get("status") != "active" or course.get("approval_status") != "approved"
                     or course.get("university_id") != approved.get("university_id")
-                    or _norm(course.get("name")) != _norm(approved["award"])
+                    or not _published_award_name_matches(
+                        course.get("name"), approved["award"], scoped_locations)
                     or _norm(course.get("course_location")) != _norm(row.get("course_location"))
                     or _norm(course.get("degree_level")) != _norm(row.get("degree_level"))
                     or _norm(course.get("study_mode")) != _norm(row.get("study_mode"))):
@@ -512,10 +618,13 @@ def _component_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[
             })
         if len(row_identities) != 1:
             reasons.append(f"cross-run identity/cohort conflict for course ID {cid}")
-        if len(row_locations) != 1 or len(row_fees) != 1:
+        if len(row_scope_sets) != 1 or len(row_fees) != 1:
             reasons.append(f"cross-run campus or fee conflict for course ID {cid}")
-        location = next(iter(row_locations), None)
-        if location:
+        if evidence and not _legacy_fee_rows_match(course, evidence[-1]):
+            reasons.append(
+                f"staged fee differs from, or lacks, the published legacy fee for course ID {cid}"
+            )
+        for location in row_locations:
             if location in seen_locations:
                 reasons.append(f"campus is assigned to multiple approved IDs: {location}")
             seen_locations[location] = cid
@@ -536,24 +645,136 @@ def _component_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[
             evidence_row["selected_for_offering"] = (
                 evidence_row["staged_row_id"] == representative["id"]
             )
+        offering_locations = list(
+            (_scope_evidence(representative) or {}).get("locations") or []
+        )
+        route_fingerprint = "sha256:" + hashlib.sha256(
+            approved["source"].encode()
+        ).hexdigest()
+        source_fee = _safe_fee(representative)
+        selected_evidence = next(
+            evidence for evidence in evidence_rows
+            if evidence["staged_row_id"] == representative["id"]
+        )
         members.append({
             "course_id": cid,
             "staged_row_id": representative["id"],
             "location": representative.get("course_location"),
-            "source_fee": _safe_fee(representative),
+            "locations": offering_locations,
+            "location_evidence": [
+                {
+                    "location": location,
+                    "staged_row_id": representative["id"],
+                    "evidence_precondition_sha256":
+                        selected_evidence["evidence_precondition_sha256"],
+                    "source_route_sha256": route_fingerprint,
+                    "source_fee": source_fee,
+                }
+                for location in offering_locations
+            ],
+            "source_fee": source_fee,
             "precondition_sha256": _row_hash(course),
-            "source_route_sha256": "sha256:" + hashlib.sha256(
-                approved["source"].encode()
-            ).hexdigest(),
+            "source_route_sha256": route_fingerprint,
             "evidence_rows": evidence_rows,
         })
     if len(identities) > 1:
         reasons.append("component rows differ in exact source/cohort/degree/variant/study mode")
+    for regional_label, scoped in regional_scopes.items():
+        if len(regional_fees[regional_label]) != 1:
+            reasons.append(f"regional fee label {regional_label} has conflicting stored fee values")
     if snapshot.get("reference_scan_complete") is not True:
         reasons.append("local PostgreSQL FK census is incomplete")
     # external_reference_scan_complete remains false by design. This task
     # explicitly retains every old course ID; it does not claim portal coverage.
     return members, list(dict.fromkeys(reasons))
+
+
+def _related_extra_ids(
+    extra_rows: list[dict[str, Any]],
+    approved_rows: list[dict[str, Any]],
+    mapping_groups: list[dict[str, Any]],
+) -> tuple[dict[int, set[int]], int]:
+    """Find out-of-map IDs whose evidence can affect an approved component."""
+    approved_by_id: dict[int, list[dict[str, Any]]] = defaultdict(list)
+    for row in approved_rows:
+        cid = row.get("course_id")
+        if isinstance(cid, int) and not isinstance(cid, bool):
+            approved_by_id[cid].append(row)
+
+    conflicts: dict[int, set[int]] = defaultdict(set)
+    unknown = 0
+    for extra in extra_rows:
+        extra_id = extra.get("course_id")
+        if not isinstance(extra_id, int) or isinstance(extra_id, bool):
+            unknown += 1
+            continue
+        extra_scope = _scope_evidence(extra) or {}
+        extra_variant, _ = _selected_study_variant(extra)
+        extra_route = extra.get("course_website")
+        extra_award = _norm(extra_scope.get("original_name"))
+        extra_degree = _norm(extra.get("degree_level"))
+        extra_family = (
+            extra.get("university_id"), extra.get("scrape_job_id"),
+            extra_scope.get("split_from_id"),
+        )
+        extra_locations = {
+            _norm(value) for value in (
+                extra_scope.get("locations") if isinstance(extra_scope.get("locations"), list) else []
+            ) if isinstance(value, str) and value.strip()
+        }
+        if isinstance(extra.get("course_location"), str):
+            extra_locations.add(_norm(extra["course_location"]))
+        for group in mapping_groups:
+            members = [
+                row for cid in group["ids"] for row in approved_by_id.get(cid, [])
+            ]
+            if not members:
+                continue
+            member_locations = {
+                _norm(value) for row in members
+                for value in (
+                    (_scope_evidence(row) or {}).get("locations")
+                    if isinstance((_scope_evidence(row) or {}).get("locations"), list)
+                    else []
+                )
+                if isinstance(value, str) and value.strip()
+            }
+            member_locations.update(
+                _norm(row["course_location"])
+                for row in members if isinstance(row.get("course_location"), str)
+            )
+            related = False
+            for row in members:
+                scope = _scope_evidence(row) or {}
+                variant, _ = _selected_study_variant(row)
+                same_family = extra_family == (
+                    row.get("university_id"), row.get("scrape_job_id"),
+                    scope.get("split_from_id"),
+                )
+                same_route_award_degree = (
+                    extra_route == row.get("course_website")
+                    and extra_award == _norm(scope.get("original_name"))
+                    and extra_degree == _norm(row.get("degree_level"))
+                )
+                identity_match = (
+                    same_route_award_degree
+                    and extra_variant is not None and variant is not None
+                    and _norm(extra_variant) == _norm(variant)
+                    and _norm(extra.get("study_mode")) == _norm(row.get("study_mode"))
+                    and extra.get("fee_year") == row.get("fee_year")
+                    and extra.get("fee_term") == row.get("fee_term")
+                    and extra.get("currency") == row.get("currency")
+                )
+                route_award_campus_match = (
+                    same_route_award_degree
+                    and bool(extra_locations.intersection(member_locations))
+                )
+                if same_family or identity_match or route_award_campus_match:
+                    related = True
+                    break
+            if related:
+                conflicts[group["parent"]].add(extra_id)
+    return conflicts, unknown
 
 
 def build_review_manifest(snapshot: dict[str, Any], *,
@@ -574,7 +795,7 @@ def build_review_manifest(snapshot: dict[str, Any], *,
         raise SnapshotError("approved mapping requires its exact file SHA-256")
     courses_by_id = {row["id"]: row for row in snapshot["courses"]}
     ignored = 0
-    candidate_rows = []
+    all_candidate_rows = []
     for row in snapshot["evidence_rows"]:
         scope = _scope_evidence(row)
         if (row.get("status") not in {"approved", "published"} or not scope
@@ -591,22 +812,36 @@ def build_review_manifest(snapshot: dict[str, Any], *,
             continue
         candidate_row = dict(row)
         candidate_row["_split_from_id"] = scope["split_from_id"]
-        candidate_rows.append(candidate_row)
+        all_candidate_rows.append(candidate_row)
+    approved_ids = {cid for group in approved_mapping["groups"] for cid in group["ids"]}
+    candidate_rows = [
+        row for row in all_candidate_rows if row.get("course_id") in approved_ids
+    ]
+    extra_rows = [
+        row for row in all_candidate_rows
+        if not isinstance(row.get("course_id"), int)
+        or isinstance(row.get("course_id"), bool)
+        or row.get("course_id") not in approved_ids
+    ]
     family_count, components = _connected_components(candidate_rows)
+    exporter_family_count, exporter_components = _connected_components(all_candidate_rows)
     component_ids = [
         {row["course_id"] for row in component
          if isinstance(row.get("course_id"), int) and not isinstance(row.get("course_id"), bool)}
         for component in components
     ]
     observed_ids = set().union(*component_ids) if component_ids else set()
-    approved_ids = {cid for group in approved_mapping["groups"] for cid in group["ids"]}
+    extra_conflicts, unknown_extra_rows = _related_extra_ids(
+        extra_rows, candidate_rows, approved_mapping["groups"],
+    )
     coverage_ok = (
         family_count == expected_families
         and len(components) == expected_groups
         and len(observed_ids) == expected_course_ids
         and observed_ids == approved_ids
-        and snapshot.get("raw_family_count", family_count) == family_count
-        and snapshot.get("logical_component_count", len(components)) == len(components)
+        and snapshot.get("raw_family_count", exporter_family_count) == exporter_family_count
+        and snapshot.get("logical_component_count", len(exporter_components))
+        == len(exporter_components)
     )
     groups = []
     for approved in approved_mapping["groups"]:
@@ -626,7 +861,18 @@ def build_review_manifest(snapshot: dict[str, Any], *,
         if len(matching) != 1 or component_member_ids != target_ids:
             reasons.append("overlap-connected component differs from approved JSON ID group")
         if not coverage_ok:
-            reasons.append("snapshot coverage must be 119 families / 102 components / 305 approved IDs")
+            reasons.append(
+                "approved-ID inventory must match 119 families / 102 components / 305 IDs"
+            )
+        if extra_conflicts.get(approved["parent"]):
+            ids_text = ", ".join(str(value) for value in sorted(
+                extra_conflicts[approved["parent"]]
+            ))
+            reasons.append(f"out-of-map course IDs may affect this approved group: {ids_text}")
+        if unknown_extra_rows:
+            reasons.append(
+                "inventory has staged evidence with no course ID; cannot exclude it from approved groups"
+            )
         member_ids = sorted(target_ids)
         canonical_id = approved["parent"]
         mapping = [
@@ -634,6 +880,7 @@ def build_review_manifest(snapshot: dict[str, Any], *,
                 "old_course_id": m["course_id"],
                 "canonical_course_id": approved["parent"],
                 "offering_location": m["location"],
+                "offering_locations": m["locations"],
                 "source_fee": m["source_fee"],
             }
             for m in sorted(members, key=lambda item: item["course_id"])
@@ -685,11 +932,27 @@ def build_review_manifest(snapshot: dict[str, Any], *,
         "observed_scope": {
             "raw_families": family_count,
             "groups": len(components),
-            "exporter_raw_families": snapshot.get("raw_family_count", family_count),
+            "exporter_raw_families": snapshot.get(
+                "raw_family_count", exporter_family_count
+            ),
             "exporter_logical_components": snapshot.get(
-                "logical_component_count", len(components)
+                "logical_component_count", len(exporter_components)
             ),
             "unique_course_ids": len(observed_ids),
+            "extra_course_ids": len({
+                row.get("course_id") for row in extra_rows
+                if isinstance(row.get("course_id"), int) and not isinstance(row.get("course_id"), bool)
+            }),
+            "related_extra_course_ids": sorted({
+                course_id for values in extra_conflicts.values() for course_id in values
+            }),
+            "unknown_extra_evidence_rows": unknown_extra_rows,
+            "excluded_unrelated_course_ids": sorted({
+                row.get("course_id") for row in extra_rows
+                if isinstance(row.get("course_id"), int)
+                and not isinstance(row.get("course_id"), bool)
+                and all(row.get("course_id") not in values for values in extra_conflicts.values())
+            }),
             "preview_candidate_groups": safe_count,
             "preview_candidate_course_ids": safe_ids,
             "blocked_groups": len(groups) - safe_count,
