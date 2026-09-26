@@ -33,6 +33,25 @@ from app.services.scraper.fee_selection import FIELDS, fee_selection
 from tests.test_fee_selection import METHOD, URL, course
 
 
+async def migrate_course_id_aliases_in_transaction(connection):
+    """Install the production alias DDL inside the disposable test schema."""
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+    from importlib.util import module_from_spec, spec_from_file_location
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[1] / "alembic/versions/388_course_id_aliases.py"
+    spec = spec_from_file_location("course_id_aliases_migration", path)
+    migration = module_from_spec(spec)
+    spec.loader.exec_module(migration)
+
+    def upgrade(sync_connection):
+        migration.op = Operations(MigrationContext.configure(sync_connection))
+        migration.upgrade()
+
+    await connection.run_sync(upgrade)
+
+
 @pytest_asyncio.fixture
 async def isolated_fee_database():
     if os.environ.get("ALLOW_ISOLATED_FEE_SELECTION_TESTS") != "1":
@@ -75,6 +94,11 @@ async def isolated_fee_database():
             await connection.run_sync(
                 lambda sync: Base.metadata.create_all(sync, tables=list(tables))
             )
+        # Use the real additive migration rather than metadata.create_all for
+        # this table so approval's fail-closed alias lookup and the database
+        # chain/self guards are both present in the isolated schema.
+        async with engine.begin() as connection:
+            await migrate_course_id_aliases_in_transaction(connection)
         yield engine
     finally:
         await engine.dispose()

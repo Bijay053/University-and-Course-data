@@ -75,10 +75,12 @@ def upgrade():
             RETURN NEW;
         END;
         $$;
-        CREATE TRIGGER trg_course_id_alias_no_chain
-        BEFORE INSERT OR UPDATE ON course_id_aliases
-        FOR EACH ROW EXECUTE FUNCTION reject_course_id_alias_chain();
         """
+    )
+    op.execute(
+        """CREATE TRIGGER trg_course_id_alias_no_chain
+        BEFORE INSERT OR UPDATE ON course_id_aliases
+        FOR EACH ROW EXECUTE FUNCTION reject_course_id_alias_chain()"""
     )
 
 

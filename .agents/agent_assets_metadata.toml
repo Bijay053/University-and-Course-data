@@ -21,3 +21,17 @@ mtime_ms = 1776917796404
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/de2d5afc-11ff-462d-b030-41995378abe2/cf256251-fd38-401b-a5b4-531036367de9"
 storage_version_token = "1788234075846570"
 content_type = "image/png"
+
+[[outputs]]
+id = "dLhVF54H3uAtQY2c2ZJC2"
+uri = "file://reports/legacy-course-id-mapping.html"
+type = "html"
+title = "Proposed legacy course ID mapping"
+description = "Read-only review of 102 University of Law awards and the exact 203 old IDs proposed to remain as aliases. No production records changed."
+logical_id = "47865b2a-30dd-41d4-892d-9b213e2297d9"
+content_hash = "sha256:948d606c78d897b7aae65ea8e31d971605b85ea63f9e9c68a9be00d01223e8bf"
+size = 21444
+mtime_ms = 1790394591986
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/47865b2a-30dd-41d4-892d-9b213e2297d9/333bff65-f0c0-4bfe-bfa8-f490c729c12d"
+storage_version_token = "1790394598746840"
+content_type = "text/html"
