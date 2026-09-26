@@ -23,17 +23,22 @@ async def read_offerings(db, course_ids):
     return result
 
 
+def canonical_degree_level(value):
+    degree = (value or "").strip().casefold()
+    return {"master's": "master", "bachelor's": "bachelor", "doctor": "doctorate"}.get(
+        degree, degree,
+    )
+
+
 def offering_identity(row, scope):
     authority = row.extraction_method["fee_variants"]
     selected = authority["selected"]
-    degree = (row.degree_level or "").strip().casefold()
-    degree = {"master's": "master", "bachelor's": "bachelor", "doctor": "doctorate"}.get(degree, degree)
     # Deliberately retain the exact route/query/year, plus award name: common
     # source URLs alone never establish that two awards are interchangeable.
     parts = [
         row.university_id, row.course_website,
         " ".join(scope["original_name"].casefold().split()),
-        degree,
+        canonical_degree_level(row.degree_level),
         selected[0]["study_variant"],
     ]
     return hashlib.sha256(json.dumps(parts, ensure_ascii=False).encode()).hexdigest()
