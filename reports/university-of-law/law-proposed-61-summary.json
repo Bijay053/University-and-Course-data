@@ -1,0 +1,5173 @@
+{
+  "status": "proposed_unapproved_for_human_review",
+  "human_review_required": true,
+  "production_writes_performed": false,
+  "source_approved_mapping_sha256": "c895a22170b62cbae095c6d689735689b8542d4eab563e36d1be8a96bf22f8a5",
+  "source_review_manifest_sha256": "775b577da1f31cb1721cb5181490a8fee4a6aaae30324a538d0a6a2dce5d3360",
+  "checks": {
+    "mapping_sha_valid": true,
+    "review_eligibility_exact_100_groups_307_scoped_plus_4_unscoped": true,
+    "exact_original_parent_and_ID_coverage": true,
+    "published_identity_key_consistent_and_unique": true,
+    "study_mode_consistent_within_clusters": true,
+    "duplicate_normalized_campus_fee_tuples_exact": true,
+    "no_missing_or_extra_ids_or_conflicting_campus_labels": true,
+    "unscoped_alias_targets_unchanged": true
+  },
+  "counts": {
+    "proposed_groups": 61,
+    "scoped_historical_ids": 307,
+    "scoped_aliases": 246,
+    "preserved_unscoped_aliases": 4,
+    "total_historical_ids": 311,
+    "total_aliases": 250,
+    "production_writes_performed": false
+  },
+  "clusters": [
+    {
+      "parent": 9389,
+      "merged_original_parents": [
+        9389
+      ],
+      "historical_ids": [
+        9389,
+        9408,
+        9645,
+        9646,
+        9647,
+        9648
+      ],
+      "award": "MSc Healthcare Management",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9389,
+            9646
+          ],
+          "staged_evidence_ids": [
+            41815,
+            41998
+          ]
+        },
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9389,
+            9647
+          ],
+          "staged_evidence_ids": [
+            41815,
+            41997
+          ]
+        },
+        {
+          "normalized_label": "london",
+          "actual_label": "London",
+          "amount": 19050.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9408
+          ],
+          "staged_evidence_ids": [
+            41814
+          ]
+        },
+        {
+          "normalized_label": "london moorgate",
+          "actual_label": "London Moorgate",
+          "amount": 19050.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9648
+          ],
+          "staged_evidence_ids": [
+            41996
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9389,
+            9645
+          ],
+          "staged_evidence_ids": [
+            41815,
+            41999
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9393,
+      "merged_original_parents": [
+        9393
+      ],
+      "historical_ids": [
+        9393,
+        9409,
+        9652
+      ],
+      "award": "MSc Computing and Cybersecurity",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 16500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9393
+          ],
+          "staged_evidence_ids": [
+            41810,
+            41992
+          ]
+        },
+        {
+          "normalized_label": "london",
+          "actual_label": "London",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9409
+          ],
+          "staged_evidence_ids": [
+            41809
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9652
+          ],
+          "staged_evidence_ids": [
+            41991
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9394,
+      "merged_original_parents": [
+        9394
+      ],
+      "historical_ids": [
+        9394,
+        9410,
+        9656
+      ],
+      "award": "MSc Digital Cybercrime",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 16500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9394
+          ],
+          "staged_evidence_ids": [
+            41805,
+            41987
+          ]
+        },
+        {
+          "normalized_label": "london",
+          "actual_label": "London",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9410
+          ],
+          "staged_evidence_ids": [
+            41804
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9656
+          ],
+          "staged_evidence_ids": [
+            41986
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9396,
+      "merged_original_parents": [
+        9396
+      ],
+      "historical_ids": [
+        9396,
+        9421,
+        9608,
+        9675,
+        9676
+      ],
+      "award": "LLM International Criminal Law",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9396,
+            9675
+          ],
+          "staged_evidence_ids": [
+            41784,
+            41961
+          ]
+        },
+        {
+          "normalized_label": "london",
+          "actual_label": "London",
+          "amount": 19600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9421
+          ],
+          "staged_evidence_ids": [
+            41783
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 19600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9676
+          ],
+          "staged_evidence_ids": [
+            41960
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9396,
+            9608
+          ],
+          "staged_evidence_ids": [
+            41784,
+            42036
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9397,
+      "merged_original_parents": [
+        9397
+      ],
+      "historical_ids": [
+        9397,
+        9432,
+        9681
+      ],
+      "award": "LLM Public International Law",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "london",
+          "actual_label": "London",
+          "amount": 19600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9432
+          ],
+          "staged_evidence_ids": [
+            41772
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 19600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9681
+          ],
+          "staged_evidence_ids": [
+            41944
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9397
+          ],
+          "staged_evidence_ids": [
+            41773,
+            41945
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9399,
+      "merged_original_parents": [
+        9399,
+        9547
+      ],
+      "historical_ids": [
+        9399,
+        9459,
+        9547,
+        9548,
+        9549,
+        9550,
+        9551,
+        9552,
+        9553,
+        9554,
+        9555,
+        9556,
+        9557,
+        9558,
+        9559,
+        9560,
+        9561,
+        9562,
+        9697
+      ],
+      "award": "LLM Legal Practice (SQE1&2)",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 15150.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9399,
+            9555
+          ],
+          "staged_evidence_ids": [
+            41755,
+            42089
+          ]
+        },
+        {
+          "normalized_label": "bristol",
+          "actual_label": "Bristol",
+          "amount": 15150.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9399,
+            9550
+          ],
+          "staged_evidence_ids": [
+            41755,
+            42094
+          ]
+        },
+        {
+          "normalized_label": "egham",
+          "actual_label": "Egham",
+          "amount": 15150.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9399,
+            9559
+          ],
+          "staged_evidence_ids": [
+            41755,
+            42085
+          ]
+        },
+        {
+          "normalized_label": "exeter",
+          "actual_label": "Exeter",
+          "amount": 15150.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9399,
+            9697
+          ],
+          "staged_evidence_ids": [
+            41755,
+            41914
+          ]
+        },
+        {
+          "normalized_label": "hull",
+          "actual_label": "Hull",
+          "amount": 15150.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9399,
+            9547
+          ],
+          "staged_evidence_ids": [
+            41755,
+            42097
+          ]
+        },
+        {
+          "normalized_label": "lancaster",
+          "actual_label": "Lancaster",
+          "amount": 15150.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9399,
+            9553
+          ],
+          "staged_evidence_ids": [
+            41755,
+            42091
+          ]
+        },
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 15150.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9399,
+            9562
+          ],
+          "staged_evidence_ids": [
+            41755,
+            42082
+          ]
+        },
+        {
+          "normalized_label": "leicester",
+          "actual_label": "Leicester",
+          "amount": 15150.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9399,
+            9558
+          ],
+          "staged_evidence_ids": [
+            41755,
+            42086
+          ]
+        },
+        {
+          "normalized_label": "liverpool",
+          "actual_label": "Liverpool",
+          "amount": 15150.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9399,
+            9554
+          ],
+          "staged_evidence_ids": [
+            41755,
+            42090
+          ]
+        },
+        {
+          "normalized_label": "london",
+          "actual_label": "London",
+          "amount": 18850.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9459
+          ],
+          "staged_evidence_ids": [
+            41754,
+            41913
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 15150.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9399,
+            9549
+          ],
+          "staged_evidence_ids": [
+            41755,
+            42095
+          ]
+        },
+        {
+          "normalized_label": "newcastle",
+          "actual_label": "Newcastle",
+          "amount": 15150.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9399,
+            9560
+          ],
+          "staged_evidence_ids": [
+            41755,
+            42084
+          ]
+        },
+        {
+          "normalized_label": "norwich",
+          "actual_label": "Norwich",
+          "amount": 15150.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9399,
+            9557
+          ],
+          "staged_evidence_ids": [
+            41755,
+            42087
+          ]
+        },
+        {
+          "normalized_label": "nottingham",
+          "actual_label": "Nottingham",
+          "amount": 15150.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9399,
+            9561
+          ],
+          "staged_evidence_ids": [
+            41755,
+            42083
+          ]
+        },
+        {
+          "normalized_label": "oxford brookes",
+          "actual_label": "Oxford Brookes",
+          "amount": 15150.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9399,
+            9556
+          ],
+          "staged_evidence_ids": [
+            41755,
+            42088
+          ]
+        },
+        {
+          "normalized_label": "reading",
+          "actual_label": "Reading",
+          "amount": 15150.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9399,
+            9551
+          ],
+          "staged_evidence_ids": [
+            41755,
+            42093
+          ]
+        },
+        {
+          "normalized_label": "sheffield",
+          "actual_label": "Sheffield",
+          "amount": 15150.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9399,
+            9548
+          ],
+          "staged_evidence_ids": [
+            41755,
+            42096
+          ]
+        },
+        {
+          "normalized_label": "southampton",
+          "actual_label": "Southampton",
+          "amount": 15150.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9399,
+            9552
+          ],
+          "staged_evidence_ids": [
+            41755,
+            42092
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9400,
+      "merged_original_parents": [
+        9400
+      ],
+      "historical_ids": [
+        9400,
+        9462,
+        9706
+      ],
+      "award": "LLM Mental Health Law",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "london",
+          "actual_label": "London",
+          "amount": 19600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9462
+          ],
+          "staged_evidence_ids": [
+            41745
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 19600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9706
+          ],
+          "staged_evidence_ids": [
+            41902
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9400
+          ],
+          "staged_evidence_ids": [
+            41746,
+            41903
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9403,
+      "merged_original_parents": [
+        9403
+      ],
+      "historical_ids": [
+        9403,
+        9479
+      ],
+      "award": "LLM Medical Law and Ethics",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "london",
+          "actual_label": "London",
+          "amount": 19600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9479
+          ],
+          "staged_evidence_ids": [
+            41731,
+            41880
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9403
+          ],
+          "staged_evidence_ids": [
+            41732,
+            41881
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9404,
+      "merged_original_parents": [
+        9404,
+        9512,
+        9513
+      ],
+      "historical_ids": [
+        9404,
+        9482,
+        9512,
+        9513,
+        9514,
+        9515,
+        9516,
+        9715,
+        9716
+      ],
+      "award": "LLM Master of Laws (General)",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9404,
+            9515
+          ],
+          "staged_evidence_ids": [
+            41729,
+            42129
+          ]
+        },
+        {
+          "normalized_label": "bristol",
+          "actual_label": "Bristol",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9404,
+            9514
+          ],
+          "staged_evidence_ids": [
+            41729,
+            42130
+          ]
+        },
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9404,
+            9715
+          ],
+          "staged_evidence_ids": [
+            41729,
+            41877
+          ]
+        },
+        {
+          "normalized_label": "london",
+          "actual_label": "London",
+          "amount": 19600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9482
+          ],
+          "staged_evidence_ids": [
+            41728
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 19600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9512
+          ],
+          "staged_evidence_ids": [
+            42132
+          ]
+        },
+        {
+          "normalized_label": "london moorgate",
+          "actual_label": "London Moorgate",
+          "amount": 19600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9716
+          ],
+          "staged_evidence_ids": [
+            41876
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9404,
+            9513
+          ],
+          "staged_evidence_ids": [
+            41729,
+            42131
+          ]
+        },
+        {
+          "normalized_label": "nottingham",
+          "actual_label": "Nottingham",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9404,
+            9516
+          ],
+          "staged_evidence_ids": [
+            41729,
+            42128
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9405,
+      "merged_original_parents": [
+        9405,
+        9511
+      ],
+      "historical_ids": [
+        9405,
+        9485,
+        9511,
+        9717
+      ],
+      "award": "LLM International Human Rights Law",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9405,
+            9717
+          ],
+          "staged_evidence_ids": [
+            41727,
+            41875
+          ]
+        },
+        {
+          "normalized_label": "london",
+          "actual_label": "London",
+          "amount": 19600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9485
+          ],
+          "staged_evidence_ids": [
+            41726,
+            41874
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9405,
+            9511
+          ],
+          "staged_evidence_ids": [
+            41727,
+            42133
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9406,
+      "merged_original_parents": [
+        9406
+      ],
+      "historical_ids": [
+        9406,
+        9490
+      ],
+      "award": "LLM Corporate Governance",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "london",
+          "actual_label": "London",
+          "amount": 19600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9490
+          ],
+          "staged_evidence_ids": [
+            41722,
+            41868
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9406
+          ],
+          "staged_evidence_ids": [
+            41723,
+            41869
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9407,
+      "merged_original_parents": [
+        9407,
+        9503
+      ],
+      "historical_ids": [
+        9407,
+        9495,
+        9503,
+        9504,
+        9505,
+        9506,
+        9721
+      ],
+      "award": "LLB Law",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9407,
+            9505
+          ],
+          "staged_evidence_ids": [
+            41719,
+            42139
+          ]
+        },
+        {
+          "normalized_label": "bristol",
+          "actual_label": "Bristol",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9407,
+            9504
+          ],
+          "staged_evidence_ids": [
+            41719,
+            42140
+          ]
+        },
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9407,
+            9721
+          ],
+          "staged_evidence_ids": [
+            41719,
+            41863
+          ]
+        },
+        {
+          "normalized_label": "london",
+          "actual_label": "London",
+          "amount": 18100.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9495
+          ],
+          "staged_evidence_ids": [
+            41718,
+            41862
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9407,
+            9503
+          ],
+          "staged_evidence_ids": [
+            41719,
+            42141
+          ]
+        },
+        {
+          "normalized_label": "nottingham",
+          "actual_label": "Nottingham",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9407,
+            9506
+          ],
+          "staged_evidence_ids": [
+            41719,
+            42138
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9411,
+      "merged_original_parents": [
+        9411,
+        9614,
+        9615
+      ],
+      "historical_ids": [
+        9411,
+        9412,
+        9614,
+        9615,
+        9616,
+        9617,
+        9618,
+        9619,
+        9620,
+        9621,
+        9622,
+        9623,
+        9624,
+        9625,
+        9626,
+        9627,
+        9628,
+        9629,
+        9658,
+        9659
+      ],
+      "award": "Postgraduate Diploma in Legal Practice (SQE2 & SQE Plus)",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 11350.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9412,
+            9623
+          ],
+          "staged_evidence_ids": [
+            41816,
+            42020
+          ]
+        },
+        {
+          "normalized_label": "bristol",
+          "actual_label": "Bristol",
+          "amount": 11350.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9412,
+            9618
+          ],
+          "staged_evidence_ids": [
+            41816,
+            42025
+          ]
+        },
+        {
+          "normalized_label": "egham (royal holloway)",
+          "actual_label": "Egham (Royal Holloway)",
+          "amount": 11350.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9412,
+            9619
+          ],
+          "staged_evidence_ids": [
+            41816,
+            42024
+          ]
+        },
+        {
+          "normalized_label": "exeter",
+          "actual_label": "Exeter",
+          "amount": 11350.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9412,
+            9658
+          ],
+          "staged_evidence_ids": [
+            41816,
+            41984
+          ]
+        },
+        {
+          "normalized_label": "hull",
+          "actual_label": "Hull",
+          "amount": 11350.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9412,
+            9615
+          ],
+          "staged_evidence_ids": [
+            41816,
+            42028
+          ]
+        },
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 11350.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9412,
+            9629
+          ],
+          "staged_evidence_ids": [
+            41816,
+            42014
+          ]
+        },
+        {
+          "normalized_label": "leicester",
+          "actual_label": "Leicester",
+          "amount": 11350.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9412,
+            9626
+          ],
+          "staged_evidence_ids": [
+            41816,
+            42017
+          ]
+        },
+        {
+          "normalized_label": "liverpool",
+          "actual_label": "Liverpool",
+          "amount": 11350.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9412,
+            9622
+          ],
+          "staged_evidence_ids": [
+            41816,
+            42021
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 14150.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9411,
+            9614
+          ],
+          "staged_evidence_ids": [
+            41802,
+            42030
+          ]
+        },
+        {
+          "normalized_label": "london moorgate",
+          "actual_label": "London Moorgate",
+          "amount": 14150.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9411,
+            9659
+          ],
+          "staged_evidence_ids": [
+            41802,
+            41983
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 11350.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9412,
+            9617
+          ],
+          "staged_evidence_ids": [
+            41816,
+            42026
+          ]
+        },
+        {
+          "normalized_label": "newcastle",
+          "actual_label": "Newcastle",
+          "amount": 11350.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9412,
+            9627
+          ],
+          "staged_evidence_ids": [
+            41816,
+            42016
+          ]
+        },
+        {
+          "normalized_label": "norwich",
+          "actual_label": "Norwich",
+          "amount": 11350.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9412,
+            9625
+          ],
+          "staged_evidence_ids": [
+            41816,
+            42018
+          ]
+        },
+        {
+          "normalized_label": "nottingham",
+          "actual_label": "Nottingham",
+          "amount": 11350.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9412,
+            9628
+          ],
+          "staged_evidence_ids": [
+            41816,
+            42015
+          ]
+        },
+        {
+          "normalized_label": "oxford brookes",
+          "actual_label": "Oxford Brookes",
+          "amount": 11350.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9412,
+            9624
+          ],
+          "staged_evidence_ids": [
+            41816,
+            42019
+          ]
+        },
+        {
+          "normalized_label": "reading",
+          "actual_label": "Reading",
+          "amount": 11350.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9412,
+            9620
+          ],
+          "staged_evidence_ids": [
+            41816,
+            42023
+          ]
+        },
+        {
+          "normalized_label": "sheffield",
+          "actual_label": "Sheffield",
+          "amount": 11350.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9412,
+            9616
+          ],
+          "staged_evidence_ids": [
+            41816,
+            42027
+          ]
+        },
+        {
+          "normalized_label": "southampton",
+          "actual_label": "Southampton",
+          "amount": 11350.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9412,
+            9621
+          ],
+          "staged_evidence_ids": [
+            41816,
+            42022
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9413,
+      "merged_original_parents": [
+        9413
+      ],
+      "historical_ids": [
+        9413,
+        9414
+      ],
+      "award": "MSc Criminology and Criminal Justice",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9413
+          ],
+          "staged_evidence_ids": [
+            41794,
+            41973
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 16500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9414
+          ],
+          "staged_evidence_ids": [
+            41817,
+            41974
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9415,
+      "merged_original_parents": [
+        9415,
+        9610
+      ],
+      "historical_ids": [
+        9415,
+        9416,
+        9610,
+        9666
+      ],
+      "award": "MSc Artificial Intelligence for Business",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9416,
+            9666
+          ],
+          "staged_evidence_ids": [
+            41818,
+            41976
+          ]
+        },
+        {
+          "normalized_label": "london moorgate",
+          "actual_label": "London Moorgate",
+          "amount": 19050.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9415
+          ],
+          "staged_evidence_ids": [
+            41795,
+            41975
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9416,
+            9610
+          ],
+          "staged_evidence_ids": [
+            41818,
+            42034
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9417,
+      "merged_original_parents": [
+        9417,
+        9609
+      ],
+      "historical_ids": [
+        9417,
+        9418,
+        9609,
+        9667
+      ],
+      "award": "BSc (Hons) Business Management (Top up)",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 16700.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9418,
+            9667
+          ],
+          "staged_evidence_ids": [
+            41819,
+            41972
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 17550.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9417
+          ],
+          "staged_evidence_ids": [
+            41793,
+            41971
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 16700.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9418,
+            9609
+          ],
+          "staged_evidence_ids": [
+            41819,
+            42035
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9419,
+      "merged_original_parents": [
+        9419
+      ],
+      "historical_ids": [
+        9419,
+        9420
+      ],
+      "award": "LLM Media Law, Privacy and Defamation",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 19600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9419
+          ],
+          "staged_evidence_ids": [
+            41787,
+            41964
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9420
+          ],
+          "staged_evidence_ids": [
+            41820,
+            41965
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9422,
+      "merged_original_parents": [
+        9422
+      ],
+      "historical_ids": [
+        9422,
+        9423
+      ],
+      "award": "MSc Computing",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 16500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9423
+          ],
+          "staged_evidence_ids": [
+            41821,
+            41956
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9422
+          ],
+          "staged_evidence_ids": [
+            41779,
+            41955
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9424,
+      "merged_original_parents": [
+        9424
+      ],
+      "historical_ids": [
+        9424,
+        9425
+      ],
+      "award": "BSc (Hons) Computer Science",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9425
+          ],
+          "staged_evidence_ids": [
+            41822,
+            41954
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 18100.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9424
+          ],
+          "staged_evidence_ids": [
+            41778,
+            41953
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9426,
+      "merged_original_parents": [
+        9426
+      ],
+      "historical_ids": [
+        9426,
+        9427
+      ],
+      "award": "BSc (Hons) Psychology with Criminology",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9427
+          ],
+          "staged_evidence_ids": [
+            41823,
+            41952
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 18100.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9426
+          ],
+          "staged_evidence_ids": [
+            41777,
+            41951
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9428,
+      "merged_original_parents": [
+        9428
+      ],
+      "historical_ids": [
+        9428,
+        9429
+      ],
+      "award": "BSc (Hons) Psychology",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9429
+          ],
+          "staged_evidence_ids": [
+            41824,
+            41950
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 18100.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9428
+          ],
+          "staged_evidence_ids": [
+            41776,
+            41949
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9430,
+      "merged_original_parents": [
+        9430
+      ],
+      "historical_ids": [
+        9430,
+        9431
+      ],
+      "award": "MSc Psychology (Conversion)",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 16500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9431
+          ],
+          "staged_evidence_ids": [
+            41825,
+            41948
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9430
+          ],
+          "staged_evidence_ids": [
+            41775,
+            41947
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9433,
+      "merged_original_parents": [
+        9433,
+        9607
+      ],
+      "historical_ids": [
+        9433,
+        9434,
+        9607,
+        9682
+      ],
+      "award": "MSc Business Analytics",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9434,
+            9682
+          ],
+          "staged_evidence_ids": [
+            41826,
+            41942
+          ]
+        },
+        {
+          "normalized_label": "london moorgate",
+          "actual_label": "London Moorgate",
+          "amount": 19050.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9433
+          ],
+          "staged_evidence_ids": [
+            41770,
+            41941
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9434,
+            9607
+          ],
+          "staged_evidence_ids": [
+            41826,
+            42037
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9435,
+      "merged_original_parents": [
+        9435,
+        9606
+      ],
+      "historical_ids": [
+        9435,
+        9436,
+        9606,
+        9683
+      ],
+      "award": "MSc Cyber Security Management",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9436,
+            9683
+          ],
+          "staged_evidence_ids": [
+            41827,
+            41940
+          ]
+        },
+        {
+          "normalized_label": "london moorgate",
+          "actual_label": "London Moorgate",
+          "amount": 19050.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9435
+          ],
+          "staged_evidence_ids": [
+            41769,
+            41939
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9436,
+            9606
+          ],
+          "staged_evidence_ids": [
+            41827,
+            42038
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9437,
+      "merged_original_parents": [
+        9437,
+        9605
+      ],
+      "historical_ids": [
+        9437,
+        9438,
+        9605,
+        9684
+      ],
+      "award": "BSc (Hons) Criminology and Policing",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9438,
+            9605
+          ],
+          "staged_evidence_ids": [
+            41828,
+            42039
+          ]
+        },
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9438,
+            9684
+          ],
+          "staged_evidence_ids": [
+            41828,
+            41938
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 18100.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9437
+          ],
+          "staged_evidence_ids": [
+            41768,
+            41937
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9439,
+      "merged_original_parents": [
+        9439,
+        9604
+      ],
+      "historical_ids": [
+        9439,
+        9440,
+        9604,
+        9685
+      ],
+      "award": "MSc Marketing",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9440,
+            9685
+          ],
+          "staged_evidence_ids": [
+            41829,
+            41936
+          ]
+        },
+        {
+          "normalized_label": "london moorgate",
+          "actual_label": "London Moorgate",
+          "amount": 19050.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9439
+          ],
+          "staged_evidence_ids": [
+            41767,
+            41935
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9440,
+            9604
+          ],
+          "staged_evidence_ids": [
+            41829,
+            42040
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9441,
+      "merged_original_parents": [
+        9441,
+        9602
+      ],
+      "historical_ids": [
+        9441,
+        9442,
+        9602,
+        9603,
+        9686
+      ],
+      "award": "LLM International Commercial Law",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "bristol",
+          "actual_label": "Bristol",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9442,
+            9602
+          ],
+          "staged_evidence_ids": [
+            41830,
+            42042
+          ]
+        },
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9442,
+            9686
+          ],
+          "staged_evidence_ids": [
+            41830,
+            41934
+          ]
+        },
+        {
+          "normalized_label": "london moorgate",
+          "actual_label": "London Moorgate",
+          "amount": 19600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9441
+          ],
+          "staged_evidence_ids": [
+            41766,
+            41933
+          ]
+        },
+        {
+          "normalized_label": "nottingham",
+          "actual_label": "Nottingham",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9442,
+            9603
+          ],
+          "staged_evidence_ids": [
+            41830,
+            42041
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9443,
+      "merged_original_parents": [
+        9443,
+        9600
+      ],
+      "historical_ids": [
+        9443,
+        9444,
+        9600,
+        9601,
+        9687
+      ],
+      "award": "LLM Employment Law",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9444,
+            9687
+          ],
+          "staged_evidence_ids": [
+            41831,
+            41932
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 19600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9443
+          ],
+          "staged_evidence_ids": [
+            41765,
+            41931
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9444,
+            9600
+          ],
+          "staged_evidence_ids": [
+            41831,
+            42044
+          ]
+        },
+        {
+          "normalized_label": "nottingham",
+          "actual_label": "Nottingham",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9444,
+            9601
+          ],
+          "staged_evidence_ids": [
+            41831,
+            42043
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9445,
+      "merged_original_parents": [
+        9445,
+        9598
+      ],
+      "historical_ids": [
+        9445,
+        9446,
+        9598,
+        9599,
+        9688
+      ],
+      "award": "MLaw (Solicitors' Practice) - four year Integrated Master's",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9446,
+            9599
+          ],
+          "staged_evidence_ids": [
+            41832,
+            42045
+          ]
+        },
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9446,
+            9688
+          ],
+          "staged_evidence_ids": [
+            41832,
+            41930
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 18100.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9445
+          ],
+          "staged_evidence_ids": [
+            41764,
+            41929
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9446,
+            9598
+          ],
+          "staged_evidence_ids": [
+            41832,
+            42046
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9447,
+      "merged_original_parents": [
+        9447,
+        9597
+      ],
+      "historical_ids": [
+        9447,
+        9448,
+        9597,
+        9689
+      ],
+      "award": "BSc Business Management with Marketing",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 16700.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9448,
+            9689
+          ],
+          "staged_evidence_ids": [
+            41833,
+            41928
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 17550.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9447
+          ],
+          "staged_evidence_ids": [
+            41763,
+            41927
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 16700.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9448,
+            9597
+          ],
+          "staged_evidence_ids": [
+            41833,
+            42047
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9449,
+      "merged_original_parents": [
+        9449,
+        9595
+      ],
+      "historical_ids": [
+        9449,
+        9450,
+        9595,
+        9596,
+        9690
+      ],
+      "award": "BSc Business Management",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 16700.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9450,
+            9596
+          ],
+          "staged_evidence_ids": [
+            41834,
+            42048
+          ]
+        },
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 16700.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9450,
+            9690
+          ],
+          "staged_evidence_ids": [
+            41834,
+            41926
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 17550.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9449
+          ],
+          "staged_evidence_ids": [
+            41762,
+            41925
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 16700.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9450,
+            9595
+          ],
+          "staged_evidence_ids": [
+            41834,
+            42049
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9451,
+      "merged_original_parents": [
+        9451,
+        9594
+      ],
+      "historical_ids": [
+        9451,
+        9452,
+        9594,
+        9691
+      ],
+      "award": "BSc Accounting with Finance",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2027,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9452,
+            9691
+          ],
+          "staged_evidence_ids": [
+            41835,
+            41924
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 18100.0,
+          "currency": "GBP",
+          "year": 2027,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9451
+          ],
+          "staged_evidence_ids": [
+            41761,
+            41923
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2027,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9452,
+            9594
+          ],
+          "staged_evidence_ids": [
+            41835,
+            42050
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9453,
+      "merged_original_parents": [
+        9453,
+        9593
+      ],
+      "historical_ids": [
+        9453,
+        9454,
+        9593,
+        9692
+      ],
+      "award": "BSc Business Management with Law",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 16700.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9454,
+            9692
+          ],
+          "staged_evidence_ids": [
+            41836,
+            41922
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 17550.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9453
+          ],
+          "staged_evidence_ids": [
+            41760,
+            41921
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 16700.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9454,
+            9593
+          ],
+          "staged_evidence_ids": [
+            41836,
+            42051
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9455,
+      "merged_original_parents": [
+        9455,
+        9578,
+        9579
+      ],
+      "historical_ids": [
+        9455,
+        9456,
+        9578,
+        9579,
+        9580,
+        9581,
+        9582,
+        9583,
+        9584,
+        9585,
+        9586,
+        9587,
+        9588,
+        9589,
+        9590,
+        9591,
+        9592,
+        9693,
+        9694
+      ],
+      "award": "Postgraduate Diploma in Law (PGDL) - (conversion)",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 12450.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9456,
+            9588
+          ],
+          "staged_evidence_ids": [
+            41837,
+            42056
+          ]
+        },
+        {
+          "normalized_label": "bristol",
+          "actual_label": "Bristol",
+          "amount": 12450.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9456,
+            9582
+          ],
+          "staged_evidence_ids": [
+            41837,
+            42062
+          ]
+        },
+        {
+          "normalized_label": "egham (royal holloway)",
+          "actual_label": "Egham (Royal Holloway)",
+          "amount": 12450.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9456,
+            9583
+          ],
+          "staged_evidence_ids": [
+            41837,
+            42061
+          ]
+        },
+        {
+          "normalized_label": "exeter",
+          "actual_label": "Exeter",
+          "amount": 12450.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9456,
+            9693
+          ],
+          "staged_evidence_ids": [
+            41837,
+            41918
+          ]
+        },
+        {
+          "normalized_label": "hull",
+          "actual_label": "Hull",
+          "amount": 12450.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9456,
+            9579
+          ],
+          "staged_evidence_ids": [
+            41837,
+            42065
+          ]
+        },
+        {
+          "normalized_label": "lancaster",
+          "actual_label": "Lancaster",
+          "amount": 12450.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9456,
+            9586
+          ],
+          "staged_evidence_ids": [
+            41837,
+            42058
+          ]
+        },
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 12450.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9456,
+            9592
+          ],
+          "staged_evidence_ids": [
+            41837,
+            42052
+          ]
+        },
+        {
+          "normalized_label": "leicester",
+          "actual_label": "Leicester",
+          "amount": 12450.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9456,
+            9589
+          ],
+          "staged_evidence_ids": [
+            41837,
+            42055
+          ]
+        },
+        {
+          "normalized_label": "liverpool",
+          "actual_label": "Liverpool",
+          "amount": 12450.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9456,
+            9587
+          ],
+          "staged_evidence_ids": [
+            41837,
+            42057
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 15450.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9455,
+            9578
+          ],
+          "staged_evidence_ids": [
+            41757,
+            42066
+          ]
+        },
+        {
+          "normalized_label": "london moorgate",
+          "actual_label": "London Moorgate",
+          "amount": 15450.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9455,
+            9694
+          ],
+          "staged_evidence_ids": [
+            41757,
+            41917
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 12450.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9456,
+            9581
+          ],
+          "staged_evidence_ids": [
+            41837,
+            42063
+          ]
+        },
+        {
+          "normalized_label": "newcastle",
+          "actual_label": "Newcastle",
+          "amount": 12450.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9456,
+            9590
+          ],
+          "staged_evidence_ids": [
+            41837,
+            42054
+          ]
+        },
+        {
+          "normalized_label": "nottingham",
+          "actual_label": "Nottingham",
+          "amount": 12450.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9456,
+            9591
+          ],
+          "staged_evidence_ids": [
+            41837,
+            42053
+          ]
+        },
+        {
+          "normalized_label": "reading",
+          "actual_label": "Reading",
+          "amount": 12450.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9456,
+            9584
+          ],
+          "staged_evidence_ids": [
+            41837,
+            42060
+          ]
+        },
+        {
+          "normalized_label": "sheffield",
+          "actual_label": "Sheffield",
+          "amount": 12450.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9456,
+            9580
+          ],
+          "staged_evidence_ids": [
+            41837,
+            42064
+          ]
+        },
+        {
+          "normalized_label": "southampton",
+          "actual_label": "Southampton",
+          "amount": 12450.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9456,
+            9585
+          ],
+          "staged_evidence_ids": [
+            41837,
+            42059
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9457,
+      "merged_original_parents": [
+        9457,
+        9563,
+        9564
+      ],
+      "historical_ids": [
+        9457,
+        9458,
+        9563,
+        9564,
+        9565,
+        9566,
+        9567,
+        9568,
+        9569,
+        9570,
+        9571,
+        9572,
+        9573,
+        9574,
+        9575,
+        9576,
+        9577,
+        9695,
+        9696
+      ],
+      "award": "MA Law (SQE1)",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 17400.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9458,
+            9573
+          ],
+          "staged_evidence_ids": [
+            41838,
+            42071
+          ]
+        },
+        {
+          "normalized_label": "bristol",
+          "actual_label": "Bristol",
+          "amount": 17400.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9458,
+            9567
+          ],
+          "staged_evidence_ids": [
+            41838,
+            42077
+          ]
+        },
+        {
+          "normalized_label": "egham (royal holloway)",
+          "actual_label": "Egham (Royal Holloway)",
+          "amount": 17400.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9458,
+            9568
+          ],
+          "staged_evidence_ids": [
+            41838,
+            42076
+          ]
+        },
+        {
+          "normalized_label": "exeter",
+          "actual_label": "Exeter",
+          "amount": 17400.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9458,
+            9695
+          ],
+          "staged_evidence_ids": [
+            41838,
+            41916
+          ]
+        },
+        {
+          "normalized_label": "hull",
+          "actual_label": "Hull",
+          "amount": 17400.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9458,
+            9564
+          ],
+          "staged_evidence_ids": [
+            41838,
+            42080
+          ]
+        },
+        {
+          "normalized_label": "lancaster",
+          "actual_label": "Lancaster",
+          "amount": 17400.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9458,
+            9571
+          ],
+          "staged_evidence_ids": [
+            41838,
+            42073
+          ]
+        },
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 17400.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9458,
+            9577
+          ],
+          "staged_evidence_ids": [
+            41838,
+            42067
+          ]
+        },
+        {
+          "normalized_label": "leicester",
+          "actual_label": "Leicester",
+          "amount": 17400.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9458,
+            9574
+          ],
+          "staged_evidence_ids": [
+            41838,
+            42070
+          ]
+        },
+        {
+          "normalized_label": "liverpool",
+          "actual_label": "Liverpool",
+          "amount": 17400.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9458,
+            9572
+          ],
+          "staged_evidence_ids": [
+            41838,
+            42072
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 20550.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9457,
+            9563
+          ],
+          "staged_evidence_ids": [
+            41756,
+            42081
+          ]
+        },
+        {
+          "normalized_label": "london moorgate",
+          "actual_label": "London Moorgate",
+          "amount": 20550.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9457,
+            9696
+          ],
+          "staged_evidence_ids": [
+            41756,
+            41915
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 17400.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9458,
+            9566
+          ],
+          "staged_evidence_ids": [
+            41838,
+            42078
+          ]
+        },
+        {
+          "normalized_label": "newcastle",
+          "actual_label": "Newcastle",
+          "amount": 17400.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9458,
+            9575
+          ],
+          "staged_evidence_ids": [
+            41838,
+            42069
+          ]
+        },
+        {
+          "normalized_label": "nottingham",
+          "actual_label": "Nottingham",
+          "amount": 17400.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9458,
+            9576
+          ],
+          "staged_evidence_ids": [
+            41838,
+            42068
+          ]
+        },
+        {
+          "normalized_label": "reading",
+          "actual_label": "Reading",
+          "amount": 17400.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9458,
+            9569
+          ],
+          "staged_evidence_ids": [
+            41838,
+            42075
+          ]
+        },
+        {
+          "normalized_label": "sheffield",
+          "actual_label": "Sheffield",
+          "amount": 17400.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9458,
+            9565
+          ],
+          "staged_evidence_ids": [
+            41838,
+            42079
+          ]
+        },
+        {
+          "normalized_label": "southampton",
+          "actual_label": "Southampton",
+          "amount": 17400.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9458,
+            9570
+          ],
+          "staged_evidence_ids": [
+            41838,
+            42074
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9460,
+      "merged_original_parents": [
+        9460,
+        9544
+      ],
+      "historical_ids": [
+        9460,
+        9461,
+        9544,
+        9545,
+        9546,
+        9702
+      ],
+      "award": "LLM Data Protection and Intellectual Property",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "bristol",
+          "actual_label": "Bristol",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9461,
+            9545
+          ],
+          "staged_evidence_ids": [
+            41839,
+            42099
+          ]
+        },
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9461,
+            9702
+          ],
+          "staged_evidence_ids": [
+            41839,
+            41908
+          ]
+        },
+        {
+          "normalized_label": "london moorgate",
+          "actual_label": "London Moorgate",
+          "amount": 19600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9460
+          ],
+          "staged_evidence_ids": [
+            41749,
+            41907
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9461,
+            9544
+          ],
+          "staged_evidence_ids": [
+            41839,
+            42100
+          ]
+        },
+        {
+          "normalized_label": "nottingham",
+          "actual_label": "Nottingham",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9461,
+            9546
+          ],
+          "staged_evidence_ids": [
+            41839,
+            42098
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9463,
+      "merged_original_parents": [
+        9463,
+        9542,
+        9543
+      ],
+      "historical_ids": [
+        9463,
+        9464,
+        9542,
+        9543,
+        9704,
+        9705
+      ],
+      "award": "LLM Master of Law (International)",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9464,
+            9704
+          ],
+          "staged_evidence_ids": [
+            41840,
+            41905
+          ]
+        },
+        {
+          "normalized_label": "bristol",
+          "actual_label": "Bristol",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9464,
+            9543
+          ],
+          "staged_evidence_ids": [
+            41840,
+            42101
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 19600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9463,
+            9542
+          ],
+          "staged_evidence_ids": [
+            41747,
+            42102
+          ]
+        },
+        {
+          "normalized_label": "london moorgate",
+          "actual_label": "London Moorgate",
+          "amount": 19600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9463,
+            9705
+          ],
+          "staged_evidence_ids": [
+            41747,
+            41904
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9465,
+      "merged_original_parents": [
+        9465
+      ],
+      "historical_ids": [
+        9465,
+        9466
+      ],
+      "award": "LLM Corporate Governance GradCG",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "london moorgate",
+          "actual_label": "London Moorgate",
+          "amount": 19600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9465
+          ],
+          "staged_evidence_ids": [
+            41743,
+            41898
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9466
+          ],
+          "staged_evidence_ids": [
+            41841,
+            41899
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9467,
+      "merged_original_parents": [
+        9467,
+        9541
+      ],
+      "historical_ids": [
+        9467,
+        9468,
+        9541,
+        9707
+      ],
+      "award": "LLM International Arbitration",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9468,
+            9707
+          ],
+          "staged_evidence_ids": [
+            41842,
+            41901
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 19600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9467
+          ],
+          "staged_evidence_ids": [
+            41744,
+            41900
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9468,
+            9541
+          ],
+          "staged_evidence_ids": [
+            41842,
+            42103
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9469,
+      "merged_original_parents": [
+        9469,
+        9537
+      ],
+      "historical_ids": [
+        9469,
+        9470,
+        9537,
+        9538,
+        9709
+      ],
+      "award": "MSc Strategic Business Management",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9470,
+            9538
+          ],
+          "staged_evidence_ids": [
+            41843,
+            42106
+          ]
+        },
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9470,
+            9709
+          ],
+          "staged_evidence_ids": [
+            41843,
+            41895
+          ]
+        },
+        {
+          "normalized_label": "london moorgate",
+          "actual_label": "London Moorgate",
+          "amount": 19050.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9469
+          ],
+          "staged_evidence_ids": [
+            41741,
+            41894
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9470,
+            9537
+          ],
+          "staged_evidence_ids": [
+            41843,
+            42107
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9471,
+      "merged_original_parents": [
+        9471,
+        9535
+      ],
+      "historical_ids": [
+        9471,
+        9472,
+        9535,
+        9536,
+        9710
+      ],
+      "award": "MSc Project Management",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9472,
+            9536
+          ],
+          "staged_evidence_ids": [
+            41844,
+            42108
+          ]
+        },
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9472,
+            9710
+          ],
+          "staged_evidence_ids": [
+            41844,
+            41893
+          ]
+        },
+        {
+          "normalized_label": "london moorgate",
+          "actual_label": "London Moorgate",
+          "amount": 19050.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9471
+          ],
+          "staged_evidence_ids": [
+            41740,
+            41892
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9472,
+            9535
+          ],
+          "staged_evidence_ids": [
+            41844,
+            42109
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9473,
+      "merged_original_parents": [
+        9473,
+        9539
+      ],
+      "historical_ids": [
+        9473,
+        9474,
+        9539,
+        9540,
+        9708
+      ],
+      "award": "BSc (Hons) Criminology",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9474,
+            9540
+          ],
+          "staged_evidence_ids": [
+            41845,
+            42104
+          ]
+        },
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9474,
+            9708
+          ],
+          "staged_evidence_ids": [
+            41845,
+            41897
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 18100.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9473
+          ],
+          "staged_evidence_ids": [
+            41742,
+            41896
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9474,
+            9539
+          ],
+          "staged_evidence_ids": [
+            41845,
+            42105
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9475,
+      "merged_original_parents": [
+        9475
+      ],
+      "historical_ids": [
+        9475,
+        9476
+      ],
+      "award": "MSc Corporate Financial Management",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9476
+          ],
+          "staged_evidence_ids": [
+            41846,
+            41890
+          ]
+        },
+        {
+          "normalized_label": "london moorgate",
+          "actual_label": "London Moorgate",
+          "amount": 19050.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9475
+          ],
+          "staged_evidence_ids": [
+            41738,
+            41889
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9477,
+      "merged_original_parents": [
+        9477
+      ],
+      "historical_ids": [
+        9477,
+        9478
+      ],
+      "award": "MSc Legal Technology",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "bristol",
+          "actual_label": "Bristol",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9478
+          ],
+          "staged_evidence_ids": [
+            41847,
+            41887
+          ]
+        },
+        {
+          "normalized_label": "london moorgate",
+          "actual_label": "London Moorgate",
+          "amount": 19600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9477
+          ],
+          "staged_evidence_ids": [
+            41736,
+            41886
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9480,
+      "merged_original_parents": [
+        9480,
+        9518,
+        9519
+      ],
+      "historical_ids": [
+        9480,
+        9481,
+        9518,
+        9519,
+        9520,
+        9521,
+        9522,
+        9523,
+        9524,
+        9525,
+        9526,
+        9527,
+        9528,
+        9529,
+        9530,
+        9531,
+        9532,
+        9712,
+        9713
+      ],
+      "award": "MA Law (Conversion)",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 16950.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9481,
+            9528
+          ],
+          "staged_evidence_ids": [
+            41848,
+            42116
+          ]
+        },
+        {
+          "normalized_label": "bristol",
+          "actual_label": "Bristol",
+          "amount": 16950.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9481,
+            9523
+          ],
+          "staged_evidence_ids": [
+            41848,
+            42122
+          ]
+        },
+        {
+          "normalized_label": "egham (royal holloway)",
+          "actual_label": "Egham (Royal Holloway)",
+          "amount": 16950.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9481,
+            9522
+          ],
+          "staged_evidence_ids": [
+            41848,
+            42121
+          ]
+        },
+        {
+          "normalized_label": "exeter",
+          "actual_label": "Exeter",
+          "amount": 16950.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9481,
+            9712
+          ],
+          "staged_evidence_ids": [
+            41848,
+            41883
+          ]
+        },
+        {
+          "normalized_label": "hull",
+          "actual_label": "Hull",
+          "amount": 16950.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9481,
+            9519
+          ],
+          "staged_evidence_ids": [
+            41848,
+            42125
+          ]
+        },
+        {
+          "normalized_label": "lancaster",
+          "actual_label": "Lancaster",
+          "amount": 16950.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9481,
+            9526
+          ],
+          "staged_evidence_ids": [
+            41848,
+            42118
+          ]
+        },
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 16950.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9481,
+            9532
+          ],
+          "staged_evidence_ids": [
+            41848,
+            42112
+          ]
+        },
+        {
+          "normalized_label": "leicester",
+          "actual_label": "Leicester",
+          "amount": 16950.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9481,
+            9529
+          ],
+          "staged_evidence_ids": [
+            41848,
+            42115
+          ]
+        },
+        {
+          "normalized_label": "liverpool",
+          "actual_label": "Liverpool",
+          "amount": 16950.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9481,
+            9527
+          ],
+          "staged_evidence_ids": [
+            41848,
+            42117
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 20100.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9480,
+            9518
+          ],
+          "staged_evidence_ids": [
+            41733,
+            42126
+          ]
+        },
+        {
+          "normalized_label": "london moorgate",
+          "actual_label": "London Moorgate",
+          "amount": 20100.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9480,
+            9713
+          ],
+          "staged_evidence_ids": [
+            41733,
+            41882
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 16950.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9481,
+            9521
+          ],
+          "staged_evidence_ids": [
+            41848,
+            42123
+          ]
+        },
+        {
+          "normalized_label": "newcastle",
+          "actual_label": "Newcastle",
+          "amount": 16950.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9481,
+            9530
+          ],
+          "staged_evidence_ids": [
+            41848,
+            42114
+          ]
+        },
+        {
+          "normalized_label": "nottingham",
+          "actual_label": "Nottingham",
+          "amount": 16950.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9481,
+            9531
+          ],
+          "staged_evidence_ids": [
+            41848,
+            42113
+          ]
+        },
+        {
+          "normalized_label": "reading",
+          "actual_label": "Reading",
+          "amount": 16950.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9481,
+            9524
+          ],
+          "staged_evidence_ids": [
+            41848,
+            42120
+          ]
+        },
+        {
+          "normalized_label": "sheffield",
+          "actual_label": "Sheffield",
+          "amount": 16950.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9481,
+            9520
+          ],
+          "staged_evidence_ids": [
+            41848,
+            42124
+          ]
+        },
+        {
+          "normalized_label": "southampton",
+          "actual_label": "Southampton",
+          "amount": 16950.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9481,
+            9525
+          ],
+          "staged_evidence_ids": [
+            41848,
+            42119
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9483,
+      "merged_original_parents": [
+        9483,
+        9517
+      ],
+      "historical_ids": [
+        9483,
+        9484,
+        9517,
+        9714
+      ],
+      "award": "LLM Mediation and Alternative Dispute Resolution",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9484,
+            9714
+          ],
+          "staged_evidence_ids": [
+            41849,
+            41879
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 19600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9483
+          ],
+          "staged_evidence_ids": [
+            41730,
+            41878
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9484,
+            9517
+          ],
+          "staged_evidence_ids": [
+            41849,
+            42127
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9486,
+      "merged_original_parents": [
+        9486,
+        9510
+      ],
+      "historical_ids": [
+        9486,
+        9487,
+        9510,
+        9718
+      ],
+      "award": "LLM International Corporate Governance",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "bristol",
+          "actual_label": "Bristol",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9487,
+            9510
+          ],
+          "staged_evidence_ids": [
+            41850,
+            42134
+          ]
+        },
+        {
+          "normalized_label": "london moorgate",
+          "actual_label": "London Moorgate",
+          "amount": 19600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9486
+          ],
+          "staged_evidence_ids": [
+            41725,
+            41872
+          ]
+        },
+        {
+          "normalized_label": "nottingham",
+          "actual_label": "Nottingham",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9487,
+            9718
+          ],
+          "staged_evidence_ids": [
+            41850,
+            41873
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9488,
+      "merged_original_parents": [
+        9488,
+        9508
+      ],
+      "historical_ids": [
+        9488,
+        9489,
+        9508,
+        9509,
+        9719
+      ],
+      "award": "LLM International Business Law",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "bristol",
+          "actual_label": "Bristol",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9489,
+            9508
+          ],
+          "staged_evidence_ids": [
+            41851,
+            42136
+          ]
+        },
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9489,
+            9719
+          ],
+          "staged_evidence_ids": [
+            41851,
+            41871
+          ]
+        },
+        {
+          "normalized_label": "london moorgate",
+          "actual_label": "London Moorgate",
+          "amount": 19600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9488
+          ],
+          "staged_evidence_ids": [
+            41724,
+            41870
+          ]
+        },
+        {
+          "normalized_label": "nottingham",
+          "actual_label": "Nottingham",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9489,
+            9509
+          ],
+          "staged_evidence_ids": [
+            41851,
+            42135
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9491,
+      "merged_original_parents": [
+        9491
+      ],
+      "historical_ids": [
+        9491,
+        9492
+      ],
+      "award": "LLM Company Law",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "london moorgate",
+          "actual_label": "London Moorgate",
+          "amount": 19600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9491
+          ],
+          "staged_evidence_ids": [
+            41721,
+            41866
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 18250.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9492
+          ],
+          "staged_evidence_ids": [
+            41852,
+            41867
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9493,
+      "merged_original_parents": [
+        9493,
+        9507
+      ],
+      "historical_ids": [
+        9493,
+        9494,
+        9507,
+        9720
+      ],
+      "award": "LLB Law (Accelerated)",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 20950.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9494,
+            9720
+          ],
+          "staged_evidence_ids": [
+            41853,
+            41865
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 22800.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9493
+          ],
+          "staged_evidence_ids": [
+            41720,
+            41864
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 20950.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9494,
+            9507
+          ],
+          "staged_evidence_ids": [
+            41853,
+            42137
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9496,
+      "merged_original_parents": [
+        9496,
+        9501
+      ],
+      "historical_ids": [
+        9496,
+        9497,
+        9501,
+        9502,
+        9724
+      ],
+      "award": "LLB Law with Criminology",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9497,
+            9502
+          ],
+          "staged_evidence_ids": [
+            41854,
+            42142
+          ]
+        },
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9497,
+            9724
+          ],
+          "staged_evidence_ids": [
+            41854,
+            41859
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 18100.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9496
+          ],
+          "staged_evidence_ids": [
+            41715,
+            41858
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9497,
+            9501
+          ],
+          "staged_evidence_ids": [
+            41854,
+            42143
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9498,
+      "merged_original_parents": [
+        9498,
+        9500
+      ],
+      "historical_ids": [
+        9498,
+        9499,
+        9500,
+        9725
+      ],
+      "award": "LLB Law with Business",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9499,
+            9725
+          ],
+          "staged_evidence_ids": [
+            41855,
+            41857
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 18100.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9498
+          ],
+          "staged_evidence_ids": [
+            41714,
+            41856
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9499,
+            9500
+          ],
+          "staged_evidence_ids": [
+            41855,
+            42144
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9533,
+      "merged_original_parents": [
+        9533
+      ],
+      "historical_ids": [
+        9533,
+        9534,
+        9711
+      ],
+      "award": "MSc Leadership and Human Resource Management",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9534
+          ],
+          "staged_evidence_ids": [
+            42110
+          ]
+        },
+        {
+          "normalized_label": "london moorgate",
+          "actual_label": "London Moorgate",
+          "amount": 19050.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9711
+          ],
+          "staged_evidence_ids": [
+            41891
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 17500.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9533
+          ],
+          "staged_evidence_ids": [
+            42111
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9611,
+      "merged_original_parents": [
+        9611
+      ],
+      "historical_ids": [
+        9611,
+        9612,
+        9613,
+        9665
+      ],
+      "award": "MBA",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 20600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9612
+          ],
+          "staged_evidence_ids": [
+            42032
+          ]
+        },
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 20600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9613
+          ],
+          "staged_evidence_ids": [
+            42031
+          ]
+        },
+        {
+          "normalized_label": "london moorgate",
+          "actual_label": "London Moorgate",
+          "amount": 20600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9665
+          ],
+          "staged_evidence_ids": [
+            41977
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 20600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9611
+          ],
+          "staged_evidence_ids": [
+            42033
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9630,
+      "merged_original_parents": [
+        9630
+      ],
+      "historical_ids": [
+        9630,
+        9657
+      ],
+      "award": "LLB Law (Top up)",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9630
+          ],
+          "staged_evidence_ids": [
+            42029
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 18100.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9657
+          ],
+          "staged_evidence_ids": [
+            41985
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9631,
+      "merged_original_parents": [
+        9631
+      ],
+      "historical_ids": [
+        9631,
+        9655
+      ],
+      "award": "LLB Law with Psychology",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9631
+          ],
+          "staged_evidence_ids": [
+            42013
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 18100.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9655
+          ],
+          "staged_evidence_ids": [
+            41988
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9632,
+      "merged_original_parents": [
+        9632
+      ],
+      "historical_ids": [
+        9632,
+        9633,
+        9634,
+        9654
+      ],
+      "award": "LLB International Law",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9633
+          ],
+          "staged_evidence_ids": [
+            42011
+          ]
+        },
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9634
+          ],
+          "staged_evidence_ids": [
+            42010
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 18100.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9654
+          ],
+          "staged_evidence_ids": [
+            41989
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 17200.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Annual",
+          "source_historical_course_ids": [
+            9632
+          ],
+          "staged_evidence_ids": [
+            42012
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9635,
+      "merged_original_parents": [
+        9635
+      ],
+      "historical_ids": [
+        9635,
+        9653
+      ],
+      "award": "LLB International Law (Top up)",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 17700.0,
+          "currency": "GBP",
+          "year": 2027,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9635
+          ],
+          "staged_evidence_ids": [
+            42009
+          ]
+        },
+        {
+          "normalized_label": "london bloomsbury",
+          "actual_label": "London Bloomsbury",
+          "amount": 18650.0,
+          "currency": "GBP",
+          "year": 2027,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9653
+          ],
+          "staged_evidence_ids": [
+            41990
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9636,
+      "merged_original_parents": [
+        9636
+      ],
+      "historical_ids": [
+        9636,
+        9637,
+        9638,
+        9651
+      ],
+      "award": "MBA with Fintech and Digital Finance",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 20600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9637
+          ],
+          "staged_evidence_ids": [
+            42007
+          ]
+        },
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 20600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9638
+          ],
+          "staged_evidence_ids": [
+            42006
+          ]
+        },
+        {
+          "normalized_label": "london moorgate",
+          "actual_label": "London Moorgate",
+          "amount": 20600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9651
+          ],
+          "staged_evidence_ids": [
+            41993
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 20600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9636
+          ],
+          "staged_evidence_ids": [
+            42008
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9639,
+      "merged_original_parents": [
+        9639
+      ],
+      "historical_ids": [
+        9639,
+        9640,
+        9641,
+        9650
+      ],
+      "award": "MBA with Artificial Intelligence",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 20600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9640
+          ],
+          "staged_evidence_ids": [
+            42004
+          ]
+        },
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 20600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9641
+          ],
+          "staged_evidence_ids": [
+            42003
+          ]
+        },
+        {
+          "normalized_label": "london moorgate",
+          "actual_label": "London Moorgate",
+          "amount": 20600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9650
+          ],
+          "staged_evidence_ids": [
+            41994
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 20600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9639
+          ],
+          "staged_evidence_ids": [
+            42005
+          ]
+        }
+      ]
+    },
+    {
+      "parent": 9642,
+      "merged_original_parents": [
+        9642
+      ],
+      "historical_ids": [
+        9642,
+        9643,
+        9644,
+        9649
+      ],
+      "award": "MBA with Healthcare Management",
+      "verified_campus_fees": [
+        {
+          "normalized_label": "birmingham",
+          "actual_label": "Birmingham",
+          "amount": 20600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9643
+          ],
+          "staged_evidence_ids": [
+            42001
+          ]
+        },
+        {
+          "normalized_label": "leeds",
+          "actual_label": "Leeds",
+          "amount": 20600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9644
+          ],
+          "staged_evidence_ids": [
+            42000
+          ]
+        },
+        {
+          "normalized_label": "london moorgate",
+          "actual_label": "London Moorgate",
+          "amount": 20600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9649
+          ],
+          "staged_evidence_ids": [
+            41995
+          ]
+        },
+        {
+          "normalized_label": "manchester",
+          "actual_label": "Manchester",
+          "amount": 20600.0,
+          "currency": "GBP",
+          "year": 2026,
+          "term": "Full Course",
+          "source_historical_course_ids": [
+            9642
+          ],
+          "staged_evidence_ids": [
+            42002
+          ]
+        }
+      ]
+    }
+  ],
+  "review_instruction": "This is preparation for review only. Do not apply or modify the approved 100-group mapping without separate explicit approval."
+}
