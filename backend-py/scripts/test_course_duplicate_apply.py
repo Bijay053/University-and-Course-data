@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import asyncio
 import hashlib
 import importlib.util
 import json
@@ -129,6 +130,9 @@ def approved_manifest(mapping_path=APPROVED_MAPPING):
             "groups": 100, "course_ids": 307,
         },
         "approved_mapping_sha256": map_sha,
+        "published_course_inventory_complete": True,
+        "published_course_inventory_count": 337,
+        "published_course_inventory_sha256": "f" * 64,
         "external_reference_scope": "out_of_scope_preserve_original_course_ids",
         "observed_scope": {
             "raw_families": 119, "overlap_components": 104,
@@ -141,10 +145,25 @@ def approved_manifest(mapping_path=APPROVED_MAPPING):
             "preview_candidate_groups": 100, "preview_candidate_course_ids": 307,
             "blocked_groups": 0, "ignored_evidence_rows": 0,
             "coverage_matches_approved_mapping": True, "coverage_matches_expected": True,
+            "unscoped_aliases": 4,
+            "original_course_ids_including_unscoped_aliases": 311,
+            "total_aliases_including_unscoped_aliases": 211,
         },
         "reference_scan_complete": True,
         "external_reference_scan_complete": False,
         "groups": groups,
+        "unscoped_aliases": [{
+            **alias,
+            "source_route_sha256": "sha256:" + hashlib.sha256(
+                alias["source"].encode()
+            ).hexdigest(),
+            "course_precondition_sha256": "1" * 64,
+            "canonical_precondition_sha256": "2" * 64,
+            "evidence_rows": [{
+                "staged_row_id": staged_id + index,
+                "evidence_precondition_sha256": "3" * 64,
+            }],
+        } for index, alias in enumerate(source["unscoped_aliases"])],
     }
     value["manifest_sha256"] = apply_tool.sha256(value)
     value["approval"] = {
@@ -152,6 +171,9 @@ def approved_manifest(mapping_path=APPROVED_MAPPING):
         "revision": "629-r1",
         "approved_by": "Task #629 mapping reviewer",
         "approved_scope": {"groups": 100, "course_ids": 307, "aliases": 207},
+        "approved_unscoped_scope": {
+            "aliases": 4, "total_course_ids": 311, "total_aliases": 211,
+        },
         "approved_mapping_sha256": map_sha,
         "external_reference_scope": "out_of_scope_preserve_original_course_ids",
     }
@@ -179,8 +201,8 @@ def test_authoritative_mapping_fingerprint_and_all_explicit_rows_are_required(tm
     value, _ = approved_manifest()
     approved = load(tmp_path, value)
     assert len(approved["groups"]) == 100
-    assert len(approved["course_ids"]) == 307
-    assert len(approved["staged_ids"]) == 322
+    assert len(approved["course_ids"]) == 311
+    assert len(approved["staged_ids"]) == 326
     assert approved["manifest"]["external_reference_scan_complete"] is False
 
 
@@ -193,6 +215,115 @@ def test_mismatched_mapping_ids_or_group_identity_refuse(tmp_path):
         assert "authoritative approved JSON" in str(exc)
     else:
         raise AssertionError("manifest IDs must match approved mapping")
+
+
+def test_unscoped_alias_study_mode_is_bound_to_exact_approval(tmp_path):
+    value, _ = approved_manifest()
+    value["unscoped_aliases"][0]["study_mode"] = "On Campus"
+    try:
+        load(tmp_path, value)
+    except apply_tool.ApplyRefused as exc:
+        assert "exact approved mapping/evidence" in str(exc)
+    else:
+        raise AssertionError("unscoped study mode must match the exact approved mapping")
+
+
+def test_approval_requires_exact_separate_unscoped_scope(tmp_path):
+    for edit in ("missing", "tampered"):
+        value, _ = approved_manifest()
+        if edit == "missing":
+            del value["approval"]["approved_unscoped_scope"]
+        else:
+            value["approval"]["approved_unscoped_scope"]["total_aliases"] = 207
+        try:
+            load(tmp_path, value)
+        except apply_tool.ApplyRefused as exc:
+            assert "separately certify exactly four unscoped aliases" in str(exc)
+        else:
+            raise AssertionError(
+                f"missing/tampered unscoped approval scope ({edit}) must be refused"
+            )
+
+
+def test_apply_rejects_changed_complete_course_inventory():
+    inventory = [{"id": 1, "university_id": 92, "name": "Reviewed course"}]
+    approved = {
+        "manifest": {
+            "published_course_inventory_count": 2,
+            "published_course_inventory_sha256": apply_tool.sha256([
+                *inventory, {"id": 2, "university_id": 92, "name": "Before"},
+            ]),
+        },
+        "unscoped_aliases": [],
+    }
+    original = apply_tool._published_course_inventory
+
+    async def current_inventory(conn):
+        return inventory
+
+    apply_tool._published_course_inventory = current_inventory
+    try:
+        try:
+            asyncio.run(apply_tool._verify_unscoped_aliases(
+                object(), approved, lock=False,
+            ))
+        except apply_tool.ApplyRefused as exc:
+            assert "inventory changed after review" in str(exc)
+        else:
+            raise AssertionError("changed complete course inventory must be refused")
+    finally:
+        apply_tool._published_course_inventory = original
+
+
+def test_apply_rejects_missing_or_extra_approved_or_published_unscoped_evidence():
+    inventory = [{"id": 1, "university_id": 92, "name": "Reviewed course"}]
+    alias = {
+        "alias_course_id": 9395, "canonical_course_id": 9611,
+        "evidence_rows": [{"staged_row_id": 101}],
+    }
+    approved = {
+        "manifest": {
+            "published_course_inventory_count": 1,
+            "published_course_inventory_sha256": apply_tool.sha256(inventory),
+        },
+        "unscoped_aliases": [alias],
+    }
+
+    class Result:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def mappings(self):
+            return self.rows
+
+    class Connection:
+        def __init__(self, rows):
+            self.rows = rows
+
+        async def execute(self, statement, params):
+            return Result(self.rows)
+
+    original = apply_tool._published_course_inventory
+
+    async def current_inventory(conn):
+        return inventory
+
+    apply_tool._published_course_inventory = current_inventory
+    try:
+        for rows in (
+            [],
+            [{"id": 101, "course_id": 9395}, {"id": 102, "course_id": 9395}],
+        ):
+            try:
+                asyncio.run(apply_tool._verify_unscoped_aliases(
+                    Connection(rows), approved, lock=False,
+                ))
+            except apply_tool.ApplyRefused as exc:
+                assert "staged evidence set changed" in str(exc)
+            else:
+                raise AssertionError("a missing or extra staged evidence row must be refused")
+    finally:
+        apply_tool._published_course_inventory = original
 
 
 def _set_member_campus(group, course_id, campus, *, fee=None):

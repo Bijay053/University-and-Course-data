@@ -1,7 +1,13 @@
 {
   "schema_version": 1,
-  "approval": "User approved the revised mapping of 100 courses and 207 retained old-ID aliases after two new published IDs linked four earlier groups",
+  "approval": "User separately approved four unscoped MBA aliases in addition to the 100 scoped groups (307 IDs, 207 aliases); the complete mapping covers 311 IDs and 211 aliases",
   "university_id": 92,
+  "unscoped_aliases": [
+    {"alias_course_id": 9395, "canonical_course_id": 9611, "award": "MBA", "study_mode": "Blended", "source": "https://www.law.ac.uk/study/postgraduate/business/mba-masters-in-business-administration/", "study_variant": "Standard", "amount": 20600, "currency": "GBP", "fee_year": 2026, "fee_term": "Full Course"},
+    {"alias_course_id": 9392, "canonical_course_id": 9636, "award": "MBA with Fintech and Digital Finance", "study_mode": "On Campus", "source": "https://www.law.ac.uk/study/postgraduate/business/mba-with-fintech-and-digital-finance/", "study_variant": "Standard", "amount": 20600, "currency": "GBP", "fee_year": 2026, "fee_term": "Full Course"},
+    {"alias_course_id": 9391, "canonical_course_id": 9639, "award": "MBA with Artificial Intelligence", "study_mode": "On Campus", "source": "https://www.law.ac.uk/study/postgraduate/business/mba-with-artificial-intelligence/", "study_variant": "Standard", "amount": 20600, "currency": "GBP", "fee_year": 2026, "fee_term": "Full Course"},
+    {"alias_course_id": 9390, "canonical_course_id": 9642, "award": "MBA with Healthcare Management", "study_mode": "On Campus", "source": "https://www.law.ac.uk/study/postgraduate/business/mba-with-healthcare-management/", "study_variant": "Standard", "amount": 20600, "currency": "GBP", "fee_year": 2026, "fee_term": "Full Course"}
+  ],
   "groups": [
     {
       "parent": 9389,

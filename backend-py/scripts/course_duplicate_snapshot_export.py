@@ -29,6 +29,7 @@ MAX_COURSE_ROWS = 1_000
 MAX_OUTPUT_BYTES = 16 * 1024 * 1024
 MAX_SNAPSHOT_GROUPS = 500
 TARGET_UNIVERSITY_ID = 92
+UNSCOPED_ALIAS_IDS = (9395, 9392, 9391, 9390)
 MAX_REFERENCE_CONSTRAINTS = 128
 
 # New FK sources must be reviewed before they can be classified as known
@@ -162,17 +163,21 @@ async def _candidate_evidence(conn: AsyncConnection) -> list[dict[str, Any]]:
           FROM scraped_courses
          WHERE status IN (:approved, :published)
            AND university_id = :university_id
-           AND jsonb_typeof(extraction_method->'campus_fee_scope') = 'object'
-           AND (extraction_method->'campus_fee_scope') ? 'original_name'
-           AND (extraction_method->'campus_fee_scope') ? 'split_from_id'
+            AND (
+                (jsonb_typeof(extraction_method->'campus_fee_scope') = 'object'
+                 AND (extraction_method->'campus_fee_scope') ? 'original_name'
+                 AND (extraction_method->'campus_fee_scope') ? 'split_from_id')
+                OR course_id IN :unscoped_ids
+            )
          ORDER BY university_id, (extraction_method->'campus_fee_scope'->>'split_from_id'),
                   id
          LIMIT :row_limit
-    """)
+    """).bindparams(bindparam("unscoped_ids", expanding=True))
     result = await conn.execute(statement, {
         "approved": "approved",
         "published": "published",
         "university_id": TARGET_UNIVERSITY_ID,
+        "unscoped_ids": list(UNSCOPED_ALIAS_IDS),
         "row_limit": MAX_EVIDENCE_ROWS + 1,
     })
     rows = [dict(row) for row in result.mappings().all()]
@@ -220,6 +225,39 @@ async def _candidate_evidence(conn: AsyncConnection) -> list[dict[str, Any]]:
                 "campus_fee_scope": scope,
                 "fee_variants": variants,
             },
+        })
+    return output
+
+
+async def _published_course_inventory(conn: AsyncConnection) -> list[dict[str, Any]]:
+    """Capture the complete local University of Law identity collision universe."""
+    result = await conn.execute(text("""
+        SELECT id, university_id, name, course_website, degree_level, study_mode,
+               course_location, status, approval_status,
+               (offering_identity IS NOT NULL) AS has_offering_identity
+          FROM courses
+         WHERE university_id = :university_id
+         ORDER BY id
+         LIMIT :row_limit
+    """), {"university_id": TARGET_UNIVERSITY_ID, "row_limit": MAX_COURSE_ROWS + 1})
+    rows = [dict(row) for row in result.mappings().all()]
+    if len(rows) > MAX_COURSE_ROWS:
+        raise ExportRefused(f"published course inventory exceeds {MAX_COURSE_ROWS} rows")
+    fees = await _legacy_fee_rows(conn, [row["id"] for row in rows])
+    output = []
+    for row in rows:
+        output.append({
+            "id": row["id"],
+            "university_id": row["university_id"],
+            "name": _safe_label(row["name"], "published award name"),
+            "course_website": _digest_route(row.get("course_website")),
+            "degree_level": _safe_label(row.get("degree_level"), "published degree"),
+            "study_mode": _safe_label(row.get("study_mode"), "published study mode"),
+            "course_location": _safe_label(row.get("course_location"), "published location"),
+            "status": row["status"],
+            "approval_status": row["approval_status"],
+            "offering_identity": "present" if row.pop("has_offering_identity") else None,
+            "legacy_fee_rows": fees.get(row["id"], []),
         })
     return output
 
@@ -446,7 +484,7 @@ async def _outside_pathway_counts(
         return result
     memberships: dict[tuple[int, str, int], set[int]] = defaultdict(set)
     for row in evidence_rows:
-        scope = row["extraction_method"]["campus_fee_scope"] or {}
+        scope = (row.get("extraction_method") or {}).get("campus_fee_scope") or {}
         split_from = scope.get("split_from_id")
         cid = row.get("course_id")
         if isinstance(split_from, int) and not isinstance(split_from, bool) and isinstance(cid, int):
@@ -497,8 +535,14 @@ async def build_snapshot(conn: AsyncConnection) -> dict[str, Any]:
     evidence_rows = await _candidate_evidence(conn)
     if not evidence_rows:
         raise ExportRefused("no approved/published campus-scope evidence matched the query")
+    scoped_evidence = [
+        row for row in evidence_rows
+        if isinstance((row.get("extraction_method") or {}).get("campus_fee_scope"), dict)
+    ]
+    if not scoped_evidence:
+        raise ExportRefused("no approved/published campus-scope evidence matched the query")
     group_keys = set()
-    for row in evidence_rows:
+    for row in scoped_evidence:
         scope = row["extraction_method"]["campus_fee_scope"] or {}
         split_from = scope.get("split_from_id")
         if not isinstance(split_from, int) or isinstance(split_from, bool):
@@ -509,7 +553,7 @@ async def build_snapshot(conn: AsyncConnection) -> dict[str, Any]:
     # Count overlap-connected logical groups independently from the 119
     # per-job families; split_from_id is not a logical-group identifier.
     family_ids = {family: set() for family in group_keys}
-    for row in evidence_rows:
+    for row in scoped_evidence:
         scope = row["extraction_method"]["campus_fee_scope"] or {}
         family_ids[(row["university_id"], row["scrape_job_id"],
                     scope["split_from_id"])].add(row["course_id"])
@@ -543,6 +587,7 @@ async def build_snapshot(conn: AsyncConnection) -> dict[str, Any]:
         raise ExportRefused(f"published course count exceeds {MAX_COURSE_ROWS}")
 
     courses = await _courses(conn, course_ids)
+    published_course_inventory = await _published_course_inventory(conn)
     legacy_fees = await _legacy_fee_rows(conn, course_ids)
     approvals = await _field_approval_counts(conn, course_ids)
     offerings = await _simple_counts(conn, "course_offerings", "course_id", course_ids)
@@ -574,6 +619,9 @@ async def build_snapshot(conn: AsyncConnection) -> dict[str, Any]:
         "logical_component_count": logical_component_count,
         "evidence_rows": evidence_rows,
         "courses": [courses[course_id] for course_id in sorted(courses)],
+        "published_course_inventory": published_course_inventory,
+        "published_course_inventory_complete": True,
+        "published_course_inventory_count": len(published_course_inventory),
     }
 
 

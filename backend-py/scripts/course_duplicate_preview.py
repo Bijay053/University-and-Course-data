@@ -39,6 +39,8 @@ SCHEMA_VERSION = 1
 EXPECTED_RAW_FAMILIES = 119
 EXPECTED_GROUPS = 100
 EXPECTED_COURSE_IDS = 307
+EXPECTED_ALIAS_IDS = 311
+EXPECTED_ALIAS_COUNT = 211
 EXPECTED_OVERLAP_COMPONENTS = 104
 MAX_INPUT_BYTES = 32 * 1024 * 1024
 MAX_EVIDENCE_ROWS = 20_000
@@ -345,6 +347,51 @@ def validate_approved_mapping(value: Any, *, expected_groups: int = EXPECTED_GRO
             "award": raw["award"], "source": raw["source"],
         })
     by_parent = {group["parent"]: tuple(group["ids"]) for group in cleaned}
+    unscoped_raw = value.get("unscoped_aliases")
+    expected_unscoped = (
+        (9395, 9611, "MBA", "Blended"),
+        (9392, 9636, "MBA with Fintech and Digital Finance", "On Campus"),
+        (9391, 9639, "MBA with Artificial Intelligence", "On Campus"),
+        (9390, 9642, "MBA with Healthcare Management", "On Campus"),
+    )
+    unscoped = []
+    enforce_unscoped = (
+        expected_groups == EXPECTED_GROUPS
+        and expected_course_ids == EXPECTED_COURSE_IDS
+        and expected_aliases == 207
+    )
+    if not enforce_unscoped and unscoped_raw is None:
+        unscoped_raw = []
+    if not isinstance(unscoped_raw, list) or (
+            enforce_unscoped and len(unscoped_raw) != len(expected_unscoped)):
+        raise SnapshotError("mapping must contain the exact four approved unscoped aliases")
+    if not enforce_unscoped and unscoped_raw:
+        raise SnapshotError("custom test mappings may not add unscoped production aliases")
+    grouped_ids = seen.copy()
+    for raw, (alias_id, canonical_id, award, study_mode) in zip(unscoped_raw, expected_unscoped):
+        if not isinstance(raw, dict) or (
+            raw.get("alias_course_id"), raw.get("canonical_course_id"),
+            raw.get("award"), raw.get("study_mode"),
+        ) != (alias_id, canonical_id, award, study_mode):
+            raise SnapshotError("unscoped aliases differ from the exact approved four")
+        if (alias_id in grouped_ids or canonical_id not in grouped_ids
+                or raw.get("study_variant") != "Standard"
+                or raw.get("amount") != 20600
+                or raw.get("currency") != "GBP"
+                or raw.get("fee_year") != 2026
+                or raw.get("fee_term") != "Full Course"):
+            raise SnapshotError("unscoped alias fee or membership differs from approved evidence")
+        canonical_group = next(group for group in cleaned if canonical_id in group["ids"])
+        if (canonical_group["award"] != award
+                or raw.get("source") != canonical_group["source"]
+                or not canonical_group["source"].startswith("https://www.law.ac.uk/")):
+            raise SnapshotError("unscoped alias award/source differs from canonical cohort")
+        unscoped.append({
+            "alias_course_id": alias_id, "canonical_course_id": canonical_id,
+            "award": award, "study_mode": study_mode, "study_variant": "Standard",
+            "amount": 20600, "currency": "GBP", "fee_year": 2026,
+            "fee_term": "Full Course", "source": raw["source"],
+        })
     if expected_groups == EXPECTED_GROUPS and expected_course_ids == EXPECTED_COURSE_IDS:
         for parent, reviewed in REVISED_UNIONS.items():
             if by_parent.get(parent) != reviewed["ids"]:
@@ -359,6 +406,7 @@ def validate_approved_mapping(value: Any, *, expected_groups: int = EXPECTED_GRO
     return {
         "schema_version": 1, "university_id": 92,
         "approval": value["approval"], "groups": cleaned,
+        "unscoped_aliases": unscoped,
     }
 
 
@@ -419,7 +467,119 @@ def _validate_snapshot(snapshot: Any) -> dict[str, Any]:
             raise SnapshotError(f"{key} rows require positive integer IDs")
         if len(ids) != len(set(ids)):
             raise SnapshotError(f"{key} contains duplicate IDs")
+    inventory = snapshot.get("published_course_inventory")
+    if inventory is not None:
+        if (not isinstance(inventory, list)
+                or snapshot.get("published_course_inventory_complete") is not True
+                or snapshot.get("published_course_inventory_count") != len(inventory)
+                or len(inventory) > MAX_COURSES
+                or not all(isinstance(row, dict) for row in inventory)):
+            raise SnapshotError("published-course collision inventory is incomplete")
+        inventory_ids = [row.get("id") for row in inventory]
+        if (any(not isinstance(i, int) or isinstance(i, bool) or i < 1
+                for i in inventory_ids) or len(inventory_ids) != len(set(inventory_ids))):
+            raise SnapshotError("published-course collision inventory has invalid IDs")
     return snapshot
+
+
+def _unscoped_alias_proposals(snapshot: dict[str, Any],
+                              approved: dict[str, Any]) -> list[dict[str, Any]]:
+    """Validate the four explicitly approved unscoped rows against the full course universe."""
+    inventory = snapshot.get("published_course_inventory")
+    if (snapshot.get("published_course_inventory_complete") is not True
+            or not isinstance(inventory, list)
+            or snapshot.get("published_course_inventory_count") != len(inventory)):
+        raise SnapshotError("complete published-course collision inventory is required")
+    by_id = {row["id"]: row for row in inventory}
+    map_ids = {cid for group in approved["groups"] for cid in group["ids"]}
+    permitted_ids = map_ids | {row["alias_course_id"] for row in approved["unscoped_aliases"]}
+    evidence_by_id: dict[int, list[dict[str, Any]]] = defaultdict(list)
+    for row in snapshot["evidence_rows"]:
+        if row.get("course_id") in {item["alias_course_id"] for item in approved["unscoped_aliases"]}:
+            evidence_by_id[row["course_id"]].append(row)
+    proposals = []
+    for item in approved["unscoped_aliases"]:
+        alias_id, canonical_id = item["alias_course_id"], item["canonical_course_id"]
+        alias = by_id.get(alias_id)
+        canonical = by_id.get(canonical_id)
+        observations = evidence_by_id.get(alias_id, [])
+        route_hash = "sha256:" + hashlib.sha256(item["source"].encode()).hexdigest()
+        if alias is None or canonical is None or not observations:
+            raise SnapshotError(f"approved unscoped alias {alias_id} lacks live course/evidence inventory")
+        if (alias.get("university_id") != 92 or canonical.get("university_id") != 92
+                or alias.get("course_website") != route_hash
+                or canonical.get("course_website") != route_hash
+                or alias.get("degree_level") != canonical.get("degree_level")
+                or _norm(alias.get("study_mode")) != _norm(item["study_mode"])
+                or _norm(canonical.get("study_mode")) != _norm(item["study_mode"])
+                or alias.get("status") != "active" or alias.get("approval_status") != "approved"
+                or canonical.get("status") != "active"
+                or canonical.get("approval_status") != "approved"):
+            raise SnapshotError(f"unscoped alias {alias_id} differs from canonical identity")
+        for course in (alias, canonical):
+            course_award = _norm(str(course.get("name") or "").split(" — ", 1)[0])
+            if course_award != _norm(item["award"]):
+                raise SnapshotError(f"unscoped alias {alias_id} award differs from approval")
+        identity_conflicts = [
+            row["id"] for row in inventory
+            if row.get("course_website") == route_hash
+            and _norm(str(row.get("name") or "").split(" — ", 1)[0]) == _norm(item["award"])
+            and row.get("degree_level") == alias.get("degree_level")
+            and _norm(row.get("study_mode")) == _norm(alias.get("study_mode"))
+            and row["id"] not in permitted_ids
+        ]
+        if identity_conflicts:
+            raise SnapshotError(
+                f"unreviewed same-identity published courses conflict with alias {alias_id}"
+            )
+        expected_fee = {
+            "amount": 20600, "currency": "GBP", "fee_year": 2026,
+            "fee_term": "Full Course",
+        }
+        legacy = alias.get("legacy_fee_rows")
+        if (not isinstance(legacy, list) or not legacy
+                or any({key: fee.get(key) for key in expected_fee} != expected_fee
+                       for fee in legacy if isinstance(fee, dict))
+                or any(not isinstance(fee, dict) for fee in legacy)):
+            raise SnapshotError(f"unscoped alias {alias_id} lacks exact published legacy fee")
+        fingerprints = []
+        for row in observations:
+            fee_authority = (row.get("extraction_method") or {}).get("fee_variants") or {}
+            selected = fee_authority.get("selected")
+            if (row.get("status") not in {"approved", "published"}
+                    or row.get("university_id") != 92
+                    or row.get("course_website") != route_hash
+                    or row.get("degree_level") != alias.get("degree_level")
+                    or _norm(row.get("study_mode")) != _norm(item["study_mode"])
+                    or row.get("international_fee") != 20600
+                    or row.get("currency") != "GBP"
+                    or row.get("fee_year") != 2026
+                    or row.get("fee_term") != "Full Course"
+                    or row.get("extraction_method", {}).get(SCOPE_KEY) is not None
+                    or fee_authority.get("status") != "uniform"
+                    or fee_authority.get("validated_uniform_authority") is not True
+                    or not isinstance(selected, list) or not selected
+                    or any(not isinstance(fee, dict)
+                           or fee.get("study_variant") != "Standard"
+                           or fee.get("amount") != 20600
+                           or fee.get("currency") != "GBP"
+                           or fee.get("year") != 2026
+                           or fee.get("period") != "Full Course"
+                           or fee.get("source_url") != route_hash
+                           for fee in selected)):
+                raise SnapshotError(f"unscoped staged evidence for alias {alias_id} is not exact")
+            fingerprints.append({
+                "staged_row_id": row["id"],
+                "evidence_precondition_sha256": _row_hash(row),
+            })
+        proposals.append({
+            **item,
+            "source_route_sha256": route_hash,
+            "course_precondition_sha256": _row_hash(alias),
+            "canonical_precondition_sha256": _row_hash(canonical),
+            "evidence_rows": sorted(fingerprints, key=lambda value: value["staged_row_id"]),
+        })
+    return proposals
 
 
 def _group_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[str, Any]],
@@ -917,6 +1077,10 @@ def build_review_manifest(snapshot: dict[str, Any], *,
         expected_course_ids=expected_course_ids,
         expected_aliases=expected_course_ids - expected_groups,
     )
+    unscoped_aliases = (
+        _unscoped_alias_proposals(snapshot, approved_mapping)
+        if approved_mapping["unscoped_aliases"] else []
+    )
     if not isinstance(approved_mapping_sha256, str) or not re.fullmatch(
             r"[0-9a-f]{64}", approved_mapping_sha256):
         raise SnapshotError("approved mapping requires its exact file SHA-256")
@@ -1106,6 +1270,41 @@ def build_review_manifest(snapshot: dict[str, Any], *,
             "approval_required": True,
         })
 
+    inventory = snapshot.get("published_course_inventory")
+    if inventory is not None:
+        all_reviewed_ids = approved_ids | {
+            item["alias_course_id"] for item in approved_mapping["unscoped_aliases"]
+        }
+        inventory_by_id = {row["id"]: row for row in inventory}
+        for group in groups:
+            if not group["members"]:
+                continue
+            member = group["members"][0]
+            source_hash = group["approved_source_sha256"]
+            route_hash = "sha256:" + source_hash
+            award = group["approved_award"]
+            degree = member.get("degree_level")
+            mode = member.get("study_mode")
+            collisions = [
+                course["id"] for course in inventory
+                if course.get("course_website") == route_hash
+                and _norm(str(course.get("name") or "").split(" — ", 1)[0]) == _norm(award)
+                and _identity_degree_level(course.get("degree_level"), award)
+                == _identity_degree_level(degree, award)
+                and _norm(course.get("study_mode")) == _norm(mode)
+                and course["id"] not in all_reviewed_ids
+            ]
+            if collisions:
+                group["blocking_reasons"] = list(dict.fromkeys(
+                    group["blocking_reasons"] + [
+                        "published collision inventory contains unreviewed same-identity "
+                        f"course ID {course_id}" for course_id in sorted(collisions)
+                    ]
+                ))
+                group["eligibility"] = "blocked"
+                group["proposed_canonical_course_id"] = None
+                group["proposed_mapping"] = []
+
     safe_count = sum(group["eligibility"] == "preview_candidate" for group in groups)
     safe_ids = sum(group["member_count"] for group in groups
                    if group["eligibility"] == "preview_candidate")
@@ -1124,6 +1323,13 @@ def build_review_manifest(snapshot: dict[str, Any], *,
             "course_ids": expected_course_ids,
         },
         "approved_mapping_sha256": approved_mapping_sha256,
+        "published_course_inventory_complete":
+            snapshot.get("published_course_inventory_complete") is True,
+        "published_course_inventory_count":
+            snapshot.get("published_course_inventory_count"),
+        "published_course_inventory_sha256": _sha256(
+            snapshot.get("published_course_inventory")
+        ),
         "external_reference_scope": "out_of_scope_preserve_original_course_ids",
         "observed_scope": {
             "raw_families": family_count,
@@ -1159,15 +1365,21 @@ def build_review_manifest(snapshot: dict[str, Any], *,
             "ignored_evidence_rows": ignored,
             "coverage_matches_approved_mapping": coverage_ok,
             "coverage_matches_expected": coverage_ok,
+            "unscoped_aliases": len(unscoped_aliases),
+            "original_course_ids_including_unscoped_aliases":
+                len(observed_ids) + len(unscoped_aliases),
+            "total_aliases_including_unscoped_aliases":
+                (expected_course_ids - expected_groups) + len(unscoped_aliases),
         },
         "reference_scan_complete": snapshot.get("reference_scan_complete") is True,
         "external_reference_scan_complete": snapshot.get("external_reference_scan_complete") is True,
         "groups": groups,
+        "unscoped_aliases": unscoped_aliases,
         "review_instructions": [
             f"The approved JSON file is authoritative for the {expected_groups} logical groups, awards, URLs, and {expected_course_ids} IDs.",
             f"The inventory must contain {expected_components} observed overlap components partitioned by the explicit mapping into {expected_groups} approved groups; the {expected_families}-family baseline may grow only through family subsets within one approved group.",
             "Review every staged row fingerprint, source fee, campus, and cross-run cohort before applying.",
-            f"All original course IDs and course rows are retained; {expected_course_ids - expected_groups} aliases are compatibility mappings only.",
+            f"All original course IDs and course rows are retained; {expected_course_ids - expected_groups} scoped aliases plus exactly four separately reviewed unscoped aliases are compatibility mappings only.",
             "External application-portal references are explicitly out of scope and were not scanned or cleared.",
             "Final approval must bind this manifest digest, the approved mapping digest, reviewer, revision, scope, and preserve-ID out-of-scope policy.",
         ],

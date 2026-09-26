@@ -110,7 +110,10 @@ def test_candidate_query_is_parameterized_and_projects_only_allowed_fields():
     }])
     rows = asyncio.run(exporter._candidate_evidence(fake))
     statement, params = fake.calls[0]
-    assert params == {"approved": "approved", "published": "published", "row_limit": 2001, "university_id": 92}
+    assert params == {
+        "approved": "approved", "published": "published", "row_limit": 2001,
+        "university_id": 92, "unscoped_ids": [9395, 9392, 9391, 9390],
+    }
     assert "status IN (:approved, :published)" in statement
     assert "LIMIT :row_limit" in statement
     assert "notes" not in statement

@@ -35,11 +35,14 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from course_duplicate_snapshot_export import (
+    MAX_COURSE_ROWS,
+    ExportRefused,
     _alias_counts,
     _course_fk_census,
     _field_approval_counts,
     _foreign_key_counts,
     _outside_pathway_counts,
+    _published_course_inventory,
     _simple_counts,
 )
 from course_duplicate_preview import (
@@ -57,6 +60,7 @@ from course_duplicate_preview import (
 EXPECTED_GROUPS = 100
 EXPECTED_COURSE_IDS = 307
 EXPECTED_ALIAS_COUNT = 207
+EXPECTED_UNSCOPED_ALIASES = 4
 MANIFEST_VERSION = 1
 SCOPE = "campus_fee_scope"
 IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_$]*$")
@@ -181,6 +185,18 @@ def load_approved_manifest(path: Path, expected_file_sha: str,
             f"{EXPECTED_OVERLAP_COMPONENTS} overlap components / "
             f"{EXPECTED_GROUPS} approved groups / {EXPECTED_COURSE_IDS} IDs"
         )
+    if (observed.get("unscoped_aliases") != EXPECTED_UNSCOPED_ALIASES
+            or observed.get("original_course_ids_including_unscoped_aliases") != 311
+            or observed.get("total_aliases_including_unscoped_aliases") != 211
+            or manifest.get("published_course_inventory_complete") is not True
+            or not isinstance(manifest.get("published_course_inventory_count"), int)
+            or isinstance(manifest.get("published_course_inventory_count"), bool)
+            or manifest.get("published_course_inventory_count") < 311
+            or manifest.get("published_course_inventory_count") > MAX_COURSE_ROWS
+            or not re.fullmatch(
+                r"[0-9a-f]{64}", str(manifest.get("published_course_inventory_sha256", ""))
+            )):
+        raise ApplyRefused("manifest lacks exact unscoped-alias and exhaustive-collision scope")
     approval = manifest.get("approval")
     if not isinstance(approval, dict) or approval.get("status") != "approved":
         raise ApplyRefused("manifest does not contain explicit reviewer approval")
@@ -214,6 +230,52 @@ def load_approved_manifest(path: Path, expected_file_sha: str,
             f"approval scope must explicitly certify {EXPECTED_GROUPS} groups, "
             f"{EXPECTED_COURSE_IDS} IDs, {EXPECTED_ALIAS_COUNT} aliases"
         )
+    expected_unscoped_scope = {
+        "aliases": EXPECTED_UNSCOPED_ALIASES,
+        "total_course_ids": EXPECTED_COURSE_IDS + EXPECTED_UNSCOPED_ALIASES,
+        "total_aliases": EXPECTED_ALIAS_COUNT + EXPECTED_UNSCOPED_ALIASES,
+    }
+    if approval.get("approved_unscoped_scope") != expected_unscoped_scope:
+        raise ApplyRefused(
+            "approval must separately certify exactly four unscoped aliases, "
+            "311 total course IDs, and 211 total aliases"
+        )
+    aliases = manifest.get("unscoped_aliases")
+    map_aliases = approved_mapping["unscoped_aliases"]
+    if not isinstance(aliases, list) or len(aliases) != EXPECTED_UNSCOPED_ALIASES:
+        raise ApplyRefused("manifest must contain exactly four separately approved unscoped aliases")
+    normalized_aliases = []
+    for reviewed, expected in zip(aliases, map_aliases):
+        if not isinstance(reviewed, dict) or any(
+            reviewed.get(key) != expected.get(key)
+            for key in (
+                "alias_course_id", "canonical_course_id", "award", "study_mode",
+                "study_variant", "amount", "currency", "fee_year", "fee_term",
+                "source",
+            )
+        ):
+            raise ApplyRefused("unscoped alias differs from exact approved mapping/evidence")
+        if reviewed.get("source_route_sha256") != (
+                "sha256:" + hashlib.sha256(expected["source"].encode()).hexdigest()):
+            raise ApplyRefused("unscoped alias route hash differs from approved official URL")
+        for digest_field in (
+            "course_precondition_sha256", "canonical_precondition_sha256",
+        ):
+            if not isinstance(reviewed.get(digest_field), str) or not re.fullmatch(
+                    r"[0-9a-f]{64}", reviewed[digest_field]):
+                raise ApplyRefused("unscoped alias is missing independent course fingerprints")
+        evidence_rows = reviewed.get("evidence_rows")
+        if not isinstance(evidence_rows, list) or not evidence_rows:
+            raise ApplyRefused("unscoped alias must fingerprint its exact source evidence rows")
+        for evidence in evidence_rows:
+            if (not isinstance(evidence, dict)
+                    or not isinstance(evidence.get("staged_row_id"), int)
+                    or isinstance(evidence.get("staged_row_id"), bool)
+                    or not isinstance(evidence.get("evidence_precondition_sha256"), str)
+                    or not re.fullmatch(r"[0-9a-f]{64}",
+                                        evidence["evidence_precondition_sha256"])):
+                raise ApplyRefused("unscoped evidence fingerprint is invalid")
+        normalized_aliases.append(reviewed)
 
     approved_by_parent = {group["parent"]: group for group in approved_mapping["groups"]}
     all_courses: list[int] = []
@@ -458,16 +520,28 @@ def load_approved_manifest(path: Path, expected_file_sha: str,
         raise ApplyRefused(
             f"manifest must identify all {EXPECTED_COURSE_IDS} IDs and every unique staged evidence row"
         )
+    scoped_course_ids = sorted(all_courses)
+    unscoped_course_ids = [row["alias_course_id"] for row in normalized_aliases]
+    unscoped_staged_ids = [
+        evidence["staged_row_id"]
+        for alias in normalized_aliases for evidence in alias["evidence_rows"]
+    ]
+    if (set(scoped_course_ids).intersection(unscoped_course_ids)
+            or len(set(unscoped_course_ids)) != EXPECTED_UNSCOPED_ALIASES
+            or len(set(unscoped_staged_ids)) != len(unscoped_staged_ids)
+            or set(all_staged).intersection(unscoped_staged_ids)):
+        raise ApplyRefused("unscoped alias IDs/evidence overlap the scoped approved cohort")
     return {
         "manifest": manifest,
         "groups": normalized_groups,
-        "course_ids": sorted(all_courses),
-        "staged_ids": sorted(all_staged),
+        "course_ids": sorted(all_courses) + sorted(unscoped_course_ids),
+        "staged_ids": sorted(all_staged) + sorted(unscoped_staged_ids),
         "file_sha256": expected_file_sha,
         "review_sha256": review_digest,
         "approval": approval,
         "approved_mapping": approved_mapping,
         "mapping_file_sha256": expected_mapping_sha,
+        "unscoped_aliases": normalized_aliases,
     }
 
 
@@ -534,6 +608,163 @@ def _course_projection(row: dict[str, Any], *, field_counts: dict[str, int],
         "alias_count": aliases,
         "legacy_fee_rows": legacy_fee_rows,
     }
+
+
+async def _verify_unscoped_aliases(conn, approved: dict, *, lock: bool) -> list[dict]:
+    """Independently recheck unscoped source, fee, identity and exhaustive collisions."""
+    from course_duplicate_snapshot_export import (
+        _digest_route, _safe_label, _safe_legacy_fee_rows,
+    )
+
+    try:
+        live_inventory = await _published_course_inventory(conn)
+    except ExportRefused as exc:
+        raise ApplyRefused(f"live published-course inventory is incomplete: {exc}") from exc
+    live_inventory_sha256 = sha256(live_inventory)
+    if (len(live_inventory) != approved["manifest"]["published_course_inventory_count"]
+            or live_inventory_sha256
+            != approved["manifest"]["published_course_inventory_sha256"]):
+        raise ApplyRefused(
+            "complete university-wide published-course inventory changed after review"
+        )
+
+    alias_specs = approved["unscoped_aliases"]
+    unscoped_ids = {item["alias_course_id"] for item in alias_specs}
+    expected_staged_ids = {
+        item["alias_course_id"]: {
+            row["staged_row_id"] for row in item["evidence_rows"]
+        }
+        for item in alias_specs
+    }
+    current_staged_rows = await conn.execute(
+        text("""
+            SELECT id, course_id
+              FROM scraped_courses
+             WHERE course_id IN :course_ids
+               AND status IN ('approved', 'published')
+             ORDER BY course_id, id
+        """).bindparams(bindparam("course_ids", expanding=True)),
+        {"course_ids": sorted(unscoped_ids)},
+    )
+    current_staged_ids: dict[int, set[int]] = defaultdict(set)
+    for row in current_staged_rows.mappings():
+        current_staged_ids[row["course_id"]].add(row["id"])
+    if any(
+        current_staged_ids.get(alias_id, set()) != staged_ids
+        for alias_id, staged_ids in expected_staged_ids.items()
+    ):
+        raise ApplyRefused(
+            "approved/published staged evidence set changed after review for an unscoped alias"
+        )
+
+    ids = sorted({
+        course_id for item in alias_specs
+        for course_id in (item["alias_course_id"], item["canonical_course_id"])
+    })
+    courses = await _fetch_rows(conn, "courses", ids, lock=lock)
+    if len(courses) != len(ids):
+        raise ApplyRefused("an approved unscoped alias or canonical course is missing")
+    course_by_id = {row["id"]: row for row in courses}
+    fees = await _fetch_rows(conn, "fees", ids, "course_id", lock=lock)
+    fees_by_id: dict[int, list[dict[str, Any]]] = defaultdict(list)
+    for fee in fees:
+        fees_by_id[fee["course_id"]].append(fee)
+
+    def inventory_projection(row):
+        return {
+            "id": row["id"], "university_id": row["university_id"],
+            "name": _safe_label(row["name"], "published award name"),
+            "course_website": _digest_route(row.get("course_website")),
+            "degree_level": _safe_label(row.get("degree_level"), "published degree"),
+            "study_mode": _safe_label(row.get("study_mode"), "published study mode"),
+            "course_location": _safe_label(row.get("course_location"), "published location"),
+            "status": row["status"], "approval_status": row["approval_status"],
+            "offering_identity": "present" if row.get("offering_identity") else None,
+            "legacy_fee_rows": _safe_legacy_fee_rows(fees_by_id.get(row["id"], [])),
+        }
+
+    inventory_hash_by_id = {
+        cid: sha256(inventory_projection(course)) for cid, course in course_by_id.items()
+    }
+    all_courses = await conn.execute(text("""
+        SELECT id, university_id, name, course_website, degree_level, study_mode
+          FROM courses WHERE university_id = 92 ORDER BY id
+    """))
+    collision_universe = [dict(row) for row in all_courses.mappings()]
+    permitted = set(approved["course_ids"])
+    plans = []
+    for item in alias_specs:
+        alias_id, canonical_id = item["alias_course_id"], item["canonical_course_id"]
+        alias, canonical = course_by_id[alias_id], course_by_id[canonical_id]
+        route_hash = "sha256:" + hashlib.sha256(item["source"].encode()).hexdigest()
+        award_norm = _norm(item["award"])
+        if (inventory_hash_by_id[alias_id] != item["course_precondition_sha256"]
+                or inventory_hash_by_id[canonical_id] != item["canonical_precondition_sha256"]):
+            raise ApplyRefused(f"unscoped course {alias_id} changed after preview")
+        if (alias["university_id"] != 92 or canonical["university_id"] != 92
+                or _digest_route(alias.get("course_website")) != route_hash
+                or _digest_route(canonical.get("course_website")) != route_hash
+                or alias.get("degree_level") != canonical.get("degree_level")
+                or _norm(alias.get("study_mode")) != _norm(item["study_mode"])
+                or _norm(canonical.get("study_mode")) != _norm(item["study_mode"])
+                or alias.get("status") != "active"
+                or alias.get("approval_status") != "approved"
+                or canonical.get("status") != "active"
+                or canonical.get("approval_status") != "approved"
+                or _norm(str(alias.get("name") or "").split(" — ", 1)[0]) != award_norm
+                or _norm(str(canonical.get("name") or "").split(" — ", 1)[0]) != award_norm):
+            raise ApplyRefused(f"unscoped course {alias_id} no longer matches canonical identity")
+        expected_fee = {
+            "amount": 20600.0, "currency": "GBP",
+            "fee_year": 2026, "fee_term": "Full Course",
+        }
+        alias_fees = _safe_legacy_fee_rows(fees_by_id.get(alias_id, []))
+        if (not alias_fees or any(
+                {key: fee.get(key) for key in expected_fee} != expected_fee
+                for fee in alias_fees)):
+            raise ApplyRefused(f"unscoped course {alias_id} legacy fee changed")
+        staged_ids = [row["staged_row_id"] for row in item["evidence_rows"]]
+        staged_rows = await _fetch_rows(conn, "scraped_courses", staged_ids, lock=lock)
+        if len(staged_rows) != len(staged_ids):
+            raise ApplyRefused(f"unscoped course {alias_id} staged evidence disappeared")
+        expected_by_id = {row["staged_row_id"]: row for row in item["evidence_rows"]}
+        for staged in staged_rows:
+            projection = _evidence_projection(staged)
+            projection.pop("_split_from_id", None)
+            if sha256(projection) != expected_by_id[staged["id"]]["evidence_precondition_sha256"]:
+                raise ApplyRefused(f"unscoped course {alias_id} staged evidence changed")
+            metadata = staged.get("extraction_method") or {}
+            variants = (metadata.get("fee_variants") or {}).get("selected") or []
+            if (staged.get("course_id") != alias_id
+                    or _norm(staged.get("study_mode")) != _norm(item["study_mode"])
+                    or (metadata.get(SCOPE) is not None)
+                    or staged.get("international_fee") != 20600
+                    or staged.get("currency") != "GBP"
+                    or staged.get("fee_year") != 2026
+                    or staged.get("fee_term") != "Full Course"
+                    or not variants or any(
+                        not isinstance(variant, dict)
+                        or variant.get("study_variant") != "Standard"
+                        or variant.get("amount") != 20600
+                            or variant.get("source_url") != item["source"]
+                        for variant in variants)):
+                raise ApplyRefused(f"unscoped course {alias_id} source fee/variant is invalid")
+        for candidate in collision_universe:
+            if (candidate["course_website"] == alias["course_website"]
+                    and _norm(str(candidate.get("name") or "").split(" — ", 1)[0])
+                    == award_norm
+                    and candidate.get("degree_level") == alias.get("degree_level")
+                    and _norm(candidate.get("study_mode")) == _norm(alias.get("study_mode"))
+                    and candidate["id"] not in permitted):
+                raise ApplyRefused(
+                    f"unreviewed same-identity course {candidate['id']} conflicts with alias {alias_id}"
+                )
+        if await _alias_counts(conn, [alias_id, canonical_id]):
+            raise ApplyRefused(f"unscoped alias {alias_id} already participates in an alias")
+        if await _simple_counts(conn, "course_offerings", "course_id", [alias_id]):
+            raise ApplyRefused(f"unscoped alias {alias_id} already has published offerings")
+        plans.append({"mapping": item, "alias": alias, "canonical": canonical})
+    return plans
 
 
 def _group_evidence(group: dict[str, Any], rows: dict[int, dict[str, Any]]) -> tuple[list[dict], tuple]:
@@ -949,6 +1180,36 @@ async def _audit_snapshot(conn, *, audit_id: str, manifest_sha: str,
         })
 
 
+def _assert_unscoped_original_rows_preserved(before: dict[str, Any],
+                                               after: dict[str, Any],
+                                               alias_ids: set[int]) -> None:
+    """Ensure the four historical rows and all non-alias FK rows were untouched."""
+    for table in ("courses", "fees", "scraped_courses", "course_offerings"):
+        def related(rows):
+            return sorted(
+                (row for row in rows if row.get("id") in alias_ids
+                 or row.get("course_id") in alias_ids),
+                key=lambda row: json.dumps(row, sort_keys=True, default=_json_default),
+            )
+        if related(before.get(table, [])) != related(after.get(table, [])):
+            raise ApplyRefused(f"unscoped historical {table} rows were unexpectedly changed")
+    for table, old_rows in before.get("foreign_key_rows", {}).items():
+        new_rows = after.get("foreign_key_rows", {}).get(table, [])
+        def related_fk(rows):
+            result = []
+            for wrapper in rows:
+                row = wrapper.get("row_data", wrapper)
+                if (row.get("course_id") in alias_ids
+                        or row.get("source_course_id") in alias_ids
+                        or row.get("target_course_id") in alias_ids):
+                    result.append(wrapper)
+            return sorted(result, key=lambda row: json.dumps(
+                row, sort_keys=True, default=_json_default,
+            ))
+        if related_fk(old_rows) != related_fk(new_rows):
+            raise ApplyRefused(f"unscoped historical foreign keys changed in {table}")
+
+
 async def _verify_and_plan(conn, approved: dict, *, lock: bool = False) -> list[dict]:
     course_ids = approved["course_ids"]
     staged_ids = approved["staged_ids"]
@@ -1243,12 +1504,19 @@ async def _run(approved: dict, *, apply: bool, actor: str, expected_database: st
                     if version != "389_course_identity_audit":
                         raise ApplyRefused("required audit migration 389 is not the live schema head")
                     plans = await _verify_and_plan(conn, approved, lock=True)
+                    unscoped_plans = await _verify_unscoped_aliases(
+                        conn, approved, lock=True,
+                    )
                     plan_digest = sha256([{
                         "canonical_id": p["canonical_id"], "identity": p["identity"],
                         "locations": [item["campus"] for item in p["locations"]],
                         "alias_ids": sorted(m["course_id"] for m in p["group"]["members"]
                                             if m["course_id"] != p["canonical_id"]),
-                    } for p in plans])
+                    } for p in plans] + [{
+                        "alias_course_id": plan["mapping"]["alias_course_id"],
+                        "canonical_course_id": plan["mapping"]["canonical_course_id"],
+                        "source_route_sha256": plan["mapping"]["source_route_sha256"],
+                    } for plan in unscoped_plans])
                     from uuid import uuid4
                     audit_id = str(uuid4())
                     before = await _affected_state_snapshot(conn, approved)
@@ -1327,7 +1595,57 @@ async def _run(approved: dict, *, apply: bool, actor: str, expected_database: st
                                          "out_of_scope_preserve_original_course_ids",
                                 }, sort_keys=True),
                             })
+                    for plan in unscoped_plans:
+                        mapping = plan["mapping"]
+                        await conn.execute(text("""
+                            INSERT INTO course_id_aliases
+                                (alias_course_id, canonical_course_id, reason, created_by,
+                                 audit_metadata)
+                            VALUES (:alias_id, :canonical_id, :reason, :actor,
+                                    CAST(:metadata AS jsonb))
+                        """), {
+                            "alias_id": mapping["alias_course_id"],
+                            "canonical_id": mapping["canonical_course_id"],
+                            "reason": "Task #629 separately reviewed unscoped historical MBA alias",
+                            "actor": actor,
+                            "metadata": json.dumps({
+                                "task": 629,
+                                "alias_scope": "approved_unscoped_historical_mba",
+                                "manifest_sha256": approved["file_sha256"],
+                                "review_manifest_sha256": approved["review_sha256"],
+                                "approval_revision": approved["approval"]["revision"],
+                                "approved_by": approved["approval"]["approved_by"],
+                                "university_id": 92,
+                                "award": mapping["award"],
+                                "source_route_sha256": mapping["source_route_sha256"],
+                                "study_variant": mapping["study_variant"],
+                                "amount": mapping["amount"],
+                                "currency": mapping["currency"],
+                                "fee_year": mapping["fee_year"],
+                                "fee_term": mapping["fee_term"],
+                                "approved_mapping_sha256": approved["mapping_file_sha256"],
+                                "external_reference_scope":
+                                    "out_of_scope_preserve_original_course_ids",
+                            }, sort_keys=True),
+                        })
                     after = await _affected_state_snapshot(conn, approved)
+                    unscoped_ids = {
+                        item["alias_course_id"] for item in approved["unscoped_aliases"]
+                    }
+                    _assert_unscoped_original_rows_preserved(before, after, unscoped_ids)
+                    alias_result = await conn.execute(text("""
+                        SELECT alias_course_id, canonical_course_id
+                          FROM course_id_aliases
+                         WHERE alias_course_id = ANY(:alias_ids)
+                         ORDER BY alias_course_id
+                    """), {"alias_ids": sorted(unscoped_ids)})
+                    inserted = [tuple(row) for row in alias_result.all()]
+                    expected_inserted = sorted(
+                        (item["alias_course_id"], item["canonical_course_id"])
+                        for item in approved["unscoped_aliases"]
+                    )
+                    if inserted != expected_inserted:
+                        raise ApplyRefused("live unscoped alias inserts failed independent verification")
                     await _audit_snapshot(
                         conn, audit_id=audit_id, manifest_sha=approved["file_sha256"],
                         approval_revision=approved["approval"]["revision"], actor=actor,
@@ -1347,7 +1665,9 @@ async def _run(approved: dict, *, apply: bool, actor: str, expected_database: st
                             "review_manifest_sha256": approved["review_sha256"],
                             "plan_sha256": plan_digest,
                             "groups": len(plans), "course_ids": len(approved["course_ids"]),
-                            "aliases": EXPECTED_ALIAS_COUNT,
+                            "aliases": EXPECTED_ALIAS_COUNT + EXPECTED_UNSCOPED_ALIASES,
+                            "scoped_aliases": EXPECTED_ALIAS_COUNT,
+                            "unscoped_aliases": EXPECTED_UNSCOPED_ALIASES,
                             "approved_mapping_sha256": approved["mapping_file_sha256"],
                             "external_reference_scope":
                                 "out_of_scope_preserve_original_course_ids",
@@ -1359,22 +1679,34 @@ async def _run(approved: dict, *, apply: bool, actor: str, expected_database: st
                         "manifest_sha256": approved["file_sha256"],
                         "plan_sha256": plan_digest, "groups": len(plans),
                         "course_ids": len(approved["course_ids"]),
-                        "aliases": EXPECTED_ALIAS_COUNT,
+                        "aliases": EXPECTED_ALIAS_COUNT + EXPECTED_UNSCOPED_ALIASES,
+                        "scoped_aliases": EXPECTED_ALIAS_COUNT,
+                        "unscoped_aliases": EXPECTED_UNSCOPED_ALIASES,
                     }
                     if rollback_after_apply:
                         raise _RollbackCanary(result, before)
                 else:
                     plans = await _verify_and_plan(conn, approved)
+                    unscoped_plans = await _verify_unscoped_aliases(
+                        conn, approved, lock=False,
+                    )
                     plan_digest = sha256([{
                         "canonical_id": p["canonical_id"], "identity": p["identity"],
                         "locations": [item["campus"] for item in p["locations"]],
-                    } for p in plans])
+                    } for p in plans] + [{
+                        "alias_course_id": plan["mapping"]["alias_course_id"],
+                        "canonical_course_id": plan["mapping"]["canonical_course_id"],
+                        "source_route_sha256": plan["mapping"]["source_route_sha256"],
+                    } for plan in unscoped_plans])
                     result = {
                         "mode": "dry-run", "database": db_name,
                         "manifest_sha256": approved["file_sha256"],
                         "plan_sha256": plan_digest, "groups": len(plans),
                         "course_ids": len(approved["course_ids"]),
-                        "aliases": EXPECTED_ALIAS_COUNT, "writes": 0,
+                        "aliases": EXPECTED_ALIAS_COUNT + EXPECTED_UNSCOPED_ALIASES,
+                        "scoped_aliases": EXPECTED_ALIAS_COUNT,
+                        "unscoped_aliases": EXPECTED_UNSCOPED_ALIASES,
+                        "writes": 0,
                     }
             except _RollbackCanary as canary:
                 async with conn.begin():

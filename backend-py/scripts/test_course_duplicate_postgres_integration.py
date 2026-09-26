@@ -144,6 +144,11 @@ def _fixture(mapping: dict):
     course_rows = []
     evidence_rows = []
     staged_id = 1
+    unscoped_mode_by_parent = {
+        next(group["parent"] for group in mapping["groups"]
+             if alias["canonical_course_id"] in group["ids"]): alias["study_mode"]
+        for alias in mapping["unscoped_aliases"]
+    }
     all_ids = []
     group_first_pair = []
     for group_index, group in enumerate(mapping["groups"]):
@@ -198,6 +203,14 @@ def _fixture(mapping: dict):
                 fee = 18_250.0 if course_id in {9396, 9608, 9675} else 19_600.0
                 fee_term = "Full Course"
                 variant = "Standard"
+            elif group["parent"] in unscoped_mode_by_parent:
+                location = f"Canary campus {course_id}"
+                scope_locations = [location]
+                name_location = location
+                fee_campus = location
+                fee = 20_600.0
+                fee_term = "Full Course"
+                variant = "Standard"
             elif group_index == 1 and course_id == group["parent"]:
                 location = "Hull"
                 scope_locations = ["Hull"]
@@ -234,11 +247,12 @@ def _fixture(mapping: dict):
                 name_location = location
                 fee_campus = location
                 fee = float(10_000 + (course_id % 1_000))
+            course_study_mode = unscoped_mode_by_parent.get(group["parent"], "Full-time")
             course_rows.append({
                 "id": course_id, "university_id": 92,
                 "name": f"{group['award']} — {name_location}",
                 "course_website": group["source"], "degree_level": published_degree,
-                "study_mode": "Full-time", "course_location": location,
+                "study_mode": course_study_mode, "course_location": location,
                 "status": "active", "approval_status": "approved",
                 "offering_identity": None, "field_approval_counts": {"name": 1},
                 "reference_counts": {}, "outside_reference_count": 0,
@@ -275,7 +289,7 @@ def _fixture(mapping: dict):
                     "status": "published",
                     "course_name": f"{group['award']} — {name_location}",
                     "course_location": location, "course_website": group["source"],
-                    "degree_level": degree, "study_mode": "Full-time",
+                    "degree_level": degree, "study_mode": course_study_mode,
                     "international_fee": fee, "fee_year": 2026,
                     "fee_term": fee_term, "currency": "GBP",
                     "fee_scope_key": scope["key"],
@@ -355,16 +369,90 @@ def _fixture(mapping: dict):
                 },
             })
             staged_id += 1
+    for alias in mapping["unscoped_aliases"]:
+        canonical = next(row for row in course_rows
+                         if row["id"] == alias["canonical_course_id"])
+        source = alias["source"]
+        route_hash_source = "sha256:" + hashlib.sha256(source.encode()).hexdigest()
+        study_mode = alias["study_mode"]
+        fee = float(alias["amount"])
+        course_rows.append({
+            "id": alias["alias_course_id"], "university_id": 92,
+            "name": alias["award"],
+            "course_website": source,
+            "degree_level": canonical["degree_level"],
+            "study_mode": study_mode,
+            "course_location": None, "status": "active",
+            "approval_status": "approved", "offering_identity": None,
+            "field_approval_counts": {"name": 1}, "reference_counts": {},
+            "outside_reference_count": 0, "existing_offering_count": 0,
+            "alias_count": 0,
+        })
+        options = [{
+            "amount": fee, "currency": "GBP", "campus": "Unspecified",
+            "study_variant": "Standard", "year": 2026,
+            "period": "Full Course", "source_url": route_hash_source,
+            "snippet": f"International Students | 2026 | Standard | Unspecified: £{fee}",
+        }]
+        evidence_rows.append({
+            "id": staged_id, "scrape_job_id": f"unscoped-job-{alias['alias_course_id']}",
+            "university_id": 92, "course_id": alias["alias_course_id"],
+            "status": "published", "course_name": alias["award"],
+            "course_location": None, "course_website": route_hash_source,
+            "degree_level": canonical["degree_level"],
+            "study_mode": study_mode,
+            "international_fee": fee, "fee_year": 2026,
+            "fee_term": "Full Course", "currency": "GBP",
+            "fee_scope_key": None,
+            "extraction_method": {
+                "international_fee": "fee.ulaw_course_authority",
+                "fee_variants": {
+                    "status": "uniform", "selected": options, "options": options,
+                    "fee_year": 2026, "fee_term": "Full Course",
+                    "currency": "GBP", "international_fee": fee,
+                    "validated_uniform_authority": True,
+                },
+            },
+        })
+        staged_id += 1
+    fee_by_course = {row["course_id"]: row for row in evidence_rows}
+    published_inventory = []
+    for course in course_rows:
+        fee_row = fee_by_course.get(course["id"])
+        fees = [] if fee_row is None else [{
+                "id": 1, "amount": float(fee_row["international_fee"]),
+            "currency": fee_row["currency"], "fee_term": fee_row["fee_term"],
+            "fee_year": fee_row["fee_year"],
+        }]
+        published_inventory.append({
+            key: (
+                "sha256:" + hashlib.sha256(course["course_website"].encode()).hexdigest()
+                if key == "course_website" and course.get("course_website") else course.get(key)
+            ) for key in (
+                "id", "university_id", "name", "course_website", "degree_level",
+                "study_mode", "course_location", "status", "approval_status",
+            )
+        } | {
+            "offering_identity": "present" if course.get("offering_identity") else None,
+            "legacy_fee_rows": fees,
+        })
     return {
         "schema_version": 1, "reference_scan_complete": True,
         "external_reference_scan_complete": False,
         "raw_family_count": 171, "logical_component_count": 129,
         "evidence_rows": evidence_rows, "courses": course_rows,
+        "published_course_inventory": published_inventory,
+        "published_course_inventory_complete": True,
+        "published_course_inventory_count": len(published_inventory),
     }, course_rows, evidence_rows, group_first_pair
 
 
 async def _seed(engine, course_rows: list[dict], evidence_rows: list[dict],
                 internal_pathway: list[int]) -> None:
+    mapping = json.loads(MAPPING_PATH.read_text(encoding="utf-8"))
+    unscoped_by_id = {
+        item["alias_course_id"]: item for item in mapping["unscoped_aliases"]
+    }
     async with engine.begin() as conn:
         for statement in DDL:
             await conn.execute(text(statement))
@@ -391,10 +479,18 @@ async def _seed(engine, course_rows: list[dict], evidence_rows: list[dict],
                 "id", "university_id", "name", "course_website", "degree_level",
                 "study_mode", "course_location", "status", "approval_status",
             )}
+            , **({"course_website": unscoped_by_id[row["id"]]["source"]}
+                 if row["id"] in unscoped_by_id else {})
         } for row in course_rows])
         stage_payloads = []
         for row in evidence_rows:
             row = dict(row)
+            alias = unscoped_by_id.get(row["course_id"])
+            if alias:
+                row["course_website"] = alias["source"]
+                variants = row.get("extraction_method", {}).get("fee_variants", {})
+                for option in variants.get("selected", []) + variants.get("options", []):
+                    option["source_url"] = alias["source"]
             row["extraction_method"] = json.dumps(row["extraction_method"])
             stage_payloads.append(row)
         await conn.execute(text("""
@@ -444,12 +540,19 @@ def _reviewed_manifest(snapshot: dict, mapping: dict, mapping_sha: str, path: Pa
     assert manifest["observed_scope"]["raw_families"] == 146
     assert manifest["observed_scope"]["groups"] == 100
     assert manifest["observed_scope"]["unique_course_ids"] == 307
-    assert manifest["observed_scope"]["preview_candidate_groups"] == 100
+    assert manifest["observed_scope"]["unscoped_aliases"] == 4
+    assert manifest["observed_scope"]["preview_candidate_groups"] == 100, [
+        (group["course_ids"][0], group["blocking_reasons"][:8])
+        for group in manifest["groups"] if group["eligibility"] != "preview_candidate"
+    ]
     assert all(group["eligibility"] == "preview_candidate" for group in manifest["groups"])
     manifest["approval"] = {
         "status": "approved", "revision": "629-isolated-integration-r1",
         "approved_by": "isolated PostgreSQL integration test",
         "approved_scope": {"groups": 100, "course_ids": 307, "aliases": 207},
+        "approved_unscoped_scope": {
+            "aliases": 4, "total_course_ids": 311, "total_aliases": 211,
+        },
         "approved_mapping_sha256": mapping_sha,
         "external_reference_scope": "out_of_scope_preserve_original_course_ids",
     }
@@ -463,7 +566,8 @@ def _reviewed_manifest(snapshot: dict, mapping: dict, mapping_sha: str, path: Pa
 
 async def _insert_unreviewed_same_award_course(engine, group: dict, *,
                                                 course_id: int, staged_id: int,
-                                                variant: str) -> None:
+                                                variant: str,
+                                                study_mode: str = "Full-time") -> None:
     location = f"Unreviewed campus {course_id}"
     fee = float(14_000 + course_id % 1_000)
     option = {
@@ -491,11 +595,11 @@ async def _insert_unreviewed_same_award_course(engine, group: dict, *,
             INSERT INTO courses
                 (id, university_id, name, course_website, degree_level, study_mode,
                  course_location, status, approval_status, category)
-            VALUES (:id, 92, :name, :source, 'Master', 'Full-time',
+            VALUES (:id, 92, :name, :source, 'Master', :study_mode,
                     :location, 'active', 'approved', 'Law')
         """), {
             "id": course_id, "name": group["award"], "source": group["source"],
-            "location": location,
+            "location": location, "study_mode": study_mode,
         })
         await conn.execute(text("""
             INSERT INTO scraped_courses
@@ -504,12 +608,13 @@ async def _insert_unreviewed_same_award_course(engine, group: dict, *,
                  international_fee, fee_year, fee_term, currency, fee_scope_key,
                  extraction_method)
             VALUES (:id, 'unreviewed-job', 92, :course_id, 'published', :course_name,
-                    :location, :source, 'Master', 'Full-time', :fee, 2026, 'Annual',
+                    :location, :source, 'Master', :study_mode, :fee, 2026, 'Annual',
                     'GBP', :scope_key, CAST(:metadata AS jsonb))
         """), {
             "id": staged_id, "course_id": course_id,
             "course_name": f"{group['award']} — {location}", "location": location,
             "source": group["source"], "fee": fee, "scope_key": scope["key"],
+            "study_mode": study_mode,
             "metadata": json.dumps(metadata),
         })
         await conn.execute(text("""
@@ -615,6 +720,94 @@ def test_approved_mapping_contains_only_the_two_reviewed_group_merges():
         if changed_ids.intersection(group["ids"])
     } == {9389, 9396}
     assert len(groups) - 2 == 98
+    assert [
+        (item["alias_course_id"], item["canonical_course_id"])
+        for item in json.loads(MAPPING_PATH.read_text())["unscoped_aliases"]
+    ] == [(9395, 9611), (9392, 9636), (9391, 9639), (9390, 9642)]
+    assert [item["study_mode"] for item in json.loads(
+        MAPPING_PATH.read_text()
+    )["unscoped_aliases"]] == ["Blended", "On Campus", "On Campus", "On Campus"]
+    assert all("location" not in item for item in json.loads(
+        MAPPING_PATH.read_text()
+    )["unscoped_aliases"])
+    assert not {
+        item["alias_course_id"] for item in json.loads(MAPPING_PATH.read_text())["unscoped_aliases"]
+    }.intersection({course_id for group in groups for course_id in group["ids"]})
+
+
+def test_four_unscoped_aliases_require_exact_evidence_and_complete_collision_scan():
+    mapping_bytes = MAPPING_PATH.read_bytes()
+    mapping = json.loads(mapping_bytes)
+    snapshot, _, _, _ = _fixture(mapping)
+    manifest = preview.build_review_manifest(
+        snapshot, approved_mapping=mapping,
+        approved_mapping_sha256=hashlib.sha256(mapping_bytes).hexdigest(),
+    )
+    assert len(manifest["unscoped_aliases"]) == 4
+    assert manifest["observed_scope"]["original_course_ids_including_unscoped_aliases"] == 311
+    assert manifest["observed_scope"]["total_aliases_including_unscoped_aliases"] == 211
+    assert all(len(alias["evidence_rows"]) == 1 for alias in manifest["unscoped_aliases"])
+    assert [alias["study_mode"] for alias in manifest["unscoped_aliases"]] == [
+        "Blended", "On Campus", "On Campus", "On Campus",
+    ]
+
+    mismatched_course_mode = dict(snapshot)
+    mismatched_course_mode["published_course_inventory"] = [
+        dict(row) for row in snapshot["published_course_inventory"]
+    ]
+    next(row for row in mismatched_course_mode["published_course_inventory"]
+         if row["id"] == 9395)["study_mode"] = "On Campus"
+    with pytest.raises(preview.SnapshotError, match="canonical identity"):
+        preview.build_review_manifest(
+            mismatched_course_mode, approved_mapping=mapping,
+            approved_mapping_sha256=hashlib.sha256(mapping_bytes).hexdigest(),
+        )
+
+    mismatched_evidence_mode = dict(snapshot)
+    mismatched_evidence_mode["evidence_rows"] = [
+        dict(row) for row in snapshot["evidence_rows"]
+    ]
+    next(row for row in mismatched_evidence_mode["evidence_rows"]
+         if row["course_id"] == 9395)["study_mode"] = "On Campus"
+    with pytest.raises(preview.SnapshotError, match="staged evidence"):
+        preview.build_review_manifest(
+            mismatched_evidence_mode, approved_mapping=mapping,
+            approved_mapping_sha256=hashlib.sha256(mapping_bytes).hexdigest(),
+        )
+
+    collision = dict(snapshot)
+    collision["published_course_inventory"] = list(snapshot["published_course_inventory"])
+    duplicate = dict(next(
+        row for row in collision["published_course_inventory"] if row["id"] == 9395
+    ))
+    duplicate["id"] = 999_999
+    collision["published_course_inventory"].append(duplicate)
+    collision["published_course_inventory_count"] += 1
+    with pytest.raises(preview.SnapshotError, match="unreviewed same-identity"):
+        preview.build_review_manifest(
+            collision, approved_mapping=mapping,
+            approved_mapping_sha256=hashlib.sha256(mapping_bytes).hexdigest(),
+        )
+    scoped_collision = dict(snapshot)
+    scoped_collision["published_course_inventory"] = list(
+        snapshot["published_course_inventory"]
+    )
+    duplicate_scoped = dict(next(
+        row for row in scoped_collision["published_course_inventory"]
+        if row["id"] == 9389
+    ))
+    duplicate_scoped["id"] = 999_998
+    scoped_collision["published_course_inventory"].append(duplicate_scoped)
+    scoped_collision["published_course_inventory_count"] += 1
+    blocked = preview.build_review_manifest(
+        scoped_collision, approved_mapping=mapping,
+        approved_mapping_sha256=hashlib.sha256(mapping_bytes).hexdigest(),
+    )
+    group_9389 = next(group for group in blocked["groups"]
+                      if group["course_ids"][0] == 9389)
+    assert group_9389["eligibility"] == "blocked"
+    assert any("published collision inventory" in reason
+               for reason in group_9389["blocking_reasons"])
 
 
 @pytest.mark.integration
@@ -669,6 +862,54 @@ def test_task629_end_to_end_canary_schema():
                 assert observed["extra_course_ids"] == 25
                 assert observed["excluded_unrelated_course_ids"] == list(range(910_000, 910_025))
                 assert observed["related_extra_course_ids"] == []
+
+                async with test_engine.begin() as conn:
+                    await conn.execute(text("""
+                        INSERT INTO courses
+                            (id, university_id, name, course_website, degree_level,
+                             study_mode, course_location, status, approval_status)
+                        VALUES (900005, 92, 'Inventory drift', 'https://unrelated.example.test/drift',
+                                'Master', 'Full-time', NULL, 'active', 'approved')
+                    """))
+                with pytest.raises(
+                    apply_tool.ApplyRefused,
+                    match="complete university-wide published-course inventory changed",
+                ):
+                    await apply_tool._run(
+                        approved, apply=False, actor="", expected_database=db_name,
+                        confirm_write=False, _test_database_url=database_url,
+                        _test_schema=schema,
+                    )
+                async with test_engine.begin() as conn:
+                    await conn.execute(text("DELETE FROM courses WHERE id = 900005"))
+
+                async with test_engine.begin() as conn:
+                    await conn.execute(text("""
+                        INSERT INTO scraped_courses
+                            (id, scrape_job_id, university_id, course_id, status,
+                             course_name, course_location, course_website, degree_level,
+                             study_mode, international_fee, fee_year, fee_term, currency,
+                             fee_scope_key, extraction_method)
+                        SELECT 900105, scrape_job_id || '-late', university_id, course_id,
+                               status, course_name, course_location, course_website,
+                               degree_level, study_mode, international_fee, fee_year,
+                               fee_term, currency, fee_scope_key, extraction_method
+                          FROM scraped_courses
+                         WHERE course_id = 9395 AND status IN ('approved', 'published')
+                         ORDER BY id LIMIT 1
+                    """))
+                with pytest.raises(
+                    apply_tool.ApplyRefused,
+                    match="staged evidence set changed after review",
+                ):
+                    await apply_tool._run(
+                        approved, apply=False, actor="", expected_database=db_name,
+                        confirm_write=False, _test_database_url=database_url,
+                        _test_schema=schema,
+                    )
+                async with test_engine.begin() as conn:
+                    await conn.execute(text("DELETE FROM scraped_courses WHERE id = 900105"))
+
                 duplicate_group = mapping["groups"][0]
                 mapped_variant = "Standard"
                 await _insert_unreviewed_same_award_course(
@@ -711,6 +952,46 @@ def test_task629_end_to_end_canary_schema():
                         _test_schema=schema,
                     )
                 await _remove_unreviewed_course(test_engine, 900_003)
+
+                mba_group = next(
+                    group for group in mapping["groups"] if 9611 in group["ids"]
+                )
+                await _insert_unreviewed_same_award_course(
+                    test_engine, mba_group, course_id=900_004,
+                    staged_id=900_104, variant="Standard",
+                    study_mode="Blended",
+                )
+                with pytest.raises(apply_tool.ApplyRefused):
+                    await apply_tool._run(
+                        approved, apply=False, actor="", expected_database=db_name,
+                        confirm_write=False, _test_database_url=database_url,
+                        _test_schema=schema,
+                    )
+                await _remove_unreviewed_course(test_engine, 900_004)
+
+                unscoped_evidence = next(
+                    row for row in evidence_rows if row["course_id"] == 9395
+                )
+                async with test_engine.begin() as conn:
+                    await conn.execute(text("""
+                        UPDATE scraped_courses
+                           SET international_fee = international_fee + 1
+                         WHERE id = :id
+                    """), {"id": unscoped_evidence["id"]})
+                with pytest.raises(apply_tool.ApplyRefused, match="changed|fingerprint"):
+                    await apply_tool._run(
+                        approved, apply=False, actor="", expected_database=db_name,
+                        confirm_write=False, _test_database_url=database_url,
+                        _test_schema=schema,
+                    )
+                async with test_engine.begin() as conn:
+                    await conn.execute(text("""
+                        UPDATE scraped_courses SET international_fee = :fee
+                         WHERE id = :id
+                    """), {
+                        "id": unscoped_evidence["id"],
+                        "fee": unscoped_evidence["international_fee"],
+                    })
 
                 stale_row = evidence_rows[0]
                 original_metadata = json.dumps(stale_row["extraction_method"])
@@ -767,6 +1048,16 @@ def test_task629_end_to_end_canary_schema():
                     test_engine, duplicate_group, course_id=alternate_variant_course,
                     staged_id=900_102, variant="Different full-time variant",
                 )
+                with pytest.raises(
+                    apply_tool.ApplyRefused,
+                    match="complete university-wide published-course inventory changed",
+                ):
+                    await apply_tool._run(
+                        approved, apply=False, actor="", expected_database=db_name,
+                        confirm_write=False, _test_database_url=database_url,
+                        _test_schema=schema,
+                    )
+                await _remove_unreviewed_course(test_engine, alternate_variant_course)
                 dry_run = await apply_tool._run(
                     approved, apply=False, actor="", expected_database=db_name,
                     confirm_write=False, _test_database_url=database_url,
@@ -791,8 +1082,11 @@ def test_task629_end_to_end_canary_schema():
                 async with test_engine.connect() as conn:
                     course_count = (await conn.execute(text("""
                         SELECT count(*) FROM courses WHERE id = ANY(:ids)
-                    """), {"ids": [course_id for group in mapping["groups"]
-                                   for course_id in group["ids"]]})).scalar_one()
+                        """), {"ids": (
+                            [course_id for group in mapping["groups"] for course_id in group["ids"]]
+                            + [alias["alias_course_id"] for alias in mapping["unscoped_aliases"]
+                            ]
+                        )})).scalar_one()
                     alias_count = (await conn.execute(text(
                         "SELECT count(*) FROM course_id_aliases"
                     ))).scalar_one()
@@ -849,8 +1143,8 @@ def test_task629_end_to_end_canary_schema():
                         SELECT location, fee_amount FROM course_offerings
                          WHERE course_id = :course_id
                     """), {"course_id": slash_course_id})).mappings().all()
-                assert course_count == 307
-                assert alias_count == 207
+                assert course_count == 311
+                assert alias_count == 211
                 assert pathway_count == (1 if internal_pathway else 0)
                 assert fee_rows == 0
                 expected_offering_count = sum(
