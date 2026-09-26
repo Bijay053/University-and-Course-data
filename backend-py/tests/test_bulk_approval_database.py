@@ -81,8 +81,8 @@ async def approval_database(approval_postgres):
             )
             # Only publication is constrained: staging both rows remains valid.
             await connection.execute(text(
-                "ALTER TABLE courses ADD CONSTRAINT private_publication_guard "
-                "CHECK (name <> 'private-bound-course')"
+                "ALTER TABLE fees ADD CONSTRAINT private_publication_guard "
+                "CHECK (international_fee <> 12345)"
             ))
         yield async_sessionmaker(engine, expire_on_commit=False)
     finally:
@@ -100,9 +100,12 @@ async def test_bulk_approval_real_constraint_rollback_continues(
             ScrapedCourse(
                 id=row_id, university_id=7, scrape_job_id="isolated-approval",
                 course_name=name, status="pending", auto_publish_status="ready",
+                international_fee=fee, fee_term="Annual", fee_year=2026,
+                currency="AUD", ielts_overall=6.5, intake_months=["March"],
             )
-            for row_id, name in (
-                (41, "private-bound-course"), (42, "Successful course"),
+            for row_id, name, fee in (
+                (41, "private-bound-course", 12345),
+                (42, "Successful course", 23456),
             )
         ])
         await seed.commit()
@@ -110,6 +113,8 @@ async def test_bulk_approval_real_constraint_rollback_continues(
     async with approval_database() as db:
         loaded = {}
         rollbacks = []
+        successful_writes = []
+        writes_before_failure = []
 
         def remember_row(session, row):
             if isinstance(row, ScrapedCourse):
@@ -125,9 +130,23 @@ async def test_bulk_approval_real_constraint_rollback_continues(
                 },
             })
 
+        def record_write(connection, cursor, statement, parameters, context, executemany):
+            if statement.lstrip().upper().startswith("INSERT INTO "):
+                successful_writes.append(statement)
+
+        def record_error(context):
+            if "INSERT INTO fees" in context.statement:
+                writes_before_failure.extend(successful_writes)
+
         event.listen(db.sync_session, "loaded_as_persistent", remember_row)
         event.listen(db.sync_session, "after_soft_rollback", record_rollback)
-        response = await _post_bulk_approval(fastapi_app, db, monkeypatch)
+        event.listen(db.bind.sync_engine, "after_cursor_execute", record_write)
+        event.listen(db.bind.sync_engine, "handle_error", record_error)
+        try:
+            response = await _post_bulk_approval(fastapi_app, db, monkeypatch)
+        finally:
+            event.remove(db.bind.sync_engine, "after_cursor_execute", record_write)
+            event.remove(db.bind.sync_engine, "handle_error", record_error)
 
         assert response.status_code == 200
         assert response.headers["content-type"] == "application/json"
@@ -152,6 +171,11 @@ async def test_bulk_approval_real_constraint_rollback_continues(
             for rollback in rollbacks
         )
         assert db.is_active
+        # The failing fee came after successful parent and detail INSERTs,
+        # not at the first publication write.
+        assert any("INSERT INTO courses" in sql for sql in writes_before_failure)
+        for table in ("english_requirements", "intakes"):
+            assert any(f"INSERT INTO {table}" in sql for sql in writes_before_failure)
 
     # A separate connection proves the second publication committed rather than
     # merely surviving in the request session's identity map.
@@ -159,11 +183,23 @@ async def test_bulk_approval_real_constraint_rollback_continues(
         courses = (await observer.execute(select(Course))).scalars().all()
         assert len(courses) == 1
         assert courses[0].name == "Successful course"
+        assert (await observer.execute(select(Fee.course_id, Fee.international_fee))).all() == [
+            (courses[0].id, 23456)
+        ]
+        assert (await observer.execute(select(Intake.course_id, Intake.intake_month))).all() == [
+            (courses[0].id, "March")
+        ]
+        assert (await observer.execute(
+            select(EnglishRequirement.course_id, EnglishRequirement.test_type, EnglishRequirement.overall)
+        )).all() == [(courses[0].id, "ielts", 6.5)]
         failed = await observer.get(ScrapedCourse, 41)
         succeeded = await observer.get(ScrapedCourse, 42)
         assert failed.status == "pending"
         assert failed.auto_publish_status == "ready"
         assert failed.course_id is None
+        assert failed.international_fee == 12345
+        assert failed.ielts_overall == 6.5
+        assert failed.intake_months == ["March"]
         assert succeeded.status == "approved"
         assert succeeded.course_id == courses[0].id
 
@@ -173,7 +209,7 @@ async def test_bulk_approval_real_constraint_rollback_continues(
     )
     assert isinstance(record.exc_info[1], IntegrityError)
     for private_detail in (
-        "private_publication_guard", "private-bound-course", "INSERT INTO courses",
+        "private_publication_guard", "12345", "INSERT INTO fees",
     ):
         assert private_detail in str(record.exc_info[1])
         assert private_detail not in response.text

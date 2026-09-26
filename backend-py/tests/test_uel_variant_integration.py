@@ -492,6 +492,9 @@ async def test_real_staging_and_approval_do_not_collapse_variants(monkeypatch):
     from app.services.scraper import http_fetcher
 
     await engine.dispose()
+    from tests.test_campus_fee_split import migrate_offerings_in_transaction
+    async with engine.begin() as connection:
+        await migrate_offerings_in_transaction(connection)
     marker = uuid.uuid4().hex[:12]
     university_id = None
     monkeypatch.setattr(http_fetcher, "fetch_html", AsyncMock(return_value=mechanical_page()))
@@ -651,6 +654,7 @@ async def test_ambiguous_legacy_parent_requires_review():
     ]))
     sc = SimpleNamespace(
         id=1, university_id=69, course_name="Mechanical Engineering MSc",
+        status="pending", course_id=None,
         course_website=URL + "?uel_variant=msc",
         extraction_method={},
     )

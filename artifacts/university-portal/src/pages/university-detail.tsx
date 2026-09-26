@@ -1633,10 +1633,10 @@ export default function UniversityDetail() {
     }
   }
 
-  async function performBulkDeleteRaw() {
+  async function performBulkDeleteRaw(explicitIds?: number[]) {
     setBulkDeleteRawRunning(true);
-    setShowBulkDeleteRawConfirm(false);
-    const ids = [...rawSelectedIds];
+    if (!explicitIds) setShowBulkDeleteRawConfirm(false);
+    const ids = explicitIds ?? [...rawSelectedIds];
     try {
       const res = await fetch(`${BASE}/api/scrape/staged/bulk-delete`, {
         method: "POST",
@@ -1646,7 +1646,12 @@ export default function UniversityDetail() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.detail ?? "Bulk delete failed");
       toast({ title: "Deleted", description: `${json.deleted} staged course${json.deleted !== 1 ? "s" : ""} removed.` });
-      setRawSelectedIds(new Set());
+      if (explicitIds) {
+        const deletedIds = new Set(explicitIds);
+        setRawSelectedIds(previous => new Set([...previous].filter(courseId => !deletedIds.has(courseId))));
+      } else {
+        setRawSelectedIds(new Set());
+      }
       await fetchRawData();
       await queryClient.invalidateQueries({ queryKey: getGetUniversityQueryKey(id) });
     } catch (e) {
@@ -3983,7 +3988,7 @@ export default function UniversityDetail() {
 
       {/* ── RAW DATA TAB ── */}
       {tab === "rawdata" && rawCampusProgress && <p role="status">Loading courses for review…</p>}
-      {tab === "rawdata" && <RawDataPanel {...{ AlertTriangle, Button, CheckCircle2, DEGREE_COLORS, Database, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, ExternalLink, GitMerge, Input, Loader2, Pencil, RefreshCw, Search, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, StatusBadge, Textarea, Trash2, Upload, XCircle, approvedCount, approvingId, bulkApproveProgress, bulkApproveRunning, bulkDeleteRawRunning, bulkMapRunning, bulkRejectFieldKey, bulkRejectReason, bulkRejectRunning, deletingId, fetchRawData, filteredRaw, forceApproveRowId, handleApprove, handleBulkApprove, handleBulkMap, handleBulkRejectSelected, handleDelete, handleImportAll, importingAll, mappedIds, num, openBackupMap, openEdit, pendingCount, rawData, rawLoading, rawSearch, rawSelectedIds, rawStatus, setBulkRejectFieldKey, setBulkRejectReason, setForceApproveRowId, setRawSearch, setRawSelectedIds, setRawStatus, setShowBulkDeleteRawConfirm, setShowBulkRejectConfirm, setShowDeleteAllRawConfirm, setShowForceApproveConfirm, showBulkRejectConfirm, showForceApproveConfirm, tableScrollRef, toggleSelectAllRaw, txt }} />}
+      {tab === "rawdata" && <RawDataPanel {...{ AlertTriangle, Button, CheckCircle2, DEGREE_COLORS, Database, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, ExternalLink, GitMerge, Input, Loader2, Pencil, RefreshCw, Search, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, StatusBadge, Textarea, Trash2, Upload, XCircle, approvedCount, approvingId, bulkApproveProgress, bulkApproveRunning, bulkDeleteRawRunning, bulkMapRunning, bulkRejectFieldKey, bulkRejectReason, bulkRejectRunning, deletingId, fetchRawData, filteredRaw, forceApproveRowId, handleApprove, handleBulkApprove, handleBulkDeleteRaw: performBulkDeleteRaw, handleBulkMap, handleBulkRejectSelected, handleDelete, handleImportAll, importingAll, mappedIds, num, openBackupMap, openEdit, pendingCount, rawData, rawLoading, rawSearch, rawSelectedIds, rawStatus, setBulkRejectFieldKey, setBulkRejectReason, setForceApproveRowId, setRawSearch, setRawSelectedIds, setRawStatus, setShowBulkDeleteRawConfirm, setShowBulkRejectConfirm, setShowDeleteAllRawConfirm, setShowForceApproveConfirm, showBulkRejectConfirm, showForceApproveConfirm, tableScrollRef, toggleSelectAllRaw, txt }} />}
 
       {/* ── Shared mini horizontal scroll indicator (all tabs) ── */}
       {tab !== "scholarships" && hasOverflow && (

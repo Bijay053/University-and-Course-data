@@ -54,6 +54,7 @@ async def test_approve_reactivates_a_matching_inactive_course():
         id=7,
         name="Master of Example Studies",
         status="inactive",
+        offering_identity=None,
     )
     lock_result = MagicMock()
     existing_result = MagicMock()
@@ -67,6 +68,7 @@ async def test_approve_reactivates_a_matching_inactive_course():
         return existing_result if execute_calls == 2 else lock_result
 
     db.execute = AsyncMock(side_effect=execute_with_existing)
+    db.get = AsyncMock(return_value=None)
     db.commit = AsyncMock()
     db.refresh = AsyncMock()
     db.flush = AsyncMock()
@@ -74,6 +76,8 @@ async def test_approve_reactivates_a_matching_inactive_course():
     sc = SimpleNamespace(
         id=101,
         university_id=1,
+        status="pending",
+        course_id=None,
         course_name="Master of Example Studies",
         extraction_method={},
         scrape_warnings=[],

@@ -114,7 +114,8 @@ async def test_real_fee_validation_http_response_remains_actionable(
     fastapi_app, unresolved, message, monkeypatch,
 ):
     sc = SimpleNamespace(
-        id=41, university_id=7, status="pending", course_id=None, course_name="Example course",
+        id=41, university_id=7, course_name="Example course",
+        status="pending", course_id=None,
         extraction_method={"fee_variants": {"status": "unresolved"}},
     )
     result = Mock()
@@ -325,7 +326,8 @@ async def test_database_errors_are_safe_and_batch_continues(error_type, monkeypa
 ])
 async def test_real_fee_validation_messages_remain_actionable(unresolved, message, monkeypatch):
     sc = SimpleNamespace(
-        id=41, university_id=7, status="pending", course_id=None, course_name="Example course",
+        id=41, university_id=7, course_name="Example course",
+        status="pending", course_id=None,
         extraction_method={"fee_variants": {"status": "unresolved"}},
     )
     result = Mock()

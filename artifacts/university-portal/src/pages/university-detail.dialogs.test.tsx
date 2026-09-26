@@ -57,7 +57,7 @@ type ApprovalResult = {
   approvedIds: number[]; approvedCount: number; splitCount: number;
   failed: Array<{ id: number; error: string }>; attempted: number;
 };
-function renderPage(approval?: (sourceId: number, force: boolean) => ApprovalResult, legacyCampusSplit = false) {
+function renderPage(approval?: (sourceId: number, force: boolean) => ApprovalResult, legacyCampusSplit = false, includeUnrelatedRawRow = false) {
   const approvedSources = new Set<number>();
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
@@ -66,6 +66,10 @@ function renderPage(approval?: (sourceId: number, force: boolean) => ApprovalRes
       const response = approval?.(courseIds[0], force);
       response?.approvedIds.forEach(id => approvedSources.add(id));
       return new Response(JSON.stringify(response ? { ...response, attempted: courseIds.length } : response), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    if (url.endsWith("/api/scrape/staged/bulk-delete")) {
+      const { ids } = JSON.parse(String(init?.body));
+      return new Response(JSON.stringify({ deleted: ids.length }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
     const body = url.includes("/scholarship-courses")
       ? [{ id: 42, name: "Accessible Course", degreeLevel: "Bachelor", category: "Business", scholarships: [{ id: 8, name: "Merit Award", details: "For strong applicants", eligibilityCriteria: "International students", amount: 5000, percentage: null, currency: "AUD" }] }]
@@ -97,7 +101,12 @@ function renderPage(approval?: (sourceId: number, force: boolean) => ApprovalRes
             } : undefined,
             status: "pending", completeness: 70,
           },
-        ].filter(c => !approvedSources.has(c.id)) : [{ id: 12, course_name: "Staged Accessible Course", status: "pending", completeness: 45 }])
+        ].filter(c => !approvedSources.has(c.id)).concat(includeUnrelatedRawRow ? [{
+          id: 14, university_id: 7, scrape_job_id: "other-job", course_name: "Unrelated Selected Course",
+          course_website: "https://example.edu/unrelated", course_location: "Perth", degree_level: "Bachelor",
+          fee_year: 2026, fee_term: "Annual", currency: "AUD", international_fee: 1000,
+          extraction_method: undefined, status: "pending", completeness: 65,
+        }] : []) : [{ id: 12, course_name: "Staged Accessible Course", status: "pending", completeness: 45 }])
       : url.includes("/repair/missing/")
       ? { courses: [] }
       : url.includes("/change-detection/")
@@ -191,6 +200,46 @@ describe("University Detail dialogs", () => {
     expect(calls.map(([, init]) => JSON.parse(String(init?.body)))).toEqual([
       { courseIds: [12], force: true }, { courseIds: [13], force: true },
     ]);
+  });
+
+  it("force-approves only the clicked campus group when an unrelated row is selected", async () => {
+    const user = userEvent.setup();
+    const { fetchMock } = renderPage(sourceId => ({
+      approvedIds: [sourceId], approvedCount: 1, splitCount: 0, failed: [], attempted: 1,
+    }), true, true);
+    await openTab(user, "Raw Data");
+    await screen.findByText("MSc Healthcare Management");
+    await user.click(screen.getByTestId("checkbox-raw-logical-course-14"));
+    await user.click(screen.getByTestId("button-force-approve-raw-course-12"));
+    const dialog = await screen.findByRole("dialog", { name: /Force Approve 2 Campus Rows/ });
+    expect(within(dialog).getByText("Manchester (row 12)")).toBeTruthy();
+    expect(within(dialog).getByText("Birmingham (row 13)")).toBeTruthy();
+    await user.click(within(dialog).getByTestId("button-confirm-group-force-approve"));
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/approve-selected"))).toHaveLength(1));
+    const calls = fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/approve-selected"));
+    expect(calls.map(([, init]) => JSON.parse(String(init?.body)))).toEqual([
+      { courseIds: [12, 13], force: true },
+    ]);
+    expect(screen.getByRole("button", { name: "Force Approve (1)" })).toBeTruthy();
+  });
+
+  it("deletes only the clicked campus group when an unrelated row is selected", async () => {
+    const user = userEvent.setup();
+    const { fetchMock } = renderPage(() => ({
+      approvedIds: [], approvedCount: 0, splitCount: 0, failed: [], attempted: 1,
+    }), true, true);
+    await openTab(user, "Raw Data");
+    await screen.findByText("MSc Healthcare Management");
+    await user.click(screen.getByTestId("checkbox-raw-logical-course-14"));
+    await user.click(screen.getByTestId("button-delete-raw-course-12"));
+    const dialog = await screen.findByRole("dialog", { name: /Delete 2 Campus Rows/ });
+    expect(within(dialog).getByText("Manchester (row 12, pending)")).toBeTruthy();
+    expect(within(dialog).getByText("Birmingham (row 13, pending)")).toBeTruthy();
+    await user.click(within(dialog).getByTestId("button-confirm-group-delete"));
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/api/scrape/staged/bulk-delete"))).toHaveLength(1));
+    const [, init] = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/api/scrape/staged/bulk-delete"))!;
+    expect(JSON.parse(String(init?.body))).toEqual({ ids: [12, 13] });
+    expect(screen.getByRole("button", { name: "Force Approve (1)" })).toBeTruthy();
   });
 
   it("forces only the confidence-blocked source on retry, never repeating successful campus groups", async () => {

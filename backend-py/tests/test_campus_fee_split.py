@@ -33,6 +33,21 @@ async def migrate_offerings_in_transaction(connection):
             migration.op = Operations(MigrationContext.configure(sync_connection))
             migration.upgrade()
         await connection.run_sync(upgrade)
+    has_alias_table = (await connection.execute(text(
+        "SELECT 1 FROM information_schema.tables "
+        "WHERE table_name='course_id_aliases' AND table_schema=current_schema()"
+    ))).scalar()
+    if not has_alias_table:
+        from alembic.migration import MigrationContext
+        from alembic.operations import Operations
+        path = Path(__file__).resolve().parents[1] / "alembic/versions/388_course_id_aliases.py"
+        spec = spec_from_file_location("course_id_alias_migration", path)
+        migration = module_from_spec(spec)
+        spec.loader.exec_module(migration)
+        def upgrade_aliases(sync_connection):
+            migration.op = Operations(MigrationContext.configure(sync_connection))
+            migration.upgrade()
+        await connection.run_sync(upgrade_aliases)
 
 
 def test_campus_migration_replaces_or_creates_missing_prior_index():
@@ -334,8 +349,9 @@ async def test_real_database_split_approve_rescrape_and_idempotency():
             assert len((await db.execute(select(Course).where(Course.university_id == uni.id))).scalars().all()) == 1
             assert {o.id for o in (await db.execute(select(CourseOffering).where(CourseOffering.course_id == courses[0].id))).scalars().all()} == original_ids
             # Existing published duplicates are never silently adopted/deleted.
-            db.add(Course(university_id=uni.id, name=values["course_name"] + " — London",
-                          course_website=URL))
+            legacy_course = Course(university_id=uni.id, name=values["course_name"] + " — London",
+                                   course_website=URL)
+            db.add(legacy_course)
             await db.flush()
             pending[0].status = "pending"
             pending[0].course_id = None
@@ -343,6 +359,17 @@ async def test_real_database_split_approve_rescrape_and_idempotency():
             from app.services.scraper.approve_course import ApprovalValidationError
             with pytest.raises(ApprovalValidationError, match="reviewed reconciliation"):
                 await approve_scraped_course(db, pending[0], actor="test-reviewer", commit=False)
+            assert len((await db.execute(select(Course).where(Course.university_id == uni.id))).scalars().all()) == 2
+            # Once a reviewed reconciliation preserves the duplicate ID as
+            # an alias, the next scoped scrape can update the canonical course.
+            from app.models.course_id_alias import CourseIdAlias
+            db.add(CourseIdAlias(
+                alias_course_id=legacy_course.id, canonical_course_id=courses[0].id,
+                reason="reviewed campus reconciliation", created_by="test-reviewer",
+            ))
+            await db.flush()
+            result = await approve_scraped_course(db, pending[0], actor="test-reviewer", commit=False)
+            assert result["course_id"] == courses[0].id
             assert len((await db.execute(select(Course).where(Course.university_id == uni.id))).scalars().all()) == 2
         await transaction.rollback()
     await engine.dispose()

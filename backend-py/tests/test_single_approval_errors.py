@@ -17,7 +17,10 @@ from app.services.scraper.approve_course import ApprovalValidationError
 def approval_client():
     app = FastAPI()
     app.include_router(router, prefix="/api")
-    sc = SimpleNamespace(id=41, course_name="Example course", extraction_method={})
+    sc = SimpleNamespace(
+        id=41, university_id=1, status="pending", course_id=None,
+        course_name="Example course", extraction_method={},
+    )
     locked_row = Mock()
     locked_row.scalar_one.return_value = sc
     db = SimpleNamespace(

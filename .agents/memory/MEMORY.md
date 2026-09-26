@@ -153,3 +153,7 @@
 - [Settled URL outcome semantics](settled-url-outcome-semantics.md) — completed URL checkpoints include errors; recovery must use outcome provenance before resolving or suppressing work.
 - [Pytest asyncio isolation](pytest-asyncio-isolation.md) — session-loop defaults can hide pool reuse failures; loop-independent suites need test-owned connections.
 - [Evidence proof persistence](evidence-proof-persistence.md) — test authority after real persistence; truncated display excerpts cannot prove omitted alternatives.
+- [Fee approval race ordering](fee-approval-race-ordering.md) — variant selection must be rechecked after row locking; a stale pre-lock rejection defeats concurrent reviewer selection.
+- [Grouped review action boundaries](grouped-review-action-boundaries.md) — row-group delete/force-approve must use explicit group IDs, never inherit unrelated bulk selections.
+- [Reconciled aliases and scoped approval](reconciled-alias-scoped-approval.md) — preserved legacy aliases must not block later scoped approvals of their canonical course.
+- [Full regression Redis ownership](full-regression-redis-ownership.md) — overlapping suites can shut down a shared temporary Redis; keep the managed Redis workflow running.

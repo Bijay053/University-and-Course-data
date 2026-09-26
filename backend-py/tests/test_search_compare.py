@@ -150,6 +150,9 @@ async def test_search_stays_fast_and_uses_child_indexes_at_catalogue_scale():
                     study_mode text, course_website text, course_location text,
                     university_id integer, status text, approval_status text
                 ) ON COMMIT DROP""",
+                """CREATE TEMP TABLE course_id_aliases (
+                    alias_course_id integer
+                ) ON COMMIT DROP""",
                 """CREATE TEMP TABLE fees (
                     id integer, course_id integer, international_fee real,
                     currency text, fee_term text, fee_year integer
@@ -390,6 +393,9 @@ async def test_search_cte_executes_against_production_base_table_shape():
                     degree_level text, duration numeric, duration_term text,
                     study_mode text, course_website text, course_location text,
                     university_id integer, status text, approval_status text
+                ) ON COMMIT DROP""",
+                """CREATE TEMP TABLE course_id_aliases (
+                    alias_course_id integer
                 ) ON COMMIT DROP""",
                 """CREATE TEMP TABLE fees (
                     id integer, course_id integer, international_fee real,

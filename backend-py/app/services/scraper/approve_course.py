@@ -132,7 +132,12 @@ async def approve_scraped_course(
         raise ApprovalValidationError(
             f"scraped_course id={sc.id} has empty course_name; cannot promote"
         )
-    if unresolved_fee_selection(sc):
+    # Fee selection may be committing concurrently. For variant-backed rows,
+    # decide only after taking the row lock and refreshing the staged values.
+    if unresolved_fee_selection(sc) and not (
+        isinstance(getattr(sc, "extraction_method", None), dict)
+        and sc.extraction_method.get("fee_variants")
+    ):
         raise ApprovalValidationError("Select a current published fee option before approval")
     from app.services.scraper.replay_extraction import review_restore_lock_scope
     await db.execute(
@@ -225,6 +230,16 @@ async def approve_scraped_course(
                   and candidate.course_website == sc.course_website
                   and (candidate.name.casefold() == scope["original_name"].casefold()
                        or candidate.name.casefold().startswith(scope["original_name"].casefold() + " — "))]
+        if legacy:
+            # Reconciliation preserves historical course IDs as aliases. They
+            # remain in courses but cannot block a future scoped approval of
+            # the canonical course. Unmapped duplicates still require review.
+            alias_ids = set((await db.execute(
+                select(CourseIdAlias.alias_course_id).where(
+                    CourseIdAlias.alias_course_id.in_([candidate.id for candidate in legacy])
+                )
+            )).scalars().all())
+            legacy = [candidate for candidate in legacy if candidate.id not in alias_ids]
         if legacy:
             raise ApprovalValidationError(
                 "Existing published campus records require reviewed reconciliation; no live IDs were merged."

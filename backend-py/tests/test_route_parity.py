@@ -42,7 +42,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from starlette.routing import compile_path
 
-from app.database import AsyncSessionLocal
+from app.database import AsyncSessionLocal, engine
 from app.main import app
 
 
@@ -166,6 +166,12 @@ def _routes(ids: dict[str, int | str]) -> list[tuple[str, str, dict[str, Any] | 
 
 # ─── DB helpers (run inside the same loop as the test) ───────────────────
 async def _seed_setup() -> dict[str, int | str]:
+    # Route coverage includes catalogue endpoints that now exclude preserved
+    # legacy course aliases. Bring the disposable test database up to the
+    # current additive schema before issuing those requests.
+    from tests.test_campus_fee_split import migrate_offerings_in_transaction
+    async with engine.begin() as connection:
+        await migrate_offerings_in_transaction(connection)
     suffix = uuid.uuid4().hex[:12]
     academic_level = f"Route Parity Level {suffix}"
     acronym = f"ROUTEPARITY{suffix.upper()}"

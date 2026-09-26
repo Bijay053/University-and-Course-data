@@ -47,9 +47,11 @@ class DB:
         self.refresh = AsyncMock()
         self.get = AsyncMock(return_value=sc)
 
-    async def execute(self, stmt):
+    async def execute(self, stmt, *args, **kwargs):
         if "scraped_field_evidence" in str(stmt):
             return SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [self.proof]))
+        if "pg_advisory_xact_lock" in str(stmt):
+            return SimpleNamespace()
         assert "FOR UPDATE" in str(stmt)
         return SimpleNamespace(scalar_one_or_none=lambda: self.sc, scalar_one=lambda: self.sc)
 

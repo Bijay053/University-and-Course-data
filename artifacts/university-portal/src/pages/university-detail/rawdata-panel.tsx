@@ -19,6 +19,7 @@ interface RawDataPanelProps {
   rawStatus: "all" | "pending" | "approved"; showBulkRejectConfirm: boolean; showForceApproveConfirm: boolean;
   fetchRawData: () => Promise<void>; handleApprove: (id: number, force?: boolean) => Promise<void>;
   handleBulkApprove: (force?: boolean, ids?: number[]) => Promise<void>; handleBulkMap: (forceOverwrite: boolean) => Promise<void>;
+  handleBulkDeleteRaw: (ids: number[]) => Promise<void>;
   handleBulkRejectSelected: () => Promise<void>; handleDelete: (id: number) => void; handleImportAll: () => void;
   num: (value: number | null | undefined) => number | "—"; openBackupMap: (course: StagedCourse) => Promise<void>;
   openEdit: (course: StagedCourse) => void; tableScrollRef: React.RefObject<HTMLDivElement | null>;
@@ -31,6 +32,8 @@ interface RawDataPanelProps {
 
 export function RawDataPanel(props: RawDataPanelProps) {
   const { AlertTriangle, Button, CheckCircle2, DEGREE_COLORS, Database, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, ExternalLink, GitMerge, Input, Loader2, Pencil, RefreshCw, Search, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, StatusBadge, Textarea, Trash2, Upload, XCircle, approvedCount, approvingId, bulkApproveProgress, bulkApproveRunning, bulkDeleteRawRunning, bulkMapRunning, bulkRejectFieldKey, bulkRejectReason, bulkRejectRunning, deletingId, fetchRawData, filteredRaw, forceApproveRowId, handleApprove, handleBulkApprove, handleBulkMap, handleBulkRejectSelected, handleDelete, handleImportAll, importingAll, mappedIds, num, openBackupMap, openEdit, pendingCount, rawData, rawLoading, rawSearch, rawSelectedIds, rawStatus, setBulkRejectFieldKey, setBulkRejectReason, setForceApproveRowId, setRawSearch, setRawSelectedIds, setRawStatus, setShowBulkDeleteRawConfirm, setShowBulkRejectConfirm, setShowDeleteAllRawConfirm, setShowForceApproveConfirm, showBulkRejectConfirm, showForceApproveConfirm, tableScrollRef, toggleSelectAllRaw, txt } = props;
+  const [groupForceApproveTarget, setGroupForceApproveTarget] = React.useState<{ courseName: string; members: Array<{ id: number; location: string; status: string }> } | null>(null);
+  const [groupDeleteTarget, setGroupDeleteTarget] = React.useState<{ courseName: string; members: Array<{ id: number; location: string; status: string }> } | null>(null);
   const filteredIds = new Set(filteredRaw.map(course => course.id));
   const logicalGroups = groupLegacyCampusRows(rawData)
     .filter(group => group.members.some(member => filteredIds.has(member.id)));
@@ -229,6 +232,86 @@ export function RawDataPanel(props: RawDataPanelProps) {
                 >
                   <AlertTriangle className="h-4 w-4 mr-1.5" />
                   Force Approve {rawSelectedIds.size}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Grouped row force approval is intentionally isolated from bulk selection. */}
+          <Dialog open={groupForceApproveTarget !== null} onOpenChange={(open: boolean) => { if (!open) setGroupForceApproveTarget(null); }}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-amber-700">
+                  <AlertTriangle className="w-5 h-5 shrink-0" />
+                  Force Approve {groupForceApproveTarget?.members.length ?? 0} Campus Row{groupForceApproveTarget?.members.length === 1 ? "" : "s"}?
+                </DialogTitle>
+                <DialogDescription>
+                  Force-approve only the campus rows grouped under {groupForceApproveTarget?.courseName}.
+                </DialogDescription>
+              </DialogHeader>
+              <ul className="space-y-1 text-sm text-gray-600">
+                {groupForceApproveTarget?.members.map(member => (
+                  <li key={member.id}>{member.location} (row {member.id})</li>
+                ))}
+              </ul>
+              <p className="text-sm text-gray-600">
+                This bypasses the <strong>60-point confidence gate</strong> for these rows only and may publish incomplete course data.
+              </p>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setGroupForceApproveTarget(null)}>Cancel</Button>
+                <Button
+                  className="bg-amber-600 hover:bg-amber-700 text-white"
+                  data-testid="button-confirm-group-force-approve"
+                  onClick={() => {
+                    const target = groupForceApproveTarget;
+                    setGroupForceApproveTarget(null);
+                    if (target) void handleBulkApprove(true, target.members.map(member => member.id));
+                  }}
+                >
+                  <AlertTriangle className="h-4 w-4 mr-1.5" />
+                  Force Approve {groupForceApproveTarget?.members.length ?? 0}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Grouped row deletion is isolated from bulk selection as well. */}
+          <Dialog open={groupDeleteTarget !== null} onOpenChange={(open: boolean) => { if (!open) setGroupDeleteTarget(null); }}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-red-700">
+                  <Trash2 className="w-5 h-5 shrink-0" />
+                  Delete {groupDeleteTarget?.members.length ?? 0} Campus Row{groupDeleteTarget?.members.length === 1 ? "" : "s"}?
+                </DialogTitle>
+                <DialogDescription>
+                  Permanently remove only the campus rows grouped under {groupDeleteTarget?.courseName}.
+                </DialogDescription>
+              </DialogHeader>
+              <ul className="space-y-1 text-sm text-gray-600">
+                {groupDeleteTarget?.members.map(member => (
+                  <li key={member.id}>{member.location} (row {member.id}, {member.status})</li>
+                ))}
+              </ul>
+              {groupDeleteTarget?.members.some(member => member.status === "approved") && (
+                <p className="text-sm text-red-700">
+                  At least one listed row is approved and linked to a live course; deleting it may also remove that live course.
+                </p>
+              )}
+              <p className="text-sm font-medium text-gray-700">This cannot be undone.</p>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setGroupDeleteTarget(null)} disabled={bulkDeleteRawRunning}>Cancel</Button>
+                <Button
+                  variant="destructive"
+                  data-testid="button-confirm-group-delete"
+                  disabled={bulkDeleteRawRunning}
+                  onClick={() => {
+                    const target = groupDeleteTarget;
+                    setGroupDeleteTarget(null);
+                    if (target) void props.handleBulkDeleteRaw(target.members.map(member => member.id));
+                  }}
+                >
+                  {bulkDeleteRawRunning ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1.5" />}
+                  Delete {groupDeleteTarget?.members.length ?? 0}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -586,8 +669,14 @@ export function RawDataPanel(props: RawDataPanelProps) {
                                 onClick={() => {
                                   if (members.length === 1) setForceApproveRowId(c.id);
                                   else {
-                                    setRawSelectedIds(previous => new Set([...previous, ...ids]));
-                                    setShowForceApproveConfirm(true);
+                                    setGroupForceApproveTarget({
+                                      courseName: c.course_name,
+                                      members: members.map(member => ({
+                                        id: member.id,
+                                        location: member.course_location?.trim() || "Unspecified campus",
+                                        status: member.status,
+                                      })),
+                                    });
                                   }
                                 }}
                                 disabled={approvingId === c.id}
@@ -603,8 +692,14 @@ export function RawDataPanel(props: RawDataPanelProps) {
                             onClick={() => {
                               if (members.length === 1) handleDelete(c.id);
                               else {
-                                setRawSelectedIds(previous => new Set([...previous, ...ids]));
-                                setShowBulkDeleteRawConfirm(true);
+                                setGroupDeleteTarget({
+                                  courseName: c.course_name,
+                                  members: members.map(member => ({
+                                    id: member.id,
+                                    location: member.course_location?.trim() || "Unspecified campus",
+                                    status: member.status,
+                                  })),
+                                });
                               }
                             }}
                             disabled={deletingId === c.id}
