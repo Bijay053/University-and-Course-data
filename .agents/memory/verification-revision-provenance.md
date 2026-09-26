@@ -15,3 +15,16 @@ during integration.
 compare the current tree and revision before diagnosing the original change
 again. Repair the integrated code, rerun affected checks, and preserve the
 original evidence's revision rather than relabelling it as proof of later code.
+
+For production course-identity reconciliation, treat a reviewed ID mapping as
+approval for that exact membership, not as permission to absorb newly
+published IDs. New scrape runs can connect previously separate groups even
+when every old ID still exists.
+
+**Why:** A live pre-write inventory found two new published rows bridging four
+previously approved groups. Reusing the old approval would silently change
+which historical IDs resolve to the same public course.
+
+**How to apply:** Refresh connected components immediately before the write;
+if membership changed, pause the write and obtain approval for the revised
+mapping. Preserve all old IDs and never infer approval from matching titles.
