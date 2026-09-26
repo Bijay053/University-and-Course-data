@@ -2437,11 +2437,11 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     // Submit every selected member together for explicitly-linked campus groups;
     // the endpoint can resolve sibling rows and reports per-ID partial failures.
     setApproving(true);
-    setApproveProgress({ done: 0, total: ids.length });
+    setApproveProgress({ done: 0, total: batches.length });
     try {
       const approvedIds = new Set<number>();
       const failures: Array<{ id: number; error: string }> = [];
-      let approvedCount = 0;
+      let approvedCourseCount = 0;
       let cursor = 0;
       let done = 0;
       // Limit parallel requests so an entire scrape cannot exceed the proxy timeout.
@@ -2466,7 +2466,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             }
             const successful = data.approvedIds.filter(id => requested.has(id));
             successful.forEach(id => approvedIds.add(id));
-            approvedCount += data.approvedCount;
+            if (batch.every(id => data.approvedIds.includes(id))) approvedCourseCount++;
             for (const id of batch) {
               if (!data.approvedIds.includes(id)) {
                 const failure = data.failed.find(item => item.id === id) ?? data.failed[0];
@@ -2476,8 +2476,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
           } catch (error) {
             batch.forEach(id => failures.push({ id, error: error instanceof Error ? error.message : "Approval request failed. Refresh before retrying." }));
           } finally {
-            done += batch.length;
-            setApproveProgress({ done, total: ids.length });
+            done++;
+            setApproveProgress({ done, total: batches.length });
           }
         }
       }));
@@ -2496,9 +2496,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         })).then(setUniStats).catch(() => {});
       }
       toast({
-        title: `${approvedCount} course(s) approved`,
+        title: `${approvedCourseCount} course${approvedCourseCount === 1 ? "" : "s"} approved`,
         description: [
-          remaining.size > 0 ? `${remaining.size} remain pending. ${failures.slice(0, 3).map(f => f.error).join(" · ") || "Refresh and review their source data."}` : "",
+          remaining.size > 0 ? `${remaining.size} campus review entries remain pending. ${failures.slice(0, 3).map(f => f.error).join(" · ") || "Refresh and review their source data."}` : "",
           !refreshed ? "Review could not be refreshed; reload the page to see current rows." : "",
         ].filter(Boolean).join(" ") || "Selected courses were published successfully.",
         ...((remaining.size > 0 || !refreshed) ? { variant: "destructive" as const } : {}),
@@ -3659,7 +3659,10 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                   {approving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1" />}
                   {approving && approveProgress
                     ? `Approving ${approveProgress.done}/${approveProgress.total}…`
-                    : `Approve (${selectedIds.size})`}
+                    : (() => {
+                        const count = logicalGroups.filter(group => group.ids.some(id => selectedIds.has(id))).length;
+                        return `Approve (${count} course${count === 1 ? "" : "s"})`;
+                      })()}
                 </Button>
               </div>
             </div>

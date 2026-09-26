@@ -227,8 +227,8 @@ describe("Scraping repair reviewer", () => {
     const checkbox = screen.getByTestId("checkbox-logical-course-101") as HTMLInputElement;
     expect(checkbox.checked).toBe(false);
     await userEvent.click(checkbox);
-    expect((screen.getByRole("button", { name: "Approve (2)" }) as HTMLButtonElement).disabled).toBe(false);
-    await userEvent.click(screen.getByRole("button", { name: "Approve (2)" }));
+    expect((screen.getByRole("button", { name: "Approve (1 course)" }) as HTMLButtonElement).disabled).toBe(false);
+    await userEvent.click(screen.getByRole("button", { name: "Approve (1 course)" }));
     await waitFor(() => expect(submittedIds.sort()).toEqual([101, 102]));
   });
 
@@ -263,8 +263,8 @@ describe("Scraping repair reviewer", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<ScrapingForTest initialReviewState={review} />);
     expect(screen.queryByTestId("button-split-campus-fees")).toBeNull();
-    expect(screen.getByRole("button", { name: "Approve (1)" })).toBeTruthy();
-    await userEvent.click(screen.getByRole("button", { name: "Approve (1)" }));
+    expect(screen.getByRole("button", { name: "Approve (1 course)" })).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Approve (1 course)" }));
     await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url) === "/api/scrape/staged/approve-selected")).toBe(true));
     await waitFor(() => expect(screen.queryByTestId("fee-summary-1")).toBeNull());
     expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/1/approve"))).toBe(false);
@@ -291,9 +291,9 @@ describe("Scraping repair reviewer", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     render(<ScrapingForTest initialReviewState={review} />);
-    await userEvent.click(screen.getByRole("button", { name: "Approve (1)" }));
+    await userEvent.click(screen.getByRole("button", { name: "Approve (1 course)" }));
     await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url) === "/api/scrape/staged/approve-selected")).toBe(true));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Approve (1)" }).hasAttribute("disabled")).toBe(false));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Approve (1 course)" }).hasAttribute("disabled")).toBe(false));
     expect(screen.getByTestId("fee-summary-1")).toBeTruthy();
   });
 
@@ -337,8 +337,8 @@ describe("Scraping repair reviewer", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<ScrapingForTest initialReviewState={review} />);
     expect(screen.getByText(/One course can include multiple locations and their fee evidence/)).toBeTruthy();
-    await userEvent.click(screen.getByRole("button", { name: "Approve (2)" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Approve (1)" }).hasAttribute("disabled")).toBe(false));
+    await userEvent.click(screen.getByRole("button", { name: "Approve (2 courses)" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Approve (1 course)" }).hasAttribute("disabled")).toBe(false));
     expect(fetchMock.mock.calls.filter(([url]) => String(url) === "/api/scrape/staged/approve-selected")).toHaveLength(2);
     expect(screen.getByTestId("fee-summary-2")).toBeTruthy();
     expect(screen.queryByTestId("fee-summary-1")).toBeNull();
@@ -360,9 +360,9 @@ describe("Scraping repair reviewer", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     render(<ScrapingForTest initialReviewState={review} />);
-    await userEvent.click(screen.getByRole("button", { name: "Approve (2)" }));
+    await userEvent.click(screen.getByRole("button", { name: "Approve (2 courses)" }));
     await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url) === "/api/scrape/staged/approve-selected")).toBe(true));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Approve (2)" }).hasAttribute("disabled")).toBe(false));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Approve (2 courses)" }).hasAttribute("disabled")).toBe(false));
     expect(screen.getByText("Course 1")).toBeTruthy();
     expect(screen.getByText("Course 2")).toBeTruthy();
   });
@@ -394,7 +394,7 @@ describe("Scraping repair reviewer", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     render(<ScrapingForTest initialReviewState={review} />);
-    await userEvent.click(screen.getByRole("button", { name: "Approve (4)" }));
+    await userEvent.click(screen.getByRole("button", { name: "Approve (4 courses)" }));
     await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => String(url) === "/api/scrape/staged/approve-selected")).toHaveLength(2));
     expect(screen.getByRole("button", { name: /Approving 0\/4/ })).toBeTruthy();
     release();
@@ -472,10 +472,10 @@ describe("Scraping repair reviewer", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     render(<ScrapingForTest initialReviewState={review} />);
-    expect(screen.getByRole("button", { name: "Approve (2)" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Approve (2 courses)" })).toBeTruthy();
     expect(screen.queryByText("Choose a published fee before approval")).toBeNull();
     expect(screen.queryByTestId("fee-choice-1-full-2027")).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: "Approve (2)" }));
+    await userEvent.click(screen.getByRole("button", { name: "Approve (2 courses)" }));
     await waitFor(() => expect(fetchMock.mock.calls.filter(args => String(args[0]) === "/api/scrape/staged/approve-selected")).toHaveLength(2));
   });
 
@@ -765,7 +765,7 @@ describe("Scraping repair reviewer", () => {
     render(<ScrapingForTest initialReviewState={review} />);
     await userEvent.setup().click(screen.getByTitle("Reload staged courses and refresh quality scores"));
     await waitFor(() => expect(screen.getByText("142 pending entries")).toBeTruthy());
-    expect(screen.getByRole("button", { name: "Approve (142)" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Approve (142 courses)" })).toBeTruthy();
     expect(screen.getAllByText("Same programme")).toHaveLength(142);
     expect(screen.queryByText("Unrelated")).toBeNull();
   }, 20000);
@@ -793,7 +793,7 @@ describe("Scraping repair reviewer", () => {
       await userEvent.click(within(tableRow).getByRole("checkbox"));
     }
     await userEvent.click(screen.getByTitle("Reload staged courses and refresh quality scores"));
-    await waitFor(() => expect(screen.getByRole("button", { name: `Approve (${deselect ? 0 : 1})` })).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("button", { name: `Approve (${deselect ? 0 : 1} course${deselect ? "s" : ""})` })).toBeTruthy());
     expect(screen.getByText("1 pending entries")).toBeTruthy();
     expect(screen.getByText("London, Leeds")).toBeTruthy();
     await userEvent.click(screen.getByTitle("Reload staged courses and refresh quality scores"));
