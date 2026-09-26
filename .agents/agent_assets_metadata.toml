@@ -35,3 +35,45 @@ mtime_ms = 1790394591986
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/47865b2a-30dd-41d4-892d-9b213e2297d9/333bff65-f0c0-4bfe-bfa8-f490c729c12d"
 storage_version_token = "1790394598746840"
 content_type = "text/html"
+
+[[outputs]]
+id = "wyNY_dQwKTmt3BdQOo-81"
+uri = "file://reports/university-of-law/law-61-review.html"
+type = "html"
+title = "University of Law — 61-group review"
+description = "Unapproved proposal covering 33 mergers, 311 preserved IDs, 250 aliases, and verified campus fee evidence."
+logical_id = "10bab507-d0a6-4d2e-bbfb-245fe6e26ed1"
+content_hash = "sha256:a8ecc13c10575a04b0b6bea58abd28a0f9376a94787fa9bdfb94c1d77dd702c7"
+size = 67961
+mtime_ms = 1790415287487
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/10bab507-d0a6-4d2e-bbfb-245fe6e26ed1/04023eeb-1903-418b-a0a6-0bd203e729dc"
+storage_version_token = "1790415314215140"
+content_type = "text/html"
+
+[[outputs]]
+id = "o14toM130jxZ_HWP-yVvV"
+uri = "file://reports/university-of-law/law-proposed-61.json"
+type = "unspecified"
+title = "Proposed 61-group mapping"
+description = "Exact machine-readable proposal; not approved or applied."
+logical_id = "98f7886e-506f-4e51-8950-4307103bf22c"
+content_hash = "sha256:3cc6e40e65f93a17b59543c750f6c7491477f1041bd757fb54958028d8693617"
+size = 60881
+mtime_ms = 1790415269143
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/98f7886e-506f-4e51-8950-4307103bf22c/8ccf46ea-f91e-4231-8c6f-13105faf2506"
+storage_version_token = "1790415315886362"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "M2ieIiQCuEZMqhs3arSeM"
+uri = "file://reports/university-of-law/law-proposed-61-summary.json"
+type = "unspecified"
+title = "Validation and campus fee audit"
+description = "Read-only validation results and per-campus source evidence."
+logical_id = "a6039bf7-9bbf-484b-8a23-5cb94e5c0018"
+content_hash = "sha256:e44cce8f0d04bd4455076a2feabcbd0fb91fa4f6ba0cbfe3aeba55a7f09d9b3c"
+size = 122033
+mtime_ms = 1790415269319
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:52ee9e3d-ac55-4716-b0ed-6bec325a5a41/a6039bf7-9bbf-484b-8a23-5cb94e5c0018/60701f01-f30f-482a-b26a-4c3843976768"
+storage_version_token = "1790415317849313"
+content_type = "application/octet-stream"
