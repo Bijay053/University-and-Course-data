@@ -71,6 +71,15 @@ def _canonical_degree_level(value: Any) -> str:
     return canonical_degree_level(value)
 
 
+def _identity_degree_level(value: Any, award: Any) -> str:
+    degree = _canonical_degree_level(value)
+    normalized_degree = _norm(value)
+    if ("diploma" in _norm(award)
+            and normalized_degree in {"graduate certificate & diploma", "graduate diploma"}):
+        return "graduate diploma"
+    return degree
+
+
 _REGIONAL_FEE_LABELS = {
     "london": "london",
     "outside london": "non_london",
@@ -84,6 +93,15 @@ _NON_LONDON_FEE_LABELS = {
 
 def _regional_fee_kind(label: str) -> str | None:
     return _REGIONAL_FEE_LABELS.get(_norm(label))
+
+
+def _slash_campus_tokens(label: str) -> frozenset[str] | None:
+    if "/" not in label:
+        return None
+    tokens = [_norm(token) for token in label.split("/")]
+    if len(tokens) < 2 or any(not token for token in tokens) or len(tokens) != len(set(tokens)):
+        return frozenset()
+    return frozenset(tokens)
 
 
 def _is_allowed_regional_fee_label(label: str, locations: tuple[str, ...]) -> bool:
@@ -166,7 +184,14 @@ def _fee_campus_binding(
     regional_label = None
     selected_label = next(iter(campus_keys), "") if len(campus_keys) == 1 else ""
     regional_kind = _regional_fee_kind(selected_label)
-    if regional_kind is not None:
+    slash_tokens = _slash_campus_tokens(selected_label)
+    if slash_tokens is not None:
+        if (not slash_tokens or len(campus_keys) != 1
+                or not set(location_keys).issubset(slash_tokens)
+                or not exact_authority):
+            return None, "selected slash campus label does not match scoped fee authority", (), None
+        regional_label = selected_label
+    elif regional_kind is not None:
         if (not _is_allowed_regional_fee_label(selected_label, location_values)
                 or not exact_authority):
             return None, "selected regional fee label does not match scoped campuses", (), None
@@ -442,7 +467,9 @@ def _group_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[str,
         identities["university_id"].add(_canonical_json(row.get("university_id")).decode())
         identities["source_route"].add(_canonical_json(source).decode())
         identities["original_name"].add(_canonical_json(original_name).decode())
-        identities["degree_level"].add(_canonical_json(row.get("degree_level")).decode())
+        identities["degree_level"].add(_identity_degree_level(
+            row.get("degree_level"), scope.get("original_name"),
+        ))
         identities["study_variant"].add(_canonical_json(variant).decode())
         identities["study_mode"].add(_canonical_json(row.get("study_mode")).decode())
         identities["fee_year"].add(_canonical_json(row.get("fee_year")).decode())
@@ -555,6 +582,8 @@ def _component_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[
     seen_locations: dict[str, int] = {}
     regional_scopes: dict[str, set[str]] = {}
     regional_fees: dict[str, set[str]] = defaultdict(set)
+    slash_alias_checks: list[tuple[frozenset[str], set[str], str]] = []
+    scoped_fee_rows: list[tuple[set[str], str]] = []
     members = []
 
     for cid in approved["ids"]:
@@ -597,9 +626,6 @@ def _component_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[
                 if regional_label:
                     scope_locations = set(scope_keys)
                     regional_scopes.setdefault(regional_label, set()).update(scope_locations)
-                    regional_fees[regional_label].add(
-                        _canonical_json(_safe_fee(row)).decode()
-                    )
             accepted_staged_names = {
                 _norm(f"{approved['award']} — {', '.join(scoped_locations)}"),
                 *(_norm(f"{approved['award']} — {location}")
@@ -612,8 +638,8 @@ def _component_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[
                     or not _published_award_name_matches(
                         course.get("name"), approved["award"], scoped_locations)
                     or _norm(course.get("course_location")) != _norm(row.get("course_location"))
-                    or _canonical_degree_level(course.get("degree_level"))
-                    != _canonical_degree_level(row.get("degree_level"))
+                    or _identity_degree_level(course.get("degree_level"), approved["award"])
+                    != _identity_degree_level(row.get("degree_level"), approved["award"])
                     or _norm(course.get("study_mode")) != _norm(row.get("study_mode"))):
                 reasons.append(f"current Course properties mismatch for ID {cid}")
             if not all(isinstance(row.get(field), str) and row[field].strip()
@@ -623,6 +649,15 @@ def _component_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[
             if fee_authority.get("status") != "uniform":
                 reasons.append(f"staged row {row['id']} lacks uniform fee authority")
             fee = _safe_fee(row)
+            fee_key = _canonical_json(fee).decode()
+            if scoped_locations:
+                row_scope_keys = {_norm(value) for value in scoped_locations}
+                scoped_fee_rows.append((row_scope_keys, fee_key))
+                if regional_label:
+                    regional_fees[regional_label].add(fee_key)
+                    slash_tokens = _slash_campus_tokens(regional_label)
+                    if slash_tokens is not None:
+                        slash_alias_checks.append((slash_tokens, row_scope_keys, fee_key))
             if (any(value is None for value in fee.values())
                     or row.get("international_fee") is None
                     or not row.get("fee_year") or not row.get("fee_term") or not row.get("currency")):
@@ -632,7 +667,8 @@ def _component_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[
                 reasons.append(f"staged row {row['id']} has invalid campus_fee_scope")
             identity = (
                 row.get("university_id"), row.get("course_website"), approved["award"],
-                _canonical_degree_level(row.get("degree_level")), variant, row.get("study_mode"),
+                _identity_degree_level(row.get("degree_level"), approved["award"]),
+                variant, row.get("study_mode"),
                 row.get("fee_year"), row.get("fee_term"), row.get("currency"),
             )
             row_identities.add(identity)
@@ -714,6 +750,13 @@ def _component_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[
     for regional_label, scoped in regional_scopes.items():
         if len(regional_fees[regional_label]) != 1:
             reasons.append(f"regional fee label {regional_label} has conflicting stored fee values")
+    for tokens, scoped_here, fee_key in slash_alias_checks:
+        for token in tokens - scoped_here:
+            if not any(token in other_scope and other_fee == fee_key
+                       for other_scope, other_fee in scoped_fee_rows):
+                reasons.append(
+                    "slash campus label includes a city not scoped at the same verified fee"
+                )
     if snapshot.get("reference_scan_complete") is not True:
         reasons.append("local PostgreSQL FK census is incomplete")
     # external_reference_scan_complete remains false by design. This task
@@ -744,7 +787,9 @@ def _related_extra_ids(
         extra_variant, _ = _selected_study_variant(extra)
         extra_route = extra.get("course_website")
         extra_award = _norm(extra_scope.get("original_name"))
-        extra_degree = _canonical_degree_level(extra.get("degree_level"))
+        extra_degree = _identity_degree_level(
+            extra.get("degree_level"), extra_scope.get("original_name"),
+        )
         extra_family = (
             extra.get("university_id"), extra.get("scrape_job_id"),
             extra_scope.get("split_from_id"),
@@ -786,7 +831,9 @@ def _related_extra_ids(
                 same_route_award_degree = (
                     extra_route == row.get("course_website")
                     and extra_award == _norm(scope.get("original_name"))
-                    and extra_degree == _canonical_degree_level(row.get("degree_level"))
+                    and extra_degree == _identity_degree_level(
+                        row.get("degree_level"), scope.get("original_name"),
+                    )
                 )
                 identity_match = (
                     same_route_award_degree

@@ -92,12 +92,12 @@ def sample_snapshot():
     }
 
 
-def manifest_for(snapshot, expected_families=1):
+def manifest_for(snapshot, expected_families=1, award="MSc Data Science"):
     return preview.build_review_manifest(
         snapshot, approved_mapping={
             "schema_version": 1, "university_id": 92, "approval": "approved test map",
             "groups": [{
-                "parent": 901, "ids": [901, 902], "award": "MSc Data Science",
+                "parent": 901, "ids": [901, 902], "award": award,
                 "source": "https://example.edu/courses/data-science?year=2026",
             }],
         }, approved_mapping_sha256="a" * 64, expected_groups=1,
@@ -201,6 +201,31 @@ def test_authoritative_degree_canonicalizer_accepts_only_known_suffix_equivalent
         course["degree_level"] = "Master"
         row["degree_level"] = "Master Degree"
     assert manifest_for(snapshot)["groups"][0]["eligibility"] == "blocked"
+
+
+def test_diploma_degree_equivalence_is_award_scoped_and_exact():
+    award = "Postgraduate Diploma in Legal Practice"
+    snapshot = sample_snapshot()
+    for row, course in zip(snapshot["evidence_rows"], snapshot["courses"]):
+        row["extraction_method"]["campus_fee_scope"]["original_name"] = award
+        row["course_name"] = f"{award} — {row['course_location']}"
+        row["degree_level"] = "Graduate Diploma"
+        course["name"] = f"{award} — {course['course_location']}"
+        course["degree_level"] = "Graduate Certificate & Diploma"
+    assert manifest_for(snapshot, award=award)["groups"][0]["eligibility"] == "preview_candidate"
+
+    for award, published_degree in (
+        ("Graduate Certificate", "Graduate Certificate & Diploma"),
+        ("Postgraduate Diploma in Legal Practice", "Graduate Certificate"),
+    ):
+        snapshot = sample_snapshot()
+        for row, course in zip(snapshot["evidence_rows"], snapshot["courses"]):
+            row["extraction_method"]["campus_fee_scope"]["original_name"] = award
+            row["course_name"] = f"{award} — {row['course_location']}"
+            row["degree_level"] = "Graduate Diploma"
+            course["name"] = f"{award} — {course['course_location']}"
+            course["degree_level"] = published_degree
+        assert manifest_for(snapshot, award=award)["groups"][0]["eligibility"] == "blocked"
 
 
 def test_selected_fee_variant_must_belong_to_exact_scoped_campus():
@@ -325,6 +350,57 @@ def test_regional_aliases_reject_mixed_or_wrong_city_scopes_and_unknown_labels()
         course["name"] = f"MSc Data Science — {locations[0]}"
         group = manifest_for(snapshot)["groups"][0]
         assert group["eligibility"] == "blocked", (label, locations)
+
+
+def test_slash_campus_alias_requires_exact_scope_and_same_fee_group_coverage():
+    snapshot = sample_snapshot()
+    row, course = snapshot["evidence_rows"][0], snapshot["courses"][0]
+    row["course_location"] = "Manchester"
+    row["course_name"] = "MSc Data Science — Manchester"
+    row["extraction_method"]["campus_fee_scope"]["locations"] = ["Manchester"]
+    course["course_location"] = "Manchester"
+    course["name"] = "MSc Data Science — Manchester"
+    row["extraction_method"]["fee_variants"]["selected"][0].update({
+        "campus": "Birmingham/Manchester",
+        "amount": row["international_fee"],
+        "currency": row["currency"],
+        "year": row["fee_year"],
+        "period": row["fee_term"],
+        "source_url": row["course_website"],
+    })
+
+    second, second_course = snapshot["evidence_rows"][1], snapshot["courses"][1]
+    second["course_location"] = "Birmingham"
+    second["course_name"] = "MSc Data Science — Birmingham"
+    second["extraction_method"]["campus_fee_scope"]["locations"] = ["Birmingham"]
+    second["international_fee"] = row["international_fee"]
+    second["extraction_method"]["fee_variants"]["selected"][0].update({
+        "campus": "Birmingham",
+        "amount": row["international_fee"],
+    })
+    second_course["course_location"] = "Birmingham"
+    second_course["name"] = "MSc Data Science — Birmingham"
+    second_course["legacy_fee_rows"][0]["amount"] = row["international_fee"]
+    assert manifest_for(snapshot)["groups"][0]["eligibility"] == "preview_candidate"
+
+    snapshot["evidence_rows"][1]["international_fee"] = 17_000
+    snapshot["evidence_rows"][1]["extraction_method"]["fee_variants"]["selected"][0][
+        "amount"
+    ] = 17_000
+    snapshot["courses"][1]["legacy_fee_rows"][0]["amount"] = 17_000
+    assert manifest_for(snapshot)["groups"][0]["eligibility"] == "blocked"
+
+    snapshot = sample_snapshot()
+    row = snapshot["evidence_rows"][0]
+    row["course_location"] = "Manchester"
+    row["course_name"] = "MSc Data Science — Manchester"
+    row["extraction_method"]["campus_fee_scope"]["locations"] = ["Manchester"]
+    row["extraction_method"]["fee_variants"]["selected"][0]["campus"] = (
+        "Birmingham/Manchester"
+    )
+    snapshot["courses"][0]["course_location"] = "Manchester"
+    snapshot["courses"][0]["name"] = "MSc Data Science — Manchester"
+    assert manifest_for(snapshot)["groups"][0]["eligibility"] == "blocked"
 
 
 def test_arbitrary_regional_labels_and_london_scope_are_rejected():

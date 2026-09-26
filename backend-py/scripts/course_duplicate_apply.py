@@ -41,8 +41,10 @@ from course_duplicate_snapshot_export import (
     _simple_counts,
 )
 from course_duplicate_preview import (
+    _identity_degree_level,
     _is_allowed_regional_fee_label,
     _regional_fee_kind,
+    _slash_campus_tokens,
     validate_approved_mapping,
     SnapshotError,
 )
@@ -95,12 +97,6 @@ def file_sha256(path: Path) -> str:
 
 def _norm(value: Any) -> str:
     return " ".join(str(value or "").casefold().split())
-
-
-def _canonical_degree_level(value: Any) -> str:
-    from app.services.scraper.published_offerings import canonical_degree_level
-
-    return canonical_degree_level(value)
 
 
 def _same_amount(left: Any, right: Any) -> bool:
@@ -459,6 +455,8 @@ def _group_evidence(group: dict[str, Any], rows: dict[int, dict[str, Any]]) -> t
     fees_by_course = {}
     regional_scopes: dict[str, set[str]] = {}
     regional_fees: dict[str, set[tuple]] = defaultdict(set)
+    slash_alias_checks: list[tuple[frozenset[str], set[str], tuple]] = []
+    scoped_fee_rows: list[tuple[set[str], tuple]] = []
     members_by_course = {member["course_id"]: member for member in group["members"]}
     representatives = []
     approved_route = "sha256:" + group["approved_source_sha256"]
@@ -510,6 +508,8 @@ def _group_evidence(group: dict[str, Any], rows: dict[int, dict[str, Any]]) -> t
                     f"staged row {row['id']} has invalid selected fee-option campus"
                 )
             campus_keys = {_norm(campus) for campus in selected_campuses}
+            label = next(iter(campus_keys), "") if len(campus_keys) == 1 else ""
+            slash_tokens = _slash_campus_tokens(label)
             exact_authority = (
                 authority.get("status") == "uniform"
                 and isinstance(source_url, str)
@@ -523,8 +523,15 @@ def _group_evidence(group: dict[str, Any], rows: dict[int, dict[str, Any]]) -> t
                 )
             )
             regional_label = None
-            label = next(iter(campus_keys), "") if len(campus_keys) == 1 else ""
-            if _regional_fee_kind(label) is not None:
+            if slash_tokens is not None:
+                if (not slash_tokens or len(campus_keys) != 1
+                        or not scope_location_keys.issubset(slash_tokens)
+                        or not exact_authority):
+                    raise ApplyRefused(
+                        f"staged row {row['id']} slash campus label does not match scoped fee authority"
+                    )
+                regional_label = label
+            elif _regional_fee_kind(label) is not None:
                 if (not _is_allowed_regional_fee_label(label, tuple(scope_locations))
                         or not exact_authority):
                     raise ApplyRefused(
@@ -566,7 +573,7 @@ def _group_evidence(group: dict[str, Any], rows: dict[int, dict[str, Any]]) -> t
                 raise ApplyRefused(f"staged row {row['id']} has an incomplete fee cohort")
             identity = (
                 row["university_id"], row["course_website"], _norm(scope.get("original_name")),
-                _canonical_degree_level(row["degree_level"]),
+                _identity_degree_level(row["degree_level"], scope.get("original_name")),
                 next(iter(variants)), _norm(row["study_mode"]),
                 row["fee_year"], row["fee_term"], row["currency"],
             )
@@ -575,10 +582,13 @@ def _group_evidence(group: dict[str, Any], rows: dict[int, dict[str, Any]]) -> t
             fee_key = (
                 row["international_fee"], row["fee_year"], row["fee_term"], row["currency"],
             )
+            scoped_fee_rows.append((set(scope_location_keys), fee_key))
             fees_by_course.setdefault(member["course_id"], set()).add(fee_key)
             if regional_label:
                 regional_scopes.setdefault(regional_label, set()).update(scope_location_keys)
                 regional_fees[regional_label].add(fee_key)
+            if slash_tokens is not None:
+                slash_alias_checks.append((slash_tokens, set(scope_location_keys), fee_key))
             if evidence.get("selected_for_offering") is True:
                 selected_rows.append(row)
         if len(selected_rows) != 1 or selected_rows[0]["id"] != member["staged_row_id"]:
@@ -591,6 +601,13 @@ def _group_evidence(group: dict[str, Any], rows: dict[int, dict[str, Any]]) -> t
         raise ApplyRefused("campus location changed across scrape runs")
     if any(len(value) != 1 for value in fees_by_course.values()):
         raise ApplyRefused("fee amount/cohort conflicts across scrape runs")
+    for tokens, scoped_here, fee_key in slash_alias_checks:
+        for token in tokens - scoped_here:
+            if not any(token in other_scope and other_fee == fee_key
+                       for other_scope, other_fee in scoped_fee_rows):
+                raise ApplyRefused(
+                    "slash campus label includes a city not scoped at the same verified fee"
+                )
     for regional_label, scope_locations in regional_scopes.items():
         if len(regional_fees[regional_label]) != 1:
             raise ApplyRefused(
@@ -723,8 +740,11 @@ async def _conflicting_evidence(conn, groups, approved_staged_ids: set[int],
                     candidate.get("course_website") == sample.get("course_website")
                     and _norm(scope.get("original_name"))
                     == _norm(sample_scope.get("original_name"))
-                    and _canonical_degree_level(candidate.get("degree_level"))
-                    == _canonical_degree_level(sample.get("degree_level"))
+                    and _identity_degree_level(
+                        candidate.get("degree_level"), scope.get("original_name")
+                    ) == _identity_degree_level(
+                        sample.get("degree_level"), sample_scope.get("original_name")
+                    )
                     and bool(candidate_locations.intersection(sample_locations))
                 )
                 if same_award_route_campus:
@@ -734,8 +754,11 @@ async def _conflicting_evidence(conn, groups, approved_staged_ids: set[int],
                 if (
                     candidate.get("course_website") == sample.get("course_website")
                     and _norm(scope.get("original_name")) == _norm(sample_scope.get("original_name"))
-                    and _canonical_degree_level(candidate.get("degree_level"))
-                    == _canonical_degree_level(sample.get("degree_level"))
+                    and _identity_degree_level(
+                        candidate.get("degree_level"), scope.get("original_name")
+                    ) == _identity_degree_level(
+                        sample.get("degree_level"), sample_scope.get("original_name")
+                    )
                     and len(candidate_variants) == 1
                     and len(sample_variants) == 1
                     and candidate_variants == sample_variants
@@ -883,8 +906,8 @@ async def _verify_and_plan(conn, approved: dict, *, lock: bool = False) -> list[
             if (course["course_website"] != route
                     or not _published_award_name_matches(
                         course["name"], original_award, scope_locations)
-                    or _canonical_degree_level(course.get("degree_level"))
-                    != _canonical_degree_level(stage.get("degree_level"))
+                    or _identity_degree_level(course.get("degree_level"), original_award)
+                    != _identity_degree_level(stage.get("degree_level"), original_award)
                     or _norm(course.get("study_mode")) != _norm(stage.get("study_mode"))
                     or _norm(course.get("course_location")) != _norm(stage.get("course_location"))):
                 raise ApplyRefused(f"current Course identity properties differ for ID {course['id']}")
@@ -940,7 +963,7 @@ async def _verify_and_plan(conn, approved: dict, *, lock: bool = False) -> list[
                 locations[key] = (campus, stage)
             identity_values.add((
                 university_id, route, original_award,
-                _canonical_degree_level(stage["degree_level"]), variant,
+                _identity_degree_level(stage["degree_level"], original_award), variant,
                 stage["study_mode"], stage["fee_year"], stage["fee_term"], stage["currency"],
             ))
         expected_locations = {
@@ -971,8 +994,8 @@ async def _verify_and_plan(conn, approved: dict, *, lock: bool = False) -> list[
         for existing in existing_identity_rows:
             if (_published_award_name_matches(
                         existing["name"], original_award, existing.get("course_location"))
-                    and _canonical_degree_level(existing["degree_level"])
-                    == _canonical_degree_level(identity_row["degree_level"])
+                    and _identity_degree_level(existing["degree_level"], original_award)
+                    == _identity_degree_level(identity_row["degree_level"], original_award)
                     and existing["id"] not in approved_course_ids):
                 if existing.get("offering_identity") == identity:
                     raise ApplyRefused(
@@ -995,8 +1018,11 @@ async def _verify_and_plan(conn, approved: dict, *, lock: bool = False) -> list[
                     scope = (candidate.get("extraction_method") or {}).get(SCOPE) or {}
                     if (_norm(scope.get("original_name")) != _norm(original_award)
                             or candidate.get("university_id") != university_id
-                            or _canonical_degree_level(candidate.get("degree_level"))
-                               != _canonical_degree_level(identity_row["degree_level"])):
+                            or _identity_degree_level(
+                                candidate.get("degree_level"), original_award
+                            ) != _identity_degree_level(
+                                identity_row["degree_level"], original_award
+                            )):
                         continue
                     selected = ((candidate.get("extraction_method") or {}).get(
                         "fee_variants", {}

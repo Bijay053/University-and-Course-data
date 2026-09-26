@@ -153,7 +153,9 @@ def _fixture(mapping: dict):
             group_first_pair = member_ids[:2]
         for course_id in member_ids:
             all_ids.append(course_id)
-            if group["award"] == "LLB International Law":
+            if "diploma" in group["award"].casefold():
+                degree, published_degree = "Graduate Diploma", "Graduate Certificate & Diploma"
+            elif group["award"] == "LLB International Law":
                 degree, published_degree = "Bachelor's", "Bachelor"
             elif course_id in {9389, 9547}:
                 degree, published_degree = "Master's", "Master"
@@ -189,6 +191,18 @@ def _fixture(mapping: dict):
                 name_location = location
                 fee_campus = "London"
                 fee = 18_100.0
+            elif group_index == 2 and course_id == group["parent"]:
+                location = "Manchester"
+                scope_locations = ["Manchester"]
+                name_location = location
+                fee_campus = "Birmingham/Manchester"
+                fee = 16_700.0
+            elif group_index == 2 and course_id == group["ids"][1]:
+                location = "Birmingham"
+                scope_locations = ["Birmingham"]
+                name_location = location
+                fee_campus = "Birmingham"
+                fee = 16_700.0
             else:
                 location = f"Canary campus {course_id}"
                 scope_locations = [location]
@@ -720,6 +734,11 @@ def test_task629_end_to_end_canary_schema():
                         SELECT course_id, location, fee_amount FROM course_offerings
                          WHERE course_id = ANY(:ids)
                     """), {"ids": [manchester_course_id, london_course_id]})).mappings().all()
+                    slash_course_id = mapping["groups"][2]["parent"]
+                    slash_offerings = (await conn.execute(text("""
+                        SELECT location, fee_amount FROM course_offerings
+                         WHERE course_id = :course_id
+                    """), {"course_id": slash_course_id})).mappings().all()
                 assert course_count == 305
                 assert alias_count == 203
                 assert pathway_count == (1 if internal_pathway else 0)
@@ -764,6 +783,10 @@ def test_task629_end_to_end_canary_schema():
                 }
                 assert regional_prices[(manchester_course_id, "Manchester")] == 18_250.0
                 assert regional_prices[(london_course_id, "London Bloomsbury")] == 18_100.0
+                slash_prices = {
+                    row["location"]: row["fee_amount"] for row in slash_offerings
+                }
+                assert slash_prices["Manchester"] == slash_prices["Birmingham"] == 16_700.0
 
                 from app.routers.search import search_courses
 
