@@ -53,14 +53,25 @@ def fixture():
             "approved_source_sha256": hashlib.sha256(original["source"].encode()).hexdigest(),
             "members": members,
         })
+    snapshot = {
+        "schema_version": 1,
+        "snapshot_id": "offline-test-snapshot",
+        "reference_scan_complete": True,
+        "external_reference_scan_complete": False,
+        "courses": [],
+        "evidence_rows": [],
+        "published_course_inventory_complete": True,
+        "published_course_inventory_count": len(inventory),
+        "published_course_inventory": inventory,
+    }
     review = {
         "mode": "read_only_preview",
         "production_writes_performed": False,
         "approved_mapping_sha256": mapping_digest,
+        "generated_from_snapshot_sha256": proposal.preview._sha256(snapshot),
         "published_course_inventory_complete": True,
         "published_course_inventory_count": len(inventory),
         "published_course_inventory_sha256": proposal.preview._sha256(inventory),
-        "published_course_inventory": inventory,
         "groups": groups,
         "unscoped_aliases": copy.deepcopy(mapping["unscoped_aliases"]),
         "expected_scope": {
@@ -76,21 +87,19 @@ def fixture():
         },
     }
     review["manifest_sha256"] = proposal.sha256(review)
-    return mapping, mapping_digest, review
+    return mapping, mapping_digest, review, snapshot
 
 
-def reseal(review):
+def reseal(review, snapshot):
     review.pop("manifest_sha256", None)
-    review["published_course_inventory_sha256"] = proposal.preview._sha256(
-        review["published_course_inventory"]
-    )
+    review["generated_from_snapshot_sha256"] = proposal.preview._sha256(snapshot)
     review["manifest_sha256"] = proposal.sha256(review)
 
 
 def test_builds_deterministic_61_group_311_id_proposal():
-    mapping, digest, review = fixture()
-    first, summary = proposal.build_proposal(mapping, digest, review)
-    second, _ = proposal.build_proposal(mapping, digest, review)
+    mapping, digest, review, snapshot = fixture()
+    first, summary = proposal.build_proposal(mapping, digest, review, snapshot)
+    second, _ = proposal.build_proposal(mapping, digest, review, snapshot)
     assert proposal.canonical_json(first) == proposal.canonical_json(second)
     assert first["status"] == "proposed_unapproved_for_human_review"
     assert first["approval"] is None
@@ -113,7 +122,7 @@ def test_rejects_original_mapping_sha_drift(tmp_path):
 
 
 def test_rejects_fee_conflict_for_duplicate_normalized_campus():
-    mapping, digest, review = fixture()
+    mapping, digest, review, snapshot = fixture()
     parents = proposal.EXPECTED_PARENTS[5]
     first, second = (next(g for g in review["groups"]
                           if g["proposed_canonical_course_id"] == parent)
@@ -122,44 +131,71 @@ def test_rejects_fee_conflict_for_duplicate_normalized_campus():
     b["locations"] = [a["locations"][0]]
     b["location"] = a["locations"][0]
     b["source_fee"]["amount"] += 1
-    inventory_row = next(row for row in review["published_course_inventory"]
+    inventory_row = next(row for row in snapshot["published_course_inventory"]
                          if row["id"] == b["course_id"])
     original = next(row for row in mapping["groups"]
                     if row["parent"] == parents[1])
     inventory_row["name"] = f"{original['award']} — {a['locations'][0]}"
-    reseal(review)
+    review["published_course_inventory_sha256"] = proposal.preview._sha256(
+        snapshot["published_course_inventory"]
+    )
+    reseal(review, snapshot)
     with pytest.raises(proposal.ProposalRefused, match="fee conflict"):
-        proposal.build_proposal(mapping, digest, review)
+        proposal.build_proposal(mapping, digest, review, snapshot)
 
 
 def test_rejects_study_mode_mismatch_inside_cluster():
-    mapping, digest, review = fixture()
+    mapping, digest, review, snapshot = fixture()
     parents = proposal.EXPECTED_PARENTS[5]
     member = next(g for g in review["groups"]
                   if g["proposed_canonical_course_id"] == parents[1])["members"][0]
     member["study_mode"] = "Online"
-    reseal(review)
+    reseal(review, snapshot)
     with pytest.raises(proposal.ProposalRefused, match="identity drift|study mode mismatch"):
-        proposal.build_proposal(mapping, digest, review)
+        proposal.build_proposal(mapping, digest, review, snapshot)
 
 
 def test_rejects_identity_key_drift_inside_cluster():
-    mapping, digest, review = fixture()
+    mapping, digest, review, snapshot = fixture()
     parents = proposal.EXPECTED_PARENTS[5]
     member = next(g for g in review["groups"]
                   if g["proposed_canonical_course_id"] == parents[1])["members"][0]
     member["study_variant"] = "Extended"
-    reseal(review)
+    reseal(review, snapshot)
     with pytest.raises(proposal.ProposalRefused, match="identity drift"):
-        proposal.build_proposal(mapping, digest, review)
+        proposal.build_proposal(mapping, digest, review, snapshot)
 
 
 def test_rejects_missing_historical_id():
-    mapping, digest, review = fixture()
+    mapping, digest, review, snapshot = fixture()
     group = review["groups"][0]
     missing = group["course_ids"].pop()
     group["member_count"] -= 1
     group["members"] = [row for row in group["members"] if row["course_id"] != missing]
-    reseal(review)
+    reseal(review, snapshot)
     with pytest.raises(proposal.ProposalRefused, match="exact eligible original group"):
-        proposal.build_proposal(mapping, digest, review)
+        proposal.build_proposal(mapping, digest, review, snapshot)
+
+
+def test_rejects_missing_companion_snapshot():
+    mapping, digest, review, _ = fixture()
+    with pytest.raises(proposal.ProposalRefused, match="companion snapshot is required"):
+        proposal.build_proposal(mapping, digest, review, None)
+
+
+def test_rejects_tampered_snapshot_hash():
+    mapping, digest, review, snapshot = fixture()
+    tampered_snapshot = copy.deepcopy(snapshot)
+    tampered_snapshot["snapshot_id"] = "tampered"
+    with pytest.raises(proposal.ProposalRefused, match="snapshot SHA-256"):
+        proposal.build_proposal(mapping, digest, review, tampered_snapshot)
+
+
+def test_rejects_changed_snapshot_inventory_even_if_snapshot_hash_is_resealed():
+    mapping, digest, review, snapshot = fixture()
+    changed_snapshot = copy.deepcopy(snapshot)
+    changed_snapshot["published_course_inventory"][0]["name"] = "Changed published name"
+    review["generated_from_snapshot_sha256"] = proposal.preview._sha256(changed_snapshot)
+    reseal(review, changed_snapshot)
+    with pytest.raises(proposal.ProposalRefused, match="published inventory differs"):
+        proposal.build_proposal(mapping, digest, review, changed_snapshot)

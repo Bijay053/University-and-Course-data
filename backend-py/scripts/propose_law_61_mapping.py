@@ -102,7 +102,12 @@ def validate_mapping(mapping: dict[str, Any]) -> None:
 
 
 def validate_manifest(manifest: dict[str, Any], mapping: dict[str, Any],
-                      mapping_digest: str) -> dict[int, dict[str, Any]]:
+                      mapping_digest: str, snapshot: dict[str, Any]
+                      ) -> tuple[dict[int, dict[str, Any]], list[dict[str, Any]]]:
+    if not isinstance(manifest, dict):
+        raise ProposalRefused("review manifest must be a JSON object")
+    if not isinstance(snapshot, dict):
+        raise ProposalRefused("a companion snapshot is required")
     if manifest.get("mode") != "read_only_preview":
         raise ProposalRefused("review input is not a read-only preview manifest")
     if manifest.get("production_writes_performed") is not False:
@@ -130,6 +135,8 @@ def validate_manifest(manifest: dict[str, Any], mapping: dict[str, Any],
         raise ProposalRefused("published course identity inventory is not complete")
     if manifest.get("published_course_inventory_count") is None:
         raise ProposalRefused("published course identity inventory count is missing")
+    if manifest.get("generated_from_snapshot_sha256") != preview._sha256(snapshot):
+        raise ProposalRefused("review manifest does not match the supplied snapshot SHA-256")
     expected_scope = manifest.get("expected_scope")
     if (not isinstance(expected_scope, dict)
             or expected_scope.get("groups") != EXPECTED_SCOPED_GROUPS
@@ -180,7 +187,15 @@ def validate_manifest(manifest: dict[str, Any], mapping: dict[str, Any],
             "study_variant", "amount", "currency", "fee_year", "fee_term", "source",
         )):
             raise ProposalRefused("review manifest changed an unscoped alias or its target")
-    return observed_by_parent
+    inventory = snapshot.get("published_course_inventory")
+    if not isinstance(inventory, list):
+        raise ProposalRefused("supplied snapshot has no published course inventory")
+    if (snapshot.get("published_course_inventory_complete") is not True
+            or snapshot.get("published_course_inventory_count") != len(inventory)
+            or len(inventory) != manifest.get("published_course_inventory_count")
+            or preview._sha256(inventory) != manifest.get("published_course_inventory_sha256")):
+        raise ProposalRefused("supplied snapshot published inventory differs from the review manifest")
+    return observed_by_parent, inventory
 
 
 def identity_key(parent: int, group: dict[str, Any]) -> tuple[str, str, str, str]:
@@ -203,8 +218,11 @@ def identity_key(parent: int, group: dict[str, Any]) -> tuple[str, str, str, str
 
 
 def build_proposal(mapping: dict[str, Any], mapping_digest: str,
-                   manifest: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
-    reviewed_by_parent = validate_manifest(manifest, mapping, mapping_digest)
+                   manifest: dict[str, Any], snapshot: dict[str, Any]
+                   ) -> tuple[dict[str, Any], dict[str, Any]]:
+    reviewed_by_parent, published_inventory = validate_manifest(
+        manifest, mapping, mapping_digest, snapshot,
+    )
     original_by_parent = {group["parent"]: group for group in mapping["groups"]}
     parent_to_cluster = {
         parent: cluster[0] for cluster in EXPECTED_PARENTS for parent in cluster
@@ -215,12 +233,6 @@ def build_proposal(mapping: dict[str, Any], mapping_digest: str,
             or set(parent_to_cluster) != all_parents):
         raise ProposalRefused("configured 61 clusters do not partition the original 100 parents exactly")
 
-    published_inventory = manifest.get("published_course_inventory")
-    if not isinstance(published_inventory, list):
-        raise ProposalRefused("complete published course inventory records are required")
-    if (manifest.get("published_course_inventory_count") != len(published_inventory)
-            or manifest.get("published_course_inventory_sha256") != preview._sha256(published_inventory)):
-        raise ProposalRefused("published course inventory count or fingerprint is invalid")
     published_by_id = {row.get("id"): row for row in published_inventory if isinstance(row, dict)}
     if len(published_by_id) != len(published_inventory):
         raise ProposalRefused("published inventory contains duplicate or malformed IDs")
@@ -391,6 +403,8 @@ def write_json(path: str | Path, value: Any) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--review", required=True, help="fresh read-only review manifest JSON")
+    parser.add_argument("--snapshot", required=True,
+                        help="companion snapshot used to generate the review manifest")
     parser.add_argument("--approved-mapping", default=str(
         Path(__file__).with_name("approved_law_legacy_mapping.json")
     ))
@@ -401,17 +415,22 @@ def main(argv: list[str] | None = None) -> int:
         protected = {
             Path(args.approved_mapping).resolve(),
             Path(args.review).resolve(),
+            Path(args.snapshot).resolve(),
         }
         if Path(args.out).resolve() in protected or Path(args.summary).resolve() in protected:
-            raise ProposalRefused("output paths must not overwrite the approved mapping or review manifest")
+            raise ProposalRefused(
+                "output paths must not overwrite the approved mapping, review manifest, or snapshot"
+            )
         if Path(args.out).resolve() == Path(args.summary).resolve():
             raise ProposalRefused("proposal and summary outputs must use different paths")
         mapping, digest = load_mapping(args.approved_mapping)
         manifest = json.loads(Path(args.review).read_text(encoding="utf-8"))
-        proposal, summary = build_proposal(mapping, digest, manifest)
+        snapshot = preview.load_snapshot(args.snapshot)
+        proposal, summary = build_proposal(mapping, digest, manifest, snapshot)
         write_json(args.out, proposal)
         write_json(args.summary, summary)
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError, ProposalRefused) as exc:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError,
+            ProposalRefused, preview.SnapshotError) as exc:
         print(f"ULaw 61-group proposal refused: {exc}", file=sys.stderr)
         return 2
     print(json.dumps({
