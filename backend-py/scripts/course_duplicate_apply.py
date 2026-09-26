@@ -40,7 +40,12 @@ from course_duplicate_snapshot_export import (
     _outside_pathway_counts,
     _simple_counts,
 )
-from course_duplicate_preview import validate_approved_mapping, SnapshotError
+from course_duplicate_preview import (
+    _is_allowed_regional_fee_label,
+    _regional_fee_kind,
+    validate_approved_mapping,
+    SnapshotError,
+)
 
 
 EXPECTED_GROUPS = 102
@@ -518,15 +523,18 @@ def _group_evidence(group: dict[str, Any], rows: dict[int, dict[str, Any]]) -> t
                 )
             )
             regional_label = None
-            if not campus_keys.issubset(scope_location_keys):
-                label = next(iter(campus_keys), "")
-                if (len(campus_keys) != 1 or not exact_authority
-                        or label != "outside london"
-                        or any("london" in key for key in scope_location_keys)):
+            label = next(iter(campus_keys), "") if len(campus_keys) == 1 else ""
+            if _regional_fee_kind(label) is not None:
+                if (not _is_allowed_regional_fee_label(label, tuple(scope_locations))
+                        or not exact_authority):
                     raise ApplyRefused(
-                        f"staged row {row['id']} selected fee option is not bound to scoped campuses"
+                        f"staged row {row['id']} regional fee label does not match scoped campuses"
                     )
                 regional_label = label
+            elif not campus_keys.issubset(scope_location_keys):
+                raise ApplyRefused(
+                    f"staged row {row['id']} selected fee option is not bound to scoped campuses"
+                )
             elif not scope_location_keys.issubset(campus_keys) or not exact_authority:
                 raise ApplyRefused(
                     f"staged row {row['id']} selected fee options do not cover every scoped campus"

@@ -71,11 +71,34 @@ def _canonical_degree_level(value: Any) -> str:
     return canonical_degree_level(value)
 
 
+_REGIONAL_FEE_LABELS = {
+    "london": "london",
+    "outside london": "non_london",
+    "outside of london": "non_london",
+    "non-london": "non_london",
+}
+_NON_LONDON_FEE_LABELS = {
+    label for label, kind in _REGIONAL_FEE_LABELS.items() if kind == "non_london"
+}
+
+
+def _regional_fee_kind(label: str) -> str | None:
+    return _REGIONAL_FEE_LABELS.get(_norm(label))
+
+
 def _is_allowed_regional_fee_label(label: str, locations: tuple[str, ...]) -> bool:
-    return (
-        _norm(label) == "outside london"
-        and bool(locations)
-        and all("london" not in _norm(location) for location in locations)
+    kind = _regional_fee_kind(label)
+    normalized_locations = [_norm(location) for location in locations]
+    if kind is None or not normalized_locations or any(not location for location in normalized_locations):
+        return False
+    if kind == "london":
+        return all(
+            location.startswith("london") and location not in _NON_LONDON_FEE_LABELS
+            for location in normalized_locations
+        )
+    return all(
+        not location.startswith("london") and location not in _REGIONAL_FEE_LABELS
+        for location in normalized_locations
     )
 
 
@@ -141,18 +164,15 @@ def _fee_campus_binding(
         )
     )
     regional_label = None
-    if not campus_keys.issubset(scope_keys):
-        # A regional label can bind to multiple concrete locations only when
-        # the extraction scope explicitly lists those locations and the
-        # selected authority is a validated uniform fee matching the stored
-        # amount/cohort/route. The apply path revalidates raw options with
-        # validated_fee_variants before any write.
-        label = next(iter(campus_keys), "")
-        if (len(campus_keys) != 1
-                or not _is_allowed_regional_fee_label(label, location_values)
+    selected_label = next(iter(campus_keys), "") if len(campus_keys) == 1 else ""
+    regional_kind = _regional_fee_kind(selected_label)
+    if regional_kind is not None:
+        if (not _is_allowed_regional_fee_label(selected_label, location_values)
                 or not exact_authority):
-            return None, "selected fee option campus differs from scoped campus", (), None
-        regional_label = label
+            return None, "selected regional fee label does not match scoped campuses", (), None
+        regional_label = selected_label
+    elif not campus_keys.issubset(scope_keys):
+        return None, "selected fee option campus differs from scoped campus", (), None
     elif not scope_keys.issubset(campus_keys) or not exact_authority:
         return None, "selected fee option campus differs from scoped campus", (), None
     if len(set(variants)) != 1:

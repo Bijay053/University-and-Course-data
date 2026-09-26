@@ -276,6 +276,57 @@ def test_outside_london_authority_can_bind_one_explicit_hull_campus():
     assert hull["source_fee"]["amount"] == snapshot["evidence_rows"][0]["international_fee"]
 
 
+def test_known_regional_aliases_bind_only_their_explicit_city_scope():
+    snapshot = sample_snapshot()
+    row, course = snapshot["evidence_rows"][0], snapshot["courses"][0]
+    locations = ["London Bloomsbury", "London Moorgate"]
+    joined = ", ".join(locations)
+    row["course_location"] = joined
+    row["course_name"] = "MSc Data Science — London Bloomsbury"
+    row["extraction_method"]["campus_fee_scope"]["locations"] = locations
+    row["extraction_method"]["fee_variants"]["selected"][0]["campus"] = "London"
+    course["course_location"] = joined
+    course["name"] = "MSc Data Science — London Bloomsbury"
+    group = manifest_for(snapshot)["groups"][0]
+    assert group["eligibility"] == "preview_candidate"
+    london = next(member for member in group["members"] if member["course_id"] == 901)
+    assert london["locations"] == locations
+    assert len(london["location_evidence"]) == 2
+
+    for label in ("Outside London", "Outside of London", "Non-London"):
+        snapshot = sample_snapshot()
+        row, course = snapshot["evidence_rows"][0], snapshot["courses"][0]
+        row["course_location"] = "Manchester"
+        row["course_name"] = "MSc Data Science — Manchester"
+        row["extraction_method"]["campus_fee_scope"]["locations"] = ["Manchester"]
+        row["extraction_method"]["fee_variants"]["selected"][0]["campus"] = label
+        course["course_location"] = "Manchester"
+        course["name"] = "MSc Data Science — Manchester"
+        assert manifest_for(snapshot)["groups"][0]["eligibility"] == "preview_candidate"
+
+
+def test_regional_aliases_reject_mixed_or_wrong_city_scopes_and_unknown_labels():
+    cases = (
+        ("London", ["Manchester"]),
+        ("Outside London", ["London Bloomsbury"]),
+        ("Outside of London", ["Manchester", "London Moorgate"]),
+        ("Non-London", ["London", "Birmingham"]),
+        ("Outside London Campus", ["Hull"]),
+    )
+    for label, locations in cases:
+        snapshot = sample_snapshot()
+        row, course = snapshot["evidence_rows"][0], snapshot["courses"][0]
+        joined = ", ".join(locations)
+        row["course_location"] = joined
+        row["course_name"] = f"MSc Data Science — {locations[0]}"
+        row["extraction_method"]["campus_fee_scope"]["locations"] = locations
+        row["extraction_method"]["fee_variants"]["selected"][0]["campus"] = label
+        course["course_location"] = joined
+        course["name"] = f"MSc Data Science — {locations[0]}"
+        group = manifest_for(snapshot)["groups"][0]
+        assert group["eligibility"] == "blocked", (label, locations)
+
+
 def test_arbitrary_regional_labels_and_london_scope_are_rejected():
     for label, location in (("Outside London Campus", "Hull"), ("Outside London", "London")):
         snapshot = sample_snapshot()

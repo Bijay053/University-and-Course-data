@@ -177,6 +177,18 @@ def _fixture(mapping: dict):
                 name_location = location
                 fee_campus = "Outside London"
                 fee = float(10_000 + (course_id % 1_000))
+            elif course_id == 9406:
+                location = "Manchester"
+                scope_locations = ["Manchester"]
+                name_location = location
+                fee_campus = "Outside London"
+                fee = 18_250.0
+            elif course_id == 9498:
+                location = "London Bloomsbury"
+                scope_locations = ["London Bloomsbury"]
+                name_location = location
+                fee_campus = "London"
+                fee = 18_100.0
             else:
                 location = f"Canary campus {course_id}"
                 scope_locations = [location]
@@ -696,6 +708,18 @@ def test_task629_end_to_end_canary_schema():
                         SELECT location, fee_amount FROM course_offerings
                          WHERE course_id = :course_id ORDER BY location
                     """), {"course_id": hull_course_id})).mappings().all()
+                    manchester_course_id = next(
+                        group["parent"] for group in mapping["groups"]
+                        if 9406 in group["ids"]
+                    )
+                    london_course_id = next(
+                        group["parent"] for group in mapping["groups"]
+                        if 9498 in group["ids"]
+                    )
+                    regional_offerings = (await conn.execute(text("""
+                        SELECT course_id, location, fee_amount FROM course_offerings
+                         WHERE course_id = ANY(:ids)
+                    """), {"ids": [manchester_course_id, london_course_id]})).mappings().all()
                 assert course_count == 305
                 assert alias_count == 203
                 assert pathway_count == (1 if internal_pathway else 0)
@@ -734,6 +758,12 @@ def test_task629_end_to_end_canary_schema():
                 }
                 assert hull_prices["Hull"] == expected_hull_fee
                 assert sum(row["location"] == "Hull" for row in hull_offerings) == 1
+                regional_prices = {
+                    (row["course_id"], row["location"]): row["fee_amount"]
+                    for row in regional_offerings
+                }
+                assert regional_prices[(manchester_course_id, "Manchester")] == 18_250.0
+                assert regional_prices[(london_course_id, "London Bloomsbury")] == 18_100.0
 
                 from app.routers.search import search_courses
 
