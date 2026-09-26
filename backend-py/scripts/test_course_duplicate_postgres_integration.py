@@ -161,28 +161,41 @@ def _fixture(mapping: dict):
                 degree, published_degree = "Master's", "Master"
             else:
                 degree = published_degree = "Master"
+            if group["parent"] in preview.REVISED_UNIONS:
+                # The revised groups have one exact reviewed study identity
+                # across every member, not the legacy representative's
+                # punctuation variant.
+                degree = published_degree = "Master"
             fee_term = "Annual"
             if group["parent"] == 9389:
-                campus_by_id = dict(zip(member_ids, (
-                    "Birmingham", "Birmingham", "Leeds", "Leeds",
-                    "Manchester", "Manchester",
-                )))
-                location = campus_by_id[course_id]
-                scope_locations = [location]
-                name_location = location
-                fee_campus = location
-                fee = 17_500.0
+                campuses_by_id = {
+                    9389: ["Birmingham", "Leeds", "Manchester"],
+                    9408: ["London"],
+                    9645: ["Manchester"],
+                    9646: ["Birmingham"],
+                    9647: ["Leeds"],
+                    9648: ["London Moorgate"],
+                }
+                scope_locations = campuses_by_id[course_id]
+                location = ", ".join(scope_locations)
+                name_location = scope_locations[0]
+                fee_campus = scope_locations
+                fee = 17_500.0 if course_id in {9389, 9645, 9646, 9647} else 19_050.0
                 fee_term = "Full Course"
                 variant = "Standard"
             elif group["parent"] == 9396:
-                campus_by_id = dict(zip(member_ids, (
-                    "Birmingham", "Birmingham", "Manchester", "Manchester", "Manchester",
-                )))
-                location = campus_by_id[course_id]
-                scope_locations = [location]
-                name_location = location
-                fee_campus = location
-                fee = 18_250.0
+                campuses_by_id = {
+                    9396: ["Birmingham", "Manchester"],
+                    9421: ["London"],
+                    9608: ["Manchester"],
+                    9675: ["Birmingham"],
+                    9676: ["London Bloomsbury"],
+                }
+                scope_locations = campuses_by_id[course_id]
+                location = ", ".join(scope_locations)
+                name_location = scope_locations[0]
+                fee_campus = scope_locations
+                fee = 18_250.0 if course_id in {9396, 9608, 9675} else 19_600.0
                 fee_term = "Full Course"
                 variant = "Standard"
             elif group_index == 1 and course_id == group["parent"]:
@@ -242,12 +255,15 @@ def _fixture(mapping: dict):
             if group_index < 15 and course_id == member_ids[0]:
                 family_records.append((f"job-overlap-{group_index}", split_id))
             for job_id, split_id in family_records:
-                option = {
-                    "amount": fee, "currency": "GBP", "campus": fee_campus,
+                fee_campuses = (
+                    fee_campus if isinstance(fee_campus, list) else [fee_campus]
+                )
+                options = [{
+                    "amount": fee, "currency": "GBP", "campus": campus,
                     "study_variant": variant, "year": 2026, "period": fee_term,
                     "source_url": group["source"],
-                    "snippet": f"International Students | 2026 | {variant} | {location}: £{fee}",
-                }
+                    "snippet": f"International Students | 2026 | {variant} | {campus}: £{fee}",
+                } for campus in fee_campuses]
                 scope = {
                     "original_name": group["award"], "locations": scope_locations,
                     "key": f"scope-{course_id}", "source_url": group["source"],
@@ -267,7 +283,7 @@ def _fixture(mapping: dict):
                         "campus_fee_scope": scope,
                         "international_fee": "fee.ulaw_course_authority",
                         "fee_variants": {
-                            "status": "uniform", "selected": [option], "options": [option],
+                            "status": "uniform", "selected": options, "options": options,
                             "fee_year": 2026, "fee_term": fee_term, "currency": "GBP",
                             "international_fee": fee,
                         },
@@ -342,7 +358,7 @@ def _fixture(mapping: dict):
     return {
         "schema_version": 1, "reference_scan_complete": True,
         "external_reference_scan_complete": False,
-        "raw_family_count": 171, "logical_component_count": 125,
+        "raw_family_count": 171, "logical_component_count": 129,
         "evidence_rows": evidence_rows, "courses": course_rows,
     }, course_rows, evidence_rows, group_first_pair
 
@@ -538,9 +554,15 @@ def test_integration_fixture_models_119_overlapping_families_and_variant_identit
     assert sum(
         1 for ids in component_ids if mapping_parent_by_id[next(iter(ids))] == 9396
     ) == 3
-    for parent, expected_campuses, expected_fee in (
-        (9389, {"Birmingham", "Leeds", "Manchester"}, 17_500.0),
-        (9396, {"Birmingham", "Manchester"}, 18_250.0),
+    for parent, expected_campuses, fee_by_id in (
+        (9389, {"Birmingham", "Leeds", "Manchester"}, {
+            9389: 17_500.0, 9408: 19_050.0, 9645: 17_500.0,
+            9646: 17_500.0, 9647: 17_500.0, 9648: 19_050.0,
+        }),
+        (9396, {"Birmingham", "Manchester"}, {
+            9396: 18_250.0, 9421: 19_600.0, 9608: 18_250.0,
+            9675: 18_250.0, 9676: 19_600.0,
+        }),
     ):
         approved_group = next(group for group in mapping["groups"]
                               if group["parent"] == parent)
@@ -551,17 +573,19 @@ def test_integration_fixture_models_119_overlapping_families_and_variant_identit
         campus_counts = {}
         tuple_by_campus = {}
         for row in group_rows.values():
-            campus = row["course_location"]
-            campus_counts[campus] = campus_counts.get(campus, 0) + 1
-            selected = row["extraction_method"]["fee_variants"]["selected"][0]
-            tuple_by_campus.setdefault(campus, set()).add((
-                row["course_website"], row["international_fee"], row["currency"],
-                row["fee_year"], row["fee_term"], selected["study_variant"],
-            ))
-            assert row["international_fee"] == expected_fee
+            selected = row["extraction_method"]["fee_variants"]["selected"]
+            for campus in row["extraction_method"]["campus_fee_scope"]["locations"]:
+                campus_counts[campus] = campus_counts.get(campus, 0) + 1
+                variant = next(item["study_variant"] for item in selected
+                               if item["campus"] == campus)
+                tuple_by_campus.setdefault(campus, set()).add((
+                    row["course_website"], row["international_fee"], row["currency"],
+                    row["fee_year"], row["fee_term"], variant,
+                ))
+            assert row["international_fee"] == fee_by_id[row["course_id"]]
             assert row["currency"] == "GBP" and row["fee_year"] == 2026
             assert row["fee_term"] == "Full Course"
-            assert selected["study_variant"] == "Standard"
+            assert all(item["study_variant"] == "Standard" for item in selected)
         assert {campus for campus, count in campus_counts.items() if count > 1} == expected_campuses
         assert all(len(values) == 1 for values in tuple_by_campus.values())
     assert preview._norm("London") != preview._norm("London Moorgate")
@@ -631,7 +655,7 @@ def test_task629_end_to_end_canary_schema():
                     ))
                     exported = await exporter.build_snapshot(conn)
             assert exported["raw_family_count"] == 171
-            assert exported["logical_component_count"] == 125
+            assert exported["logical_component_count"] == 129
             manifest_path = SCRIPT_DIR / f".task629-integration-{schema}.json"
             try:
                 approved = _reviewed_manifest(
@@ -646,7 +670,7 @@ def test_task629_end_to_end_canary_schema():
                 assert observed["excluded_unrelated_course_ids"] == list(range(910_000, 910_025))
                 assert observed["related_extra_course_ids"] == []
                 duplicate_group = mapping["groups"][0]
-                mapped_variant = f"Isolated integration variant 1"
+                mapped_variant = "Standard"
                 await _insert_unreviewed_same_award_course(
                     test_engine, duplicate_group, course_id=900_001,
                     staged_id=900_101, variant=mapped_variant,
@@ -795,6 +819,14 @@ def test_task629_end_to_end_canary_schema():
                         SELECT location, fee_amount FROM course_offerings
                          WHERE course_id = :course_id ORDER BY location
                     """), {"course_id": group_zero_id})).mappings().all()
+                    group_one_revised_id = next(
+                        group["parent"] for group in mapping["groups"]
+                        if group["parent"] == 9396
+                    )
+                    group_one_revised_offerings = (await conn.execute(text("""
+                        SELECT location, fee_amount FROM course_offerings
+                         WHERE course_id = :course_id ORDER BY location
+                    """), {"course_id": group_one_revised_id})).mappings().all()
                     hull_course_id = mapping["groups"][1]["parent"]
                     hull_offerings = (await conn.execute(text("""
                         SELECT location, fee_amount FROM course_offerings
@@ -830,7 +862,7 @@ def test_task629_end_to_end_canary_schema():
                     })
                     for group in mapping["groups"]
                 )
-                assert offer_rows == expected_offering_count == 309
+                assert offer_rows == expected_offering_count == 305
                 assert duplicate_offering_campuses == 0
                 expected_group_zero_prices = {
                     location: next(
@@ -845,7 +877,23 @@ def test_task629_end_to_end_canary_schema():
                 }
                 assert {row["location"]: row["fee_amount"]
                         for row in group_zero_offerings} == expected_group_zero_prices
-                assert len(group_zero_offerings) == len(expected_group_zero_prices) == 8
+                assert len(group_zero_offerings) == len(expected_group_zero_prices) == 5
+                assert expected_group_zero_prices == {
+                    "Birmingham": 17_500.0,
+                    "Leeds": 17_500.0,
+                    "London": 19_050.0,
+                    "London Moorgate": 19_050.0,
+                    "Manchester": 17_500.0,
+                }
+                assert {
+                    row["location"]: row["fee_amount"]
+                    for row in group_one_revised_offerings
+                } == {
+                    "Birmingham": 18_250.0,
+                    "London": 19_600.0,
+                    "London Bloomsbury": 19_600.0,
+                    "Manchester": 18_250.0,
+                }
                 expected_hull_fee = next(
                     row["international_fee"] for row in evidence_rows
                     if row["course_id"] == hull_course_id

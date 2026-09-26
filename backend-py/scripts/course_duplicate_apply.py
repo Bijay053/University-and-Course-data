@@ -702,7 +702,7 @@ def _group_evidence(group: dict[str, Any], rows: dict[int, dict[str, Any]]) -> t
             raise ApplyRefused(
                 f"regional fee label {regional_label} has conflicting verified fee values"
             )
-    representative_campuses = []
+    representative_campuses = {}
     for row in representatives:
         member = members_by_course[row["course_id"]]
         scope_locations = (
@@ -710,9 +710,23 @@ def _group_evidence(group: dict[str, Any], rows: dict[int, dict[str, Any]]) -> t
         ).get("locations")
         if scope_locations != member.get("locations"):
             raise ApplyRefused("reviewed campus list differs from validated source scope")
-        representative_campuses.extend(_norm(location) for location in scope_locations)
-    if len(set(representative_campuses)) != len(representative_campuses):
-        raise ApplyRefused("approved IDs claim a duplicate offering campus")
+        fee = (row["international_fee"], row["fee_year"], row["fee_term"], row["currency"])
+        for location in scope_locations:
+            key = _norm(location)
+            previous = representative_campuses.get(key)
+            if previous is not None:
+                reviewed_union = REVISED_UNIONS.get(group["proposed_canonical_course_id"])
+                if (reviewed_union is None
+                        or tuple(sorted(members_by_course)) != reviewed_union["ids"]
+                        or key not in reviewed_union["duplicate_campuses"]
+                        or previous[0] == row["course_id"]
+                        or previous[1] != fee
+                        or not _same_amount(fee[0], reviewed_union["amount"])
+                        or fee[1:] != (2026, "Full Course", "GBP")
+                        or _norm(next(iter(variants))) != "standard"):
+                    raise ApplyRefused("approved IDs claim a duplicate offering campus")
+            else:
+                representative_campuses[key] = (row["course_id"], fee)
     return sorted(representatives, key=lambda row: _norm(row["course_location"])), next(iter(identities))
 
 
@@ -1231,7 +1245,7 @@ async def _run(approved: dict, *, apply: bool, actor: str, expected_database: st
                     plans = await _verify_and_plan(conn, approved, lock=True)
                     plan_digest = sha256([{
                         "canonical_id": p["canonical_id"], "identity": p["identity"],
-                        "locations": [loc for loc, _ in p["locations"]],
+                        "locations": [item["campus"] for item in p["locations"]],
                         "alias_ids": sorted(m["course_id"] for m in p["group"]["members"]
                                             if m["course_id"] != p["canonical_id"]),
                     } for p in plans])
@@ -1253,7 +1267,7 @@ async def _run(approved: dict, *, apply: bool, actor: str, expected_database: st
                              WHERE id = :course_id
                         """), {
                             "name": plan["award"],
-                            "locations": ", ".join(loc for loc, _ in plan["locations"]),
+                            "locations": ", ".join(item["campus"] for item in plan["locations"]),
                             "identity": plan["identity"], "actor": actor,
                             "course_id": canonical_id,
                         })
@@ -1262,7 +1276,8 @@ async def _run(approved: dict, *, apply: bool, actor: str, expected_database: st
                         # is represented only by verified location offerings.
                         await conn.execute(text("DELETE FROM fees WHERE course_id = :id"),
                                            {"id": canonical_id})
-                        for location, source in plan["locations"]:
+                        for item in plan["locations"]:
+                            location, source = item["campus"], item["stage"]
                             await conn.execute(text("""
                                 INSERT INTO course_offerings
                                     (course_id, location_key, location, fee_amount,
@@ -1352,7 +1367,7 @@ async def _run(approved: dict, *, apply: bool, actor: str, expected_database: st
                     plans = await _verify_and_plan(conn, approved)
                     plan_digest = sha256([{
                         "canonical_id": p["canonical_id"], "identity": p["identity"],
-                        "locations": [loc for loc, _ in p["locations"]],
+                        "locations": [item["campus"] for item in p["locations"]],
                     } for p in plans])
                     result = {
                         "mode": "dry-run", "database": db_name,
