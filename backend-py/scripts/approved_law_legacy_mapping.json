@@ -1,13 +1,8 @@
 {
   "schema_version": 1,
-  "approval": "User separately approved four unscoped MBA aliases in addition to the 100 scoped groups (307 IDs, 207 aliases); the complete mapping covers 311 IDs and 211 aliases",
   "university_id": 92,
-  "unscoped_aliases": [
-    {"alias_course_id": 9395, "canonical_course_id": 9611, "award": "MBA", "study_mode": "Blended", "source": "https://www.law.ac.uk/study/postgraduate/business/mba-masters-in-business-administration/", "study_variant": "Standard", "amount": 20600, "currency": "GBP", "fee_year": 2026, "fee_term": "Full Course"},
-    {"alias_course_id": 9392, "canonical_course_id": 9636, "award": "MBA with Fintech and Digital Finance", "study_mode": "On Campus", "source": "https://www.law.ac.uk/study/postgraduate/business/mba-with-fintech-and-digital-finance/", "study_variant": "Standard", "amount": 20600, "currency": "GBP", "fee_year": 2026, "fee_term": "Full Course"},
-    {"alias_course_id": 9391, "canonical_course_id": 9639, "award": "MBA with Artificial Intelligence", "study_mode": "On Campus", "source": "https://www.law.ac.uk/study/postgraduate/business/mba-with-artificial-intelligence/", "study_variant": "Standard", "amount": 20600, "currency": "GBP", "fee_year": 2026, "fee_term": "Full Course"},
-    {"alias_course_id": 9390, "canonical_course_id": 9642, "award": "MBA with Healthcare Management", "study_mode": "On Campus", "source": "https://www.law.ac.uk/study/postgraduate/business/mba-with-healthcare-management/", "study_variant": "Standard", "amount": 20600, "currency": "GBP", "fee_year": 2026, "fee_term": "Full Course"}
-  ],
+  "approval": "User explicitly approved the exact 61-group proposal: 307 scoped IDs, 246 scoped aliases plus four unchanged unscoped aliases; 311 historical IDs and 250 aliases. Production execution requires a fresh independently approved live manifest.",
+  "approved_proposal_sha256": "3cc6e40e65f93a17b59543c750f6c7491477f1041bd757fb54958028d8693617",
   "groups": [
     {
       "parent": 9389,
@@ -20,7 +15,17 @@
         9648
       ],
       "award": "MSc Healthcare Management",
-      "source": "https://www.law.ac.uk/study/postgraduate/business/msc-healthcare-management/"
+      "source": "https://www.law.ac.uk/study/postgraduate/business/msc-healthcare-management/",
+      "merged_original_parents": [
+        9389
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:abdc8bf4fc668e7771ef294327f16e7ef61546f71bb4438777a839534d8f93c3",
+        "normalized_award": "msc healthcare management",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
     },
     {
       "parent": 9393,
@@ -30,7 +35,17 @@
         9652
       ],
       "award": "MSc Computing and Cybersecurity",
-      "source": "https://www.law.ac.uk/study/postgraduate/computer-science/msc-computing-and-cybersecurity/"
+      "source": "https://www.law.ac.uk/study/postgraduate/computer-science/msc-computing-and-cybersecurity/",
+      "merged_original_parents": [
+        9393
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:9470d6eaed68d9d67455eab0b5fb8438677398e605064f056311cdd8ed3927eb",
+        "normalized_award": "msc computing and cybersecurity",
+        "study_variant": "standard"
+      },
+      "study_mode": "Blended"
     },
     {
       "parent": 9394,
@@ -40,7 +55,17 @@
         9656
       ],
       "award": "MSc Digital Cybercrime",
-      "source": "https://www.law.ac.uk/study/postgraduate/criminology/msc-digital-cybercrime/"
+      "source": "https://www.law.ac.uk/study/postgraduate/criminology/msc-digital-cybercrime/",
+      "merged_original_parents": [
+        9394
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:7ad3626d33a499cd260d4b5f914554fac521c1e7874fe8014f11819ffab6e1a2",
+        "normalized_award": "msc digital cybercrime",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
     },
     {
       "parent": 9396,
@@ -52,7 +77,17 @@
         9676
       ],
       "award": "LLM International Criminal Law",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-international-criminal-law/"
+      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-international-criminal-law/",
+      "merged_original_parents": [
+        9396
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:4fa5f0febbbfe8010172dd821233535155daf4bf41361757c786895ccab16b70",
+        "normalized_award": "llm international criminal law",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
     },
     {
       "parent": 9397,
@@ -62,642 +97,23 @@
         9681
       ],
       "award": "LLM Public International Law",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-public-international-law/"
+      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-public-international-law/",
+      "merged_original_parents": [
+        9397
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:b99af12b0c2521c4d50831181e6c8d81b732ec21f81737eac3613bac66ee0c5f",
+        "normalized_award": "llm public international law",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
     },
     {
       "parent": 9399,
       "ids": [
         9399,
-        9459
-      ],
-      "award": "LLM Legal Practice (SQE1&2)",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-sqe-1-and-2/"
-    },
-    {
-      "parent": 9400,
-      "ids": [
-        9400,
-        9462,
-        9706
-      ],
-      "award": "LLM Mental Health Law",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-mental-health-law/"
-    },
-    {
-      "parent": 9403,
-      "ids": [
-        9403,
-        9479
-      ],
-      "award": "LLM Medical Law and Ethics",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-medical-law-and-ethics/"
-    },
-    {
-      "parent": 9404,
-      "ids": [
-        9404,
-        9482
-      ],
-      "award": "LLM Master of Laws (General)",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-master-of-laws-general/"
-    },
-    {
-      "parent": 9405,
-      "ids": [
-        9405,
-        9485
-      ],
-      "award": "LLM International Human Rights Law",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-international-human-rights-law/"
-    },
-    {
-      "parent": 9406,
-      "ids": [
-        9406,
-        9490
-      ],
-      "award": "LLM Corporate Governance",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-corporate-governance/"
-    },
-    {
-      "parent": 9407,
-      "ids": [
-        9407,
-        9495
-      ],
-      "award": "LLB Law",
-      "source": "https://www.law.ac.uk/study/undergraduate/law/llb-hons-law/"
-    },
-    {
-      "parent": 9411,
-      "ids": [
-        9411,
-        9412
-      ],
-      "award": "Postgraduate Diploma in Legal Practice (SQE2 & SQE Plus)",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/postgraduate-diploma-in-legal-practice-sqe2-and-sqe-plus/"
-    },
-    {
-      "parent": 9413,
-      "ids": [
-        9413,
-        9414
-      ],
-      "award": "MSc Criminology and Criminal Justice",
-      "source": "https://www.law.ac.uk/study/postgraduate/criminology/msc-criminology-and-criminal-justice/"
-    },
-    {
-      "parent": 9415,
-      "ids": [
-        9415,
-        9416
-      ],
-      "award": "MSc Artificial Intelligence for Business",
-      "source": "https://www.law.ac.uk/study/postgraduate/business/msc-artificial-intelligence-for-business/"
-    },
-    {
-      "parent": 9417,
-      "ids": [
-        9417,
-        9418
-      ],
-      "award": "BSc (Hons) Business Management (Top up)",
-      "source": "https://www.law.ac.uk/study/undergraduate/business/bsc-hons-business-management-top-up/"
-    },
-    {
-      "parent": 9419,
-      "ids": [
-        9419,
-        9420
-      ],
-      "award": "LLM Media Law, Privacy and Defamation",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-media-law-and-defamation/"
-    },
-    {
-      "parent": 9422,
-      "ids": [
-        9422,
-        9423
-      ],
-      "award": "MSc Computing",
-      "source": "https://www.law.ac.uk/study/postgraduate/computer-science/msc-computing/"
-    },
-    {
-      "parent": 9424,
-      "ids": [
-        9424,
-        9425
-      ],
-      "award": "BSc (Hons) Computer Science",
-      "source": "https://www.law.ac.uk/study/undergraduate/computer-science/bsc-hons-computer-science/"
-    },
-    {
-      "parent": 9426,
-      "ids": [
-        9426,
-        9427
-      ],
-      "award": "BSc (Hons) Psychology with Criminology",
-      "source": "https://www.law.ac.uk/study/undergraduate/psychology/bsc-hons-psychology-with-criminology/"
-    },
-    {
-      "parent": 9428,
-      "ids": [
-        9428,
-        9429
-      ],
-      "award": "BSc (Hons) Psychology",
-      "source": "https://www.law.ac.uk/study/undergraduate/psychology/bsc-hons-psychology/"
-    },
-    {
-      "parent": 9430,
-      "ids": [
-        9430,
-        9431
-      ],
-      "award": "MSc Psychology (Conversion)",
-      "source": "https://www.law.ac.uk/study/postgraduate/psychology/msc-psychology-conversion/"
-    },
-    {
-      "parent": 9433,
-      "ids": [
-        9433,
-        9434
-      ],
-      "award": "MSc Business Analytics",
-      "source": "https://www.law.ac.uk/study/postgraduate/business/msc-business-analytics/"
-    },
-    {
-      "parent": 9435,
-      "ids": [
-        9435,
-        9436
-      ],
-      "award": "MSc Cyber Security Management",
-      "source": "https://www.law.ac.uk/study/postgraduate/business/msc-cyber-security-management/"
-    },
-    {
-      "parent": 9437,
-      "ids": [
-        9437,
-        9438
-      ],
-      "award": "BSc (Hons) Criminology and Policing",
-      "source": "https://www.law.ac.uk/study/undergraduate/criminology/bsc-hons-criminology-and-policing/"
-    },
-    {
-      "parent": 9439,
-      "ids": [
-        9439,
-        9440
-      ],
-      "award": "MSc Marketing",
-      "source": "https://www.law.ac.uk/study/postgraduate/business/msc-marketing/"
-    },
-    {
-      "parent": 9441,
-      "ids": [
-        9441,
-        9442
-      ],
-      "award": "LLM International Commercial Law",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-international-commercial-law/"
-    },
-    {
-      "parent": 9443,
-      "ids": [
-        9443,
-        9444
-      ],
-      "award": "LLM Employment Law",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-employment-law/"
-    },
-    {
-      "parent": 9445,
-      "ids": [
-        9445,
-        9446
-      ],
-      "award": "MLaw (Solicitors' Practice) - four year Integrated Master's",
-      "source": "https://www.law.ac.uk/study/undergraduate/law/mlaw-solicitors-practice-four-year-integrated-masters/"
-    },
-    {
-      "parent": 9447,
-      "ids": [
-        9447,
-        9448
-      ],
-      "award": "BSc Business Management with Marketing",
-      "source": "https://www.law.ac.uk/study/undergraduate/business/bsc-hons-business-management-with-marketing/"
-    },
-    {
-      "parent": 9449,
-      "ids": [
-        9449,
-        9450
-      ],
-      "award": "BSc Business Management",
-      "source": "https://www.law.ac.uk/study/undergraduate/business/bsc-hons-business-management/"
-    },
-    {
-      "parent": 9451,
-      "ids": [
-        9451,
-        9452
-      ],
-      "award": "BSc Accounting with Finance",
-      "source": "https://www.law.ac.uk/study/undergraduate/business/bsc-hons-accounting-with-finance/"
-    },
-    {
-      "parent": 9453,
-      "ids": [
-        9453,
-        9454
-      ],
-      "award": "BSc Business Management with Law",
-      "source": "https://www.law.ac.uk/study/undergraduate/business/bsc-hons-business-management-with-law/"
-    },
-    {
-      "parent": 9455,
-      "ids": [
-        9455,
-        9456
-      ],
-      "award": "Postgraduate Diploma in Law (PGDL) - (conversion)",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/pgdl/"
-    },
-    {
-      "parent": 9457,
-      "ids": [
-        9457,
-        9458
-      ],
-      "award": "MA Law (SQE1)",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/ma-law-sqe/"
-    },
-    {
-      "parent": 9460,
-      "ids": [
-        9460,
-        9461
-      ],
-      "award": "LLM Data Protection and Intellectual Property",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-data-protection-and-intellectual-property/"
-    },
-    {
-      "parent": 9463,
-      "ids": [
-        9463,
-        9464
-      ],
-      "award": "LLM Master of Law (International)",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-international-law/"
-    },
-    {
-      "parent": 9465,
-      "ids": [
-        9465,
-        9466
-      ],
-      "award": "LLM Corporate Governance GradCG",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-corporate-governance-gradcg/"
-    },
-    {
-      "parent": 9467,
-      "ids": [
-        9467,
-        9468
-      ],
-      "award": "LLM International Arbitration",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-international-arbitration/"
-    },
-    {
-      "parent": 9469,
-      "ids": [
-        9469,
-        9470
-      ],
-      "award": "MSc Strategic Business Management",
-      "source": "https://www.law.ac.uk/study/postgraduate/business/msc-strategic-business-management/"
-    },
-    {
-      "parent": 9471,
-      "ids": [
-        9471,
-        9472
-      ],
-      "award": "MSc Project Management",
-      "source": "https://www.law.ac.uk/study/postgraduate/business/msc-project-management/"
-    },
-    {
-      "parent": 9473,
-      "ids": [
-        9473,
-        9474
-      ],
-      "award": "BSc (Hons) Criminology",
-      "source": "https://www.law.ac.uk/study/undergraduate/criminology/bsc-hons-criminology/"
-    },
-    {
-      "parent": 9475,
-      "ids": [
-        9475,
-        9476
-      ],
-      "award": "MSc Corporate Financial Management",
-      "source": "https://www.law.ac.uk/study/postgraduate/business/msc-corporate-financial-management/"
-    },
-    {
-      "parent": 9477,
-      "ids": [
-        9477,
-        9478
-      ],
-      "award": "MSc Legal Technology",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/msc-legal-technology/"
-    },
-    {
-      "parent": 9480,
-      "ids": [
-        9480,
-        9481
-      ],
-      "award": "MA Law (Conversion)",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/ma-law/"
-    },
-    {
-      "parent": 9483,
-      "ids": [
-        9483,
-        9484
-      ],
-      "award": "LLM Mediation and Alternative Dispute Resolution",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-mediation-and-alternative-dispute-resolution/"
-    },
-    {
-      "parent": 9486,
-      "ids": [
-        9486,
-        9487
-      ],
-      "award": "LLM International Corporate Governance",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-international-corporate-governance/"
-    },
-    {
-      "parent": 9488,
-      "ids": [
-        9488,
-        9489
-      ],
-      "award": "LLM International Business Law",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-international-business-law/"
-    },
-    {
-      "parent": 9491,
-      "ids": [
-        9491,
-        9492
-      ],
-      "award": "LLM Company Law",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-company-law/"
-    },
-    {
-      "parent": 9493,
-      "ids": [
-        9493,
-        9494
-      ],
-      "award": "LLB Law (Accelerated)",
-      "source": "https://www.law.ac.uk/study/undergraduate/law/accelerated-llb-hons-law/"
-    },
-    {
-      "parent": 9496,
-      "ids": [
-        9496,
-        9497
-      ],
-      "award": "LLB Law with Criminology",
-      "source": "https://www.law.ac.uk/study/undergraduate/law/llb-hons-law-with-criminology/"
-    },
-    {
-      "parent": 9498,
-      "ids": [
-        9498,
-        9499
-      ],
-      "award": "LLB Law with Business",
-      "source": "https://www.law.ac.uk/study/undergraduate/law/llb-hons-law-with-business/"
-    },
-    {
-      "parent": 9500,
-      "ids": [
-        9500,
-        9725
-      ],
-      "award": "LLB Law with Business",
-      "source": "https://www.law.ac.uk/study/undergraduate/law/llb-hons-law-with-business/"
-    },
-    {
-      "parent": 9501,
-      "ids": [
-        9501,
-        9502,
-        9724
-      ],
-      "award": "LLB Law with Criminology",
-      "source": "https://www.law.ac.uk/study/undergraduate/law/llb-hons-law-with-criminology/"
-    },
-    {
-      "parent": 9503,
-      "ids": [
-        9503,
-        9504,
-        9505,
-        9506,
-        9721
-      ],
-      "award": "LLB Law",
-      "source": "https://www.law.ac.uk/study/undergraduate/law/llb-hons-law/"
-    },
-    {
-      "parent": 9507,
-      "ids": [
-        9507,
-        9720
-      ],
-      "award": "LLB Law (Accelerated)",
-      "source": "https://www.law.ac.uk/study/undergraduate/law/accelerated-llb-hons-law/"
-    },
-    {
-      "parent": 9508,
-      "ids": [
-        9508,
-        9509,
-        9719
-      ],
-      "award": "LLM International Business Law",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-international-business-law/"
-    },
-    {
-      "parent": 9510,
-      "ids": [
-        9510,
-        9718
-      ],
-      "award": "LLM International Corporate Governance",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-international-corporate-governance/"
-    },
-    {
-      "parent": 9511,
-      "ids": [
-        9511,
-        9717
-      ],
-      "award": "LLM International Human Rights Law",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-international-human-rights-law/"
-    },
-    {
-      "parent": 9512,
-      "ids": [
-        9512,
-        9716
-      ],
-      "award": "LLM Master of Laws (General)",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-master-of-laws-general/"
-    },
-    {
-      "parent": 9513,
-      "ids": [
-        9513,
-        9514,
-        9515,
-        9516,
-        9715
-      ],
-      "award": "LLM Master of Laws (General)",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-master-of-laws-general/"
-    },
-    {
-      "parent": 9517,
-      "ids": [
-        9517,
-        9714
-      ],
-      "award": "LLM Mediation and Alternative Dispute Resolution",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-mediation-and-alternative-dispute-resolution/"
-    },
-    {
-      "parent": 9518,
-      "ids": [
-        9518,
-        9713
-      ],
-      "award": "MA Law (Conversion)",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/ma-law/"
-    },
-    {
-      "parent": 9519,
-      "ids": [
-        9519,
-        9520,
-        9521,
-        9522,
-        9523,
-        9524,
-        9525,
-        9526,
-        9527,
-        9528,
-        9529,
-        9530,
-        9531,
-        9532,
-        9712
-      ],
-      "award": "MA Law (Conversion)",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/ma-law/"
-    },
-    {
-      "parent": 9533,
-      "ids": [
-        9533,
-        9534,
-        9711
-      ],
-      "award": "MSc Leadership and Human Resource Management",
-      "source": "https://www.law.ac.uk/study/postgraduate/business/msc-leadership-and-human-resource-management/"
-    },
-    {
-      "parent": 9535,
-      "ids": [
-        9535,
-        9536,
-        9710
-      ],
-      "award": "MSc Project Management",
-      "source": "https://www.law.ac.uk/study/postgraduate/business/msc-project-management/"
-    },
-    {
-      "parent": 9537,
-      "ids": [
-        9537,
-        9538,
-        9709
-      ],
-      "award": "MSc Strategic Business Management",
-      "source": "https://www.law.ac.uk/study/postgraduate/business/msc-strategic-business-management/"
-    },
-    {
-      "parent": 9539,
-      "ids": [
-        9539,
-        9540,
-        9708
-      ],
-      "award": "BSc (Hons) Criminology",
-      "source": "https://www.law.ac.uk/study/undergraduate/criminology/bsc-hons-criminology/"
-    },
-    {
-      "parent": 9541,
-      "ids": [
-        9541,
-        9707
-      ],
-      "award": "LLM International Arbitration",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-international-arbitration/"
-    },
-    {
-      "parent": 9542,
-      "ids": [
-        9542,
-        9705
-      ],
-      "award": "LLM Master of Law (International)",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-international-law/"
-    },
-    {
-      "parent": 9543,
-      "ids": [
-        9543,
-        9704
-      ],
-      "award": "LLM Master of Law (International)",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-international-law/"
-    },
-    {
-      "parent": 9544,
-      "ids": [
-        9544,
-        9545,
-        9546,
-        9702
-      ],
-      "award": "LLM Data Protection and Intellectual Property",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-data-protection-and-intellectual-property/"
-    },
-    {
-      "parent": 9547,
-      "ids": [
+        9459,
         9547,
         9548,
         9549,
@@ -717,214 +133,158 @@
         9697
       ],
       "award": "LLM Legal Practice (SQE1&2)",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-sqe-1-and-2/"
-    },
-    {
-      "parent": 9563,
-      "ids": [
-        9563,
-        9696
+      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-sqe-1-and-2/",
+      "merged_original_parents": [
+        9399,
+        9547
       ],
-      "award": "MA Law (SQE1)",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/ma-law-sqe/"
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:8ef2b25499555c937723f9cd660624e92ccf7e42f391d559eeb3908aec55b5d1",
+        "normalized_award": "llm legal practice (sqe1&2)",
+        "study_variant": "standard"
+      },
+      "study_mode": "Blended"
     },
     {
-      "parent": 9564,
+      "parent": 9400,
       "ids": [
-        9564,
-        9565,
-        9566,
-        9567,
-        9568,
-        9569,
-        9570,
-        9571,
-        9572,
-        9573,
-        9574,
-        9575,
-        9576,
-        9577,
-        9695
+        9400,
+        9462,
+        9706
       ],
-      "award": "MA Law (SQE1)",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/ma-law-sqe/"
-    },
-    {
-      "parent": 9578,
-      "ids": [
-        9578,
-        9694
+      "award": "LLM Mental Health Law",
+      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-mental-health-law/",
+      "merged_original_parents": [
+        9400
       ],
-      "award": "Postgraduate Diploma in Law (PGDL) - (conversion)",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/pgdl/"
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:3deb93278260e3de099bf2a2eabb06760c1b432fbd57baa26ea97f900c38d216",
+        "normalized_award": "llm mental health law",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
     },
     {
-      "parent": 9579,
+      "parent": 9403,
       "ids": [
-        9579,
-        9580,
-        9581,
-        9582,
-        9583,
-        9584,
-        9585,
-        9586,
-        9587,
-        9588,
-        9589,
-        9590,
-        9591,
-        9592,
-        9693
+        9403,
+        9479
       ],
-      "award": "Postgraduate Diploma in Law (PGDL) - (conversion)",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/pgdl/"
-    },
-    {
-      "parent": 9593,
-      "ids": [
-        9593,
-        9692
+      "award": "LLM Medical Law and Ethics",
+      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-medical-law-and-ethics/",
+      "merged_original_parents": [
+        9403
       ],
-      "award": "BSc Business Management with Law",
-      "source": "https://www.law.ac.uk/study/undergraduate/business/bsc-hons-business-management-with-law/"
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:19e0ecea3ac9eb38531bd26d2e1b983302e1f5a8c1f96b9a3aab025d4ca8206f",
+        "normalized_award": "llm medical law and ethics",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
     },
     {
-      "parent": 9594,
+      "parent": 9404,
       "ids": [
-        9594,
-        9691
+        9404,
+        9482,
+        9512,
+        9513,
+        9514,
+        9515,
+        9516,
+        9715,
+        9716
       ],
-      "award": "BSc Accounting with Finance",
-      "source": "https://www.law.ac.uk/study/undergraduate/business/bsc-hons-accounting-with-finance/"
-    },
-    {
-      "parent": 9595,
-      "ids": [
-        9595,
-        9596,
-        9690
+      "award": "LLM Master of Laws (General)",
+      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-master-of-laws-general/",
+      "merged_original_parents": [
+        9404,
+        9512,
+        9513
       ],
-      "award": "BSc Business Management",
-      "source": "https://www.law.ac.uk/study/undergraduate/business/bsc-hons-business-management/"
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:cf617de2731db0d33c445d2bd1fb53fcb7594ae74d5094ee08bffa080dabaf82",
+        "normalized_award": "llm master of laws (general)",
+        "study_variant": "llm master of laws (general)"
+      },
+      "study_mode": "On Campus"
     },
     {
-      "parent": 9597,
+      "parent": 9405,
       "ids": [
-        9597,
-        9689
+        9405,
+        9485,
+        9511,
+        9717
       ],
-      "award": "BSc Business Management with Marketing",
-      "source": "https://www.law.ac.uk/study/undergraduate/business/bsc-hons-business-management-with-marketing/"
-    },
-    {
-      "parent": 9598,
-      "ids": [
-        9598,
-        9599,
-        9688
+      "award": "LLM International Human Rights Law",
+      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-international-human-rights-law/",
+      "merged_original_parents": [
+        9405,
+        9511
       ],
-      "award": "MLaw (Solicitors' Practice) - four year Integrated Master's",
-      "source": "https://www.law.ac.uk/study/undergraduate/law/mlaw-solicitors-practice-four-year-integrated-masters/"
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:08be6d0f9ea4463bfb26cae04b51386ecdf025f5bfcf2a78ea4b9c0694fb753e",
+        "normalized_award": "llm international human rights law",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
     },
     {
-      "parent": 9600,
+      "parent": 9406,
       "ids": [
-        9600,
-        9601,
-        9687
+        9406,
+        9490
       ],
-      "award": "LLM Employment Law",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-employment-law/"
-    },
-    {
-      "parent": 9602,
-      "ids": [
-        9602,
-        9603,
-        9686
+      "award": "LLM Corporate Governance",
+      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-corporate-governance/",
+      "merged_original_parents": [
+        9406
       ],
-      "award": "LLM International Commercial Law",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-international-commercial-law/"
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:245dbdd96f547e32add24553c6c7b3abd832c04e4dbae0ab5a5a6f1affdeeee2",
+        "normalized_award": "llm corporate governance",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
     },
     {
-      "parent": 9604,
+      "parent": 9407,
       "ids": [
-        9604,
-        9685
+        9407,
+        9495,
+        9503,
+        9504,
+        9505,
+        9506,
+        9721
       ],
-      "award": "MSc Marketing",
-      "source": "https://www.law.ac.uk/study/postgraduate/business/msc-marketing/"
-    },
-    {
-      "parent": 9605,
-      "ids": [
-        9605,
-        9684
+      "award": "LLB Law",
+      "source": "https://www.law.ac.uk/study/undergraduate/law/llb-hons-law/",
+      "merged_original_parents": [
+        9407,
+        9503
       ],
-      "award": "BSc (Hons) Criminology and Policing",
-      "source": "https://www.law.ac.uk/study/undergraduate/criminology/bsc-hons-criminology-and-policing/"
+      "identity_key": {
+        "canonical_degree": "bachelor",
+        "source_route_sha256": "sha256:2474a384037811560a4dde6e8aee4b3d848f24eb9fc93cfb6accd41776cf659d",
+        "normalized_award": "llb law",
+        "study_variant": "standard"
+      },
+      "study_mode": "Blended"
     },
     {
-      "parent": 9606,
+      "parent": 9411,
       "ids": [
-        9606,
-        9683
-      ],
-      "award": "MSc Cyber Security Management",
-      "source": "https://www.law.ac.uk/study/postgraduate/business/msc-cyber-security-management/"
-    },
-    {
-      "parent": 9607,
-      "ids": [
-        9607,
-        9682
-      ],
-      "award": "MSc Business Analytics",
-      "source": "https://www.law.ac.uk/study/postgraduate/business/msc-business-analytics/"
-    },
-    {
-      "parent": 9609,
-      "ids": [
-        9609,
-        9667
-      ],
-      "award": "BSc (Hons) Business Management (Top up)",
-      "source": "https://www.law.ac.uk/study/undergraduate/business/bsc-hons-business-management-top-up/"
-    },
-    {
-      "parent": 9610,
-      "ids": [
-        9610,
-        9666
-      ],
-      "award": "MSc Artificial Intelligence for Business",
-      "source": "https://www.law.ac.uk/study/postgraduate/business/msc-artificial-intelligence-for-business/"
-    },
-    {
-      "parent": 9611,
-      "ids": [
-        9611,
-        9612,
-        9613,
-        9665
-      ],
-      "award": "MBA",
-      "source": "https://www.law.ac.uk/study/postgraduate/business/mba-masters-in-business-administration/"
-    },
-    {
-      "parent": 9614,
-      "ids": [
+        9411,
+        9412,
         9614,
-        9659
-      ],
-      "award": "Postgraduate Diploma in Legal Practice (SQE2 & SQE Plus)",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/postgraduate-diploma-in-legal-practice-sqe2-and-sqe-plus/"
-    },
-    {
-      "parent": 9615,
-      "ids": [
         9615,
         9616,
         9617,
@@ -940,10 +300,951 @@
         9627,
         9628,
         9629,
-        9658
+        9658,
+        9659
       ],
       "award": "Postgraduate Diploma in Legal Practice (SQE2 & SQE Plus)",
-      "source": "https://www.law.ac.uk/study/postgraduate/law/postgraduate-diploma-in-legal-practice-sqe2-and-sqe-plus/"
+      "source": "https://www.law.ac.uk/study/postgraduate/law/postgraduate-diploma-in-legal-practice-sqe2-and-sqe-plus/",
+      "merged_original_parents": [
+        9411,
+        9614,
+        9615
+      ],
+      "identity_key": {
+        "canonical_degree": "graduate diploma",
+        "source_route_sha256": "sha256:cb18b82071fcaa3a5c9e6b9f5e82825f35c8664cdfc999bc15bc80d4bb5f3055",
+        "normalized_award": "postgraduate diploma in legal practice (sqe2 & sqe plus)",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9413,
+      "ids": [
+        9413,
+        9414
+      ],
+      "award": "MSc Criminology and Criminal Justice",
+      "source": "https://www.law.ac.uk/study/postgraduate/criminology/msc-criminology-and-criminal-justice/",
+      "merged_original_parents": [
+        9413
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:5d393a3f4bf4a651a852f17e567378e2d8e325c916eda3de1e9ffef417e826a2",
+        "normalized_award": "msc criminology and criminal justice",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9415,
+      "ids": [
+        9415,
+        9416,
+        9610,
+        9666
+      ],
+      "award": "MSc Artificial Intelligence for Business",
+      "source": "https://www.law.ac.uk/study/postgraduate/business/msc-artificial-intelligence-for-business/",
+      "merged_original_parents": [
+        9415,
+        9610
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:d8618287e5406d0876bb141c6e6d7dc346604673a6644eefa2465fda50816d93",
+        "normalized_award": "msc artificial intelligence for business",
+        "study_variant": "standard"
+      },
+      "study_mode": "Blended"
+    },
+    {
+      "parent": 9417,
+      "ids": [
+        9417,
+        9418,
+        9609,
+        9667
+      ],
+      "award": "BSc (Hons) Business Management (Top up)",
+      "source": "https://www.law.ac.uk/study/undergraduate/business/bsc-hons-business-management-top-up/",
+      "merged_original_parents": [
+        9417,
+        9609
+      ],
+      "identity_key": {
+        "canonical_degree": "bachelor",
+        "source_route_sha256": "sha256:770b2e132055fc3dbdf45a6591bec5de98320f2983885f3f0954c3ce2a0a14e6",
+        "normalized_award": "bsc (hons) business management (top up)",
+        "study_variant": "standard"
+      },
+      "study_mode": "Blended"
+    },
+    {
+      "parent": 9419,
+      "ids": [
+        9419,
+        9420
+      ],
+      "award": "LLM Media Law, Privacy and Defamation",
+      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-media-law-and-defamation/",
+      "merged_original_parents": [
+        9419
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:2faeaa43980bb26e6c62cd6de707617f930ceff7f0c7cb1ca8a1de2f8951a3eb",
+        "normalized_award": "llm media law, privacy and defamation",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9422,
+      "ids": [
+        9422,
+        9423
+      ],
+      "award": "MSc Computing",
+      "source": "https://www.law.ac.uk/study/postgraduate/computer-science/msc-computing/",
+      "merged_original_parents": [
+        9422
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:5049313f45bd07c7ce853f0119f8ec442099408bdb04e273df27058566e743c4",
+        "normalized_award": "msc computing",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9424,
+      "ids": [
+        9424,
+        9425
+      ],
+      "award": "BSc (Hons) Computer Science",
+      "source": "https://www.law.ac.uk/study/undergraduate/computer-science/bsc-hons-computer-science/",
+      "merged_original_parents": [
+        9424
+      ],
+      "identity_key": {
+        "canonical_degree": "bachelor",
+        "source_route_sha256": "sha256:227e31bc20fb051a77c368a6b73abcec7aabf902753c734a0292682fb9f55cfe",
+        "normalized_award": "bsc (hons) computer science",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9426,
+      "ids": [
+        9426,
+        9427
+      ],
+      "award": "BSc (Hons) Psychology with Criminology",
+      "source": "https://www.law.ac.uk/study/undergraduate/psychology/bsc-hons-psychology-with-criminology/",
+      "merged_original_parents": [
+        9426
+      ],
+      "identity_key": {
+        "canonical_degree": "bachelor",
+        "source_route_sha256": "sha256:2d28d0039fa4ec18eb4f846e0f004dd70c5361c0120f4cd3b4778ca4114f8cb4",
+        "normalized_award": "bsc (hons) psychology with criminology",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9428,
+      "ids": [
+        9428,
+        9429
+      ],
+      "award": "BSc (Hons) Psychology",
+      "source": "https://www.law.ac.uk/study/undergraduate/psychology/bsc-hons-psychology/",
+      "merged_original_parents": [
+        9428
+      ],
+      "identity_key": {
+        "canonical_degree": "bachelor",
+        "source_route_sha256": "sha256:3f00ada358ade24ac4fa6d5c88508b18560682cbf1dabe38b866b520bc95e0b8",
+        "normalized_award": "bsc (hons) psychology",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9430,
+      "ids": [
+        9430,
+        9431
+      ],
+      "award": "MSc Psychology (Conversion)",
+      "source": "https://www.law.ac.uk/study/postgraduate/psychology/msc-psychology-conversion/",
+      "merged_original_parents": [
+        9430
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:19b0dba7d16edc15526af26590197d0a5e2c75d7949f9ec5e8aa909811ad96e3",
+        "normalized_award": "msc psychology (conversion)",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9433,
+      "ids": [
+        9433,
+        9434,
+        9607,
+        9682
+      ],
+      "award": "MSc Business Analytics",
+      "source": "https://www.law.ac.uk/study/postgraduate/business/msc-business-analytics/",
+      "merged_original_parents": [
+        9433,
+        9607
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:8b36cf6a12b7578502fd0887fe45b007013fca720f6a1f33cf030733f277828e",
+        "normalized_award": "msc business analytics",
+        "study_variant": "standard"
+      },
+      "study_mode": "Blended"
+    },
+    {
+      "parent": 9435,
+      "ids": [
+        9435,
+        9436,
+        9606,
+        9683
+      ],
+      "award": "MSc Cyber Security Management",
+      "source": "https://www.law.ac.uk/study/postgraduate/business/msc-cyber-security-management/",
+      "merged_original_parents": [
+        9435,
+        9606
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:484e9daedf133cf6741d0ae4e2025508ff3de76b9d94164b26d9d1bc37b92796",
+        "normalized_award": "msc cyber security management",
+        "study_variant": "standard"
+      },
+      "study_mode": "Blended"
+    },
+    {
+      "parent": 9437,
+      "ids": [
+        9437,
+        9438,
+        9605,
+        9684
+      ],
+      "award": "BSc (Hons) Criminology and Policing",
+      "source": "https://www.law.ac.uk/study/undergraduate/criminology/bsc-hons-criminology-and-policing/",
+      "merged_original_parents": [
+        9437,
+        9605
+      ],
+      "identity_key": {
+        "canonical_degree": "bachelor",
+        "source_route_sha256": "sha256:731ae9974bd8bd1aea86b5878af2652383021ee70b2da8fae47749b57ed99b72",
+        "normalized_award": "bsc (hons) criminology and policing",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9439,
+      "ids": [
+        9439,
+        9440,
+        9604,
+        9685
+      ],
+      "award": "MSc Marketing",
+      "source": "https://www.law.ac.uk/study/postgraduate/business/msc-marketing/",
+      "merged_original_parents": [
+        9439,
+        9604
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:a19d0e723af008dac69f8b90b121dafe04268a6259d6d3ad6515fd3c6d988011",
+        "normalized_award": "msc marketing",
+        "study_variant": "standard"
+      },
+      "study_mode": "Blended"
+    },
+    {
+      "parent": 9441,
+      "ids": [
+        9441,
+        9442,
+        9602,
+        9603,
+        9686
+      ],
+      "award": "LLM International Commercial Law",
+      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-international-commercial-law/",
+      "merged_original_parents": [
+        9441,
+        9602
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:1842293f6c34ddd10ddce3fd092ab83f1697f5344877e0ab2dc4a77076565dcd",
+        "normalized_award": "llm international commercial law",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9443,
+      "ids": [
+        9443,
+        9444,
+        9600,
+        9601,
+        9687
+      ],
+      "award": "LLM Employment Law",
+      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-employment-law/",
+      "merged_original_parents": [
+        9443,
+        9600
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:5a539a3287410336e64a5020c10139751f343426402f751c71f2e0fa93224b72",
+        "normalized_award": "llm employment law",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9445,
+      "ids": [
+        9445,
+        9446,
+        9598,
+        9599,
+        9688
+      ],
+      "award": "MLaw (Solicitors' Practice) - four year Integrated Master's",
+      "source": "https://www.law.ac.uk/study/undergraduate/law/mlaw-solicitors-practice-four-year-integrated-masters/",
+      "merged_original_parents": [
+        9445,
+        9598
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:d63a89b6947cf1faff813a4477a2c1d5f217a5589f2444b9a99a0096c3f06bfa",
+        "normalized_award": "mlaw (solicitors' practice) - four year integrated master's",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9447,
+      "ids": [
+        9447,
+        9448,
+        9597,
+        9689
+      ],
+      "award": "BSc Business Management with Marketing",
+      "source": "https://www.law.ac.uk/study/undergraduate/business/bsc-hons-business-management-with-marketing/",
+      "merged_original_parents": [
+        9447,
+        9597
+      ],
+      "identity_key": {
+        "canonical_degree": "bachelor",
+        "source_route_sha256": "sha256:682fbb20ac66b0f5c7bc5d355df0f5fb9e1fa1d4319c47d00c0a29e9eb6c07ec",
+        "normalized_award": "bsc business management with marketing",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9449,
+      "ids": [
+        9449,
+        9450,
+        9595,
+        9596,
+        9690
+      ],
+      "award": "BSc Business Management",
+      "source": "https://www.law.ac.uk/study/undergraduate/business/bsc-hons-business-management/",
+      "merged_original_parents": [
+        9449,
+        9595
+      ],
+      "identity_key": {
+        "canonical_degree": "bachelor",
+        "source_route_sha256": "sha256:7d380c6c98f302430bdd360c01aef87a13cfd0b295a4653b4f0304f4321e8808",
+        "normalized_award": "bsc business management",
+        "study_variant": "standard"
+      },
+      "study_mode": "Blended"
+    },
+    {
+      "parent": 9451,
+      "ids": [
+        9451,
+        9452,
+        9594,
+        9691
+      ],
+      "award": "BSc Accounting with Finance",
+      "source": "https://www.law.ac.uk/study/undergraduate/business/bsc-hons-accounting-with-finance/",
+      "merged_original_parents": [
+        9451,
+        9594
+      ],
+      "identity_key": {
+        "canonical_degree": "bachelor",
+        "source_route_sha256": "sha256:abd4eda1b3d01f9ac3e9b2c9a4e304ac43cd1b7dd7558aef1c4ff1ded395891a",
+        "normalized_award": "bsc accounting with finance",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9453,
+      "ids": [
+        9453,
+        9454,
+        9593,
+        9692
+      ],
+      "award": "BSc Business Management with Law",
+      "source": "https://www.law.ac.uk/study/undergraduate/business/bsc-hons-business-management-with-law/",
+      "merged_original_parents": [
+        9453,
+        9593
+      ],
+      "identity_key": {
+        "canonical_degree": "bachelor",
+        "source_route_sha256": "sha256:cd779fcfa2049fedbfc736e84048674a040573cad8d4beabe975c83f11b5ad98",
+        "normalized_award": "bsc business management with law",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9455,
+      "ids": [
+        9455,
+        9456,
+        9578,
+        9579,
+        9580,
+        9581,
+        9582,
+        9583,
+        9584,
+        9585,
+        9586,
+        9587,
+        9588,
+        9589,
+        9590,
+        9591,
+        9592,
+        9693,
+        9694
+      ],
+      "award": "Postgraduate Diploma in Law (PGDL) - (conversion)",
+      "source": "https://www.law.ac.uk/study/postgraduate/law/pgdl/",
+      "merged_original_parents": [
+        9455,
+        9578,
+        9579
+      ],
+      "identity_key": {
+        "canonical_degree": "graduate diploma",
+        "source_route_sha256": "sha256:1c491a699df217042defe522a4335e8b36b8c2e7e4e2db56293d854759b42122",
+        "normalized_award": "postgraduate diploma in law (pgdl) - (conversion)",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9457,
+      "ids": [
+        9457,
+        9458,
+        9563,
+        9564,
+        9565,
+        9566,
+        9567,
+        9568,
+        9569,
+        9570,
+        9571,
+        9572,
+        9573,
+        9574,
+        9575,
+        9576,
+        9577,
+        9695,
+        9696
+      ],
+      "award": "MA Law (SQE1)",
+      "source": "https://www.law.ac.uk/study/postgraduate/law/ma-law-sqe/",
+      "merged_original_parents": [
+        9457,
+        9563,
+        9564
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:09f1336222d40dc997567d39d149b423b815ca9b23839efacdf7d1a70051eaeb",
+        "normalized_award": "ma law (sqe1)",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9460,
+      "ids": [
+        9460,
+        9461,
+        9544,
+        9545,
+        9546,
+        9702
+      ],
+      "award": "LLM Data Protection and Intellectual Property",
+      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-data-protection-and-intellectual-property/",
+      "merged_original_parents": [
+        9460,
+        9544
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:fc16288ce6329b24dbdaca7670d45b2e84c2998d06f6515474ca1aa73e31c97f",
+        "normalized_award": "llm data protection and intellectual property",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9463,
+      "ids": [
+        9463,
+        9464,
+        9542,
+        9543,
+        9704,
+        9705
+      ],
+      "award": "LLM Master of Law (International)",
+      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-international-law/",
+      "merged_original_parents": [
+        9463,
+        9542,
+        9543
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:007cf72601041c33e7131a7d877fdd03f969da032d30ecc025209313088c6893",
+        "normalized_award": "llm master of law (international)",
+        "study_variant": "llm master of law (international)"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9465,
+      "ids": [
+        9465,
+        9466
+      ],
+      "award": "LLM Corporate Governance GradCG",
+      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-corporate-governance-gradcg/",
+      "merged_original_parents": [
+        9465
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:4afe7a6a62c137225ebb7d70ee43cbf1a20ca29347746069d2ca668cb6685e08",
+        "normalized_award": "llm corporate governance gradcg",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9467,
+      "ids": [
+        9467,
+        9468,
+        9541,
+        9707
+      ],
+      "award": "LLM International Arbitration",
+      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-international-arbitration/",
+      "merged_original_parents": [
+        9467,
+        9541
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:d6fa32fa9a8f762a82006a99f7421f4c241b9eb12e714ac8c56b0c4007d4a6fd",
+        "normalized_award": "llm international arbitration",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9469,
+      "ids": [
+        9469,
+        9470,
+        9537,
+        9538,
+        9709
+      ],
+      "award": "MSc Strategic Business Management",
+      "source": "https://www.law.ac.uk/study/postgraduate/business/msc-strategic-business-management/",
+      "merged_original_parents": [
+        9469,
+        9537
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:c454062180145c99c3a90ce9417d5d58b2d3164b9af622752cc7c8e8abf8662b",
+        "normalized_award": "msc strategic business management",
+        "study_variant": "standard"
+      },
+      "study_mode": "Blended"
+    },
+    {
+      "parent": 9471,
+      "ids": [
+        9471,
+        9472,
+        9535,
+        9536,
+        9710
+      ],
+      "award": "MSc Project Management",
+      "source": "https://www.law.ac.uk/study/postgraduate/business/msc-project-management/",
+      "merged_original_parents": [
+        9471,
+        9535
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:d21750d2ee1f21d62ce84308b54a68090086ae083827d07000a0d9b0ef50026a",
+        "normalized_award": "msc project management",
+        "study_variant": "standard"
+      },
+      "study_mode": "Blended"
+    },
+    {
+      "parent": 9473,
+      "ids": [
+        9473,
+        9474,
+        9539,
+        9540,
+        9708
+      ],
+      "award": "BSc (Hons) Criminology",
+      "source": "https://www.law.ac.uk/study/undergraduate/criminology/bsc-hons-criminology/",
+      "merged_original_parents": [
+        9473,
+        9539
+      ],
+      "identity_key": {
+        "canonical_degree": "bachelor",
+        "source_route_sha256": "sha256:e9afa98a8ce656bd1747a800d7d532950da486599fdadd422ec3de948e9b5ccd",
+        "normalized_award": "bsc (hons) criminology",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9475,
+      "ids": [
+        9475,
+        9476
+      ],
+      "award": "MSc Corporate Financial Management",
+      "source": "https://www.law.ac.uk/study/postgraduate/business/msc-corporate-financial-management/",
+      "merged_original_parents": [
+        9475
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:49e51a52c1c5475d6c5259d6a47c225926840f8baeb10e6f73d593768cf8ab7a",
+        "normalized_award": "msc corporate financial management",
+        "study_variant": "standard"
+      },
+      "study_mode": "Blended"
+    },
+    {
+      "parent": 9477,
+      "ids": [
+        9477,
+        9478
+      ],
+      "award": "MSc Legal Technology",
+      "source": "https://www.law.ac.uk/study/postgraduate/law/msc-legal-technology/",
+      "merged_original_parents": [
+        9477
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:5dad83eb49cda218d26f1b567dd3c0964be88a57466ba16c3b0d2b9371623c30",
+        "normalized_award": "msc legal technology",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9480,
+      "ids": [
+        9480,
+        9481,
+        9518,
+        9519,
+        9520,
+        9521,
+        9522,
+        9523,
+        9524,
+        9525,
+        9526,
+        9527,
+        9528,
+        9529,
+        9530,
+        9531,
+        9532,
+        9712,
+        9713
+      ],
+      "award": "MA Law (Conversion)",
+      "source": "https://www.law.ac.uk/study/postgraduate/law/ma-law/",
+      "merged_original_parents": [
+        9480,
+        9518,
+        9519
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:235d4ef342fdeb43e21951e0eef63d0de36705702e86dc697c7e77266229e130",
+        "normalized_award": "ma law (conversion)",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9483,
+      "ids": [
+        9483,
+        9484,
+        9517,
+        9714
+      ],
+      "award": "LLM Mediation and Alternative Dispute Resolution",
+      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-mediation-and-alternative-dispute-resolution/",
+      "merged_original_parents": [
+        9483,
+        9517
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:0002cbd05e463d4d8b1ed1d1fda10cc128719d50fb1ca94b39cadbdf96aa40f2",
+        "normalized_award": "llm mediation and alternative dispute resolution",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9486,
+      "ids": [
+        9486,
+        9487,
+        9510,
+        9718
+      ],
+      "award": "LLM International Corporate Governance",
+      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-international-corporate-governance/",
+      "merged_original_parents": [
+        9486,
+        9510
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:eb44c4c5f4a373e416960dd1fa84508eb0cfcc6add0ad40afd6067e932011459",
+        "normalized_award": "llm international corporate governance",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9488,
+      "ids": [
+        9488,
+        9489,
+        9508,
+        9509,
+        9719
+      ],
+      "award": "LLM International Business Law",
+      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-international-business-law/",
+      "merged_original_parents": [
+        9488,
+        9508
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:17f0de931670935940552cd20921e3c55d3b4a41292cec902a499fced77f5c70",
+        "normalized_award": "llm international business law",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9491,
+      "ids": [
+        9491,
+        9492
+      ],
+      "award": "LLM Company Law",
+      "source": "https://www.law.ac.uk/study/postgraduate/law/llm-company-law/",
+      "merged_original_parents": [
+        9491
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:b1ac9800846715310032868cc6325a98949f9e2493b7ff798ddfc438a8b91657",
+        "normalized_award": "llm company law",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9493,
+      "ids": [
+        9493,
+        9494,
+        9507,
+        9720
+      ],
+      "award": "LLB Law (Accelerated)",
+      "source": "https://www.law.ac.uk/study/undergraduate/law/accelerated-llb-hons-law/",
+      "merged_original_parents": [
+        9493,
+        9507
+      ],
+      "identity_key": {
+        "canonical_degree": "bachelor",
+        "source_route_sha256": "sha256:49d51abffa0825932706a2e270bbaad0417f5ec083d373d1117b321df1c4f6cc",
+        "normalized_award": "llb law (accelerated)",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    },
+    {
+      "parent": 9496,
+      "ids": [
+        9496,
+        9497,
+        9501,
+        9502,
+        9724
+      ],
+      "award": "LLB Law with Criminology",
+      "source": "https://www.law.ac.uk/study/undergraduate/law/llb-hons-law-with-criminology/",
+      "merged_original_parents": [
+        9496,
+        9501
+      ],
+      "identity_key": {
+        "canonical_degree": "bachelor",
+        "source_route_sha256": "sha256:7b890203ed541286e5d1d1ccc35e6ce056e66513d9162b9a1583ccfca1f06fe3",
+        "normalized_award": "llb law with criminology",
+        "study_variant": "standard"
+      },
+      "study_mode": "Blended"
+    },
+    {
+      "parent": 9498,
+      "ids": [
+        9498,
+        9499,
+        9500,
+        9725
+      ],
+      "award": "LLB Law with Business",
+      "source": "https://www.law.ac.uk/study/undergraduate/law/llb-hons-law-with-business/",
+      "merged_original_parents": [
+        9498,
+        9500
+      ],
+      "identity_key": {
+        "canonical_degree": "bachelor",
+        "source_route_sha256": "sha256:0753492cf75480cb8da876ee8d414f16c19705c982675fe0b900d125bd90fe1f",
+        "normalized_award": "llb law with business",
+        "study_variant": "standard"
+      },
+      "study_mode": "Blended"
+    },
+    {
+      "parent": 9533,
+      "ids": [
+        9533,
+        9534,
+        9711
+      ],
+      "award": "MSc Leadership and Human Resource Management",
+      "source": "https://www.law.ac.uk/study/postgraduate/business/msc-leadership-and-human-resource-management/",
+      "merged_original_parents": [
+        9533
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:5ef053f42eebccb079e9642c0ca6f0b0f405a5bba4cddb110d9a7897fe28b7da",
+        "normalized_award": "msc leadership and human resource management",
+        "study_variant": "standard"
+      },
+      "study_mode": "Blended"
+    },
+    {
+      "parent": 9611,
+      "ids": [
+        9611,
+        9612,
+        9613,
+        9665
+      ],
+      "award": "MBA",
+      "source": "https://www.law.ac.uk/study/postgraduate/business/mba-masters-in-business-administration/",
+      "merged_original_parents": [
+        9611
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:8ba8c18470d4d0dcddd149372371026ecc7f78dd49c26ba0811e076b6c7c4554",
+        "normalized_award": "mba",
+        "study_variant": "standard"
+      },
+      "study_mode": "Blended"
     },
     {
       "parent": 9630,
@@ -952,7 +1253,17 @@
         9657
       ],
       "award": "LLB Law (Top up)",
-      "source": "https://www.law.ac.uk/study/undergraduate/law/llb-hons-law-top-up/"
+      "source": "https://www.law.ac.uk/study/undergraduate/law/llb-hons-law-top-up/",
+      "merged_original_parents": [
+        9630
+      ],
+      "identity_key": {
+        "canonical_degree": "bachelor",
+        "source_route_sha256": "sha256:ac286aa11d419f39f63e9ce33004285a2314ad13c0967235229d2f3fcc1a5107",
+        "normalized_award": "llb law (top up)",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
     },
     {
       "parent": 9631,
@@ -961,7 +1272,17 @@
         9655
       ],
       "award": "LLB Law with Psychology",
-      "source": "https://www.law.ac.uk/study/undergraduate/law/llb-hons-law-with-psychology/"
+      "source": "https://www.law.ac.uk/study/undergraduate/law/llb-hons-law-with-psychology/",
+      "merged_original_parents": [
+        9631
+      ],
+      "identity_key": {
+        "canonical_degree": "bachelor",
+        "source_route_sha256": "sha256:0ee923be6a92f852d9ba13188d43f0d275c593533da445c1636a9c8d82d66803",
+        "normalized_award": "llb law with psychology",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
     },
     {
       "parent": 9632,
@@ -972,7 +1293,17 @@
         9654
       ],
       "award": "LLB International Law",
-      "source": "https://www.law.ac.uk/study/undergraduate/law/llb-hons-international-law/"
+      "source": "https://www.law.ac.uk/study/undergraduate/law/llb-hons-international-law/",
+      "merged_original_parents": [
+        9632
+      ],
+      "identity_key": {
+        "canonical_degree": "bachelor",
+        "source_route_sha256": "sha256:d07a5a2d941b0c3858f750320cd71ac20f57e9f6f9ddb678743336ffdd2aaa6d",
+        "normalized_award": "llb international law",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
     },
     {
       "parent": 9635,
@@ -981,7 +1312,17 @@
         9653
       ],
       "award": "LLB International Law (Top up)",
-      "source": "https://www.law.ac.uk/study/undergraduate/law/llb-hons-international-law-top-up/"
+      "source": "https://www.law.ac.uk/study/undergraduate/law/llb-hons-international-law-top-up/",
+      "merged_original_parents": [
+        9635
+      ],
+      "identity_key": {
+        "canonical_degree": "bachelor",
+        "source_route_sha256": "sha256:6f54895a696370a7623e5442f1a0d57499c74062d5666f1d9e10daf8664220a0",
+        "normalized_award": "llb international law (top up)",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
     },
     {
       "parent": 9636,
@@ -992,7 +1333,17 @@
         9651
       ],
       "award": "MBA with Fintech and Digital Finance",
-      "source": "https://www.law.ac.uk/study/postgraduate/business/mba-with-fintech-and-digital-finance/"
+      "source": "https://www.law.ac.uk/study/postgraduate/business/mba-with-fintech-and-digital-finance/",
+      "merged_original_parents": [
+        9636
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:44f2d5497ad690f11d4b7b2be5a0424cf02365f6779005efd4d5aa020375bb84",
+        "normalized_award": "mba with fintech and digital finance",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
     },
     {
       "parent": 9639,
@@ -1003,7 +1354,17 @@
         9650
       ],
       "award": "MBA with Artificial Intelligence",
-      "source": "https://www.law.ac.uk/study/postgraduate/business/mba-with-artificial-intelligence/"
+      "source": "https://www.law.ac.uk/study/postgraduate/business/mba-with-artificial-intelligence/",
+      "merged_original_parents": [
+        9639
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:a0d34d507f8129d6e635c9da1c264f85dd81d1c0643c61a0a7fe480fb431ca16",
+        "normalized_award": "mba with artificial intelligence",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
     },
     {
       "parent": 9642,
@@ -1014,7 +1375,67 @@
         9649
       ],
       "award": "MBA with Healthcare Management",
-      "source": "https://www.law.ac.uk/study/postgraduate/business/mba-with-healthcare-management/"
+      "source": "https://www.law.ac.uk/study/postgraduate/business/mba-with-healthcare-management/",
+      "merged_original_parents": [
+        9642
+      ],
+      "identity_key": {
+        "canonical_degree": "master",
+        "source_route_sha256": "sha256:076c0b4add960ba1d272ee468cb8e3b2814448e4f95a03e2acea1efac3d391a0",
+        "normalized_award": "mba with healthcare management",
+        "study_variant": "standard"
+      },
+      "study_mode": "On Campus"
+    }
+  ],
+  "unscoped_aliases": [
+    {
+      "alias_course_id": 9395,
+      "canonical_course_id": 9611,
+      "award": "MBA",
+      "study_mode": "Blended",
+      "source": "https://www.law.ac.uk/study/postgraduate/business/mba-masters-in-business-administration/",
+      "study_variant": "Standard",
+      "amount": 20600,
+      "currency": "GBP",
+      "fee_year": 2026,
+      "fee_term": "Full Course"
+    },
+    {
+      "alias_course_id": 9392,
+      "canonical_course_id": 9636,
+      "award": "MBA with Fintech and Digital Finance",
+      "study_mode": "On Campus",
+      "source": "https://www.law.ac.uk/study/postgraduate/business/mba-with-fintech-and-digital-finance/",
+      "study_variant": "Standard",
+      "amount": 20600,
+      "currency": "GBP",
+      "fee_year": 2026,
+      "fee_term": "Full Course"
+    },
+    {
+      "alias_course_id": 9391,
+      "canonical_course_id": 9639,
+      "award": "MBA with Artificial Intelligence",
+      "study_mode": "On Campus",
+      "source": "https://www.law.ac.uk/study/postgraduate/business/mba-with-artificial-intelligence/",
+      "study_variant": "Standard",
+      "amount": 20600,
+      "currency": "GBP",
+      "fee_year": 2026,
+      "fee_term": "Full Course"
+    },
+    {
+      "alias_course_id": 9390,
+      "canonical_course_id": 9642,
+      "award": "MBA with Healthcare Management",
+      "study_mode": "On Campus",
+      "source": "https://www.law.ac.uk/study/postgraduate/business/mba-with-healthcare-management/",
+      "study_variant": "Standard",
+      "amount": 20600,
+      "currency": "GBP",
+      "fee_year": 2026,
+      "fee_term": "Full Course"
     }
   ]
 }

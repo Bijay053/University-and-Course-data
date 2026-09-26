@@ -438,7 +438,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--snapshot", required=True,
                         help="companion snapshot used to generate the review manifest")
     parser.add_argument("--approved-mapping", default=str(
-        Path(__file__).with_name("approved_law_legacy_mapping.json")
+        Path(__file__).with_name("archived_law_100_mapping.json")
     ))
     parser.add_argument("--out", required=True, help="proposed mapping JSON output")
     parser.add_argument("--summary", required=True, help="human-review summary JSON output")

@@ -11,7 +11,7 @@ import propose_law_61_mapping as proposal
 
 def fixture():
     raw = (proposal.__file__.replace(
-        "propose_law_61_mapping.py", "approved_law_legacy_mapping.json"
+        "propose_law_61_mapping.py", "archived_law_100_mapping.json"
     ))
     mapping, mapping_digest = proposal.load_mapping(raw)
     groups = []

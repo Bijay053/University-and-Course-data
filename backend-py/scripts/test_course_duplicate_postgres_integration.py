@@ -152,7 +152,7 @@ def _fixture(mapping: dict):
     all_ids = []
     group_first_pair = []
     for group_index, group in enumerate(mapping["groups"]):
-        variant = f"Isolated integration variant {group_index + 1}"
+        variant = group["identity_key"]["study_variant"]
         member_ids = list(group["ids"])
         if len(member_ids) >= 2 and not group_first_pair:
             group_first_pair = member_ids[:2]
@@ -211,6 +211,14 @@ def _fixture(mapping: dict):
                 fee = 20_600.0
                 fee_term = "Full Course"
                 variant = "Standard"
+            elif course_id in {9399, 9547}:
+                # Newly approved union: distinct original components share one
+                # campus only with identical fee and full study identity.
+                location = "Reviewed shared campus"
+                scope_locations = [location]
+                name_location = location
+                fee_campus = location
+                fee = 18_000.0
             elif group_index == 1 and course_id == group["parent"]:
                 location = "Hull"
                 scope_locations = ["Hull"]
@@ -247,7 +255,10 @@ def _fixture(mapping: dict):
                 name_location = location
                 fee_campus = location
                 fee = float(10_000 + (course_id % 1_000))
-            course_study_mode = unscoped_mode_by_parent.get(group["parent"], "Full-time")
+            degree = published_degree = group["identity_key"]["canonical_degree"].title()
+            if degree == "Graduate Diploma":
+                published_degree = "Graduate Certificate & Diploma"
+            course_study_mode = group["study_mode"]
             course_rows.append({
                 "id": course_id, "university_id": 92,
                 "name": f"{group['award']} — {name_location}",
@@ -258,11 +269,13 @@ def _fixture(mapping: dict):
                 "reference_counts": {}, "outside_reference_count": 0,
                 "existing_offering_count": 0, "alias_count": 0,
             })
-            if group["parent"] in preview.REVISED_UNIONS:
-                component_index = member_ids.index(course_id) // 2
-                split_id = group["parent"] + 10_000 + component_index
+            from law_reconciliation_contract import ORIGINAL_GROUPS
+            original = next(old for old in ORIGINAL_GROUPS.values() if course_id in old["ids"])
+            if original["parent"] in preview.REVISED_UNIONS:
+                component_index = original["ids"].index(course_id) // 2
+                split_id = original["parent"] + 10_000 + component_index
             else:
-                split_id = group["parent"] + 10_000
+                split_id = original["parent"] + 10_000
             family_records = [(f"job-base-{group_index}", split_id)]
             # Fifteen extra per-job families overlap an existing ID. The
             # approved inventory therefore has 119 families but 104 components.
@@ -538,10 +551,10 @@ def _reviewed_manifest(snapshot: dict, mapping: dict, mapping_sha: str, path: Pa
         snapshot, approved_mapping=mapping, approved_mapping_sha256=mapping_sha,
     )
     assert manifest["observed_scope"]["raw_families"] == 146
-    assert manifest["observed_scope"]["groups"] == 100
+    assert manifest["observed_scope"]["groups"] == 61
     assert manifest["observed_scope"]["unique_course_ids"] == 307
     assert manifest["observed_scope"]["unscoped_aliases"] == 4
-    assert manifest["observed_scope"]["preview_candidate_groups"] == 100, [
+    assert manifest["observed_scope"]["preview_candidate_groups"] == 61, [
         (group["course_ids"][0], group["blocking_reasons"][:8])
         for group in manifest["groups"] if group["eligibility"] != "preview_candidate"
     ]
@@ -549,9 +562,9 @@ def _reviewed_manifest(snapshot: dict, mapping: dict, mapping_sha: str, path: Pa
     manifest["approval"] = {
         "status": "approved", "revision": "629-isolated-integration-r1",
         "approved_by": "isolated PostgreSQL integration test",
-        "approved_scope": {"groups": 100, "course_ids": 307, "aliases": 207},
+        "approved_scope": {"groups": 61, "course_ids": 307, "aliases": 246},
         "approved_unscoped_scope": {
-            "aliases": 4, "total_course_ids": 311, "total_aliases": 211,
+            "aliases": 4, "total_course_ids": 311, "total_aliases": 250,
         },
         "approved_mapping_sha256": mapping_sha,
         "external_reference_scope": "out_of_scope_preserve_original_course_ids",
@@ -702,15 +715,15 @@ def test_integration_fixture_models_119_overlapping_families_and_variant_identit
     for index, group in enumerate(mapping["groups"]):
         key = (group["award"], group["source"])
         award_sources.setdefault(key, set()).add(f"Isolated integration variant {index + 1}")
-    assert sum(len(variants) > 1 for variants in award_sources.values()) == 33
+    assert sum(len(variants) > 1 for variants in award_sources.values()) == 0
 
 
-def test_approved_mapping_contains_only_the_two_reviewed_group_merges():
+def test_approved_mapping_contains_exact_61_reviewed_unions():
     mapping = json.loads(MAPPING_PATH.read_text(encoding="utf-8"))
     groups = mapping["groups"]
     by_parent = {group["parent"]: group for group in groups}
 
-    assert len(groups) == 100
+    assert len(groups) == 61
     assert by_parent[9389]["ids"] == [9389, 9408, 9645, 9646, 9647, 9648]
     assert by_parent[9396]["ids"] == [9396, 9421, 9608, 9675, 9676]
     assert not {9645, 9648, 9608, 9676} & set(by_parent)
@@ -719,7 +732,8 @@ def test_approved_mapping_contains_only_the_two_reviewed_group_merges():
         group["parent"] for group in groups
         if changed_ids.intersection(group["ids"])
     } == {9389, 9396}
-    assert len(groups) - 2 == 98
+    from law_reconciliation_contract import PROPOSAL
+    assert groups == PROPOSAL["groups"]
     assert [
         (item["alias_course_id"], item["canonical_course_id"])
         for item in json.loads(MAPPING_PATH.read_text())["unscoped_aliases"]
@@ -745,7 +759,7 @@ def test_four_unscoped_aliases_require_exact_evidence_and_complete_collision_sca
     )
     assert len(manifest["unscoped_aliases"]) == 4
     assert manifest["observed_scope"]["original_course_ids_including_unscoped_aliases"] == 311
-    assert manifest["observed_scope"]["total_aliases_including_unscoped_aliases"] == 211
+    assert manifest["observed_scope"]["total_aliases_including_unscoped_aliases"] == 250
     assert all(len(alias["evidence_rows"]) == 1 for alias in manifest["unscoped_aliases"])
     assert [alias["study_mode"] for alias in manifest["unscoped_aliases"]] == [
         "Blended", "On Campus", "On Campus", "On Campus",
@@ -874,11 +888,32 @@ def test_task629_end_to_end_canary_schema():
                 observed = approved["manifest"]["observed_scope"]
                 assert observed["raw_families"] == 146
                 assert observed["additional_approved_id_families"] == 27
-                assert observed["groups"] == 100
+                assert observed["groups"] == 61
                 assert observed["unique_course_ids"] == 307
                 assert observed["extra_course_ids"] == 25
                 assert observed["excluded_unrelated_course_ids"] == list(range(910_000, 910_025))
                 assert observed["related_extra_course_ids"] == []
+
+                # Full evidence inventory is pinned even for an unrelated
+                # approved course outside all 311 reconciled historical IDs.
+                async with test_engine.begin() as conn:
+                    old_name = (await conn.execute(text(
+                        "SELECT course_name FROM scraped_courses WHERE course_id = 910000"
+                    ))).scalar_one()
+                    await conn.execute(text(
+                        "UPDATE scraped_courses SET course_name = 'Unrelated evidence drift' "
+                        "WHERE course_id = 910000"
+                    ))
+                with pytest.raises(apply_tool.ApplyRefused, match="complete staged evidence set changed"):
+                    await apply_tool._run(
+                        approved, apply=False, actor="", expected_database=db_name,
+                        confirm_write=False, _test_database_url=database_url,
+                        _test_schema=schema,
+                    )
+                async with test_engine.begin() as conn:
+                    await conn.execute(text(
+                        "UPDATE scraped_courses SET course_name = :name WHERE course_id = 910000"
+                    ), {"name": old_name})
 
                 async with test_engine.begin() as conn:
                     await conn.execute(text("""
@@ -1067,7 +1102,7 @@ def test_task629_end_to_end_canary_schema():
                 )
                 with pytest.raises(
                     apply_tool.ApplyRefused,
-                    match="complete university-wide published-course inventory changed",
+                    match="complete staged evidence set changed after review",
                 ):
                     await apply_tool._run(
                         approved, apply=False, actor="", expected_database=db_name,
@@ -1161,7 +1196,7 @@ def test_task629_end_to_end_canary_schema():
                          WHERE course_id = :course_id
                     """), {"course_id": slash_course_id})).mappings().all()
                 assert course_count == 311
-                assert alias_count == 211
+                assert alias_count == 250
                 assert pathway_count == (1 if internal_pathway else 0)
                 assert fee_rows == 0
                 expected_offering_count = sum(
@@ -1173,7 +1208,7 @@ def test_task629_end_to_end_canary_schema():
                     })
                     for group in mapping["groups"]
                 )
-                assert offer_rows == expected_offering_count == 305
+                assert offer_rows == expected_offering_count == 304
                 assert duplicate_offering_campuses == 0
                 expected_group_zero_prices = {
                     location: next(

@@ -33,14 +33,18 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
+from law_reconciliation_contract import (
+    PROPOSAL, REVIEWED_GROUPS, component_count, original_topology_matches,
+    reviewed_identity_matches, reviewed_union, duplicate_campus_allowed,
+)
 
 
 SCHEMA_VERSION = 1
 EXPECTED_RAW_FAMILIES = 119
-EXPECTED_GROUPS = 100
+EXPECTED_GROUPS = 61
 EXPECTED_COURSE_IDS = 307
 EXPECTED_ALIAS_IDS = 311
-EXPECTED_ALIAS_COUNT = 211
+EXPECTED_ALIAS_COUNT = 250
 EXPECTED_OVERLAP_COMPONENTS = 104
 MAX_INPUT_BYTES = 32 * 1024 * 1024
 MAX_EVIDENCE_ROWS = 20_000
@@ -314,7 +318,7 @@ def _scope_evidence(evidence: dict[str, Any]) -> dict[str, Any] | None:
 
 def validate_approved_mapping(value: Any, *, expected_groups: int = EXPECTED_GROUPS,
                               expected_course_ids: int = EXPECTED_COURSE_IDS,
-                              expected_aliases: int = 207) -> dict[str, Any]:
+                              expected_aliases: int = 246) -> dict[str, Any]:
     """Validate the user-approved ID/source manifest, not a scrape-derived guess."""
     if not isinstance(value, dict) or value.get("schema_version") != 1:
         raise SnapshotError("approved mapping must be schema_version 1 JSON")
@@ -358,7 +362,7 @@ def validate_approved_mapping(value: Any, *, expected_groups: int = EXPECTED_GRO
     enforce_unscoped = (
         expected_groups == EXPECTED_GROUPS
         and expected_course_ids == EXPECTED_COURSE_IDS
-        and expected_aliases == 207
+        and expected_aliases == 246
     )
     if not enforce_unscoped and unscoped_raw is None:
         unscoped_raw = []
@@ -393,11 +397,13 @@ def validate_approved_mapping(value: Any, *, expected_groups: int = EXPECTED_GRO
             "fee_term": "Full Course", "source": raw["source"],
         })
     if expected_groups == EXPECTED_GROUPS and expected_course_ids == EXPECTED_COURSE_IDS:
-        for parent, reviewed in REVISED_UNIONS.items():
-            if by_parent.get(parent) != reviewed["ids"]:
-                raise SnapshotError(
-                    f"revised union {parent} must contain exactly its explicitly reviewed IDs"
-                )
+        expected = [
+            {key: group[key] for key in ("parent", "ids", "award", "source")}
+            for group in PROPOSAL["groups"]
+        ]
+        if (cleaned != expected or groups != PROPOSAL["groups"]
+                or unscoped != PROPOSAL["unscoped_aliases"]):
+            raise SnapshotError("mapping differs from the exact explicitly reviewed 61-group proposal")
     if (len(seen) != expected_course_ids
             or sum(len(group["ids"]) - 1 for group in cleaned) != expected_aliases):
         raise SnapshotError(
@@ -858,6 +864,9 @@ def _component_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[
                 variant, row.get("study_mode"),
                 row.get("fee_year"), row.get("fee_term"), row.get("currency"),
             )
+            if (approved.get("reviewed_61_contract") and not reviewed_identity_matches(
+                    approved["parent"], identity[3], variant, row.get("study_mode"))):
+                reasons.append(f"study identity differs from reviewed 61-group contract for {cid}")
             row_identities.add(identity)
             identities.add(identity)
             campus_identity = (
@@ -898,6 +907,11 @@ def _component_reason(rows: list[dict[str, Any]], courses_by_id: dict[int, dict[
                     )
                     and _norm(campus_identity[0][4]) == "standard"
                 )
+                if approved.get("reviewed_61_contract"):
+                    allowed = (
+                        duplicate_campus_allowed(approved["parent"], approved["ids"], location, fee)
+                        and previous[1] == campus_identity and campus_identity is not None
+                    )
                 if not allowed:
                     reasons.append(f"campus is assigned to multiple approved IDs: {location}")
             elif previous is not None and previous[1] != campus_identity:
@@ -1178,10 +1192,11 @@ def build_review_manifest(snapshot: dict[str, Any], *,
         if len(parents) == 1 and None not in parents:
             group_component_counts[next(iter(parents))] += 1
     component_partition_ok = components_match_mapping and all(
-        group_component_counts[parent] == 1
+        group_component_counts[parent] == component_count(parent)
         for parent in approved_ids_by_parent
-        if parent not in REVISED_UNIONS
     )
+    if expected_groups == EXPECTED_GROUPS and expected_course_ids == EXPECTED_COURSE_IDS:
+        component_partition_ok = component_partition_ok and original_topology_matches(component_ids)
     coverage_ok = (
         family_inventory_ok
         and component_partition_ok
@@ -1194,6 +1209,10 @@ def build_review_manifest(snapshot: dict[str, Any], *,
     )
     groups = []
     for approved in approved_mapping["groups"]:
+        approved = dict(approved)
+        approved["reviewed_61_contract"] = (
+            expected_groups == EXPECTED_GROUPS and expected_course_ids == EXPECTED_COURSE_IDS
+        )
         target_ids = set(approved["ids"])
         matching = [
             component for component, ids in zip(components, component_ids)
@@ -1210,7 +1229,7 @@ def build_review_manifest(snapshot: dict[str, Any], *,
         expected_component_count = group_component_counts.get(approved["parent"], 0)
         component_count_ok = (
             expected_component_count == (
-                3 if approved["parent"] in REVISED_UNIONS else 1
+                component_count(approved["parent"])
             )
             and all(
                 ids.issubset(target_ids)
@@ -1332,6 +1351,10 @@ def build_review_manifest(snapshot: dict[str, Any], *,
             snapshot.get("published_course_inventory_count"),
         "published_course_inventory_sha256": _sha256(
             snapshot.get("published_course_inventory")
+        ),
+        "evidence_inventory_count": len(snapshot["evidence_rows"]),
+        "evidence_inventory_sha256": _sha256(
+            sorted(snapshot["evidence_rows"], key=lambda row: row["id"])
         ),
         "external_reference_scope": "out_of_scope_preserve_original_course_ids",
         "observed_scope": {

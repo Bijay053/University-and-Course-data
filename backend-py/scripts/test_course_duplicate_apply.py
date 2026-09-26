@@ -27,12 +27,14 @@ def approved_manifest(mapping_path=APPROVED_MAPPING):
     for group_index, approved in enumerate(source["groups"]):
         members, mappings = [], []
         ids = approved["ids"]
-        if approved["parent"] in apply_tool.REVISED_UNIONS:
-            chunks = [list(chunk) for chunk in (
-                ids[:2], ids[2:4], ids[4:],
-            )]
-        else:
-            chunks = [list(ids)]
+        from law_reconciliation_contract import ORIGINAL_GROUPS
+        chunks = []
+        for parent in approved["merged_original_parents"]:
+            original_ids = ORIGINAL_GROUPS[parent]["ids"]
+            chunks.extend(
+                [original_ids[:2], original_ids[2:4], original_ids[4:]]
+                if parent in {9389, 9396} else [original_ids]
+            )
         overlap_component_signatures.extend(chunks)
         component_by_id = {
             course_id: component_index
@@ -63,9 +65,9 @@ def approved_manifest(mapping_path=APPROVED_MAPPING):
                     "source_fee": source_fee,
                 }],
                 "source_fee": source_fee,
-                "study_variant": "Standard",
-                "study_mode": "Full-time",
-                "degree_level": "Master",
+                "study_variant": approved["identity_key"]["study_variant"],
+                "study_mode": approved["study_mode"],
+                "degree_level": approved["identity_key"]["canonical_degree"],
                 "precondition_sha256": "b" * 64,
                 "source_route_sha256": route_fingerprint,
                 "evidence_rows": [{
@@ -127,27 +129,29 @@ def approved_manifest(mapping_path=APPROVED_MAPPING):
         "manifest_digest_scope": "canonical JSON excluding manifest_sha256 and approval",
         "expected_scope": {
             "raw_families": 119, "overlap_components": 104,
-            "groups": 100, "course_ids": 307,
+            "groups": 61, "course_ids": 307,
         },
         "approved_mapping_sha256": map_sha,
         "published_course_inventory_complete": True,
         "published_course_inventory_count": 337,
         "published_course_inventory_sha256": "f" * 64,
+        "evidence_inventory_count": staged_id + 3,
+        "evidence_inventory_sha256": "a" * 64,
         "external_reference_scope": "out_of_scope_preserve_original_course_ids",
         "observed_scope": {
             "raw_families": 119, "overlap_components": 104,
-            "groups": 100, "unique_course_ids": 307,
+            "groups": 61, "unique_course_ids": 307,
             "overlap_component_signatures": sorted(
                 overlap_component_signatures, key=lambda signature: tuple(signature)
             ),
             "approved_family_signature_count": 119,
             "additional_approved_id_families": 0,
-            "preview_candidate_groups": 100, "preview_candidate_course_ids": 307,
+            "preview_candidate_groups": 61, "preview_candidate_course_ids": 307,
             "blocked_groups": 0, "ignored_evidence_rows": 0,
             "coverage_matches_approved_mapping": True, "coverage_matches_expected": True,
             "unscoped_aliases": 4,
             "original_course_ids_including_unscoped_aliases": 311,
-            "total_aliases_including_unscoped_aliases": 211,
+            "total_aliases_including_unscoped_aliases": 250,
         },
         "reference_scan_complete": True,
         "external_reference_scan_complete": False,
@@ -170,9 +174,9 @@ def approved_manifest(mapping_path=APPROVED_MAPPING):
         "status": "approved",
         "revision": "629-r1",
         "approved_by": "Task #629 mapping reviewer",
-        "approved_scope": {"groups": 100, "course_ids": 307, "aliases": 207},
+        "approved_scope": {"groups": 61, "course_ids": 307, "aliases": 246},
         "approved_unscoped_scope": {
-            "aliases": 4, "total_course_ids": 311, "total_aliases": 211,
+            "aliases": 4, "total_course_ids": 311, "total_aliases": 250,
         },
         "approved_mapping_sha256": map_sha,
         "external_reference_scope": "out_of_scope_preserve_original_course_ids",
@@ -189,6 +193,59 @@ def save_manifest(tmp_path, value):
     return path, apply_tool.file_sha256(path)
 
 
+def test_new_reviewed_union_duplicate_requires_exact_fee_and_identity(tmp_path):
+    import copy
+    import pytest
+    value, _ = approved_manifest()
+    group = next(group for group in value["groups"]
+                 if group["proposed_canonical_course_id"] == 9399)
+    fee = {"amount": 18000, "currency": "GBP", "fee_year": 2026, "fee_term": "Annual"}
+    _set_member_campus(group, 9399, "Shared reviewed campus", fee=fee)
+    _set_member_campus(group, 9547, "Shared reviewed campus", fee=fee)
+    assert len(load(tmp_path, value)["groups"]) == 61
+    for field, changed in (
+        ("amount", 18001), ("currency", "USD"), ("fee_year", 2025),
+        ("fee_term", "Full Course"),
+    ):
+        bad = copy.deepcopy(value)
+        bad_group = next(group for group in bad["groups"]
+                         if group["proposed_canonical_course_id"] == 9399)
+        _set_member_campus(bad_group, 9547, "Shared reviewed campus", fee={**fee, field: changed})
+        with pytest.raises(apply_tool.ApplyRefused, match="exact reviewed fee/study match"):
+            load(tmp_path, bad)
+    for field, changed in (
+        ("study_variant", "Different variant"), ("study_mode", "Online"),
+        ("degree_level", "Bachelor"),
+    ):
+        bad = copy.deepcopy(value)
+        bad["groups"][5]["members"][0][field] = changed
+        with pytest.raises(apply_tool.ApplyRefused, match="study identity"):
+            load(tmp_path, bad)
+
+
+def test_exact_proposal_membership_and_original_topology_are_immutable():
+    import copy
+    import pytest
+    from course_duplicate_preview import validate_approved_mapping, SnapshotError
+    from law_reconciliation_contract import original_topology_matches
+    mapping = json.loads(APPROVED_MAPPING.read_bytes())
+    assert len(validate_approved_mapping(mapping)["groups"]) == 61
+    mapping["groups"][0]["ids"][-1], mapping["groups"][1]["ids"][-1] = (
+        mapping["groups"][1]["ids"][-1], mapping["groups"][0]["ids"][-1],
+    )
+    with pytest.raises(SnapshotError, match="exact explicitly reviewed"):
+        validate_approved_mapping(mapping)
+    value, _ = approved_manifest()
+    signatures = copy.deepcopy(value["observed_scope"]["overlap_component_signatures"])
+    assert original_topology_matches(signatures)
+    # Same cardinality, same 104 components, and still inside one new group:
+    # moving an ID across two original components must not silently pass.
+    left = next(part for part in signatures if 9399 in part)
+    right = next(part for part in signatures if 9547 in part)
+    left[1], right[1] = right[1], left[1]
+    assert not original_topology_matches(signatures)
+
+
 def load(tmp_path, value):
     path, digest = save_manifest(tmp_path, value)
     _, map_sha = approved_manifest()
@@ -200,7 +257,7 @@ def load(tmp_path, value):
 def test_authoritative_mapping_fingerprint_and_all_explicit_rows_are_required(tmp_path):
     value, _ = approved_manifest()
     approved = load(tmp_path, value)
-    assert len(approved["groups"]) == 100
+    assert len(approved["groups"]) == 61
     assert len(approved["course_ids"]) == 311
     assert len(approved["staged_ids"]) == 326
     assert approved["manifest"]["external_reference_scan_complete"] is False
