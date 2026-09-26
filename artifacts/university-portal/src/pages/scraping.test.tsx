@@ -217,9 +217,9 @@ describe("Scraping repair reviewer", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     render(<ScrapingForTest initialReviewState={review} />);
-    expect(screen.getByTestId("text-review-logical-course-count").textContent).toContain("1 courses");
-    expect(screen.getByTestId("text-review-entry-count").textContent).toContain("2 pending");
-    expect(screen.getByText("review entries")).toBeTruthy();
+    expect(screen.getByTestId("text-review-logical-course-count").textContent).toContain("1 course groups");
+    expect(screen.getByTestId("text-review-entry-count").textContent).toContain("2 pending entries");
+    expect(screen.getByText(/Campus-specific rows stay separate/)).toBeTruthy();
     expect(screen.getByTestId("text-campus-fees-101").textContent).toContain("Manchester:");
     expect(screen.getByTestId("text-campus-fees-101").textContent).toContain("18,000");
     expect(screen.getByTestId("text-campus-fees-101").textContent).toContain("Birmingham:");
@@ -764,7 +764,7 @@ describe("Scraping repair reviewer", () => {
     }));
     render(<ScrapingForTest initialReviewState={review} />);
     await userEvent.setup().click(screen.getByTitle("Reload staged courses and refresh quality scores"));
-    await waitFor(() => expect(screen.getByText("142 pending")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("142 pending entries")).toBeTruthy());
     expect(screen.getByRole("button", { name: "Approve (142)" })).toBeTruthy();
     expect(screen.getAllByText("Same programme")).toHaveLength(142);
     expect(screen.queryByText("Unrelated")).toBeNull();
@@ -794,7 +794,7 @@ describe("Scraping repair reviewer", () => {
     }
     await userEvent.click(screen.getByTitle("Reload staged courses and refresh quality scores"));
     await waitFor(() => expect(screen.getByRole("button", { name: `Approve (${deselect ? 0 : 1})` })).toBeTruthy());
-    expect(screen.getByText("1 pending")).toBeTruthy();
+    expect(screen.getByText("1 pending entries")).toBeTruthy();
     expect(screen.getByText("London, Leeds")).toBeTruthy();
     await userEvent.click(screen.getByTitle("Reload staged courses and refresh quality scores"));
     await waitFor(() => expect(loaded).toBe(2));

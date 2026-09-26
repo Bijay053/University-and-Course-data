@@ -6,6 +6,14 @@ export type LogicalCourseGroup<T extends Row> = {
   ids: number[];
 };
 
+export type CampusReviewFee = {
+  location: string;
+  amount: number | null;
+  currency: string;
+  term: string;
+  year: unknown;
+};
+
 function record(value: unknown): Row | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? value as Row
@@ -103,4 +111,41 @@ export function groupLegacyCampusRows<T extends { id: number }>(rows: T[]): Logi
     }
   }
   return groups.sort((a, b) => a.course.id - b.course.id);
+}
+
+export function legacyCampusGroupName(members: Row[]): string | null {
+  if (members.length < 2) return null;
+  const names = members.map(member => campusScope(member)?.original_name ?? campusScope(member)?.originalName);
+  return names.every(name => typeof name === "string" && normalized(name) === normalized(names[0]))
+    ? names[0] as string : null;
+}
+
+/** The selected options describe fee regions, not additional campus rows.
+ * Each split row owns its persisted fee and its explicit scoped locations. */
+export function legacyCampusReviewFees(members: Row[]): CampusReviewFee[] {
+  const seen = new Set<string>();
+  const result: CampusReviewFee[] = [];
+  for (const member of members) {
+    const scoped = campusScope(member)?.locations;
+    const locations = Array.isArray(scoped) && scoped.length
+      && scoped.every(location => typeof location === "string" && location.trim())
+      ? scoped as string[]
+      : [read(member, "courseLocation", "course_location")];
+    const amount = read(member, "internationalFee", "international_fee");
+    const fee: Omit<CampusReviewFee, "location"> = {
+      amount: typeof amount === "number" && Number.isFinite(amount) ? amount : null,
+      currency: String(member.currency ?? "AUD"),
+      term: String(read(member, "feeTerm", "fee_term") ?? ""),
+      year: read(member, "feeYear", "fee_year"),
+    };
+    for (const value of locations) {
+      const location = typeof value === "string" && value.trim() ? value.trim() : "Location unresolved";
+      const key = JSON.stringify([normalized(location), fee.amount, fee.currency, fee.term, fee.year]);
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push({ location, ...fee });
+      }
+    }
+  }
+  return result;
 }

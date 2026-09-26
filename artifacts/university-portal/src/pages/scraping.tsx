@@ -2,7 +2,7 @@ import { Fragment, useEffect, useState, useRef, useCallback, useMemo } from "rea
 import { PublishedFeeVariants, feeVariantAuthority, type FeeVariantCarrier } from "@/components/published-fee-variants";
 import { shouldLoadForBackgroundJob } from "@/utils/scraping-poll-guard";
 import { mergeReextractFieldResults } from "@/utils/reextract-field-aggregation";
-import { groupLegacyCampusRows } from "@/utils/legacy-campus-groups";
+import { groupLegacyCampusRows, legacyCampusGroupName, legacyCampusReviewFees } from "@/utils/legacy-campus-groups";
 import { useListUniversities } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -3518,12 +3518,12 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                   <Eye className="w-5 h-5 text-green-600" />
                   Review Scraped Courses
                   <Badge className="bg-blue-100 text-blue-700" data-testid="text-review-logical-course-count">
-                    {logicalGroups.length} courses
+                    {logicalGroups.length} course groups
                   </Badge>
                   <Badge variant="outline" data-testid="text-review-entry-count">
-                    {stagedCourses.length} pending
+                    {stagedCourses.length} pending entries
                   </Badge>
-                  <span className="text-xs text-muted-foreground">review entries</span>
+                  <span className="text-xs text-muted-foreground">Campus-specific rows stay separate for approval and evidence.</span>
                   {selectedUniversityName && (
                     <Badge
                       variant="outline"
@@ -3538,7 +3538,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                 {lastScrapeInfo && (
                   <p className="text-xs text-gray-500 mt-1">
                     Original scrape: <span className="font-medium text-gray-700">
-                      {lastScrapeInfo.staged} courses staged in{" "}
+                      {lastScrapeInfo.staged} review entries staged in{" "}
                       {lastScrapeInfo.durationMs != null
                         ? lastScrapeInfo.durationMs >= 3600000
                           ? `${Math.floor(lastScrapeInfo.durationMs / 3600000)}h ${Math.floor((lastScrapeInfo.durationMs % 3600000) / 60000)}m`
@@ -3550,6 +3550,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                     )}
                     {(lastScrapeInfo.skipped > 0 || lastScrapeInfo.errors > 0) && (
                       <> &bull; {lastScrapeInfo.skipped} skipped{lastScrapeInfo.errors > 0 ? `, ${lastScrapeInfo.errors} errors` : ""}</>
+                    )}
+                    {lastScrapeInfo.staged > lastScrapeInfo.totalFound && (
+                      <> &bull; {lastScrapeInfo.totalFound} source courses expanded into campus-specific entries; these are not {lastScrapeInfo.staged} distinct courses</>
                     )}
                   </p>
                 )}
@@ -3807,25 +3810,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                       const qData = courseQualityMap[course.id];
                       const qExpanded = qualityExpanded.has(course.id);
                       const groupSelected = ids.every(id => selectedIds.has(id));
-                      const selectedFeeLines = members.flatMap(member => {
-                        const extraction = (member.extractionMethod ?? member.extraction_method) as Record<string, unknown> | null | undefined;
-                        const authority = (member.feeVariants ?? member.fee_variants ?? extraction?.fee_variants) as Record<string, unknown> | null | undefined;
-                        const selected = Array.isArray(authority?.selected) ? authority.selected as Record<string, unknown>[] : [];
-                        if (selected.length) return selected.map(option => ({
-                          location: String(option.campus ?? member.courseLocation ?? "Location"),
-                          amount: typeof option.amount === "number" ? option.amount : null,
-                          currency: String(option.currency ?? member.currency ?? "AUD"),
-                          term: String(option.period ?? member.feeTerm ?? "yr"),
-                          year: option.year,
-                        }));
-                        return member.internationalFee == null ? [] : [{
-                          location: member.courseLocation ?? "Location",
-                          amount: member.internationalFee,
-                          currency: member.currency ?? "AUD",
-                          term: member.feeTerm ?? "yr",
-                          year: member.feeYear,
-                        }];
-                      });
+                      const selectedFeeLines = legacyCampusReviewFees(members);
+                      const groupName = legacyCampusGroupName(members);
                       return (<Fragment key={course.id}>
                       <tr className={`hover:bg-gray-50 ${groupSelected ? "bg-blue-50/50" : ""}`} data-testid={`row-logical-course-${course.id}`}>
                         <td className="p-2">
@@ -3839,8 +3825,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                         </td>
                         <td className="p-2">
                           <div className="flex items-start gap-1 min-w-[280px] max-w-[420px]">
-                            <span className="font-medium text-gray-800 break-words" title={course.courseName}>
-                              {course.courseName}
+                            <span className="font-medium text-gray-800 break-words" title={groupName ?? course.courseName}>
+                              {groupName ?? course.courseName}
                             </span>
                             {course.courseWebsite && (
                               <a

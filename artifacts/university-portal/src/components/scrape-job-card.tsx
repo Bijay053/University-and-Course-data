@@ -4802,7 +4802,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
                   <Eye className="w-3.5 h-3.5 mr-1.5" />
                   {visiblePendingReviewCount === null
                     ? "Review pending courses"
-                    : `Review ${visiblePendingReviewCount} Course${visiblePendingReviewCount === 1 ? "" : "s"}`}
+                    : `Review ${visiblePendingReviewCount} Entr${visiblePendingReviewCount === 1 ? "y" : "ies"}`}
                 </Button>
               )}
               <Button onClick={resetToIdle} variant="outline" size="sm" className="h-9">
