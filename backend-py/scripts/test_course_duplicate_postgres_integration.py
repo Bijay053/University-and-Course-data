@@ -399,7 +399,7 @@ def _fixture(mapping: dict):
             "university_id": 92, "course_id": alias["alias_course_id"],
             "status": "published", "course_name": alias["award"],
             "course_location": None, "course_website": route_hash_source,
-            "degree_level": canonical["degree_level"],
+            "degree_level": "Master's",
             "study_mode": study_mode,
             "international_fee": fee, "fee_year": 2026,
             "fee_term": "Full Course", "currency": "GBP",
@@ -750,6 +750,11 @@ def test_four_unscoped_aliases_require_exact_evidence_and_complete_collision_sca
     assert [alias["study_mode"] for alias in manifest["unscoped_aliases"]] == [
         "Blended", "On Campus", "On Campus", "On Campus",
     ]
+    alias_evidence = next(row for row in snapshot["evidence_rows"]
+                          if row["course_id"] == 9395)
+    assert alias_evidence["degree_level"] == "Master's"
+    assert next(row for row in snapshot["published_course_inventory"]
+                if row["id"] == 9395)["degree_level"] == "Master"
 
     mismatched_course_mode = dict(snapshot)
     mismatched_course_mode["published_course_inventory"] = [
@@ -772,6 +777,18 @@ def test_four_unscoped_aliases_require_exact_evidence_and_complete_collision_sca
     with pytest.raises(preview.SnapshotError, match="staged evidence"):
         preview.build_review_manifest(
             mismatched_evidence_mode, approved_mapping=mapping,
+            approved_mapping_sha256=hashlib.sha256(mapping_bytes).hexdigest(),
+        )
+
+    mismatched_evidence_degree = dict(snapshot)
+    mismatched_evidence_degree["evidence_rows"] = [
+        dict(row) for row in snapshot["evidence_rows"]
+    ]
+    next(row for row in mismatched_evidence_degree["evidence_rows"]
+         if row["course_id"] == 9395)["degree_level"] = "Bachelor's"
+    with pytest.raises(preview.SnapshotError, match="staged evidence"):
+        preview.build_review_manifest(
+            mismatched_evidence_degree, approved_mapping=mapping,
             approved_mapping_sha256=hashlib.sha256(mapping_bytes).hexdigest(),
         )
 

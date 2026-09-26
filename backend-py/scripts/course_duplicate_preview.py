@@ -509,7 +509,8 @@ def _unscoped_alias_proposals(snapshot: dict[str, Any],
         if (alias.get("university_id") != 92 or canonical.get("university_id") != 92
                 or alias.get("course_website") != route_hash
                 or canonical.get("course_website") != route_hash
-                or alias.get("degree_level") != canonical.get("degree_level")
+                or _identity_degree_level(alias.get("degree_level"), item["award"])
+                != _identity_degree_level(canonical.get("degree_level"), item["award"])
                 or _norm(alias.get("study_mode")) != _norm(item["study_mode"])
                 or _norm(canonical.get("study_mode")) != _norm(item["study_mode"])
                 or alias.get("status") != "active" or alias.get("approval_status") != "approved"
@@ -524,7 +525,8 @@ def _unscoped_alias_proposals(snapshot: dict[str, Any],
             row["id"] for row in inventory
             if row.get("course_website") == route_hash
             and _norm(str(row.get("name") or "").split(" — ", 1)[0]) == _norm(item["award"])
-            and row.get("degree_level") == alias.get("degree_level")
+            and _identity_degree_level(row.get("degree_level"), item["award"])
+            == _identity_degree_level(alias.get("degree_level"), item["award"])
             and _norm(row.get("study_mode")) == _norm(alias.get("study_mode"))
             and row["id"] not in permitted_ids
         ]
@@ -549,7 +551,8 @@ def _unscoped_alias_proposals(snapshot: dict[str, Any],
             if (row.get("status") not in {"approved", "published"}
                     or row.get("university_id") != 92
                     or row.get("course_website") != route_hash
-                    or row.get("degree_level") != alias.get("degree_level")
+                    or _identity_degree_level(row.get("degree_level"), item["award"])
+                    != _identity_degree_level(alias.get("degree_level"), item["award"])
                     or _norm(row.get("study_mode")) != _norm(item["study_mode"])
                     or row.get("international_fee") != 20600
                     or row.get("currency") != "GBP"

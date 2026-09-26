@@ -704,7 +704,8 @@ async def _verify_unscoped_aliases(conn, approved: dict, *, lock: bool) -> list[
         if (alias["university_id"] != 92 or canonical["university_id"] != 92
                 or _digest_route(alias.get("course_website")) != route_hash
                 or _digest_route(canonical.get("course_website")) != route_hash
-                or alias.get("degree_level") != canonical.get("degree_level")
+                or _identity_degree_level(alias.get("degree_level"), item["award"])
+                != _identity_degree_level(canonical.get("degree_level"), item["award"])
                 or _norm(alias.get("study_mode")) != _norm(item["study_mode"])
                 or _norm(canonical.get("study_mode")) != _norm(item["study_mode"])
                 or alias.get("status") != "active"
@@ -736,6 +737,8 @@ async def _verify_unscoped_aliases(conn, approved: dict, *, lock: bool) -> list[
             metadata = staged.get("extraction_method") or {}
             variants = (metadata.get("fee_variants") or {}).get("selected") or []
             if (staged.get("course_id") != alias_id
+                    or _identity_degree_level(staged.get("degree_level"), item["award"])
+                    != _identity_degree_level(alias.get("degree_level"), item["award"])
                     or _norm(staged.get("study_mode")) != _norm(item["study_mode"])
                     or (metadata.get(SCOPE) is not None)
                     or staged.get("international_fee") != 20600
@@ -753,7 +756,8 @@ async def _verify_unscoped_aliases(conn, approved: dict, *, lock: bool) -> list[
             if (candidate["course_website"] == alias["course_website"]
                     and _norm(str(candidate.get("name") or "").split(" — ", 1)[0])
                     == award_norm
-                    and candidate.get("degree_level") == alias.get("degree_level")
+                    and _identity_degree_level(candidate.get("degree_level"), item["award"])
+                    == _identity_degree_level(alias.get("degree_level"), item["award"])
                     and _norm(candidate.get("study_mode")) == _norm(alias.get("study_mode"))
                     and candidate["id"] not in permitted):
                 raise ApplyRefused(
