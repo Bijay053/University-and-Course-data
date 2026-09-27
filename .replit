@@ -64,6 +64,10 @@ args = "dated-catalogue-history-scale"
 task = "workflow.run"
 args = "fee-selection-concurrency"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "approval-guidance-scale"
+
 [[workflows.workflow]]
 name = "backend-py: FastAPI"
 author = "agent"
@@ -193,6 +197,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd backend-py && ALLOW_ISOLATED_FEE_SELECTION_TESTS=1 python -m pytest tests/test_fee_selection_concurrency.py -q"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "approval-guidance-scale"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend-py && PYTHONPATH=. python -m pytest tests/test_approval_guidance_scale.py tests/test_durable_approval_guidance.py -q -s -c /dev/null -p no:cacheprovider"
 
 [workflows.workflow.metadata]
 isValidation = true

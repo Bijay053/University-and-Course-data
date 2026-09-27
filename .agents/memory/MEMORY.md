@@ -145,3 +145,4 @@
 - [ULaw joint qualification recovery](ulaw-joint-qualification-recovery.md) — shared course pages do not merge awards; widening the verified cohort requires fresh award and campus evidence.
 - [Current delivery over historical fees](current-delivery-over-historical-fees.md) — exclusive current Online delivery overrides old campus prices, including during targeted fee repair.
 - [Approval guidance lifetime](approval-guidance-lifetime.md) — failure advice belongs to uninterrupted evidence state; restoring old values must not revive it.
+- [Database latency validation](database-latency-validation.md) — rollback isolation does not eliminate parallel load or DDL locks; check isolated timing before changing budgets.
