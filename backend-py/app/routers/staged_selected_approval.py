@@ -90,15 +90,24 @@ async def approve_selected(
             ids = [source_id]
             did_split = False
             if (row.extraction_method or {}).get("fee_variants"):
+                from app.services.scraper.ulaw_qualifications import split_pending_qualifications
+                qualification = await split_pending_qualifications(db, row, actor=actor)
+                if qualification["status"] == "needs_review":
+                    raise ApprovalValidationError(qualification["reason"])
+                qualification_ids = qualification["courseIds"]
+                did_split = qualification["status"] == "split"
                 from app.services.scraper.extractors.ulaw_campuses import enrich_course_campuses
-                resolution = await enrich_course_campuses(db, row)
-                if resolution["status"] == "needs_review":
-                    raise ApprovalValidationError(resolution.get("reason") or "Course campus evidence requires review.")
-                split = await split_pending_course(db, row, actor=actor)
-                if split["status"] == "needs_review":
-                    raise ApprovalValidationError(split["reason"])
-                ids = split["courseIds"]
-                did_split = split["status"] == "split"
+                ids = []
+                for qualification_id in qualification_ids:
+                    award_row = row if qualification_id == source_id else await db.get(ScrapedCourse, qualification_id)
+                    resolution = await enrich_course_campuses(db, award_row)
+                    if resolution["status"] == "needs_review":
+                        raise ApprovalValidationError(resolution.get("reason") or "Course campus evidence requires review.")
+                    split = await split_pending_course(db, award_row, actor=actor)
+                    if split["status"] == "needs_review":
+                        raise ApprovalValidationError(split["reason"])
+                    ids.extend(split["courseIds"])
+                    did_split |= split["status"] == "split"
                 # Already-prepared legacy scopes are evidence rows, not separate
                 # approval identities. One action includes every proven sibling.
                 from app.services.scraper.campus_fee_split import SCOPE
@@ -111,11 +120,17 @@ async def approve_selected(
                         ScrapedCourse.status.in_(["pending", "review_ready"]),
                     ).order_by(ScrapedCourse.id).with_for_update())).scalars().all()
                     identity = offering_identity(row, scope)
+                    from app.services.scraper.ulaw_qualifications import QUALIFICATION_SCOPE
+                    qualification_scope = (row.extraction_method or {}).get(QUALIFICATION_SCOPE)
                     ids = [s.id for s in siblings
                            if (s.extraction_method or {}).get(SCOPE)
-                           and (s.extraction_method[SCOPE].get("split_from_id") == scope.get("split_from_id"))
+                            and (qualification_scope or
+                                 s.extraction_method[SCOPE].get("split_from_id") == scope.get("split_from_id"))
                            and s.course_website == row.course_website
-                           and offering_identity(s, s.extraction_method[SCOPE]) == identity]
+                            and (not qualification_scope or
+                                 (s.extraction_method or {}).get(QUALIFICATION_SCOPE, {}).get("split_from_id")
+                                 == qualification_scope["split_from_id"])
+                            and (qualification_scope or offering_identity(s, s.extraction_method[SCOPE]) == identity)]
             cohort = [await db.get(ScrapedCourse, child_id) for child_id in ids]
             for child_id in ids:
                 child = await db.get(ScrapedCourse, child_id)
@@ -124,7 +139,15 @@ async def approve_selected(
                 _check_confidence(child, body.force)
                 if did_split:
                     await persist_staged_row_backup(db, child)
-                await approve_scraped_course(db, child, actor=actor, commit=False, offering_cohort=cohort)
+                from app.services.scraper.published_offerings import offering_identity
+                from app.services.scraper.campus_fee_split import SCOPE
+                child_scope = (child.extraction_method or {}).get(SCOPE)
+                award_cohort = ([member for member in cohort
+                                 if (member.extraction_method or {}).get(SCOPE)
+                                 and offering_identity(member, member.extraction_method[SCOPE])
+                                 == offering_identity(child, child_scope)]
+                                if child_scope else cohort)
+                await approve_scraped_course(db, child, actor=actor, commit=False, offering_cohort=award_cohort)
             await db.commit()
             approved_ids.extend(ids)
             split_count += int(did_split)

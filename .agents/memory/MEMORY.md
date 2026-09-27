@@ -142,3 +142,4 @@
 - [Legacy unscoped collision inventory](legacy-unscoped-collision-inventory.md) — scoped previews omit older published same-award records; compare against the full live course inventory before write.
 - [Reconciliation identity coverage](reconciliation-identity-coverage.md) — evidence-connected groups may still collide under the app’s published identity; validate both partitions before write.
 - [SQE2 source scope](sqe2-source-scope.md) — linked demands own English requirements; teaching-content weeks do not establish total course duration.
+- [ULaw joint qualification recovery](ulaw-joint-qualification-recovery.md) — shared course pages do not merge awards; widening the verified cohort requires fresh award and campus evidence.

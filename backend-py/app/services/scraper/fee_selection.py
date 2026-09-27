@@ -50,6 +50,13 @@ def source_options(row):
     selected = variants.get("selected")
     if not isinstance(selected, list) or not selected or any(o not in options for o in selected):
         return None
+    from app.services.scraper.ulaw_qualifications import QUALIFICATION_SCOPE
+    qualification = metadata.get(QUALIFICATION_SCOPE)
+    if qualification:
+        award = qualification.get("award")
+        if award not in {"PG Dip", "PG Cert"} or any(o["study_variant"] != award for o in selected):
+            return None
+        options = [o for o in options if o["study_variant"] == award]
     # Historical cohorts were deliberately excluded by extraction. Later
     # published years and alternative awards/periods remain explicit choices.
     floor = min(o["year"] for o in selected)

@@ -88,7 +88,12 @@ def plan_campus_fees(row):
 
 
 def _apply_group(row, group, original_name, original_locations):
-    row.fee_scope_key = group["key"]
+    from app.services.scraper.ulaw_qualifications import QUALIFICATION_SCOPE
+    award = (row.extraction_method or {}).get(QUALIFICATION_SCOPE)
+    # Staged uniqueness includes fee_scope_key but not award. Campus hashes
+    # must therefore be disjoint even for awards on the same canonical URL.
+    key = sha256(f"{award['award']}|{group['key']}".encode()).hexdigest()[:20] if award else group["key"]
+    row.fee_scope_key = key
     row.course_name = f"{original_name} — {', '.join(group['locations'])}"
     row.course_location = ", ".join(group["locations"])
     row.international_fee = group["amount"]
@@ -96,7 +101,7 @@ def _apply_group(row, group, original_name, original_locations):
         **deepcopy(row.extraction_method or {}),
         "fee_variants": deepcopy(group["authority"]),
         SCOPE: {
-            "key": group["key"], "locations": group["locations"],
+            "key": key, "locations": group["locations"],
             "original_name": original_name, "original_locations": original_locations,
             "source_url": row.course_website,
         },
@@ -188,6 +193,54 @@ async def split_pending_course(db, row, *, actor="scraper"):
 
 def scope_refresh_payload(row, payload):
     """A re-extract must not expand a child back into the unsplit parent."""
+    from app.services.scraper.ulaw_qualifications import QUALIFICATION_SCOPE
+    qualification = (row.extraction_method or {}).get(QUALIFICATION_SCOPE)
+    if qualification:
+        payload = deepcopy(payload)
+        payload.pop("course_name", None)
+        payload.pop("degree_level", None)
+        payload.pop("course_location", None)
+        payload.pop("canonical_course_url", None)
+        payload.pop("fee_scope_key", None)
+        # Joint Key Facts intakes are not evidence for either individual award.
+        # A refresh must never reintroduce the other award's months.
+        payload["intake_months"] = deepcopy(row.intake_months)
+        # The generic extractor reads shared Key Facts, which is not an
+        # award-specific start-date proof. Keep the verified physical cohort.
+        if "extraction_method" in payload:
+            payload["extraction_method"] = deepcopy(payload["extraction_method"] or {})
+            payload["extraction_method"].pop("campus_authority", None)
+        incoming = (payload.get("extraction_method") or {}).get("fee_variants")
+        if incoming:
+            from app.services.scraper.extractors.ulaw_fees import validated_fee_variants
+            award = qualification["award"]
+            selected = [o for o in incoming.get("selected", []) if o.get("study_variant") == award]
+            authority = {**incoming, "selected": selected}
+            amounts = {o["amount"] for o in selected}
+            authority["international_fee"] = next(iter(amounts)) if len(amounts) == 1 else None
+            authority["status"] = "uniform" if len(amounts) == 1 else ("range" if selected else "unresolved")
+            check = {c.name: getattr(row, c.name) for c in row.__table__.columns}
+            check.update(payload)
+            check.update(international_fee=authority["international_fee"],
+                         fee_year=authority.get("fee_year"), fee_term=authority.get("fee_term"),
+                         currency=authority.get("currency"))
+            check["extraction_method"] = {
+                **deepcopy(row.extraction_method), **deepcopy(payload.get("extraction_method") or {}),
+                "fee_variants": authority, QUALIFICATION_SCOPE: deepcopy(qualification),
+                "campus_authority": deepcopy(row.extraction_method["campus_authority"]),
+            }
+            if not selected or not validated_fee_variants(check):
+                authority = {**authority, "selected": [], "status": "unresolved", "international_fee": None}
+            payload["international_fee"] = authority["international_fee"]
+            payload["extraction_method"] = {**check["extraction_method"], "fee_variants": authority}
+        else:
+            for key in ("international_fee", "fee_year", "fee_term", "currency"):
+                payload.pop(key, None)
+            payload["extraction_method"] = {
+                **deepcopy(row.extraction_method), **deepcopy(payload.get("extraction_method") or {}),
+                QUALIFICATION_SCOPE: deepcopy(qualification),
+                "campus_authority": deepcopy(row.extraction_method["campus_authority"]),
+            }
     scope = (row.extraction_method or {}).get(SCOPE)
     if not scope:
         return payload
