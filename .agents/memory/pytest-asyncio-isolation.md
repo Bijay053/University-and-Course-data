@@ -33,5 +33,8 @@ do not rebind the application's session factory or disable production pooling.
 failure. A passing default run alone does not demonstrate loop independence.
 
 **How to apply:** Check the whole file with both the normal configuration and
-`-o asyncio_default_test_loop_scope=function`. Keep SQL event listeners bound
-to the same test engine used by the test session factory.
+`-o asyncio_default_test_loop_scope=function -o asyncio_default_fixture_loop_scope=function`.
+Change both defaults together: even a NullPool fixture's open connection remains
+bound to the loop that created it. Changing only the test loop produces an
+artificial cross-loop failure. Keep SQL event listeners bound to the same test
+engine used by the test session factory.

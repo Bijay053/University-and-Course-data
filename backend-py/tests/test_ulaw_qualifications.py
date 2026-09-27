@@ -7,6 +7,7 @@ The compact fixture retains the exact published headings, locations, course
 introduction, start-date entries and fee paragraphs; surrounding presentational
 markup is omitted. Its SHA-256 is pinned below to catch accidental price edits.
 """
+import asyncio
 from copy import deepcopy
 from datetime import date
 from hashlib import sha256
@@ -19,7 +20,8 @@ import httpx
 import pytest
 import pytest_asyncio
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import event, select
+from starlette.requests import ClientDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
@@ -112,8 +114,10 @@ def counted_official_fetch(monkeypatch, html=HTML):
     state = {"html": html, "status": 200, "calls": []}
     real = httpx.AsyncClient
 
-    def respond(request):
+    async def respond(request):
         state["calls"].append((request.method, str(request.url)))
+        if state.get("before_response"):
+            await state["before_response"]()
         return httpx.Response(state["status"], text=state["html"], request=request)
 
     transport = httpx.MockTransport(respond)
@@ -530,6 +534,164 @@ async def test_proof_cohort_isolation_and_detached_snapshot(db, monkeypatch):
         assert len(upstream["calls"]) == 2
     finally:
         context.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("interruption", ["cancel", "disconnect"])
+@pytest.mark.parametrize("phase", ["fetch", "promotion", "commit", "rollback"])
+async def test_interrupted_selected_approval_releases_proofs(
+    db, monkeypatch, interruption, phase,
+):
+    """Interrupt actual awaits; dependency teardown must undo flushed children.
+
+    ClientDisconnect is injected explicitly: ASGI servers do not necessarily
+    cancel a handler merely because its client closes the connection.
+    """
+    import app.database as database
+    from app.services.scraper import ulaw_qualifications as qualifications
+
+    freeze_cohort(monkeypatch)
+    upstream = counted_official_fetch(monkeypatch)
+    uni, _, row_id = await seed(db)
+    staged_ids = select(ScrapedCourse.id).where(ScrapedCourse.university_id == uni)
+    course_ids = select(Course.id).where(Course.university_id == uni)
+    scoped_models = (
+        (ScrapedCourse, ScrapedCourse.university_id == uni),
+        (ScrapedFieldEvidence, ScrapedFieldEvidence.scraped_course_id.in_(staged_ids)),
+        (FieldConflict, FieldConflict.scraped_course_id.in_(staged_ids)
+         | FieldConflict.course_id.in_(course_ids)),
+        (PageSnapshot, PageSnapshot.university_id == uni),
+        (Course, Course.university_id == uni),
+        (CourseOffering, CourseOffering.course_id.in_(course_ids)),
+        (Fee, Fee.course_id.in_(course_ids)),
+        (Intake, Intake.course_id.in_(course_ids)),
+    )
+
+    async def contents(session):
+        return {
+            model.__tablename__: [
+                dict(row) for row in (await session.execute(
+                    select(model.__table__).where(scope).order_by(model.__table__.c.id)
+                )).mappings()
+            ] for model, scope in scoped_models
+        }
+
+    before = await contents(db)
+    await db.commit()
+    contexts = []
+    original_context = qualifications.SelectedQualificationProof
+
+    class TrackedProof(original_context):
+        def __init__(self, session):
+            super().__init__(session)
+            contexts.append(self)
+
+    monkeypatch.setattr(qualifications, "SelectedQualificationProof", TrackedProof)
+    request_session = AsyncSession(
+        bind=db.bind, expire_on_commit=False, join_transaction_mode="create_savepoint",
+    )
+    monkeypatch.setattr(database, "AsyncSessionLocal", lambda: request_session)
+    reached = asyncio.Event()
+    release = asyncio.Event()
+    original_approve = route.approve_scraped_course
+    original_commit = request_session.commit
+    original_rollback = request_session.rollback
+
+    async def interrupt():
+        reached.set()
+        await release.wait()
+        raise ClientDisconnect()
+
+    promoted = []
+
+    async def promote(*args, **kwargs):
+        result = await original_approve(*args, **kwargs)
+        promoted.append(args[1].id)
+        await request_session.flush()
+        assert contexts[0]._snapshots
+        if phase == "promotion":
+            await interrupt()
+        if phase == "rollback":
+            raise RuntimeError("injected failure after child flush")
+        return result
+
+    async def commit():
+        # Cancel before the durable commit boundary, not after a successful COMMIT.
+        assert len(promoted) == 3
+        assert contexts[0]._snapshots
+        await interrupt()
+        await original_commit()
+
+    async def rollback():
+        assert promoted and contexts[0]._snapshots
+        await interrupt()
+        await original_rollback()
+
+    if phase == "fetch":
+        upstream["before_response"] = interrupt
+    monkeypatch.setattr(route, "approve_scraped_course", promote)
+    if phase == "commit":
+        monkeypatch.setattr(request_session, "commit", commit)
+    if phase == "rollback":
+        monkeypatch.setattr(request_session, "rollback", rollback)
+
+    async def request():
+        dependency = database.get_db()
+        session = await anext(dependency)
+        try:
+            return await route.approve_selected(
+                route.ApproveSelectedBody(courseIds=[row_id]), session, {},
+            )
+        finally:
+            await dependency.aclose()
+
+    task = asyncio.create_task(request())
+    try:
+        await asyncio.wait_for(reached.wait(), timeout=15)
+        assert event.contains(request_session.sync_session, "after_transaction_end",
+                              contexts[0]._ended)
+        if interruption == "cancel":
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        else:
+            release.set()
+            result = await task
+            assert result["approvedCount"] == 0
+            assert result["failed"]
+    finally:
+        if not task.done():
+            task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+
+    assert len(contexts) == 1
+    context = contexts[0]
+    assert context._closed and context._snapshots == {}
+    assert not event.contains(request_session.sync_session, "after_transaction_end", context._ended)
+    assert not request_session.in_transaction()
+    assert await contents(db) == before
+    assert await published(db, uni) == ([], [])
+    assert upstream["calls"] == [("GET", URL)]
+
+    # A changed upstream must invalidate the next request, not reuse old proof.
+    upstream.pop("before_response", None)
+    monkeypatch.setattr(route, "approve_scraped_course", original_approve)
+    upstream["html"] = "<h1>Source unavailable</h1>"
+    retry = await route.approve_selected(
+        route.ApproveSelectedBody(courseIds=[row_id]), db, {},
+    )
+    assert retry["approvedCount"] == 0 and retry["failed"]
+    assert len(upstream["calls"]) == 2
+    assert await contents(db) == before
+    upstream["html"] = HTML
+    retry = await route.approve_selected(
+        route.ApproveSelectedBody(courseIds=[row_id]), db, {},
+    )
+    assert not retry["failed"] and retry["approvedCount"] == 3
+    assert len(upstream["calls"]) == 3
+    for context in contexts:
+        assert context._closed and not context._snapshots
+        assert not event.contains(context._db.sync_session, "after_transaction_end", context._ended)
 
 
 @pytest.mark.asyncio
