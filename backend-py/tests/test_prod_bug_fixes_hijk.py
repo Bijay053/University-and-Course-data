@@ -22,7 +22,10 @@ from app.main import app
 
 
 @pytest_asyncio.fixture
-async def client():
+async def client(monkeypatch):
+    from app.dependencies import get_current_user
+    monkeypatch.setitem(app.dependency_overrides, get_current_user,
+                        lambda: {"email": "reviewer@test", "permissions": ["staged.view"]})
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://t") as c:
         yield c

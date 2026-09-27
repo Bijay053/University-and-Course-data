@@ -157,6 +157,9 @@ function resultFromCompletedStatus(data: ScrapeStatusResponse): ScrapeLog {
 }
 
 type StagedCourse = FeeVariantCarrier & {
+  lastQualificationApproval?: {
+    rowId: number; jobId: string; universityId: number; reasonCode: string; attemptedAt: string;
+  } | null;
   id: number;
   scrapeJobId: string;
   universityId: number;
@@ -409,7 +412,27 @@ const QUALIFICATION_APPROVAL_GUIDANCE: Record<string, string> = {
   unverified_page: "Official qualification evidence could not be verified. Review the source before retrying; no cohort change is confirmed.",
   invalid_stored_scope: "Stored qualification scope is invalid. Review and refresh staged evidence before approval.",
 };
-type ApprovalFailure = { id: number; error: string; reasonCode?: string };
+type ApprovalFailure = { id: number; error: string; reasonCode?: string; attemptedAt?: string; evidenceKey?: string };
+
+function approvalEvidenceKey(course: StagedCourse): string {
+  const { lastQualificationApproval: _guidance, ...evidence } = course;
+  return JSON.stringify(evidence);
+}
+
+function rowApprovalFailures(course: StagedCourse, failures: ApprovalFailure[]): ApprovalFailure[] {
+  // The returned Review rows are the authorized continuation-chain scope.
+  // Each diagnostic belongs to its row's own job, not the chain's newest job.
+  if (!["pending", "review_ready"].includes(course.status)) return [];
+  const saved = course.lastQualificationApproval;
+  if (saved && saved.rowId === course.id && saved.jobId === course.scrapeJobId
+    && saved.universityId === course.universityId
+    && Object.hasOwn(QUALIFICATION_APPROVAL_GUIDANCE, saved.reasonCode)
+    && Number.isFinite(Date.parse(saved.attemptedAt))) {
+    return [{ id: course.id, reasonCode: saved.reasonCode,
+      error: QUALIFICATION_APPROVAL_GUIDANCE[saved.reasonCode], attemptedAt: saved.attemptedAt }];
+  }
+  return failures.filter(failure => failure.id === course.id && failure.evidenceKey === approvalEvidenceKey(course));
+}
 
 /**
  * Infer the likely country from a university URL's TLD/ccTLD.
@@ -1142,6 +1165,14 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   const [approving, setApproving] = useState(false);
   const [approveProgress, setApproveProgress] = useState<{ done: number; total: number } | null>(null);
   const [approvalFailures, setApprovalFailures] = useState<ApprovalFailure[]>([]);
+  const approvalFailureGeneration = useRef(0);
+  useEffect(() => {
+    // Discard, rather than merely hide, evidence-bound transient messages.
+    // Restoring an old value later must never resurrect a cleared attempt.
+    const remaining = approvalFailures.filter(failure => stagedCourses.some(course =>
+      course.id === failure.id && failure.evidenceKey === approvalEvidenceKey(course)));
+    if (remaining.length !== approvalFailures.length) setApprovalFailures(remaining);
+  }, [stagedCourses, approvalFailures]);
   const [approvingId, setApprovingId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(
     () => new Set(groupLegacyCampusRows(initialReviewState?.courses ?? [])
@@ -1735,6 +1766,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     campusRequest.current?.controller.abort();
     const controller = new AbortController();
     campusRequest.current = { jobId, controller };
+    const failureGenerationAtStart = approvalFailureGeneration.current;
     campusLoadBusy.current = true;
     setCampusProgress({ done: 0, total: 0 });
     try {
@@ -1748,6 +1780,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       }
       const payload = await readResponseJson<unknown>(res);
       if (controller.signal.aborted) return false;
+      // An older in-flight read is not authority for a failure that arrived
+      // after that read began. Keep both the latest row and its new message.
+      if (failureGenerationAtStart !== approvalFailureGeneration.current) return false;
       if (!payload) return false;
         const data: StagedCourse[] = (Array.isArray(payload)
           ? (payload as StagedCourse[])
@@ -1781,6 +1816,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
           ).map(course => course.id));
         });
         stagedCoursesRef.current = pending;
+        setApprovalFailures([]);
         setStagedCourses(pending);
         reviewJobIdRef.current = jobId;
         setReviewJobId(jobId);
@@ -2513,7 +2549,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                 const failure = data.failed.find(item => item.id === id) ?? data.failed[0];
                 const reasonCode = failure?.reasonCode && Object.hasOwn(QUALIFICATION_APPROVAL_GUIDANCE, failure.reasonCode)
                   ? failure.reasonCode : undefined;
-                failures.push({ id, reasonCode, error: reasonCode
+                failures.push({ id, reasonCode, evidenceKey: stagedCourses.find(course => course.id === id)
+                  ? approvalEvidenceKey(stagedCourses.find(course => course.id === id)!) : undefined, error: reasonCode
                   ? QUALIFICATION_APPROVAL_GUIDANCE[reasonCode] : "Approval not confirmed. Review staged evidence before retrying." });
               }
             }
@@ -2526,6 +2563,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         }
       }));
       const remaining = new Set(ids.filter(id => !approvedIds.has(id)));
+      approvalFailureGeneration.current++;
       setApprovalFailures(failures);
       setStagedCourses(prev => prev.filter(course => !approvedIds.has(course.id)));
       setSelectedIds(remaining);
@@ -3067,12 +3105,14 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     const fresh = courses.find(c => c.id === id);
     if (!fresh) throw new Error("Course is no longer pending review.");
     const normalized = normalizeStagedCourse(fresh);
+    setApprovalFailures(prev => prev.filter(failure => failure.id !== id));
     setStagedCourses(prev => prev.map(c => c.id === id ? normalized : c));
     setEditingCourse(prev => prev?.id === id ? normalized : prev);
   };
 
   const handleFeeCourseUpdated = (updated: FeeVariantCarrier & { id: number }) => {
     const course = normalizeStagedCourse(updated as StagedCourse);
+    setApprovalFailures(prev => prev.filter(failure => failure.id !== course.id));
     setStagedCourses(prev => prev.map(c => c.id === course.id ? course : c));
     setEditingCourse(prev => prev?.id === course.id ? { ...prev, ...course } : prev);
     void refreshFeeCourse(course.id).catch(err => {
@@ -3100,7 +3140,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         return;
       }
       const data = await readResponseJson<{ course?: StagedCourse }>(res);
-      const updatedCourse = data?.course ?? editPayload;
+      const updatedCourse = data?.course ?? { ...editPayload, lastQualificationApproval: null };
+      setApprovalFailures(prev => prev.filter(failure => failure.id !== editingCourse.id));
       setStagedCourses((prev) => prev.map((c) => c.id === editingCourse.id ? updatedCourse : c));
       setEditingCourse(null);
     } catch {}
@@ -3941,9 +3982,10 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                           </div>
                           <QualificationRefresh courseId={course.id} metadata={course.extractionMethod ?? course.extraction_method}
                             onApplied={() => reviewJobId ? loadStagedCourses(reviewJobId) : Promise.resolve()} />
-                          {approvalFailures.filter(failure => failure.id === course.id).map(failure => (
+                          {rowApprovalFailures(course, approvalFailures).map(failure => (
                             <div key={failure.id} role="alert" className="mt-2 rounded border border-amber-300 p-2 text-xs" data-testid={`approval-failure-${course.id}`}>
                               <p>{failure.error}</p>
+                              {failure.attemptedAt && <p>Last approval attempt: <time dateTime={failure.attemptedAt}>{new Date(failure.attemptedAt).toLocaleString()}</time></p>}
                               {failure.reasonCode === "changed_cohort" && !((course.extractionMethod ?? course.extraction_method) && typeof (course.extractionMethod ?? course.extraction_method) === "object" && "ulaw_qualification_scope" in ((course.extractionMethod ?? course.extraction_method) as object)) && (
                                 <p>This joint parent has not been split. Re-extract current official evidence and review the qualification split; cohort preview is available only for split awards.</p>
                               )}

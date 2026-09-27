@@ -14,7 +14,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from app.dependencies import get_db
+from app.dependencies import get_db, get_current_user
 from app.main import app
 
 
@@ -63,6 +63,9 @@ def client_and_session(monkeypatch):
     monkeypatch.setattr(scrape_mod, "_attach_evidence_bulk", _noop)
 
     app.dependency_overrides[get_db] = _override
+    app.dependency_overrides[get_current_user] = lambda: {
+        "email": "reviewer@test", "permissions": ["staged.view"],
+    }
     try:
         yield TestClient(app), fake
     finally:

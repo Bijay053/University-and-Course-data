@@ -245,27 +245,30 @@ async def act_on_recovery_result(
         raise HTTPException(status_code=422, detail="Recovered value could not be parsed")
 
     col = _FIELD_TO_COLUMN[field]
+    from app.services.scraper.approval_guidance import synchronize_updated_guidance
 
     # Write value into scraped_courses
     if field == "intake_months":
         # JSONB column
-        await db.execute(
-            text(f"UPDATE scraped_courses SET {col} = CAST(:v AS jsonb) WHERE id=:id"),
+        updated = await db.execute(
+            text(f"UPDATE scraped_courses SET {col} = CAST(:v AS jsonb) WHERE id=:id RETURNING id"),
             {"v": json.dumps(value), "id": sc_id},
         )
     elif field in {
         "international_fee", "ielts_overall", "ielts_listening",
         "ielts_speaking", "ielts_writing", "ielts_reading",
     }:
-        await db.execute(
-            text(f"UPDATE scraped_courses SET {col} = :v WHERE id=:id"),
+        updated = await db.execute(
+            text(f"UPDATE scraped_courses SET {col} = :v WHERE id=:id RETURNING id"),
             {"v": float(value), "id": sc_id},
         )
     else:
-        await db.execute(
-            text(f"UPDATE scraped_courses SET {col} = :v WHERE id=:id"),
+        updated = await db.execute(
+            text(f"UPDATE scraped_courses SET {col} = :v WHERE id=:id RETURNING id"),
             {"v": str(value), "id": sc_id},
         )
+
+    await synchronize_updated_guidance(db, updated)
 
     # Insert evidence row
     source_url = row.get("source_url")

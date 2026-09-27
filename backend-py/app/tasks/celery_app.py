@@ -31,7 +31,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from celery import Celery
+from celery import Celery, bootsteps
 from celery.schedules import crontab
 from celery.signals import worker_ready
 
@@ -56,6 +56,18 @@ celery_app = Celery(
         "app.tasks.auto_repair_task",
     ],
 )
+
+
+class QualificationSchemaReadiness(bootsteps.StartStopStep):
+    """Mandatory worker bootstep, before Consumer begins accepting tasks."""
+    requires = {"celery.worker.components:Pool"}
+
+    def start(self, worker):
+        from app.schema_readiness import check_worker_schema
+        asyncio.run(check_worker_schema())
+
+
+celery_app.steps["worker"].add(QualificationSchemaReadiness)
 
 celery_app.conf.update(
     task_acks_late=True,

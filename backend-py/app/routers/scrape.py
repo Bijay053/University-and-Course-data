@@ -274,6 +274,8 @@ def _staged_row_to_dict(r) -> dict:
     d["feeSelection"] = fee_selection(r)
     from app.services.scraper.duration_review import public_duration_review_status
     d["durationReviewStatus"] = public_duration_review_status(r)
+    from app.services.scraper.approval_guidance import sanitize_guidance_response
+    sanitize_guidance_response(d, r)
     from app.services.scraper.requirement_status import public_requirement_status
 
     # Additive API contract. Internal proof fingerprints stay server-side.
@@ -1991,7 +1993,7 @@ async def continue_unresolved_history_urls(
     )
 
 
-@router.get("/export")
+@router.get("/export", dependencies=[Depends(require_permission("staged.view"))])
 async def export_scraped_courses(
     db: Annotated[AsyncSession, Depends(get_db)],
     universityId: int | None = Query(default=None),
@@ -2032,6 +2034,11 @@ async def export_scraped_courses(
             params,
         )
     ).mappings().all()
+
+    # Export is a public serialization boundary too: never export diagnostic
+    # storage or its private evidence fingerprint in either CSV or JSON.
+    from app.services.scraper.approval_guidance import sanitize_guidance_response
+    rows = [sanitize_guidance_response(dict(row)) for row in rows]
 
     uni_slug = (
         f"uni{universityId}" if universityId else (f"job_{jobId}" if jobId else "all")
@@ -4281,7 +4288,7 @@ async def analyze_staged(
     }
 
 
-@router.get("/staged")
+@router.get("/staged", dependencies=[Depends(require_permission("staged.view"))])
 async def staged_list(
     db: Annotated[AsyncSession, Depends(get_db)],
     job_id: str | None = Query(default=None, alias="jobId"),
@@ -4349,7 +4356,7 @@ async def staged_list(
     return dicts
 
 
-@router.get("/staged/{sc_id_or_job}")
+@router.get("/staged/{sc_id_or_job}", dependencies=[Depends(require_permission("staged.view"))])
 async def staged_one(
     sc_id_or_job: str,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -4475,7 +4482,7 @@ def _row_to_camel(row: dict) -> dict:
     return out
 
 
-@router.get("/staged/{sc_id}/review")
+@router.get("/staged/{sc_id}/review", dependencies=[Depends(require_permission("staged.view"))])
 async def staged_review(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
     """Return all data needed for the course review modal.
 
@@ -4498,6 +4505,7 @@ async def staged_review(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)]
         raise HTTPException(status_code=404, detail="Staged course not found")
 
     row_dict = dict(row)
+    row_dict.pop("last_qualification_approval", None)
     from app.models import ScrapedCourse
     from app.services.scraper.requirement_status import public_requirement_status
 
@@ -4522,6 +4530,8 @@ async def staged_review(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)]
     # leaking snake_case keys into the same object.
     course_obj = _row_to_camel(row_dict)
     course_obj["requirementStatus"] = requirement_status
+    from app.services.scraper.approval_guidance import public_approval_guidance
+    course_obj["lastQualificationApproval"] = public_approval_guidance(status_row) if status_row else None
 
     # UI may expect nested shape similar to live courses
     out["fees"] = {
@@ -4626,6 +4636,11 @@ async def staged_review(sc_id: int, db: Annotated[AsyncSession, Depends(get_db)]
     # `course` MUST be camelCase (StagedCourse type). `stagedCourse` is
     # kept as a snake_case+camelCase hybrid for legacy paths that read
     # individual fields directly from the response root.
+    from app.services.scraper.approval_guidance import (
+        redact_approval_diagnostics, sanitize_guidance_response,
+    )
+    out = redact_approval_diagnostics(out)
+    sanitize_guidance_response(course_obj, status_row)
     out["course"] = course_obj
     out["stagedCourse"] = dict(out)
     out["ok"] = True
@@ -5130,6 +5145,7 @@ async def staged_bulk_reject(
     """
     from app.models import ScrapedCourse
     from sqlalchemy import update
+    from app.services.scraper.approval_guidance import synchronize_updated_guidance
 
     result = await db.execute(
         update(ScrapedCourse)
@@ -5138,9 +5154,11 @@ async def staged_bulk_reject(
             ScrapedCourse.status == "pending",
         )
         .values(status="rejected", rejection_reason=body.reason)
+        .returning(ScrapedCourse.id)
     )
+    updated_ids = await synchronize_updated_guidance(db, result)
     await db.commit()
-    return {"ok": True, "rejected": result.rowcount or 0}
+    return {"ok": True, "rejected": len(updated_ids)}
 
 
 @router.post("/staged/dedup/{university_id}")
@@ -5180,7 +5198,7 @@ class _FeeSelectionBody(BaseModel):
     model_config = {"extra": "forbid"}
 
 
-@router.post("/staged/{sc_id}/fee-selection")
+@router.post("/staged/{sc_id}/fee-selection", dependencies=[Depends(require_permission("staged.view"))])
 async def staged_fee_selection(
     sc_id: int,
     body: _FeeSelectionBody,
@@ -5486,6 +5504,7 @@ async def expire_rejections(
                OR rejection_reason NOT IN ('manual_reject', 'online_only',
                                            'category_landing_page'));
     """
+    from app.services.scraper.approval_guidance import synchronize_updated_guidance
     result = await db.execute(
         text("""
             UPDATE scraped_courses
@@ -5496,9 +5515,11 @@ async def expire_rejections(
                    OR rejection_reason NOT IN (
                        'manual_reject', 'online_only', 'category_landing_page'
                    ))
+            RETURNING id
         """),
         {"uid": university_id},
     )
+    await synchronize_updated_guidance(db, result)
     await db.commit()
     updated = result.rowcount or 0
     return {
@@ -5621,7 +5642,9 @@ _STAGED_EDITABLE_FIELDS: dict[str, str] = {
 }
 
 
-@router.put("/staged/{sc_id}")
+@router.put("/staged/{sc_id}", dependencies=[
+    Depends(require_permission("staged.view")), Depends(require_permission("staged.edit")),
+])
 async def staged_update(
     sc_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -5949,7 +5972,9 @@ async def _apply_backup_one(
     }
 
 
-@router.post("/staged/{sc_id}/apply-backup")
+@router.post("/staged/{sc_id}/apply-backup", dependencies=[
+    Depends(require_permission("staged.view")), Depends(require_permission("staged.edit")),
+])
 async def staged_apply_backup(
     sc_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -5972,7 +5997,7 @@ async def staged_apply_backup(
 
     sc = await db.get(ScrapedCourse, sc_id)
     course_dict = (
-        {c.name: getattr(sc, c.name) for c in sc.__table__.columns} if sc else None
+        _staged_row_to_dict(sc) if sc else None
     )
     return {
         "ok": True,

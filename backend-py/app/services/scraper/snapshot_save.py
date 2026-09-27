@@ -87,7 +87,8 @@ def _extraction_fields(result: dict[str, Any]) -> dict[str, Any]:
     fields = [column.key for column in ScrapedCourse.__table__.columns if column.key not in excluded]
     extraction = {f: source.get(f) for f in fields if f in source}
     extraction["_snapshot_schema"] = "extractor_payload_v1"
-    return extraction
+    from app.services.scraper.approval_guidance import redact_approval_diagnostics
+    return redact_approval_diagnostics(extraction)
 
 
 def staged_row_backup_payload(sc: Any) -> dict[str, Any]:
@@ -106,7 +107,8 @@ def staged_row_backup_payload(sc: Any) -> dict[str, Any]:
             value = value.isoformat()
         payload[column.key] = value
     payload["_snapshot_schema"] = "staged_row_v1"
-    return payload
+    from app.services.scraper.approval_guidance import redact_approval_diagnostics
+    return redact_approval_diagnostics(payload)
 
 
 async def persist_staged_row_backup(
@@ -274,7 +276,8 @@ async def save_api_json_snapshot(
         if not is_enabled():
             return
 
-        body = json.dumps(payload, default=str).encode("utf-8")
+        from app.services.scraper.approval_guidance import redact_approval_diagnostics
+        body = json.dumps(redact_approval_diagnostics(payload), default=str).encode("utf-8")
 
         key = await upload_snapshot(
             body,

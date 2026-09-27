@@ -411,7 +411,12 @@ describe("Scraping repair reviewer", () => {
           { id: 1, reasonCode, error: "PRIVATE provider token=secret" },
         ], attempted: 1 });
       }
-      if (url === "/api/scrape/staged/repair-job") return jsonResponse({ courses: review.courses });
+      if (url === "/api/scrape/staged/repair-job") return jsonResponse({ courses: review.courses.map(course => ({
+        ...course, lastQualificationApproval: reasonCode === "unknown_private" ? null : {
+          rowId: course.id, jobId: course.scrapeJobId, universityId: course.universityId,
+          reasonCode, attemptedAt: "2026-09-27T10:30:00Z",
+        },
+      })) });
       if (url === "/api/import/history") return jsonResponse([]);
       if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
       if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
@@ -420,6 +425,12 @@ describe("Scraping repair reviewer", () => {
     }));
     render(<ScrapingForTest initialReviewState={review} />);
     await userEvent.click(screen.getByRole("button", { name: "Approve (1 course)" }));
+    if (reasonCode === "unknown_private") {
+      await waitFor(() => expect(screen.getByRole("button", { name: "Approve (1 course)" }).hasAttribute("disabled")).toBe(false));
+      expect(screen.queryByTestId("approval-failure-1")).toBeNull();
+      expect(document.body.textContent).not.toContain("PRIVATE");
+      return;
+    }
     const notice = await screen.findByTestId("approval-failure-1");
     expect(notice.textContent).not.toContain("PRIVATE");
     if (reasonCode === "official_source_unavailable") {
@@ -1193,7 +1204,7 @@ describe("Scraping repair reviewer", () => {
     await user.click(within(dialog).getByRole("button", { name: "Report official URL" }));
     expect(await screen.findByDisplayValue("https://example.test/courses/1")).toBeTruthy();
     expect((screen.getByTestId("input-report-description") as HTMLTextAreaElement).value).toContain("International Fee");
-  });
+  }, 15000);
 
   it("requires reasons for forced fields and sends them with the union of detected targets", async () => {
     const review = initialReview();

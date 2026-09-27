@@ -193,7 +193,7 @@ async def test_staged_approval_precheck_failure_releases_fee_lock(
                 yield request_db
 
             async def reviewer():
-                return {"email": "reviewer@example.test", "permissions": ["staged.approve"]}
+                return {"email": "reviewer@example.test", "permissions": ["staged.approve", "staged.view", "staged.edit"]}
 
             app = FastAPI()
             app.include_router(router, prefix="/api/scrape")
@@ -304,7 +304,7 @@ async def test_bulk_approval_recovers_after_real_fee_constraint_error(isolated_f
             yield db
 
     async def reviewer():
-        return {"email": "constraint-reviewer@example.test", "permissions": ["staged.approve"]}
+        return {"email": "constraint-reviewer@example.test", "permissions": ["staged.approve", "staged.view", "staged.edit"]}
 
     app = FastAPI()
     app.include_router(reviews_router, prefix="/api/reviews")
@@ -422,7 +422,7 @@ async def test_bulk_approval_publishes_only_current_selected_fees(
             yield db
 
     async def reviewer():
-        return {"email": "bulk-reviewer@example.test", "permissions": ["staged.approve"]}
+        return {"email": "bulk-reviewer@example.test", "permissions": ["staged.approve", "staged.view", "staged.edit"]}
 
     app = FastAPI()
     app.include_router(router, prefix="/api/scrape")
@@ -631,7 +631,7 @@ async def test_simultaneous_same_snapshot_has_one_winner(isolated_fee_database, 
     async def reviewer(request: Request):
         return {
             "email": f"reviewer-{request.headers['x-test-reviewer']}@example.test",
-            "permissions": ["staged.approve"],
+            "permissions": ["staged.approve", "staged.view", "staged.edit"],
         }
 
     app = FastAPI()
@@ -810,7 +810,7 @@ async def test_fee_selection_contends_with_approval(
 
     async def reviewer(request: Request):
         return {"email": request.headers["x-test-reviewer"] + "@example.test",
-                "permissions": ["staged.approve"]}
+                "permissions": ["staged.approve", "staged.view", "staged.edit"]}
 
     app = FastAPI()
     app.include_router(router, prefix="/api/scrape")

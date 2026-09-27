@@ -1537,6 +1537,7 @@ async def _run_extraction_scan(
     _base_params: dict[str, Any] = {"uid": uni_id, "jid": job_id}
 
     # ── Phase 1: SQL fast path ────────────────────────────────────────────────
+    from app.services.scraper.approval_guidance import synchronize_updated_guidance
 
     # 1a. default_ielts → fill NULL ielts_overall rows immediately
     default_ielts = (extr_patch.get("english") or {}).get("default_ielts")
@@ -1544,10 +1545,11 @@ async def _run_extraction_scan(
         res = await db.execute(
             text(
                 f"UPDATE scraped_courses SET ielts_overall = :iv "
-                f"WHERE {_base_where} AND ielts_overall IS NULL"
+                f"WHERE {_base_where} AND ielts_overall IS NULL RETURNING id"
             ),
             {**_base_params, "iv": float(default_ielts)},
         )
+        await synchronize_updated_guidance(db, res)
         fills["ielts_fills"] = res.rowcount or 0
 
     # 1b. reject_values → clear junk course_location values
@@ -1560,10 +1562,11 @@ async def _run_extraction_scan(
                 f"UPDATE scraped_courses SET course_location = NULL "
                 f"WHERE {_base_where} AND course_location IS NOT NULL "
                 f"AND COALESCE(fee_scope_key, '') = '' "
-                f"AND LOWER(course_location) LIKE LOWER(:rv)"
+                f"AND LOWER(course_location) LIKE LOWER(:rv) RETURNING id"
             ),
             {**_base_params, "rv": f"%{val}%"},
         )
+        await synchronize_updated_guidance(db, res)
         fills["location_clears"] += res.rowcount or 0
 
     await db.commit()

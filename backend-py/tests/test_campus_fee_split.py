@@ -19,6 +19,19 @@ URL = "https://www.law.ac.uk/study/postgraduate/business/msc-healthcare-manageme
 async def migrate_offerings_in_transaction(connection):
     """Test-only additive DDL, always owned by a caller's rollback transaction."""
     from sqlalchemy import text
+    await connection.execute(text(
+        "ALTER TABLE scraped_courses ADD COLUMN IF NOT EXISTS last_qualification_approval JSONB"
+    ))
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+    guidance_spec = spec_from_file_location("guidance_migration",
+        Path(__file__).resolve().parents[1] / "alembic/versions/390_qualification_approval_guidance.py")
+    guidance = module_from_spec(guidance_spec)
+    guidance_spec.loader.exec_module(guidance)
+    def install_guidance_trigger(sync_connection):
+        guidance.op = Operations(MigrationContext.configure(sync_connection))
+        guidance.install_invalidation_trigger()
+    await connection.run_sync(install_guidance_trigger)
     has_column = (await connection.execute(text(
         "SELECT 1 FROM information_schema.columns WHERE table_name='courses' AND column_name='offering_identity'"
     ))).scalar()

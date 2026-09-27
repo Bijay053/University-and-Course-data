@@ -338,10 +338,13 @@ def test_every_route_is_in_the_app_route_table() -> None:
 
 
 @pytest.mark.asyncio
-async def test_routes_smoke() -> None:
+async def test_routes_smoke(monkeypatch) -> None:
     """Live-request smoke: every endpoint dispatches cleanly. No
     framework 404 (= unrouted) and no 5xx (= server crash). Other 4xx
     is fine — proves the handler ran and rejected the input."""
+    from app.dependencies import get_current_user
+    monkeypatch.setitem(app.dependency_overrides, get_current_user,
+                        lambda: {"email": "reviewer@test", "permissions": ["staged.view", "staged.edit"]})
     ids = await _seed_setup()
     try:
         transport = httpx.ASGITransport(app=app)

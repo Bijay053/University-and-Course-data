@@ -152,6 +152,8 @@ async def split_pending_course(db, row, *, actor="scraper"):
     ))).scalars().all()
     values = {c.name: deepcopy(getattr(row, c.name)) for c in ScrapedCourse.__table__.columns
               if c.name not in {"id", "created_at", "canonical_course_url"}}
+    from app.services.scraper.approval_guidance import redact_approval_diagnostics
+    values = redact_approval_diagnostics(values)
     name = scope["original_name"] if scope else row.course_name
     locations = scope["original_locations"] if scope else row.course_location
     children = [row]

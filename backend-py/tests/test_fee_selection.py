@@ -219,7 +219,10 @@ async def test_real_promotion_rejects_invalidated_selection(source_status, mutat
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("permissions,expected", [(None, 401), ([], 403), (["staged.view"], 403), (["staged.approve"], 200)])
+@pytest.mark.parametrize("permissions,expected", [
+    (None, 401), ([], 403), (["staged.view"], 403), (["staged.approve"], 403),
+    (["staged.approve", "staged.view"], 200),
+])
 async def test_http_authentication_and_permission(permissions, expected):
     from fastapi import FastAPI
     from httpx import ASGITransport, AsyncClient

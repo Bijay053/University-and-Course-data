@@ -474,6 +474,8 @@ async def split_pending_qualifications(db, row, *, actor="scraper", proof_contex
         FieldConflict.scraped_course_id == row.id))).scalars().all()
     values = {c.name: deepcopy(getattr(row, c.name)) for c in ScrapedCourse.__table__.columns
               if c.name not in {"id", "created_at", "canonical_course_url"}}
+    from app.services.scraper.approval_guidance import redact_approval_diagnostics
+    values = redact_approval_diagnostics(values)
     snapshot = {key: deepcopy(values.get(key)) for key in (
         "course_name", "degree_level", "course_location", "international_fee",
         "currency", "fee_year", "fee_term", "fee_scope_key", "extraction_method",

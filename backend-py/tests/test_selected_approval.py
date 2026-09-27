@@ -47,7 +47,7 @@ def sync_session():
 async def test_actionable_campus_reasons_propagate_even_with_force(monkeypatch, reason_name, sync_session):
     from app.services.scraper.extractors import ulaw_campuses
     reason = getattr(ulaw_campuses, reason_name)
-    row = SimpleNamespace(id=1, status="pending", extraction_method={"fee_variants": {"status": "range"}})
+    row = SimpleNamespace(id=1, scrape_job_id="test-job", university_id=42, status="pending", extraction_method={"fee_variants": {"status": "range"}})
     db = SimpleNamespace(
         sync_session=sync_session,
         execute=AsyncMock(side_effect=[

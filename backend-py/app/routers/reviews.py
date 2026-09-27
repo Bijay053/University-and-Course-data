@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_user, get_db
 from app.models import ScrapedCourse, University
+from app.permissions import require_permission
 from app.services.scraper.response_sanitizer import sanitize_scraped_row
 from app.services.scraper.approve_course import ApprovalValidationError
 
@@ -22,7 +23,7 @@ router = APIRouter()
 @router.get("/scraped-courses")
 async def list_scraped_courses(
     db: Annotated[AsyncSession, Depends(get_db)],
-    _user: Annotated[dict, Depends(get_current_user)],
+    _user: Annotated[dict, Depends(require_permission("staged.view"))],
     status_filter: str | None = Query(default=None, alias="status"),
     university_id: int | None = None,
     auto_publish_status: str | None = None,
@@ -45,6 +46,8 @@ async def list_scraped_courses(
 
     def _row_dict(sc, uname: str) -> dict:
         d = {c.name: getattr(sc, c.name) for c in sc.__table__.columns}
+        from app.services.scraper.approval_guidance import sanitize_guidance_response
+        sanitize_guidance_response(d, sc)
         d["university_name"] = uname
         # Guard against float32 precision artefacts (pre-migration REAL column).
         if d.get("duration") is not None:

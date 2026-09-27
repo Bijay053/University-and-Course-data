@@ -5,6 +5,33 @@
  * University Course, Fee, Intake & Requirement Management System API
  * OpenAPI spec version: 0.1.0
  */
+export type LastQualificationApprovalReasonCode =
+  (typeof LastQualificationApprovalReasonCode)[keyof typeof LastQualificationApprovalReasonCode];
+
+export const LastQualificationApprovalReasonCode = {
+  official_source_unavailable: "official_source_unavailable",
+  changed_cohort: "changed_cohort",
+  unverified_page: "unverified_page",
+  invalid_stored_scope: "invalid_stored_scope",
+} as const;
+
+export interface LastQualificationApproval {
+  rowId: number;
+  jobId: string;
+  universityId: number;
+  reasonCode: LastQualificationApprovalReasonCode;
+  attemptedAt: string;
+}
+
+export interface StagedCourseGuidanceResponse {
+  id: number;
+  scrapeJobId: string;
+  universityId: number;
+  status: string;
+  lastQualificationApproval?: LastQualificationApproval | null;
+  [key: string]: unknown;
+}
+
 export interface ApprovedQualificationCohort {
   rowId: number;
   splitFromId: number;
@@ -603,6 +630,11 @@ export interface BulkUploadResult {
   updated: number;
   errors: string[];
 }
+
+export type ListStagedCoursesParams = {
+  jobId?: string;
+  universityId?: number;
+};
 
 export type ListUniversitiesParams = {
   /**

@@ -25,6 +25,14 @@ class LocalDB:
     def __init__(self, session):
         self.session = session
 
+    @property
+    def identity_map(self):
+        return self.session.identity_map
+
+    @property
+    def no_autoflush(self):
+        return self.session.no_autoflush
+
     async def execute(self, query, params=None):
         # SQLite has no PostgreSQL advisory locks; this test checks the policy.
         if "pg_advisory_xact_lock" in str(query):

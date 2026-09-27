@@ -76,6 +76,7 @@ async def annotate_review_quality(db, *, job_id, university_id, row_ids, critica
     Never reparent, publish, delete, or update extraction data. Caller commits.
     """
     from sqlalchemy import update
+    from app.services.scraper.approval_guidance import synchronize_updated_guidance
     from app.models import ScrapedCourse
     if not row_ids or not critical_urls:
         return []
@@ -90,7 +91,7 @@ async def annotate_review_quality(db, *, job_id, university_id, row_ids, critica
         ).values(auto_publish_status="data_quality_failure")
         .returning(ScrapedCourse.id)
     )
-    return list(result.scalars())
+    return await synchronize_updated_guidance(db, result)
 
 
 async def run_full_catalogue_review(db, job, run):

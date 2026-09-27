@@ -682,7 +682,16 @@ async def test_interrupted_selected_approval_releases_proofs(
     )
     assert retry["approvedCount"] == 0 and retry["failed"]
     assert len(upstream["calls"]) == 2
-    assert await contents(db) == before
+    # Intentional validation failure now saves sanitized, non-authoritative
+    # guidance in a separate transaction; all approval/evidence state is intact.
+    after_retry = await contents(db)
+    for record in after_retry["scraped_courses"]:
+        guidance = record.get("last_qualification_approval")
+        if guidance:
+            assert guidance["rowId"] == row_id
+            assert guidance["reasonCode"] == "unverified_page"
+            record["last_qualification_approval"] = None
+    assert after_retry == before
     upstream["html"] = HTML
     retry = await route.approve_selected(
         route.ApproveSelectedBody(courseIds=[row_id]), db, {},

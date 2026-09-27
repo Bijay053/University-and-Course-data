@@ -47,12 +47,13 @@ from app.models.scraped_course import (
 )
 from app.services.snapshot_store import download_snapshot
 from app.services.scraper.url_identity import canonical_course_url_key
+from app.services.scraper.approval_guidance import redact_approval_diagnostics
 
 log = logging.getLogger(__name__)
 
 _RESTORE_EXCLUDED_FIELDS = {
     "id", "scrape_job_id", "university_id", "course_id", "status",
-    "reviewed_at", "created_at",
+    "reviewed_at", "created_at", "last_qualification_approval",
 }
 _RESTORABLE_FIELDS = {
     column.key for column in ScrapedCourse.__table__.columns
@@ -327,7 +328,7 @@ async def restore_review_rows(
             return (rank[snap.scrape_job_id], 0 if exact else 1, snap.course_url)
 
         for snap in sorted(unique.values(), key=_restore_order):
-            data = dict(snap.original_extraction or {})
+            data = redact_approval_diagnostics(dict(snap.original_extraction or {}))
             is_exact_backup = (
                 snap.snapshot_type == "staged_row"
                 and data.get("_snapshot_schema") == "staged_row_v1"
@@ -691,6 +692,7 @@ async def _replay_job_inner(
                             seed_url=scrape_url or snap.course_url,
                         )
 
+            new_data = redact_approval_diagnostics(new_data)
             replayed += 1
             if emit:
                 await emit(
@@ -703,7 +705,7 @@ async def _replay_job_inner(
             # ── Diff against original_extraction, NOT scraped_courses ────────
             # This compares V1 extractor output vs V2 extractor output on the
             # same HTML — isolating the extractor delta cleanly.
-            old_data: dict[str, Any] = snap.original_extraction or {}
+            old_data: dict[str, Any] = redact_approval_diagnostics(snap.original_extraction or {})
             # Fallback: if snapshot predates original_extraction column,
             # fall back to scraped_courses (graceful degradation).
             if not old_data:

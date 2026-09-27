@@ -24,6 +24,7 @@ from app.database import get_db
 from app.models.page_snapshot import PageSnapshot
 from app.permissions import require_permission
 from app.services.scraper.replay_extraction import replay_job, restore_review_rows
+from app.services.scraper.approval_guidance import redact_approval_diagnostics
 from app.services.snapshot_store import (
     get_snapshot_bytes,
     is_enabled,
@@ -88,7 +89,7 @@ class RestoreReviewRequest(BaseModel):
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
-@router.get("/snapshots/{job_id}/summary")
+@router.get("/snapshots/{job_id}/summary", dependencies=[Depends(require_permission("staged.view"))])
 async def snapshot_summary(
     job_id: str,
     db: AsyncSession = Depends(get_db),
@@ -110,7 +111,7 @@ async def snapshot_summary(
     }
 
 
-@router.get("/snapshots/storage-stats")
+@router.get("/snapshots/storage-stats", dependencies=[Depends(require_permission("staged.view"))])
 async def storage_stats(
     _user: Annotated[dict, Depends(require_permission("settings.view"))],
     db: AsyncSession = Depends(get_db),
@@ -205,7 +206,8 @@ async def storage_stats(
     }
 
 
-@router.get("/snapshots/{job_id}", response_model=SnapshotListResponse)
+@router.get("/snapshots/{job_id}", response_model=SnapshotListResponse,
+            dependencies=[Depends(require_permission("staged.view"))])
 async def list_snapshots(
     job_id: str,
     db: AsyncSession = Depends(get_db),
@@ -272,7 +274,7 @@ async def replay_scrape_job(
             course_url=course_url,
             db=db,
         )
-        return ReplayResponse(**result)
+        return ReplayResponse(**redact_approval_diagnostics(result))
     except Exception as exc:
         log.exception("replay failed for job %s", job_id)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -290,7 +292,7 @@ async def restore_scrape_review_rows(
         result = await restore_review_rows(job_id, commit=body.commit, db=db)
         if not result["chain_job_ids"]:
             raise HTTPException(status_code=404, detail=result["message"])
-        return result
+        return redact_approval_diagnostics(result)
     except HTTPException:
         raise
     except Exception as exc:
@@ -349,7 +351,7 @@ async def replay_stream(
                     continue
                 if item is None:
                     break
-                yield f"data: {_json.dumps(item)}\n\n"
+                yield f"data: {_json.dumps(redact_approval_diagnostics(item))}\n\n"
         finally:
             task.cancel()
 
@@ -381,25 +383,64 @@ async def replay_and_commit(
             course_url=course_url,
             db=db,
         )
-        return ReplayResponse(**result)
+        return ReplayResponse(**redact_approval_diagnostics(result))
     except Exception as exc:
         log.exception("replay+commit failed for job %s", job_id)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-@router.get("/snapshot/download/{job_id}")
+@router.get("/snapshot/download/{job_id}", dependencies=[Depends(require_permission("staged.view"))])
 async def get_snapshot_presigned_url(
     job_id: str,
     key: str = Query(..., description="S3 object key"),
     expires: int = Query(3600, ge=60, le=86400),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Generate a pre-signed S3 URL to download a specific snapshot."""
+    """Resolve only a recorded job/object pair; JSON never gets a raw S3 URL."""
+    records = list((await db.execute(select(PageSnapshot).where(
+        PageSnapshot.scrape_job_id == job_id,
+        PageSnapshot.storage_path == key,
+    ))).scalars().all())
+    if not records:
+        raise HTTPException(status_code=404, detail="Snapshot not recorded for this job.")
+    json_record = next((r for r in records if r.snapshot_type == "json"), None)
+    if json_record is not None:
+        return {"url": f"/api/scrape/snapshot/content/{json_record.id}", "expires_in": expires}
+    if any(r.snapshot_type not in {"html", "pdf", "ai_prompt", "repair", "failed"}
+           for r in records):
+        raise HTTPException(status_code=400, detail="Unsupported snapshot download type.")
     if not is_enabled():
         raise HTTPException(status_code=503, detail="S3 not configured.")
     url = await presign_url(key, expires_in=expires)
     if not url:
         raise HTTPException(status_code=404, detail="Could not generate presigned URL.")
     return {"url": url, "expires_in": expires}
+
+
+@router.get("/snapshot/content/{snapshot_id}", dependencies=[Depends(require_permission("staged.view"))])
+async def download_sanitized_json_snapshot(snapshot_id: int, db: AsyncSession = Depends(get_db)):
+    """Authenticated JSON download, including redaction of historical objects."""
+    import gzip
+    from fastapi.responses import Response
+
+    record = await db.get(PageSnapshot, snapshot_id)
+    if record is None or record.snapshot_type != "json" or not record.storage_path:
+        raise HTTPException(status_code=404, detail="JSON snapshot not found.")
+    raw = await get_snapshot_bytes(record.storage_path)
+    if raw is None:
+        raise HTTPException(status_code=502, detail="Failed to fetch snapshot bytes.")
+    try:
+        if raw.startswith(b"\x1f\x8b"):
+            raw = gzip.decompress(raw)
+        value = _json.loads(raw.decode("utf-8"))
+    except (ValueError, UnicodeError, OSError, EOFError) as exc:
+        raise HTTPException(status_code=502, detail="Stored JSON snapshot is invalid.") from exc
+    return Response(
+        content=_json.dumps(redact_approval_diagnostics(value)),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="snapshot-{record.id}.json"',
+                 "Cache-Control": "private, no-store"},
+    )
 
 
 @router.post("/snapshot/setup-lifecycle")
@@ -413,7 +454,7 @@ async def apply_s3_lifecycle():
     return {"ok": True, "message": "S3 lifecycle rules applied successfully."}
 
 
-@router.get("/snapshot/for-course")
+@router.get("/snapshot/for-course", dependencies=[Depends(require_permission("staged.view"))])
 async def get_snapshots_for_course(
     job_id: str = Query(..., description="Scrape runtime job ID"),
     course_url: str = Query(..., description="Course page URL"),
@@ -446,8 +487,15 @@ async def get_snapshots_for_course(
     snaps = []
     for r, availability in zip(records, availability_checks):
         download_url = None
-        if availability["available"]:
-            download_url = await presign_url(r.storage_path)
+        if availability["available"] and r.snapshot_type in {
+            "json", "html", "pdf", "ai_prompt", "repair", "failed",
+        }:
+            # Use the same DB-bound classifier as the key endpoint, including
+            # the case where several historical records reference one object.
+            download = await get_snapshot_presigned_url(
+                r.scrape_job_id, r.storage_path, 3600, db,
+            )
+            download_url = download["url"]
         snaps.append({
             "id": r.id,
             "snapshot_type": r.snapshot_type,
@@ -456,7 +504,7 @@ async def get_snapshots_for_course(
             "fetched_at": r.fetched_at.isoformat() if r.fetched_at else None,
             "scraper_commit": r.scraper_commit,
             "yaml_version": r.yaml_version,
-            "original_extraction": r.original_extraction or {},
+            "original_extraction": redact_approval_diagnostics(r.original_extraction or {}),
             "download_url": download_url,
             "storage_path": r.storage_path,
             "has_text": r.snapshot_type in ("ai_prompt", "html", "repair"),
@@ -473,7 +521,7 @@ async def get_snapshots_for_course(
     }
 
 
-@router.get("/snapshot/text/{snapshot_id}")
+@router.get("/snapshot/text/{snapshot_id}", dependencies=[Depends(require_permission("staged.view"))])
 async def get_snapshot_text(
     snapshot_id: int,
     _user: Annotated[dict, Depends(require_permission("scraping.view"))],
@@ -530,4 +578,13 @@ async def get_snapshot_text(
     except Exception:
         text = raw.decode("utf-8", errors="replace")
 
+    # JSON source snapshots may predate diagnostic-container exclusion.
+    # Preserve ordinary source/proof fields; never regex-edit HTML or prose.
+    try:
+        parsed = _json.loads(text)
+    except (ValueError, TypeError):
+        pass
+    else:
+        if isinstance(parsed, (dict, list)):
+            text = _json.dumps(redact_approval_diagnostics(parsed))
     return PlainTextResponse(content=text)

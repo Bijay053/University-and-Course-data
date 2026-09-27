@@ -41,6 +41,7 @@ import type {
   Intake,
   ListCoursesParams,
   ListScrapingChangesParams,
+  ListStagedCoursesParams,
   ListUniversitiesParams,
   QualificationRefreshInput,
   QualificationRefreshPreview,
@@ -48,6 +49,7 @@ import type {
   Scholarship,
   ScrapingChange,
   ScrapingJob,
+  StagedCourseGuidanceResponse,
   University,
   UniversityListResponse,
   UpcomingIntake,
@@ -63,6 +65,99 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+export const getListStagedCoursesUrl = (params?: ListStagedCoursesParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/scrape/staged?${stringifiedParams}`
+    : `/api/scrape/staged`;
+};
+
+export const listStagedCourses = async (
+  params?: ListStagedCoursesParams,
+  options?: RequestInit,
+): Promise<StagedCourseGuidanceResponse[]> => {
+  return customFetch<StagedCourseGuidanceResponse[]>(
+    getListStagedCoursesUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListStagedCoursesQueryKey = (
+  params?: ListStagedCoursesParams,
+) => {
+  return [`/api/scrape/staged`, ...(params ? [params] : [])] as const;
+};
+
+export const getListStagedCoursesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listStagedCourses>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListStagedCoursesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listStagedCourses>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListStagedCoursesQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listStagedCourses>>
+  > = ({ signal }) => listStagedCourses(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listStagedCourses>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListStagedCoursesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listStagedCourses>>
+>;
+export type ListStagedCoursesQueryError = ErrorType<unknown>;
+
+export function useListStagedCourses<
+  TData = Awaited<ReturnType<typeof listStagedCourses>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListStagedCoursesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listStagedCourses>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListStagedCoursesQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 export const getListApprovedQualificationCohortsUrl = (
   universityId: number,

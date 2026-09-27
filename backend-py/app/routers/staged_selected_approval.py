@@ -68,6 +68,7 @@ async def approve_selected(
             continue
         from app.services.scraper.ulaw_qualifications import SelectedQualificationProof
         qualification_proof = SelectedQualificationProof(db)
+        original_identity = None
         try:
             university_id = (await db.execute(
                 select(ScrapedCourse.university_id).where(ScrapedCourse.id == source_id)
@@ -90,6 +91,8 @@ async def approve_selected(
             if row.status not in {"pending", "review_ready"}:
                 raise ApprovalValidationError("Only pending courses can be approved.")
             ids = [source_id]
+            from app.services.scraper.approval_guidance import attempt_identity
+            original_identity = attempt_identity(row)
             did_split = False
             if (row.extraction_method or {}).get("fee_variants"):
                 from app.services.scraper.ulaw_qualifications import split_pending_qualifications
@@ -173,6 +176,14 @@ async def approve_selected(
                               if remaining not in approved_ids)
                 break
             failed.append(failure)
+            if failure.get("reasonCode"):
+                from app.services.scraper.approval_guidance import persist_failure
+                try:
+                    await persist_failure(db, original_identity, failure["reasonCode"])
+                except Exception:
+                    await db.rollback()
+                    log.exception("Could not save sanitized approval guidance for row %s", source_id)
+                    failure["guidanceSaveFailed"] = True
         finally:
             qualification_proof.close()
     return {

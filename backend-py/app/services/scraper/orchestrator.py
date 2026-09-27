@@ -8278,6 +8278,7 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                             )
                             _qi_summary = _QI_ER.from_dict(_qi_er).to_summary_text()
                             if _qi_summary:
+                                from app.services.scraper.approval_guidance import synchronize_updated_guidance
                                 _qi_upd = await db.execute(
                                     _qi_sql("""
                                         UPDATE scraped_courses
@@ -8285,20 +8286,25 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                                          WHERE scrape_job_id = :jid
                                            AND (other_requirement IS NULL
                                                 OR other_requirement = '')
+                                    RETURNING id
                                     """),
                                     {"s": _qi_summary[:500], "jid": runtime_job_id},
                                 )
+                                await synchronize_updated_guidance(db, _qi_upd)
                                 _qi_backfilled += getattr(_qi_upd, "rowcount", 0) or 0
                         if _qi_fee_data.get("international_fee") and _qi_needs_fee:
+                            from app.services.scraper.approval_guidance import synchronize_updated_guidance
                             _qi_upd2 = await db.execute(
                                 _qi_sql("""
                                     UPDATE scraped_courses
                                        SET international_fee = :f
                                      WHERE scrape_job_id = :jid
                                        AND international_fee IS NULL
+                                    RETURNING id
                                 """),
                                 {"f": _qi_fee_data["international_fee"], "jid": runtime_job_id},
                             )
+                            await synchronize_updated_guidance(db, _qi_upd2)
                             _qi_backfilled += getattr(_qi_upd2, "rowcount", 0) or 0
                         if _qi_backfilled:
                             await db.commit()

@@ -31,6 +31,24 @@ tags:
     description: Bulk upload/download
 
 paths:
+  /scrape/staged:
+    get:
+      operationId: listStagedCourses
+      parameters:
+        - in: query
+          name: jobId
+          schema: { type: string }
+        - in: query
+          name: universityId
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Staged rows visible to staged.view; guidance is diagnostic only, never approval proof.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/StagedCourseGuidanceResponse" }
   /scrape/universities/{universityId}/approved-qualification-cohorts:
     get:
       operationId: listApprovedQualificationCohorts
@@ -965,6 +983,31 @@ paths:
 
 components:
   schemas:
+    StagedCourseGuidanceResponse:
+      type: object
+      additionalProperties: true
+      required: [id, scrapeJobId, universityId, status]
+      properties:
+        id: { type: integer }
+        scrapeJobId: { type: string }
+        universityId: { type: integer }
+        status: { type: string }
+        lastQualificationApproval:
+          anyOf:
+            - { $ref: "#/components/schemas/LastQualificationApproval" }
+            - { type: "null" }
+    LastQualificationApproval:
+      type: object
+      additionalProperties: false
+      required: [rowId, jobId, universityId, reasonCode, attemptedAt]
+      properties:
+        rowId: { type: integer }
+        jobId: { type: string }
+        universityId: { type: integer }
+        reasonCode:
+          type: string
+          enum: [official_source_unavailable, changed_cohort, unverified_page, invalid_stored_scope]
+        attemptedAt: { type: string, format: date-time }
     ApprovedQualificationCohort:
       type: object
       required: [rowId, splitFromId, jobId, createdAt, courseIds, feeYears, label, latest]

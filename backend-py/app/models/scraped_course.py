@@ -119,6 +119,7 @@ class ScrapedCourse(Base):
     status: Mapped[str] = mapped_column(Text, nullable=False, default="pending")
     rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     extraction_method: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    last_qualification_approval: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     requirement_status: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     scrape_warnings: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     has_central_fee_page: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -146,3 +147,6 @@ def _sync_canonical_course_url(
     target.canonical_course_url = (
         canonical_course_url_key(target.course_website) or None
     )
+    from app.services.scraper.approval_guidance import public_approval_guidance
+    if target.last_qualification_approval and public_approval_guidance(target) is None:
+        target.last_qualification_approval = None

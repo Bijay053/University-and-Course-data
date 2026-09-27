@@ -219,13 +219,15 @@ async def apply_refresh(db, row_id, token, actor):
             row.course_id = None
             db.add(row)
         linked_course = row.course_id
-        metadata = deepcopy(old["extraction_method"])
+        from app.services.scraper.approval_guidance import redact_approval_diagnostics
+        metadata = redact_approval_diagnostics(deepcopy(old["extraction_method"]))
         qualification = metadata[QUALIFICATION_SCOPE]
         history = qualification.setdefault("refresh_history", [])
         history.append({"actor": actor, "at": source["captured_at"],
                         "previous_source": deepcopy(qualification.get("verified_source")),
                         "previous_row": json.loads(json.dumps(
-                            {k: v for k, v in old.items() if k != "extraction_method"}, default=str))})
+                            redact_approval_diagnostics(
+                                {k: v for k, v in old.items() if k != "extraction_method"}), default=str))})
         qualification["verified_source"] = deepcopy(source)
         metadata["campus_authority"] = deepcopy(source["proofs"][award])
         row.extraction_method = metadata

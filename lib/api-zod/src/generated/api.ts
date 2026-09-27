@@ -7,6 +7,38 @@
  */
 import * as zod from "zod";
 
+export const ListStagedCoursesQueryParams = zod.object({
+  jobId: zod.coerce.string().optional(),
+  universityId: zod.coerce.number().optional(),
+});
+
+export const ListStagedCoursesResponseItem = zod.object({
+  id: zod.number(),
+  scrapeJobId: zod.string(),
+  universityId: zod.number(),
+  status: zod.string(),
+  lastQualificationApproval: zod
+    .union([
+      zod.object({
+        rowId: zod.number(),
+        jobId: zod.string(),
+        universityId: zod.number(),
+        reasonCode: zod.enum([
+          "official_source_unavailable",
+          "changed_cohort",
+          "unverified_page",
+          "invalid_stored_scope",
+        ]),
+        attemptedAt: zod.coerce.date(),
+      }),
+      zod.null(),
+    ])
+    .optional(),
+});
+export const ListStagedCoursesResponse = zod.array(
+  ListStagedCoursesResponseItem,
+);
+
 export const ListApprovedQualificationCohortsParams = zod.object({
   universityId: zod.coerce.number(),
 });

@@ -51,7 +51,7 @@ it("shows actionable stale-source error without claiming success", async () => {
   const onApplied = setup();
   fireEvent.click(screen.getByText("Preview current award cohort"));
   fireEvent.click(await screen.findByText("Apply to staging only"));
-  expect((await screen.findByRole("alert")).textContent).toContain("Preview again");
+  expect((await screen.findByRole("alert")).textContent).toContain("Retry preview");
   expect(onApplied).not.toHaveBeenCalled();
   expect(screen.getByText("Refresh preview")).toBeTruthy();
 });

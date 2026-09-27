@@ -195,6 +195,15 @@ def sanitize_scraped_row(d: dict) -> dict:
     ``d`` must contain ``university_id`` so per-university allowlists are
     enforced.  Handles both ``course_location`` and ``location`` key aliases.
     """
+    # Internal diagnostic storage must never escape generic row serializers.
+    d.pop("last_qualification_approval", None)
+    guidance = d.get("lastQualificationApproval")
+    if isinstance(guidance, dict) and "evidenceFingerprint" in guidance:
+        d.pop("lastQualificationApproval", None)
+    from app.services.scraper.approval_guidance import redact_approval_diagnostics
+    for key, value in list(d.items()):
+        if key != "lastQualificationApproval":
+            d[key] = redact_approval_diagnostics(value)
     uni_id: int | None = d.get("university_id")
 
     d["degree_level"] = sanitize_degree_level(

@@ -55,6 +55,10 @@ log = logging.getLogger("uniportal")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # noqa: ARG001
+    from app.schema_readiness import check_worker_schema
+    # The startup check must not borrow asyncpg connections owned by another
+    # event loop (e.g. a prior lifespan/TestClient or a worker task).
+    await check_worker_schema()
     log.info(
         "Python backend starting up (debug=%s, release_revision=%s)",
         settings.debug,

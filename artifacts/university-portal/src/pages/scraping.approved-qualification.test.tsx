@@ -13,6 +13,124 @@ vi.mock("@/components/can", () => ({
 vi.mock("@/components/scrape-job-card", () => ({ ScrapeJobCard: () => null }));
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); localStorage.clear(); sessionStorage.clear(); });
 
+it("hydrates durable guidance through a fresh Review fetch after remount and clears changed evidence and success", async () => {
+  const row = {
+    id: 201, universityId: 7, scrapeJobId: "prior-chain-job", courseName: "Legal Technology",
+    status: "pending", intakeMonths: ["October"], scrapeWarnings: [], createdAt: "2026-09-27T00:00:00Z",
+  };
+  const saved = { rowId: 201, jobId: "prior-chain-job", universityId: 7,
+    reasonCode: "official_source_unavailable", attemptedAt: "2026-09-27T10:30:00Z" };
+  let guidance: typeof saved | null = saved;
+  let approved = false;
+  const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url === "/api/scrape/staged/durable-job") return Response.json({
+      courses: approved ? [] : [{ ...row, lastQualificationApproval: guidance }],
+    });
+    if (url === "/api/scrape/staged/approve-selected") {
+      approved = true;
+      return Response.json({ approvedIds: [201], approvedCount: 1, failed: [], attempted: 1 });
+    }
+    if (url.startsWith("/api/universities")) return Response.json({ data: [], total: 0 });
+    if (url === "/api/import/history") return Response.json([]);
+    if (url.endsWith("/course-quality")) return Response.json({ courses: [] });
+    if (url.startsWith("/api/scrape/staged/fix-jobs?")) return Response.json(null);
+    return Response.json({});
+  });
+  vi.stubGlobal("fetch", fetcher);
+  const mount = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <ScrapingForTest initialReviewState={{ universityId: 7, jobId: "durable-job", courses: [row] as never }} />
+  </QueryClientProvider>);
+  const refresh = async () => {
+    const button = await screen.findByTitle("Reload staged courses and refresh quality scores");
+    await waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(button);
+    await waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(false));
+  };
+  const first = mount();
+  await refresh();
+  expect((await screen.findByTestId("approval-failure-201")).textContent).toContain("Last approval attempt:");
+  first.unmount();
+  mount();
+  expect(screen.queryByTestId("approval-failure-201")).toBeNull();
+  await refresh();
+  expect((await screen.findByTestId("approval-failure-201")).querySelector("time")?.dateTime).toBe(saved.attemptedAt);
+  guidance = null;
+  row.courseName = "Changed evidence on same ID";
+  await refresh();
+  await waitFor(() => expect(screen.queryByTestId("approval-failure-201")).toBeNull());
+  guidance = { ...saved, jobId: "wrong-job" };
+  await refresh();
+  await waitFor(() => expect(screen.getByText("Changed evidence on same ID")).toBeTruthy());
+  expect(screen.queryByTestId("approval-failure-201")).toBeNull();
+  guidance = saved;
+  await refresh();
+  await screen.findByTestId("approval-failure-201");
+  fireEvent.click(screen.getByRole("button", { name: "Retry approval" }));
+  await waitFor(() => expect(screen.queryByTestId("approval-failure-201")).toBeNull());
+  expect(approved).toBe(true);
+}, 20000);
+
+it.each(["edit then restore", "authoritative refetch"])("permanently clears transient errors on %s, without an older read erasing a new failure", async (mode) => {
+  let row = { id: 201, universityId: 7, scrapeJobId: "race-job", courseName: "Legal Technology",
+    status: "pending", intakeMonths: ["October"], scrapeWarnings: [], createdAt: "2026-09-27T00:00:00Z" };
+  let finishApproval: (response: Response) => void = () => {};
+  let finishOldRead: (response: Response) => void = () => {};
+  let approvalStarted = false;
+  let oldReadStarted = false;
+  let reads = 0;
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url === "/api/scrape/staged/approve-selected") {
+      approvalStarted = true;
+      return new Promise<Response>(resolve => { finishApproval = resolve; });
+    }
+    if (url === "/api/scrape/staged/race-job") {
+      if (++reads === 1) {
+        oldReadStarted = true;
+        return new Promise<Response>(resolve => { finishOldRead = resolve; });
+      }
+      return Response.json({ courses: [row] });
+    }
+    if (url === "/api/scrape/staged/201" && init?.method === "PUT") {
+      row = JSON.parse(String(init.body));
+      return Response.json({ course: { ...row, lastQualificationApproval: null } });
+    }
+    if (url.startsWith("/api/universities")) return Response.json({ data: [], total: 0 });
+    if (url === "/api/import/history") return Response.json([]);
+    if (url.endsWith("/course-quality")) return Response.json({ courses: [] });
+    if (url.startsWith("/api/scrape/staged/fix-jobs?")) return Response.json(null);
+    return Response.json({});
+  }));
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <ScrapingForTest initialReviewState={{ universityId: 7, jobId: "race-job", courses: [row] as never }} />
+  </QueryClientProvider>);
+  fireEvent.click(screen.getByRole("button", { name: "Approve (1 course)" }));
+  await waitFor(() => expect(approvalStarted).toBe(true));
+  fireEvent.click(screen.getByTitle("Reload staged courses and refresh quality scores"));
+  await waitFor(() => expect(oldReadStarted).toBe(true));
+  finishApproval(Response.json({ approvedIds: [], approvedCount: 0, attempted: 1,
+    failed: [{ id: 201, reasonCode: "official_source_unavailable", error: "PRIVATE" }] }));
+  await screen.findByTestId("approval-failure-201");
+  finishOldRead(Response.json({ courses: [row] }));
+  await waitFor(() => expect((screen.getByTitle("Reload staged courses and refresh quality scores") as HTMLButtonElement).disabled).toBe(false));
+  expect(screen.getByTestId("approval-failure-201")).toBeTruthy();
+  if (mode === "edit then restore") {
+    for (const [before, after] of [["Legal Technology", "Changed evidence"], ["Changed evidence", "Legal Technology"]]) {
+      fireEvent.click(screen.getByTitle("Edit"));
+      fireEvent.change(screen.getByDisplayValue(before), { target: { value: after } });
+      fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+      await waitFor(() => expect(screen.queryByText("Edit Scraped Course")).toBeNull());
+      expect(screen.queryByTestId("approval-failure-201")).toBeNull();
+    }
+  } else {
+    fireEvent.click(screen.getByTitle("Reload staged courses and refresh quality scores"));
+    await waitFor(() => expect(screen.queryByTestId("approval-failure-201")).toBeNull());
+    expect(reads).toBe(2);
+  }
+  expect(document.body.textContent).not.toContain("PRIVATE");
+}, 20000);
+
 it("offers current cohort preview for a changed split award on the actual Review page", async () => {
   const row = {
     id: 201, universityId: 7, scrapeJobId: "changed-award", courseName: "PG Cert Legal Technology",
@@ -29,7 +147,10 @@ it("offers current cohort preview for a changed split award on the actual Review
     });
     if (url.includes("/qualification-refresh/preview")) return Response.json(
       { detail: "PRIVATE provider diagnostics" }, { status: 503 });
-    if (url === "/api/scrape/staged/changed-award") return Response.json({ courses: [row] });
+    if (url === "/api/scrape/staged/changed-award") return Response.json({ courses: [{
+      ...row, lastQualificationApproval: { rowId: row.id, jobId: row.scrapeJobId,
+        universityId: row.universityId, reasonCode: "changed_cohort", attemptedAt: "2026-09-27T10:30:00Z" },
+    }] });
     if (url.startsWith("/api/universities")) return Response.json({ data: [], total: 0 });
     if (url === "/api/import/history") return Response.json([]);
     if (url.endsWith("/course-quality")) return Response.json({ courses: [] });

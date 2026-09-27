@@ -301,6 +301,13 @@ def test_exact_backup_suppresses_legacy_fetched_url_duplicate():
         snapshot_schema="staged_row_v1",
         extra=staged_row_backup_payload(original),
     )
+    # Historical backups may predate diagnostic exclusion. Never restore the
+    # attempt itself, including copies buried in otherwise-restorable metadata.
+    exact.original_extraction["last_qualification_approval"] = {"evidenceFingerprint": "private"}
+    exact.original_extraction["extraction_method"] = {
+        "history": [{"lastQualificationApproval": {"evidenceFingerprint": "private"}}],
+        "evidenceFingerprint": "legitimate-evidence",
+    }
     legacy = _snapshot(
         1,
         "parent",
@@ -316,6 +323,10 @@ def test_exact_backup_suppresses_legacy_fetched_url_duplicate():
     assert result["skipped_existing"] == 1
     assert len(db.added) == 1
     assert db.added[0].course_website == canonical_url
+    assert db.added[0].last_qualification_approval is None
+    assert db.added[0].extraction_method == {
+        "history": [{}], "evidenceFingerprint": "legitimate-evidence",
+    }
 
     db.staged.append(db.added[0])
     second = asyncio.run(restore_review_rows("parent", commit=True, db=db))

@@ -25,6 +25,13 @@ async def _dispose_engine_per_test():
     await engine.dispose()
 
 
+@pytest.fixture
+def staged_reader(monkeypatch):
+    from app.dependencies import get_current_user
+    monkeypatch.setitem(app.dependency_overrides, get_current_user,
+                        lambda: {"email": "reviewer@test", "permissions": ["staged.view"]})
+
+
 async def _pick_university() -> int:
     async with AsyncSessionLocal() as db:
         row = (await db.execute(select(University.id).order_by(University.id).limit(1))).first()
@@ -47,7 +54,7 @@ async def _cleanup(job_ids: list[str]) -> None:
 
 
 @pytest.mark.asyncio
-async def test_staged_list_is_scoped_to_current_job_id():
+async def test_staged_list_is_scoped_to_current_job_id(staged_reader):
     uni_id = await _pick_university()
     old_job_id = f"test_resume_old_{uuid.uuid4().hex[:8]}"
     new_job_id = f"test_resume_new_{uuid.uuid4().hex[:8]}"
@@ -198,7 +205,7 @@ async def test_continuation_status_keeps_parent_rows_visible():
 
 
 @pytest.mark.asyncio
-async def test_parent_review_keeps_continuation_rows_visible():
+async def test_parent_review_keeps_continuation_rows_visible(staged_reader):
     uni_id = await _pick_university()
     parent_job_id = f"test_review_parent_{uuid.uuid4().hex[:8]}"
     child_job_id = f"test_review_child_{uuid.uuid4().hex[:8]}"
@@ -282,7 +289,7 @@ async def test_parent_review_keeps_continuation_rows_visible():
 
 
 @pytest.mark.asyncio
-async def test_review_chain_shows_newest_row_once_per_canonical_course_url():
+async def test_review_chain_shows_newest_row_once_per_canonical_course_url(staged_reader):
     uni_id = await _pick_university()
     parent_job_id = f"test_review_dedup_parent_{uuid.uuid4().hex[:8]}"
     child_job_id = f"test_review_dedup_child_{uuid.uuid4().hex[:8]}"

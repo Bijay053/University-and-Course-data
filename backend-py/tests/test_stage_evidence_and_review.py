@@ -359,7 +359,10 @@ async def test_ulaw_normal_targeted_reextract_persists_course_owned_range(monkey
 
 
 @pytest.fixture(autouse=True)
-async def _dispose_engine_per_test():
+async def _dispose_engine_per_test(monkeypatch):
+    from app.dependencies import get_current_user
+    monkeypatch.setitem(app.dependency_overrides, get_current_user,
+                        lambda: {"email": "reviewer@test", "permissions": ["staged.view", "staged.edit"]})
     await engine.dispose()
     yield
     await engine.dispose()
