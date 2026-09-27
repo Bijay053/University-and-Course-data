@@ -31,6 +31,38 @@ def test_defaults_and_deduplication():
         route.ApproveSelectedBody(courseIds=[3], force="false")
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reason_name", ["QUALIFICATION_FEE_REASON", "ONLINE_ONLY_REASON"])
+async def test_actionable_campus_reasons_propagate_even_with_force(monkeypatch, reason_name):
+    from app.services.scraper.extractors import ulaw_campuses
+    reason = getattr(ulaw_campuses, reason_name)
+    row = SimpleNamespace(id=1, status="pending", extraction_method={"fee_variants": {"status": "range"}})
+    db = SimpleNamespace(
+        execute=AsyncMock(side_effect=[
+            SimpleNamespace(scalar_one_or_none=lambda: 42),
+            None,
+            SimpleNamespace(scalar_one_or_none=lambda: row),
+        ]),
+        rollback=AsyncMock(), commit=AsyncMock(),
+    )
+    monkeypatch.setattr(ulaw_campuses, "enrich_course_campuses", AsyncMock(
+        return_value={"status": "needs_review", "reason": reason},
+    ))
+    split = AsyncMock()
+    approve = AsyncMock()
+    monkeypatch.setattr(route, "split_pending_course", split)
+    monkeypatch.setattr(route, "approve_scraped_course", approve)
+    result = await route.approve_selected(
+        route.ApproveSelectedBody(courseIds=[1], force=True), db, {"email": "reviewer"},
+    )
+    assert result["failed"] == [{"id": 1, "error": reason}]
+    assert result["approvedIds"] == []
+    split.assert_not_awaited()
+    approve.assert_not_awaited()
+    db.commit.assert_not_awaited()
+    db.rollback.assert_awaited_once()
+
+
 @pytest.mark.parametrize("rollback_fails", [False, True])
 def test_http_contract_sanitizes_database_errors_and_rollback(rollback_fails):
     from app.routers.scrape import router

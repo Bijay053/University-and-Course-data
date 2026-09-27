@@ -10,6 +10,48 @@ from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup
 
 METHOD = "location.ulaw_course_authority"
+QUALIFICATION_FEE_REASON = (
+    "Selected published fees contain multiple qualification or study variants. "
+    "Choose a separate qualification fee set before approval; campus splitting cannot separate awards."
+)
+ONLINE_ONLY_REASON = (
+    "The official course source lists Online only in its Key Facts locations. "
+    "This contradicts the staged campus delivery or campus fees. Review the official source; "
+    "on-campus approval is blocked."
+)
+
+
+def _official_online_only(html, url, course_name):
+    """A course-owned location statement, never a title/navigation heuristic."""
+    soup = BeautifulSoup(html, "html.parser")
+    canonical = soup.find("link", rel="canonical")
+    if canonical and urljoin(url, canonical.get("href", "")).rstrip("/") != url.rstrip("/"):
+        return False
+    title = soup.find("h1")
+    if not title or _norm(title.get_text(" ", strip=True)) != _norm(course_name or ""):
+        return False
+    locations = []
+    for block in soup.select(".key-facts .key-facts__locations"):
+        heading = block.find(["h3", "h4"])
+        if not heading or _norm(heading.get_text(" ", strip=True)) not in {"location", "locations"}:
+            continue
+        if not block.find("a"):
+            text = _norm(block.get_text(" ", strip=True))
+            label = _norm(heading.get_text(" ", strip=True))
+            if text in {f"{label} online", f"{label} ulaw online"}:
+                locations.append(("online", "/locations/online"))
+            else:
+                locations.append((text, ""))
+        for link in block.find_all("a", href=True):
+            target = urlparse(urljoin(url, link["href"]))
+            if target.hostname in {"law.ac.uk", "www.law.ac.uk"} and target.path.startswith("/locations/"):
+                locations.append((_norm(link.get_text(" ", strip=True)), target.path.rstrip("/")))
+            else:
+                locations.append(("", ""))
+    return bool(locations) and all(
+        label in {"online", "ulaw online"} and path == "/locations/online"
+        for label, path in locations
+    )
 
 
 def _norm(value):
@@ -134,15 +176,58 @@ async def enrich_course_campuses(db, row):
     with stale fees. Failure is explicit and leaves the row untouched.
     """
     from .ulaw_fees import is_ulaw_course, parse_course_fees, validated_fee_variants
-    from app.services.scraper.campus_fee_split import plan_campus_fees
+    from app.services.scraper.campus_fee_split import SCOPE, plan_campus_fees
 
-    if (row.extraction_method or {}).get("campus_fee_scope"):
+    scope = (row.extraction_method or {}).get(SCOPE)
+    if scope:
+        from app.services.scraper.approve_course import ApprovalValidationError
+        from app.services.scraper.published_offerings import offering_identity, validate_offering_cohort
+        try:
+            validate_offering_cohort([row], offering_identity(row, scope))
+            # Cohort validation binds the tuple and identity, not fee campus
+            # labels. Independently prove that every scoped location maps to
+            # its selected published fee using the existing regional rules.
+            groups, reason = plan_campus_fees(row)
+            covered = {_norm(location) for group in groups for location in group["locations"]}
+            expected = {_norm(location) for location in scope["locations"]}
+            if not groups or covered != expected:
+                return {
+                    "status": "needs_review",
+                    "reason": reason or "Stored campus scope does not match published fee locations; review required.",
+                }
+        except (ApprovalValidationError, KeyError, IndexError, AttributeError, TypeError, ValueError):
+            return {"status": "needs_review", "reason": "Stored campus scope evidence is inconsistent; review required."}
         return {"status": "unchanged"}
     # An unscoped legacy row may contain an institution-default campus even
     # when that happens to map to a price. Reverify course-owned evidence.
     old = validated_fee_variants(row)
     if not old or not is_ulaw_course(row.course_website):
         return {"status": "needs_review", "reason": "Verified course fee evidence is required."}
+    if len({option["study_variant"] for option in old["selected"]}) > 1:
+        return {"status": "needs_review", "reason": QUALIFICATION_FEE_REASON}
+    # A previously captured, course-owned location proof remains usable with
+    # the exact fee cohort it attests. Do not replace it with a fresh page's
+    # missing/differently rendered campus section, or infer scope from names.
+    proof = (row.extraction_method or {}).get("campus_authority") or {}
+    selected = old["selected"]
+    locations = proof.get("locations")
+    if (
+        proof.get("method") == METHOD
+        and proof.get("source_url") == row.course_website
+        and proof.get("course_name") == row.course_name
+        and isinstance(locations, list) and locations
+        and all(isinstance(location, str) and location.strip() for location in locations)
+        and row.course_location == ", ".join(locations)
+        and proof.get("fee_year") == old["fee_year"]
+        and proof.get("fee_term") == old["fee_term"]
+        and selected
+        and {option["study_variant"] for option in selected} == {proof.get("study_variant")}
+        and isinstance(proof.get("snippet"), str) and proof["snippet"].strip()
+    ):
+        groups, reason = plan_campus_fees(row)
+        if groups:
+            return {"status": "unchanged"}
+        return {"status": "needs_review", "reason": reason}
     import httpx
     try:
         async with httpx.AsyncClient(timeout=15, follow_redirects=False) as client:
@@ -159,6 +244,10 @@ async def enrich_course_campuses(db, row):
                 html = b"".join(chunks).decode("utf-8", errors="replace")
     except httpx.HTTPError:
         return {"status": "needs_review", "reason": "Official course locations could not be verified. Try again later."}
+    # Current official online-only scope is actionable even when the legacy
+    # campus fee cohort is stale. Do not stage or publish the online route.
+    if _official_online_only(html, row.course_website, row.course_name):
+        return {"status": "needs_review", "reason": ONLINE_ONLY_REASON}
     fresh = parse_course_fees(html, row.course_website)
     def signature(authority):
         return sorted((o["amount"], o["currency"], o["campus"], o["year"], o["period"], o["study_variant"])

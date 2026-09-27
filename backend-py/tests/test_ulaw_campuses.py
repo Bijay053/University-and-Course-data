@@ -155,3 +155,143 @@ async def test_recovery_failures_do_not_mutate_row(monkeypatch, change):
     assert result["status"] == "needs_review"
     assert result["reason"]
     assert vars(row) == before
+
+
+@pytest.mark.asyncio
+async def test_verified_campus_evidence_does_not_require_live_recovery(monkeypatch):
+    html = page(table())
+    row = staged(html)
+    proof = parse(html)
+    row.course_location = ", ".join(proof["locations"])
+    row.extraction_method["campus_authority"] = proof
+    before = deepcopy(vars(row))
+
+    def unexpected_fetch(**kwargs):
+        pytest.fail("Verified course/cohort evidence must not require a network fetch")
+
+    monkeypatch.setattr(httpx, "AsyncClient", unexpected_fetch)
+    assert await enrich_course_campuses(SimpleNamespace(), row) == {"status": "unchanged"}
+    assert vars(row) == before
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("field,value", [
+    ("course_name", "Another award"),
+    ("source_url", URL + "another/"),
+    ("fee_year", 2001),
+    ("fee_term", "Annual"),
+    ("study_variant", "Professional Practice"),
+    ("snippet", ""),
+    ("method", "university_default"),
+    ("locations", ["Leeds"]),
+])
+async def test_stale_or_unrelated_campus_proof_cannot_skip_recovery(monkeypatch, field, value):
+    html = page(table())
+    row = staged(html)
+    proof = parse(html)
+    row.course_location = ", ".join(proof["locations"])
+    row.extraction_method["campus_authority"] = {**proof, field: value}
+    before = deepcopy(vars(row))
+    client(monkeypatch, html, 503)
+    result = await enrich_course_campuses(SimpleNamespace(), row)
+    assert result["status"] == "needs_review"
+    assert vars(row) == before
+
+
+@pytest.mark.asyncio
+async def test_scope_marker_alone_does_not_bypass_campus_validation():
+    row = staged(page(table()))
+    row.university_id = 1
+    row.degree_level = "Master"
+    row.extraction_method["campus_fee_scope"] = {"original_name": TITLE}
+    before = deepcopy(vars(row))
+    result = await enrich_course_campuses(SimpleNamespace(), row)
+    assert result["status"] == "needs_review"
+    assert vars(row) == before
+
+
+@pytest.mark.asyncio
+async def test_scoped_london_cannot_use_birmingham_selected_fees():
+    from app.models import ScrapedCourse
+    from app.services.scraper.campus_fee_split import _apply_group, plan_campus_fees
+    from tests.test_campus_fee_split import row_values
+    values = row_values()
+    groups, _ = plan_campus_fees(values)
+    london = next(group for group in groups if "London" in group["locations"])
+    row = ScrapedCourse(university_id=1, **deepcopy(values))
+    _apply_group(row, london, values["course_name"], values["course_location"])
+    authority = row.extraction_method["fee_variants"]
+    # Internally consistent fee evidence for the wrong physical campus:
+    # tuple/identity validation alone must not authorize this scope.
+    for option in authority["selected"]:
+        original = deepcopy(option)
+        option["campus"] = "Birmingham"
+        for candidate in authority["options"]:
+            if candidate == original:
+                candidate["campus"] = "Birmingham"
+    before = deepcopy(row.extraction_method)
+    result = await enrich_course_campuses(SimpleNamespace(), row)
+    assert result["status"] == "needs_review"
+    assert "campus" in result["reason"].lower() or "London" in result["reason"]
+    assert row.extraction_method == before
+    assert row.course_location == "London"
+
+
+@pytest.mark.asyncio
+async def test_scoped_regional_fees_require_exact_location_coverage():
+    from app.models import ScrapedCourse
+    from app.services.scraper.campus_fee_split import _apply_group, plan_campus_fees
+    from tests.test_campus_fee_split import row_values
+    values = row_values()
+    groups, _ = plan_campus_fees(values)
+    for group in groups:
+        row = ScrapedCourse(university_id=1, **deepcopy(values))
+        _apply_group(row, group, values["course_name"], values["course_location"])
+        assert await enrich_course_campuses(SimpleNamespace(), row) == {"status": "unchanged"}
+
+
+@pytest.mark.asyncio
+async def test_mixed_qualification_fees_have_actionable_reason_without_mutation(monkeypatch):
+    from app.services.scraper.extractors.ulaw_campuses import QUALIFICATION_FEE_REASON
+    row = staged(page(table()))
+    authority = row.extraction_method["fee_variants"]
+    for option, variant in zip(authority["selected"], ["PGDip", "PGCert"]):
+        original = deepcopy(option)
+        option["study_variant"] = variant
+        # Keep the evidence internally valid even if options aren't shared.
+        for candidate in authority["options"]:
+            if candidate == original:
+                candidate["study_variant"] = variant
+    before = deepcopy(vars(row))
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: pytest.fail("No live recovery needed"))
+    assert await enrich_course_campuses(SimpleNamespace(), row) == {
+        "status": "needs_review", "reason": QUALIFICATION_FEE_REASON,
+    }
+    assert vars(row) == before
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("location", ['<a href="/locations/online/">Online</a>', "Online"])
+async def test_official_online_only_precedes_stale_fee_error(monkeypatch, location):
+    from app.services.scraper.extractors.ulaw_campuses import ONLINE_ONLY_REASON
+    row = staged(page(table()))
+    row.course_location = "London"
+    row.study_mode = "Blended"
+    before = deepcopy(vars(row))
+    html = page('<section class="key-facts"><div class="key-facts__locations">'
+                f'<h4>Locations</h4>{location}</div></section>').replace("£19,050", "£20,050")
+    client(monkeypatch, html)
+    assert await enrich_course_campuses(SimpleNamespace(), row) == {
+        "status": "needs_review", "reason": ONLINE_ONLY_REASON,
+    }
+    assert vars(row) == before
+
+
+@pytest.mark.parametrize("body", [
+    '<nav><a href="/locations/online/">Online</a></nav>',
+    '<section class="key-facts"><div class="key-facts__locations"><h4>Locations</h4>'
+    '<a href="/locations/online/">Online</a><a href="/locations/leeds/">Leeds</a></div></section>',
+])
+def test_online_navigation_or_mixed_delivery_is_not_online_only(body):
+    from app.services.scraper.extractors.ulaw_campuses import _official_online_only
+    assert not _official_online_only(page(body), URL, TITLE)
