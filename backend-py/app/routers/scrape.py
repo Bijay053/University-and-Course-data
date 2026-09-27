@@ -2859,6 +2859,24 @@ async def re_extract_staged(
                 for signature, evidence in other_evidence.items()
                 if str(evidence.get("field_key") or "") in targeted_fields
             }
+            # Preserve untouched reviewer provenance while refreshing the
+            # selected field's method from the actual course-owned citation.
+            from app.services.scraper.extractors.ulaw_sqe2_demands import is_sqe2_course
+            if is_sqe2_course(url):
+                _sqe_methods = dict(row.extraction_method or {})
+                for field_key in (
+                    "ielts_overall", "ielts_listening", "ielts_reading",
+                    "ielts_writing", "ielts_speaking", "duration", "duration_term",
+                ):
+                    if field_key not in payload:
+                        continue
+                    selected = selected_evidence_by_field.get(field_key)
+                    if (selected and selected.get("method") == "ulaw_sqe2:course_demands_pdf"
+                            and payload[field_key] == selected.get("value")):
+                        _sqe_methods[field_key] = selected["method"]
+                    elif payload[field_key] is None:
+                        _sqe_methods.pop(field_key, None)
+                payload["extraction_method"] = _sqe_methods
         if _ulaw_fee_refresh:
             payload["extraction_method"] = _ulaw_fee_map
             payload["scrape_warnings"] = list(payload.get("scrape_warnings") or []) + (
@@ -2868,6 +2886,22 @@ async def re_extract_staged(
                 if _ulaw_fee_variants.get("status") == "unresolved"
                 else []
             )
+        from app.services.scraper.extractors.ulaw_sqe2_demands import is_sqe2_course
+        if is_sqe2_course(url) and (
+            targeted_fields is None or "ielts_overall" in targeted_fields
+        ):
+            _sqe_warning = "ulaw_sqe2_demands_unavailable"
+            # A fresh successful citation clears the old failure; an empty
+            # source keeps a visible warning rather than silently retaining
+            # peer/default English scores on the staged row.
+            _sqe_recovered = any(
+                item.get("method") == "ulaw_sqe2:course_demands_pdf"
+                for item in selected_evidence_by_field.values()
+            )
+            payload["scrape_warnings"] = [
+                warning for warning in (payload.get("scrape_warnings") or [])
+                if warning != _sqe_warning
+            ] + ([] if _sqe_recovered else [_sqe_warning])
 
         # Re-apply the guard after combining extraction passes and narrowing a
         # targeted request.  This is the last boundary before values are
@@ -2909,6 +2943,13 @@ async def re_extract_staged(
         # Preserve unrelated historical warnings and add any warnings from this
         # attempt. Resolution is evaluated after applying the fresh fields.
         warning_candidates = list(row.scrape_warnings or [])
+        if is_sqe2_course(url) and (
+            targeted_fields is None or "ielts_overall" in targeted_fields
+        ):
+            warning_candidates = [
+                warning for warning in warning_candidates
+                if warning != "ulaw_sqe2_demands_unavailable"
+            ]
         if _ulaw_fee_refresh:
             warning_candidates = [
                 warning for warning in warning_candidates

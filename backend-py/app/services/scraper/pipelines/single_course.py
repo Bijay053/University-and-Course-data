@@ -11224,6 +11224,25 @@ async def extract_course(
         from app.services.scraper.extractors.ulaw_campuses import apply_course_campus_authority
         _ulaw_campus_authority = apply_course_campus_authority(html or "", url, payload, evidence, _ulaw_fee_authority)
 
+    # This course's page links to the Course Demands index, whose SQE2 PDF
+    # specifies IELTS. The page itself does not publish a complete course
+    # duration: do not translate weeks of content or assessment dates into one.
+    from app.services.scraper.extractors.ulaw_sqe2_demands import (
+        ENGLISH_FIELDS as _sqe_english_fields, is_sqe2_course, recover_sqe2_english,
+    )
+    if is_sqe2_course(url):
+        _sqe_evidence = await recover_sqe2_english(url, html or "")
+        if not _sqe_evidence:
+            payload.setdefault("scrape_warnings", []).append("ulaw_sqe2_demands_unavailable")
+        # Neither a central/peer requirement nor a time-limit/content-length
+        # guess may survive as this course's own English or duration.
+        for _sqe_field in (*_sqe_english_fields, "duration", "duration_term"):
+            payload[_sqe_field] = None
+            evidence = [item for item in evidence if item.get("field_key") != _sqe_field]
+        for _sqe_ev in _sqe_evidence:
+            payload[_sqe_ev["field_key"]] = _sqe_ev["value"]
+            evidence.append(_sqe_ev)
+
     footer = build_course_page_provenance_footer(payload)
 
     # Build extraction_method provenance map.

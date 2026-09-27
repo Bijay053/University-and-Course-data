@@ -29,6 +29,98 @@ from app.services.scraper.replay_extraction import restore_review_rows
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("smart", [False, True])
+async def test_ulaw_sqe2_normal_and_review_fix_keep_pdf_proof(monkeypatch, smart):
+    from tests.test_ulaw_sqe2_demands import URL, PDF, COURSE_HTML, mock_sources
+    from app.routers.scrape import ReExtractBody, re_extract_staged
+    from app.services.scraper.config.context import current_uni_config
+    from app.services.scraper.config.loader import load_uni_config
+    from app.services.scraper.pipelines.single_course import extract_course
+
+    mock_sources(monkeypatch)
+    async def no_ai(*args, **kwargs):
+        return {}, 0.0, 0, 0, {"skipped": True}
+    monkeypatch.setattr("app.services.scraper.extractors.gemini_primary.extract_primary", no_ai)
+    cfg = load_uni_config(slug="law_1902", name="University of Law",
+                          scrape_url="https://www.law.ac.uk/study/", create_missing_stub=False)
+
+    async def extraction(link, **kwargs):
+        token = current_uni_config.set(cfg)
+        try:
+            return await extract_course(link["url"], html=COURSE_HTML,
+                                        country="United Kingdom", use_ai_fallback=False)
+        finally:
+            current_uni_config.reset(token)
+
+    async def no_central(*args, **kwargs):
+        return {}
+
+    monkeypatch.setattr("app.services.scraper.orchestrator._extract_only", extraction)
+    monkeypatch.setattr("app.services.scraper.central_pages.prefetch_central_pages", no_central)
+    # An existing reviewed SQE2 row can be refreshed even though new
+    # non-degree preparation courses are excluded by the current staging gate.
+    monkeypatch.setattr("app.services.scraper.stage_course.should_stage_course",
+                        lambda *args, **kwargs: (True, ""))
+    uni_id = await _pick_university()
+    job_id = f"test_sqe2_pdf_{uuid.uuid4().hex[:10]}"
+    try:
+        fresh = await extraction({"url": URL})
+        async with AsyncSessionLocal() as db:
+            db.add(ScrapeRuntimeJob(runtime_job_id=job_id, university_id=uni_id,
+                                    job_type="scrape", status="completed"))
+            await db.flush()
+            staged = await stage_course(
+                db, scrape_job_id=job_id, university_id=uni_id,
+                course_name="SQE2 Preparation Course", source_url=URL,
+                payload=fresh["payload"], evidence=fresh["evidence"],
+            )
+            assert staged.saved, staged.reason
+            await db.commit()
+            row = await db.get(ScrapedCourse, staged.scraped_course_id)
+            assert row.ielts_overall == 6.5
+            assert row.duration is None
+            # Legacy review scores must be replaced by the actual course PDF,
+            # without altering a separate reviewer-controlled field.
+            row.ielts_overall = 7.0
+            row.ielts_writing = 7.0
+            row.course_location = "Reviewer verified location"
+            row.extraction_method = {"ielts_overall": "manual", "course_location": "manual"}
+            await db.commit()
+            result = await re_extract_staged(ReExtractBody(
+                ids=[row.id], universityId=uni_id, smart=smart,
+                targetFields=["english_requirements", "duration"],
+            ), db)
+            assert result["errors"] == 0, result
+            await db.refresh(row)
+            assert row.ielts_overall == 6.5 and row.ielts_writing == 6.0
+            assert row.duration is None and row.duration_term is None
+            assert row.course_location == "Reviewer verified location"
+            assert row.extraction_method["course_location"] == "manual"
+            assert row.extraction_method["ielts_overall"] == "ulaw_sqe2:course_demands_pdf"
+            proof = (await db.execute(select(ScrapedFieldEvidence).where(
+                ScrapedFieldEvidence.scraped_course_id == row.id,
+                ScrapedFieldEvidence.field_key == "ielts_overall",
+            ))).scalars().all()
+            assert any(ev.source_url == PDF and "sufficient command of English" in (ev.snippet or "")
+                       and ev.selected for ev in proof)
+            from app.services.scraper.extractors import ulaw_sqe2_demands
+            async def unavailable_pdf(_url):
+                return ""
+            monkeypatch.setattr(ulaw_sqe2_demands, "download_pdf_text", unavailable_pdf)
+            failure = await re_extract_staged(ReExtractBody(
+                ids=[row.id], universityId=uni_id, targetFields=["english_requirements"],
+            ), db)
+            assert failure["errors"] == 0, failure
+            await db.refresh(row)
+            assert row.ielts_overall is None
+            assert "ulaw_sqe2_demands_unavailable" in row.scrape_warnings
+            assert "ielts_overall" not in row.extraction_method
+            assert row.course_location == "Reviewer verified location"
+    finally:
+        await _cleanup(job_id)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("smart", [False, True])
 async def test_ulaw_normal_targeted_reextract_persists_course_owned_range(monkeypatch, smart):
     """Run the real extractor, staging and normal re-extract persistence path."""
     import os
