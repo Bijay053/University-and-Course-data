@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   annualFeeEquivalentForDisplay,
+  durationReportPrefill,
   formatRecoveryDiagnosticMessage,
   getFixResultHeading,
   SmartFixDetails,
@@ -31,6 +32,86 @@ describe("annualFeeEquivalentForDisplay", () => {
   });
 });
 
+describe("verified unpublished duration review", () => {
+  it("renders the official citation without inventing a duration and keeps new-source reporting available", async () => {
+    const review = initialReview();
+    review.courses = [{
+      ...review.courses[0],
+      duration: null,
+      durationTerm: null,
+      completeness: 72,
+      durationReviewStatus: {
+        status: "confirmed_unpublished",
+        reason: "The verified course page does not publish a duration.",
+        sources: [{ url: "https://example.test/courses/1", snippet: "Study options and fees; no duration listed." }],
+      },
+    }] as ScrapingInitialReviewState["courses"];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/scrape/staged/repair-job") return jsonResponse({ courses: review.courses });
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      return jsonResponse({});
+    }));
+    render(<ScrapingForTest initialReviewState={review} />);
+    const status = screen.getByTestId("status-duration-unpublished-1");
+    expect(status.textContent).toContain("Not published");
+    expect(status.textContent).toContain("no duration listed");
+    expect(status.textContent).not.toMatch(/\b\d+\s+(year|month|week)/i);
+    expect((screen.getByTestId("link-duration-source-1-0") as HTMLAnchorElement).href)
+      .toBe("https://example.test/courses/1");
+    await userEvent.setup().click(screen.getByTestId("button-report-duration-1"));
+    expect(screen.getByTestId("input-report-urls")).toBeTruthy();
+    expect((screen.getByTestId("checkbox-report-duration") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByTestId("input-report-description") as HTMLTextAreaElement).value)
+      .toContain("recheck the unpublished duration");
+  });
+
+  it("prefills a manual recheck with the official URL rather than a numeric duration", () => {
+    expect(durationReportPrefill({ courseName: "Biology", courseWebsite: "https://example.test/biology" })).toEqual({
+      courseName: "Biology",
+      courseUrl: "https://example.test/biology",
+      fields: ["duration"],
+      description: "New official evidence for Biology: please recheck the unpublished duration against the supplied course URL.",
+    });
+  });
+
+  it("suppresses an obsolete automatic duration fix after source verification", async () => {
+    const review = initialReview();
+    review.courses = [{
+      ...review.courses[0], duration: null,
+      durationReviewStatus: {
+        status: "confirmed_unpublished", reason: "No duration on the official page.",
+        sources: [{ url: "https://example.test/courses/1", snippet: "Course overview" }],
+      },
+    }] as ScrapingInitialReviewState["courses"];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/scrape/staged/analyze") return jsonResponse({
+        total: 1, courses_with_url: 1,
+        issues: [{ field: "duration", label: "Duration", missing: 1, total: 1, current_pct: 0, expected_fill_pct: 70 }],
+      });
+      if (url === "/api/scrape/staged/repair-job") return jsonResponse({ courses: review.courses });
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ScrapingForTest initialReviewState={review} />);
+    const checkbox = screen.getByTestId("checkbox-logical-course-1") as HTMLInputElement;
+    if (!checkbox.checked) await userEvent.setup().click(checkbox);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Smart Fix (1)" }));
+    await waitFor(() => expect(screen.getByTestId("text-duration-unpublished-fix")).toBeTruthy());
+    expect(screen.getByText(/No additional legacy-field gaps were detected/)).toBeTruthy();
+    expect((screen.getByRole("button", { name: /Confirm Smart Fix/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect(fetchMock.mock.calls.some(([url]) => String(url) === "/api/scrape/staged/fix-jobs")).toBe(false);
+  });
+});
+
 describe("Smart Fix results contract", () => {
   const issue = { field: "international_fee", label: "Fee", missing: 1, total: 1, current_pct: 0, expected_fill_pct: 0 };
   const base = {
@@ -46,6 +127,27 @@ describe("Smart Fix results contract", () => {
     expect(getFixResultHeading({ ...base, updated: 0, errors: 1, courseResults: [] })).toBe("Failed");
     expect(getFixResultHeading({ ...base, afterAnalysisComplete: false })).toBe("Resolution not verified");
     expect(getFixResultHeading({ ...base, courseResults: [{ ...base.courseResults[0], unsupported_fields: ["score_type"] }] })).toBe("Partially successful");
+  });
+  it("does not count verified unpublished duration as a numeric gap or a successful repair", () => {
+    const reviewed = { field: "duration", label: "Duration", missing: 1, confirmed_unpublished: 1,
+      total: 1, current_pct: 0, expected_fill_pct: 0 };
+    const result = { ...base, beforeIssues: [reviewed], afterIssues: [reviewed],
+      requestedFields: ["duration"], updated: 0, courseResults: [] };
+    expect(getFixResultHeading(result)).toBe("No progress");
+    render(<SmartFixDetails result={result} />);
+    expect(screen.getByText("0 selected issues remaining in fresh analysis")).toBeTruthy();
+  });
+  it("does not treat newly confirmed nonpublication as numeric repair progress", () => {
+    const missing = { field: "duration", label: "Duration", missing: 1, total: 1,
+      current_pct: 0, expected_fill_pct: 50 };
+    const verified = { ...missing, confirmed_unpublished: 1 };
+    const result = { ...base, beforeIssues: [missing], afterIssues: [verified],
+      requestedFields: ["duration"], updated: 0, courseResults: [{
+        id: 1, ok: true, attempted: true, outcome: "no_progress" as const,
+        made_progress: false, resolved_fields: [], unresolved_fields: ["duration"],
+      }] };
+    expect(getFixResultHeading(result)).toBe("No progress");
+    expect(getFixResultHeading({ ...result, beforeIssues: [], courseResults: [] })).toBe("No progress");
   });
   it("groups explicit reasons, separates unattempted work, and only offers the indicated report action", async () => {
     const onReport = vi.fn();

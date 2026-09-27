@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { DurationReviewNotice, type DurationReviewStatus } from "@/components/duration-review-status";
 import { PublishedFeeVariants, feeVariantAuthority, feeVariantSummary, type FeeVariantCarrier } from "@/components/published-fee-variants";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, ExternalLink, ChevronRight, ChevronDown, RefreshCw, RotateCcw, CheckCircle2, XCircle, Loader2, SearchX, FileSearch, Ban, Globe, FileWarning } from "lucide-react";
@@ -28,6 +29,7 @@ export type ReviewStagedCourse = FeeVariantCarrier & {
   courseLocation: string | null;
   duration: number | string | null;
   durationTerm: string | null;
+  durationReviewStatus?: DurationReviewStatus | null;
   studyMode: string | null;
   degreeLevel: string | null;
   internationalFee: number | string | null;
@@ -1025,13 +1027,15 @@ export function ReviewScrapedCoursesTable({ courses, universityName, readOnly, s
                       ) : <span className="text-gray-300">-</span>}
                     </td>
                     <td className="p-2 text-gray-600 whitespace-nowrap align-top">
-                      {course.duration != null && course.duration !== "" ? (() => {
+                      {course.durationReviewStatus?.status === "confirmed_unpublished" && (course.duration == null || course.duration === "") ? (
+                        <DurationReviewNotice status={course.durationReviewStatus} id={course.id} />
+                      ) : course.duration != null && course.duration !== "" ? (() => {
                         const n = typeof course.duration === "number" ? course.duration : parseFloat(course.duration as string);
                         if (isNaN(n)) return `${course.duration} ${course.durationTerm || ""}`.trim();
                         const r = Math.round(n * 10) / 10;
                         const display = r % 1 === 0 ? String(Math.round(r)) : String(r);
                         return `${display} ${course.durationTerm || "Year"}`.trim();
-                      })() : <span className="text-gray-300">-</span>}
+                      })() : <span className="text-gray-500" title="Duration not verified — the source may be unavailable or extraction may have failed">Not verified</span>}
                     </td>
                     <td className="p-2 text-right font-medium whitespace-nowrap align-top">
                       {feeDisplay(updatedCourses[course.id] ?? course, readOnly, handleFeeUpdated, onCourseUpdated) ?? <MissingBadge title="Missing international fee" />}

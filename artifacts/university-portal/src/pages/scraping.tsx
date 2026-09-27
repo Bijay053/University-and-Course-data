@@ -31,6 +31,7 @@ import {
 } from "@/components/review-scraped-courses-table";
 import { ScrapeJobCard } from "@/components/scrape-job-card";
 import { CourseReport, type CourseReportPrefillCourse } from "@/components/course-report";
+import { DurationReviewNotice, type DurationReviewStatus } from "@/components/duration-review-status";
 import { TargetedRetryAllFilteredNotice, type TargetedRetryDiagnostic } from "@/components/targeted-retry-diagnostic";
 import { DatedCatalogueReview } from "@/components/dated-catalogue-review";
 import { QualificationRefresh } from "@/components/qualification-refresh";
@@ -166,6 +167,7 @@ type StagedCourse = FeeVariantCarrier & {
   courseLocation: string | null;
   duration: number | null;
   durationTerm: string | null;
+  durationReviewStatus?: DurationReviewStatus | null;
   studyMode: string | null;
   degreeLevel: string | null;
   studyLoad: string | null;
@@ -275,12 +277,14 @@ export function normalizeRequirementStatus(value: unknown): CourseRequirementSta
 function normalizeStagedCourse(course: StagedCourse & {
   requirement_status?: unknown;
   requirementStatus?: unknown;
+  duration_review_status?: DurationReviewStatus | null;
 }): StagedCourse {
   return {
     ...course,
     requirementStatus: normalizeRequirementStatus(
       course.requirementStatus ?? course.requirement_status,
     ),
+    durationReviewStatus: course.durationReviewStatus ?? course.duration_review_status ?? null,
   };
 }
 
@@ -433,9 +437,15 @@ interface FixIssue {
   field: string;
   label: string;
   missing: number;
+  confirmed_unpublished?: number;
   total: number;
   current_pct: number;
   expected_fill_pct: number;
+}
+function actionableMissing(issue: FixIssue): number {
+  return issue.field === "duration"
+    ? Math.max(0, issue.missing - (issue.confirmed_unpublished ?? 0))
+    : issue.missing;
 }
 interface FixAnalysis {
   total: number;
@@ -526,9 +536,19 @@ export function smartFixReportPrefill(
     courseName: course.courseName,
     courseUrl: course.courseWebsite,
     fields: Array.from(new Set(fields.map((field) =>
-      field.startsWith("ielts") || field === "english_requirements" ? "english" as const : "other" as const,
+      field === "duration" ? "duration" as const
+        : field.startsWith("ielts") || field === "english_requirements" ? "english" as const : "other" as const,
     ))),
     description: `Smart Fix: ${course.courseName}. Please verify these unresolved fields using the exact official source: ${fields.map((field) => FIX_FIELD_LABELS[field] ?? field).join(", ")}.`,
+  };
+}
+
+export function durationReportPrefill(course: Pick<StagedCourse, "courseName" | "courseWebsite">): CourseReportPrefillCourse {
+  return {
+    courseName: course.courseName,
+    courseUrl: course.courseWebsite,
+    fields: ["duration"],
+    description: `New official evidence for ${course.courseName}: please recheck the unpublished duration against the supplied course URL.`,
   };
 }
 
@@ -547,6 +567,7 @@ export function SmartFixDetails({ result, onReport }: {
     unresolved_after_official_recovery: "Selected issues remain after official-source recovery",
     issues_resolved: "Selected issues resolved",
     correction_requires_review: "Correction needs manual source review",
+    confirmed_unpublished: "Duration verified as not published — supply a new official URL to recheck",
     initial_analysis_failed: "Initial issue analysis failed — resolution unverified; recheck",
     post_analysis_failed: "Post-fix analysis failed — changes may be saved; resolution unverified; recheck",
     course_changed_during_fix: "Course changed during repair — resolution unverified; recheck",
@@ -558,7 +579,7 @@ export function SmartFixDetails({ result, onReport }: {
     const key = `${state}: ${reason}`;
     groups.set(key, [...(groups.get(key) ?? []), row]);
   }
-  const remaining = result.afterIssues.filter((issue) => result.requestedFields.includes(issue.field)).reduce((sum, issue) => sum + issue.missing, 0);
+  const remaining = result.afterIssues.filter((issue) => result.requestedFields.includes(issue.field)).reduce((sum, issue) => sum + actionableMissing(issue), 0);
   const fieldList = (fields?: string[]) => fields?.length ? fields.map((field) => FIX_FIELD_LABELS[field] ?? field).join(", ") : "None reported";
   return (
     <div className="space-y-3 text-sm" data-testid="smart-fix-details">
@@ -632,12 +653,22 @@ export function getFixResultHeading(result: {
     if (result.courseResults?.some((row) => UNVERIFIED_FIX_REASONS.has(row.reason_code ?? ""))) return "Resolution not verified";
     if (!result.afterAnalysisComplete) return "Resolution not verified";
     const resolved = result.beforeIssues?.length
-      ? result.beforeIssues.reduce((sum, issue) => sum + issue.missing - (result.afterIssues?.find((after) => after.field === issue.field)?.missing ?? 0), 0)
-      : (result.courseResults ?? []).reduce((sum, row) => sum + (row.resolved_fields?.length ?? 0), 0);
-    const remaining = (result.afterIssues ?? []).filter((issue) => result.requestedFields?.includes(issue.field)).reduce((sum, issue) => sum + issue.missing, 0);
+      ? result.beforeIssues.reduce((sum, issue) => {
+          const after = result.afterIssues?.find((candidate) => candidate.field === issue.field);
+          // Verification of nonpublication is evidence, not a newly extracted number.
+          return sum + issue.missing - (after?.missing ?? 0);
+        }, 0)
+      : (result.courseResults ?? []).reduce((sum, row) => sum + (row.resolved_fields ?? []).filter(
+          (field) => field !== "duration" || !(result.afterIssues ?? []).some(
+            (issue) => issue.field === "duration" && (issue.confirmed_unpublished ?? 0) > 0,
+          ),
+        ).length, 0);
+    const remaining = (result.afterIssues ?? []).filter((issue) => result.requestedFields?.includes(issue.field)).reduce((sum, issue) => sum + actionableMissing(issue), 0);
+    const unpublishedDuration = (result.afterIssues ?? []).some((issue) => issue.field === "duration"
+      && result.requestedFields?.includes("duration") && (issue.confirmed_unpublished ?? 0) > 0);
     const unsupported = (result.courseResults ?? []).some((row) => row.unsupported_fields?.length);
     if (resolved <= 0) return result.errors > 0 ? "Failed" : "No progress";
-    return remaining || unsupported || result.errors ? "Partially successful" : "Successful";
+    return remaining || unpublishedDuration || unsupported || result.errors ? "Partially successful" : "Successful";
   }
   if (result.afterAnalysisComplete && result.beforeIssues?.length) {
     const beforeMissing = result.beforeIssues.reduce((sum, issue) => sum + issue.missing, 0);
@@ -2559,6 +2590,17 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   const [cleaningNames, setCleaningNames] = useState(false);
   const [requirementRecoveryRequest, setRequirementRecoveryRequest] = useState(0);
   const [requirementRecoveryCourses, setRequirementRecoveryCourses] = useState<CourseReportPrefillCourse[]>([]);
+  const reportNewDurationSource = (course: StagedCourse) => {
+    setRequirementRecoveryCourses([durationReportPrefill(course)]);
+    setRequirementRecoveryRequest((request) => request + 1);
+  };
+  const allSelectedDurationsUnpublished = stagedCourses.some((course) => selectedIds.has(course.id))
+    && stagedCourses.filter((course) => selectedIds.has(course.id))
+      .every((course) => course.durationReviewStatus?.status === "confirmed_unpublished");
+  const actionableFixIssues = fixAnalysis?.issues.filter(
+    (issue) => issue.field !== "duration"
+      || (!allSelectedDurationsUnpublished && issue.missing > (issue.confirmed_unpublished ?? 0)),
+  ) ?? [];
 
   const resetForcedFixFields = () => {
     setForceFields([]);
@@ -2673,6 +2715,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             ...existing,
             total: combinedTotal,
             missing: combinedMissing,
+            confirmed_unpublished: (existing.confirmed_unpublished ?? 0) + (issue.confirmed_unpublished ?? 0),
             current_pct: combinedTotal > 0 ? Math.round(100 * (1 - combinedMissing / combinedTotal)) : 100,
             expected_fill_pct: Math.round((existing.expected_fill_pct + issue.expected_fill_pct) / 2),
           });
@@ -2763,7 +2806,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
           universityId: uniId,
           sourceJobId: reviewJobId,
           targetFields: Array.from(new Set([
-            ...fixAnalysis.issues.map((issue) => issue.field),
+            ...actionableFixIssues.map((issue) => issue.field),
             ...requirementTargets,
             ...forceFields,
           ])),
@@ -4036,7 +4079,10 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                           ) : <span className="text-gray-300">-</span>}
                         </td>
                         <td className="p-2 text-gray-600 whitespace-nowrap">
-                          {course.duration ? `${course.duration} ${course.durationTerm || ""}` : <span className="text-gray-300">-</span>}
+                          {course.duration ? `${course.duration} ${course.durationTerm || ""}` : course.durationReviewStatus?.status === "confirmed_unpublished"
+                            ? <DurationReviewNotice status={course.durationReviewStatus} id={course.id}
+                                onReport={() => reportNewDurationSource(course)} />
+                            : <span className="text-gray-300" title="Duration not verified — source may be unavailable or extraction may have failed">Not verified</span>}
                         </td>
                         <td className="p-2 text-right font-medium whitespace-nowrap">
                           {members.length > 1 ? (
@@ -4450,17 +4496,24 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
 
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Detected Issues</p>
-                {fixAnalysis.issues.length === 0 ? (
+                {stagedCourses.some((course) => selectedIds.has(course.id) && course.durationReviewStatus?.status === "confirmed_unpublished") && (
+                  <p className="mb-2 text-xs text-amber-800" data-testid="text-duration-unpublished-fix">
+                    Verified unpublished duration is not a numeric fix. Report a new official URL on the course row to recheck when new evidence is available.
+                  </p>
+                )}
+                {actionableFixIssues.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     No additional legacy-field gaps were detected. Any unresolved requirement statuses shown below are still included.
                   </p>
                 ) : (
                   <div className="space-y-1.5">
-                    {fixAnalysis.issues.map(issue => (
+                    {actionableFixIssues.map(issue => (
                       <div key={issue.field} className="flex items-center justify-between text-sm">
                         <span>{issue.label}</span>
                         <span className="font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded px-2 py-0.5 text-xs">
-                          {issue.missing} course{issue.missing !== 1 ? "s" : ""}
+                          {issue.field === "duration"
+                            ? `${issue.missing - (issue.confirmed_unpublished ?? 0)} need a duration check`
+                            : `${issue.missing} course${issue.missing !== 1 ? "s" : ""}`}
                         </span>
                       </div>
                     ))}
@@ -4568,7 +4621,10 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             </Button>
             <Button
               onClick={handleConfirmFix}
-              disabled={fixingSelected || forceFields.some((field) => !forceReasons[field]?.trim())}
+              disabled={fixingSelected || forceFields.some((field) => !forceReasons[field]?.trim())
+                || (actionableFixIssues.length === 0 && forceFields.length === 0 && !stagedCourses.some(
+                  (course) => selectedIds.has(course.id) && requirementRepairFields(course).length > 0,
+                ))}
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               {fixingSelected ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}

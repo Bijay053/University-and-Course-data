@@ -272,6 +272,8 @@ def _staged_row_to_dict(r) -> dict:
     d["feeYear"] = r.fee_year
     from app.services.scraper.fee_selection import fee_selection
     d["feeSelection"] = fee_selection(r)
+    from app.services.scraper.duration_review import public_duration_review_status
+    d["durationReviewStatus"] = public_duration_review_status(r)
     from app.services.scraper.requirement_status import public_requirement_status
 
     # Additive API contract. Internal proof fingerprints stay server-side.
@@ -1730,6 +1732,7 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
         select(ScrapedCourse).where(ScrapedCourse.scrape_job_id == job_id)
         .order_by(ScrapedCourse.created_at.desc())
     )).scalars().all()
+    from app.services.scraper.duration_review import public_duration_review_status
     staged = [{
         "id": s.id,
         "scrapeJobId": s.scrape_job_id,
@@ -1756,6 +1759,7 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
         "notes": s.notes,
         "completeness": s.completeness,
         "scrapeWarnings": s.scrape_warnings,
+        "durationReviewStatus": public_duration_review_status(s),
         "status": s.status,
         "createdAt": s.created_at.isoformat() if s.created_at else None,
         "evidence": [],
@@ -2390,6 +2394,7 @@ def _targeted_reextract_fields(target_fields: list[str]) -> set[str] | None:
 
 _FORCEABLE_REEXTRACT_FIELDS = frozenset({
     "course_location",
+    "duration",
     "english_requirements",
     "international_fee",
     "intake_months",
@@ -2908,6 +2913,12 @@ async def re_extract_staged(
             from app.services.scraper.extractors.ulaw_sqe2_demands import is_sqe2_course
             if is_sqe2_course(url):
                 _sqe_methods = dict(row.extraction_method or {})
+                from app.services.scraper.extractors.ulaw_sqe2_demands import REVIEW_KEY
+                if "duration" in targeted_fields:
+                    _new_review = (out.get("payload") or {}).get("extraction_method") or {}
+                    _sqe_methods.pop(REVIEW_KEY, None)
+                    if isinstance(_new_review.get(REVIEW_KEY), dict):
+                        _sqe_methods[REVIEW_KEY] = _new_review[REVIEW_KEY]
                 for field_key in (
                     "ielts_overall", "ielts_listening", "ielts_reading",
                     "ielts_writing", "ielts_speaking", "duration", "duration_term",
@@ -2915,14 +2926,33 @@ async def re_extract_staged(
                     if field_key not in payload:
                         continue
                     selected = selected_evidence_by_field.get(field_key)
-                    if (selected and selected.get("method") == "ulaw_sqe2:course_demands_pdf"
+                    if (selected and selected.get("method") in {
+                            "ulaw_sqe2:course_demands_pdf", "ulaw_sqe2:course_total_duration",
+                        }
                             and payload[field_key] == selected.get("value")):
                         _sqe_methods[field_key] = selected["method"]
                     elif payload[field_key] is None:
                         _sqe_methods.pop(field_key, None)
                 payload["extraction_method"] = _sqe_methods
+        else:
+            from app.services.scraper.extractors.ulaw_sqe2_demands import is_sqe2_course, REVIEW_KEY
+            if is_sqe2_course(url):
+                _sqe_methods = dict(row.extraction_method or {})
+                _sqe_methods.pop(REVIEW_KEY, None)
+                _sqe_methods.update((out.get("payload") or {}).get("extraction_method") or {})
+                payload["extraction_method"] = _sqe_methods
         if _ulaw_fee_refresh:
-            payload["extraction_method"] = _ulaw_fee_map
+            # Merge the freshly scoped SQE2 duration/English review map rather
+            # than restoring an old unpublished assertion from the fee-only
+            # snapshot. The fee fields still come from the validated fee
+            # refresh, not from an unrelated extractor candidate.
+            from app.services.scraper.extractors.ulaw_sqe2_demands import is_sqe2_course
+            payload["extraction_method"] = {
+                **((payload.get("extraction_method") or _ulaw_fee_map)
+                   if is_sqe2_course(url) else _ulaw_fee_map),
+                "international_fee": _ULAW_FEE_METHOD,
+                "fee_variants": _ulaw_fee_variants,
+            }
             payload["scrape_warnings"] = list(payload.get("scrape_warnings") or []) + (
                 ["international_fee_varies_by_campus"]
                 if _ulaw_fee_variants.get("status") == "range"
@@ -4111,6 +4141,7 @@ async def analyze_staged(
 
     issues: list[dict] = []
     from app.services.scraper.extractors.ulaw_fees import validated_fee_variants
+    from app.services.scraper.duration_review import public_duration_review_status
     for field, label in _ANALYZE_FIELDS:
         missing = sum(
             1
@@ -4125,7 +4156,13 @@ async def analyze_staged(
         current_pct = round((total - missing) / total * 100) if total else 0
         fill_rate = _EXPECTED_FILL_RATE.get(field, 0.60)
         # Estimate: courses_with_url fraction can be attempted; fill_rate of those succeed
-        fillable = round(missing * (courses_with_url / total if total else 1) * fill_rate)
+        reviewed = (
+            sum(1 for r in rows if public_duration_review_status(r))
+            if field == "duration" else 0
+        )
+        fillable = round(
+            (missing - reviewed) * (courses_with_url / total if total else 1) * fill_rate
+        )
         expected_pct = round((total - missing + fillable) / total * 100) if total else current_pct
         issues.append({
             "field": field,
@@ -4135,6 +4172,7 @@ async def analyze_staged(
             "pct_missing": 100 - current_pct,
             "current_pct": current_pct,
             "expected_fill_pct": min(99, expected_pct),
+            **({"confirmed_unpublished": reviewed} if field == "duration" else {}),
         })
 
     from app.services.scraper.requirement_status import effective_requirement_status

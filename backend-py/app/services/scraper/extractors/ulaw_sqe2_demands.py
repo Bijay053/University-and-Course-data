@@ -18,6 +18,109 @@ PDF_NAME = "pdf_students_programme-demands-sqe2-preparation-course-ft-pt.pdf"
 METHOD = "ulaw_sqe2:course_demands_pdf"
 ENGLISH_FIELDS = ("ielts_overall", "ielts_listening", "ielts_reading",
                   "ielts_writing", "ielts_speaking")
+REVIEW_KEY = "duration_review_status"
+BLOG_URL = "https://www.law.ac.uk/resources/blog/sqe-prep-courses/"
+_WEEKLY_UNITS = re.compile(
+    r"There are six units per week throughout the course "
+    r"\(two units per week in the part-time courses\)", re.I,
+)
+_CONTENT_ONLY = re.compile(
+    r"(?:full-time )?SQE2 Preparation Course has 5 weeks of content "
+    r"but the actual completion time is slightly longer", re.I,
+)
+_TOTAL_DURATION = re.compile(
+    r"\b(?:(?:course|total)\s+)?duration\s*:\s*(\d+(?:\.\d+)?)\s*"
+    r"(weeks?|months?|years?)\b", re.I,
+)
+_OTHER_COURSE_CONTAINER = re.compile(r"related|similar|recommended|card|carousel", re.I)
+
+
+def _course_total_duration(soup: BeautifulSoup, url: str):
+    """Accept a duration label only in this course's detail content, not cards."""
+    root = soup.select_one("main") or soup
+    for tag in root.select("p, li, dt, dd, div"):
+        if tag.name == "div" and tag.select_one("p, li, dt, dd"):
+            continue
+        parent = tag
+        excluded = False
+        while parent is not None and parent != root:
+            identity = " ".join([str(parent.get("id") or ""), *parent.get("class", [])])
+            if _OTHER_COURSE_CONTAINER.search(identity):
+                excluded = True
+                break
+            if parent.name == "a" and parent.get("href"):
+                linked = urlparse(urljoin(url, parent["href"]))
+                if linked.path.rstrip("/") != urlparse(url).path.rstrip("/"):
+                    excluded = True
+                    break
+            parent = parent.parent
+        if excluded:
+            continue
+        match = _TOTAL_DURATION.search(" ".join(tag.get_text(" ", strip=True).split()))
+        if match and float(match[1]) > 0:
+            return match
+    return None
+
+
+def review_sqe2_duration(
+    url: str, course_html: str, blog_html: str = "",
+    demands_evidence: list[dict] | None = None,
+) -> tuple[dict | None, dict | None]:
+    """Review only a fetched, titled course-owned page, never an absent source.
+
+    The content-only statement is not a course duration. An explicit total
+    duration on that same course page takes precedence if published later.
+    """
+    if not is_sqe2_course(url) or not course_html:
+        return None, None
+    soup = BeautifulSoup(course_html, "html.parser")
+    if not re.search(r"\bSQE2 Preparation Course\b", soup.get_text(" ", strip=True)[:1500], re.I):
+        return None, None
+    for tag in soup(["script", "style", "nav", "footer"]):
+        tag.decompose()
+    text = " ".join(soup.get_text(" ", strip=True).split())
+    total = _course_total_duration(soup, url)
+    if total and float(total[1]) > 0:
+        unit = total[2].lower().rstrip("s")
+        return None, {
+            "duration": float(total[1]), "duration_term": unit,
+            "evidence": {"field_key": "duration", "value": float(total[1]),
+                         "source_url": url, "snippet": total[0],
+                         "method": "ulaw_sqe2:course_total_duration", "confidence": 0.90},
+        }
+    weekly = _WEEKLY_UNITS.search(text)
+    blog = BeautifulSoup(blog_html, "html.parser")
+    blog_text = " ".join(blog.get_text(" ", strip=True).split())
+    match = _CONTENT_ONLY.search(blog_text)
+    demand = next((item for item in (demands_evidence or [])
+                   if item.get("field_key") == "ielts_overall"
+                   and item.get("method") == METHOD
+                   and item.get("source_url") and item.get("snippet")), None)
+    if weekly and match and demand:
+        return {
+            "status": "confirmed_unpublished",
+            "reason": "The course page gives weekly units, and the official SQE2 article says five weeks is content only; no total course duration is established.",
+            "sources": [
+                {"url": url, "snippet": weekly[0]},
+                {"url": demand["source_url"], "snippet": demand["snippet"]},
+                {"url": BLOG_URL, "snippet": match[0]},
+            ],
+        }, None
+    return None, None
+
+
+async def fetch_sqe2_blog() -> str:
+    """Read only the exact official article; an unavailable article is not proof."""
+    try:
+        async with httpx.AsyncClient(timeout=10, follow_redirects=False) as client:
+            response = await client.get(BLOG_URL)
+            response.raise_for_status()
+            if len(response.content) > 2_000_000:
+                raise ValueError("SQE2 article exceeds size limit")
+            return response.text
+    except (httpx.HTTPError, ValueError) as exc:
+        log.warning("ULaw SQE2 duration article unavailable: %s", exc)
+        return ""
 
 
 def is_sqe2_course(url: str) -> bool:

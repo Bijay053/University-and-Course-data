@@ -28,9 +28,57 @@ from app.services.scraper.replay_extraction import restore_review_rows
 
 
 @pytest.mark.asyncio
+async def test_sqe2_unavailable_blog_does_not_stage_unpublished_review(monkeypatch):
+    from tests.test_ulaw_sqe2_demands import URL, COURSE_HTML, mock_sources
+    from app.services.scraper.config.context import current_uni_config
+    from app.services.scraper.config.loader import load_uni_config
+    from app.services.scraper.pipelines.single_course import extract_course
+    from app.services.scraper.duration_review import public_duration_review_status
+    from app.routers.scrape import _staged_row_to_dict
+
+    mock_sources(monkeypatch, blog_status=503)
+    async def no_ai(*args, **kwargs):
+        return {}, 0.0, 0, 0, {"skipped": True}
+    monkeypatch.setattr("app.services.scraper.extractors.gemini_primary.extract_primary", no_ai)
+    monkeypatch.setattr("app.services.scraper.stage_course.should_stage_course",
+                        lambda *args, **kwargs: (True, ""))
+    cfg = load_uni_config(slug="law_1902", name="University of Law",
+                          scrape_url="https://www.law.ac.uk/study/", create_missing_stub=False)
+    token = current_uni_config.set(cfg)
+    try:
+        fresh = await extract_course(URL, html=COURSE_HTML, country="United Kingdom",
+                                     use_ai_fallback=False)
+    finally:
+        current_uni_config.reset(token)
+    assert "duration_review_status" not in fresh["payload"].get("extraction_method", {})
+    uni_id = await _pick_university()
+    job_id = f"test_sqe2_blog_failure_{uuid.uuid4().hex[:10]}"
+    try:
+        async with AsyncSessionLocal() as db:
+            db.add(ScrapeRuntimeJob(runtime_job_id=job_id, university_id=uni_id,
+                                    job_type="scrape", status="completed"))
+            await db.flush()
+            staged = await stage_course(
+                db, scrape_job_id=job_id, university_id=uni_id,
+                course_name="SQE2 Preparation Course", source_url=URL,
+                payload=fresh["payload"], evidence=fresh["evidence"],
+            )
+            assert staged.saved, staged.reason
+            await db.commit()
+            row = await db.get(ScrapedCourse, staged.scraped_course_id)
+            assert row.duration is None
+            assert public_duration_review_status(row) is None
+            assert _staged_row_to_dict(row)["durationReviewStatus"] is None
+    finally:
+        await _cleanup(job_id)
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("smart", [False, True])
 async def test_ulaw_sqe2_normal_and_review_fix_keep_pdf_proof(monkeypatch, smart):
     from tests.test_ulaw_sqe2_demands import URL, PDF, COURSE_HTML, mock_sources
+    from app.services.scraper.duration_review import public_duration_review_status
+    from app.services.scraper.confidence import score_payload
     from app.routers.scrape import ReExtractBody, re_extract_staged
     from app.services.scraper.config.context import current_uni_config
     from app.services.scraper.config.loader import load_uni_config
@@ -42,11 +90,16 @@ async def test_ulaw_sqe2_normal_and_review_fix_keep_pdf_proof(monkeypatch, smart
     monkeypatch.setattr("app.services.scraper.extractors.gemini_primary.extract_primary", no_ai)
     cfg = load_uni_config(slug="law_1902", name="University of Law",
                           scrape_url="https://www.law.ac.uk/study/", create_missing_stub=False)
+    fee_tab = """<a role="tab" href="#sqe-fees">International Students</a>
+    <div id="sqe-fees"><table><tr><td>2026/27 Course Fees</td><td></td></tr>
+    <tr><td>London</td><td>£19,050</td></tr>
+    <tr><td>Outside London</td><td>£17,500</td></tr></table></div>"""
+    current_html = COURSE_HTML.replace("</main>", fee_tab + "</main>")
 
     async def extraction(link, **kwargs):
         token = current_uni_config.set(cfg)
         try:
-            return await extract_course(link["url"], html=COURSE_HTML,
+            return await extract_course(link["url"], html=current_html,
                                         country="United Kingdom", use_ai_fallback=False)
         finally:
             current_uni_config.reset(token)
@@ -64,6 +117,10 @@ async def test_ulaw_sqe2_normal_and_review_fix_keep_pdf_proof(monkeypatch, smart
     job_id = f"test_sqe2_pdf_{uuid.uuid4().hex[:10]}"
     try:
         fresh = await extraction({"url": URL})
+        assert score_payload(fresh["payload"])["breakdown"]["duration"]["points_earned"] == 0
+        assert score_payload(fresh["payload"])["score"] == score_payload({
+            **fresh["payload"], "extraction_method": {},
+        })["score"]
         async with AsyncSessionLocal() as db:
             db.add(ScrapeRuntimeJob(runtime_job_id=job_id, university_id=uni_id,
                                     job_type="scrape", status="completed"))
@@ -78,16 +135,28 @@ async def test_ulaw_sqe2_normal_and_review_fix_keep_pdf_proof(monkeypatch, smart
             row = await db.get(ScrapedCourse, staged.scraped_course_id)
             assert row.ielts_overall == 6.5
             assert row.duration is None
+            assert row.extraction_method["fee_variants"]["status"] == "range"
+            assert public_duration_review_status(row) == fresh["payload"]["extraction_method"]["duration_review_status"]
+            from app.routers.scrape import _staged_row_to_dict
+            assert _staged_row_to_dict(row)["durationReviewStatus"] == public_duration_review_status(row)
+            db.expunge(row)
+            row = await db.get(ScrapedCourse, staged.scraped_course_id)
+            assert public_duration_review_status(row)["sources"][1]["url"] == PDF
             # Legacy review scores must be replaced by the actual course PDF,
             # without altering a separate reviewer-controlled field.
             row.ielts_overall = 7.0
             row.ielts_writing = 7.0
             row.course_location = "Reviewer verified location"
-            row.extraction_method = {"ielts_overall": "manual", "course_location": "manual"}
+            row.extraction_method = {
+                **{key: value for key, value in row.extraction_method.items()
+                   if key != "duration_review_status"},
+                "ielts_overall": "manual",
+                "course_location": "manual",
+            }
             await db.commit()
             result = await re_extract_staged(ReExtractBody(
                 ids=[row.id], universityId=uni_id, smart=smart,
-                targetFields=["english_requirements", "duration"],
+                targetFields=["english_requirements", "duration", "international_fee"],
             ), db)
             assert result["errors"] == 0, result
             await db.refresh(row)
@@ -96,6 +165,8 @@ async def test_ulaw_sqe2_normal_and_review_fix_keep_pdf_proof(monkeypatch, smart
             assert row.course_location == "Reviewer verified location"
             assert row.extraction_method["course_location"] == "manual"
             assert row.extraction_method["ielts_overall"] == "ulaw_sqe2:course_demands_pdf"
+            assert public_duration_review_status(row)["sources"][2]["url"].endswith("/sqe-prep-courses/")
+            assert row.extraction_method["fee_variants"]["status"] == "range"
             proof = (await db.execute(select(ScrapedFieldEvidence).where(
                 ScrapedFieldEvidence.scraped_course_id == row.id,
                 ScrapedFieldEvidence.field_key == "ielts_overall",
@@ -103,6 +174,7 @@ async def test_ulaw_sqe2_normal_and_review_fix_keep_pdf_proof(monkeypatch, smart
             assert any(ev.source_url == PDF and "sufficient command of English" in (ev.snippet or "")
                        and ev.selected for ev in proof)
             from app.services.scraper.extractors import ulaw_sqe2_demands
+            original_pdf = ulaw_sqe2_demands.download_pdf_text
             async def unavailable_pdf(_url):
                 return ""
             monkeypatch.setattr(ulaw_sqe2_demands, "download_pdf_text", unavailable_pdf)
@@ -115,6 +187,23 @@ async def test_ulaw_sqe2_normal_and_review_fix_keep_pdf_proof(monkeypatch, smart
             assert "ulaw_sqe2_demands_unavailable" in row.scrape_warnings
             assert "ielts_overall" not in row.extraction_method
             assert row.course_location == "Reviewer verified location"
+            # Unavailable English evidence must not invent a fresh duration review.
+            assert public_duration_review_status(row) is not None
+            current_html = current_html.replace(
+                "</main>", "<p>Duration: 12 months</p></main>",
+            )
+            monkeypatch.setattr(ulaw_sqe2_demands, "download_pdf_text", original_pdf)
+            recovery = await re_extract_staged(ReExtractBody(
+                ids=[row.id], universityId=uni_id,
+                targetFields=["duration", "international_fee"],
+            ), db)
+            assert recovery["errors"] == 0, recovery
+            await db.refresh(row)
+            assert float(row.duration) == 12 and row.duration_term == "month"
+            assert public_duration_review_status(row) is None
+            assert "duration_review_status" not in row.extraction_method
+            assert row.extraction_method["fee_variants"]["status"] == "range"
+            assert _staged_row_to_dict(row)["durationReviewStatus"] is None
     finally:
         await _cleanup(job_id)
 

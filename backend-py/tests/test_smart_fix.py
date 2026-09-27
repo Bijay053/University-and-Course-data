@@ -30,6 +30,51 @@ def test_planner_exact_field_identity_and_scope():
 
 
 @pytest.mark.asyncio
+async def test_cited_unpublished_duration_skips_automatic_fix_but_forced_retry_runs(monkeypatch):
+    from app.services.scraper.extractors.ulaw_sqe2_demands import REVIEW_KEY
+    url = "https://www.law.ac.uk/study/postgraduate/law/sqe-2-preparation-course/"
+    row = SimpleNamespace(duration=None, course_website=url, extraction_method={
+        REVIEW_KEY: {"status": "confirmed_unpublished", "reason": "No total duration",
+                     "sources": [{"url": url, "snippet": "Teaching content is five weeks; revision follows."}]},
+    })
+    db = SimpleNamespace(get=AsyncMock(return_value=row))
+    monkeypatch.setattr(scrape, "analyze_staged", AsyncMock(return_value=analysis("duration")))
+    extract = AsyncMock(return_value={"results": [{"id": 1, "ok": True}]})
+    monkeypatch.setattr(scrape, "re_extract_staged", extract)
+    result = (await smart_fix.run_smart_batch(body(targets=["duration"]), db))["results"][0]
+    assert result["reason_code"] == "confirmed_unpublished" and not result["attempted"]
+    extract.assert_not_awaited()
+    await smart_fix.run_smart_batch(
+        body(targets=["duration"], forceFields=["duration"],
+             forceReasons={"duration": "Updated official source"}), db,
+    )
+    extract.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_cited_duration_stays_missing_when_other_target_is_fixed(monkeypatch):
+    from app.services.scraper.extractors.ulaw_sqe2_demands import REVIEW_KEY
+    url = "https://www.law.ac.uk/study/postgraduate/law/sqe-2-preparation-course/"
+    row = SimpleNamespace(duration=None, course_website=url, extraction_method={
+        REVIEW_KEY: {"status": "confirmed_unpublished", "reason": "Reviewed content only",
+                     "sources": [{"url": url, "snippet": "Weekly units are not total duration"}]},
+    })
+    db = SimpleNamespace(get=AsyncMock(return_value=row))
+    monkeypatch.setattr(scrape, "analyze_staged", AsyncMock(side_effect=[
+        analysis("duration", "course_location"), analysis("duration"),
+    ]))
+    extract = AsyncMock(return_value={"results": [{"id": 1, "ok": True}]})
+    monkeypatch.setattr(scrape, "re_extract_staged", extract)
+    result = (await smart_fix.run_smart_batch(
+        body(targets=["duration", "course_location"]), db,
+    ))["results"][0]
+    assert extract.call_args.args[0].target_fields == ["course_location"]
+    assert result["resolved_fields"] == ["course_location"]
+    assert result["unresolved_fields"] == ["duration"]
+    assert result["made_progress"]
+
+
+@pytest.mark.asyncio
 async def test_per_row_targets_and_resolution_not_metadata(monkeypatch):
     analyzer = AsyncMock(side_effect=[
         analysis("duration", "academic_score"), analysis("academic_score"),

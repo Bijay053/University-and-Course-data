@@ -109,6 +109,15 @@ async def run_smart_batch(body, db):
             })
             continue
         targets = plan_targets(before["issues"], body.target_fields, body.force_fields)
+        reviewed_duration = False
+        if "duration" in targets and "duration" not in body.force_fields and hasattr(db, "get"):
+            from app.models import ScrapedCourse
+            from app.services.scraper.duration_review import public_duration_review_status
+            row = await db.get(ScrapedCourse, course_id)
+            reviewed_duration = row is not None and bool(public_duration_review_status(row))
+            if reviewed_duration:
+                targets.remove("duration")
+        suppressed = {"duration"} if reviewed_duration else set()
         unsupported = sorted(set(body.target_fields) - SUPPORTED_TARGETS)
         base = {
             "id": course_id, "target_fields": targets, "attempted": False,
@@ -123,9 +132,15 @@ async def run_smart_batch(body, db):
         if not targets:
             results.append({
                 **base, "ok": True, "made_progress": False,
-                "resolved_fields": [], "unresolved_fields": [],
-                "reason_code": "unsupported_targets" if unsupported else "already_resolved",
+                "resolved_fields": [],
+                "unresolved_fields": sorted(suppressed),
+                "reason_code": (
+                    "confirmed_unpublished" if reviewed_duration
+                    else "unsupported_targets" if unsupported else "already_resolved"
+                ),
                 "reason": (
+                    "A cited course-owned source was reviewed; total duration is not published. Force a retry when the source changes."
+                    if reviewed_duration else
                     "Some selected fields have no supported automatic issue check."
                     if unsupported else "No unresolved issues remain in the selected scope."
                 ),
@@ -135,7 +150,8 @@ async def run_smart_batch(body, db):
         if remaining <= 0:
             results.append({
                 **base, "ok": False, "error": "Smart Fix batch budget exhausted",
-                "reason_code": "budget_exhausted", "unresolved_fields": targets,
+                "reason_code": "budget_exhausted",
+                "unresolved_fields": sorted(set(targets) | suppressed),
             })
             continue
         if not before["courses_with_url"]:
@@ -143,7 +159,7 @@ async def run_smart_batch(body, db):
                 **base, "ok": True, "made_progress": False,
                 "reason_code": "missing_official_url",
                 "reason": "No course source URL is saved. Submit the exact official course URL.",
-                "unresolved_fields": targets, "resolved_fields": [],
+                "unresolved_fields": sorted(set(targets) | suppressed), "resolved_fields": [],
                 "next_action": "report_official_url",
             })
             continue
@@ -160,7 +176,8 @@ async def run_smart_batch(body, db):
             results.append({
                 **base, "attempted": True, "ok": False,
                 "error": "Smart Fix batch budget exhausted",
-                "reason_code": "budget_exhausted", "unresolved_fields": targets,
+                "reason_code": "budget_exhausted",
+                "unresolved_fields": sorted(set(targets) | suppressed),
             })
             continue
         except Exception:
@@ -168,7 +185,8 @@ async def run_smart_batch(body, db):
             results.append({
                 **base, "attempted": True, "ok": False,
                 "error": "Official-source recovery failed; retry or report the official URL.",
-                "reason_code": "source_recovery_failed", "unresolved_fields": targets,
+                "reason_code": "source_recovery_failed",
+                "unresolved_fields": sorted(set(targets) | suppressed),
                 "next_action": "report_official_url",
             })
             continue
@@ -179,7 +197,7 @@ async def run_smart_batch(body, db):
         )
         item.update({
             **base, "attempted": True, "made_progress": False,
-            "resolved_fields": [], "unresolved_fields": targets,
+            "resolved_fields": [], "unresolved_fields": sorted(set(targets) | suppressed),
         })
         if not item.get("ok"):
             item["reason_code"] = "source_recovery_failed"
@@ -217,20 +235,34 @@ async def run_smart_batch(body, db):
             if corrected_row is not None and validated_fee_variants(corrected_row):
                 authoritative_corrections.add("international_fee")
         resolved = sorted((before_issues - unresolved) | authoritative_corrections)
+        resolved = [field for field in resolved if field not in suppressed]
+        unresolved |= suppressed
         item.update({
             **base, "attempted": True,
-            "resolved_fields": resolved, "unresolved_fields": sorted(unresolved),
+            "resolved_fields": resolved, "unresolved_fields": sorted(unresolved | suppressed),
             "made_progress": bool(resolved),
         })
         if not item.get("ok"):
             item["reason_code"] = "source_recovery_failed"
         elif unresolved:
-            item["reason_code"] = "unresolved_after_official_recovery"
+            from app.models import ScrapedCourse
+            from app.services.scraper.duration_review import public_duration_review_status
+            reviewed = (
+                "duration" in unresolved and hasattr(db, "get")
+                and public_duration_review_status(await db.get(ScrapedCourse, course_id))
+            )
+            item["reason_code"] = (
+                "confirmed_unpublished" if reviewed and unresolved == {"duration"}
+                else "unresolved_after_official_recovery"
+            )
             item["reason"] = (
+                "The cited course-owned source describes content but does not publish total duration."
+                if reviewed and unresolved == {"duration"} else
                 "Official-source recovery did not resolve all selected issues. "
                 "Submit an exact official URL supporting the unresolved fields."
             )
-            item["next_action"] = "report_official_url"
+            if not reviewed or unresolved != {"duration"}:
+                item["next_action"] = "report_official_url"
         elif resolved:
             item["reason_code"] = "issues_resolved"
         else:

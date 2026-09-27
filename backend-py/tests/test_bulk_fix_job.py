@@ -236,12 +236,26 @@ def test_force_fields_are_limited_and_require_nonblank_reasons():
         forceReasons={"intake_months": "Existing intake is incorrect"},
     )
     assert bulk_valid.force_fields == ["intake_months"]
+    duration_retry = StartBulkFixBody(
+        ids=[1],
+        universityId=7,
+        forceFields=["duration"],
+        forceReasons={"duration": "New official duration evidence is available"},
+    )
+    assert duration_retry.force_fields == ["duration"]
+    with pytest.raises(ValidationError):
+        StartBulkFixBody(
+            ids=[1],
+            universityId=7,
+            forceFields=["course_name"],
+            forceReasons={"course_name": "Required"},
+        )
     with pytest.raises(ValidationError):
         StartBulkFixBody(
             ids=[1],
             universityId=7,
             forceFields=["duration"],
-            forceReasons={"duration": "Required"},
+            forceReasons={"duration": "   "},
         )
     with pytest.raises(ValidationError):
         ReExtractBody(

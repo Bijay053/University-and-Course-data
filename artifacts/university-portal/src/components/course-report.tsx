@@ -42,7 +42,7 @@ const activeStatuses = new Set(["queued", "running", "recovering", "verification
 export type CourseReportPrefillCourse = {
   courseName: string;
   courseUrl?: string | null;
-  fields: Array<"english" | "other">;
+  fields: Array<"english" | "other" | "duration">;
   description: string;
 };
 const NO_PREFILL_COURSES: CourseReportPrefillCourse[] = [];

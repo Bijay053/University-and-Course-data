@@ -11236,10 +11236,18 @@ async def extract_course(
     # specifies IELTS. The page itself does not publish a complete course
     # duration: do not translate weeks of content or assessment dates into one.
     from app.services.scraper.extractors.ulaw_sqe2_demands import (
-        ENGLISH_FIELDS as _sqe_english_fields, is_sqe2_course, recover_sqe2_english,
+        ENGLISH_FIELDS as _sqe_english_fields, REVIEW_KEY as _sqe_review_key,
+        is_sqe2_course, recover_sqe2_english, review_sqe2_duration,
+        fetch_sqe2_blog,
     )
     if is_sqe2_course(url):
         _sqe_evidence = await recover_sqe2_english(url, html or "")
+        _sqe_review, _sqe_total = review_sqe2_duration(url, html or "")
+        if not _sqe_total and _sqe_evidence:
+            _sqe_blog = await fetch_sqe2_blog()
+            _sqe_review, _ = review_sqe2_duration(
+                url, html or "", _sqe_blog, _sqe_evidence,
+            )
         if not _sqe_evidence:
             payload.setdefault("scrape_warnings", []).append("ulaw_sqe2_demands_unavailable")
         # Neither a central/peer requirement nor a time-limit/content-length
@@ -11250,6 +11258,14 @@ async def extract_course(
         for _sqe_ev in _sqe_evidence:
             payload[_sqe_ev["field_key"]] = _sqe_ev["value"]
             evidence.append(_sqe_ev)
+        _sqe_methods = dict(payload.get("extraction_method") or {})
+        if _sqe_review:
+            _sqe_methods[_sqe_review_key] = _sqe_review
+        if _sqe_total:
+            payload["duration"] = _sqe_total["duration"]
+            payload["duration_term"] = _sqe_total["duration_term"]
+            evidence.append(_sqe_total["evidence"])
+        payload["extraction_method"] = _sqe_methods
 
     footer = build_course_page_provenance_footer(payload)
 
@@ -11274,6 +11290,11 @@ async def extract_course(
     # Persist in payload so stage_course can store it without schema changes to
     # extract_course's callers (it is stripped in stage_course before DB write).
     _attach_extraction_method_map(payload, evidence)
+    if is_sqe2_course(url):
+        if _sqe_review:
+            payload.setdefault("extraction_method", {})[_sqe_review_key] = _sqe_review
+        if _sqe_total:
+            payload.setdefault("extraction_method", {})["duration"] = _sqe_total["evidence"]["method"]
     if _ulaw_campus_authority:
         payload.setdefault("extraction_method", {})["campus_authority"] = _ulaw_campus_authority
     if _ulaw_fee_authority:
