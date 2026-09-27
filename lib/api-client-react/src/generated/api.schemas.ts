@@ -5,6 +5,80 @@
  * University Course, Fee, Intake & Requirement Management System API
  * OpenAPI spec version: 0.1.0
  */
+export interface ApprovedQualificationCohort {
+  rowId: number;
+  splitFromId: number;
+  jobId: string;
+  createdAt: string;
+  label: string;
+  latest: boolean;
+  courseIds: number[];
+  feeYears: number[];
+}
+
+export interface ApprovedQualificationCohorts {
+  cohorts: ApprovedQualificationCohort[];
+}
+
+export interface QualificationRefreshInput {
+  token: string;
+}
+
+export type QualificationRefreshResultStatus =
+  (typeof QualificationRefreshResultStatus)[keyof typeof QualificationRefreshResultStatus];
+
+export const QualificationRefreshResultStatus = {
+  applied: "applied",
+  already_applied: "already_applied",
+} as const;
+
+export interface QualificationRefreshResult {
+  status: QualificationRefreshResultStatus;
+  courseIds: number[];
+}
+
+export interface QualificationRefreshFee {
+  /** @nullable */
+  amount: number | null;
+  /** @nullable */
+  year: number | null;
+  /** @nullable */
+  term: string | null;
+}
+
+export interface QualificationRefreshIntake {
+  intake: string;
+  study_load: string;
+  locations: string[];
+}
+
+export type QualificationRefreshChangeKind =
+  (typeof QualificationRefreshChangeKind)[keyof typeof QualificationRefreshChangeKind];
+
+export const QualificationRefreshChangeKind = {
+  new: "new",
+  retained: "retained",
+} as const;
+
+export interface QualificationRefreshChange {
+  award: string;
+  campus: string;
+  kind: QualificationRefreshChangeKind;
+  /** @nullable */
+  stagedId: number | null;
+  old: QualificationRefreshFee | null;
+  new: QualificationRefreshFee;
+  intakes: QualificationRefreshIntake[];
+}
+
+export interface QualificationRefreshPreview {
+  token: string;
+  sourceUrl: string;
+  message: string;
+  courseIds: number[];
+  changes: QualificationRefreshChange[];
+}
+
 export interface HealthStatus {
   status: string;
 }

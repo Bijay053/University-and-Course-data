@@ -33,6 +33,8 @@ import { ScrapeJobCard } from "@/components/scrape-job-card";
 import { CourseReport, type CourseReportPrefillCourse } from "@/components/course-report";
 import { TargetedRetryAllFilteredNotice, type TargetedRetryDiagnostic } from "@/components/targeted-retry-diagnostic";
 import { DatedCatalogueReview } from "@/components/dated-catalogue-review";
+import { QualificationRefresh } from "@/components/qualification-refresh";
+import { ApprovedQualificationCohorts } from "@/components/approved-qualification-cohorts";
 import { DEGREE_LEVELS, FEE_TERM_OPTIONS, STUDY_LOADS, STUDY_MODES } from "@/lib/course-constants";
 
 function optionsIncludingCurrent(options: string[], current: string | null): string[] {
@@ -3297,6 +3299,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         </div>
       </div>
 
+      <ApprovedQualificationCohorts universities={uniData?.data || []}
+        onApplied={(jobId) => loadStagedCourses(jobId, false)} />
+
       {showReview && stagedCourses.length === 0 && lastScrapeInfo?.staged === 0 && selectedUni && selectedUni !== ALL && (
         <Card className="border border-amber-200 bg-amber-50">
           <CardContent className="py-4 flex items-center justify-between gap-4">
@@ -3879,6 +3884,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                               </span>
                             )}
                           </div>
+                          <QualificationRefresh courseId={course.id} metadata={course.extractionMethod}
+                            onApplied={() => reviewJobId ? loadStagedCourses(reviewJobId) : Promise.resolve()} />
                           {course.notes && (
                             <div className="text-xs text-amber-600 truncate mt-0.5" title={course.notes}>⚠ {course.notes}</div>
                           )}

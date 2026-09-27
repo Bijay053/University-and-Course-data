@@ -31,6 +31,56 @@ tags:
     description: Bulk upload/download
 
 paths:
+  /scrape/universities/{universityId}/approved-qualification-cohorts:
+    get:
+      operationId: listApprovedQualificationCohorts
+      tags: [scraping]
+      parameters:
+        - in: path
+          name: universityId
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Approved award cohorts with exact job and original split identities
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApprovedQualificationCohorts" }
+  /scrape/staged/{courseId}/qualification-refresh/preview:
+    post:
+      operationId: previewQualificationRefresh
+      tags: [scraping]
+      parameters:
+        - in: path
+          name: courseId
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Read-only current official cohort preview
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QualificationRefreshPreview" }
+  /scrape/staged/{courseId}/qualification-refresh/apply:
+    post:
+      operationId: applyQualificationRefresh
+      tags: [scraping]
+      parameters:
+        - in: path
+          name: courseId
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/QualificationRefreshInput" }
+      responses:
+        "200":
+          description: Atomic staging-only refresh or committed retry
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QualificationRefreshResult" }
   /healthz:
     get:
       operationId: healthCheck
@@ -915,6 +965,87 @@ paths:
 
 components:
   schemas:
+    ApprovedQualificationCohort:
+      type: object
+      required: [rowId, splitFromId, jobId, createdAt, courseIds, feeYears, label, latest]
+      properties:
+        rowId: { type: integer }
+        splitFromId: { type: integer }
+        jobId: { type: string }
+        createdAt: { type: string }
+        label: { type: string }
+        latest: { type: boolean }
+        courseIds:
+          type: array
+          items: { type: integer }
+        feeYears:
+          type: array
+          items: { type: integer }
+    ApprovedQualificationCohorts:
+      type: object
+      required: [cohorts]
+      properties:
+        cohorts:
+          type: array
+          items: { $ref: "#/components/schemas/ApprovedQualificationCohort" }
+    QualificationRefreshInput:
+      type: object
+      required: [token]
+      properties:
+        token: { type: string }
+    QualificationRefreshResult:
+      type: object
+      required: [status, courseIds]
+      properties:
+        status: { type: string, enum: [applied, already_applied] }
+        courseIds:
+          type: array
+          items: { type: integer }
+    QualificationRefreshFee:
+      type: object
+      required: [amount, year, term]
+      properties:
+        amount: { type: [number, "null"] }
+        year: { type: [integer, "null"] }
+        term: { type: [string, "null"] }
+    QualificationRefreshIntake:
+      type: object
+      required: [intake, study_load, locations]
+      properties:
+        intake: { type: string }
+        study_load: { type: string }
+        locations:
+          type: array
+          items: { type: string }
+    QualificationRefreshChange:
+      type: object
+      required: [award, campus, kind, stagedId, old, new, intakes]
+      properties:
+        award: { type: string }
+        campus: { type: string }
+        kind: { type: string, enum: [new, retained] }
+        stagedId: { type: [integer, "null"] }
+        old:
+          anyOf:
+            - $ref: "#/components/schemas/QualificationRefreshFee"
+            - type: "null"
+        new: { $ref: "#/components/schemas/QualificationRefreshFee" }
+        intakes:
+          type: array
+          items: { $ref: "#/components/schemas/QualificationRefreshIntake" }
+    QualificationRefreshPreview:
+      type: object
+      required: [token, changes, courseIds, sourceUrl, message]
+      properties:
+        token: { type: string }
+        sourceUrl: { type: string }
+        message: { type: string }
+        courseIds:
+          type: array
+          items: { type: integer }
+        changes:
+          type: array
+          items: { $ref: "#/components/schemas/QualificationRefreshChange" }
     HealthStatus:
       type: object
       properties:

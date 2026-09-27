@@ -7,6 +7,77 @@
  */
 import * as zod from "zod";
 
+export const ListApprovedQualificationCohortsParams = zod.object({
+  universityId: zod.coerce.number(),
+});
+
+export const ListApprovedQualificationCohortsResponse = zod.object({
+  cohorts: zod.array(
+    zod.object({
+      rowId: zod.number(),
+      splitFromId: zod.number(),
+      jobId: zod.string(),
+      createdAt: zod.string(),
+      label: zod.string(),
+      latest: zod.boolean(),
+      courseIds: zod.array(zod.number()),
+      feeYears: zod.array(zod.number()),
+    }),
+  ),
+});
+
+export const PreviewQualificationRefreshParams = zod.object({
+  courseId: zod.coerce.number(),
+});
+
+export const PreviewQualificationRefreshResponse = zod.object({
+  token: zod.string(),
+  sourceUrl: zod.string(),
+  message: zod.string(),
+  courseIds: zod.array(zod.number()),
+  changes: zod.array(
+    zod.object({
+      award: zod.string(),
+      campus: zod.string(),
+      kind: zod.enum(["new", "retained"]),
+      stagedId: zod.number().nullable(),
+      old: zod.union([
+        zod.object({
+          amount: zod.number().nullable(),
+          year: zod.number().nullable(),
+          term: zod.string().nullable(),
+        }),
+        zod.null(),
+      ]),
+      new: zod.object({
+        amount: zod.number().nullable(),
+        year: zod.number().nullable(),
+        term: zod.string().nullable(),
+      }),
+      intakes: zod.array(
+        zod.object({
+          intake: zod.string(),
+          study_load: zod.string(),
+          locations: zod.array(zod.string()),
+        }),
+      ),
+    }),
+  ),
+});
+
+export const ApplyQualificationRefreshParams = zod.object({
+  courseId: zod.coerce.number(),
+});
+
+export const ApplyQualificationRefreshBody = zod.object({
+  token: zod.string(),
+});
+
+export const ApplyQualificationRefreshResponse = zod.object({
+  status: zod.enum(["applied", "already_applied"]),
+  courseIds: zod.array(zod.number()),
+});
+
 /**
  * Returns server health status
  * @summary Health check

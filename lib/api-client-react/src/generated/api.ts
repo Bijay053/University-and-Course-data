@@ -18,6 +18,7 @@ import type {
 
 import type {
   AcademicRequirement,
+  ApprovedQualificationCohorts,
   BulkUploadBody,
   BulkUploadResult,
   CountByLabel,
@@ -41,6 +42,9 @@ import type {
   ListCoursesParams,
   ListScrapingChangesParams,
   ListUniversitiesParams,
+  QualificationRefreshInput,
+  QualificationRefreshPreview,
+  QualificationRefreshResult,
   Scholarship,
   ScrapingChange,
   ScrapingJob,
@@ -59,6 +63,270 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+export const getListApprovedQualificationCohortsUrl = (
+  universityId: number,
+) => {
+  return `/api/scrape/universities/${universityId}/approved-qualification-cohorts`;
+};
+
+export const listApprovedQualificationCohorts = async (
+  universityId: number,
+  options?: RequestInit,
+): Promise<ApprovedQualificationCohorts> => {
+  return customFetch<ApprovedQualificationCohorts>(
+    getListApprovedQualificationCohortsUrl(universityId),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListApprovedQualificationCohortsQueryKey = (
+  universityId: number,
+) => {
+  return [
+    `/api/scrape/universities/${universityId}/approved-qualification-cohorts`,
+  ] as const;
+};
+
+export const getListApprovedQualificationCohortsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listApprovedQualificationCohorts>>,
+  TError = ErrorType<unknown>,
+>(
+  universityId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listApprovedQualificationCohorts>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getListApprovedQualificationCohortsQueryKey(universityId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listApprovedQualificationCohorts>>
+  > = ({ signal }) =>
+    listApprovedQualificationCohorts(universityId, {
+      signal,
+      ...requestOptions,
+    });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!universityId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listApprovedQualificationCohorts>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListApprovedQualificationCohortsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listApprovedQualificationCohorts>>
+>;
+export type ListApprovedQualificationCohortsQueryError = ErrorType<unknown>;
+
+export function useListApprovedQualificationCohorts<
+  TData = Awaited<ReturnType<typeof listApprovedQualificationCohorts>>,
+  TError = ErrorType<unknown>,
+>(
+  universityId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listApprovedQualificationCohorts>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListApprovedQualificationCohortsQueryOptions(
+    universityId,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getPreviewQualificationRefreshUrl = (courseId: number) => {
+  return `/api/scrape/staged/${courseId}/qualification-refresh/preview`;
+};
+
+export const previewQualificationRefresh = async (
+  courseId: number,
+  options?: RequestInit,
+): Promise<QualificationRefreshPreview> => {
+  return customFetch<QualificationRefreshPreview>(
+    getPreviewQualificationRefreshUrl(courseId),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getPreviewQualificationRefreshMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof previewQualificationRefresh>>,
+    TError,
+    { courseId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof previewQualificationRefresh>>,
+  TError,
+  { courseId: number },
+  TContext
+> => {
+  const mutationKey = ["previewQualificationRefresh"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof previewQualificationRefresh>>,
+    { courseId: number }
+  > = (props) => {
+    const { courseId } = props ?? {};
+
+    return previewQualificationRefresh(courseId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PreviewQualificationRefreshMutationResult = NonNullable<
+  Awaited<ReturnType<typeof previewQualificationRefresh>>
+>;
+
+export type PreviewQualificationRefreshMutationError = ErrorType<unknown>;
+
+export const usePreviewQualificationRefresh = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof previewQualificationRefresh>>,
+    TError,
+    { courseId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof previewQualificationRefresh>>,
+  TError,
+  { courseId: number },
+  TContext
+> => {
+  return useMutation(getPreviewQualificationRefreshMutationOptions(options));
+};
+
+export const getApplyQualificationRefreshUrl = (courseId: number) => {
+  return `/api/scrape/staged/${courseId}/qualification-refresh/apply`;
+};
+
+export const applyQualificationRefresh = async (
+  courseId: number,
+  qualificationRefreshInput: QualificationRefreshInput,
+  options?: RequestInit,
+): Promise<QualificationRefreshResult> => {
+  return customFetch<QualificationRefreshResult>(
+    getApplyQualificationRefreshUrl(courseId),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(qualificationRefreshInput),
+    },
+  );
+};
+
+export const getApplyQualificationRefreshMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof applyQualificationRefresh>>,
+    TError,
+    { courseId: number; data: BodyType<QualificationRefreshInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof applyQualificationRefresh>>,
+  TError,
+  { courseId: number; data: BodyType<QualificationRefreshInput> },
+  TContext
+> => {
+  const mutationKey = ["applyQualificationRefresh"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof applyQualificationRefresh>>,
+    { courseId: number; data: BodyType<QualificationRefreshInput> }
+  > = (props) => {
+    const { courseId, data } = props ?? {};
+
+    return applyQualificationRefresh(courseId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ApplyQualificationRefreshMutationResult = NonNullable<
+  Awaited<ReturnType<typeof applyQualificationRefresh>>
+>;
+export type ApplyQualificationRefreshMutationBody =
+  BodyType<QualificationRefreshInput>;
+export type ApplyQualificationRefreshMutationError = ErrorType<unknown>;
+
+export const useApplyQualificationRefresh = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof applyQualificationRefresh>>,
+    TError,
+    { courseId: number; data: BodyType<QualificationRefreshInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof applyQualificationRefresh>>,
+  TError,
+  { courseId: number; data: BodyType<QualificationRefreshInput> },
+  TContext
+> => {
+  return useMutation(getApplyQualificationRefreshMutationOptions(options));
+};
 
 /**
  * Returns server health status
