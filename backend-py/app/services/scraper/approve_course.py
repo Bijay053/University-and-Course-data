@@ -128,7 +128,7 @@ async def approve_scraped_course(
     every subsequent row in a batch fail (Week 5: Charles Sturt promotion gap).
     """
     from app.services.scraper.fee_selection import fee_selection, unresolved_fee_selection
-    from app.services.scraper.ulaw_qualifications import QUALIFICATION_SCOPE, AWARDS, URL, validate_qualification_scope
+    from app.services.scraper.ulaw_qualifications import QUALIFICATION_SCOPE, AWARDS, URL, verify_qualification_source
     if not sc.course_name or not sc.course_name.strip():
         raise ApprovalValidationError(
             f"scraped_course id={sc.id} has empty course_name; cannot promote"
@@ -185,8 +185,8 @@ async def approve_scraped_course(
     fee_authority = fee_metadata.get("fee_variants")
     qualification = fee_metadata.get(QUALIFICATION_SCOPE)
     if qualification:
-        if not validate_qualification_scope(sc):
-            raise ApprovalValidationError("Qualification fee scope no longer matches the award; review required")
+        if not await verify_qualification_source(sc):
+            raise ApprovalValidationError("Official qualification fee and intake source could not be reverified; review required")
     # A reviewer may choose a source-owned alternative outside the extractor's
     # original uniform tuple (or resolve a range). Validate its fingerprint and
     # entire current tuple, not merely the presence of selection metadata.

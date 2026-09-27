@@ -11,6 +11,7 @@ from copy import deepcopy
 from datetime import date
 from hashlib import sha256
 import json
+from pathlib import Path
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
@@ -330,6 +331,256 @@ async def test_award_specific_intake_proof_cannot_fall_back_to_shared_locations(
         ScrapedCourse.university_id == uni, ScrapedCourse.scrape_job_id == job,
         ScrapedCourse.id != original_id
     ))).scalars().all()
+
+
+def live_capture():
+    path = Path(__file__).parent / "fixtures/ulaw_legal_technology_20260927.html"
+    provenance = json.loads(path.with_suffix(".provenance.json").read_text())
+    assert sha256(path.read_bytes()).hexdigest() == provenance["response_sha256"]
+    assert provenance["source_url"] == URL
+    return path.read_text()
+
+
+def freeze_rollover(monkeypatch):
+    class RolloverDate(date):
+        @classmethod
+        def today(cls):
+            return cls(2027, 9, 27)
+    monkeypatch.setattr(ulaw_fees, "date", RolloverDate)
+
+
+def test_actual_current_capture_contains_complete_next_cohort(monkeypatch):
+    """Future fees are genuinely published, not a synthetic price-year replacement."""
+    from app.services.scraper.ulaw_qualifications import _verified_page
+    freeze_rollover(monkeypatch)
+    authority, proofs = _verified_page(live_capture(), URL)
+    assert authority["fee_year"] == 2027
+    assert {(o["study_variant"], o["campus"], o["amount"]) for o in authority["selected"]} == {
+        ("PG Dip", "London", 13500), ("PG Dip", "Outside of London", 12500),
+        ("PG Cert", "London", 6750), ("PG Cert", "Outside of London", 6300),
+    }
+    for proof in proofs.values():
+        assert proof["fee_term"] == "Full Course"
+        assert (proof["cohort_start"], proof["cohort_end"]) == ("2027-06-01", "2028-05-31")
+        assert proof["locations"] == ["Bristol", "London Moorgate"]
+    assert {e["intake"] for e in proofs["PG Cert"]["start_dates"]} == {"October 2027"}
+    assert {e["intake"] for e in proofs["PG Dip"]["start_dates"]} == {"October 2027", "February 2028"}
+
+
+@pytest.mark.asyncio
+async def test_verified_live_cohort_rollover_keeps_award_and_existing_offering_ids(db, monkeypatch):
+    freeze_cohort(monkeypatch)
+    html = live_capture()
+    mock_official_fetch(monkeypatch, html)
+    uni, _, original_id = await seed(db)
+    first = await route.approve_selected(route.ApproveSelectedBody(courseIds=[original_id]), db,
+                                         {"email": "test-reviewer"})
+    assert not first["failed"], first
+    courses, offerings = await published(db, uni)
+    course_ids = {c.name: c.id for c in courses}
+    offering_ids = {(o.course_id, o.location): o.id for o in offerings}
+    freeze_rollover(monkeypatch)
+    values = captured_values()
+    authority = ulaw_fees.parse_course_fees(html, URL)
+    values["fee_year"] = 2027
+    values["extraction_method"]["fee_variants"] = authority
+    job_id = str(uuid4())
+    db.add(ScrapeRuntimeJob(runtime_job_id=job_id, university_id=uni,
+                           job_type="scrape", status="completed"))
+    await db.flush()
+    row = ScrapedCourse(university_id=uni, scrape_job_id=job_id, **values)
+    db.add(row)
+    await db.flush()
+    next_result = await route.approve_selected(route.ApproveSelectedBody(courseIds=[row.id]), db,
+                                               {"email": "test-reviewer"})
+    assert not next_result["failed"], next_result
+    courses, offerings = await published(db, uni)
+    assert {c.name: c.id for c in courses} == course_ids
+    assert len(offerings) == 4
+    assert all(o.id == offering_ids[(o.course_id, o.location)]
+               for o in offerings if (o.course_id, o.location) in offering_ids)
+    assert {(c.name, o.location, o.fee_amount) for c in courses for o in offerings if o.course_id == c.id} == {
+        ("PG Dip Legal Technology", "London Moorgate", 13500),
+        ("PG Dip Legal Technology", "Bristol", 12500),
+        ("PG Cert Legal Technology", "London Moorgate", 6750),
+        ("PG Cert Legal Technology", "Bristol", 6300),
+    }
+    assert all(o.fee_year == 2027 for o in offerings)
+    for staged_id in next_result["approvedIds"]:
+        staged = await db.get(ScrapedCourse, staged_id)
+        proof = staged.extraction_method[QUALIFICATION_SCOPE]["verified_source"]
+        assert proof["response_sha256"] == sha256(html.encode()).hexdigest()
+        assert len(proof["authority"]["selected"]) == 4
+
+
+@pytest.mark.parametrize("damage", ["no_award_intakes", "online", "no_window", "term", "missing_price"])
+def test_next_cohort_requires_joint_fee_and_award_owned_physical_contract(monkeypatch, damage):
+    from bs4 import BeautifulSoup
+    from app.services.scraper.ulaw_qualifications import _verified_page
+    freeze_rollover(monkeypatch)
+    soup = BeautifulSoup(live_capture(), "html.parser")
+    if damage in {"no_award_intakes", "online"}:
+        item = next(i for i in soup.select("#accordion-bcz .accordion__item")
+                    if i.select_one("h4").get_text(strip=True) == "October 2027")
+        if damage == "no_award_intakes":
+            item.decompose()
+        else:
+            for li in item.select(".accordion__body li li"):
+                li.string = "Part-time: Online"
+    html = str(soup)
+    if damage == "no_window":
+        html = html.replace("1 June 2027 - 31 May 2028", "dates to be confirmed")
+    elif damage == "term":
+        html = html.replace("PG Cert Non-domestic students", "PG Cert Non-domestic students per year")
+    elif damage == "missing_price":
+        html = html.replace("£6,750", "TBC")
+    assert _verified_page(html, URL) is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("damage", ["window", "year", "amount", "proof", "expired", "missing_capture"])
+async def test_next_cohort_persisted_source_mismatch_is_rejected(db, monkeypatch, damage):
+    from app.services.scraper.ulaw_qualifications import split_pending_qualifications, validate_qualification_scope
+    freeze_rollover(monkeypatch)
+    html = live_capture()
+    mock_official_fetch(monkeypatch, html)
+    values = captured_values()
+    values["fee_year"] = 2027
+    values["extraction_method"]["fee_variants"] = ulaw_fees.parse_course_fees(html, URL)
+    _, _, row_id = await seed(db, values)
+    row = await db.get(ScrapedCourse, row_id)
+    result = await split_pending_qualifications(db, row)
+    assert result["status"] == "split"
+    assert validate_qualification_scope(row)
+    metadata = deepcopy(row.extraction_method)
+    if damage == "window":
+        metadata["campus_authority"]["cohort_start"] = "2026-06-01"
+    elif damage == "year":
+        row.fee_year = 2026
+    elif damage == "amount":
+        metadata["fee_variants"]["selected"][0]["amount"] += 1
+    elif damage == "proof":
+        metadata["campus_authority"]["start_dates"][0]["locations"] = ["Online"]
+    elif damage == "missing_capture":
+        metadata[QUALIFICATION_SCOPE].pop("verified_source")
+    else:
+        class ExpiredDate(date):
+            @classmethod
+            def today(cls):
+                return cls(2028, 6, 1)
+        monkeypatch.setattr(ulaw_fees, "date", ExpiredDate)
+    row.extraction_method = metadata
+    assert not validate_qualification_scope(row)
+
+
+@pytest.mark.asyncio
+async def test_legacy_pinned_current_cohort_remains_valid_without_inventing_provenance(db, monkeypatch):
+    from app.services.scraper.ulaw_qualifications import split_pending_qualifications, validate_qualification_scope
+    freeze_cohort(monkeypatch)
+    mock_official_fetch(monkeypatch)
+    _, _, row_id = await seed(db)
+    row = await db.get(ScrapedCourse, row_id)
+    assert (await split_pending_qualifications(db, row))["status"] == "split"
+    metadata = deepcopy(row.extraction_method)
+    metadata[QUALIFICATION_SCOPE].pop("verified_source")
+    row.extraction_method = metadata
+    assert validate_qualification_scope(row)
+    assert "verified_source" not in row.extraction_method[QUALIFICATION_SCOPE]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("damage", ["coordinated_fee", "coordinated_intake", "unavailable"])
+async def test_pending_promotion_reverifies_source_not_mutable_capture_hashes(db, monkeypatch, damage):
+    from app.services.scraper.ulaw_qualifications import (
+        _contract_hash, split_pending_qualifications, validate_qualification_scope,
+    )
+    from app.services.scraper.campus_fee_split import split_pending_course
+    from app.services.scraper.approve_course import ApprovalValidationError, approve_scraped_course
+
+    real_client = httpx.AsyncClient
+    freeze_rollover(monkeypatch)
+    html = live_capture()
+    mock_official_fetch(monkeypatch, html)
+    values = captured_values()
+    values["fee_year"] = 2027
+    values["extraction_method"]["fee_variants"] = ulaw_fees.parse_course_fees(html, URL)
+    uni, _, row_id = await seed(db, values)
+    row = await db.get(ScrapedCourse, row_id)
+    split = await split_pending_qualifications(db, row)
+    cert = await db.get(ScrapedCourse, split["courseIds"][1])
+    assert (await split_pending_course(db, cert))["status"] == "split"
+    assert cert.course_location == "London Moorgate"
+    metadata = deepcopy(cert.extraction_method)
+    source = metadata[QUALIFICATION_SCOPE]["verified_source"]
+    genuine_hash = source["response_sha256"]
+    if damage == "coordinated_fee":
+        for authority in (metadata["fee_variants"], source["authority"]):
+            for option in authority["options"] + authority["selected"]:
+                if option["study_variant"] == "PG Cert" and option["campus"] == "London" and option["year"] == 2027:
+                    option["amount"] = 7777
+                    option["snippet"] = option["snippet"].replace("6,750", "7,777")
+        metadata["fee_variants"]["international_fee"] = cert.international_fee = 7777
+    elif damage == "coordinated_intake":
+        proof = deepcopy(metadata["campus_authority"])
+        forged = deepcopy(proof["start_dates"][0])
+        forged["intake"] = "February 2028"
+        proof["start_dates"].append(forged)
+        proof["snippet"] = " | ".join(e["snippet"] for e in proof["start_dates"])
+        metadata["campus_authority"] = proof
+        source["proofs"]["PG Cert"] = deepcopy(proof)
+        cert.intake_months = ["October", "February"]
+    else:
+        monkeypatch.setattr(httpx, "AsyncClient", real_client)
+        mock_official_fetch(monkeypatch, html, 503)
+    source["contract_sha256"] = _contract_hash(source["authority"], source["proofs"])
+    assert source["response_sha256"] == genuine_hash
+    cert.extraction_method = metadata
+    # Deliberately demonstrate that consistency + recomputed checksum is not
+    # external authority. The shared async promotion boundary must stop it.
+    assert validate_qualification_scope(cert)
+    await db.flush()
+    with pytest.raises(ApprovalValidationError, match="could not be reverified"):
+        await approve_scraped_course(db, cert, actor="test-reviewer", commit=False)
+    assert cert.status == "pending" and cert.course_id is None
+    assert not (await published(db, uni))[0]
+    result = await route.approve_selected(
+        route.ApproveSelectedBody(courseIds=[cert.id], force=True), db, {"email": "test-reviewer"},
+    )
+    assert result["approvedIds"] == [] and result["failed"]
+    assert not (await published(db, uni))[0]
+
+
+@pytest.mark.asyncio
+async def test_approved_historical_retries_keep_ids_after_cohort_expiry_without_fetch(db, monkeypatch):
+    from app.services.scraper.approve_course import approve_scraped_course
+    from app.services.scraper.ulaw_qualifications import validate_qualification_scope
+
+    freeze_cohort(monkeypatch)
+    mock_official_fetch(monkeypatch)
+    uni, _, row_id = await seed(db)
+    result = await route.approve_selected(
+        route.ApproveSelectedBody(courseIds=[row_id]), db, {"email": "test-reviewer"},
+    )
+    assert not result["failed"]
+    courses, offerings = await published(db, uni)
+    course_ids, offering_ids = {c.id for c in courses}, {o.id for o in offerings}
+    freeze_rollover(monkeypatch)
+    def no_fetch(**kwargs):
+        pytest.fail("Historical approved retries must not fetch or re-promote")
+    monkeypatch.setattr(httpx, "AsyncClient", no_fetch)
+    for staged_id in result["approvedIds"]:
+        staged = await db.get(ScrapedCourse, staged_id)
+        assert not validate_qualification_scope(staged)  # expired for NEW promotion
+        retry = await approve_scraped_course(db, staged, actor="test-reviewer")
+        assert retry["course_id"] in course_ids and retry["reason"] == "Already approved"
+    retried = await route.approve_selected(
+        route.ApproveSelectedBody(courseIds=result["approvedIds"]), db, {"email": "test-reviewer"},
+    )
+    assert not retried["failed"] and set(retried["approvedIds"]) == set(result["approvedIds"])
+    courses, offerings = await published(db, uni)
+    assert {c.id for c in courses} == course_ids
+    assert {o.id for o in offerings} == offering_ids
+    assert all(o.fee_year == 2026 for o in offerings)
 
 
 @pytest.mark.asyncio

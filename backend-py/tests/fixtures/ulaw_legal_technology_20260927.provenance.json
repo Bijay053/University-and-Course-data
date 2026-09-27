@@ -1,0 +1,8 @@
+{
+  "source_url": "https://www.law.ac.uk/study/postgraduate/law/pg-dip-and-pg-cert-legal-technology/",
+  "captured_at": "2026-09-27T06:33:24Z",
+  "method": "read-only public HTTPS GET",
+  "response_sha256": "35677a8f0612cb725e0f85b41f7eb395902e8d6cd0271ce521aee799fa71bee1",
+  "fixture": "ulaw_legal_technology_20260927.html",
+  "notes": "Full official response, not synthetic. Both 2026/27 and 2027/28 tuition are published. The 2027/28 window is 1 June 2027 through 31 May 2028. October 2027 lists both awards at Bristol and London Moorgate; February 2028 lists only PG Dip."
+}
