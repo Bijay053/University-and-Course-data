@@ -86,6 +86,36 @@ async def test_unavailable_failure_reused_but_next_approval_refetches(db, monkey
 
 
 @pytest.mark.asyncio
+async def test_ordinary_selected_approval_refetches_on_each_unavailable_retry(db, monkeypatch):
+    freeze_cohort(monkeypatch)
+    upstream = counted_official_fetch(monkeypatch)
+    uni, _, parent = await seed(db)
+    ids = await prepare_qualification_children(db, parent)
+    upstream["calls"].clear()
+    upstream["status"] = 503
+
+    for attempt in (1, 2):
+        result = await route.approve_selected(
+            route.ApproveSelectedBody(courseIds=[ids[0]]), db, {"email": "reviewer"},
+        )
+        assert result["approvedIds"] == []
+        assert result["failed"] == [{
+            "id": ids[0], "error": APPROVAL_REASONS["official_source_unavailable"],
+            "reasonCode": "official_source_unavailable",
+        }]
+        assert upstream["calls"] == [("GET", URL)] * attempt
+        assert (await db.get(ScrapedCourse, ids[0])).status == "pending"
+        assert await published(db, uni) == ([], [])
+
+    upstream["status"] = 200
+    recovered = await route.approve_selected(
+        route.ApproveSelectedBody(courseIds=[ids[0]]), db, {"email": "reviewer"},
+    )
+    assert not recovered["failed"] and len(recovered["approvedIds"]) == 3
+    assert upstream["calls"] == [("GET", URL)] * 3
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("change", ["fees", "intakes", "unverified"])
 async def test_current_source_change_is_distinct_from_unverified_page(db, monkeypatch, change):
     from app.services.scraper.extractors.ulaw_fees import parse_course_fees
