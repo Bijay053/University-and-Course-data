@@ -31,3 +31,16 @@ a bypass of the legacy-collision guard.
 run approval preflight for every incoming identity, including standalone awards.
 Count public identities rather than physical campus evidence rows, and do not
 force low-confidence records through merely to reach the displayed group count.
+
+Singleton adoption must prove campus-to-fee correspondence independently of
+matching scalar values and scope metadata, including each historical witness.
+
+**Why:** A scope labelled London can still carry self-consistent Birmingham fee
+options; metadata validation alone does not prove the fee belongs to that campus.
+Also, row locks plus SERIALIZABLE do not universally block new competing rows
+from ordinary application writers during an exhaustive inventory migration.
+
+**How to apply:** Use the vetted campus fee planner or exact campus-label proof.
+For one-off exhaustive migrations, acquire bounded table writer barriers before
+the first snapshot-bearing query, then the normal university lock. Exercise
+concurrent inserts in the isolated PostgreSQL canary; keep dry-runs truly read-only.

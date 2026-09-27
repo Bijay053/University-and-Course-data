@@ -10,6 +10,7 @@ export interface HealthStatus {
 }
 
 export interface University {
+  courseCount?: number;
   id: number;
   name: string;
   country: string;
@@ -22,7 +23,6 @@ export interface University {
   logoUrl?: string | null;
   /** @nullable */
   scrapeUrl?: string | null;
-  courseCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -65,7 +65,29 @@ export interface UpdateUniversityBody {
   scrapeUrl?: string | null;
 }
 
+export type CourseOfferingsItem = {
+  id: string;
+  location: string;
+  /** @nullable */
+  feeAmount?: number | null;
+  /** @nullable */
+  feeCurrency?: string | null;
+  /** @nullable */
+  feeTerm?: string | null;
+  /** @nullable */
+  feeYear?: number | null;
+};
+
 export interface Course {
+  /** @nullable */
+  courseLocation?: string | null;
+  /** @nullable */
+  scholarshipAmount?: number | null;
+  /** @nullable */
+  scholarshipPercentage?: number | null;
+  /** @nullable */
+  scholarshipCurrency?: string | null;
+  offerings?: CourseOfferingsItem[];
   id: number;
   universityId: number;
   /** @nullable */
@@ -79,8 +101,6 @@ export interface Course {
   subCategory?: string | null;
   /** @nullable */
   courseWebsite?: string | null;
-  /** @nullable */
-  courseLocation?: string | null;
   /** @nullable */
   duration?: number | null;
   /** @nullable */
@@ -172,12 +192,6 @@ export interface Course {
   scholarshipDetails?: string | null;
   /** @nullable */
   scholarshipEligibility?: string | null;
-  /** @nullable */
-  scholarshipAmount?: number | null;
-  /** @nullable */
-  scholarshipPercentage?: number | null;
-  /** @nullable */
-  scholarshipCurrency?: string | null;
   createdAt: string;
   updatedAt: string;
 }

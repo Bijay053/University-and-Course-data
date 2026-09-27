@@ -185,12 +185,12 @@ async def list_courses(
         d["courseLanguage"] = d.get("language")
         d["otherRequirement"] = d.get("other_requirement")
         # Merge in fees (always include keys, even null)
-        d.update(fees_map.get(r.id, {
+        d.update((fees_map.get(r.id) if not d["offerings"] else None) or {
             "international_fee": None, "internationalFee": None,
             "fee_term": None, "feeTerm": None,
             "fee_year": None, "feeYear": None,
             "currency": None, "feeCurrency": None,
-        }))
+        })
 
         # B7: surface english bands. Always emit ALL keys (with None
         # fallback) so the UI doesn't have to guard against undefined.

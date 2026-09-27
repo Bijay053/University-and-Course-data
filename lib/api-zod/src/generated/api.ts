@@ -29,6 +29,7 @@ export const ListUniversitiesQueryParams = zod.object({
 export const ListUniversitiesResponse = zod.object({
   data: zod.array(
     zod.object({
+      courseCount: zod.number().optional(),
       id: zod.number(),
       name: zod.string(),
       country: zod.string(),
@@ -67,6 +68,7 @@ export const GetUniversityParams = zod.object({
 });
 
 export const GetUniversityResponse = zod.object({
+  courseCount: zod.number().optional(),
   id: zod.number(),
   name: zod.string(),
   country: zod.string(),
@@ -97,6 +99,7 @@ export const UpdateUniversityBody = zod.object({
 });
 
 export const UpdateUniversityResponse = zod.object({
+  courseCount: zod.number().optional(),
   id: zod.number(),
   name: zod.string(),
   country: zod.string(),
@@ -135,6 +138,22 @@ export const ListCoursesQueryParams = zod.object({
 export const ListCoursesResponse = zod.object({
   data: zod.array(
     zod.object({
+      courseLocation: zod.string().nullish(),
+      scholarshipAmount: zod.number().nullish(),
+      scholarshipPercentage: zod.number().nullish(),
+      scholarshipCurrency: zod.string().nullish(),
+      offerings: zod
+        .array(
+          zod.object({
+            id: zod.string(),
+            location: zod.string(),
+            feeAmount: zod.number().nullish(),
+            feeCurrency: zod.string().nullish(),
+            feeTerm: zod.string().nullish(),
+            feeYear: zod.number().nullish(),
+          }),
+        )
+        .optional(),
       id: zod.number(),
       universityId: zod.number(),
       universityName: zod.string().nullish(),
@@ -340,6 +359,22 @@ export const UpdateCourseBody = zod.object({
 });
 
 export const UpdateCourseResponse = zod.object({
+  courseLocation: zod.string().nullish(),
+  scholarshipAmount: zod.number().nullish(),
+  scholarshipPercentage: zod.number().nullish(),
+  scholarshipCurrency: zod.string().nullish(),
+  offerings: zod
+    .array(
+      zod.object({
+        id: zod.string(),
+        location: zod.string(),
+        feeAmount: zod.number().nullish(),
+        feeCurrency: zod.string().nullish(),
+        feeTerm: zod.string().nullish(),
+        feeYear: zod.number().nullish(),
+      }),
+    )
+    .optional(),
   id: zod.number(),
   universityId: zod.number(),
   universityName: zod.string().nullish(),

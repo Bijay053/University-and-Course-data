@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { useListCourses } from "@workspace/api-client-react";
+import { CourseCampusFees } from "@/components/course-campus-fees";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, ChevronLeft, ChevronRight, X, ExternalLink, DollarSign, GraduationCap } from "lucide-react";
+import { Plus, Search, ChevronLeft, ChevronRight, X, ExternalLink, GraduationCap } from "lucide-react";
 import { CATEGORY_NAMES, DEGREE_LEVELS, STUDY_MODES, getSubCategories } from "@/lib/course-constants";
 
 const DEGREE_COLORS: Record<string, string> = {
@@ -196,12 +197,7 @@ export default function Courses() {
                             <span>{course.duration} {course.durationTerm}</span>
                           )}
                           {course.studyMode && <span>{course.studyMode}</span>}
-                          {!!row.internationalFee && (
-                            <span className="flex items-center gap-0.5 text-green-700 font-medium">
-                              <DollarSign className="h-3 w-3" />
-                              {(row.internationalFee as number).toLocaleString()} {row.feeTerm ? `/ ${row.feeTerm}` : ""}
-                            </span>
-                          )}
+                          <CourseCampusFees course={course} />
                           {!!row.ieltsOverall && (
                             <span className="text-amber-700">IELTS {row.ieltsOverall as number}</span>
                           )}
@@ -320,7 +316,7 @@ export default function Courses() {
                           <td className={colClass}><Cell v={row.city} /></td>
                           <td className={`${colClass} bg-blue-50/40`}><Cell v={row.intakeMonths} /></td>
                           <td className={`${colClass} bg-blue-50/40`}><Cell v={row.intakeDays} /></td>
-                          <td className={`${colClass} bg-green-50/40`}><ScoreCell v={row.internationalFee} /></td>
+                          <td className={`${colClass} bg-green-50/40`}><CourseCampusFees course={course} /></td>
                           <td className={`${colClass} bg-green-50/40`}><Cell v={row.feeTerm} /></td>
                           <td className={`${colClass} bg-green-50/40`}><Cell v={row.feeYear} /></td>
                           <td className={`${colClass} bg-green-50/40`}><Cell v={row.currency} /></td>

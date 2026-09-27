@@ -926,6 +926,8 @@ components:
     University:
       type: object
       properties:
+        courseCount:
+          type: integer
         id:
           type: integer
         name:
@@ -1016,6 +1018,32 @@ components:
     Course:
       type: object
       properties:
+        courseLocation:
+          type: ["string", "null"]
+        scholarshipAmount:
+          type: ["number", "null"]
+        scholarshipPercentage:
+          type: ["number", "null"]
+        scholarshipCurrency:
+          type: ["string", "null"]
+        offerings:
+          type: array
+          items:
+            type: object
+            required: [id, location]
+            properties:
+              id:
+                type: string
+              location:
+                type: string
+              feeAmount:
+                type: ["number", "null"]
+              feeCurrency:
+                type: ["string", "null"]
+              feeTerm:
+                type: ["string", "null"]
+              feeYear:
+                type: ["integer", "null"]
         id:
           type: integer
         universityId:

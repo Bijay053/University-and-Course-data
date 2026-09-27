@@ -8,6 +8,10 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 class CourseLocationOffering(BaseModel):
     id: str
     location: str
+    feeAmount: float | None = None
+    feeCurrency: str | None = None
+    feeTerm: str | None = None
+    feeYear: int | None = None
 
 
 class CourseBase(BaseModel):

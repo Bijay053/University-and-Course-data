@@ -9,7 +9,7 @@ from app.models.course_offering import CourseOffering
 
 
 async def read_offerings(db, course_ids):
-    """Location-only contract for application consumers; tuition is search-only."""
+    """Verified campus tuition, using the same public keys as search offerings."""
     result = {cid: [] for cid in course_ids}
     if not course_ids:
         return result
@@ -19,6 +19,10 @@ async def read_offerings(db, course_ids):
     for row in rows:
         result[row.course_id].append({
             "id": str(row.id), "location": row.location,
+            "feeAmount": float(row.fee_amount) if row.fee_amount is not None else None,
+            "feeCurrency": row.fee_currency,
+            "feeTerm": row.fee_term,
+            "feeYear": row.fee_year,
         })
     return result
 

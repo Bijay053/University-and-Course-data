@@ -1250,8 +1250,18 @@ async def get_university_courses(
     total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
     stmt = stmt.order_by(desc(Course.updated_at)).offset((page - 1) * limit).limit(limit)
     rows = (await db.execute(stmt)).scalars().all()
+    from app.services.scraper.published_offerings import read_offerings
+    from app.schemas.course import CourseLocationOffering
+
+    offerings = await read_offerings(db, [r.id for r in rows])
+    data = []
+    for row in rows:
+        course = CourseRead.model_validate(row)
+        course.offerings = [CourseLocationOffering(**o) for o in offerings[row.id]]
+        course.locations = [o.location for o in course.offerings]
+        data.append(course)
     return CourseListResponse(
-        data=[CourseRead.model_validate(r) for r in rows],
+        data=data,
         total=int(total),
         page=page,
         limit=limit,

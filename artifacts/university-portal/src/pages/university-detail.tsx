@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useQueryClient } from "@tanstack/react-query";
 import { useRoute, Link, useLocation } from "wouter";
 import { useGetUniversity, getGetUniversityQueryKey, useListCourses, getListCoursesQueryKey } from "@workspace/api-client-react";
+import { CourseCampusFees } from "@/components/course-campus-fees";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -3863,7 +3864,7 @@ export default function UniversityDetail() {
                     <td className="px-2 py-2 text-blue-600">{txt(c.intakeMonths)}</td>
                     <td className="px-2 py-2 text-blue-500">{txt(c.intakeDays)}</td>
                     <td className="px-2 py-2 text-blue-500 border-r">{txt(c.courseLocation)}</td>
-                    <td className="px-2 py-2 text-amber-700 font-medium">{c.internationalFee ? c.internationalFee.toLocaleString() : "—"}</td>
+                    <td className="px-2 py-2 text-amber-700 font-medium"><CourseCampusFees course={c} /></td>
                     <td className="px-2 py-2 text-amber-600">{txt(c.feeTerm)}</td>
                     <td className="px-2 py-2 text-amber-600">{num(c.feeYear)}</td>
                     <td className="px-2 py-2 text-amber-600 border-r">{txt(c.currency)}</td>
