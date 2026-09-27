@@ -7,6 +7,8 @@ import { useGetCourse, getGetCourseQueryKey } from "@workspace/api-client-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CourseCampusFees } from "@/components/course-campus-fees";
+import type { Course } from "@workspace/api-client-react";
 
 function formatDuration(d: number | null | undefined, term: string | null | undefined) {
   if (d == null) return null;
@@ -53,6 +55,7 @@ export default function CourseDetail() {
   // cast to access them. The API returns them at /api/courses/:id.
   const c = course as unknown as {
     id: number; universityId: number; universityName?: string | null;
+    offerings?: Course["offerings"];
     name: string; category?: string | null; subCategory?: string | null;
     courseWebsite?: string | null; duration?: number | null; durationTerm?: string | null;
     studyMode?: string | null; degreeLevel?: string | null; studyLoad?: string | null;
@@ -110,9 +113,10 @@ export default function CourseDetail() {
         <div className="flex flex-wrap gap-x-6 gap-y-2 mt-4 text-sm">
           {c.degreeLevel && <span className="flex items-center gap-1"><GraduationCap className="w-4 h-4" /> {c.degreeLevel}</span>}
           {formatDuration(c.duration, c.durationTerm) && <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> {formatDuration(c.duration, c.durationTerm)}</span>}
-          {latestFee?.internationalFee != null && (
+          {!!c.offerings?.length && <CourseCampusFees course={{ offerings: c.offerings }} />}
+          {!c.offerings?.length && latestFee?.internationalFee != null && (
             <span className="flex items-center gap-1">
-              <DollarSign className="w-4 h-4" /> {latestFee.currency || "AUD"} {Math.round(latestFee.internationalFee).toLocaleString()}{latestFee.feeTerm ? ` / ${latestFee.feeTerm}` : ""}
+              <DollarSign className="w-4 h-4" /> {latestFee.currency || "Currency not published"} {Math.round(latestFee.internationalFee).toLocaleString()}{latestFee.feeTerm ? ` / ${latestFee.feeTerm}` : ""}
             </span>
           )}
           {c.language && <span className="flex items-center gap-1"><Languages className="w-4 h-4" /> {c.language}</span>}
@@ -253,8 +257,8 @@ export default function CourseDetail() {
               <CardContent className="space-y-3 text-sm">
                 {fees.map((f) => (
                   <div key={f.id} className="border-b last:border-0 pb-3 last:pb-0 space-y-1">
-                    {f.internationalFee != null && (
-                      <div className="flex justify-between"><span className="text-gray-600">International</span><strong>{f.currency || "AUD"} {Math.round(f.internationalFee).toLocaleString()}{f.feeTerm ? ` / ${f.feeTerm}` : ""}</strong></div>
+                    {!c.offerings?.length && f.internationalFee != null && (
+                      <div className="flex justify-between"><span className="text-gray-600">International</span><strong>{f.currency || "Currency not published"} {Math.round(f.internationalFee).toLocaleString()}{f.feeTerm ? ` / ${f.feeTerm}` : ""}</strong></div>
                     )}
                     {f.domesticFee != null && (
                       <div className="flex justify-between"><span className="text-gray-600">Domestic</span><strong>{f.currency || "AUD"} {Math.round(f.domesticFee).toLocaleString()}{f.feeTerm ? ` / ${f.feeTerm}` : ""}</strong></div>

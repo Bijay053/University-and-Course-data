@@ -630,14 +630,15 @@ async def search_courses(
             "duolingo_overall": d.get("duolingo_overall"),
         }
 
-        # Currency / fee_term / fee_yearly — UI reads them on the result
-        d.setdefault("currency", "AUD")
-        d.setdefault("fee_term", "Year")
-        if d.get("international_fee") is None and not d["offerings"]:
-            d["international_fee"] = 0
-            d["internationalFee"] = 0
-        d.setdefault("international_fee_yearly", d.get("international_fee") or 0)
-        d.setdefault("internationalFeeYearly", d.get("international_fee") or 0)
+        # The SQL scalar is useful for sorting, not a campus-independent price.
+        # Scoped fee filters above still use the matching offering's own amount.
+        if d["offerings"]:
+            for key in ("international_fee", "internationalFee", "currency",
+                        "fee_term", "feeTerm", "fee_year", "feeYear"):
+                d[key] = None
+        # Never relabel a raw Full Course / Semester amount as annual tuition.
+        d["international_fee_yearly"] = None
+        d["internationalFeeYearly"] = None
 
         # Optional fields UI checks (with falsy guards but better defined)
         d.setdefault("category", None)
@@ -781,8 +782,9 @@ async def search_compare(
         # so we mirror that exactly instead of inventing a yearly figure
         # from the raw fee (which would be wrong for Full Course / Total
         # / Trimester fee terms).
-        intl_fee = r.get("international_fee")
-        intl_fee_yearly_raw = r.get("international_fee_yearly")
+        has_offerings = bool(r.get("offerings"))
+        intl_fee = None if has_offerings else r.get("international_fee")
+        intl_fee_yearly_raw = None if has_offerings else r.get("international_fee_yearly")
         intl_fee_yearly = (
             None if intl_fee_yearly_raw is None else float(intl_fee_yearly_raw)
         )
@@ -810,8 +812,9 @@ async def search_compare(
                 "intakes": r.get("intakes") or [],
                 "international_fee": intl_fee,
                 "international_fee_yearly": intl_fee_yearly,
-                "currency": r.get("currency"),
-                "fee_term": r.get("fee_term"),
+                "currency": None if has_offerings else r.get("currency"),
+                "fee_term": None if has_offerings else r.get("fee_term"),
+                "fee_year": None if has_offerings else r.get("fee_year"),
                 "application_fee": r.get("application_fee"),
                 "course_url": r.get("course_website"),
                 "english_requirements": eng_by_course.get(cid, []),

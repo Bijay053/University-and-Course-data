@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useSearch } from "wouter";
 import { ArrowLeft, ExternalLink, Loader2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CourseCampusFees } from "@/components/course-campus-fees";
+import type { Course } from "@workspace/api-client-react";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -29,21 +31,14 @@ type CompareCourse = {
   international_fee_yearly: number | null;
   currency: string | null;
   fee_term: string | null;
+  fee_year?: number | null;
+  offerings?: Course["offerings"];
   application_fee: number | null;
   course_url: string | null;
   english_requirements: EnglishReq[];
   academic_requirements: AcademicReq[];
 };
 
-function formatFee(c: CompareCourse): string | null {
-  // Always render the per-year amount. The API normalises "Full Course" /
-  // "Total" / "Trimester" via `international_fee_yearly`; if missing, use
-  // the raw amount as a best-effort fallback.
-  const value = c.international_fee_yearly != null ? c.international_fee_yearly : c.international_fee;
-  if (value == null) return null;
-  const cur = c.currency || "AUD";
-  return `${cur} ${Math.round(value).toLocaleString()} / Year`;
-}
 function formatDuration(c: CompareCourse): string | null {
   if (c.duration == null) return null;
   const unit = c.duration_term || "Year";
@@ -259,7 +254,12 @@ export default function ComparePage() {
 
             {condRow("Intakes", courses.map((c) => c.intakes.length), (i) => courses[i].intakes.join(", "))}
 
-            {condRow("International Fee", courses.map((c) => c.international_fee), (i) => formatFee(courses[i]))}
+            {condRow("International Fee", courses.map((c) => c.offerings?.length ? c.offerings : c.international_fee), (i) => (
+              <CourseCampusFees course={{
+                offerings: courses[i].offerings, internationalFee: courses[i].international_fee,
+                currency: courses[i].currency, feeTerm: courses[i].fee_term, feeYear: courses[i].fee_year,
+              }} />
+            ))}
 
             {condRow("Application Fee",
               courses.map((c) => c.application_fee),

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useQueryClient } from "@tanstack/react-query";
 import { useRoute, Link, useLocation } from "wouter";
 import { useGetUniversity, getGetUniversityQueryKey, useListCourses, getListCoursesQueryKey } from "@workspace/api-client-react";
-import { CourseCampusFees } from "@/components/course-campus-fees";
+import { CourseCampusFees, courseFeeExportColumns } from "@/components/course-campus-fees";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -1597,10 +1597,7 @@ export default function UniversityDetail() {
         "Language": c.courseLanguage ?? "",
         "Course Location": c.courseLocation ?? "",
         "Intake Months": c.intakeMonths ?? "",
-        "Int'l Fee": c.internationalFee != null ? Number(c.internationalFee) : "",
-        "Fee Term": c.feeTerm ?? "",
-        "Fee Year": c.feeYear != null ? Number(c.feeYear) : "",
-        "Currency": c.feeCurrency ?? "",
+        ...courseFeeExportColumns(c),
         "IELTS Overall": c.ieltsOverall != null ? Number(c.ieltsOverall) : "",
         "IELTS Listening": c.ieltsListening != null ? Number(c.ieltsListening) : "",
         "IELTS Speaking": c.ieltsSpeaking != null ? Number(c.ieltsSpeaking) : "",

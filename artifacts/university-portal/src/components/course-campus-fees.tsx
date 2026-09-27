@@ -1,5 +1,25 @@
 import type { Course } from "@workspace/api-client-react";
 
+export function formatCampusTuition(offering: NonNullable<Course["offerings"]>[number]): string {
+  if (offering.feeAmount == null) return "Fee not published for this location";
+  return `${offering.feeCurrency || "Currency not published"} ${offering.feeAmount.toLocaleString("en-GB")} / ${offering.feeTerm || "Term not published"} · ${offering.feeYear ?? "Year not published"}`;
+}
+
+/** Spreadsheet tuition columns follow the same offering authority as the UI. */
+export function courseFeeExportColumns(course: Record<string, unknown>) {
+  const offerings = course.offerings as Course["offerings"];
+  const hasOfferings = !!offerings?.length;
+  return {
+    "Campus fees": hasOfferings
+      ? offerings.map(o => `${o.location}: ${formatCampusTuition(o)}`).join("\n")
+      : "",
+    "Int'l Fee": !hasOfferings && course.internationalFee != null ? Number(course.internationalFee) : "",
+    "Fee Term": !hasOfferings ? String(course.feeTerm ?? "") : "",
+    "Fee Year": !hasOfferings && course.feeYear != null ? Number(course.feeYear) : "",
+    "Currency": !hasOfferings ? String(course.feeCurrency ?? course.currency ?? "") : "",
+  };
+}
+
 /** Never collapse prices across campuses, years, currencies or fee periods. */
 export function CourseCampusFees({ course }: { course: Pick<Course, "offerings" | "internationalFee" | "currency" | "feeTerm" | "feeYear"> }) {
   if (course.offerings?.length) {
@@ -8,13 +28,7 @@ export function CourseCampusFees({ course }: { course: Pick<Course, "offerings" 
         {course.offerings.map((o) => (
           <li key={o.id} data-testid={`text-campus-fee-${o.id}`}>
             <strong>{o.location}:</strong>{" "}
-            {o.feeAmount == null ? "Fee not published for this location" : (
-              <span>
-                {o.feeCurrency || "Currency not published"} {o.feeAmount.toLocaleString("en-GB")}
-                {" / "}{o.feeTerm || "Term not published"}
-                {" · "}{o.feeYear ?? "Year not published"}
-              </span>
-            )}
+            <span>{formatCampusTuition(o)}</span>
           </li>
         ))}
       </ul>

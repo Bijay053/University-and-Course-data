@@ -988,6 +988,72 @@ def test_compare_yearly_fee_is_null_when_view_has_no_yearly_column():
     )
 
 
+def test_compare_offerings_suppress_all_unqualified_scalar_tuition():
+    offerings = [
+        {"id": "1", "location": "London", "feeAmount": 19050, "feeCurrency": "GBP",
+         "feeTerm": "Full Course", "feeYear": 2026},
+        {"id": "2", "location": "Leeds", "feeAmount": 17500, "feeCurrency": "GBP",
+         "feeTerm": "Full Course", "feeYear": 2026},
+        {"id": "3", "location": "Paris", "feeAmount": 12000, "feeCurrency": "EUR",
+         "feeTerm": "Semester", "feeYear": 2027},
+    ]
+    client, _ = _client_with([{
+        "id": 201, "course_name": "Canonical award", "offerings": offerings,
+        "international_fee": 19050, "international_fee_yearly": 19050,
+        "currency": "GBP", "fee_term": "Full Course", "fee_year": 2026,
+    }])
+    response = client.get("/api/search/compare?ids=201")
+    assert response.status_code == 200
+    course = response.json()["courses"][0]
+    assert course["offerings"] == offerings
+    for field in ("international_fee", "international_fee_yearly", "currency", "fee_term", "fee_year"):
+        assert course[field] is None
+
+
+def test_search_suppresses_offering_scalar_without_changing_scoped_fee_filters():
+    offerings = [{"id": "1", "location": "London", "feeAmount": 19050,
+                  "feeCurrency": "GBP", "feeTerm": "Full Course", "feeYear": 2026}]
+    session = _SequentialSession([[{
+        "course_id": 201, "course_name": "Award", "offerings": offerings,
+        "international_fee": 19050, "currency": "GBP", "fee_term": "Full Course",
+    }], [1]])
+
+    async def override():
+        yield session
+
+    app.dependency_overrides[get_db] = override
+    response = TestClient(app).get("/api/search/courses?location=London&fee_min=18000&fee_max=20000")
+    assert response.status_code == 200
+    course = response.json()["results"][0]
+    assert course["offerings"] == offerings
+    for field in ("international_fee", "internationalFee", "international_fee_yearly", "internationalFeeYearly"):
+        assert course[field] is None
+    sql, params = session.calls[0]
+    assert "o.fee_amount >= :fee_min" in sql
+    assert "o.fee_amount <= :fee_max" in sql
+    assert "lower(o.location) ILIKE :loc" in sql
+    assert params["fee_min"] == 18000
+    assert params["fee_max"] == 20000
+
+
+def test_search_never_fabricates_annual_tuition_from_raw_full_course_fee():
+    session = _SequentialSession([[{
+        "course_id": 201, "course_name": "Award", "international_fee": 95000,
+        "currency": "AUD", "fee_term": "Full Course",
+    }], [1]])
+
+    async def override():
+        yield session
+
+    app.dependency_overrides[get_db] = override
+    response = TestClient(app).get("/api/search/courses")
+    assert response.status_code == 200
+    course = response.json()["results"][0]
+    assert course["international_fee"] == 95000
+    assert course["fee_term"] == "Full Course"
+    assert course["international_fee_yearly"] is None
+
+
 def test_compare_drops_unknown_ids_silently():
     """If a requested id doesn't exist in the MV, drop it (don't 404)."""
     mv_rows = [

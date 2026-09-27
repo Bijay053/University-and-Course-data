@@ -311,7 +311,14 @@ async def test_real_database_split_approve_rescrape_and_idempotency():
             detail = await get_course(courses[0].id, db)
             assert len(detail.offerings) == 4
             assert set(detail.locations) == {"London", "Birmingham", "Leeds", "Manchester"}
-            assert all(set(o.model_dump()) == {"id", "location"} for o in detail.offerings)
+            expected_offerings = {
+                str(o.id): {
+                    "id": str(o.id), "location": o.location,
+                    "feeAmount": float(o.fee_amount), "feeCurrency": o.fee_currency,
+                    "feeTerm": o.fee_term, "feeYear": o.fee_year,
+                } for o in offerings
+            }
+            assert {o.id: o.model_dump() for o in detail.offerings} == expected_offerings
             from app.routers.courses import list_courses
             listing = await list_courses(
                 db, university_id=uni.id, q=None, degree_level=None, study_mode=None,
@@ -319,7 +326,7 @@ async def test_real_database_split_approve_rescrape_and_idempotency():
             )
             listed = json.loads(listing.body)["data"][0]
             assert len(listed["offerings"]) == 4
-            assert all(set(o) == {"id", "location"} for o in listed["offerings"])
+            assert {o["id"]: o for o in listed["offerings"]} == expected_offerings
             # Database constraints provide a backstop even if a caller bypasses
             # the transaction advisory lock or tries to insert the same campus.
             from sqlalchemy.exc import IntegrityError

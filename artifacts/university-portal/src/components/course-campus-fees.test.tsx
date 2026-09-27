@@ -3,12 +3,31 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { CourseListResponse } from "@workspace/api-client-react";
-import { CourseCampusFees } from "./course-campus-fees";
+import { CourseCampusFees, courseFeeExportColumns } from "./course-campus-fees";
+import * as XLSX from "xlsx";
 import Courses from "@/pages/courses";
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("course list campus tuition contract", () => {
+  it("exports exact campus tuition into XLSX without a scalar, retaining legacy tuition", () => {
+    const offerings = [
+      { id: "1", location: "London", feeAmount: 19050, feeCurrency: "GBP", feeTerm: "Full Course", feeYear: 2026 },
+      { id: "2", location: "Paris", feeAmount: 12000, feeCurrency: "EUR", feeTerm: "Semester", feeYear: 2027 },
+      { id: "3", location: "Online", feeAmount: null },
+    ];
+    const campus = courseFeeExportColumns({ internationalFee: null, offerings });
+    const legacy = courseFeeExportColumns({ internationalFee: 95000, feeTerm: "Full Course", feeYear: 2025, feeCurrency: "AUD" });
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([campus, legacy]), "Courses");
+    const decoded = XLSX.read(XLSX.write(workbook, { type: "array", bookType: "xlsx" }), { type: "array" });
+    expect(XLSX.utils.sheet_to_json(decoded.Sheets.Courses)).toEqual([
+      { "Campus fees": "London: GBP 19,050 / Full Course · 2026\nParis: EUR 12,000 / Semester · 2027\nOnline: Fee not published for this location",
+        "Int'l Fee": "", "Fee Term": "", "Fee Year": "", "Currency": "" },
+      { "Campus fees": "", "Int'l Fee": 95000, "Fee Term": "Full Course", "Fee Year": 2025, "Currency": "AUD" },
+    ]);
+    expect(courseFeeExportColumns({ offerings, internationalFee: 99999, feeTerm: "Annual", feeYear: 2020, currency: "AUD" })).toEqual(campus);
+  });
   it("renders exact campus tuition from the data envelope without a scalar fee", () => {
     // Same camelCase offering contract returned by both Python course list routes.
     const response: CourseListResponse = { total: 1, page: 1, limit: 50, data: [{

@@ -21,6 +21,13 @@ const result: SearchResult = {
 };
 
 describe("search course location offerings", () => {
+  it("does not label a raw semester or full-course price as annual", () => {
+    const { rerender } = render(<ResultLocationFee result={{ ...result, fee_term: "Semester" }} locationFilter="" />);
+    expect(screen.getByText("GBP 19,050 / Semester")).toBeTruthy();
+    rerender(<ResultLocationFee result={{ ...result, fee_term: "Full Course" }} locationFilter="" />);
+    expect(screen.getByText("GBP 19,050 / Full Course")).toBeTruthy();
+    expect(screen.queryByText(/\/ Year/)).toBeNull();
+  });
   it("offers every location under one course and shows only the selected location's fee", () => {
     const offerings = [
       { id: "london", location: "London", feeAmount: 19050, feeCurrency: "GBP", feeTerm: "Full Course", feeYear: 2026 },
@@ -44,7 +51,7 @@ describe("search course location offerings", () => {
     render(<ResultLocationFee result={result} locationFilter="" />);
     expect(screen.queryByRole("combobox")).toBeNull();
     expect(screen.getByText("London, Leeds")).toBeTruthy();
-    expect(screen.getByText("GBP 19,050 / Year")).toBeTruthy();
+    expect(screen.getByText("GBP 19,050 / Annual")).toBeTruthy();
   });
 
   it("does not use a legacy scalar fee for an offering without a published fee", () => {

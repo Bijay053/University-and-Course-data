@@ -91,23 +91,10 @@ function formatFee(
   amount: number | null,
   currency: string | null,
   term: string | null,
-  yearly?: number | null,
+  _yearly?: number | null,
 ) {
-  // The API normalises "Full Course" / "Total" / "Trimester" fees into a
-  // per-year figure (international_fee_yearly) when it has the duration.
-  // When duration is unknown it can't divide, so it returns the raw amount
-  // unchanged — meaning a 3-year total like "AUD 58,080 (Full Course)"
-  // would otherwise be mislabeled as "AUD 58,080 / Year".  Detect that
-  // case and surface the actual term instead of lying.
-  const value = yearly != null ? yearly : amount;
-  if (value == null) return null;
-  const cur = currency || "AUD";
-  const isFullCourse = term != null && /full|total/i.test(term);
-  const wasNormalised = yearly != null && amount != null && yearly !== amount;
-  if (isFullCourse && !wasNormalised) {
-    return `${cur} ${Math.round(value).toLocaleString()} (Full Course)`;
-  }
-  return `${cur} ${Math.round(value).toLocaleString()} / Year`;
+  if (amount == null) return null;
+  return `${currency || "Currency not specified"} ${amount.toLocaleString()} / ${term || "Period not specified"}`;
 }
 function formatDuration(d: number | null, term: string | null) {
   if (d == null) return null;
