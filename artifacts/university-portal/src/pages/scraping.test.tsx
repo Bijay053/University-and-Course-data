@@ -399,6 +399,43 @@ describe("Scraping repair reviewer", () => {
     expect(screen.getByTestId("fee-summary-1")).toBeTruthy();
   });
 
+  it.each(["official_source_unavailable", "changed_cohort", "unverified_page", "unknown_private"])("renders sanitized approval guidance for %s on the actual review page", async (reasonCode) => {
+    const review = initialReview();
+    review.courses = review.courses.slice(0, 1);
+    const bodies: Array<{ courseIds: number[]; force: boolean }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/scrape/staged/approve-selected") {
+        bodies.push(JSON.parse(String(init?.body)));
+        return jsonResponse({ approvedIds: [], approvedCount: 0, failed: [
+          { id: 1, reasonCode, error: "PRIVATE provider token=secret" },
+        ], attempted: 1 });
+      }
+      if (url === "/api/scrape/staged/repair-job") return jsonResponse({ courses: review.courses });
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      return jsonResponse({});
+    }));
+    render(<ScrapingForTest initialReviewState={review} />);
+    await userEvent.click(screen.getByRole("button", { name: "Approve (1 course)" }));
+    const notice = await screen.findByTestId("approval-failure-1");
+    expect(notice.textContent).not.toContain("PRIVATE");
+    if (reasonCode === "official_source_unavailable") {
+      expect(notice.textContent).toContain("temporarily unavailable");
+      await waitFor(() => expect(screen.getByRole("button", { name: "Retry approval" }).hasAttribute("disabled")).toBe(false));
+      await userEvent.click(screen.getByRole("button", { name: "Retry approval" }));
+      await waitFor(() => expect(bodies).toHaveLength(2));
+      expect(bodies).toEqual([{ courseIds: [1], force: false }, { courseIds: [1], force: false }]);
+    } else if (reasonCode === "changed_cohort") {
+      expect(notice.textContent).toContain("joint parent has not been split");
+      expect(screen.queryByRole("button", { name: "Preview current award cohort" })).toBeNull();
+    } else if (reasonCode === "unverified_page") {
+      expect(notice.textContent).toContain("no cohort change is confirmed");
+    }
+  });
+
   it("submits mixed uniform and range fees together, retaining only failed original IDs", async () => {
     const review = initialReview();
     const options = (amounts: number[]) => amounts.map((amount, index) => ({

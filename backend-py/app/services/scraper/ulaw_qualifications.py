@@ -20,6 +20,26 @@ AWARDS = {
     "PG Cert": ("PG Cert Legal Technology", "Graduate Certificate", {"London": 6600, "Outside of London": 6150}),
 }
 REVIEW_REASON = "Official Legal Technology qualification and applicable cohort evidence could not be verified; refresh before approval."
+APPROVAL_REASONS = {
+    "official_source_unavailable": "Official qualification source is temporarily unavailable. Retry approval; nothing was published.",
+    "changed_cohort": "Verified official fees or intakes differ from staging. Preview the current award cohort before approval.",
+    "unverified_page": "Official qualification evidence could not be verified. Review the source before retrying; no cohort change is confirmed.",
+    "invalid_stored_scope": "Stored qualification scope is invalid. Review and refresh staged evidence before approval.",
+}
+
+
+class SourceFailure(dict):
+    """Falsey, sanitized outcome; never contains HTTP or provider diagnostics."""
+
+    def __init__(self, reason_code):
+        super().__init__(reason_code=reason_code if reason_code in APPROVAL_REASONS else "unverified_page")
+
+    def __bool__(self):
+        return False
+
+
+def source_failure_code(value):
+    return value["reason_code"] if isinstance(value, SourceFailure) else "unverified_page"
 CAMPUSES = {"Bristol", "London Moorgate"}
 COHORT_LOCATIONS = {"PG Dip": {"Bristol", "London Moorgate"}, "PG Cert": {"London Moorgate"}}
 COHORT_STARTS = {
@@ -335,9 +355,10 @@ class SelectedQualificationProof:
                tuple(sorted(str(_cohort_dates(o["snippet"])) for o in authority["selected"])))
         if key not in self._snapshots:
             proof = await _fetch_qualification_page()
-            self._snapshots[key] = json.dumps(proof) if proof else None
+            self._snapshots[key] = json.dumps(proof) if proof is not None else None
         snapshot = self._snapshots[key]
-        return json.loads(snapshot) if snapshot else None
+        value = json.loads(snapshot) if snapshot else None
+        return SourceFailure(value["reason_code"]) if value and "reason_code" in value else value
 
 
 async def _fetch_qualification_page():
@@ -358,8 +379,14 @@ async def _fetch_qualification_page():
                     chunks.append(chunk)
         body = b"".join(chunks)
         verified = _verified_page(body.decode("utf-8"), URL)
-    except (httpx.HTTPError, UnicodeError):
-        return None
+    except httpx.HTTPStatusError as exc:
+        return SourceFailure("official_source_unavailable" if
+                             exc.response.status_code in {408, 425, 429} or exc.response.status_code >= 500
+                             else "unverified_page")
+    except httpx.HTTPError:
+        return SourceFailure("official_source_unavailable")
+    except UnicodeError:
+        return SourceFailure("unverified_page")
     if not verified:
         return None
     return {"authority": verified[0], "proofs": verified[1],
@@ -367,6 +394,10 @@ async def _fetch_qualification_page():
 
 
 async def verify_qualification_source(sc, *, proof_context=None, db=None):
+    return await qualification_source_reason(sc, proof_context=proof_context, db=db) is None
+
+
+async def qualification_source_reason(sc, *, proof_context=None, db=None):
     """Re-establish external authority before any pending award is promoted.
 
     Persisted hashes are audit checksums, not signatures. Neither they nor a
@@ -375,7 +406,7 @@ async def verify_qualification_source(sc, *, proof_context=None, db=None):
     joint cohort and award-owned intakes without trusting stored response hashes.
     """
     if not validate_qualification_scope(sc):
-        return False
+        return "invalid_stored_scope"
     metadata = sc.extraction_method
     qualification = metadata[QUALIFICATION_SCOPE]
     source = qualification.get("verified_source")
@@ -384,14 +415,14 @@ async def verify_qualification_source(sc, *, proof_context=None, db=None):
     verified = (await proof_context.fetch(db, captured) if proof_context is not None
                 else await _fetch_qualification_page())
     if not verified:
-        return False
+        return source_failure_code(verified)
     authority, proofs = verified["authority"], verified["proofs"]
     # Compare source-owned structured evidence, not the whole HTTP response:
     # analytics/nonces can change between two otherwise identical live pages.
     if (authority["selected"] != captured["selected"]
             or metadata["campus_authority"] != proofs[qualification["award"]]):
-        return False
-    return source is None or source["proofs"] == proofs
+        return "changed_cohort"
+    return None if source is None or source["proofs"] == proofs else "changed_cohort"
 
 
 def is_qualification_candidate(row):
@@ -410,8 +441,9 @@ async def split_pending_qualifications(db, row, *, actor="scraper", proof_contex
     unchanged = {"id": row.id, "status": "unchanged", "courseIds": [row.id]}
     if not is_qualification_candidate(row):
         return unchanged
-    def reject():
-        return {"id": row.id, "status": "needs_review", "courseIds": [row.id], "reason": REVIEW_REASON}
+    def reject(code="invalid_stored_scope"):
+        return {"id": row.id, "status": "needs_review", "courseIds": [row.id],
+                "reason": APPROVAL_REASONS[code], "reasonCode": code}
     if row.status not in {"pending", "review_ready"} or row.course_name not in {
         "Legal Technology", "PG Dip and PG Cert Legal Technology",
     }:
@@ -421,13 +453,15 @@ async def split_pending_qualifications(db, row, *, actor="scraper", proof_contex
         return reject()
     verified = (await proof_context.fetch(db, stored) if proof_context is not None
                 else await _fetch_qualification_page())
-    if not verified or _signature(verified["authority"]["selected"]) != _signature(stored["selected"]):
-        return reject()
+    if not verified:
+        return reject(source_failure_code(verified))
+    if _signature(verified["authority"]["selected"]) != _signature(stored["selected"]):
+        return reject("changed_cohort")
     fresh, proofs = verified["authority"], verified["proofs"]
     if {_cohort_dates(o["snippet"]) for o in fresh["selected"]} != {
         _cohort_dates(o["snippet"]) for o in stored["selected"]
     }:
-        return reject()
+        return reject("changed_cohort")
     verified_source = {
         "source_url": URL, "captured_at": datetime.now(timezone.utc).isoformat(),
         "response_sha256": verified["response_sha256"],

@@ -403,6 +403,13 @@ export function formatRecoveryDiagnosticMessage(log: {
 }
 
 const ALL = "__new__";
+const QUALIFICATION_APPROVAL_GUIDANCE: Record<string, string> = {
+  official_source_unavailable: "Official qualification source is temporarily unavailable. Retry approval; nothing was published.",
+  changed_cohort: "Verified official fees or intakes differ from staging. Preview the current award cohort before approval.",
+  unverified_page: "Official qualification evidence could not be verified. Review the source before retrying; no cohort change is confirmed.",
+  invalid_stored_scope: "Stored qualification scope is invalid. Review and refresh staged evidence before approval.",
+};
+type ApprovalFailure = { id: number; error: string; reasonCode?: string };
 
 /**
  * Infer the likely country from a university URL's TLD/ccTLD.
@@ -1134,6 +1141,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
   const [approving, setApproving] = useState(false);
   const [approveProgress, setApproveProgress] = useState<{ done: number; total: number } | null>(null);
+  const [approvalFailures, setApprovalFailures] = useState<ApprovalFailure[]>([]);
   const [approvingId, setApprovingId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(
     () => new Set(groupLegacyCampusRows(initialReviewState?.courses ?? [])
@@ -2473,7 +2481,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     setApproveProgress({ done: 0, total: batches.length });
     try {
       const approvedIds = new Set<number>();
-      const failures: Array<{ id: number; error: string }> = [];
+      const failures: ApprovalFailure[] = [];
       let approvedCourseCount = 0;
       let cursor = 0;
       let done = 0;
@@ -2491,7 +2499,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             if (!res.ok) throw new Error(await getFetchErrorMessage(res));
             const data = await readResponseJson<{
               approvedIds: number[]; approvedCount: number; splitCount?: number;
-              failed: Array<{ id: number; error: string }>; attempted: number;
+              failed: ApprovalFailure[]; attempted: number;
             }>(res);
             if (!data || !Array.isArray(data.approvedIds) || !Number.isInteger(data.approvedCount)
               || !Array.isArray(data.failed) || data.attempted !== batch.length) {
@@ -2503,11 +2511,14 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             for (const id of batch) {
               if (!data.approvedIds.includes(id)) {
                 const failure = data.failed.find(item => item.id === id) ?? data.failed[0];
-                failures.push({ id, error: failure?.error || "Approval not confirmed; refresh before retrying." });
+                const reasonCode = failure?.reasonCode && Object.hasOwn(QUALIFICATION_APPROVAL_GUIDANCE, failure.reasonCode)
+                  ? failure.reasonCode : undefined;
+                failures.push({ id, reasonCode, error: reasonCode
+                  ? QUALIFICATION_APPROVAL_GUIDANCE[reasonCode] : "Approval not confirmed. Review staged evidence before retrying." });
               }
             }
           } catch (error) {
-            batch.forEach(id => failures.push({ id, error: error instanceof Error ? error.message : "Approval request failed. Refresh before retrying." }));
+            batch.forEach(id => failures.push({ id, error: "Approval request failed. Refresh before retrying." }));
           } finally {
             done++;
             setApproveProgress({ done, total: batches.length });
@@ -2515,6 +2526,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         }
       }));
       const remaining = new Set(ids.filter(id => !approvedIds.has(id)));
+      setApprovalFailures(failures);
       setStagedCourses(prev => prev.filter(course => !approvedIds.has(course.id)));
       setSelectedIds(remaining);
       const refreshed = await loadStagedCourses(reviewJobId, false);
@@ -3927,8 +3939,26 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                               </span>
                             )}
                           </div>
-                          <QualificationRefresh courseId={course.id} metadata={course.extractionMethod}
+                          <QualificationRefresh courseId={course.id} metadata={course.extractionMethod ?? course.extraction_method}
                             onApplied={() => reviewJobId ? loadStagedCourses(reviewJobId) : Promise.resolve()} />
+                          {approvalFailures.filter(failure => failure.id === course.id).map(failure => (
+                            <div key={failure.id} role="alert" className="mt-2 rounded border border-amber-300 p-2 text-xs" data-testid={`approval-failure-${course.id}`}>
+                              <p>{failure.error}</p>
+                              {failure.reasonCode === "changed_cohort" && !((course.extractionMethod ?? course.extraction_method) && typeof (course.extractionMethod ?? course.extraction_method) === "object" && "ulaw_qualification_scope" in ((course.extractionMethod ?? course.extraction_method) as object)) && (
+                                <p>This joint parent has not been split. Re-extract current official evidence and review the qualification split; cohort preview is available only for split awards.</p>
+                              )}
+                              <Can permission="staged.approve">
+                                {failure.reasonCode && failure.reasonCode !== "official_source_unavailable" && (
+                                  <Button type="button" variant="outline" size="sm" data-testid={`review-approval-evidence-${course.id}`}
+                                    onClick={() => handleOpenReview(course.id)}>Review staged evidence</Button>
+                                )}
+                                {(!failure.reasonCode || failure.reasonCode === "official_source_unavailable") && (
+                                  <Button type="button" variant="outline" size="sm" disabled={approving} data-testid={`retry-approval-${course.id}`}
+                                    onClick={() => handleApproveSelected([failure.id])}>Retry approval</Button>
+                                )}
+                              </Can>
+                            </div>
+                          ))}
                           {course.notes && (
                             <div className="text-xs text-amber-600 truncate mt-0.5" title={course.notes}>⚠ {course.notes}</div>
                           )}

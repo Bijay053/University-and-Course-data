@@ -13,6 +13,44 @@ vi.mock("@/components/can", () => ({
 vi.mock("@/components/scrape-job-card", () => ({ ScrapeJobCard: () => null }));
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); localStorage.clear(); sessionStorage.clear(); });
 
+it("offers current cohort preview for a changed split award on the actual Review page", async () => {
+  const row = {
+    id: 201, universityId: 7, scrapeJobId: "changed-award", courseName: "PG Cert Legal Technology",
+    status: "pending", intakeMonths: ["October"], scrapeWarnings: [], createdAt: "2026-09-27T00:00:00Z",
+    extractionMethod: { ulaw_qualification_scope: { award: "PG Cert" } },
+  };
+  const requests: string[] = [];
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    requests.push(url);
+    if (url === "/api/scrape/staged/approve-selected") return Response.json({
+      approvedIds: [], approvedCount: 0, attempted: 1,
+      failed: [{ id: 201, reasonCode: "changed_cohort", error: "PRIVATE token=secret" }],
+    });
+    if (url.includes("/qualification-refresh/preview")) return Response.json(
+      { detail: "PRIVATE provider diagnostics" }, { status: 503 });
+    if (url === "/api/scrape/staged/changed-award") return Response.json({ courses: [row] });
+    if (url.startsWith("/api/universities")) return Response.json({ data: [], total: 0 });
+    if (url === "/api/import/history") return Response.json([]);
+    if (url.endsWith("/course-quality")) return Response.json({ courses: [] });
+    if (url.startsWith("/api/scrape/staged/fix-jobs?")) return Response.json(null);
+    return Response.json({});
+  }));
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  render(<QueryClientProvider client={client}>
+    <ScrapingForTest initialReviewState={{ universityId: 7, jobId: "changed-award", courses: [row] as never }} />
+  </QueryClientProvider>);
+  fireEvent.click(await screen.findByRole("button", { name: "Approve (1 course)" }));
+  const failure = await screen.findByTestId("approval-failure-201");
+  expect(failure.textContent).toContain("Verified official fees or intakes differ");
+  expect(failure.textContent).not.toContain("joint parent has not been split");
+  expect(screen.queryByRole("button", { name: "Retry approval" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Preview current award cohort" }));
+  expect(await screen.findByText(/could not be previewed or applied/)).toBeTruthy();
+  expect(requests.some(url => url.includes("/201/qualification-refresh/preview"))).toBe(true);
+  expect(document.body.textContent).not.toContain("PRIVATE");
+});
+
 it("discovers an approved-only cohort from the full page, previews via HTTP, applies to its exact job and uses normal Review approval", async () => {
   const jobId = "original-approved-job";
   let status = "approved";

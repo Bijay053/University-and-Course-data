@@ -476,7 +476,7 @@ async def test_selected_proof_rechecks_coordinated_child_metadata(db, monkeypatc
     monkeypatch.setattr(route, "approve_scraped_course", mutate_next_award)
     result = await route.approve_selected(route.ApproveSelectedBody(courseIds=[row_id]), db, {"email": "reviewer"})
     assert result["failed"] and not result["approvedIds"]
-    assert "reverified" in result["failed"][0]["error"]
+    assert result["failed"][0]["reasonCode"] == "changed_cohort"
     assert upstream["calls"] == [("GET", URL)]
     assert not (await published(db, uni))[0]
 
@@ -785,8 +785,11 @@ async def test_pending_promotion_reverifies_source_not_mutable_capture_hashes(db
     # external authority. The shared async promotion boundary must stop it.
     assert validate_qualification_scope(cert)
     await db.flush()
-    with pytest.raises(ApprovalValidationError, match="could not be reverified"):
+    with pytest.raises(ApprovalValidationError) as rejected:
         await approve_scraped_course(db, cert, actor="test-reviewer", commit=False)
+    assert rejected.value.reason_code == (
+        "official_source_unavailable" if damage == "unavailable" else "changed_cohort"
+    )
     assert cert.status == "pending" and cert.course_id is None
     assert not (await published(db, uni))[0]
     result = await route.approve_selected(

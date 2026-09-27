@@ -32,6 +32,12 @@ import re
 class ApprovalValidationError(ValueError):
     """Intentional approval rejection whose message is safe for reviewers."""
 
+    def __init__(self, message, *, reason_code=None):
+        from app.services.scraper.ulaw_qualifications import APPROVAL_REASONS
+        self.reason_code = reason_code if reason_code in APPROVAL_REASONS else None
+        super().__init__(APPROVAL_REASONS[self.reason_code] if self.reason_code else
+                         "Course approval failed. Please retry." if reason_code is not None else message)
+
 
 _ACADEMIC_MAPPING_BY_DEGREE = {
     "master": "bachelors_equivalent",
@@ -129,7 +135,7 @@ async def approve_scraped_course(
     every subsequent row in a batch fail (Week 5: Charles Sturt promotion gap).
     """
     from app.services.scraper.fee_selection import fee_selection, unresolved_fee_selection
-    from app.services.scraper.ulaw_qualifications import QUALIFICATION_SCOPE, AWARDS, URL, verify_qualification_source
+    from app.services.scraper.ulaw_qualifications import QUALIFICATION_SCOPE, AWARDS, URL
     if not sc.course_name or not sc.course_name.strip():
         raise ApprovalValidationError(
             f"scraped_course id={sc.id} has empty course_name; cannot promote"
@@ -190,8 +196,10 @@ async def approve_scraped_course(
     fee_authority = fee_metadata.get("fee_variants")
     qualification = fee_metadata.get(QUALIFICATION_SCOPE)
     if qualification:
-        if not await verify_qualification_source(sc, proof_context=qualification_proof_context, db=db):
-            raise ApprovalValidationError("Official qualification fee and intake source could not be reverified; review required")
+        from app.services.scraper.ulaw_qualifications import qualification_source_reason
+        reason = await qualification_source_reason(sc, proof_context=qualification_proof_context, db=db)
+        if reason:
+            raise ApprovalValidationError("Official qualification source requires review.", reason_code=reason)
     # A reviewer may choose a source-owned alternative outside the extractor's
     # original uniform tuple (or resolve a range). Validate its fingerprint and
     # entire current tuple, not merely the presence of selection metadata.

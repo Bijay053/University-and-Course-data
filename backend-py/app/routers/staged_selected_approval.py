@@ -95,7 +95,7 @@ async def approve_selected(
                 from app.services.scraper.ulaw_qualifications import split_pending_qualifications
                 qualification = await split_pending_qualifications(db, row, actor=actor, proof_context=qualification_proof)
                 if qualification["status"] == "needs_review":
-                    raise ApprovalValidationError(qualification["reason"])
+                    raise ApprovalValidationError(qualification["reason"], reason_code=qualification.get("reasonCode"))
                 qualification_ids = qualification["courseIds"]
                 did_split = qualification["status"] == "split"
                 from app.services.scraper.extractors.ulaw_campuses import enrich_course_campuses
@@ -158,18 +158,21 @@ async def approve_selected(
             # Capture only intentional validation messages. A failed rollback
             # cannot replace the original private approval error.
             error = str(exc) if isinstance(exc, ApprovalValidationError) else "Course approval failed. Please retry."
+            failure = {"id": source_id, "error": error}
+            if isinstance(exc, ApprovalValidationError) and exc.reason_code:
+                failure["reasonCode"] = exc.reason_code
             if not isinstance(exc, ApprovalValidationError):
                 log.exception("Selected approval failed for staged row %s", source_id)
             try:
                 await db.rollback()
             except Exception:
                 log.exception("Selected approval rollback failed for staged row %s", source_id)
-                failed.append({"id": source_id, "error": error})
+                failed.append(failure)
                 failed.extend({"id": remaining, "error": "Approval could not continue. Please retry."}
                               for remaining in body.courseIds[body.courseIds.index(source_id) + 1:]
                               if remaining not in approved_ids)
                 break
-            failed.append({"id": source_id, "error": error})
+            failed.append(failure)
         finally:
             qualification_proof.close()
     return {

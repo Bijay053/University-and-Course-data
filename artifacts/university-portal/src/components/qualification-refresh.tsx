@@ -12,9 +12,8 @@ function fee(value: QualificationRefreshFee | null) {
   return value ? `GBP ${value.amount?.toLocaleString() ?? "varies"} · ${value.year ?? "unknown year"} · ${value.term ?? "unknown term"}` : "Not staged";
 }
 
-function errorMessage(error: unknown) {
-  const e = error as { data?: { detail?: string }; message?: string };
-  return e.data?.detail || e.message || "Refresh failed. Retry preview; no approval has been performed.";
+function errorMessage(_error: unknown) {
+  return "The current official cohort could not be previewed or applied. Retry preview or review staged evidence; no approval has been performed.";
 }
 
 type Props = {
