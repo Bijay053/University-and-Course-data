@@ -107,6 +107,34 @@ def mock_official_fetch(monkeypatch, html=HTML, status=200):
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: real(transport=transport, **kwargs))
 
 
+def counted_official_fetch(monkeypatch, html=HTML):
+    """Mutable upstream, not mutable proof: every GET records its exact route."""
+    state = {"html": html, "status": 200, "calls": []}
+    real = httpx.AsyncClient
+
+    def respond(request):
+        state["calls"].append((request.method, str(request.url)))
+        return httpx.Response(state["status"], text=state["html"], request=request)
+
+    transport = httpx.MockTransport(respond)
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: real(transport=transport, **kwargs))
+    return state
+
+
+async def prepare_qualification_children(db, row_id):
+    from app.services.scraper.ulaw_qualifications import split_pending_qualifications
+    from app.services.scraper.campus_fee_split import split_pending_course
+    row = await db.get(ScrapedCourse, row_id)
+    awards = await split_pending_qualifications(db, row)
+    assert awards["status"] == "split"
+    ids = []
+    for award_id in awards["courseIds"]:
+        split = await split_pending_course(db, await db.get(ScrapedCourse, award_id))
+        ids.extend(split["courseIds"])
+    await db.commit()
+    return ids
+
+
 @pytest_asyncio.fixture
 async def db():
     from app.database import engine as configured_engine
@@ -331,6 +359,224 @@ async def test_award_specific_intake_proof_cannot_fall_back_to_shared_locations(
         ScrapedCourse.university_id == uni, ScrapedCourse.scrape_job_id == job,
         ScrapedCourse.id != original_id
     ))).scalars().all()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("prepared", [False, True])
+async def test_selected_proof_one_get_snapshot_and_next_request_refetch(db, monkeypatch, prepared):
+    freeze_cohort(monkeypatch)
+    upstream = counted_official_fetch(monkeypatch)
+    uni, _, row_id = await seed(db)
+    ids = await prepare_qualification_children(db, row_id) if prepared else [row_id]
+    upstream["calls"].clear()
+    original = route.approve_scraped_course
+
+    async def change_source_after_child(*args, **kwargs):
+        result = await original(*args, **kwargs)
+        upstream["html"] = "<h1>Source changed during transaction</h1>"
+        return result
+
+    monkeypatch.setattr(route, "approve_scraped_course", change_source_after_child)
+    result = await route.approve_selected(route.ApproveSelectedBody(courseIds=ids), db, {"email": "reviewer"})
+    assert not result["failed"], result
+    assert len(result["approvedIds"]) == 3
+    assert upstream["calls"] == [("GET", URL)]
+    assert len((await published(db, uni))[0]) == 2
+    # Historical retries do not consume even one fresh proof.
+    retry = await route.approve_selected(route.ApproveSelectedBody(courseIds=result["approvedIds"]),
+                                         db, {"email": "reviewer"})
+    assert not retry["failed"] and upstream["calls"] == [("GET", URL)]
+    other_uni, _, other_id = await seed(db)
+    second = await route.approve_selected(route.ApproveSelectedBody(courseIds=[other_id]), db, {"email": "reviewer"})
+    assert not second["approvedIds"] and second["failed"]
+    assert len(upstream["calls"]) == 2
+    assert not (await published(db, other_uni))[0]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["fetch", "after_child"])
+async def test_selected_proof_rollback_retry_and_same_request_isolation(db, monkeypatch, failure):
+    freeze_cohort(monkeypatch)
+    upstream = counted_official_fetch(monkeypatch)
+    uni, _, row_id = await seed(db)
+    ids = await prepare_qualification_children(db, row_id)
+    other_uni, _, other_id = await seed(db)
+    upstream["calls"].clear()
+    original = route.approve_scraped_course
+    original_rollback = db.rollback
+    failed_once = False
+
+    async def fail_child(*args, **kwargs):
+        nonlocal failed_once
+        result = await original(*args, **kwargs)
+        if failure == "after_child" and not failed_once:
+            failed_once = True
+            raise route.ApprovalValidationError("Deliberate transactional failure")
+        return result
+
+    async def restore_upstream():
+        await original_rollback()
+        upstream["status"] = 200
+
+    monkeypatch.setattr(route, "approve_scraped_course", fail_child)
+    monkeypatch.setattr(db, "rollback", restore_upstream)
+    if failure == "fetch":
+        upstream["status"] = 503
+    result = await route.approve_selected(route.ApproveSelectedBody(courseIds=[ids[0], other_id]),
+                                          db, {"email": "reviewer"})
+    assert len(result["failed"]) == 1 and result["failed"][0]["id"] == ids[0]
+    assert other_id in result["approvedIds"]
+    assert len(upstream["calls"]) == 2
+    assert not (await published(db, uni))[0]
+    assert len((await published(db, other_uni))[0]) == 2
+    retry = await route.approve_selected(route.ApproveSelectedBody(courseIds=[ids[0]]), db, {"email": "reviewer"})
+    assert not retry["failed"] and len(retry["approvedIds"]) == 3
+    assert len(upstream["calls"]) == 3
+
+
+@pytest.mark.asyncio
+async def test_selected_proof_rechecks_coordinated_child_metadata(db, monkeypatch):
+    from app.services.scraper.ulaw_qualifications import _contract_hash, validate_qualification_scope
+    freeze_rollover(monkeypatch)
+    html = live_capture()
+    upstream = counted_official_fetch(monkeypatch, html)
+    values = captured_values()
+    values["fee_year"] = 2027
+    values["extraction_method"]["fee_variants"] = ulaw_fees.parse_course_fees(html, URL)
+    uni, _, row_id = await seed(db, values)
+    ids = await prepare_qualification_children(db, row_id)
+    upstream["calls"].clear()
+    original = route.approve_scraped_course
+    mutated = False
+
+    async def mutate_next_award(db, child, **kwargs):
+        nonlocal mutated
+        result = await original(db, child, **kwargs)
+        if not mutated:
+            mutated = True
+            for child_id in ids:
+                target = await db.get(ScrapedCourse, child_id)
+                metadata = deepcopy(target.extraction_method)
+                if metadata[QUALIFICATION_SCOPE]["award"] != "PG Cert":
+                    continue
+                proof = metadata["campus_authority"]
+                extra = deepcopy(proof["start_dates"][0])
+                extra["intake"] = "February 2028"
+                proof["start_dates"].append(extra)
+                proof["snippet"] = " | ".join(e["snippet"] for e in proof["start_dates"])
+                source = metadata[QUALIFICATION_SCOPE]["verified_source"]
+                source["proofs"]["PG Cert"] = deepcopy(proof)
+                source["contract_sha256"] = _contract_hash(source["authority"], source["proofs"])
+                target.intake_months = ["October", "February"]
+                target.extraction_method = metadata
+                assert validate_qualification_scope(target)
+            await db.flush()
+        return result
+
+    monkeypatch.setattr(route, "approve_scraped_course", mutate_next_award)
+    result = await route.approve_selected(route.ApproveSelectedBody(courseIds=[row_id]), db, {"email": "reviewer"})
+    assert result["failed"] and not result["approvedIds"]
+    assert "reverified" in result["failed"][0]["error"]
+    assert upstream["calls"] == [("GET", URL)]
+    assert not (await published(db, uni))[0]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("end", ["commit", "rollback"])
+async def test_explicit_proof_context_transaction_lifecycle_and_direct_verification(db, monkeypatch, end):
+    from app.services.scraper.ulaw_qualifications import SelectedQualificationProof, verify_qualification_source
+    freeze_cohort(monkeypatch)
+    upstream = counted_official_fetch(monkeypatch)
+    _, _, row_id = await seed(db)
+    ids = await prepare_qualification_children(db, row_id)
+    upstream["calls"].clear()
+    child = await db.get(ScrapedCourse, ids[0])
+    context = SelectedQualificationProof(db)
+    try:
+        assert await verify_qualification_source(child, proof_context=context, db=db)
+        assert await verify_qualification_source(child, proof_context=context, db=db)
+        assert len(upstream["calls"]) == 1
+        await getattr(db, end)()
+        assert context._closed and not context._snapshots
+        child = await db.get(ScrapedCourse, ids[0])
+        assert not await verify_qualification_source(child, proof_context=context, db=db)
+        assert len(upstream["calls"]) == 1
+        assert await verify_qualification_source(child)
+        assert await verify_qualification_source(child)
+        assert len(upstream["calls"]) == 3
+    finally:
+        context.close()
+
+
+@pytest.mark.asyncio
+async def test_proof_cohort_isolation_and_detached_snapshot(db, monkeypatch):
+    from app.services.scraper.ulaw_qualifications import SelectedQualificationProof
+    freeze_cohort(monkeypatch)
+    upstream = counted_official_fetch(monkeypatch, live_capture())
+    await seed(db)
+    # Begin the caller-owned transaction before creating its explicit capability.
+    await db.execute(select(ScrapedCourse.id).limit(1))
+    context = SelectedQualificationProof(db)
+    old = captured_values()["extraction_method"]["fee_variants"]
+    try:
+        first = await context.fetch(db, old)
+        first["proofs"]["PG Cert"]["locations"].append("Forged")
+        assert "Forged" not in (await context.fetch(db, old))["proofs"]["PG Cert"]["locations"]
+        freeze_rollover(monkeypatch)
+        new = ulaw_fees.parse_course_fees(live_capture(), URL)
+        second = await context.fetch(db, new)
+        assert second["authority"]["fee_year"] == 2027
+        assert (await context.fetch(db, old))["authority"]["fee_year"] == 2026
+        assert len(upstream["calls"]) == 2
+    finally:
+        context.close()
+
+
+@pytest.mark.asyncio
+async def test_selected_mixed_cohort_parents_get_independent_split_proofs(db, monkeypatch):
+    freeze_cohort(monkeypatch)
+    html = live_capture()
+    upstream = counted_official_fetch(monkeypatch, html)
+    old_uni, _, old_id = await seed(db)
+    values = captured_values()
+    values["fee_year"] = 2027
+    values["extraction_method"]["fee_variants"] = ulaw_fees.parse_course_fees(
+        html, URL, today=date(2027, 9, 27),
+    )
+    new_uni, _, new_id = await seed(db, values)
+    original_commit = db.commit
+
+    async def rollover_after_transaction():
+        await original_commit()
+        freeze_rollover(monkeypatch)
+
+    monkeypatch.setattr(db, "commit", rollover_after_transaction)
+    result = await route.approve_selected(
+        route.ApproveSelectedBody(courseIds=[old_id, new_id]), db, {"email": "reviewer"},
+    )
+    assert not result["failed"] and result["approvedCount"] == 7
+    assert result["splitCount"] == 2
+    assert upstream["calls"] == [("GET", URL), ("GET", URL)]
+    assert {o.fee_year for o in (await published(db, old_uni))[1]} == {2026}
+    assert {o.fee_year for o in (await published(db, new_uni))[1]} == {2027}
+
+
+@pytest.mark.asyncio
+async def test_direct_approval_without_capability_fetches_for_every_pending_child(db, monkeypatch):
+    from app.services.scraper.approve_course import approve_scraped_course
+    freeze_cohort(monkeypatch)
+    upstream = counted_official_fetch(monkeypatch)
+    _, _, row_id = await seed(db)
+    ids = await prepare_qualification_children(db, row_id)
+    upstream["calls"].clear()
+    children = [await db.get(ScrapedCourse, child_id) for child_id in ids]
+    for child in children:
+        cohort = [member for member in children
+                  if member.extraction_method[QUALIFICATION_SCOPE]["award"]
+                  == child.extraction_method[QUALIFICATION_SCOPE]["award"]]
+        await approve_scraped_course(db, child, actor="reviewer", commit=False, offering_cohort=cohort)
+    assert upstream["calls"] == [("GET", URL)] * len(ids)
+    await db.rollback()
 
 
 def live_capture():

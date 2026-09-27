@@ -118,6 +118,7 @@ _ENGLISH_TESTS = (
 async def approve_scraped_course(
     db: AsyncSession, sc: ScrapedCourse, *, actor: str = "system", commit: bool = True,
     offering_cohort: list[ScrapedCourse] | None = None,
+    qualification_proof_context=None,
 ) -> dict:
     """Idempotent: if a course with the same (university_id, name CI) exists,
     the row is updated rather than duplicated.
@@ -189,7 +190,7 @@ async def approve_scraped_course(
     fee_authority = fee_metadata.get("fee_variants")
     qualification = fee_metadata.get(QUALIFICATION_SCOPE)
     if qualification:
-        if not await verify_qualification_source(sc):
+        if not await verify_qualification_source(sc, proof_context=qualification_proof_context, db=db):
             raise ApprovalValidationError("Official qualification fee and intake source could not be reverified; review required")
     # A reviewer may choose a source-owned alternative outside the extractor's
     # original uniform tuple (or resolve a range). Validate its fingerprint and

@@ -9,7 +9,7 @@ import re
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
-from sqlalchemy import select
+from sqlalchemy import event, select
 
 from app.services.scraper.extractors.ulaw_fees import _cohort_dates, parse_course_fees, validated_fee_variants
 
@@ -295,7 +295,78 @@ def _verified_page(html, url):
     return fresh, proofs
 
 
-async def verify_qualification_source(sc):
+class SelectedQualificationProof:
+    """Explicit single-transaction capability, never a persisted/cache authority.
+
+    JSON strings are immutable snapshots. Callers receive detached parsed copies;
+    editing any child's audit metadata cannot edit another child's live proof.
+    """
+
+    def __init__(self, db):
+        self._db = db
+        self._transaction = None
+        self._closed = False
+        self._snapshots = {}
+        event.listen(db.sync_session, "after_transaction_end", self._ended)
+
+    def _ended(self, session, transaction):
+        if transaction is self._transaction:
+            self._snapshots.clear()
+            self._closed = True
+
+    def close(self):
+        self._snapshots.clear()
+        self._closed = True
+        if event.contains(self._db.sync_session, "after_transaction_end", self._ended):
+            event.remove(self._db.sync_session, "after_transaction_end", self._ended)
+
+    async def fetch(self, db, authority):
+        if db is not self._db:
+            self.close()
+            return None
+        transaction = db.sync_session.get_transaction()
+        if (self._closed or db is not self._db or transaction is None
+                or (self._transaction is not None and transaction is not self._transaction)):
+            self.close()
+            return None
+        self._transaction = transaction
+        # Cohort keys are isolation boundaries only, never evidence of validity.
+        key = (URL, authority.get("fee_year"), authority.get("fee_term"),
+               tuple(sorted(str(_cohort_dates(o["snippet"])) for o in authority["selected"])))
+        if key not in self._snapshots:
+            proof = await _fetch_qualification_page()
+            self._snapshots[key] = json.dumps(proof) if proof else None
+        snapshot = self._snapshots[key]
+        return json.loads(snapshot) if snapshot else None
+
+
+async def _fetch_qualification_page():
+    """Bounded exact-route GET and parse; only this function creates live proof."""
+    import httpx
+
+    try:
+        async with httpx.AsyncClient(timeout=15, follow_redirects=False) as client:
+            async with client.stream("GET", URL) as response:
+                response.raise_for_status()
+                if str(response.url).rstrip("/") != URL.rstrip("/"):
+                    return None
+                chunks, size = [], 0
+                async for chunk in response.aiter_bytes():
+                    size += len(chunk)
+                    if size > 2_000_000:
+                        return None
+                    chunks.append(chunk)
+        body = b"".join(chunks)
+        verified = _verified_page(body.decode("utf-8"), URL)
+    except (httpx.HTTPError, UnicodeError):
+        return None
+    if not verified:
+        return None
+    return {"authority": verified[0], "proofs": verified[1],
+            "response_sha256": sha256(body).hexdigest()}
+
+
+async def verify_qualification_source(sc, *, proof_context=None, db=None):
     """Re-establish external authority before any pending award is promoted.
 
     Persisted hashes are audit checksums, not signatures. Neither they nor a
@@ -305,31 +376,16 @@ async def verify_qualification_source(sc):
     """
     if not validate_qualification_scope(sc):
         return False
-    import httpx
-
-    try:
-        async with httpx.AsyncClient(timeout=15, follow_redirects=False) as client:
-            async with client.stream("GET", URL) as response:
-                response.raise_for_status()
-                if str(response.url).rstrip("/") != URL.rstrip("/"):
-                    return False
-                chunks, size = [], 0
-                async for chunk in response.aiter_bytes():
-                    size += len(chunk)
-                    if size > 2_000_000:
-                        return False
-                    chunks.append(chunk)
-        verified = _verified_page(b"".join(chunks).decode("utf-8"), URL)
-    except (httpx.HTTPError, UnicodeError):
-        return False
-    if not verified:
-        return False
-    authority, proofs = verified
     metadata = sc.extraction_method
     qualification = metadata[QUALIFICATION_SCOPE]
     source = qualification.get("verified_source")
     captured = (source["authority"] if source else
                 qualification["pre_split"]["extraction_method"]["fee_variants"])
+    verified = (await proof_context.fetch(db, captured) if proof_context is not None
+                else await _fetch_qualification_page())
+    if not verified:
+        return False
+    authority, proofs = verified["authority"], verified["proofs"]
     # Compare source-owned structured evidence, not the whole HTTP response:
     # analytics/nonces can change between two otherwise identical live pages.
     if (authority["selected"] != captured["selected"]
@@ -347,7 +403,7 @@ def is_qualification_candidate(row):
     return {o.get("study_variant") for o in authority.get("selected", []) if isinstance(o, dict)} == set(AWARDS)
 
 
-async def split_pending_qualifications(db, row, *, actor="scraper"):
+async def split_pending_qualifications(db, row, *, actor="scraper", proof_context=None):
     """Caller owns row lock/transaction. Return unchanged for unrelated awards."""
     from app.models import ScrapedCourse, ScrapedFieldEvidence, FieldConflict
 
@@ -363,32 +419,18 @@ async def split_pending_qualifications(db, row, *, actor="scraper"):
     stored = validated_fee_variants(row)
     if not _joint_cohort(stored):
         return reject()
-    import httpx
-    try:
-        async with httpx.AsyncClient(timeout=15, follow_redirects=False) as client:
-            async with client.stream("GET", row.course_website) as response:
-                response.raise_for_status()
-                if str(response.url).rstrip("/") != URL.rstrip("/"):
-                    return reject()
-                chunks, size = [], 0
-                async for chunk in response.aiter_bytes():
-                    size += len(chunk)
-                    if size > 2_000_000:
-                        return reject()
-                    chunks.append(chunk)
-        verified = _verified_page(b"".join(chunks).decode("utf-8", errors="replace"), row.course_website)
-    except (httpx.HTTPError, UnicodeError):
+    verified = (await proof_context.fetch(db, stored) if proof_context is not None
+                else await _fetch_qualification_page())
+    if not verified or _signature(verified["authority"]["selected"]) != _signature(stored["selected"]):
         return reject()
-    if not verified or _signature(verified[0]["selected"]) != _signature(stored["selected"]):
-        return reject()
-    fresh, proofs = verified
+    fresh, proofs = verified["authority"], verified["proofs"]
     if {_cohort_dates(o["snippet"]) for o in fresh["selected"]} != {
         _cohort_dates(o["snippet"]) for o in stored["selected"]
     }:
         return reject()
     verified_source = {
         "source_url": URL, "captured_at": datetime.now(timezone.utc).isoformat(),
-        "response_sha256": sha256(b"".join(chunks)).hexdigest(),
+        "response_sha256": verified["response_sha256"],
         "authority": deepcopy(fresh), "proofs": deepcopy(proofs),
         "contract_sha256": _contract_hash(fresh, proofs),
     }

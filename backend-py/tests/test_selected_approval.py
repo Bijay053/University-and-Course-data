@@ -8,6 +8,7 @@ import pytest_asyncio
 from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -31,19 +32,31 @@ def test_defaults_and_deduplication():
         route.ApproveSelectedBody(courseIds=[3], force="false")
 
 
+@pytest.fixture
+def sync_session():
+    """Real SQLAlchemy lifecycle for route fakes, without database I/O."""
+    with Session() as session:
+        session.begin()
+        yield session
+        # The request must detach its proof listener even on rollback failure.
+        assert not list(session.dispatch.after_transaction_end)
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("reason_name", ["QUALIFICATION_FEE_REASON", "ONLINE_ONLY_REASON"])
-async def test_actionable_campus_reasons_propagate_even_with_force(monkeypatch, reason_name):
+async def test_actionable_campus_reasons_propagate_even_with_force(monkeypatch, reason_name, sync_session):
     from app.services.scraper.extractors import ulaw_campuses
     reason = getattr(ulaw_campuses, reason_name)
     row = SimpleNamespace(id=1, status="pending", extraction_method={"fee_variants": {"status": "range"}})
     db = SimpleNamespace(
+        sync_session=sync_session,
         execute=AsyncMock(side_effect=[
             SimpleNamespace(scalar_one_or_none=lambda: 42),
             None,
             SimpleNamespace(scalar_one_or_none=lambda: row),
         ]),
-        rollback=AsyncMock(), commit=AsyncMock(),
+        rollback=AsyncMock(side_effect=sync_session.rollback),
+        commit=AsyncMock(side_effect=sync_session.commit),
     )
     monkeypatch.setattr(ulaw_campuses, "enrich_course_campuses", AsyncMock(
         return_value={"status": "needs_review", "reason": reason},
@@ -64,13 +77,20 @@ async def test_actionable_campus_reasons_propagate_even_with_force(monkeypatch, 
 
 
 @pytest.mark.parametrize("rollback_fails", [False, True])
-def test_http_contract_sanitizes_database_errors_and_rollback(rollback_fails):
+def test_http_contract_sanitizes_database_errors_and_rollback(rollback_fails, sync_session):
     from app.routers.scrape import router
     app = FastAPI()
     app.include_router(router, prefix="/api/scrape")
+
+    def rollback():
+        if rollback_fails:
+            raise RuntimeError("private rollback")
+        sync_session.rollback()
+
     db = SimpleNamespace(
+        sync_session=sync_session,
         execute=AsyncMock(side_effect=RuntimeError("private SQL and secret")),
-        rollback=AsyncMock(side_effect=RuntimeError("private rollback") if rollback_fails else None),
+        rollback=AsyncMock(side_effect=rollback),
     )
     app.dependency_overrides[get_db] = lambda: db
     app.dependency_overrides[get_current_user] = lambda: {

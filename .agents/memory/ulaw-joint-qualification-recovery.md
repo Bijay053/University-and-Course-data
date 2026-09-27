@@ -14,3 +14,9 @@ Persisted evidence hashes establish consistency, not independent source authorit
 **Why:** Coordinated edits to stored fee options and location proofs can recompute an unkeyed contract digest while retaining a genuine page hash.
 
 **How to apply:** Revalidate pending promotion against independently fetched official evidence; source unavailability must fail closed. Historical approved retries must remain idempotent rather than re-promoting an expired cohort.
+
+Reuse fresh evidence only within one cohort's root approval transaction, not merely within one HTTP request.
+
+**Why:** Selected approval can commit several independent parent transactions inside a single request. Reusing an earlier parent's source response would cross the intended freshness boundary.
+
+**How to apply:** Treat each committed or rolled-back parent as the end of proof reuse. Children must still validate their own award and fees against an immutable source snapshot; shared proof must never mean shared approval.

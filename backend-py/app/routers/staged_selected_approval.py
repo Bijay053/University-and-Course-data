@@ -66,6 +66,8 @@ async def approve_selected(
     for source_id in body.courseIds:
         if source_id in approved_ids:
             continue
+        from app.services.scraper.ulaw_qualifications import SelectedQualificationProof
+        qualification_proof = SelectedQualificationProof(db)
         try:
             university_id = (await db.execute(
                 select(ScrapedCourse.university_id).where(ScrapedCourse.id == source_id)
@@ -91,7 +93,7 @@ async def approve_selected(
             did_split = False
             if (row.extraction_method or {}).get("fee_variants"):
                 from app.services.scraper.ulaw_qualifications import split_pending_qualifications
-                qualification = await split_pending_qualifications(db, row, actor=actor)
+                qualification = await split_pending_qualifications(db, row, actor=actor, proof_context=qualification_proof)
                 if qualification["status"] == "needs_review":
                     raise ApprovalValidationError(qualification["reason"])
                 qualification_ids = qualification["courseIds"]
@@ -147,7 +149,8 @@ async def approve_selected(
                                  and offering_identity(member, member.extraction_method[SCOPE])
                                  == offering_identity(child, child_scope)]
                                 if child_scope else cohort)
-                await approve_scraped_course(db, child, actor=actor, commit=False, offering_cohort=award_cohort)
+                await approve_scraped_course(db, child, actor=actor, commit=False, offering_cohort=award_cohort,
+                                             qualification_proof_context=qualification_proof)
             await db.commit()
             approved_ids.extend(ids)
             split_count += int(did_split)
@@ -167,6 +170,8 @@ async def approve_selected(
                               if remaining not in approved_ids)
                 break
             failed.append({"id": source_id, "error": error})
+        finally:
+            qualification_proof.close()
     return {
         "approvedIds": approved_ids, "approvedCount": len(approved_ids),
         "splitCount": split_count, "failed": failed, "attempted": len(body.courseIds),
