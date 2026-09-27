@@ -979,6 +979,64 @@ def is_confirmed_host_online_only_page(
     return False
 
 
+_VIRTUAL_LOCATION_RE = re.compile(
+    r"^\s*(?:online(?:\s+only|\s+study|\s+learning)?|"
+    r"distance(?:\s+education|\s+learning)?|"
+    r"remote(?:\s+learning)?|"
+    r"virtual(?:\s+campus)?|"
+    r"external)\s*$",
+    re.IGNORECASE,
+)
+
+
+def is_online_only_for_staging(
+    course_name: str,
+    payload: dict[str, Any],
+    source_url: str | None = None,
+    *,
+    partial: bool = False,
+) -> bool:
+    """All staging online-only signals, regardless of competing rejection reasons.
+
+    For partial re-extractions, an omitted UTAS location is *unknown*, not
+    proof of virtual delivery; an explicit blank or online_only_utas still is.
+    """
+    if payload.get("online_only"):
+        return True
+    url_path = (source_url or "").lower().split("?")[0].rstrip("/")
+    slug = url_path.rsplit("/", 1)[-1]
+    if slug in {"online", "odl"} or slug.endswith(("-online", "-odl")):
+        return True
+    name = str(payload.get("course_name") or course_name or "").strip().lower()
+    if (
+        re.search(r"\bonline(?:\s+degree)?$", name)
+        or re.search(r"\bodl\b", name)
+        or "open distance learning" in name
+    ):
+        return True
+    study_mode = str(payload.get("study_mode") or "").strip().lower()
+    campus_component = any(
+        kw in study_mode
+        for kw in (
+            "on campus", "on-campus", "campus", "on site", "on-site",
+            "face-to-face", "blended", "in-person", "in person",
+        )
+    )
+    if "online" in study_mode and not campus_component:
+        return True
+    # UTAS's international Location field takes precedence over a default
+    # domestic campus or a noisy "Blended" mode. Never substitute location_text
+    # (which can itself say Online) for the physical course_location field.
+    if "utas.edu.au" in (source_url or "").lower():
+        if payload.get("online_only_utas"):
+            return True
+        if not partial or "course_location" in payload:
+            location = str(payload.get("course_location") or "").strip()
+            if not location or _VIRTUAL_LOCATION_RE.fullmatch(location):
+                return True
+    return False
+
+
 def should_stage_course(
     course_name: str,
     payload: dict[str, Any],
@@ -1015,10 +1073,10 @@ def should_stage_course(
     # This is intentionally not configurable per university: old YAML and
     # admin-config ``enabled: false`` values remain readable for compatibility,
     # but cannot silently bypass the shared safety gate.
-    if payload.get("online_only"):
+    if is_online_only_for_staging(course_name, payload, source_url):
         log.info(
             "[REJECT CHECK] course=%r decision=reject "
-            "(online_only — explicit authoritative page signal) global_policy=true",
+            "(online_only — source delivery signal) global_policy=true",
             payload.get("course_name") or course_name,
         )
         return (False, "online_only")
@@ -1032,49 +1090,6 @@ def should_stage_course(
         _url_path = source_url.lower().split("?")[0]  # strip query string
         if any(_url_path.endswith(sfx) for sfx in _CATEGORY_URL_SUFFIXES):
             return (False, "category_landing_page_url_suffix")
-
-        # URL-slug online detection: if the last path segment is exactly
-        # "online"/"odl" or ends with "-online"/"-odl", the university
-        # explicitly published this as an online/distance-learning course.
-        # These URL shapes are common:
-        #   /course/graduate-certificate-business-online
-        #   /course/graduate-certificate-business/online/
-        #   /programme/master-of-education-odl/
-        # Uses the same global policy as the study-mode check below.
-        _slug = _url_path.rstrip("/").rsplit("/", 1)[-1]
-        if (
-            _slug in {"online", "odl"}
-            or _slug.endswith("-online")
-            or _slug.endswith("-odl")
-        ):
-            log.info(
-                "[REJECT CHECK] course=%r url_slug=%r "
-                "decision=reject (url_slug_online) global_policy=true",
-                payload.get("course_name") or course_name,
-                _slug,
-            )
-            return (False, "online_only")
-
-    # A course name ending in "Online" or containing the institution-owned ODL
-    # label is also explicit delivery evidence. This catches provider/API
-    # records even if an upstream transform strips the URL marker or a noisy
-    # location fallback later overwrites study_mode from Online to On Campus.
-    # Only the course name is checked, so test-format text such as
-    # "TOEFL Essentials (Online)" elsewhere in the payload cannot trigger it.
-    _name_for_online_check = str(
-        payload.get("course_name") or course_name or ""
-    ).strip().lower()
-    if (
-        re.search(r"\bonline(?:\s+degree)?$", _name_for_online_check)
-        or re.search(r"\bodl\b", _name_for_online_check)
-        or "open distance learning" in _name_for_online_check
-    ):
-        log.info(
-            "[REJECT CHECK] course=%r decision=reject "
-            "(course_name_online) global_policy=true",
-            payload.get("course_name") or course_name,
-        )
-        return (False, "online_only")
 
     # Bot / cookie-consent page rejection — runs UNCONDITIONALLY before the
     # degree-qualifier check so that skip_degree_qualifier_check:true YAML
@@ -1222,14 +1237,6 @@ def should_stage_course(
     # virtual delivery label so it is never stored as a campus name.
     # This also prevents the online_only guard below from being confused by a
     # physical-looking location that turns out to be "Online Study".
-    _VIRTUAL_LOCATION_RE = re.compile(
-        r"^\s*(?:online(?:\s+only|\s+study|\s+learning)?|"
-        r"distance(?:\s+education|\s+learning)?|"
-        r"remote(?:\s+learning)?|"
-        r"virtual(?:\s+campus)?|"
-        r"external)\s*$",
-        re.IGNORECASE,
-    )
     _raw_loc = payload.get("course_location") or payload.get("location_text") or ""
     if _VIRTUAL_LOCATION_RE.match(_raw_loc.strip()):
         log.info(
@@ -1239,94 +1246,6 @@ def should_stage_course(
         )
         payload["course_location"] = None
         payload["location_text"] = None
-
-    # Online-only filter: study_mode is the authoritative signal.
-    # Rule: if study_mode contains "online" but NO campus/blended keyword →
-    # reject regardless of whether a city/campus name appears in
-    # course_location.  Many universities list their physical campus name in
-    # the location field even for courses delivered entirely online (e.g. ACAP
-    # lists all 5 cities for both Online and On Campus courses) — that location
-    # text does NOT mean the course is available on campus.
-    # Courses that are genuinely mixed-mode have study_mode = "Blended" or
-    # "On Campus, Online" and pass through because they contain campus keywords.
-    # _online_filter_enabled was computed above — reuse it here.
-    _study_mode = (payload.get("study_mode") or "").strip().lower()
-    _has_campus_component = any(
-        kw in _study_mode
-        for kw in (
-            "on campus", "on-campus", "campus", "on site", "on-site",
-            "face-to-face", "blended", "in-person", "in person",
-        )
-    )
-
-    _physical_location = (
-        payload.get("course_location") or payload.get("location_text") or ""
-    ).strip()
-
-    if "online" in _study_mode and not _has_campus_component:
-        log.info(
-            "[REJECT CHECK] course=%r detected_modes=[%s] detected_locations=[%s] "
-            "decision=reject (online_only — study_mode is authoritative) "
-            "global_policy=true",
-            effective_name,
-            payload.get("study_mode", "Online"),
-            _physical_location or "none",
-        )
-        return (False, "online_only")
-
-    # UTAS-specific online_only: utas.edu.au pages always declare a physical
-    # campus name in their "Location" panel when the course has any on-campus
-    # component.  The location extractor strips virtual keywords ("Online",
-    # "Distance", etc.) so a blank course_location means the panel contained
-    # only "Online" — i.e. the course is online-only for international
-    # students and cannot be studied on a student visa.
-    # This catches cases where the study_mode extractor returned "Blended" or
-    # "On Campus" by picking up the domestic-tab campus reference while the
-    # international-tab Location field said "Online" only — the general
-    # online_only guard above requires "online" in study_mode and misses these.
-    #
-    # IMPORTANT: use course_location exclusively here, NOT location_text.
-    # course_location has already had virtual keywords ("Online", "Distance",
-    # "Internet", etc.) stripped by the location extractor, so it contains
-    # only confirmed physical campuses.  location_text is the raw value from
-    # the page and may be "Online" — using it here would make the guard treat
-    # "Online" as a physical campus and silently let the course through.
-    # UTAS rejection fires on EITHER of two signals:
-    #   (a) `course_location` is blank — the historical signal; the location
-    #       extractor stripped virtual keywords ("Online", "Distance", ...) so
-    #       blank means the panel contained ONLY a virtual value.
-    #   (b) `payload["online_only_utas"]` is True — set by single_course.py
-    #       when Gemini's `mode` field returned exactly "Online" for a UTAS
-    #       page. Needed because utas.yaml's `default_course_location: "Hobart"`
-    #       fallback fills course_location with "Hobart" on partial-HTML
-    #       fetches, masking signal (a) for real online-only pages like the
-    #       Graduate Certificate in Dementia (M5x, 2026-05-17 report).
-    _utas_physical_location = (payload.get("course_location") or "").strip()
-    _is_utas = "utas.edu.au" in (source_url or "").lower()
-    _utas_online_via_gemini = bool(payload.get("online_only_utas"))
-    if _is_utas and (not _utas_physical_location or _utas_online_via_gemini):
-        _reason = (
-            "utas_online_gemini_mode — Gemini detected Location: Online"
-            if _utas_online_via_gemini
-            else "utas_online_blank_location — Location panel was Online only"
-        )
-        log.info(
-            "[REJECT CHECK] course=%r url=%r decision=reject (%s)",
-            effective_name,
-            source_url,
-            _reason,
-        )
-        return (False, "online_only")
-
-    # Note: we do NOT reject study_mode="Blended" when location is absent
-    # for non-UTAS universities.
-    # "Blended" means the extractor found explicit evidence of both online
-    # and campus delivery on the course page — by definition a campus
-    # component exists.  Some universities (e.g. Torrens) don't embed campus
-    # location details on individual course pages, so location=None is
-    # expected even for courses genuinely available on campus.
-    # The strict "Online → reject" rule above already handles any case where
-    # the mode is purely online.  UTAS is handled by the explicit check above.
 
     # Bug B: no international fee after all extraction is done.
     # If the university has a centralized fee page, the fee may simply not

@@ -2470,6 +2470,7 @@ async def re_extract_staged(
     from app.services.scraper.orchestrator import _extract_only
     from app.services.scraper.stage_course import (
         evidence_fields_with_changed_provenance,
+        quarantine_reextracted_online_course,
         refresh_evidence_for_fields,
     )
     from app.services.scraper.field_normalizers import (
@@ -2665,6 +2666,7 @@ async def re_extract_staged(
         last_error = "extractor returned empty payload"
         retry_merge_fields: set[str] | None = None
         recovery_reason_code: str | None = None
+        online_only_found = False
         for pass_number in range(1, 3):
             if body.smart and pass_number == 2:
                 from app.services.scraper.smart_fix import refresh_central_recovery
@@ -2729,6 +2731,19 @@ async def re_extract_staged(
                 break
 
             raw_pass_payload = pass_out.get("payload") or {}
+            # Apply the same global staging policy to the *fresh, full*
+            # extraction before target-field narrowing or retry merges. A
+            # fee-only Fix must not leave an already-staged online-only course
+            # with its old campus/fee looking approval-eligible.
+            if isinstance(raw_pass_payload, dict) and raw_pass_payload:
+                from app.services.scraper.guards import is_online_only_for_staging
+
+                if is_online_only_for_staging(
+                    row.course_name or "", raw_pass_payload, source_url=url,
+                    partial=True,
+                ):
+                    online_only_found = True
+                    break
             if (
                 isinstance(raw_pass_payload, dict)
                 and "intake_months" in raw_pass_payload
@@ -2811,6 +2826,35 @@ async def re_extract_staged(
                     retry_merge_fields.add("duration_term")
                 if "course_location" in retry_merge_fields:
                     retry_merge_fields.update({"study_mode", "delivery_mode"})
+
+        if online_only_found:
+            try:
+                quarantined = await quarantine_reextracted_online_course(
+                    db, row, source_url=out.get("url") or url,
+                )
+                await db.commit()
+            except Exception as exc:  # noqa: BLE001
+                await db.rollback()
+                log.warning("re-extract: online-only audit failed for sc %s: %s", sc_id, exc)
+                results.append({"id": sc_id, "ok": False, "error": "online-only audit failed"})
+                errors += 1
+                continue
+            results.append({
+                "id": sc_id, "ok": True,
+                "outcome": "rejected_online_only" if quarantined else "protected_published_course",
+                "reason": (
+                    "Online-only staged row quarantined; fee and campus cleared"
+                    if quarantined else
+                    "Published/approved course unchanged; manual reconciliation required"
+                ),
+                "made_progress": quarantined,
+                "progress_fields": [],
+            })
+            if quarantined:
+                updated += 1
+            else:
+                skipped += 1
+            continue
 
         if not payload:
             results.append({"id": sc_id, "ok": False, "error": last_error})

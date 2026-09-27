@@ -6,7 +6,8 @@ import httpx
 import pytest
 
 from app.services.scraper.extractors.ulaw_campuses import (
-    METHOD, apply_course_campus_authority, enrich_course_campuses, parse_course_campuses,
+    METHOD, apply_course_campus_authority, apply_course_online_only_authority,
+    enrich_course_campuses, parse_course_campuses,
 )
 from app.services.scraper.extractors.ulaw_fees import METHOD as FEE_METHOD, parse_course_fees
 
@@ -295,3 +296,36 @@ async def test_official_online_only_precedes_stale_fee_error(monkeypatch, locati
 def test_online_navigation_or_mixed_delivery_is_not_online_only(body):
     from app.services.scraper.extractors.ulaw_campuses import _official_online_only
     assert not _official_online_only(page(body), URL, TITLE)
+    payload = {"course_name": TITLE, "study_mode": "Blended", "course_location": "Leeds"}
+    evidence = [{"field_key": "course_location", "value": "Leeds"}]
+    assert not apply_course_online_only_authority(page(body), URL, payload, evidence)
+    assert payload["study_mode"] == "Blended"
+    assert payload["course_location"] == "Leeds"
+    assert parse_course_fees(page(body), URL)["selected"]
+
+
+@pytest.mark.asyncio
+async def test_latest_single_course_extract_rejects_changed_delivery_without_ai(monkeypatch):
+    from app.services.scraper.config.context import current_uni_config
+    from app.services.scraper.config.loader import load_uni_config
+    from app.services.scraper.guards import should_stage_course
+    from app.services.scraper.pipelines.single_course import extract_course
+    from tests.test_ulaw_fees import POPULATION
+
+    source = POPULATION[41033]
+    cfg = load_uni_config(slug="law_1902", name="University of Law",
+                          scrape_url="https://www.law.ac.uk/study/", create_missing_stub=False)
+    token = current_uni_config.set(cfg)
+    try:
+        result = await extract_course(source["url"], html=source["html"],
+                                      country="United Kingdom", use_ai_fallback=False)
+    finally:
+        current_uni_config.reset(token)
+    payload = result["payload"]
+    assert payload["online_only"] is True
+    assert payload["study_mode"] == "Online"
+    assert payload["course_location"] is None
+    assert payload.get("international_fee") is None
+    assert payload.get("fee_year") is None
+    assert not payload.get("extraction_method", {}).get("fee_variants")
+    assert should_stage_course(payload["course_name"], payload, source_url=source["url"])[1] == "online_only"

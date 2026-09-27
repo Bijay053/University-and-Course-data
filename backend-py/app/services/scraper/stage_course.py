@@ -19,6 +19,7 @@ from __future__ import annotations
 import logging
 import math
 import re
+import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
@@ -83,6 +84,106 @@ def _reported_gate_reason(
     if gate_reason == "online_only" and is_sit and is_schedule_listed:
         return "listed_but_ineligible_online_only"
     return gate_reason
+
+
+async def quarantine_reextracted_online_course(
+    db: AsyncSession,
+    row: ScrapedCourse,
+    *,
+    source_url: str,
+) -> bool:
+    """Audit an online-only rediscovery without touching a published course.
+
+    Returns whether the unlinked review row was quarantined. A linked or
+    approved row is never changed here: removing it would alter a published
+    course without a reviewer-authorised reconciliation.
+    """
+    from app.models import CourseAuditLog, ScrapeFeedback
+
+    if row.status == "rejected" and row.rejection_reason == "online_only":
+        return False  # already quarantined and audited
+
+    protected = row.course_id is not None or row.status not in {"pending", "review"}
+    reason = (
+        "Online-only delivery confirmed on re-extraction; published/approved "
+        "course retained for manual reconciliation"
+        if protected else
+        "Online-only delivery confirmed on re-extraction; staged course "
+        "removed from approval queue"
+    )
+    existing = await db.scalar(
+        select(ScrapeFeedback.id).where(
+            ScrapeFeedback.scraped_course_id == row.id,
+            ScrapeFeedback.issue_type == "online_only_reextract",
+            ScrapeFeedback.reason == reason,
+            ScrapeFeedback.status == "active",
+        ).limit(1)
+    )
+    if existing is None:
+        db.add(ScrapeFeedback(
+            university_id=row.university_id,
+            scraped_course_id=row.id,
+            course_name=row.course_name,
+            field_key="study_mode",
+            issue_type="online_only_reextract",
+            reason=reason,
+            preferred_value=source_url,
+            status="active",
+        ))
+    if protected:
+        return False
+
+    db.add(CourseAuditLog(
+        scraped_course_id=row.id,
+        field_key="online_only",
+        action="staged_online_only_quarantine",
+        old_value=json.dumps({
+            "status": row.status,
+            "international_fee": row.international_fee,
+            "fee_year": row.fee_year,
+            "course_location": row.course_location,
+            "fee_variants": (row.extraction_method or {}).get("fee_variants"),
+        }, default=str),
+        new_value=json.dumps({"status": "rejected", "source_url": source_url}),
+        reason=reason,
+        actor="system:reextract",
+    ))
+    row.status = "rejected"
+    row.rejection_reason = "online_only"
+    row.auto_publish_status = "review"
+    row.eligibility_status = "ineligible"
+    row.eligibility_reason = reason
+    row.decision_score = None
+    row.pub_decision = None
+    row.pub_decision_reason = reason
+    # Do not leave a campus or fee (including campus fee variants) that can
+    # appear current if this row is subsequently reopened by a reviewer.
+    for key in (
+        "international_fee", "fee_term", "fee_year", "currency",
+        "course_location", "study_mode", "delivery_mode",
+    ):
+        setattr(row, key, None)
+    row.on_campus_available = False
+    row.international_eligible = False
+    methods = dict(row.extraction_method or {})
+    for key in (
+        "international_fee", "fee_term", "fee_year", "currency",
+        "course_location", "study_mode", "delivery_mode", "fee_variants",
+    ):
+        methods.pop(key, None)
+    row.extraction_method = methods
+    warnings = list(row.scrape_warnings or [])
+    if "online_only_reextract" not in warnings:
+        warnings.append("online_only_reextract")
+    row.scrape_warnings = warnings
+    await refresh_evidence_for_fields(
+        db, scraped_course_id=row.id, evidence=[], source_url=source_url,
+        field_keys={
+            "international_fee", "fee_term", "fee_year", "currency",
+            "course_location", "study_mode", "delivery_mode",
+        },
+    )
+    return True
 
 
 def _clean_model_value(field_name: str, value: Any) -> Any:

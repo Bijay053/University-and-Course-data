@@ -133,6 +133,10 @@ async def approve_scraped_course(
         raise ApprovalValidationError(
             f"scraped_course id={sc.id} has empty course_name; cannot promote"
         )
+    if sc.status == "rejected" and sc.rejection_reason == "online_only":
+        raise ApprovalValidationError(
+            "Online-only course was rejected on re-extraction; re-stage from current campus evidence before approval"
+        )
     # Fee selection may be committing concurrently. For variant-backed rows,
     # decide only after taking the row lock and refreshing the staged values.
     if unresolved_fee_selection(sc) and not (

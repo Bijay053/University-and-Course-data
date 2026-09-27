@@ -23,6 +23,9 @@ ONLINE_ONLY_REASON = (
 
 def _official_online_only(html, url, course_name):
     """A course-owned location statement, never a title/navigation heuristic."""
+    from .ulaw_fees import is_ulaw_course
+    if not is_ulaw_course(url):
+        return False
     soup = BeautifulSoup(html, "html.parser")
     canonical = soup.find("link", rel="canonical")
     if canonical and urljoin(url, canonical.get("href", "")).rstrip("/") != url.rstrip("/"):
@@ -52,6 +55,36 @@ def _official_online_only(html, url, course_name):
         label in {"online", "ulaw online"} and path == "/locations/online"
         for label, path in locations
     )
+
+
+def apply_course_online_only_authority(html, url, payload, evidence):
+    """Apply exact-route Key Facts delivery before generic campus/fee fallbacks.
+
+    This is an eligibility signal, not a fee region: Online cannot be mapped
+    to Outside London. Return False when the source does not prove exclusivity.
+    """
+    if not _official_online_only(html, url, payload.get("course_name")):
+        return False
+    payload["study_mode"] = "Online"
+    payload["online_only"] = True
+    payload["online_only_authoritative"] = True
+    payload["course_location"] = None
+    payload["location_text"] = None
+    for field in ("international_fee", "currency", "fee_year", "fee_term"):
+        payload[field] = None
+    methods = payload.get("extraction_method")
+    if isinstance(methods, dict):
+        methods.pop("fee_variants", None)
+        methods.pop("campus_authority", None)
+    evidence[:] = [item for item in evidence if item.get("field_key") not in {
+        "study_mode", "course_location", "international_fee", "currency", "fee_year", "fee_term",
+    }]
+    evidence.append({
+        "field_key": "study_mode", "value": "Online", "confidence": 0.99,
+        "method": METHOD + ":online_only", "source_url": url,
+        "snippet": "Exact-route Key Facts: Locations Online only",
+    })
+    return True
 
 
 def _norm(value):

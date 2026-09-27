@@ -112,6 +112,14 @@ def parse_course_fees(html: str, url: str, *, today: date | None = None) -> dict
     """
     if not is_ulaw_course(url):
         return None
+    # Historical campus prices can remain in the Fees tab after the course
+    # switches to Online-only delivery. They are not prices for this route.
+    from .ulaw_campuses import _official_online_only
+    title_for_delivery = BeautifulSoup(html, "html.parser").find("h1")
+    if title_for_delivery and _official_online_only(
+        html, url, title_for_delivery.get_text(" ", strip=True),
+    ):
+        return None
     soup = BeautifulSoup(html, "html.parser")
     # Rich-text editors split digits across adjacent inline spans/strong tags
     # (e.g. £1<span>6,500</span>, <strong>2</strong><strong>027/28</strong>).

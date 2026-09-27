@@ -278,7 +278,6 @@ for ids, amounts, period, year in [
     ([41017], [18850, 15150], "Full Course", 2026),
     ([41018], [20550, 17400], "Full Course", 2026),
     ([41019], [15450, 12450], "Full Course", 2026),
-    ([41033], [18500, 17000], "Full Course", 2025),
     ([41035, 41039, 41053, 41063, 41067], [17500, 16500], "Full Course", 2026),
     ([41052], [17550, 16700], "Full Course", 2026),
     ([41055, 41068, 41069, 41070], [20600, 20600], "Full Course", 2026),
@@ -295,10 +294,36 @@ UNRESOLVED = {
     41001: "LPC is closed to new applications and publishes no current tuition",
     41020: "SQE1 preparation tuition has no explicit international applicability",
     41021: "SQE2 preparation tuition has no explicit international applicability",
+    41033: "Exact-route Key Facts offers Online only; historical 2025 campus fees are not applicable",
 }
 assert len(POPULATION) == 85
 assert set(EXPECTED) | set(UNRESOLVED) == set(POPULATION)
-assert len(EXPECTED) == 82
+assert len(EXPECTED) == 81
+
+
+def test_frozen_human_resources_delivery_supersedes_historical_campus_fees():
+    from app.services.scraper.extractors.ulaw_campuses import (
+        _official_online_only, apply_course_online_only_authority,
+    )
+
+    source = POPULATION[41033]
+    assert _official_online_only(
+        source["html"], source["url"], "MSc Human Resources with Employment Law",
+    )
+    assert parse_course_fees(source["html"], source["url"], today=TODAY) is None
+    payload = {
+        "course_name": "MSc Human Resources with Employment Law",
+        "study_mode": "Blended", "course_location": "London",
+        "international_fee": 18500, "currency": "GBP",
+        "fee_year": 2025, "fee_term": "Full Course",
+    }
+    evidence = [{"field_key": "course_location", "value": "London", "method": "generic"}]
+    assert apply_course_online_only_authority(source["html"], source["url"], payload, evidence)
+    assert payload["study_mode"] == "Online"
+    assert payload["online_only"] is True
+    assert payload["course_location"] is None
+    assert all(payload[key] is None for key in ("international_fee", "currency", "fee_year", "fee_term"))
+    assert not any(item["field_key"] == "course_location" for item in evidence)
 
 
 @pytest.mark.parametrize("course_id", sorted(POPULATION))
@@ -408,5 +433,5 @@ async def test_all_live_population_fee_only_recovery_is_one_fetch_and_fee_only(m
             "course_website", "international_fee", "fee_year", "fee_term", "currency",
             "extraction_method",
         }
-    assert states == {"range": 78, "uniform": 4, "unresolved": 3}
+    assert states == {"range": 77, "uniform": 4, "unresolved": 4}
     assert len(fetched) == 85 and set(fetched.values()) == {1}

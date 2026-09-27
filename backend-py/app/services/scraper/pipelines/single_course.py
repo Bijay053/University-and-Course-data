@@ -5539,12 +5539,16 @@ async def extract_course(
     # ``study_mode:rule`` is deliberately excluded by the shared helper: broad
     # page text can be navigation or marketing copy and must not reject a
     # mixed/on-campus course.
+    from app.services.scraper.extractors.ulaw_campuses import apply_course_online_only_authority
+    _ulaw_online_only = apply_course_online_only_authority(html or "", url, payload, evidence)
     _apply_explicit_online_title_authority(payload, evidence)
     _authoritative_online = (
-        not _course_title_declares_mixed_delivery(payload)
-        and study_mode.has_authoritative_online_location_evidence(
-            payload.get("study_mode"),
-            evidence,
+        _ulaw_online_only or (
+            not _course_title_declares_mixed_delivery(payload)
+            and study_mode.has_authoritative_online_location_evidence(
+                payload.get("study_mode"),
+                evidence,
+            )
         )
     )
     if _authoritative_online:
@@ -11217,8 +11221,12 @@ async def extract_course(
     # Reapply course-owned ULaw audience/year/route authority atomically after
     # every fallback. Broad-page candidates and domestic reject-keyword
     # evidence must not detach the price from its selected cohort.
+    from app.services.scraper.extractors.ulaw_campuses import apply_course_online_only_authority
+    _ulaw_online_only = apply_course_online_only_authority(html or "", url, payload, evidence)
     from app.services.scraper.extractors.ulaw_fees import apply_course_fee_authority
-    _ulaw_fee_authority = apply_course_fee_authority(html or "", url, payload, evidence)
+    _ulaw_fee_authority = (
+        None if _ulaw_online_only else apply_course_fee_authority(html or "", url, payload, evidence)
+    )
     _ulaw_campus_authority = None
     if _ulaw_fee_authority:
         from app.services.scraper.extractors.ulaw_campuses import apply_course_campus_authority
