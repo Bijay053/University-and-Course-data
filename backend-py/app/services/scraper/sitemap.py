@@ -337,6 +337,68 @@ def _same_registrable_host(host_a: str, host_b: str) -> bool:
     return a_parts[-2:] == b_parts[-2:]
 
 
+def _canonicalize_sitemap_loc(
+    loc: str,
+    *,
+    public_host: str,
+    host_canonicalizations: list[dict] | None,
+) -> str:
+    """Rewrite only explicitly configured, safe sitemap loc hosts.
+
+    This is intentionally separate from the general same-host check: it does
+    not make the source host fetchable, and only maps exact configured hosts
+    to an exact configured public origin for explicitly allowed paths.
+    """
+    if not host_canonicalizations or not public_host:
+        return loc
+    try:
+        parsed = urlparse(loc)
+        source_host = (parsed.hostname or "").lower()
+    except (TypeError, ValueError):
+        return loc
+    if parsed.scheme.lower() not in {"http", "https"}:
+        return loc
+
+    for rule in host_canonicalizations:
+        source = str(rule.get("source_host") or "").strip().lower().rstrip(".")
+        official_origin = str(rule.get("origin") or "").strip()
+        prefixes = rule.get("allowed_path_prefixes") or []
+        if not source or source_host != source or parsed.netloc.lower() != source:
+            continue
+        try:
+            origin = urlparse(official_origin)
+            origin_host = (origin.hostname or "").lower()
+            origin_port = origin.port
+        except (TypeError, ValueError):
+            continue
+        # Require a bare HTTP(S) origin whose hostname is the exact host
+        # discovery was asked to crawl. Do not let a YAML rule redirect a
+        # sitemap candidate to an unrelated site or alternate port.
+        if (
+            origin.scheme.lower() not in {"http", "https"}
+            or origin_host != public_host.lower()
+            or origin.username
+            or origin.password
+            or origin_port is not None
+            or origin.path not in {"", "/"}
+            or origin.query
+            or origin.fragment
+        ):
+            continue
+        path = parsed.path or "/"
+        if not any(
+            isinstance(prefix, str)
+            and prefix.startswith("/")
+            and path.startswith(prefix)
+            for prefix in prefixes
+        ):
+            continue
+        return f"{origin.scheme}://{origin.netloc}{path}" + (
+            f"?{parsed.query}" if parsed.query else ""
+        )
+    return loc
+
+
 async def discover_from_sitemap(
     origin: str,
     *,
@@ -344,6 +406,7 @@ async def discover_from_sitemap(
     sitemap_url: str | None = None,
     offset: int = 0,
     allow_url_patterns: "list[re.Pattern[str]] | None" = None,
+    loc_host_canonicalizations: list[dict] | None = None,
 ) -> list[dict]:
     """Probe sitemap.xml + robots.txt at ``origin`` and return course candidates.
 
@@ -369,6 +432,7 @@ async def discover_from_sitemap(
     parsed = urlparse(origin)
     base = f"{parsed.scheme}://{parsed.netloc}" if parsed.netloc else origin.rstrip("/")
     base_host = urlparse(base).netloc
+    public_hostname = (urlparse(base).hostname or "").lower()
 
     def _accept(loc: str) -> bool:
         """Return True if ``loc`` should be kept as a course candidate.
@@ -520,6 +584,18 @@ async def discover_from_sitemap(
                 if nested_url in seen_locs:
                     continue
                 seen_locs.add(nested_url)
+                nested_parsed = urlparse(nested_url)
+                nested_host = nested_parsed.netloc
+                if (
+                    nested_parsed.scheme.lower() not in {"http", "https"}
+                    or not nested_host
+                    or (
+                        base_host
+                        and not _same_registrable_host(base_host, nested_host)
+                    )
+                ):
+                    log.debug("sitemap: dropping off-host nested sitemap %s", nested_url)
+                    continue
                 sub_xml = await _fetch_text(nested_url)
                 if not sub_xml:
                     continue
@@ -534,7 +610,13 @@ async def discover_from_sitemap(
                         )
                 added = 0
                 for raw_loc in _sub_locs:
-                    loc = _normalize_sitemap_url(raw_loc)
+                    loc = _normalize_sitemap_url(
+                        _canonicalize_sitemap_loc(
+                            raw_loc,
+                            public_host=public_hostname,
+                            host_canonicalizations=loc_host_canonicalizations,
+                        )
+                    )
                     if (
                         loc in found
                         or _is_nested_loc(loc)
@@ -556,7 +638,13 @@ async def discover_from_sitemap(
 
         before = len(found)
         for raw_loc in all_locs:
-            loc = _normalize_sitemap_url(raw_loc)
+            loc = _normalize_sitemap_url(
+                _canonicalize_sitemap_loc(
+                    raw_loc,
+                    public_host=public_hostname,
+                    host_canonicalizations=loc_host_canonicalizations,
+                )
+            )
             if (
                 loc in found
                 or _is_nested_loc(loc)

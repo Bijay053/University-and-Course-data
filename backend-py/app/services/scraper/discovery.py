@@ -1700,6 +1700,15 @@ async def discover_course_links(
                         _fb_allow_pats.append(re.compile(_ap_str, re.IGNORECASE))
                     except re.error:
                         pass
+            _loc_host_canonicalizations = []
+            if discovery_config is not None:
+                for _rule in (
+                    getattr(discovery_config, "sitemap_loc_host_canonicalizations", None) or []
+                ):
+                    if hasattr(_rule, "dict"):
+                        _loc_host_canonicalizations.append(_rule.dict())
+                    elif isinstance(_rule, dict):
+                        _loc_host_canonicalizations.append(_rule)
             # Bound the whole sitemap-fallback probe chain (robots.txt +
             # up to 4 generic index paths, each internally capped at
             # sitemap._PROBE_TIMEOUT_S=100s) to whatever's actually left of
@@ -1711,6 +1720,7 @@ async def discover_course_links(
                 discover_from_sitemap(
                     origin, emit=emit, sitemap_url=_explicit_sm, offset=_sm_offset,
                     allow_url_patterns=_fb_allow_pats or None,
+                    loc_host_canonicalizations=_loc_host_canonicalizations or None,
                 ),
                 timeout=max(_remaining_budget_s(), 1.0),
             )

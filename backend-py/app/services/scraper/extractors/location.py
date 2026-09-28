@@ -39,6 +39,58 @@ def _otago_course_meta_location(html: str, url: str) -> tuple[bool, str | None]:
     value = re.sub(r"\s+", " ", raw).strip(" ,;|")
     return True, (value or None)
 
+
+def _aru_course_header_location(html: str, url: str) -> tuple[bool, str | None]:
+    """Extract Location from the selected core-options panel for an ARU course."""
+    parsed = urlparse(url or "")
+    if (
+        parsed.netloc.lower() != "www.aru.ac.uk"
+        or not re.fullmatch(
+            r"/study/(?:undergraduate|postgraduate)/[^/]+/?",
+            parsed.path or "",
+            re.IGNORECASE,
+        )
+    ):
+        return False, None
+
+    soup = BeautifulSoup(html or "", "html.parser")
+    course_container = soup.find(id="utopian-course-container-id")
+    overview = (
+        course_container.find(id="utopian-course-overview")
+        if course_container is not None
+        else None
+    )
+    heading = overview.find("h1") if overview is not None else None
+    if heading is None:
+        return False, None
+
+    # The current course's location lives in the selected core-options tab.
+    # Limit the lookup to that panel and its first options list so later lists
+    # or related-course cards cannot contribute a coincidental Location.
+    core_panel = course_container.find(
+        id="core-option-aria",
+        class_="utopian-tabs-container__tab-panel--open",
+    )
+    if core_panel is None:
+        return False, None
+    options_wrapper = core_panel.find(class_="utopian-course-options")
+    options = (
+        options_wrapper.find("dl", class_="utopian-course-options__list")
+        if options_wrapper is not None
+        else None
+    )
+    if options is None:
+        return False, None
+    for label in options.find_all("dt"):
+        label_text = re.sub(r"\s+", " ", label.get_text(" ", strip=True))
+        if label_text.rstrip(":").strip().casefold() != "location":
+            continue
+        value = label.find_next_sibling()
+        if value is None or value.name != "dd":
+            return True, None
+        return True, value.get_text(" ", strip=True) or None
+    return False, None
+
 LOCATION_LABEL = re.compile(
     r"^\s*(?:campus(?:\s*locations?)?|location|locations|"
     r"start\s+dates?\s+(?:and\s+)?campus(?:es)?|"
@@ -1739,6 +1791,34 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
                 snippet=f'meta[name="location"]: {_otago_meta_location or "(empty)"}',
             )
         ]
+
+    # ARU's exact course-header fact outranks page-wide text and navigation.
+    # Scope the short-circuit to its public course-detail URLs so unrelated
+    # ARU pages and every other host retain the normal location cascade.
+    _aru_url = urlparse(url or "")
+    if (
+        _aru_url.netloc.lower() == "www.aru.ac.uk"
+        and re.fullmatch(
+            r"/study/(?:undergraduate|postgraduate)/[^/]+/?",
+            _aru_url.path or "",
+            re.IGNORECASE,
+        )
+    ):
+        _aru_fact_present, _aru_raw_location = _aru_course_header_location(html, url)
+        if _aru_fact_present:
+            _aru_location = _normalise(_aru_raw_location)
+            return [
+                ExtractionResult(
+                    field_key="course_location",
+                    value=_aru_location,
+                    normalized={"course_location": _aru_location},
+                    confidence=0.99,
+                    method="location.aru_course_header",
+                    snippet=f"ARU course-header Location: {_aru_raw_location or '(empty)'}",
+                )
+            ]
+        # Do not let the broad fallback promote nav or related-course facts.
+        return []
 
     # Per-uni text-cleaning strip_patterns (Option C).
     # Loaded from the contextvar set by set_uni_config() before extraction.

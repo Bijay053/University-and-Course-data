@@ -1243,9 +1243,34 @@ class NonDegreeClassifierConfig(BaseModel):
     )
 
 
+class SitemapLocHostCanonicalizationConfig(BaseModel):
+    """A tightly scoped rewrite for misconfigured sitemap ``<loc>`` hosts."""
+
+    source_host: str = Field(
+        description="Exact hostname found in sitemap loc URLs (no wildcard)."
+    )
+    origin: str = Field(
+        description="Official public origin used for the rewritten candidate URLs."
+    )
+    allowed_path_prefixes: list[str] = Field(
+        description="Only loc paths beginning with one of these prefixes may be rewritten."
+    )
+
+
 class DiscoveryConfig(BaseModel):
     official_catalogue_fallback: bool = False
     """Safe to replay against unknown universities (Tier-3 playbook matching)."""
+
+    sitemap_loc_host_canonicalizations: list["SitemapLocHostCanonicalizationConfig"] = Field(
+        default_factory=list,
+        description=(
+            "Narrow sitemap-only canonicalization rules for exact source hosts. "
+            "A rule rewrites loc URLs to its official origin only when discovery "
+            "itself is running on that exact public host and the loc path begins "
+            "with one of the explicitly allowed prefixes. This never authorizes "
+            "fetching the source host or off-host nested sitemaps."
+        ),
+    )
 
     non_degree_classifier: NonDegreeClassifierConfig = Field(
         default_factory=NonDegreeClassifierConfig,

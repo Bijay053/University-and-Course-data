@@ -30,6 +30,21 @@
 #   Projected new total: (11.9 - 2.6) / 2 × 327 = ~24 min extraction
 #     + ~3 min discovery = ~27 min. Within target.
 
+hostname_guard: www.aru.ac.uk
+locked_config_paths:
+  # Generated rules from old probes point at ARU's private Azure hostname
+  # and can otherwise replace the public catalogue recipe after a failed run.
+  - discovery.seed_urls
+  - discovery.sitemap_url
+  - discovery.sitemap_loc_host_canonicalizations
+  - discovery.always_sitemap_supplement
+  - discovery.allow_url_patterns
+  - discovery.block_url_patterns
+  - discovery.use_stealth_browser
+  - discovery.skip_browser_discovery
+  - discovery.expected_min_courses
+  - discovery.max_candidates
+
 discovery:
   auto_api_discovery: false
 
@@ -47,6 +62,15 @@ discovery:
 
   always_sitemap_supplement: true
   sitemap_url: https://www.aru.ac.uk/sitemap.xml
+  # The public sitemap advertises its Azure publishing host in <loc>. Fetch
+  # only pages on the public ARU origin; do not allow the Azure host as a
+  # scraping or nested-sitemap destination.
+  sitemap_loc_host_canonicalizations:
+    - source_host: aru-sc104-prod-uksouth-cd.azurewebsites.net
+      origin: https://www.aru.ac.uk
+      allowed_path_prefixes:
+        - /study/undergraduate/
+        - /study/postgraduate/
 
   bfs_page_budget: 20
   max_candidates: 800

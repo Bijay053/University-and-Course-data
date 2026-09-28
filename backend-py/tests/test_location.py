@@ -81,6 +81,186 @@ def test_dt_dd_location_classifies_via_existing_dl_path():
     assert out[0].method == "location.dl"
 
 
+def test_aru_course_header_extracts_h1_owned_location_and_corrects_fallback_mode():
+    html = """
+    <main>
+      <div id="utopian-course-container-id" class="utopian-course-container">
+        <div class="course-upper" id="utopian-course-overview">
+          <div class="utopian-course-hero">
+            <div class="hero-header">
+              <h1 id="course-page-title">Banking and Finance MBA</h1>
+            </div>
+          </div>
+        </div>
+        <div class="course-content grid-container-course">
+          <div class="utopian-tabs-container">
+            <div id="core-option-aria" class="utopian-tabs-container__tab-panel--open">
+              <div class="utopian-course-options">
+                <dl class="utopian-course-options__list">
+                  <dt>Location</dt>
+                  <dd><a href="/student-life/life-on-campus/chelmsford-campus">Chelmsford</a></dd>
+                  <dt>Study mode</dt><dd>Full-time</dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="careers-centre-cta">Apply online · Careers Centre</div>
+    </main>
+    """
+    url = "https://www.aru.ac.uk/study/postgraduate/banking-and-finance-mba"
+    out = _run(location.extract(html, url))
+    assert out and out[0].value == "Chelmsford"
+    assert out[0].method == "location.aru_course_header"
+
+    # This is the existing safety correction used for low-confidence Online
+    # keyword matches: a confirmed physical course location means On Campus.
+    from app.services.scraper.extractors.study_mode import (
+        classify_study_mode,
+        derive_mode_from_location,
+    )
+
+    mode, _, confidence = classify_study_mode(html)
+    assert mode == "Online" and confidence <= 0.5
+    assert derive_mode_from_location(out[0].value) == "On Campus"
+
+
+def test_aru_course_header_location_online_is_not_a_physical_campus():
+    html = """
+    <main>
+      <div id="utopian-course-container-id" class="utopian-course-container">
+        <div class="course-upper" id="utopian-course-overview">
+          <div class="utopian-course-hero">
+            <div class="hero-header"><h1 id="course-page-title">Agribusiness</h1></div>
+          </div>
+        </div>
+        <div class="course-content grid-container-course">
+          <div class="utopian-tabs-container">
+            <div id="core-option-aria" class="utopian-tabs-container__tab-panel--open">
+              <div class="utopian-course-options">
+                <dl class="utopian-course-options__list">
+                  <dt>Location</dt><dd>Online</dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <nav><a href="/apply">Apply online</a></nav>
+    </main>
+    """
+    out = _run(
+        location.extract(
+            html, "https://www.aru.ac.uk/study/postgraduate/agribusiness"
+        )
+    )
+    assert out and out[0].value is None
+    assert out[0].method == "location.aru_course_header"
+
+
+def test_aru_agribusiness_extracts_writtle_from_course_options_list():
+    html = """
+    <main>
+      <div id="utopian-course-container-id" class="utopian-course-container">
+        <div class="course-upper" id="utopian-course-overview">
+          <div class="utopian-course-hero">
+            <div class="hero-header"><h1 id="course-page-title">Agribusiness</h1></div>
+          </div>
+        </div>
+        <div class="course-content grid-container-course">
+          <div class="utopian-tabs-container">
+            <div id="core-option-aria" class="utopian-tabs-container__tab-panel--open">
+              <div class="utopian-course-options">
+                <dl class="utopian-course-options__list">
+                  <dt>Location</dt>
+                  <dd><a href="/student-life/life-on-campus/writtle-campus">Writtle</a></dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+          <section class="related-courses">
+            <dl class="utopian-course-options__list">
+              <dt>Location</dt><dd>Cambridge</dd>
+            </dl>
+          </section>
+        </div>
+      </div>
+    </main>
+    """
+    out = _run(
+        location.extract(
+            html, "https://www.aru.ac.uk/study/postgraduate/agribusiness"
+        )
+    )
+    assert out and out[0].value == "Writtle"
+    assert out[0].method == "location.aru_course_header"
+
+
+def test_aru_location_does_not_use_nav_or_related_course_facts():
+    html = """
+    <main>
+      <nav><a href="/apply">Apply online</a><span>Location</span>
+        <span>Cambridge</span></nav>
+      <div id="utopian-course-container-id" class="utopian-course-container">
+        <div class="course-upper" id="utopian-course-overview">
+          <div class="utopian-course-hero">
+            <div class="hero-header"><h1 id="course-page-title">Agribusiness</h1></div>
+          </div>
+        </div>
+        <div class="course-content grid-container-course">
+          <div class="utopian-tabs-container">
+            <div id="core-option-aria" class="utopian-tabs-container__tab-panel--open">
+              <div class="utopian-course-options">
+                <dl class="utopian-course-options__list">
+                  <dt>Duration</dt><dd>3 years</dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+          <section class="related-courses">
+            <dl class="utopian-course-options__list">
+              <dt>Location</dt><dd>Cambridge</dd>
+            </dl>
+          </section>
+        </div>
+      </div>
+    </main>
+    """
+    out = _run(
+        location.extract(
+            html, "https://www.aru.ac.uk/study/postgraduate/agribusiness"
+        )
+    )
+    assert out == []
+
+
+def test_aru_course_header_location_is_restricted_to_public_detail_urls():
+    html = """
+    <div id="utopian-course-container-id">
+      <div class="course-upper" id="utopian-course-overview">
+        <div class="hero-header"><h1>Banking and Finance MBA</h1></div>
+      </div>
+      <div id="core-option-aria" class="utopian-tabs-container__tab-panel--open">
+        <div class="utopian-course-options">
+          <dl class="utopian-course-options__list">
+            <dt>Location</dt><dd>Chelmsford</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+    """
+    assert location._aru_course_header_location(
+        html, "https://aru.ac.uk/study/postgraduate/banking-and-finance-mba"
+    ) == (False, None)
+    assert location._aru_course_header_location(
+        html, "https://www.aru.ac.uk/study/postgraduate/banking-and-finance-mba/fees"
+    ) == (False, None)
+    assert location._aru_course_header_location(
+        html, "https://www.aru.ac.uk/other/postgraduate/banking-and-finance-mba"
+    ) == (False, None)
+
+
 def test_th_td_location_classifies_via_existing_table_path():
     """Table key/value shape — already covered by `_from_tables`,
     locked in here so a future refactor can't regress it."""

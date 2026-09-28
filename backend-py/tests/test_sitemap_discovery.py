@@ -11,9 +11,22 @@ Plus negative cases: empty/malformed sitemap → empty list, never raise.
 """
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from app.services.scraper import sitemap as sitemap_mod
+from app.services.scraper.config.schema import DiscoveryConfig
+
+
+_ARU_SITEMAP_CANONICALIZATION = {
+    "source_host": "aru-sc104-prod-uksouth-cd.azurewebsites.net",
+    "origin": "https://www.aru.ac.uk",
+    "allowed_path_prefixes": [
+        "/study/undergraduate/",
+        "/study/postgraduate/",
+    ],
+}
 
 
 @pytest.fixture(autouse=True)
@@ -338,6 +351,85 @@ async def test_offhost_locs_dropped_ssrf_guard(monkeypatch):
     # Different registrable hosts — must be dropped.
     assert not any("evil.com" in u for u in urls)
     assert not any("169.254" in u for u in urls)
+
+
+@pytest.mark.asyncio
+async def test_configured_sitemap_loc_host_canonicalization_is_path_and_origin_scoped(
+    monkeypatch,
+):
+    """Only ARU's exact Azure hostname and official course paths are rewritten."""
+    azure = _ARU_SITEMAP_CANONICALIZATION["source_host"]
+    sitemap_xml = f"""<urlset>
+      <url><loc>https://{azure}/study/undergraduate/accounting-and-finance</loc></url>
+      <url><loc>https://{azure}/study/postgraduate/master-of-business</loc></url>
+      <url><loc>https://{azure}/study/undergraduate/scholarships</loc></url>
+      <url><loc>https://{azure}/study/undergraduateevil/master-of-law</loc></url>
+      <url><loc>https://{azure}/about/courses/master-of-law</loc></url>
+      <url><loc>https://evil.{azure}/study/undergraduate/phishing-degree</loc></url>
+    </urlset>"""
+    _patch_fetch(monkeypatch, {"https://www.aru.ac.uk/sitemap.xml": sitemap_xml})
+
+    out = await sitemap_mod.discover_from_sitemap(
+        "https://www.aru.ac.uk",
+        sitemap_url="https://www.aru.ac.uk/sitemap.xml",
+        allow_url_patterns=[re.compile(r"/study/(?:undergraduate|postgraduate)/")],
+        loc_host_canonicalizations=[_ARU_SITEMAP_CANONICALIZATION],
+    )
+
+    assert {course["url"] for course in out} == {
+        "https://www.aru.ac.uk/study/undergraduate/accounting-and-finance",
+        "https://www.aru.ac.uk/study/postgraduate/master-of-business",
+    }
+
+
+@pytest.mark.asyncio
+async def test_sitemap_loc_canonicalization_requires_exact_configured_public_host(
+    monkeypatch,
+):
+    azure = _ARU_SITEMAP_CANONICALIZATION["source_host"]
+    xml = (
+        f"<urlset><url><loc>https://{azure}/study/undergraduate/"
+        "bachelor-of-business</loc></url></urlset>"
+    )
+    _patch_fetch(monkeypatch, {"https://aru.ac.uk/sitemap.xml": xml})
+
+    out = await sitemap_mod.discover_from_sitemap(
+        "https://aru.ac.uk",
+        sitemap_url="https://aru.ac.uk/sitemap.xml",
+        loc_host_canonicalizations=[_ARU_SITEMAP_CANONICALIZATION],
+    )
+
+    assert out == []
+
+
+@pytest.mark.asyncio
+async def test_offhost_nested_sitemap_is_never_fetched_even_with_loc_rule(monkeypatch):
+    azure = _ARU_SITEMAP_CANONICALIZATION["source_host"]
+    index_xml = (
+        f"<sitemapindex><sitemap><loc>https://{azure}/sitemap.xml</loc>"
+        "</sitemap></sitemapindex>"
+    )
+    calls = _patch_fetch(
+        monkeypatch,
+        {"https://www.aru.ac.uk/sitemap.xml": index_xml},
+    )
+
+    await sitemap_mod.discover_from_sitemap(
+        "https://www.aru.ac.uk",
+        sitemap_url="https://www.aru.ac.uk/sitemap.xml",
+        loc_host_canonicalizations=[_ARU_SITEMAP_CANONICALIZATION],
+    )
+
+    assert calls == ["https://www.aru.ac.uk/sitemap.xml"]
+
+
+def test_discovery_schema_accepts_declared_sitemap_loc_canonicalization():
+    config = DiscoveryConfig(
+        sitemap_loc_host_canonicalizations=[_ARU_SITEMAP_CANONICALIZATION]
+    )
+    assert config.sitemap_loc_host_canonicalizations[0].source_host == (
+        "aru-sc104-prod-uksouth-cd.azurewebsites.net"
+    )
 
 
 @pytest.mark.asyncio
