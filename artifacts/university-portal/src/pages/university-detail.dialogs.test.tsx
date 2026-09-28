@@ -57,7 +57,10 @@ type ApprovalResult = {
   approvedIds: number[]; approvedCount: number; splitCount: number;
   failed: Array<{ id: number; error: string }>; attempted: number;
 };
-function renderPage(approval?: (sourceId: number, force: boolean) => ApprovalResult, legacyCampusSplit = false, includeUnrelatedRawRow = false, studyById?: Record<number, string>) {
+function renderPage(approval?: (sourceId: number, force: boolean) => ApprovalResult, legacyCampusSplit = false, includeUnrelatedRawRow = false,
+  evidenceOrStudy?: ((id: number) => Promise<Response> | Response) | Record<number, string>, summaryCampus = false) {
+  const onEvidence = typeof evidenceOrStudy === "function" ? evidenceOrStudy : undefined;
+  const studyById = typeof evidenceOrStudy === "function" ? undefined : evidenceOrStudy;
   const approvedSources = new Set<number>();
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
@@ -71,6 +74,14 @@ function renderPage(approval?: (sourceId: number, force: boolean) => ApprovalRes
       const { ids } = JSON.parse(String(init?.body));
       return new Response(JSON.stringify({ deleted: ids.length }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
+    if (url.includes("/api/scrape/staged/12/evidence?")) {
+      if (onEvidence) return onEvidence(12);
+      return Response.json({ course: {
+        id: 12, university_id: 7, scrape_job_id: "campus-job",
+        course_name: "Staged Accessible Course", status: "pending", completeness: 45,
+      } });
+    }
+    if (url.includes("/api/scrape/staged/13/evidence?") && onEvidence) return onEvidence(13);
     const body = url.includes("/scholarship-courses")
       ? [{ id: 42, name: "Accessible Course", degreeLevel: "Bachelor", category: "Business", scholarships: [{ id: 8, name: "Merit Award", details: "For strong applicants", eligibilityCriteria: "International students", amount: 5000, percentage: null, currency: "AUD" }] }]
       : url.includes("/academic-requirements")
@@ -89,6 +100,15 @@ function renderPage(approval?: (sourceId: number, force: boolean) => ApprovalRes
               campus_fee_scope: { split_from_id: 12, original_name: "MSc Healthcare Management" },
               fee_variants: { selected: [{ campus: "Manchester", amount: 18000, year: 2026, period: "Annual", study_variant: "Standard" }] },
             } : undefined,
+            ...(summaryCampus ? {
+              extraction_method: undefined,
+              extractionMethod: { campus_fee_scope: {
+                split_from_id: 12, original_name: "MSc Healthcare Management", locations: ["Manchester"],
+              } },
+              feeVariants: { selected: [{ campus: "Outside London", amount: 18000, year: 2026,
+                period: "Annual", study_variant: "Standard" }] },
+              evidenceLoaded: false, evidenceCount: 1,
+            } : {}),
             status: "pending", completeness: 45, study_load: studyById?.[12],
           },
           {
@@ -99,6 +119,15 @@ function renderPage(approval?: (sourceId: number, force: boolean) => ApprovalRes
               campus_fee_scope: { split_from_id: 12, original_name: "MSc Healthcare Management" },
               fee_variants: { selected: [{ campus: "Birmingham", amount: 19500, year: 2026, period: "Annual", study_variant: "Standard" }] },
             } : undefined,
+            ...(summaryCampus ? {
+              extraction_method: undefined,
+              extractionMethod: { campus_fee_scope: {
+                split_from_id: 12, original_name: "MSc Healthcare Management", locations: ["Birmingham", "Leeds"],
+              } },
+              feeVariants: { selected: [{ campus: "Outside London", amount: 19500, year: 2026,
+                period: "Annual", study_variant: "Standard" }] },
+              evidenceLoaded: false, evidenceCount: 1,
+            } : {}),
             status: "pending", completeness: 70, study_load: studyById?.[13],
           },
         ].filter(c => !approvedSources.has(c.id)).concat(includeUnrelatedRawRow ? [{
@@ -106,7 +135,8 @@ function renderPage(approval?: (sourceId: number, force: boolean) => ApprovalRes
           course_website: "https://example.edu/unrelated", course_location: "Perth", degree_level: "Bachelor",
           fee_year: 2026, fee_term: "Annual", currency: "AUD", international_fee: 1000,
           extraction_method: undefined, status: "pending", completeness: 65, study_load: studyById?.[14],
-        }] : []) : [{ id: 12, course_name: "Staged Accessible Course", status: "pending", completeness: 45 }])
+        }] : []) : [{ id: 12, university_id: 7, scrape_job_id: "campus-job",
+          course_name: "Staged Accessible Course", status: "pending", completeness: 45 }])
       : url.includes("/repair/missing/")
       ? { courses: [] }
       : url.includes("/change-detection/")
@@ -184,6 +214,31 @@ describe("University Detail dialogs", () => {
         .flatMap(([, init]) => JSON.parse(String(init?.body)).courseIds as number[]);
       expect(ids).toEqual(expect.arrayContaining([12, 13]));
     });
+  });
+
+  it("groups projected summary campus fees, selects both rows and hydrates Edit", async () => {
+    const user = userEvent.setup();
+    const { fetchMock } = renderPage(() => ({
+      approvedIds: [], approvedCount: 0, splitCount: 0, failed: [], attempted: 0,
+    }), true, false, () => Response.json({ course: {
+      id: 12, university_id: 7, scrape_job_id: "campus-job",
+      course_name: "MSc Healthcare Management — Manchester", status: "pending",
+      raw_data: { original: "preserved" },
+    } }), true);
+    await openTab(user, "Raw Data");
+    expect(await screen.findByText("1 courses · 2 review entries")).toBeTruthy();
+    const group = screen.getByTestId("row-raw-logical-course-12");
+    const fees = screen.getByTestId("text-raw-campus-fees-12");
+    expect(fees.textContent).toContain("Manchester: GBP 18,000");
+    expect(fees.textContent).toContain("Birmingham: GBP 19,500");
+    expect(fees.textContent).toContain("Leeds: GBP 19,500");
+    expect(fees.textContent).not.toContain("Outside London");
+    await user.click(screen.getByTitle("Select all"));
+    expect(screen.getByRole("button", { name: "Approve (2)" })).toBeTruthy();
+    await user.click(within(group).getByTitle("Edit"));
+    expect(await screen.findByDisplayValue("MSc Healthcare Management — Manchester")).toBeTruthy();
+    expect(fetchMock.mock.calls.some(([input]) =>
+      String(input).includes("/api/scrape/staged/12/evidence?jobId=campus-job&universityId=7"))).toBe(true);
   });
 
   it("approves all selected IDs in one request, retaining ambiguous campus rows", async () => {
@@ -402,5 +457,31 @@ describe("University Detail dialogs", () => {
     await user.click(screen.getByRole("button", { name: "Delete (1)" }));
     await screen.findByRole("dialog", { name: "Delete 1 staged row?" });
     expectAccessibleDialog();
+  });
+
+  it("keeps the last selected row when an older edit detail resolves late", async () => {
+    let finishOld!: (response: Response) => void;
+    const oldDetail = new Promise<Response>(resolve => { finishOld = resolve; });
+    const { fetchMock } = renderPage(() => ({
+      approvedIds: [], approvedCount: 0, splitCount: 0, failed: [], attempted: 0,
+    }), false, false, rowId => rowId === 12 ? oldDetail : Response.json({ course: {
+      id: 13, university_id: 7, scrape_job_id: "campus-job",
+      course_name: "Campus-fee Course", status: "pending",
+    } }));
+    const user = userEvent.setup();
+    await openTab(user, "Raw Data");
+    await screen.findByText("Campus-fee Course");
+    const editButtons = screen.getAllByTitle("Edit");
+    await user.click(editButtons[0]);
+    await user.click(editButtons[1]);
+    expect(await screen.findByDisplayValue("Campus-fee Course")).toBeTruthy();
+    finishOld(Response.json({ course: {
+      id: 12, university_id: 7, scrape_job_id: "campus-job",
+      course_name: "Staged Accessible Course", status: "pending",
+    } }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input]) =>
+      String(input).includes("/api/scrape/staged/13/evidence?"))).toBe(true));
+    expect(screen.getByDisplayValue("Campus-fee Course")).toBeTruthy();
+    expect(screen.queryByDisplayValue("Staged Accessible Course")).toBeNull();
   });
 });

@@ -1889,7 +1889,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
           // count always matches the review table rather than overstating work.
           pendingReviewCountJobRef.current = jobId;
           setPendingReviewCount(null);
-          void fetch(`/api/scrape/staged/${jobId}`, {
+          void fetch(`/api/scrape/staged/${encodeURIComponent(jobId)}?view=summary`, {
             cache: "no-store",
             headers: { "Cache-Control": "no-cache" },
           })

@@ -113,6 +113,22 @@ describe("persisted published fee alternatives", () => {
     expect(feeVariantNeedsReview(scoped)).toBe(false);
   });
 
+  it("uses summary fee projections and minimal campus scope without raw metadata or evidence", () => {
+    const fees = { ...authority([option(17500, "Outside London")]), status: "uniform" };
+    const summary = course({
+      feeVariants: fees,
+      feeSelection: selection(),
+      extractionMethod: { campus_fee_scope: { locations: ["Birmingham", "Leeds", "Manchester"] } },
+      evidenceLoaded: false, evidenceCount: 0, evidence: [],
+    });
+    render(<ReviewScrapedCoursesTable courses={[summary]} readOnly />);
+    const assigned = screen.getByTestId("fee-assigned-41").textContent;
+    expect(assigned).toContain("Birmingham, Leeds, Manchester · Standard · 2026");
+    expect(assigned).not.toContain("Outside London");
+    expect(screen.getByTestId("fee-summary-41").textContent).toContain("£17,500");
+    expect(feeVariantNeedsReview(summary)).toBe(false);
+  });
+
   it("refreshes from persisted metadata rather than retaining an old range", () => {
     const { rerender } = render(<ReviewScrapedCoursesTable courses={[course()]} readOnly />);
     const fees = authority([option(17000, "Outside London", 2025), option(18500, "London", 2025)]);

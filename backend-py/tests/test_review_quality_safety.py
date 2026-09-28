@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import Session
 
-from app.models import ScrapedCourse, ScrapeRuntimeJob, University
+from app.models import ScrapedCourse, ScrapedFieldEvidence, ScrapeRuntimeJob, University
 from app.models.field_conflict import FieldConflict
 from app.models.publishing_ledger import PublishingLedger
 from app.services.scraper.review_policy import annotate_review_quality
@@ -52,7 +52,8 @@ class LocalDB:
 @pytest.fixture
 def quality_db():
     engine = create_engine("sqlite://")
-    for model in (University, ScrapeRuntimeJob, ScrapedCourse, FieldConflict, PublishingLedger):
+    for model in (University, ScrapeRuntimeJob, ScrapedCourse, ScrapedFieldEvidence,
+                  FieldConflict, PublishingLedger):
         model.__table__.create(engine)
     with Session(engine, expire_on_commit=False) as session:
         session.add(University(id=1, name="Test University", country="UK", city="Test City"))

@@ -1,8 +1,9 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { DurationReviewNotice, type DurationReviewStatus } from "@/components/duration-review-status";
 import { PublishedFeeVariants, feeVariantAuthority, feeVariantSummary, type FeeVariantCarrier } from "@/components/published-fee-variants";
 import { Button } from "@/components/ui/button";
+import { getFetchErrorMessage } from "@/lib/readResponseJson";
 import { AlertTriangle, ExternalLink, ChevronRight, ChevronDown, RefreshCw, RotateCcw, CheckCircle2, XCircle, Loader2, SearchX, FileSearch, Ban, Globe, FileWarning } from "lucide-react";
 
 export type ReviewEvidenceItem = {
@@ -47,6 +48,10 @@ export type ReviewStagedCourse = FeeVariantCarrier & {
   completeness: number | null;
   scrapeWarnings?: string[] | null;
   evidence?: ReviewEvidenceItem[];
+  evidenceLoaded?: boolean;
+  evidenceCount?: number;
+  scrapeJobId?: string;
+  universityId?: number;
   /** Count of pending agent_recovery_results rows for this course. */
   recoveryCount?: number;
 };
@@ -80,9 +85,7 @@ interface Props {
   universityName?: string | null;
   /** When true, hides Approve / Reject / Edit / selection controls. */
   readOnly?: boolean;
-  /** When true, exposes a "Sources" toggle on each row that reveals
-   *  evidence grouped by field_key. Requires `course.evidence` to be
-   *  populated by the API. */
+  /** Shows Sources even for summary rows whose evidence is not yet loaded. */
   showEvidence?: boolean;
   /** University ID used by the repair-queue re-scrape button. */
   universityId?: number;
@@ -844,6 +847,25 @@ export function ReviewScrapedCoursesTable({ courses, universityName, readOnly, s
   };
   const [rescraping, setRescraping] = useState<Set<number>>(new Set());
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [evidenceState, setEvidenceState] = useState<Record<number, {
+    key: string; status: "loading" | "loaded" | "error"; evidence?: ReviewEvidenceItem[]; error?: string;
+  }>>({});
+  const evidenceRequests = useRef(new Map<number, AbortController>());
+  const evidenceVersion = useRef(0);
+  const coursesRef = useRef(courses);
+  coursesRef.current = courses;
+  useEffect(() => {
+    evidenceVersion.current++;
+    evidenceRequests.current.forEach(controller => controller.abort());
+    evidenceRequests.current.clear();
+    setEvidenceState({});
+    setExpanded(new Set());
+    return () => {
+      evidenceVersion.current++;
+      evidenceRequests.current.forEach(controller => controller.abort());
+      evidenceRequests.current.clear();
+    };
+  }, [courses]);
   const [recoveryOpen, setRecoveryOpen] = useState<Set<number>>(new Set());
 
   const handleRescrape = async (course: ReviewStagedCourse) => {
@@ -864,12 +886,54 @@ export function ReviewScrapedCoursesTable({ courses, universityName, readOnly, s
     }
   };
 
-  const toggle = (id: number) => {
+  const toggle = (course: ReviewStagedCourse) => {
+    const id = course.id;
+    if (!expanded.has(id) && course.evidenceLoaded === false && evidenceState[id]?.status !== "loaded"
+      && evidenceState[id]?.status !== "loading") void loadEvidence(course);
     setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+  };
+
+  const loadEvidence = async (course: ReviewStagedCourse) => {
+    const jobId = course.scrapeJobId;
+    const ownerId = course.universityId ?? universityId;
+    if (!jobId || !ownerId) {
+      setEvidenceState(prev => ({ ...prev, [course.id]: { key: `${course.id}:${jobId}:${ownerId}`,
+        status: "error", error: "Missing job or university identity for this row." } }));
+      return;
+    }
+    const key = `${course.id}:${jobId}:${ownerId}`;
+    evidenceRequests.current.get(course.id)?.abort();
+    const controller = new AbortController();
+    evidenceRequests.current.set(course.id, controller);
+    const version = evidenceVersion.current;
+    setEvidenceState(prev => ({ ...prev, [course.id]: { key, status: "loading" } }));
+    const current = () => !controller.signal.aborted && evidenceVersion.current === version
+      && coursesRef.current.some(row => row.id === course.id
+        && row.scrapeJobId === jobId && (row.universityId ?? universityId) === ownerId);
+    try {
+      const params = new URLSearchParams({ jobId, universityId: String(ownerId) });
+      const response = await fetch(`/api/scrape/staged/${course.id}/evidence?${params}`, {
+        credentials: "include", cache: "no-store", signal: controller.signal,
+      });
+      if (!response.ok) throw new Error(await getFetchErrorMessage(response));
+      const payload = await response.json() as { course?: ReviewStagedCourse };
+      if (!payload.course || payload.course.id !== course.id
+        || payload.course.scrapeJobId !== jobId || payload.course.universityId !== ownerId
+        || !Array.isArray(payload.course.evidence)) throw new Error("Invalid evidence response for this row.");
+      if (current()) setEvidenceState(prev => ({ ...prev, [course.id]: {
+        key, status: "loaded", evidence: payload.course!.evidence,
+      } }));
+    } catch (error) {
+      if (current()) setEvidenceState(prev => ({ ...prev, [course.id]: {
+        key, status: "error", error: error instanceof Error ? error.message : String(error),
+      } }));
+    } finally {
+      if (evidenceRequests.current.get(course.id) === controller) evidenceRequests.current.delete(course.id);
+    }
   };
 
   const toggleRecovery = (id: number) => {
@@ -920,7 +984,11 @@ export function ReviewScrapedCoursesTable({ courses, universityName, readOnly, s
             {courses.map((course) => {
               const isOpen = expanded.has(course.id);
               const isRecoveryOpen = recoveryOpen.has(course.id);
-              const evidenceCount = course.evidence?.length ?? 0;
+              const evidenceCount = course.evidenceCount ?? course.evidence?.length ?? 0;
+              const evidence = course.evidenceLoaded === false
+                ? evidenceState[course.id]?.key === `${course.id}:${course.scrapeJobId}:${course.universityId ?? universityId}`
+                  ? evidenceState[course.id] : undefined
+                : undefined;
               const recoveryCount = course.recoveryCount ?? 0;
               const colSpan = (showEvidence ? 1 : 0) + 13 + (readOnly ? 0 : 1);
               return (
@@ -932,12 +1000,13 @@ export function ReviewScrapedCoursesTable({ courses, universityName, readOnly, s
                           size="sm"
                           variant="ghost"
                           className={`h-7 px-2 text-xs font-medium gap-1 ${evidenceCount > 0 ? "text-blue-600 hover:bg-blue-50 hover:text-blue-700" : "text-slate-300 cursor-not-allowed"}`}
-                          onClick={() => toggle(course.id)}
+                          onClick={() => toggle(course)}
+                          data-testid={`sources-toggle-${course.id}`}
                           title={`${isOpen ? "Hide" : "Show"} ${evidenceCount} evidence row${evidenceCount === 1 ? "" : "s"}`}
                           disabled={evidenceCount === 0}
                         >
                           {isOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                          {evidenceCount > 0 ? `${evidenceCount}` : "—"}
+                          Sources {evidenceCount > 0 ? `(${evidenceCount})` : "—"}
                         </Button>
                       </td>
                     ) : null}
@@ -1120,7 +1189,11 @@ export function ReviewScrapedCoursesTable({ courses, universityName, readOnly, s
                   {showEvidence && isOpen ? (
                     <tr>
                       <td colSpan={colSpan} className="p-0">
-                        <EvidencePanel evidence={course.evidence ?? []} course={course} />
+                        {evidence?.status === "loading" ? <div role="status" className="p-3 text-sm" data-testid={`sources-loading-${course.id}`}>Loading sources…</div>
+                          : evidence?.status === "error" ? <div role="alert" className="p-3 text-sm text-red-700" data-testid={`sources-error-${course.id}`}>
+                            {evidence.error} <Button size="sm" variant="outline" data-testid={`sources-retry-${course.id}`} onClick={() => void loadEvidence(course)}>Retry sources</Button>
+                          </div>
+                            : <EvidencePanel evidence={evidence?.evidence ?? course.evidence ?? []} course={course} />}
                       </td>
                     </tr>
                   ) : null}

@@ -87,6 +87,166 @@ def guidance(row):
             "attemptedAt": "2026-09-27T00:00:00+00:00"}
 
 
+@pytest.mark.parametrize("scope", [False, True, None])
+def test_summary_preserves_legacy_fee_authority_and_scope_value(scope):
+    authority = {
+        "status": "range",
+        "selected": [{"amount": 18000, "source_url": "https://synthetic.test/fee",
+                      "snippet": "Official campus fee"}],
+    }
+    metadata = {
+        "fee_variants": authority,
+        "ulaw_qualification_scope": scope,
+        "campus_fee_scope": {
+            "locations": ["Birmingham", "Leeds"],
+            "split_from_id": 17,
+            "original_name": "MSc Healthcare Management",
+            "private_evidence": "bulky-campus-source",
+        },
+        "raw_data": {"private": "bulky-source"},
+    }
+    row = {
+        "id": 17, "extraction_method": metadata, "extractionMethod": metadata,
+        "rawData": {"private": "bulky-source"}, "raw_data": {"private": "bulky-source"},
+        "evidence": [{"snippet": "other bulky source"}],
+        "feeSelection": {"selectedOptionId": None},
+    }
+    result = scrape._staged_summary(row)
+    assert result["feeVariants"] == authority
+    assert "fee_variants" not in result  # legacy authority promoted out of metadata
+    assert result["extractionMethod"] == {
+        "ulaw_qualification_scope": scope,
+        "campus_fee_scope": {
+            "locations": ["Birmingham", "Leeds"],
+            "split_from_id": 17,
+            "original_name": "MSc Healthcare Management",
+        },
+    }
+    assert result["feeSelection"] == {"selectedOptionId": None}
+    assert not {"extraction_method", "raw_data", "rawData", "evidence"} & result.keys()
+    assert metadata["raw_data"] == {"private": "bulky-source"}  # no ORM JSON mutation
+
+
+def test_summary_without_scope_does_not_invent_one():
+    row = {"id": 17, "extraction_method": {"raw_data": "large"}, "evidence": []}
+    assert "extractionMethod" not in scrape._staged_summary(row)
+
+
+def test_summary_projects_nested_qualification_scope_truthiness_without_proof():
+    proof = "VERIFIED-SOURCE-PRIVATE-" * 4096
+    nested_scope = {
+        "award": "PG Dip",
+        "pre_split": {"extraction_method": {"sources": [proof]}},
+        "verified_source": {"html": proof},
+    }
+    for scope, expected in ((nested_scope, True), ({}, False), (False, False),
+                            (None, None)):
+        row = {"id": 17, "extraction_method": {"ulaw_qualification_scope": scope}}
+        full_bytes = len(json.dumps(row).encode())
+        projected = scrape._staged_summary(row)
+        assert projected["extractionMethod"] == {"ulaw_qualification_scope": expected}
+        if scope is nested_scope:
+            assert full_bytes >= 65_536
+            assert len(json.dumps(projected).encode()) < 200
+            assert "VERIFIED-SOURCE-PRIVATE" not in json.dumps(projected)
+
+
+def test_summary_does_not_replace_existing_top_level_fee_authority():
+    top_level = {"status": "uniform", "selected": [{"amount": 19000}]}
+    row = {
+        "id": 17, "feeVariants": top_level,
+        "extraction_method": {"fee_variants": {"status": "range", "selected": []}},
+    }
+    assert scrape._staged_summary(row)["feeVariants"] == top_level
+
+
+@pytest.mark.asyncio
+async def test_api_summary_keeps_legacy_fee_authority_and_minimal_campus_scope(db):
+    uni, job, row_id = await seed(db)
+    row = await db.get(ScrapedCourse, row_id)
+    original_name = "MSc Healthcare Management"
+    authority = {
+        "status": "uniform",
+        "selected": [{"amount": 18000, "source_url": "https://synthetic.test/fee",
+                      "study_variant": "MSc", "snippet": "Official Birmingham and Leeds fee"}],
+    }
+    row.course_name = f"{original_name} — Birmingham"
+    row.course_location = "Birmingham"
+    row.status = "pending"
+    row.extraction_method = {
+        "fee_variants": authority,
+        "ulaw_qualification_scope": {
+            "award": "PG Dip",
+            "pre_split": {"extraction_method": {
+                "source": "NESTED-PRE-SPLIT-PRIVATE-" * 4096,
+            }},
+            "verified_source": {"html": "NESTED-VERIFIED-PRIVATE-" * 4096},
+        },
+        "campus_fee_scope": {
+            "locations": ["Birmingham"],
+            "split_from_id": row_id,
+            "original_name": original_name,
+            "internal_source_evidence": "PRIVATE-SCOPE-PROOF",
+        },
+        "candidates": [{"snippet": "PRIVATE-RAW-SOURCE"}],
+    }
+    sibling = ScrapedCourse(
+        university_id=uni, scrape_job_id=job,
+        course_name=f"{original_name} — Leeds", course_website=row.course_website,
+        course_location="Leeds", degree_level=row.degree_level, study_mode=row.study_mode,
+        international_fee=18000, fee_term=row.fee_term, fee_year=row.fee_year,
+        currency=row.currency, fee_scope_key="leeds", status="pending",
+        extraction_method={
+            "fee_variants": deepcopy(authority),
+            "campus_fee_scope": {
+                "locations": ["Leeds"], "split_from_id": row_id,
+                "original_name": original_name,
+                "private_evidence": "PRIVATE-SIBLING-PROOF",
+            },
+        },
+    )
+    db.add(sibling)
+    await db.commit()
+    app = FastAPI()
+    app.include_router(scrape.router, prefix="/api/scrape")
+    app.dependency_overrides[get_db] = lambda: db
+    app.dependency_overrides[get_current_user] = lambda: {"permissions": ["staged.view"]}
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),
+                                base_url="http://test") as client:
+        for path, params in (
+            ("/api/scrape/staged", {"jobId": job, "universityId": uni}),
+            (f"/api/scrape/staged/{job}", {}),
+        ):
+            full = (await client.get(path, params=params)).json()
+            summary_response = await client.get(path, params={**params, "view": "summary"})
+            assert summary_response.status_code == 200
+            assert len(summary_response.content) < 0.5 * len(json.dumps(full).encode())
+            summary = summary_response.json()
+            full_rows = full["courses"] if isinstance(full, dict) else full
+            items = summary["courses"] if isinstance(summary, dict) else summary
+            assert {item["id"] for item in items} == {row_id, sibling.id}
+            assert [item["id"] for item in items] == [item["id"] for item in full_rows]
+            for item, full_row in zip(items, full_rows):
+                locations = ["Birmingham"] if item["id"] == row_id else ["Leeds"]
+                assert item["feeVariants"] == full_row["extractionMethod"]["fee_variants"]
+                expected_metadata = {
+                    "campus_fee_scope": {
+                        "locations": locations, "split_from_id": row_id,
+                        "original_name": original_name,
+                    },
+                }
+                if item["id"] == row_id:
+                    expected_metadata["ulaw_qualification_scope"] = True
+                assert item["extractionMethod"] == expected_metadata
+                assert item["feeSelection"] == full_row["feeSelection"]
+                assert "extraction_method" not in item
+            assert "PRIVATE-SCOPE-PROOF" not in summary_response.text
+            assert "PRIVATE-RAW-SOURCE" not in summary_response.text
+            assert "PRIVATE-SIBLING-PROOF" not in summary_response.text
+            assert "NESTED-PRE-SPLIT-PRIVATE" not in summary_response.text
+            assert "NESTED-VERIFIED-PRIVATE" not in summary_response.text
+
+
 @pytest.mark.asyncio
 async def test_large_guided_review_pages_and_bulk_invalidation(db):
     uni, job, control_id, rows = await large_rows(db)
@@ -140,6 +300,113 @@ async def test_large_guided_review_pages_and_bulk_invalidation(db):
         full_baseline, full_base_bytes, full_base_queries = await full_review()
         assert all(row["lastQualificationApproval"] is None for row in full_baseline)
         baseline, base_bytes, base_queries = await page(100, 2)
+        explicit_full = await client.get("/api/scrape/staged", params={
+            "jobId": job, "universityId": uni, "status": "pending",
+            "limit": 100, "page": 2, "view": "full",
+        })
+        assert explicit_full.status_code == 200
+        assert explicit_full.json() == baseline
+        explicit_job_full = await client.get(f"/api/scrape/staged/{job}", params={"view": "full"})
+        assert explicit_job_full.status_code == 200
+        assert explicit_job_full.json()["courses"] == full_baseline
+        for path, params, full_items in (
+            ("/api/scrape/staged", {"jobId": job, "universityId": uni,
+                                    "status": "pending", "limit": 100, "page": 2}, baseline),
+            (f"/api/scrape/staged/{job}", {}, full_baseline),
+        ):
+            db.expire_all()
+            with Meter(db) as meter:
+                response = await client.get(path, params={**params, "view": "summary"})
+            assert response.status_code == 200, response.text[:500]
+            assert meter.elapsed < 5
+            assert meter.queries <= 6
+            summary = response.json()
+            items = summary["courses"] if isinstance(summary, dict) else summary
+            assert [item["id"] for item in items] == [item["id"] for item in full_items]
+            assert len(response.content) < 0.2 * (
+                full_base_bytes if isinstance(summary, dict) else base_bytes
+            )
+            for item, full in zip(items, full_items):
+                assert item["evidenceCount"] == len(full["evidence"])
+                assert item["evidenceLoaded"] is False
+                assert not {"evidence", "extraction_method", "raw_data", "rawData"} & item.keys()
+                for key in ("courseName", "status", "feeSelection", "requirementStatus",
+                            "durationReviewStatus", "lastQualificationApproval", "recoveryCount"):
+                    assert item[key] == full[key]
+            assert "PRIVATE-DIAGNOSTIC" not in response.text
+            metrics.append({"operation": "summary-review-241" if isinstance(summary, dict)
+                            else "summary-page-100", "seconds": round(meter.elapsed, 3),
+                            "queries": meter.queries, "bytes": len(response.content)})
+
+        target = baseline[0]
+        detail_url = f"/api/scrape/staged/{target['id']}/evidence"
+        fences = {"jobId": job, "universityId": uni}
+        for params in ({}, {"jobId": job}, {"universityId": uni}):
+            assert (await client.get(detail_url, params=params)).status_code == 422
+        for params in ({"jobId": "wrong", "universityId": uni},
+                       {"jobId": job, "universityId": uni + 1}):
+            assert (await client.get(detail_url, params=params)).status_code == 404
+        detail = await client.get(detail_url, params=fences)
+        assert detail.status_code == 200, detail.text[:500]
+        assert detail.json()["course"] == target
+        assert "PRIVATE-DIAGNOSTIC" not in detail.text
+        history_url = f"/api/scrape/history/{job}"
+        db.expire_all()
+        with Meter(db) as meter:
+            history_full_response = await client.get(history_url)
+        assert history_full_response.status_code == 200, history_full_response.text[:500]
+        history_full = history_full_response.json()
+        history_explicit = await client.get(history_url, params={"view": "full"})
+        assert history_explicit.status_code == 200
+        assert history_explicit.json() == history_full
+        assert {item["id"] for item in history_full["stagedCourses"]} == expected_ids
+        metrics.append({"operation": "history-full-241",
+                        "seconds": round(meter.elapsed, 3),
+                        "queries": meter.queries, "bytes": len(history_full_response.content)})
+        db.expire_all()
+        with Meter(db) as meter:
+            history_summary_response = await client.get(history_url, params={"view": "summary"})
+        assert history_summary_response.status_code == 200, history_summary_response.text[:500]
+        history_summary = history_summary_response.json()
+        assert history_summary.keys() == history_full.keys()
+        for key in ("job", "logs", "provider_failure", "unresolvedCourses"):
+            assert history_summary[key] == history_full[key]
+        assert len(history_summary_response.content) < len(history_full_response.content) * 0.5
+        assert meter.elapsed < 5
+        assert meter.queries <= 10
+        assert [item["id"] for item in history_summary["stagedCourses"]] == [
+            item["id"] for item in history_full["stagedCourses"]
+        ]
+        for item, full in zip(history_summary["stagedCourses"], history_full["stagedCourses"]):
+            assert item["scrapeJobId"] == job and item["universityId"] == uni
+            assert item["evidenceLoaded"] is False
+            assert item["evidenceCount"] == len(full["evidence"])
+            assert "evidence" not in item
+            for key in full.keys() - {"evidence"}:
+                assert item[key] == full[key]
+        assert (await client.get(history_url, params={"view": "invalid"})).status_code == 422
+        assert (await client.get("/api/scrape/history/nonexistent-job",
+                                 params={"view": "summary"})).status_code == 404
+        metrics.append({"operation": "history-summary-241",
+                        "seconds": round(meter.elapsed, 3),
+                        "queries": meter.queries, "bytes": len(history_summary_response.content)})
+        # A second university/job must not make its staged row visible in the
+        # selected job's history, even when the reviewer requests summary.
+        other_uni, other_job, other_id = await seed(db)
+        other_history = await client.get(f"/api/scrape/history/{other_job}",
+                                         params={"view": "summary"})
+        assert other_history.status_code == 200
+        assert [row["id"] for row in other_history.json()["stagedCourses"]] == [other_id]
+        assert other_history.json()["stagedCourses"][0]["universityId"] == other_uni
+        original_history = await client.get(history_url, params={"view": "summary"})
+        assert [row["id"] for row in original_history.json()["stagedCourses"]] == [
+            row["id"] for row in history_full["stagedCourses"]
+        ]
+        app.dependency_overrides[get_current_user] = lambda: {"permissions": []}
+        assert (await client.get(detail_url, params=fences)).status_code == 403
+        assert (await client.get("/api/scrape/staged", params={**fences, "view": "summary"})).status_code == 403
+        app.dependency_overrides[get_current_user] = lambda: {"permissions": ["staged.view"]}
+        assert (await client.get("/api/scrape/staged", params={**fences, "view": "invalid"})).status_code == 422
         # Reload all rows after expiry, then add metadata without changing evidence.
         rows = list((await db.execute(select(ScrapedCourse).where(
             ScrapedCourse.scrape_job_id == job, ScrapedCourse.id != control_id,

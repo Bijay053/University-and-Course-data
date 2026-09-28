@@ -36,8 +36,13 @@ function campusScope(row: Row): Row | null {
   return record(extraction(row)?.campus_fee_scope ?? extraction(row)?.campusFeeScope);
 }
 
+function feeAuthority(row: Row): Row | null {
+  return record(read(row, "feeVariants", "fee_variants")
+    ?? extraction(row)?.fee_variants ?? extraction(row)?.feeVariants);
+}
+
 function selectedVariants(row: Row): string[] {
-  const feeVariants = record(extraction(row)?.fee_variants ?? extraction(row)?.feeVariants);
+  const feeVariants = feeAuthority(row);
   const selected = Array.isArray(feeVariants?.selected) ? feeVariants.selected : [];
   return [...new Set(selected.map(value => {
     const option = record(value);
@@ -46,7 +51,7 @@ function selectedVariants(row: Row): string[] {
 }
 
 function selectedFeeCohort(row: Row): { year: unknown; period: string; currency: string } {
-  const feeVariants = record(extraction(row)?.fee_variants ?? extraction(row)?.feeVariants);
+  const feeVariants = feeAuthority(row);
   const selected = Array.isArray(feeVariants?.selected) ? feeVariants.selected : [];
   const option = selected.length === 1 ? record(selected[0]) : null;
   return {

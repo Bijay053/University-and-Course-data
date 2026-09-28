@@ -146,3 +146,4 @@
 - [Current delivery over historical fees](current-delivery-over-historical-fees.md) — exclusive current Online delivery overrides old campus prices, including during targeted fee repair.
 - [Approval guidance lifetime](approval-guidance-lifetime.md) — failure advice belongs to uninterrupted evidence state; restoring old values must not revive it.
 - [Database latency validation](database-latency-validation.md) — rollback isolation does not eliminate parallel load or DDL locks; check isolated timing before changing budgets.
+- [Review payload measurement](review-payload-measurement.md) — include background counts and history reads; endpoint-only savings can hide eager evidence downloads.

@@ -1,7 +1,7 @@
 import React from "react";
 import type { StagedCourse } from "../university-detail";
-import { groupLegacyCampusRows } from "../../utils/legacy-campus-groups";
 import { isPartTimeOnlyCourse, PART_TIME_APPROVAL_REASON } from "../../utils/part-time-approval";
+import { groupLegacyCampusRows, legacyCampusReviewFees } from "../../utils/legacy-campus-groups";
 
 type Setter<T> = React.Dispatch<React.SetStateAction<T>>;
 interface RawDataPanelProps {
@@ -532,9 +532,11 @@ export function RawDataPanel(props: RawDataPanelProps) {
                 <tbody className="divide-y">
                   {logicalGroups.map(({ course: c, members, ids }, idx) => {
                     const locations = [...new Set(members.map(member => member.course_location?.trim()).filter((value): value is string => Boolean(value)))];
-                    const feeLines = members.flatMap(member => {
+                    const feeLines = members.length > 1 ? legacyCampusReviewFees(members) : members.flatMap(member => {
                       const extraction = (member.extraction_method ?? member.extractionMethod) as Record<string, unknown> | null | undefined;
-                      const authority = (extraction?.fee_variants ?? (member as unknown as Record<string, unknown>).fee_variants) as Record<string, unknown> | null | undefined;
+                      const authority = ((member as unknown as Record<string, unknown>).feeVariants
+                        ?? (member as unknown as Record<string, unknown>).fee_variants
+                        ?? extraction?.fee_variants) as Record<string, unknown> | null | undefined;
                       const selected = Array.isArray(authority?.selected) ? authority.selected as Record<string, unknown>[] : [];
                       if (selected.length) return selected.map(option => ({
                         location: String(option.campus ?? member.course_location ?? "Location"),

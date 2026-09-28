@@ -1158,6 +1158,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   const showReviewRef = useRef(false);
   const reviewJobIdRef = useRef<string | null>(null);
   const [editingCourse, setEditingCourse] = useState<StagedCourse | null>(null);
+  const [editLoadingId, setEditLoadingId] = useState<number | null>(null);
+  const editRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => editRequest.current?.abort(), []);
   const [reviewDetail, setReviewDetail] = useState<CourseReviewPayload | null>(null);
   const [rejectingIds, setRejectingIds] = useState<number[] | null>(null);
   const [rejectReason, setRejectReason] = useState("");
@@ -1277,11 +1280,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     targetedRetryDiagnostic: TargetedRetryDiagnostic | null;
   };
   type HistoryLogEntry = { sequence: number; event: string; createdAt: string; message?: string; phase?: string; [k: string]: unknown };
-  // History staged course is now the full StagedCourse + evidence array
-  // (matches the live Review table). Keep it loose here — the component
-  // owns the strict typing.
+  // History also requests summary rows; the Sources panel hydrates evidence
+  // only when expanded. Older full history responses remain supported.
   type HistoryStagedCourse = ReviewStagedCourse & {
-    evidence: ReviewEvidenceItem[];
     scrapeJobId: string;
     universityId: number;
   };
@@ -1464,7 +1465,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     setHistoryDetail(null);
     try {
       const [detailRes, summaryRes] = await Promise.all([
-        fetch(`/api/scrape/history/${runtimeJobId}`),
+        fetch(`/api/scrape/history/${encodeURIComponent(runtimeJobId)}?view=summary`),
         fetch(`/api/scrape/recovery/summary/${runtimeJobId}`),
       ]);
       const data = await readResponseJson<HistoryDetail>(detailRes);
@@ -1772,7 +1773,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     campusLoadBusy.current = true;
     setCampusProgress({ done: 0, total: 0 });
     try {
-      const res = await fetch(`/api/scrape/staged/${jobId}`, {
+      const res = await fetch(`/api/scrape/staged/${encodeURIComponent(jobId)}?view=summary`, {
         signal: controller.signal,
         credentials: "include",
         cache: "no-store",
@@ -3119,7 +3120,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
 
   const refreshFeeCourse = async (id: number) => {
     if (!reviewJobId) return;
-    const res = await fetch(`/api/scrape/staged/${reviewJobId}`, { credentials: "include", cache: "no-store" });
+    const res = await fetch(`/api/scrape/staged/${encodeURIComponent(reviewJobId)}?view=summary`, { credentials: "include", cache: "no-store" });
     if (!res.ok) throw new Error(await getFetchErrorMessage(res));
     const payload = await readResponseJson<StagedCourse[] | { courses: StagedCourse[] }>(res);
     const courses = Array.isArray(payload) ? payload : payload?.courses ?? [];
@@ -3128,7 +3129,53 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     const normalized = normalizeStagedCourse(fresh);
     setApprovalFailures(prev => prev.filter(failure => failure.id !== id));
     setStagedCourses(prev => prev.map(c => c.id === id ? normalized : c));
-    setEditingCourse(prev => prev?.id === id ? normalized : prev);
+    setEditingCourse(prev => prev?.id === id ? { ...prev, ...normalized,
+      rawData: (prev as StagedCourse & { rawData?: unknown }).rawData,
+      raw_data: (prev as StagedCourse & { raw_data?: unknown }).raw_data } : prev);
+  };
+
+  const openEditCourse = async (course: StagedCourse) => {
+    editRequest.current?.abort();
+    // A continuation Review can show rows owned by ancestor jobs. The row's
+    // own job fences detail; the currently open Review job guards navigation.
+    const reviewJobAtStart = reviewJobIdRef.current;
+    // The displayed multi-campus course is a clone with joined locations.
+    // Track its underlying persisted row rather than the displayed object;
+    // replacing the list on refresh invalidates this request.
+    const listRequestAtStart = campusRequest.current;
+    const sourceRow = stagedCoursesRef.current.find(row =>
+      row.id === course.id && row.scrapeJobId === course.scrapeJobId
+      && row.universityId === course.universityId);
+    // A summary has no rawData. Never submit a summary as a complete PUT.
+    const controller = new AbortController();
+    editRequest.current = controller;
+    setEditLoadingId(course.id);
+    try {
+      const params = new URLSearchParams({
+        jobId: course.scrapeJobId, universityId: String(course.universityId),
+      });
+      const res = await fetch(`/api/scrape/staged/${course.id}/evidence?${params}`, {
+        credentials: "include", cache: "no-store", signal: controller.signal,
+      });
+      if (!res.ok) throw new Error(await getFetchErrorMessage(res));
+      const payload = await readResponseJson<{ course: StagedCourse }>(res);
+      if (!payload?.course || payload.course.id !== course.id
+        || payload.course.scrapeJobId !== course.scrapeJobId
+        || payload.course.universityId !== course.universityId) throw new Error("Invalid course detail response.");
+      if (!controller.signal.aborted && sourceRow && editRequest.current === controller
+        && reviewJobIdRef.current === reviewJobAtStart
+        && campusRequest.current === listRequestAtStart
+        && stagedCoursesRef.current.some(row => row === sourceRow)) {
+        setEditingCourse(normalizeStagedCourse(payload.course));
+      }
+    } catch (error) {
+      if (!controller.signal.aborted) toast({
+        title: "Could not load course for editing",
+        description: error instanceof Error ? error.message : String(error), variant: "destructive",
+      });
+    } finally {
+      if (editRequest.current === controller) setEditLoadingId(null);
+    }
   };
 
   const handleFeeCourseUpdated = (updated: FeeVariantCarrier & { id: number }) => {
@@ -4367,10 +4414,12 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                                 size="icon"
                                 variant="ghost"
                                 className="h-7 w-7 text-blue-600 hover:bg-blue-50"
-                                onClick={() => setEditingCourse({ ...course })}
+                                onClick={() => void openEditCourse(course)}
+                                disabled={editLoadingId === course.id}
+                                data-testid={`edit-staged-course-${course.id}`}
                                 title="Edit"
                               >
-                                <Pencil className="w-3.5 h-3.5" />
+                                {editLoadingId === course.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Pencil className="w-3.5 h-3.5" />}
                               </Button>
                               <Button
                                 size="icon"

@@ -41,7 +41,8 @@ class DB:
     def __init__(self, sc):
         self.sc = sc
         self.audit = []
-        self.proof = SimpleNamespace(id=77, source_url=URL,
+        self.proof = SimpleNamespace(id=77, field_key="international_fee",
+                                    source_url=URL,
                                     snippet=json.dumps(sc.extraction_method["fee_variants"]))
         self.commit = AsyncMock()
         self.refresh = AsyncMock()
@@ -49,6 +50,10 @@ class DB:
 
     async def execute(self, stmt, *args, **kwargs):
         if "scraped_field_evidence" in str(stmt):
+            # The promotion boundary now also asks for selected study/duration
+            # evidence. This fixture only owns a fee proof, not mode evidence.
+            if "study_mode" in str(stmt) and "study_load" in str(stmt):
+                return SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: []))
             return SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [self.proof]))
         if "pg_advisory_xact_lock" in str(stmt):
             return SimpleNamespace()

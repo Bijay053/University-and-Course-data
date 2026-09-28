@@ -179,7 +179,7 @@ describe("full catalogue review-only mode", () => {
 
   it("shows the mode when restored from job metadata", async () => {
     sessionStorage.setItem("scrape_slot_22_jobId", "review-only-job");
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.startsWith("/api/scrape/status/review-only-job")) {
         return jsonResponse({
@@ -193,7 +193,8 @@ describe("full catalogue review-only mode", () => {
       if (url.includes("/ai-repair-status")) return jsonResponse({ status: "not_started" });
       if (url.includes("/staged/")) return jsonResponse([]);
       return jsonResponse({});
-    }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
 
     render(React.createElement(ScrapeJobCard, {
       slotId: 22,
@@ -203,6 +204,10 @@ describe("full catalogue review-only mode", () => {
     }));
 
     expect(await screen.findByText("Full catalogue review only")).toBeTruthy();
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input]) =>
+      String(input) === "/api/scrape/staged/review-only-job?view=summary")).toBe(true));
+    expect(fetchMock.mock.calls.some(([input]) =>
+      String(input) === "/api/scrape/staged/review-only-job")).toBe(false);
   });
 });
 
@@ -230,7 +235,7 @@ async function renderCompletedCard(errors: number, diagnosis?: unknown, repairSe
         logs: [],
       });
     }
-    if (url === "/api/scrape/staged/job-complete") return jsonResponse([]);
+    if (url === "/api/scrape/staged/job-complete?view=summary") return jsonResponse([]);
     if (url === "/api/scrape/jobs/job-complete/diagnose" && diagnosis) return jsonResponse(diagnosis);
     if (url.includes("/ai-repair-status")) return jsonResponse(repairSession ?? { status: "not_started" });
     return jsonResponse({});
@@ -382,7 +387,7 @@ it("keeps a newly returned retry selected when older hydration finishes later", 
         logs: [],
       });
     }
-    if (url === "/api/scrape/staged/job-race") return jsonResponse([]);
+    if (url === "/api/scrape/staged/job-race?view=summary") return jsonResponse([]);
     if (url === "/api/scrape/jobs/job-race/diagnose") {
       return jsonResponse({
         ok: true,
@@ -460,7 +465,7 @@ async function renderFailedFilterCollapseCard(): Promise<void> {
         }],
       });
     }
-    if (url === "/api/scrape/staged/job-filter-collapse") return jsonResponse([]);
+    if (url === "/api/scrape/staged/job-filter-collapse?view=summary") return jsonResponse([]);
     if (url.includes("/auto-repair-candidates")) return jsonResponse({ ok: true, candidates: [] });
     if (url.includes("/ai-repair-status")) return jsonResponse({ status: "not_started" });
     return jsonResponse({});
@@ -753,7 +758,7 @@ describe("SearchStax provider discovery recovery", () => {
           },
         });
       }
-      if (url === "/api/scrape/staged/leeds-trinity-original") return jsonResponse([]);
+      if (url === "/api/scrape/staged/leeds-trinity-original?view=summary") return jsonResponse([]);
       if (url === "/api/scrape/jobs/leeds-trinity-original/ai-repair-status") {
         return jsonResponse({ status: "not_started" });
       }

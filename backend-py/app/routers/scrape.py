@@ -399,6 +399,73 @@ async def _attach_evidence_bulk(
         d["evidence"] = grouped.get(d["id"], [])
 
 
+async def _attach_evidence_counts_bulk(db: AsyncSession, course_dicts: list[dict]) -> None:
+    """Count source records without loading snippets/candidate values into memory."""
+    if not course_dicts:
+        return
+    ids = [d["id"] for d in course_dicts]
+    rows = (await db.execute(
+        text(
+            "SELECT scraped_course_id, COUNT(*) AS cnt FROM scraped_field_evidence "
+            "WHERE scraped_course_id = ANY(:ids) GROUP BY scraped_course_id"
+        ),
+        {"ids": ids},
+    )).all()
+    counts = {row.scraped_course_id: int(row.cnt) for row in rows}
+    for course in course_dicts:
+        course["evidenceCount"] = counts.get(course["id"], 0)
+        course["evidenceLoaded"] = False
+
+
+def _staged_summary(course: dict) -> dict:
+    """Remove raw source payloads only after public projections have been computed.
+
+    Keep the tiny qualification-scope marker and campus locations used by
+    list actions/fee presentation; all other extraction metadata and evidence
+    are available from the fenced evidence detail endpoint instead.
+    """
+    metadata = course.get("extraction_method")
+    if isinstance(metadata, dict):
+        # The legacy fee authority lives only inside extraction_method. Keep
+        # that authoritative object for the fee table and guarded edit actions,
+        # even though the surrounding extraction diagnostics are too large for
+        # a list response.
+        variants = metadata.get("fee_variants")
+        if isinstance(variants, dict) and "feeVariants" not in course:
+            course["feeVariants"] = variants
+    for key in ("raw_data", "rawData", "extraction_method", "extractionMethod", "evidence"):
+        course.pop(key, None)
+    if isinstance(metadata, dict):
+        minimal_metadata = {}
+        if "ulaw_qualification_scope" in metadata:
+            # The UI only tests whether this marker exists. The original
+            # scope can embed pre_split.extraction_method and verified source
+            # material; never copy that nested proof into a list response.
+            scope = metadata["ulaw_qualification_scope"]
+            minimal_metadata["ulaw_qualification_scope"] = (
+                None if scope is None else bool(scope)
+            )
+        campus_scope = metadata.get("campus_fee_scope")
+        if isinstance(campus_scope, dict):
+            public_scope = {}
+            locations = campus_scope.get("locations")
+            if isinstance(locations, list) and all(
+                isinstance(location, str) and location.strip() for location in locations
+            ):
+                public_scope["locations"] = locations
+            split_from_id = campus_scope.get("split_from_id")
+            if isinstance(split_from_id, int) and not isinstance(split_from_id, bool) and split_from_id > 0:
+                public_scope["split_from_id"] = split_from_id
+            original_name = campus_scope.get("original_name")
+            if isinstance(original_name, str) and original_name.strip():
+                public_scope["original_name"] = original_name
+            if public_scope:
+                minimal_metadata["campus_fee_scope"] = public_scope
+        if minimal_metadata:
+            course["extractionMethod"] = minimal_metadata
+    return course
+
+
 # English-test field names that may be suppressed when only inherited
 _ENGLISH_TEST_FIELDS = [
     "toefl_overall", "pte_overall", "cambridge_overall",
@@ -1594,7 +1661,11 @@ async def history_restore(
 
 
 @router.get("/history/{job_id}")
-async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
+async def history_one(
+    job_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    view: str = Query(default="full", pattern="^(full|summary)$"),
+) -> dict:
     """Match Node: returns {job, logs, stagedCourses}."""
     from app.models import ScrapedCourse
     job = await db.get(ScrapeRuntimeJob, job_id)
@@ -1766,9 +1837,14 @@ async def history_one(job_id: str, db: Annotated[AsyncSession, Depends(get_db)])
         "createdAt": s.created_at.isoformat() if s.created_at else None,
         "evidence": [],
     } for s in sc_rows]
-    await _attach_evidence_bulk(db, staged)
+    if view == "summary":
+        await _attach_evidence_counts_bulk(db, staged)
+    else:
+        await _attach_evidence_bulk(db, staged)
     await _apply_inherited_suppression(db, staged)
     await _attach_recovery_counts_bulk(db, staged)
+    if view == "summary":
+        staged = [_staged_summary(course) for course in staged]
 
     from app.services.scraper.provider_failure import load_failure, sanitize_provider_logs
     provider_failure = await load_failure(
@@ -4296,6 +4372,7 @@ async def staged_list(
     status_f: str | None = Query(default=None, alias="status"),
     limit: int = Query(default=500, ge=1, le=2000),
     page: int = Query(default=1, ge=1),
+    view: str = Query(default="full", pattern="^(full|summary)$"),
 ):
     from app.models import Course, ScrapedCourse
 
@@ -4350,16 +4427,48 @@ async def staged_list(
 
     # UI expects a bare array (Array.isArray check)
     dicts = [_staged_row_to_dict(r) for r in rows]
-    await _attach_evidence_bulk(db, dicts)
+    if view == "summary":
+        await _attach_evidence_counts_bulk(db, dicts)
+    else:
+        await _attach_evidence_bulk(db, dicts)
     await _apply_inherited_suppression(db, dicts)
     await _attach_recovery_counts_bulk(db, dicts)
+    if view == "summary":
+        dicts = [_staged_summary(d) for d in dicts]
     return dicts
+
+
+@router.get("/staged/{sc_id}/evidence", dependencies=[Depends(require_permission("staged.view"))])
+async def staged_evidence(
+    sc_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    job_id: str = Query(alias="jobId", min_length=1),
+    university_id: int = Query(alias="universityId"),
+) -> dict:
+    """Hydrate a single summary row, fenced to its actual job and university."""
+    from app.models import ScrapedCourse
+
+    row = (await db.execute(
+        select(ScrapedCourse).where(
+            ScrapedCourse.id == sc_id,
+            ScrapedCourse.scrape_job_id == job_id,
+            ScrapedCourse.university_id == university_id,
+        )
+    )).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Staged course not found")
+    course = _staged_row_to_dict(row)
+    await _attach_evidence_bulk(db, [course])
+    await _apply_inherited_suppression(db, [course])
+    await _attach_recovery_counts_bulk(db, [course])
+    return {"course": course}
 
 
 @router.get("/staged/{sc_id_or_job}", dependencies=[Depends(require_permission("staged.view"))])
 async def staged_one(
     sc_id_or_job: str,
     db: Annotated[AsyncSession, Depends(get_db)],
+    view: str = Query(default="full", pattern="^(full|summary)$"),
 ):
     """Handle both /staged/123 (single course by id) and /staged/job_xxx (all staged for job)."""
     from app.models import ScrapedCourse
@@ -4430,7 +4539,11 @@ async def staged_one(
             if getattr(row, "auto_publish_status", None) != "data_quality_failure"
         ]
         courses = [_staged_row_to_dict(s) for s in review_rows]
-        await _attach_evidence_bulk(db, courses)
+        if view == "summary":
+            await _attach_evidence_counts_bulk(db, courses)
+            courses = [_staged_summary(d) for d in courses]
+        else:
+            await _attach_evidence_bulk(db, courses)
         await _attach_recovery_counts_bulk(db, courses)
         last_scrape = None
         if job:

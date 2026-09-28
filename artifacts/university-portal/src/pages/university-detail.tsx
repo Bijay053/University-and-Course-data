@@ -1121,8 +1121,12 @@ export default function UniversityDetail() {
   const [rawData, setRawData] = useState<StagedCourse[]>([]);
   const [rawLoading, setRawLoading] = useState(false);
   const rawCampusRequest = useRef<AbortController | null>(null);
+  const editDetailRequest = useRef<AbortController | null>(null);
   const [rawCampusProgress, setRawCampusProgress] = useState<{ done: number; total: number } | null>(null);
-  useEffect(() => () => rawCampusRequest.current?.abort(), []);
+  useEffect(() => () => {
+    rawCampusRequest.current?.abort();
+    editDetailRequest.current?.abort();
+  }, []);
   const [editingCourse, setEditingCourse] = useState<StagedCourse | null>(null);
   const [editForm, setEditForm] = useState<EditForm | null>(null);
   const [saving, setSaving] = useState(false);
@@ -1379,6 +1383,7 @@ export default function UniversityDetail() {
 
   const fetchRawData = useCallback(async () => {
     if (!id) return;
+    editDetailRequest.current?.abort();
     rawCampusRequest.current?.abort();
     const controller = new AbortController();
     rawCampusRequest.current = controller;
@@ -1386,7 +1391,7 @@ export default function UniversityDetail() {
     setRawCampusProgress({ done: 0, total: 0 });
     try {
       const reload = async (): Promise<StagedCourse[]> => {
-        const res = await fetch(`${BASE}/api/scrape/staged?universityId=${id}&status=${rawStatus}`, { signal: controller.signal, cache: "no-store" });
+        const res = await fetch(`${BASE}/api/scrape/staged?universityId=${id}&status=${rawStatus}&view=summary`, { signal: controller.signal, cache: "no-store" });
         if (!res.ok) throw new Error(`Cannot load courses (${res.status})`);
         const data = await res.json();
         return Array.isArray(data) ? data : [];
@@ -1761,9 +1766,30 @@ export default function UniversityDetail() {
     setImportingAll(false);
   }
 
-  function openEdit(c: StagedCourse) {
-    setEditingCourse(c);
-    setEditForm(courseToForm(c));
+  async function openEdit(c: StagedCourse) {
+    editDetailRequest.current?.abort();
+    const controller = new AbortController();
+    editDetailRequest.current = controller;
+    try {
+      if (!c.scrape_job_id) throw new Error("Missing scrape job for this staged row.");
+      const listRequest = rawCampusRequest.current;
+      const params = new URLSearchParams({ jobId: c.scrape_job_id, universityId: String(c.university_id) });
+      const res = await fetch(`${BASE}/api/scrape/staged/${c.id}/evidence?${params}`, {
+        cache: "no-store", signal: controller.signal,
+      });
+      if (!res.ok) throw new Error(`Cannot load course detail (${res.status})`);
+      const data = await res.json() as { course?: StagedCourse };
+      if (!data.course || data.course.id !== c.id
+        || data.course.university_id !== c.university_id || data.course.scrape_job_id !== c.scrape_job_id)
+        throw new Error("Invalid course detail response.");
+      if (controller.signal.aborted || editDetailRequest.current !== controller
+        || rawCampusRequest.current !== listRequest || Number(id) !== c.university_id) return;
+      setEditingCourse(data.course);
+      setEditForm(courseToForm(data.course));
+    } catch (error) {
+      if (!controller.signal.aborted && editDetailRequest.current === controller)
+        toast({ title: "Cannot edit course", description: String(error), variant: "destructive" });
+    }
   }
 
   function setField<K extends keyof EditForm>(key: K, val: string) {

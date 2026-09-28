@@ -48,7 +48,7 @@ it("retries only displayed temporary failures via normal approval, once per clic
         })),
       });
     }
-    if (url === `/api/scrape/staged/${jobId}`) return Response.json({
+    if (url === `/api/scrape/staged/${jobId}?view=summary`) return Response.json({
       courses: rows.filter(row => !approved201 || row.id !== 201).map(row => ({
         ...row,
         lastQualificationApproval: reasons[row.id] ? {

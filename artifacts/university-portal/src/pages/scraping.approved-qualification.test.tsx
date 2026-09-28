@@ -13,6 +13,67 @@ vi.mock("@/components/can", () => ({
 vi.mock("@/components/scrape-job-card", () => ({ ScrapeJobCard: () => null }));
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); localStorage.clear(); sessionStorage.clear(); });
 
+it("edits an ancestor-owned row within a continuation Review using its own exact detail fences", async () => {
+  const row = {
+    id: 481, universityId: 7, scrapeJobId: "ancestor-job", courseName: "Ancestor course",
+    status: "pending", intakeMonths: ["October"], scrapeWarnings: [], createdAt: "2026-09-27T00:00:00Z",
+  };
+  const rawData = { original: "preserve me" };
+  const requests: string[] = [];
+  let saved: Record<string, unknown> | null = null;
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    requests.push(url);
+    if (url === "/api/scrape/staged/481/evidence?jobId=ancestor-job&universityId=7")
+      return Response.json({ course: { ...row, rawData, raw_data: rawData, evidence: [] } });
+    if (url === "/api/scrape/staged/481" && init?.method === "PUT") {
+      saved = JSON.parse(String(init.body));
+      return Response.json({ course: saved });
+    }
+    if (url.startsWith("/api/universities")) return Response.json({ data: [], total: 0 });
+    if (url === "/api/import/history") return Response.json([]);
+    if (url.startsWith("/api/scrape/staged/fix-jobs?")) return Response.json(null);
+    return Response.json({});
+  }));
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <ScrapingForTest initialReviewState={{ universityId: 7, jobId: "continuation-job", courses: [row] as never }} />
+  </QueryClientProvider>);
+  fireEvent.click(screen.getByTestId("edit-staged-course-481"));
+  const input = await screen.findByDisplayValue("Ancestor course");
+  fireEvent.change(input, { target: { value: "Edited ancestor course" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+  await waitFor(() => expect(saved).not.toBeNull());
+  expect(saved).toMatchObject({ courseName: "Edited ancestor course", rawData, raw_data: rawData });
+  expect(requests).toContain("/api/scrape/staged/481/evidence?jobId=ancestor-job&universityId=7");
+  expect(requests).not.toContain("/api/scrape/staged/481/evidence?jobId=continuation-job&universityId=7");
+});
+
+it("does not open an edit from a detail response predating a Review refresh", async () => {
+  const row = { id: 482, universityId: 7, scrapeJobId: "ancestor-job", courseName: "Before refresh",
+    status: "pending", intakeMonths: ["October"], scrapeWarnings: [], createdAt: "2026-09-27T00:00:00Z" };
+  let resolveDetail!: (response: Response) => void;
+  const pendingDetail = new Promise<Response>(resolve => { resolveDetail = resolve; });
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url === "/api/scrape/staged/482/evidence?jobId=ancestor-job&universityId=7") return pendingDetail;
+    if (url === "/api/scrape/staged/continuation-job?view=summary")
+      return Response.json({ courses: [{ ...row, courseName: "After refresh" }] });
+    if (url.startsWith("/api/universities")) return Response.json({ data: [], total: 0 });
+    if (url === "/api/import/history") return Response.json([]);
+    if (url.startsWith("/api/scrape/staged/fix-jobs?")) return Response.json(null);
+    return Response.json({});
+  }));
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <ScrapingForTest initialReviewState={{ universityId: 7, jobId: "continuation-job", courses: [row] as never }} />
+  </QueryClientProvider>);
+  fireEvent.click(screen.getByTestId("edit-staged-course-482"));
+  fireEvent.click(screen.getByTitle("Reload staged courses and refresh quality scores"));
+  await screen.findByText("After refresh");
+  resolveDetail(Response.json({ course: { ...row, evidence: [] } }));
+  await waitFor(() => expect(screen.queryByTestId("edit-staged-course-482")?.hasAttribute("disabled")).toBe(false));
+  expect(screen.queryByText("Edit Scraped Course")).toBeNull();
+});
+
 it("hydrates durable guidance through a fresh Review fetch after remount and clears changed evidence and success", async () => {
   const row = {
     id: 201, universityId: 7, scrapeJobId: "prior-chain-job", courseName: "Legal Technology",
@@ -24,7 +85,7 @@ it("hydrates durable guidance through a fresh Review fetch after remount and cle
   let approved = false;
   const fetcher = vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
-    if (url === "/api/scrape/staged/durable-job") return Response.json({
+    if (url === "/api/scrape/staged/durable-job?view=summary") return Response.json({
       courses: approved ? [] : [{ ...row, lastQualificationApproval: guidance }],
     });
     if (url === "/api/scrape/staged/approve-selected") {
@@ -85,7 +146,8 @@ it.each(["edit then restore", "authoritative refetch"])("permanently clears tran
       approvalStarted = true;
       return new Promise<Response>(resolve => { finishApproval = resolve; });
     }
-    if (url === "/api/scrape/staged/race-job") {
+    if (url === "/api/scrape/staged/201/evidence?jobId=race-job&universityId=7") return Response.json({ course: row });
+    if (url === "/api/scrape/staged/race-job?view=summary") {
       if (++reads === 1) {
         oldReadStarted = true;
         return new Promise<Response>(resolve => { finishOldRead = resolve; });
@@ -118,7 +180,7 @@ it.each(["edit then restore", "authoritative refetch"])("permanently clears tran
   if (mode === "edit then restore") {
     for (const [before, after] of [["Legal Technology", "Changed evidence"], ["Changed evidence", "Legal Technology"]]) {
       fireEvent.click(screen.getByTitle("Edit"));
-      fireEvent.change(screen.getByDisplayValue(before), { target: { value: after } });
+      fireEvent.change(await screen.findByDisplayValue(before), { target: { value: after } });
       fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
       await waitFor(() => expect(screen.queryByText("Edit Scraped Course")).toBeNull());
       expect(screen.queryByTestId("approval-failure-201")).toBeNull();
@@ -147,7 +209,7 @@ it("offers current cohort preview for a changed split award on the actual Review
     });
     if (url.includes("/qualification-refresh/preview")) return Response.json(
       { detail: "PRIVATE provider diagnostics" }, { status: 503 });
-    if (url === "/api/scrape/staged/changed-award") return Response.json({ courses: [{
+    if (url === "/api/scrape/staged/changed-award?view=summary") return Response.json({ courses: [{
       ...row, lastQualificationApproval: { rowId: row.id, jobId: row.scrapeJobId,
         universityId: row.universityId, reasonCode: "changed_cohort", attemptedAt: "2026-09-27T10:30:00Z" },
     }] });
@@ -209,7 +271,7 @@ it("discovers an approved-only cohort from the full page, previews via HTTP, app
       status = "pending";
       return Response.json({ status: "applied", courseIds: rows.map(r => r.id) });
     }
-    if (url === `/api/scrape/staged/${jobId}`) return Response.json({
+    if (url === `/api/scrape/staged/${jobId}?view=summary`) return Response.json({
       courses: (status === "approved" ? rows.slice(0, 3) : rows).map(r => ({ ...r, status })),
     });
     if (url === "/api/scrape/staged/approve-selected") {
@@ -237,7 +299,7 @@ it("discovers an approved-only cohort from the full page, previews via HTTP, app
   expect(await screen.findByText(/Bristol · New campus/)).toBeTruthy();
   expect(status).toBe("approved");
   fireEvent.click(screen.getByRole("button", { name: "Apply to staging only" }));
-  await waitFor(() => expect(requests).toContain(`/api/scrape/staged/${jobId}`));
+  await waitFor(() => expect(requests).toContain(`/api/scrape/staged/${jobId}?view=summary`));
   expect(await screen.findByText("PG Cert Legal Technology — Bristol")).toBeTruthy();
   const approve = await screen.findByRole("button", { name: "Approve (4 courses)" });
   expect(status).toBe("pending");

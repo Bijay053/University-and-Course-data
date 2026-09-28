@@ -64,6 +64,32 @@ describe("legacy campus logical course grouping", () => {
     expect(rows).toHaveLength(2);
   });
 
+  it("groups summary rows using promoted feeVariants and minimal campus scope", () => {
+    const rows = [
+      campusRow(101, "Manchester", {
+        extraction_method: undefined,
+        extractionMethod: { campus_fee_scope: {
+          split_from_id: 72, original_name: "MSc Healthcare Management", locations: ["Manchester"],
+        } },
+        feeVariants: { selected: [{ campus: "Outside London", amount: 18000,
+          year: 2026, period: "Annual", study_variant: "Standard" }] },
+      }),
+      campusRow(102, "Birmingham", {
+        extraction_method: undefined,
+        extractionMethod: { campus_fee_scope: {
+          split_from_id: 72, original_name: "MSc Healthcare Management", locations: ["Birmingham", "Leeds"],
+        } },
+        feeVariants: { selected: [{ campus: "Outside London", amount: 19500,
+          year: 2026, period: "Annual", study_variant: "Standard" }] },
+      }),
+    ];
+    const groups = groupLegacyCampusRows(rows);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].ids).toEqual([101, 102]);
+    expect(legacyCampusReviewFees(groups[0].members).map(fee => fee.location))
+      .toEqual(["Manchester", "Birmingham", "Leeds"]);
+  });
+
   it("leaves ordinary same-title/source rows ungrouped and does not preselect the visual group", () => {
     const rows = [campusRow(1, "Manchester", { extraction_method: {} }), campusRow(2, "Birmingham", { extraction_method: {} })];
     const groups = groupLegacyCampusRows(rows);

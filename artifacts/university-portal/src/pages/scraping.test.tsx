@@ -48,7 +48,7 @@ describe("verified unpublished duration review", () => {
     }] as ScrapingInitialReviewState["courses"];
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url === "/api/scrape/staged/repair-job") return jsonResponse({ courses: review.courses });
+      if (url === "/api/scrape/staged/repair-job?view=summary") return jsonResponse({ courses: review.courses });
       if (url === "/api/import/history") return jsonResponse([]);
       if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
       if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
@@ -93,7 +93,7 @@ describe("verified unpublished duration review", () => {
         total: 1, courses_with_url: 1,
         issues: [{ field: "duration", label: "Duration", missing: 1, total: 1, current_pct: 0, expected_fill_pct: 70 }],
       });
-      if (url === "/api/scrape/staged/repair-job") return jsonResponse({ courses: review.courses });
+      if (url === "/api/scrape/staged/repair-job?view=summary") return jsonResponse({ courses: review.courses });
       if (url === "/api/import/history") return jsonResponse([]);
       if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
       if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
@@ -262,6 +262,42 @@ function jsonResponse(body: unknown): Response {
   });
 }
 
+it("opens history using summaries and hydrates evidence only when Sources expands", async () => {
+  const jobId = "history-summary-job";
+  const row = { id: 43, universityId: 7, scrapeJobId: jobId,
+    courseName: "History Summary Course", status: "pending",
+    evidenceLoaded: false, evidenceCount: 1 };
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.startsWith("/api/scrape/history?")) return jsonResponse({
+      runs: [{ runtimeJobId: jobId, universityId: 7, universityName: "Batch University",
+        status: "completed", stagedCount: 1, releaseHistory: [], releaseWarnings: [] }],
+      total: 1,
+    });
+    if (url === `/api/scrape/history/${jobId}?view=summary`) return jsonResponse({
+      logs: [], stagedCourses: [row], unresolvedCourses: [],
+    });
+    if (url === `/api/scrape/staged/43/evidence?jobId=${jobId}&universityId=7`)
+      return jsonResponse({ course: { ...row, evidence: [{
+        id: 11, fieldKey: "course_name", candidateValue: "History Summary Course",
+        sourceUrl: null, pageType: "course", extractionMethod: "html",
+        snippet: "Historic source", confidence: 0.9, selected: true,
+      }] } });
+    if (url === "/api/import/history") return jsonResponse([]);
+    if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+    return jsonResponse({});
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  render(<ScrapingForTest initialReviewState={{ universityId: 7, jobId: "empty-review", courses: [] }} />);
+  await userEvent.setup().click(await screen.findByRole("button", { name: "View Courses" }));
+  expect(await screen.findByText("History Summary Course")).toBeTruthy();
+  expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/staged/43/evidence?"))).toBe(false);
+  expect(fetchMock.mock.calls.some(([input]) => String(input) === `/api/scrape/history/${jobId}`)).toBe(false);
+  expect(fetchMock.mock.calls.some(([input]) => String(input) === `/api/scrape/history/${jobId}?view=summary`)).toBe(true);
+  await userEvent.setup().click(screen.getByTestId("sources-toggle-43"));
+  expect(await screen.findByText(/Historic source/)).toBeTruthy();
+});
+
 function initialReview(): ScrapingInitialReviewState {
   return {
     universityId: 7,
@@ -296,7 +332,7 @@ describe("Scraping repair reviewer", () => {
         ids.forEach(id => published.add(id));
         return jsonResponse({ approvedIds: ids, approvedCount: ids.length, failed: [], attempted: ids.length });
       }
-      if (url === "/api/scrape/staged/repair-job") return jsonResponse({ courses: review.courses.filter(course => !published.has(course.id)) });
+      if (url === "/api/scrape/staged/repair-job?view=summary") return jsonResponse({ courses: review.courses.filter(course => !published.has(course.id)) });
       if (url === "/api/import/history") return jsonResponse([]);
       if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
       if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
@@ -354,7 +390,7 @@ describe("Scraping repair reviewer", () => {
         submittedIds.push(...courseIds);
         return jsonResponse({ approvedIds: submittedIds, approvedCount: submittedIds.length, failed: [], attempted: courseIds.length });
       }
-      if (url === "/api/scrape/staged/repair-job") return jsonResponse({ courses: review.courses });
+      if (url === "/api/scrape/staged/repair-job?view=summary") return jsonResponse({ courses: review.courses });
       if (url === "/api/import/history") return jsonResponse([]);
       if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
       if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
@@ -399,7 +435,7 @@ describe("Scraping repair reviewer", () => {
         approved = true;
         return jsonResponse({ approvedIds: [1], approvedCount: 1, failed: [], attempted: 1 });
       }
-      if (url === "/api/scrape/staged/repair-job") return jsonResponse({ courses: approved ? [] : review.courses });
+      if (url === "/api/scrape/staged/repair-job?view=summary") return jsonResponse({ courses: approved ? [] : review.courses });
       if (url === "/api/import/history") return jsonResponse([]);
       if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
       if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
@@ -428,7 +464,7 @@ describe("Scraping repair reviewer", () => {
         expect(JSON.parse(String(init?.body))).toEqual({ courseIds: [1], force: false });
         return jsonResponse({ approvedIds: [], approvedCount: 0, splitCount: 0, failed: [{ id: 1, error: "Campus mapping is ambiguous" }], attempted: 1 });
       }
-      if (url === "/api/scrape/staged/repair-job") return jsonResponse({ courses: review.courses });
+      if (url === "/api/scrape/staged/repair-job?view=summary") return jsonResponse({ courses: review.courses });
       if (url === "/api/import/history") return jsonResponse([]);
       if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
       if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
@@ -455,7 +491,7 @@ describe("Scraping repair reviewer", () => {
           { id: 1, reasonCode, error: "PRIVATE provider token=secret" },
         ], attempted: 1 });
       }
-      if (url === "/api/scrape/staged/repair-job") return jsonResponse({ courses: review.courses.map(course => ({
+      if (url === "/api/scrape/staged/repair-job?view=summary") return jsonResponse({ courses: review.courses.map(course => ({
         ...course, lastQualificationApproval: reasonCode === "unknown_private" ? null : {
           rowId: course.id, jobId: course.scrapeJobId, universityId: course.universityId,
           reasonCode, attemptedAt: "2026-09-27T10:30:00Z",
@@ -521,7 +557,7 @@ describe("Scraping repair reviewer", () => {
         }
         return jsonResponse({ approvedIds: [], approvedCount: 0, splitCount: 0, failed: [{ id: 2, error: "Campus mapping is ambiguous" }], attempted: 1 });
       }
-      if (url === "/api/scrape/staged/repair-job") return jsonResponse({ courses: approved ? [review.courses[1]] : review.courses });
+      if (url === "/api/scrape/staged/repair-job?view=summary") return jsonResponse({ courses: approved ? [review.courses[1]] : review.courses });
       if (url === "/api/import/history") return jsonResponse([]);
       if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
       if (url.endsWith("/course-quality")) return jsonResponse({ courses: [{ id: 2, score: 40, tier: "risky", issues: [], breakdown: {} }] });
@@ -545,7 +581,7 @@ describe("Scraping repair reviewer", () => {
       const url = String(input);
       if (url === "/api/scrape/staged/approve-selected")
         return new Response(JSON.stringify({ detail: "Approval temporarily unavailable" }), { status: 503 });
-      if (url === "/api/scrape/staged/repair-job") return jsonResponse({ courses: review.courses });
+      if (url === "/api/scrape/staged/repair-job?view=summary") return jsonResponse({ courses: review.courses });
       if (url === "/api/import/history") return jsonResponse([]);
       if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
       if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
@@ -579,7 +615,7 @@ describe("Scraping repair reviewer", () => {
         active--;
         return jsonResponse({ approvedIds: courseIds, approvedCount: 1, splitCount: 0, failed: [], attempted: 1 });
       }
-      if (url === "/api/scrape/staged/repair-job") return jsonResponse({ courses: [] });
+      if (url === "/api/scrape/staged/repair-job?view=summary") return jsonResponse({ courses: [] });
       if (url === "/api/import/history") return jsonResponse([]);
       if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
       if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
@@ -909,7 +945,7 @@ describe("Scraping repair reviewer", () => {
       const url = String(input);
       if (url === "/api/import/history") return jsonResponse([]);
       if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
-      if (url === "/api/scrape/staged/repair-job") {
+      if (url === "/api/scrape/staged/repair-job?view=summary") {
         stagedRequests.push(init ?? {});
         return jsonResponse(review.courses);
       }
@@ -948,7 +984,7 @@ describe("Scraping repair reviewer", () => {
       const url = String(input);
       if (url === "/api/import/history") return jsonResponse([]);
       if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
-      if (url === "/api/scrape/staged/repair-job")
+      if (url === "/api/scrape/staged/repair-job?view=summary")
         return jsonResponse({ courses: expanded, lastScrape: { staged: 90 } });
       if (url.endsWith("/course-quality")) return jsonResponse({ courses: [
         ...expanded.map(c => ({ id: c.id, score: 96, issues: [] })),
@@ -964,6 +1000,57 @@ describe("Scraping repair reviewer", () => {
     expect(screen.queryByText("Unrelated")).toBeNull();
   }, 20000);
 
+  it("groups summary-only campus splits, selects both persisted rows, and edits the displayed location clone", async () => {
+    const review = initialReview();
+    const base = review.courses[0];
+    const makeRow = (id: number, location: string, scoped: string[], fee: number) => ({
+      ...base, id, universityId: 7, scrapeJobId: "repair-job",
+      courseName: `MSc Healthcare Management — ${location}`,
+      courseWebsite: "https://example.edu/msc-healthcare-management/",
+      courseLocation: location, degreeLevel: "Master", status: "pending",
+      feeYear: 2026, feeTerm: "Annual", currency: "GBP", internationalFee: fee,
+      extractionMethod: { campus_fee_scope: {
+        split_from_id: 72, original_name: "MSc Healthcare Management", locations: scoped,
+      } },
+      feeVariants: { selected: [{ campus: "Outside London", amount: fee,
+        year: 2026, period: "Annual", study_variant: "Standard" }] },
+      evidenceLoaded: false, evidenceCount: 1,
+    });
+    const rows = [makeRow(101, "Manchester", ["Manchester"], 18000),
+      makeRow(102, "Birmingham", ["Birmingham", "Leeds"], 19500)];
+    review.courses = rows as unknown as ScrapingInitialReviewState["courses"];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/scrape/staged/repair-job?view=summary") return jsonResponse({ courses: rows });
+      if (url === "/api/scrape/staged/101/evidence?jobId=repair-job&universityId=7")
+        return jsonResponse({ course: { ...rows[0], rawData: { original: "kept" }, evidence: [] } });
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<ScrapingForTest initialReviewState={review} />);
+    await user.click(screen.getByTitle("Reload staged courses and refresh quality scores"));
+    expect(await screen.findByText("1 course groups")).toBeTruthy();
+    expect(screen.getByText("2 pending entries")).toBeTruthy();
+    expect(screen.getAllByTestId("row-logical-course-101")).toHaveLength(1);
+    const group = screen.getByTestId("row-logical-course-101");
+    expect(group.textContent).toContain("Manchester: GBP 18,000");
+    expect(group.textContent).toContain("Birmingham: GBP 19,500");
+    expect(group.textContent).toContain("Leeds: GBP 19,500");
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/101/evidence?"))).toBe(false);
+    await user.click(screen.getByTestId("checkbox-logical-course-101"));
+    expect(screen.getByRole("button", { name: "Approve (1 course)" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Smart Fix (2)" })).toBeTruthy();
+    await user.click(within(group).getByTitle("Edit"));
+    expect(await screen.findByDisplayValue("MSc Healthcare Management — Manchester")).toBeTruthy();
+    expect(fetchMock.mock.calls.some(([input]) =>
+      String(input) === "/api/scrape/staged/101/evidence?jobId=repair-job&universityId=7")).toBe(true);
+    await user.keyboard("{Escape}");
+  }, 20000);
+
   it.each([false, true])("keeps multi-location staged courses as one row across refresh, deselection=%s", async (deselect) => {
     const review = initialReview();
     review.courses = [{
@@ -976,7 +1063,7 @@ describe("Scraping repair reviewer", () => {
       const url = String(input);
       if (url === "/api/import/history") return jsonResponse([]);
       if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
-      if (url === "/api/scrape/staged/repair-job")
+      if (url === "/api/scrape/staged/repair-job?view=summary")
         return jsonResponse({ courses: review.courses.slice(0, ++loaded) });
       return jsonResponse({});
     });
@@ -1013,7 +1100,7 @@ describe("Scraping repair reviewer", () => {
       if (url === "/api/import/history") return jsonResponse([]);
       if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
       if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
-      if (url === "/api/scrape/staged/repair-job") return jsonResponse(review.courses);
+      if (url === "/api/scrape/staged/repair-job?view=summary") return jsonResponse(review.courses);
       if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
 
       if (url === "/api/scrape/staged/analyze") {
@@ -1141,7 +1228,7 @@ describe("Scraping repair reviewer", () => {
       if (url === "/api/import/history") return jsonResponse([]);
       if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
       if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
-      if (url === "/api/scrape/staged/repair-job") return jsonResponse(review.courses);
+      if (url === "/api/scrape/staged/repair-job?view=summary") return jsonResponse(review.courses);
       if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
       if (url === "/api/scrape/staged/analyze") {
         return jsonResponse({ total: 3, courses_with_url: 3, issues: [] });
@@ -1220,7 +1307,7 @@ describe("Scraping repair reviewer", () => {
       if (url === "/api/import/history") return jsonResponse([]);
       if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
       if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
-      if (url === "/api/scrape/staged/repair-job") return jsonResponse(review.courses);
+      if (url === "/api/scrape/staged/repair-job?view=summary") return jsonResponse(review.courses);
       if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
       if (url === "/api/scrape/staged/analyze") {
         analyses.push(JSON.parse(String(init?.body)));
@@ -1263,7 +1350,7 @@ describe("Scraping repair reviewer", () => {
       if (url === "/api/import/history") return jsonResponse([]);
       if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
       if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
-      if (url === "/api/scrape/staged/repair-job") return jsonResponse(review.courses);
+      if (url === "/api/scrape/staged/repair-job?view=summary") return jsonResponse(review.courses);
       if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
       if (url === "/api/scrape/staged/analyze") {
         const body = JSON.parse(String(init?.body));
