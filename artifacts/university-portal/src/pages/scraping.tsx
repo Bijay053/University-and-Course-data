@@ -1277,6 +1277,22 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       staged: number;
       expected_min_courses: number;
     } | null;
+    listingPageSummary?: {
+      coverage: "complete" | "incomplete";
+      configured: number;
+      succeeded: number;
+      failed: number;
+      not_attempted: number;
+      retried: number;
+      expected_min_courses?: number | null;
+      pages: Array<{
+        url: string;
+        status: "succeeded" | "failed" | "not_attempted";
+        attempts: number;
+        links_added: number;
+      }>;
+      omitted: number;
+    } | null;
     targetedRetryDiagnostic: TargetedRetryDiagnostic | null;
   };
   type HistoryLogEntry = { sequence: number; event: string; createdAt: string; message?: string; phase?: string; [k: string]: unknown };
@@ -5613,6 +5629,46 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                           {" · "}Extractable URLs: <strong>{run.catalogueGuard.extractable}</strong>
                           {" · "}Staged courses: <strong>{run.catalogueGuard.staged}</strong>
                           {" · "}Configured floor: <strong>{run.catalogueGuard.expected_min_courses}</strong>
+                        </div>
+                      ) : null}
+                      {run.listingPageSummary ? (
+                        <div className={`w-full rounded-md border px-3 py-2 text-xs ${
+                          run.listingPageSummary.coverage === "complete"
+                            ? "border-green-200 bg-green-50 text-green-900"
+                            : "border-amber-300 bg-amber-50 text-amber-900"
+                        }`}>
+                          <strong>Configured listing-page coverage: {run.listingPageSummary.coverage}.</strong>{" "}
+                          {run.listingPageSummary.succeeded}/{run.listingPageSummary.configured} scanned
+                          {" · "}{run.listingPageSummary.failed} failed
+                          {" · "}{run.listingPageSummary.not_attempted} not attempted
+                          {" · "}{run.listingPageSummary.retried} retried.
+                          <div className="mt-1">
+                            {run.listingPageSummary.expected_min_courses
+                              ? <>Minimum course-count check: <strong>
+                                  {(run.totalFound ?? 0) >= run.listingPageSummary.expected_min_courses
+                                    ? "passed" : "below minimum"}
+                                </strong> ({run.totalFound ?? 0}/{run.listingPageSummary.expected_min_courses} URLs).
+                                {" "}This does not establish full listing-page coverage.</>
+                              : "No minimum course count configured. Course count does not establish listing-page coverage."}
+                          </div>
+                          <details className="mt-2">
+                            <summary className="cursor-pointer font-medium">Page-by-page results</summary>
+                            <ul className="mt-1 space-y-1">
+                              {run.listingPageSummary.pages.map((page, index) => (
+                                <li key={`${page.url}-${index}`} className="break-all">
+                                  <span className="font-semibold">
+                                    {page.status === "succeeded" ? "Scanned" : page.status === "failed" ? "Failed" : "Not attempted"}
+                                  </span>
+                                  {page.attempts > 1 ? ` · retried (${page.attempts} attempts)` : ` · ${page.attempts} attempt${page.attempts === 1 ? "" : "s"}`}
+                                  {page.status === "succeeded" ? ` · +${page.links_added} new links` : ""}
+                                  {" · "}<a href={page.url} target="_blank" rel="noopener noreferrer" className="underline">{page.url}</a>
+                                </li>
+                              ))}
+                            </ul>
+                            {run.listingPageSummary.omitted > 0 ? (
+                              <p className="mt-1 font-medium">{run.listingPageSummary.omitted} additional pages omitted from this bounded report; coverage totals include them.</p>
+                            ) : null}
+                          </details>
                         </div>
                       ) : null}
                       {compactionLostSpeedup ? (

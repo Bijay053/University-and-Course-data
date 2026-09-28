@@ -1471,6 +1471,9 @@ async def history_list(
             "htmlCompactionAlerts": compaction_alerts_by_run.get(r.runtime_job_id, []),
             "antiBotChallenges": (r.gate_skip_counts or {}).get("anti_bot_challenges"),
             "catalogueGuard": (r.gate_skip_counts or {}).get("catalogue_guard"),
+            "listingPageSummary": (
+                (r.discovered_config or {}).get("listing_page_summary")
+            ),
             "targetedRetryDiagnostic": (
                 (r.discovered_config or {}).get("targeted_retry_diagnostic")
             ),

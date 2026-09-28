@@ -528,6 +528,46 @@ async def _instant_sleep(_seconds: float) -> None:
 
 class TestFailedFetch:
     @pytest.mark.asyncio
+    async def test_page_outcomes_distinguish_recovered_retry_from_missing_page(self):
+        calls = {}
+        pages = [f"https://www.example.edu/catalogue?page={n}" for n in range(1, 4)]
+
+        async def fetch(url, *, render, rate_limit, max_retries):
+            calls[url] = calls.get(url, 0) + 1
+            if url == pages[0] and calls[url] == 1:
+                return ""
+            if url == pages[1]:
+                return ""
+            return _html_with_links("/courses/bsc")
+
+        outcomes = []
+        added = await _apply_render_listing_pages(
+            links=[], scrape_url="https://www.example.edu",
+            render_pages=pages, allow_patterns=[], block_patterns=[],
+            _fetch_fn=fetch, _sleep_fn=_instant_sleep, emit=_noop_emit,
+            page_outcomes=outcomes,
+        )
+        from app.services.scraper.orchestrator import _listing_page_summary
+        summary = _listing_page_summary(pages, outcomes)
+        assert added == 1
+        assert summary["coverage"] == "incomplete"
+        assert (summary["succeeded"], summary["failed"], summary["retried"]) == (2, 1, 2)
+        assert summary["pages"][0]["url"] == pages[1]
+        assert summary["pages"][0]["attempts"] == 3
+        assert next(p for p in summary["pages"] if p["url"] == pages[0])["attempts"] == 2
+
+    def test_early_abort_and_bounded_report_include_unattempted_pages(self):
+        from app.services.scraper.orchestrator import _listing_page_summary
+        pages = [f"https://example.edu/page/{n}" for n in range(105)]
+        outcomes = [{"url": pages[0], "status": "failed", "attempts": 1, "links_added": 0}]
+        summary = _listing_page_summary(pages, outcomes)
+        assert summary["coverage"] == "incomplete"
+        assert summary["not_attempted"] == 104
+        assert len(summary["pages"]) == 100
+        assert summary["omitted"] == 5
+        assert summary["pages"][0]["url"] == pages[0]
+
+    @pytest.mark.asyncio
     async def test_empty_response_returns_zero_links(self):
         """fetch_fn returning '' → no links added, no exception raised.
 

@@ -768,6 +768,35 @@ def _has_per_university_yaml(yaml_root: Path, slug: str) -> bool:
     )
 
 
+def _listing_page_summary(
+    configured_pages: list[str], outcomes: list[dict], *, limit: int = 100,
+) -> dict:
+    """Bound the persisted detail while retaining exact aggregate coverage."""
+    pages = [
+        outcomes[index] if index < len(outcomes) else {
+            "url": url, "status": "not_attempted", "attempts": 0, "links_added": 0,
+        }
+        for index, url in enumerate(configured_pages)
+    ]
+    succeeded = sum(page["status"] == "succeeded" for page in pages)
+    failed = sum(page["status"] == "failed" for page in pages)
+    retried = sum(page["attempts"] > 1 for page in pages)
+    # Put unavailable pages first so the bounded sample remains useful.
+    visible = sorted(
+        pages, key=lambda page: {"failed": 0, "not_attempted": 1, "succeeded": 2}[page["status"]],
+    )
+    return {
+        "coverage": "complete" if succeeded == len(pages) else "incomplete",
+        "configured": len(pages),
+        "succeeded": succeeded,
+        "failed": failed,
+        "not_attempted": len(pages) - succeeded - failed,
+        "retried": retried,
+        "pages": visible[:limit],
+        "omitted": max(0, len(pages) - limit),
+    }
+
+
 async def _apply_render_listing_pages(
     *,
     links: list[dict],
@@ -779,6 +808,7 @@ async def _apply_render_listing_pages(
     emit=None,
     _fetch_fn=None,
     _sleep_fn=None,
+    page_outcomes: list[dict] | None = None,
 ) -> int:
     """Fetch rendered listing pages via Scrape.do and harvest course links.
 
@@ -842,9 +872,18 @@ async def _apply_render_listing_pages(
 
     _rlp_total_added = 0
     for _page_number, _rlp_url in enumerate(render_pages, 1):
+        _outcome = {
+            "url": _rlp_url,
+            "status": "failed",
+            "attempts": 0,
+            "links_added": 0,
+        }
+        if page_outcomes is not None:
+            page_outcomes.append(_outcome)
         try:
             _rlp_html = None
             for _rlp_attempt in range(3):
+                _outcome["attempts"] += 1
                 _fetch_started = time.time()
                 try:
                     # The listing loop owns retries. Avoid multiplying its three
@@ -951,6 +990,8 @@ async def _apply_render_listing_pages(
                     _added_this += 1
                     _rlp_total_added += 1
             log.info("[RENDER_PAGES] %s → +%d new link(s)", _rlp_url[:90], _added_this)
+            _outcome["status"] = "succeeded"
+            _outcome["links_added"] = _added_this
             await emit(
                 "status",
                 f"[DISCOVER] Catalogue page {_page_number}/{len(render_pages)}: "
@@ -4518,15 +4559,29 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
             # When render_listing_pages_static is set, the listing pages are
             # server-side rendered and the course links are present in the raw
             # HTML without JS — use the cheaper render=False call (~1 credit vs ~5).
-            await _apply_render_listing_pages(
-                links=links,
-                scrape_url=scrape_url,
-                render_pages=_render_pages,
-                allow_patterns=list(_uni_cfg.discovery.allow_url_patterns or []),
-                block_patterns=list(_uni_cfg.discovery.block_url_patterns or []),
-                render_static=bool(getattr(_uni_cfg.discovery, "render_listing_pages_static", False)),
-                emit=emit,
-            )
+            _listing_outcomes: list[dict] = []
+            try:
+                await _apply_render_listing_pages(
+                    links=links,
+                    scrape_url=scrape_url,
+                    render_pages=_render_pages,
+                    allow_patterns=list(_uni_cfg.discovery.allow_url_patterns or []),
+                    block_patterns=list(_uni_cfg.discovery.block_url_patterns or []),
+                    render_static=bool(getattr(_uni_cfg.discovery, "render_listing_pages_static", False)),
+                    emit=emit,
+                    page_outcomes=_listing_outcomes,
+                )
+            finally:
+                # Keep the evidence even when the provider aborts discovery.
+                _dc_pages = dict(job.discovered_config or {})
+                _dc_pages["listing_page_summary"] = _listing_page_summary(
+                    _render_pages, _listing_outcomes,
+                )
+                _dc_pages["listing_page_summary"]["expected_min_courses"] = (
+                    getattr(_uni_cfg.discovery, "expected_min_courses", None)
+                )
+                job.discovered_config = _dc_pages
+                await db.commit()
 
         # ── Raw discovery count (before any post-filter like must_contain) ───────
         # summary["discovered"] will be updated again after must_contain filtering
