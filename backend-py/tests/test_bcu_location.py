@@ -31,6 +31,8 @@ def bcu_config(request):
     "Royal Birmingham Conservatoire",
     "City Centre",
     "City Centre, City South",
+    "RBC Digbeth / Bournville / City Centre",
+    "City South / Alexander Stadium",
     "Wuhan Textile University / BCU",
 ])
 def test_bcu_structured_course_location_survives_both_filters(bcu_config, campus):
@@ -49,7 +51,10 @@ def test_bcu_structured_course_location_survives_both_filters(bcu_config, campus
     assert results[0].method == "location.bcu_keyfacts"
     assert is_bcu_keyfact_location(campus)
     if bcu_config.extraction.text_cleaning.location.allowed_values:
-        payload = {"course_location": campus}
+        payload = {
+            "course_location": campus,
+            "course_website": "https://www.bcu.ac.uk/courses/acting-pgdip-ma-2026-27",
+        }
         apply_recipe_rules(payload, {
             "location_allowed_values": bcu_config.extraction.text_cleaning.location.allowed_values
         })
@@ -61,9 +66,21 @@ def test_bcu_structured_course_location_survives_both_filters(bcu_config, campus
     "Lauren Redfern, City Centre interview",
     "School of Jewellery applications",
     "City Centre, Lauren Redfern",
+    "City South / Alexander Stadium news",
 ])
 def test_bcu_hard_guard_does_not_accept_partial_campus_names(value):
     assert not is_bcu_keyfact_location(value)
+
+
+def test_bcu_recipe_rejects_partial_campus_text(bcu_config):
+    payload = {
+        "course_location": "City Centre student interview",
+        "course_website": "https://www.bcu.ac.uk/courses/acting-pgdip-ma-2026-27",
+    }
+    apply_recipe_rules(payload, {
+        "location_allowed_values": bcu_config.extraction.text_cleaning.location.allowed_values
+    })
+    assert not payload.get("course_location")
 
 
 def test_bcu_does_not_read_location_from_outside_keyfacts(bcu_config):

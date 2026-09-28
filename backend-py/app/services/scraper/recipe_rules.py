@@ -457,9 +457,23 @@ def _apply_location_rules(payload: dict, recipe: dict) -> None:
     # 3. Allowed values filter — keep only matching items from the allowlist
     allowed = recipe.get("location_allowed_values") or []
     if allowed:
+        from urllib.parse import urlparse
+        from app.services.scraper.bcu_location import is_bcu_keyfact_location
+
+        host = urlparse(payload.get("course_website") or "").hostname or ""
+        is_bcu = host == "bcu.ac.uk" or host.endswith(".bcu.ac.uk")
+        if is_bcu and not is_bcu_keyfact_location(loc):
+            # Do not turn "City Centre interview" into an apparently verified
+            # campus just because it contains an allowlisted substring.
+            _clear_location(payload)
+            return
         matched = [a for a in allowed if a.lower() in loc.lower()]
         if matched:
-            loc = ", ".join(matched)
+            # BCU's course facts include multi-site names such as "City South /
+            # Alexander Stadium". A substring-based allowlist must not reduce
+            # the official value to just "City South".
+            if not is_bcu:
+                loc = ", ".join(matched)
         else:
             log.info("[RECIPE] location not in allowed_values, clearing: %r", loc)
             _clear_location(payload)
