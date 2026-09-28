@@ -13,3 +13,4 @@ description: Pointers to site-specific discovery and extraction lessons for UK u
 - [Kingston Cloudflare](kingston-cf-enterprise-fix.md), [Herts Cloudflare](herts-cf-fix.md): rendering and sitemap transport.
 - [Leeds Trinity provider fallback](leedstrinity-searchstax.md), [Lincoln Bishop listing](lincolnbishop-static-listing-undercounted.md), [Hull static discovery](hull-discovery.md): verify official fallback discovery.
 - [UC Leeds qualifier](ucleeds-degree-qualifier-false-positive.md): degree word absence does not prove a category page.
+- [Huddersfield intake authority](huddersfield-intake-authority.md): placeholder metadata needs exact labelled course dates, not range facets or deadlines.

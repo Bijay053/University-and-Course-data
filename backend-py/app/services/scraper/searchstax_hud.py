@@ -405,6 +405,31 @@ def _build_description(content: str, name: str) -> Optional[str]:
     return snippet or None
 
 
+def _hud_intake_source(doc: dict, content: str) -> tuple[Optional[list[str]], str, str]:
+    """Use metadata, then only a course-owned labelled list of complete dates."""
+    raw = _first(doc.get("start_dates_s")) or ""
+    months = _parse_intakes(raw)
+    if months:
+        return months, raw, "searchstax:start_dates_s"
+    # Solr concatenates adjacent DOM text: "...Start Dates20 September
+    # 2027, 10 January 2028Duration...". Consume date tokens, not a broad
+    # text window that could include application deadlines or events.
+    month_names = (
+        "January|February|March|April|May|June|July|August|"
+        "September|October|November|December"
+    )
+    date = rf"(?:[0-2]?\d|3[01])\s+(?:{month_names})\s+20\d{{2}}(?!\d)"
+    match = re.search(
+        rf"(?<![A-Za-z])Start Dates?\s*:?\s*({date}(?:\s*(?:,|;|\band\b)\s*{date})*)",
+        content,
+        re.IGNORECASE,
+    )
+    if match:
+        raw = match.group(1)
+        return _parse_intakes(raw), raw, "searchstax:content:start_dates"
+    return None, "", "searchstax:start_dates_s"
+
+
 def _map_doc(doc: dict, cfg: SearchStaxConfig) -> Optional[dict]:
     """Map one Solr doc → a {name, url, searchstax_result} link dict.
 
@@ -448,8 +473,8 @@ def _map_doc(doc: dict, cfg: SearchStaxConfig) -> Optional[dict]:
     if study_mode == "Part-time" and not is_distance:
         log.info("[SEARCHSTAX] skip (part-time on-campus, domestic only): %r", raw_title)
         return None
-    intakes = _parse_intakes(_first(doc.get("start_dates_s")) or "")
     content = _first(doc.get("content")) or ""
+    intakes, start_dates_raw, intake_method = _hud_intake_source(doc, content)
     ielts_overall, ielts_band, ielts_snippet = _extract_ielts(content)
     fee, fee_subject = _fee_for(raw_title, study_level)
     acad_level = _academic_level(degree_level)
@@ -529,12 +554,11 @@ def _map_doc(doc: dict, cfg: SearchStaxConfig) -> Optional[dict]:
                 f"Solr duration_t: {duration_t}", 0.8,
             ))
 
-    # Intake months from Solr start_dates_s
+    # Keep the precise metadata or labelled-content provenance.
     if intakes:
-        start_dates_raw = _first(doc.get("start_dates_s")) or ""
         evidence.append(_ev(
-            "intake_months", ", ".join(intakes), "searchstax:start_dates_s", url, "course",
-            f"Solr start_dates_s: {start_dates_raw}", 0.85,
+            "intake_months", ", ".join(intakes), intake_method, url, "course",
+            f"Start Dates: {start_dates_raw}", 0.85,
         ))
 
     # International fee from central band schedule
