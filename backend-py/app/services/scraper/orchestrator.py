@@ -61,6 +61,10 @@ class BrowserDiscoveryDeadlineExceeded(RuntimeError):
     """Terminal live-discovery phase timeout."""
 
 
+class CataloguePagesUnavailable(RuntimeError):
+    """Catalogue transport failed; do not stage a partial BFS discovery."""
+
+
 async def _run_browser_discovery_with_deadline(
     browser_discover,
     *,
@@ -803,6 +807,7 @@ async def _apply_render_listing_pages(
     """
     from urllib.parse import urlparse as _urlparse_rlp
 
+    from app.services.scraper.http_fetcher import get_last_fetch_error
     if _fetch_fn is None:
         from app.services.scraper.http_fetcher import fetch_html_scrape_do
         _fetch_fn = fetch_html_scrape_do
@@ -822,6 +827,7 @@ async def _apply_render_listing_pages(
     _rlp_base = f"{_rlp_parsed_base.scheme}://{_rlp_parsed_base.netloc}"
     _rlp_host = _rlp_parsed_base.netloc
     _rlp_render = not render_static
+    _consecutive_render_rotation_failures = 0
 
     log.info(
         "[RENDER_PAGES] fetching %d listing page(s) via Scrape.do (render=%s)",
@@ -835,17 +841,43 @@ async def _apply_render_listing_pages(
     )
 
     _rlp_total_added = 0
-    for _rlp_url in render_pages:
+    for _page_number, _rlp_url in enumerate(render_pages, 1):
         try:
             _rlp_html = None
             for _rlp_attempt in range(3):
+                _fetch_started = time.time()
                 try:
-                    _rlp_html = await _fetch_fn(_rlp_url, render=_rlp_render, rate_limit=False)
+                    # The listing loop owns retries. Avoid multiplying its three
+                    # attempts by the fetcher's own retry ladder.
+                    _rlp_html = await _fetch_fn(
+                        _rlp_url, render=_rlp_render, rate_limit=False, max_retries=0,
+                    )
                 except TypeError:
                     # _fetch_fn may be a test double / injected callable that
                     # doesn't accept rate_limit — fall back gracefully.
                     _rlp_html = await _fetch_fn(_rlp_url, render=_rlp_render)
                 if _rlp_html:
+                    break
+                _fetch_error = get_last_fetch_error(_rlp_url)
+                _rotation_failed = bool(
+                    _fetch_error
+                    and _fetch_error.get("ts", 0) >= _fetch_started
+                    and "ROTATION_FAILED" in str(_fetch_error.get("detail", ""))
+                )
+                if _rotation_failed and not _rlp_render:
+                    _rlp_render = True
+                    await emit(
+                        "status",
+                        "[DISCOVER] Static catalogue proxy cannot reach this site; "
+                        "switching to rendered pages.",
+                        phase="discover",
+                    )
+                    continue
+                # Repeating a provider-level connect failure on the same route
+                # cannot reveal new links. Try another page, not this same one.
+                if _rotation_failed:
+                    break
+                if _rlp_attempt == 2:
                     break
                 _rlp_wait = (_rlp_attempt + 1) * 12
                 log.warning(
@@ -855,7 +887,31 @@ async def _apply_render_listing_pages(
                 await _sleep(_rlp_wait)
             if not _rlp_html:
                 log.warning("[RENDER_PAGES] no response from %s after 3 attempts", _rlp_url)
+                await emit(
+                    "status",
+                    f"[DISCOVER] Catalogue page {_page_number}/{len(render_pages)} "
+                    f"unavailable: {_rlp_url}",
+                    phase="discover",
+                )
+                if _rlp_render and _rotation_failed:
+                    _consecutive_render_rotation_failures += 1
+                    if _consecutive_render_rotation_failures >= 2:
+                        message = (
+                            "Catalogue provider cannot reach two consecutive "
+                            "rendered pages; stopping discovery rather than "
+                            "staging an incomplete catalogue."
+                        )
+                        await emit(
+                            "status",
+                            f"[ERROR] {message}",
+                            phase="discover",
+                            level="error",
+                        )
+                        raise CataloguePagesUnavailable(message)
+                else:
+                    _consecutive_render_rotation_failures = 0
                 continue
+            _consecutive_render_rotation_failures = 0
             _rlp_hrefs = re.findall(r'href=["\']([^"\'<> ]+)["\']', _rlp_html)
             _added_this = 0
             for _h in _rlp_hrefs:
@@ -895,6 +951,16 @@ async def _apply_render_listing_pages(
                     _added_this += 1
                     _rlp_total_added += 1
             log.info("[RENDER_PAGES] %s → +%d new link(s)", _rlp_url[:90], _added_this)
+            await emit(
+                "status",
+                f"[DISCOVER] Catalogue page {_page_number}/{len(render_pages)}: "
+                f"+{_added_this} course links (total +{_rlp_total_added})",
+                phase="discover",
+            )
+        except ScrapedoAccountError:
+            raise
+        except CataloguePagesUnavailable:
+            raise
         except Exception as _rlp_exc:
             log.warning("[RENDER_PAGES] failed %s: %s", _rlp_url, _rlp_exc)
 

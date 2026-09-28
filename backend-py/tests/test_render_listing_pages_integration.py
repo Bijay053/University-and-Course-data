@@ -23,9 +23,14 @@ refactored, or the flag logic is inverted.
 """
 from __future__ import annotations
 
+import time
+
 import pytest
 
-from app.services.scraper.orchestrator import _apply_render_listing_pages
+from app.services.scraper.orchestrator import (
+    CataloguePagesUnavailable,
+    _apply_render_listing_pages,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -411,6 +416,106 @@ class TestRenderStaticFlag:
             emit=_noop_emit,
         )
         assert fetch.calls[0][1] is False, "render=False when render_static is True"
+
+
+class TestCatalogueProviderFailure:
+    @pytest.mark.asyncio
+    async def test_static_rotation_failure_switches_to_render_and_reports_progress(
+        self, monkeypatch,
+    ):
+        from app.services.scraper import orchestrator
+
+        pages = [
+            "https://www.uwl.ac.uk/courses/search?query=&page=0",
+            "https://www.uwl.ac.uk/courses/search?query=&page=1",
+        ]
+        calls = []
+        events = []
+        failure = {}
+
+        async def fetch(url, *, render, rate_limit, max_retries):
+            calls.append((url, render, max_retries))
+            if not render:
+                failure[url] = {"ts": time.time(), "detail": "ROTATION_FAILED static"}
+                return None
+            return _html_with_links(f"/course/undergraduate/degree-{len(calls)}")
+
+        async def emit(event, message, **kwargs):
+            events.append(message)
+
+        monkeypatch.setattr(
+            "app.services.scraper.http_fetcher.get_last_fetch_error",
+            lambda url: failure.get(url),
+        )
+        links = []
+        added = await orchestrator._apply_render_listing_pages(
+            links=links,
+            scrape_url="https://www.uwl.ac.uk",
+            render_pages=pages,
+            allow_patterns=[r"/course/undergraduate/[^/]+$"],
+            block_patterns=[r"/courses/"],
+            render_static=True,
+            _fetch_fn=fetch,
+            emit=emit,
+        )
+        assert added == 2
+        assert calls == [
+            (pages[0], False, 0), (pages[0], True, 0),
+            (pages[1], True, 0),
+        ]
+        assert any("switching to rendered pages" in msg for msg in events)
+        assert any("Catalogue page 2/2" in msg for msg in events)
+
+    @pytest.mark.asyncio
+    async def test_two_unreachable_rendered_pages_stop_the_route(self, monkeypatch):
+        from app.services.scraper.http_fetcher import ScrapedoAccountError
+
+        pages = [f"https://www.uwl.ac.uk/courses/search?page={n}" for n in range(12)]
+        calls = []
+        events = []
+        failure = {}
+
+        async def fetch(url, *, render, rate_limit, max_retries):
+            calls.append((url, render))
+            failure[url] = {
+                "ts": time.time(),
+                "detail": "ROTATION_FAILED static" if not render else "ROTATION_FAILED",
+            }
+            return None
+
+        async def emit(event, message, **kwargs):
+            events.append(message)
+
+        monkeypatch.setattr(
+            "app.services.scraper.http_fetcher.get_last_fetch_error",
+            lambda url: failure.get(url),
+        )
+        with pytest.raises(CataloguePagesUnavailable):
+            await _apply_render_listing_pages(
+                links=[],
+                scrape_url="https://www.uwl.ac.uk",
+                render_pages=pages,
+                allow_patterns=[],
+                block_patterns=[],
+                render_static=True,
+                _fetch_fn=fetch,
+                emit=emit,
+                _sleep_fn=_instant_sleep,
+            )
+        assert calls == [
+            (pages[0], False), (pages[0], True), (pages[1], True),
+        ]
+        assert any("stopping discovery" in msg for msg in events)
+
+        async def account_error(url, *, render, rate_limit, max_retries):
+            raise ScrapedoAccountError("account unavailable")
+
+        with pytest.raises(ScrapedoAccountError):
+            await _apply_render_listing_pages(
+                links=[], scrape_url="https://www.uwl.ac.uk",
+                render_pages=pages[:1], allow_patterns=[], block_patterns=[],
+                _fetch_fn=account_error, emit=emit,
+            )
 
 
 # ---------------------------------------------------------------------------
