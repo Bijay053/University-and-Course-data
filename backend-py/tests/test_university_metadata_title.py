@@ -194,6 +194,16 @@ def test_splits_plain_hyphen_homepage_title() -> None:
             "Study at James Cook University in Queensland",
             "James Cook University",
         ),
+        ("University courses at ARU", ""),
+        ("Anglia Ruskin University courses", ""),
+        ("Study at ARU", ""),
+        ("Browse university courses at Example", ""),
+        ("Find courses at Example University", ""),
+        ("Courses at Anglia Ruskin University", ""),
+        (
+            "University courses at ARU | Anglia Ruskin University",
+            "Anglia Ruskin University",
+        ),
     ],
 )
 def test_normalises_institution_name_from_any_metadata_source(
@@ -207,6 +217,87 @@ def test_rejects_generic_only_institution_name_metadata() -> None:
     assert _normalise_institution_name("Home | Welcome") == ""
     assert _normalise_institution_name("UNSW Sites") == ""
     assert _normalise_institution_name("Top Private University Degree College") == ""
+    assert _normalise_institution_name("University degree programmes at XYZ") == ""
+
+
+@pytest.mark.asyncio
+async def test_aru_url_repairs_existing_course_listing_name(monkeypatch):
+    from unittest.mock import AsyncMock
+    from app.routers import universities as routes
+
+    existing = SimpleNamespace(
+        id=93, name="University courses at ARU",
+        country="United Kingdom", city="Chelmsford",
+    )
+    db = SimpleNamespace(commit=AsyncMock())
+    monkeypatch.setattr(routes, "_fetch_onboarding_homepage", AsyncMock(
+        return_value='<meta property="og:site_name" content="University courses at ARU">'
+        "<title>University courses at ARU</title>",
+    ))
+    monkeypatch.setattr(routes, "_resolve_university_identity_openai", AsyncMock(return_value={}))
+    monkeypatch.setattr(routes, "_find_existing_university_by_domain", AsyncMock(return_value=existing))
+    monkeypatch.setattr(routes, "_upsert_discovered_locations", AsyncMock(return_value=False))
+
+    result = await routes.add_university_by_url(
+        {"url": "https://www.aru.ac.uk"}, db, {},
+    )
+    assert result["university_id"] == 93
+    assert result["name"] == existing.name == "Anglia Ruskin University"
+    db.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_unknown_course_listing_name_rejected_before_creation(monkeypatch):
+    from unittest.mock import AsyncMock
+    from fastapi import HTTPException
+    from app.routers import universities as routes
+
+    db = SimpleNamespace(commit=AsyncMock())
+    monkeypatch.setattr(routes, "_fetch_onboarding_homepage", AsyncMock(
+        return_value='<meta property="og:site_name" content="University courses at XYZ">'
+        "<title>University courses at XYZ</title>",
+    ))
+    monkeypatch.setattr(routes, "_resolve_university_identity_openai", AsyncMock(return_value={}))
+    monkeypatch.setattr(routes, "_find_existing_university_by_domain", AsyncMock(return_value=None))
+    with pytest.raises(HTTPException) as error:
+        await routes.add_university_by_url(
+            {"url": "https://www.example.ac.uk"}, db, {},
+        )
+    assert error.value.status_code == 422
+    db.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_aru_url_creates_with_verified_name_not_page_heading(monkeypatch):
+    from unittest.mock import AsyncMock, Mock
+    from app.routers import universities as routes
+    from app.tasks.scrape_tasks import probe_and_configure
+
+    class Db:
+        def __init__(self):
+            self.added = None
+            self.commit = AsyncMock()
+            self.execute = AsyncMock()
+
+        def add(self, university):
+            self.added = university
+            university.id = 94
+
+        async def refresh(self, university):
+            pass
+
+    db = Db()
+    monkeypatch.setattr(routes, "_fetch_onboarding_homepage", AsyncMock(
+        return_value="<title>University courses at ARU</title>",
+    ))
+    monkeypatch.setattr(routes, "_resolve_university_identity_openai", AsyncMock(return_value={}))
+    monkeypatch.setattr(routes, "_find_existing_university_by_domain", AsyncMock(return_value=None))
+    monkeypatch.setattr(routes, "_upsert_discovered_locations", AsyncMock(return_value=False))
+    monkeypatch.setattr(probe_and_configure, "delay", Mock(return_value=SimpleNamespace(id="task-94")))
+
+    result = await routes.add_university_by_url({"url": "https://www.aru.ac.uk"}, db, {})
+    assert db.added.name == result["name"] == "Anglia Ruskin University"
+    assert result["university_id"] == 94
 
 
 def test_known_jcu_domain_has_authoritative_official_name() -> None:

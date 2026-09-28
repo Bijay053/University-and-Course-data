@@ -18,6 +18,20 @@ allow a clean official candidate to replace a longer phrase that contains it as
 a complete name. Keep exact regression cases for both separator-based and
 single-segment marketing titles.
 
+An institution keyword may describe a catalogue rather than identify the
+institution: “University courses at ARU” is a course-page heading, not a name.
+Reject course, degree, programme, admission, and other catalogue/navigation
+phrases even when they contain “University,” and never treat a rejected
+metadata segment as proof of identity. If no verified name remains, fail the
+URL addition visibly instead of saving page copy. A source-verified domain
+mapping can repair an existing bad name as well as name a new record.
+
+**Why:** A keyword-only check accepted a course-listing title as an official
+name and left the bad title on an existing university record.
+
+**How to apply:** Validate extracted and AI-proposed names before persistence;
+test both first-time creation and re-adding a URL for a record with a bad name.
+
 Branded CMS wrappers ending in “Site” or “Sites” are not institution names.
 Known domain mappings must also be allowed to repair older stored names even
 when the official brand and bad wrapper both lack words such as “University.”

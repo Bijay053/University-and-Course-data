@@ -190,6 +190,7 @@ _MULTI_LABEL_EDUCATION_SUFFIXES = {
     "ac.au", "ac.nz", "ac.uk", "edu.au", "edu.hk", "edu.my", "edu.nz", "edu.sg",
 }
 _HOSTNAME_OFFICIAL_NAMES = {
+    "aru.ac.uk": "Anglia Ruskin University",
     "aut.ac.nz": "Auckland University of Technology",
     "op.ac.nz": "Otago Polytechnic",
     "csu.edu.au": "Charles Sturt University",
@@ -317,7 +318,12 @@ def _can_upgrade_to_official_name(
     """Allow AI to expand weak branding without replacing unrelated names."""
     current = _decode_metadata_text(current_name or "").strip()
     candidate = _decode_metadata_text(official_name or "").strip()
-    if not candidate or len(candidate) > 200 or not _INSTITUTION_KEYWORDS.search(candidate):
+    if (
+        not candidate
+        or len(candidate) > 200
+        or not _INSTITUTION_KEYWORDS.search(candidate)
+        or _is_non_institution_marketing_name(candidate)
+    ):
         return False
     if not current:
         return True
@@ -331,6 +337,8 @@ def _can_upgrade_to_official_name(
         current,
         re.I,
     ):
+        return True
+    if _is_non_institution_marketing_name(current):
         return True
     if _contains_encoded_html_entity(current) or _is_hostname_fallback_name(
         current, hostname
@@ -476,6 +484,7 @@ async def _resolve_university_identity_openai(
         or not official_name
         or len(official_name) > 200
         or not _INSTITUTION_KEYWORDS.search(official_name)
+        or _is_non_institution_marketing_name(official_name)
         or not has_grounded_quote
         or (
             expected_country != "Unknown"
@@ -585,13 +594,34 @@ def _metadata_title_segments(value: str) -> list[str]:
     ]
 
 
+def _is_non_institution_marketing_name(value: str | None) -> bool:
+    """Reject course/navigation headings that merely mention an institution."""
+    text = _decode_metadata_text(value or "").strip()
+    return bool(
+        re.search(
+            r"\b(?:courses?|degrees?|programmes?|programs?|"
+            r"subjects?|admissions?|open\s+days?)\b",
+            text,
+            re.I,
+        )
+        or (
+            not _INSTITUTION_KEYWORDS.search(text)
+            and bool(re.match(r"^(?:study\s+at|welcome\s+to|explore)\s+", text, re.I))
+        )
+    )
+
+
 def _normalise_institution_name(value: str) -> str:
     """Extract a plausible institution name from page-title metadata."""
     segments = _metadata_title_segments(value)
     if not segments:
         return ""
     institution_segment = next(
-        (segment for segment in segments if _INSTITUTION_KEYWORDS.search(segment)),
+        (
+            segment for segment in segments
+            if _INSTITUTION_KEYWORDS.search(segment)
+            and not _is_non_institution_marketing_name(segment)
+        ),
         None,
     )
     if institution_segment:
@@ -623,6 +653,7 @@ def _normalise_institution_name(value: str) -> str:
         segment
         for segment in segments
         if segment.casefold() not in _GENERIC_TITLE_SEGMENTS
+        and not _is_non_institution_marketing_name(segment)
         and not _is_location_only_institution_name(segment)
         and not (
             re.search(r"\bsites?$", segment, re.I)
@@ -2044,6 +2075,7 @@ async def add_university_by_url(
         or _is_hostname_fallback_name(existing.name, hostname)
         or _is_location_only_institution_name(existing.name)
         or _has_generic_title_prefix(existing.name)
+        or _is_non_institution_marketing_name(existing.name)
     ):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -2063,6 +2095,7 @@ async def add_university_by_url(
             or _is_location_only_institution_name(existing.name)
             or _is_hostname_fallback_name(existing.name, hostname)
             or _has_generic_title_prefix(existing.name)
+            or _is_non_institution_marketing_name(existing.name)
             or _can_upgrade_to_official_name(existing.name, name, hostname)
             or (
                 _known_official_name is not None
