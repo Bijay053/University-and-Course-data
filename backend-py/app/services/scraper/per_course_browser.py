@@ -816,6 +816,9 @@ async def _extended_extract(
                     "snippet": (r.snippet or f"browser-rendered: {k}={v}")[:240],
                     "confidence": min(1.0, (r.confidence or 0.6) + 0.05),
                     "method": "per_course_browser_extended",
+                    # Keep extractor provenance separate from the wrapper
+                    # method so callers can apply narrowly-scoped merge rules.
+                    "source_method": r.method,
                 })
 
     return filled, evidence

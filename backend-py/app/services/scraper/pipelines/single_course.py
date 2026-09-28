@@ -135,6 +135,43 @@ def _attach_extraction_method_map(
         payload["extraction_method"] = extraction_method
 
 
+def _is_aru_browser_keyword_online(
+    url: str,
+    browser_evidence: dict[str, Any],
+    evidence: list[dict[str, Any]],
+) -> bool:
+    """Identify ARU's browser-only generic Online keyword false positive.
+
+    The selected ARU course header's physical Location is authoritative, but
+    the extended browser extractor can still see unrelated page-wide "online"
+    copy and overwrite the location-derived mode.  Keep this exception limited
+    to that exact provenance and the public ARU course-detail URL shape.
+    """
+    parsed = urlparse(url or "")
+    if (
+        parsed.netloc.lower() != "www.aru.ac.uk"
+        or not re.fullmatch(
+            r"/study/(?:undergraduate|postgraduate)/[^/]+/?",
+            parsed.path or "",
+            re.IGNORECASE,
+        )
+        or browser_evidence.get("field_key") != "study_mode"
+        or browser_evidence.get("value") != "Online"
+        or browser_evidence.get("method") != "per_course_browser_extended"
+        or browser_evidence.get("source_method") != "study_mode:rule"
+    ):
+        return False
+
+    return any(
+        row.get("field_key") == "course_location"
+        and row.get("method") == "location.aru_course_header"
+        and isinstance(row.get("value"), str)
+        and bool(row["value"].strip())
+        and location._classify_location_value(row["value"]) is not None
+        for row in evidence
+    )
+
+
 def _apply_configured_field_overrides(payload: dict[str, Any], url: str) -> None:
     """Apply YAML URL-specific overrides before final warning generation.
 
@@ -6757,7 +6794,14 @@ async def extract_course(
         browser_filled, browser_evidence, rendered_html, _override = (
             await maybe_browser_refetch(url, payload, emit=emit, force=_force)
         )
+        _ignored_aru_browser_rows = [
+            row for row in browser_evidence
+            if _is_aru_browser_keyword_online(url, row, evidence)
+        ]
+        _ignore_aru_browser_online = bool(_ignored_aru_browser_rows)
         for k, v in browser_filled.items():
+            if k == "study_mode" and _ignore_aru_browser_online and v == "Online":
+                continue
             # Explicit APU ODL has authoritative negative location evidence.
             # Protect both canonical and Gemini/browser alias keys even when
             # the browser pass is in forced-override mode.
@@ -6775,7 +6819,10 @@ async def extract_course(
                 payload[k] = v
             else:
                 payload.setdefault(k, v)
-        evidence.extend(browser_evidence)
+        evidence.extend(
+            row for row in browser_evidence
+            if row not in _ignored_aru_browser_rows
+        )
 
         # ── YAML: fee rejection (reject_keywords) ─────────────────────────────
         # Discards international_fee when the winning evidence snippet contains

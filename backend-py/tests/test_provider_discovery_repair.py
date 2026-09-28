@@ -392,17 +392,68 @@ async def test_official_host_resolving_private_is_never_fetched(monkeypatch):
 @pytest.mark.asyncio
 async def test_unpaginated_official_catalogue_alternative_and_paginated_refusal(monkeypatch):
     from tests.test_ai_repair_live import LISTING
+    from app.services.scraper import sitemap as sitemap_mod
+    sitemap_discovery = AsyncMock()
+    monkeypatch.setattr(sitemap_mod, "discover_from_sitemap", sitemap_discovery)
     async def fetch(url, *_args):
         return ("", "not_published", "HTTP 404") if url.endswith(".xml") else (LISTING, "", "")
     monkeypatch.setattr(live, "_fetch_official", fetch)
     from app.services.scraper.official_catalogue_repair import discover_official_catalogue
     result = await discover_official_catalogue(live.LiveRepairEvidence(repair_context()))
     assert result["source"] == SEED and len(result["candidates"]) == 2
+    sitemap_discovery.assert_not_awaited()
     async def paginated(url, *_args):
         return ("", "not_published", "HTTP 404") if url.endswith(".xml") else (LISTING + '<a rel="next" href="?page=2">Next page</a>', "", "")
     monkeypatch.setattr(live, "_fetch_official", paginated)
     result = await discover_official_catalogue(live.LiveRepairEvidence(repair_context()))
     assert not result["candidates"]
+
+
+@pytest.mark.asyncio
+async def test_aru_repair_uses_canonicalized_sitemap_candidates_and_rejects_foreign_hosts(monkeypatch):
+    from app.services.scraper import sitemap as sitemap_mod
+    from app.services.scraper.official_catalogue_repair import discover_official_catalogue
+
+    seed = "https://www.aru.ac.uk"
+    azure = "https://aru-sc104-prod-uksouth-cd.azurewebsites.net"
+    canonicalization = {
+        "source_host": "aru-sc104-prod-uksouth-cd.azurewebsites.net",
+        "origin": seed,
+        "allowed_path_prefixes": [
+            "/study/undergraduate/", "/study/postgraduate/",
+        ],
+    }
+    cfg = config()
+    cfg.discovery = DiscoveryConfig(
+        sitemap_url=seed + "/sitemap.xml",
+        sitemap_loc_host_canonicalizations=[canonicalization],
+        allow_url_patterns=[r"/study/undergraduate/", r"/study/postgraduate/"],
+        block_url_patterns=[r"/research/", r"/short-courses/", r"-research$"],
+        max_candidates=2,
+    )
+    candidates = [
+        azure + "/study/undergraduate/private-host-candidate",
+        "https://evil.example/study/postgraduate/hostile-candidate",
+        seed + "/study/undergraduate/short-courses/introduction",
+        seed + "/study/postgraduate/biology-research",
+        seed + "/study/undergraduate/accounting-and-finance",
+        seed + "/study/postgraduate/master-of-business",
+    ]
+    discover = AsyncMock(return_value=[{"url": url, "name": "Candidate"} for url in candidates])
+    monkeypatch.setattr(sitemap_mod, "discover_from_sitemap", discover)
+
+    evidence = live.LiveRepairEvidence(repair_context(
+        scrape_url=seed, effective_config=cfg, effective_discovery={},
+    ))
+    result = await discover_official_catalogue(evidence)
+
+    discover.assert_awaited_once()
+    args = discover.await_args.kwargs
+    assert args["sitemap_url"] == seed + "/sitemap.xml"
+    assert args["loc_host_canonicalizations"] == [canonicalization]
+    assert result["source"] == seed + "/sitemap.xml"
+    assert result["candidates"] == candidates[-2:]
+    assert all("azurewebsites.net" not in url for url in result["candidates"])
 
 
 @pytest.mark.asyncio

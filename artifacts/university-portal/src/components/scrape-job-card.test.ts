@@ -18,6 +18,7 @@ import {
   countSuspiciousSkipped,
   hasCompletedExtractionErrors,
   hasReviewableCourses,
+  isAruOfficialScrapeUrl,
   isCategoryPageWarningStale,
   isConfigurationWaitingResponse,
   onlyKnownExcludedUrls,
@@ -100,6 +101,102 @@ it("renders a configuring start response as waiting without auto-retrying", asyn
 });
 
 describe("full catalogue review-only mode", () => {
+  it("recognizes only the existing ARU official scrape host", () => {
+    expect(isAruOfficialScrapeUrl("https://www.aru.ac.uk/")).toBe(true);
+    expect(isAruOfficialScrapeUrl("https://aru.ac.uk/")).toBe(false);
+    expect(isAruOfficialScrapeUrl("https://www.example.edu/")).toBe(false);
+    expect(isAruOfficialScrapeUrl("not a URL")).toBe(false);
+  });
+
+  it("offers ARU a fresh review-only discovery from needs_review without URL entry", async () => {
+    sessionStorage.setItem("scrape_slot_23_jobId", "aru-repair-job");
+    const repairSession = {
+      session_id: "aru-repair-session",
+      job_id: "aru-repair-job",
+      status: "completed",
+      attempts: [],
+      current_attempt: 1,
+      autonomous: {
+        enabled: true,
+        phase: "needs_review",
+        reason: "Bounded sample could not establish the expected catalogue size.",
+      },
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith("/api/scrape/status/aru-repair-job")) {
+        return jsonResponse({
+          status: "completed",
+          universityId: 42,
+          universityName: "Anglia Ruskin University",
+          url: "https://www.aru.ac.uk/",
+          totalFound: 50,
+          imported: 50,
+          skipped: 0,
+          errors: 0,
+          current: 50,
+          provider_failure: {
+            provider: "searchstax",
+            http_status: 403,
+            kind: "provider_access_denied",
+          },
+          logs: [],
+        });
+      }
+      if (url === "/api/scrape/staged/aru-repair-job?view=summary") return jsonResponse([]);
+      if (url === "/api/scrape/jobs/aru-repair-job/diagnose") {
+        return jsonResponse({
+          ok: true,
+          job_id: "aru-repair-job",
+          university_id: 42,
+          diagnosis: { summary: "Discovery needs review.", root_causes: [], recommended_actions: [] },
+        });
+      }
+      if (url === "/api/scrape/jobs/aru-repair-job/ai-repair-status") return jsonResponse(repairSession);
+      if (url === "/api/scrape/start" && init?.method === "POST") {
+        return jsonResponse({ jobId: "aru-catalogue-review" });
+      }
+      if (url.startsWith("/api/scrape/status/aru-catalogue-review")) {
+        return jsonResponse({ status: "completed", logs: [], imported: 0, reviewableCount: 0 });
+      }
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(React.createElement(ScrapeJobCard, {
+      slotId: 23,
+      slotIndex: 0,
+      universities: [{
+        id: 42,
+        name: "Anglia Ruskin University",
+        scrapeUrl: "https://www.aru.ac.uk/",
+      }],
+      onReviewReady: () => undefined,
+    }));
+
+    await userEvent.click(await screen.findByRole("button", { name: /AI Scrape Diagnostics/ }));
+    const reviewButton = await screen.findByRole("button", { name: "Review full known catalogue" });
+    expect(screen.getByText(/cannot certify full coverage or run automatic repair/i)).toBeTruthy();
+    expect(screen.getByText(/nothing is published or removed/i)).toBeTruthy();
+
+    await userEvent.click(screen.getByTestId("button-report-courses"));
+    expect(screen.queryByTestId("report-prefill-course")).toBeNull();
+    await userEvent.click(screen.getByTestId("button-report-courses"));
+
+    await userEvent.click(reviewButton);
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.some(([input]) => String(input) === "/api/scrape/start")).toBe(true);
+    });
+    const startCall = fetchMock.mock.calls.find(([input]) => String(input) === "/api/scrape/start");
+    const payload = JSON.parse(String(startCall?.[1]?.body));
+    expect(payload).toMatchObject({
+      url: "https://www.aru.ac.uk/",
+      universityId: 42,
+      fullCatalogueReviewOnly: true,
+      fastMode: false,
+    });
+  });
+
   it("posts a strict true flag and disables fast mode", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       if (String(input) === "/api/scrape/start") {
@@ -288,7 +385,9 @@ it("lets a blocked historical repair run retry with current checks", async () =>
   });
   await userEvent.click(screen.getByRole("button", { name: /AI Scrape Diagnostics/ }));
   const retry = await screen.findByRole("button", { name: "Retry automatic repair" });
-  expect(screen.getAllByRole("button", { name: "Report official course URL" }).length).toBeGreaterThan(0);
+  const optionalCourseUrl = screen.getByRole("button", { name: "I already have a course URL (optional)" });
+  await userEvent.click(optionalCourseUrl);
+  expect(await screen.findByTestId("input-report-urls")).toBeTruthy();
 
   await userEvent.click(retry);
   await waitFor(() => {

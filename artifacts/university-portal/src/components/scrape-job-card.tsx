@@ -250,6 +250,15 @@ export function shouldShowScrapeDiagnostics(
   );
 }
 
+export function isAruOfficialScrapeUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  try {
+    return new URL(url).hostname.toLowerCase() === "www.aru.ac.uk";
+  } catch {
+    return false;
+  }
+}
+
 type QualityAction = {
   action_type: string;
   target_fields: string[];
@@ -1925,10 +1934,15 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
     void poll();
   }, [slotKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleStart = useCallback(async () => {
+  const handleStart = useCallback(async (options?: {
+    fullCatalogueReviewOnly?: boolean;
+    fastMode?: boolean;
+  }) => {
     if (submittingRef.current || scraping) return;
     submittingRef.current = true;
 
+    const reviewOnly = options?.fullCatalogueReviewOnly ?? fullCatalogueReviewOnly;
+    const useFastMode = options?.fastMode ?? fastMode;
     const url = scrapeUrl.trim();
     if (!url) { submittingRef.current = false; return; }
 
@@ -1965,9 +1979,11 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
     }
     if (feePageUrl.trim()) body.feePageUrl = feePageUrl.trim();
     if (requirementsPageUrl.trim()) body.requirementsPageUrl = requirementsPageUrl.trim();
-    if (fastMode) body.fastMode = true;
-    body.fullCatalogueReviewOnly = fullCatalogueReviewOnly;
+    if (useFastMode || options?.fastMode === false) body.fastMode = useFastMode;
+    body.fullCatalogueReviewOnly = reviewOnly;
 
+    setFastMode(useFastMode);
+    setFullCatalogueReviewOnly(reviewOnly);
     setScraping(true);
     setPhase("running");
     setLogs([]);
@@ -2359,7 +2375,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
             onReview={id => onReviewReady(id, uniName, true)}
             onStarted={onReportStarted}
             openRequest={courseReportOpenRequest}
-            prefillCourses={providerFailure && scrapeUrl ? [{
+            prefillCourses={providerFailure && scrapeUrl && !isAruOfficialScrapeUrl(scrapeUrl) ? [{
               courseName: "Official course catalogue",
               courseUrl: scrapeUrl,
               fields: ["other"],
@@ -2455,7 +2471,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
             )}
 
             <div className="flex gap-2 mt-1">
-              <Button onClick={handleStart} disabled={!scrapeUrl.trim()} className="h-9 flex-1 bg-blue-600 hover:bg-blue-700">
+              <Button onClick={() => void handleStart()} disabled={!scrapeUrl.trim()} className="h-9 flex-1 bg-blue-600 hover:bg-blue-700">
                 <Play className="w-4 h-4 mr-2" />Start Scrape
               </Button>
               {latestReplayJobId && (
@@ -2681,7 +2697,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
               {phase === "error" && !providerFailure && (
                 <>
                   <Button
-                    onClick={handleStart}
+                    onClick={() => void handleStart()}
                     disabled={!activeJobId || !scrapeUrl.trim()}
                     size="sm"
                     className="flex-1 bg-blue-600 hover:bg-blue-700"
@@ -2697,7 +2713,7 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
               {phase === "waiting" && (
                 <>
                   <Button
-                    onClick={handleStart}
+                    onClick={() => void handleStart()}
                     disabled={!scrapeUrl.trim()}
                     size="sm"
                     className="flex-1 bg-amber-600 hover:bg-amber-700"
@@ -4129,6 +4145,37 @@ export function ScrapeJobCard({ slotId, slotIndex, universities, defaultUniversi
                               onReportOfficialCourse={openOfficialCourseReport}
                             />
                           )}
+                          {aiRepairSession?.autonomous?.phase === "needs_review"
+                            && aiRepairSession.status === "completed"
+                            && selectedUni !== ALL
+                            && universities.some(university => String(university.id) === selectedUni)
+                            && isAruOfficialScrapeUrl(scrapeUrl)
+                            && (
+                              <div className="rounded border border-amber-200 bg-amber-50 p-2.5 space-y-1.5">
+                                <p className="text-[10px] leading-relaxed text-amber-900">
+                                  The bounded repair check is not proof of full catalogue coverage. A fresh review-only discovery can inspect the known catalogue; it cannot certify full coverage or run automatic repair. Existing data is preserved: nothing is published or removed.
+                                </p>
+                                {can("scraping.trigger") ? (
+                                  <Button
+                                    type="button"
+                                    onClick={() => void handleStart({
+                                      fullCatalogueReviewOnly: true,
+                                      fastMode: false,
+                                    })}
+                                    disabled={scraping || aiRepairLoading || aiRepairPolling}
+                                    size="sm"
+                                    className="bg-amber-700 hover:bg-amber-800"
+                                  >
+                                    <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+                                    Review full known catalogue
+                                  </Button>
+                                ) : (
+                                  <p className="text-[10px] text-amber-900">
+                                    You do not have permission to start a catalogue review.
+                                  </p>
+                                )}
+                              </div>
+                            )}
 
                            {aiRepairLoading && !aiRepairSession && (
                              <div className="mt-2 flex items-center gap-1.5 rounded border border-violet-200 bg-violet-50 px-2.5 py-2 text-[10px] text-violet-700">
