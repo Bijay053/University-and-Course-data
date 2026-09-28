@@ -26,3 +26,9 @@ Bounded repair samples must be chosen after filtering the complete configured si
 **Why:** The initial live fallback had many public-host candidates but sampled only ARU subject-area and guidance pages. Those pages cannot establish course-owned evidence, even though degree detail pages were present later in the same sitemap.
 
 **How to apply:** Keep candidate output bounded but distribute the evidence sample among likely degree details, and separately verify that the sample pages really classify as courses. A healthy sample still does not certify the whole catalogue.
+
+A mixed official sitemap sample can contain a genuine navigation page. The bounded fallback may proceed with at least two confirmed course pages and only harmless listing classifications in the remainder; network failures, unconfirmed pages and unsafe URLs still fail the live gate.
+
+**Why:** An actual ARU production probe found three course-owned pages and one listing among four sampled official pages. Requiring every sitemap entry to be a course incorrectly rejected the otherwise verified official source.
+
+**How to apply:** Preserve exact-host and filter replay, require positive course evidence, and let a separate full-catalogue review determine whether the 200-course production floor is met.

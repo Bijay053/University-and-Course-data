@@ -884,6 +884,27 @@ class LiveRepairEvidence:
         bad_old = {url for url in rejected if passes(url, before)}
         bad_new = {url for url in rejected if passes(url, after)}
         reasons = []
+        fallback = getattr(self, "fallback", {})
+        fallback_sample = fallback.get("sample", [])
+        fallback_sample_records = [(url, self.initial.get(url)) for url in fallback_sample]
+        fallback_sample_courses = {
+            url for url, record in fallback_sample_records
+            if record and record.get("classification") == "course"
+        }
+        fallback_sample_safe = (
+            len(fallback_sample_courses) >= 2
+            and all(
+                record
+                and official_url(url, self.ctx["scrape_url"], self.extra_hosts)
+                and record.get("classification") in {"course", "listing"}
+                and (
+                    record.get("classification") != "course"
+                    or passes(url, after)
+                )
+                for url, record in fallback_sample_records
+            )
+        )
+        fallback_source = fallback.get("source")
         if patch.get("sitemap_url") and not official_url(
             patch["sitemap_url"], self.ctx["scrape_url"], self.extra_hosts
         ):
@@ -891,12 +912,14 @@ class LiveRepairEvidence:
         fallback_patch = (
             self.ctx.get("provider_failure") and patch.get("official_catalogue_fallback") is True
             and set(patch) == {"official_catalogue_fallback", "sitemap_url",
-                               *getattr(self, "fallback", {}).get("filter_patch", {})}
+                               *fallback.get("filter_patch", {})}
             and all(patch.get(key) == value for key, value in
-                    getattr(self, "fallback", {}).get("filter_patch", {}).items())
-            and patch.get("sitemap_url") == getattr(self, "fallback", {}).get("source")
+                    fallback.get("filter_patch", {}).items())
+            and isinstance(fallback_source, str) and bool(fallback_source)
+            and official_url(fallback_source, self.ctx["scrape_url"], self.extra_hosts)
+            and patch.get("sitemap_url") == fallback_source
             and len(new) >= 2
-            and len(new) == len(getattr(self, "fallback", {}).get("sample", []))
+            and fallback_sample_safe
         )
         if set(patch) - {"allow_url_patterns", "block_url_patterns", "must_contain", "course_detail_url_patterns"} and not fallback_patch:
             reasons.append("Discovery strategy changes require a bounded provider replay not available in this probe")

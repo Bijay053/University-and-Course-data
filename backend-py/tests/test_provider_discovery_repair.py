@@ -105,6 +105,79 @@ async def test_official_source_replay_and_fresh_validation(monkeypatch):
     assert not evidence.discovery_validation({}, {**patch, "sitemap_url": "https://evil.example/map.xml"})["accepted"]
 
 
+def _fallback_validation_evidence(classifications, *, filter_patch=None):
+    evidence = live.LiveRepairEvidence(repair_context())
+    urls = [ONE, TWO, SEED + "/courses/third", SEED + "/courses/category"]
+    evidence.fallback = {
+        "source": SEED + "/sitemap.xml",
+        "sample": urls[:len(classifications)],
+        "filter_patch": filter_patch or {},
+    }
+    evidence.initial = {
+        url: {"classification": classification}
+        for url, classification in zip(urls, classifications)
+    }
+    patch = {
+        "official_catalogue_fallback": True,
+        "sitemap_url": evidence.fallback["source"],
+        **evidence.fallback["filter_patch"],
+    }
+    return evidence, patch, urls
+
+
+def test_fallback_gate_accepts_confirmed_courses_with_benign_listing_sample():
+    evidence, patch, _urls = _fallback_validation_evidence(
+        ["course", "course", "course", "listing"]
+    )
+
+    report = evidence.discovery_validation({}, patch)
+
+    assert report["accepted"]
+    assert len(report["courses"]) == 3
+
+
+def test_fallback_gate_needs_two_confirmed_sample_courses():
+    evidence, patch, _urls = _fallback_validation_evidence(["course", "listing"])
+
+    assert not evidence.discovery_validation({}, patch)["accepted"]
+
+
+@pytest.mark.parametrize(
+    "classification",
+    ["challenge", "network_failure", "budget_exhausted", "unconfirmed", "unsafe_url"],
+)
+def test_fallback_gate_rejects_failed_unconfirmed_or_unsafe_sample(classification):
+    evidence, patch, _urls = _fallback_validation_evidence(
+        ["course", "course", classification]
+    )
+
+    assert not evidence.discovery_validation({}, patch)["accepted"]
+
+
+def test_fallback_gate_rejects_wrong_source_or_patch():
+    evidence, patch, _urls = _fallback_validation_evidence(
+        ["course", "course"], filter_patch={"block_url_patterns": ["/blocked/"]}
+    )
+
+    wrong_source = {**patch, "sitemap_url": SEED + "/another-sitemap.xml"}
+    wrong_patch = {**patch, "block_url_patterns": ["/different/"]}
+    extra_patch_key = {**patch, "max_candidates": 100}
+
+    assert not evidence.discovery_validation({}, wrong_source)["accepted"]
+    assert not evidence.discovery_validation({}, wrong_patch)["accepted"]
+    assert not evidence.discovery_validation({}, extra_patch_key)["accepted"]
+
+
+def test_fallback_gate_rejects_course_sample_filtered_by_proposed_patch():
+    evidence, patch, urls = _fallback_validation_evidence(
+        ["course", "course", "course"],
+        filter_patch={"block_url_patterns": ["/third$"]},
+    )
+    assert urls[2] in evidence.fallback["sample"]
+
+    assert not evidence.discovery_validation({}, patch)["accepted"]
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("bad,changed", [(True, False), (False, True)])
 async def test_no_write_for_unverified_or_changed_sources(monkeypatch, tmp_path, bad, changed):
