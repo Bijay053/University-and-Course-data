@@ -4421,7 +4421,15 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                                 ⛔ QF — blocked
                               </span>
                             )}
-                            {members.some(isPartTimeOnlyCourse) && <span className="text-[10px] font-semibold text-amber-800">{PART_TIME_APPROVAL_REASON}</span>}
+                            {members.some(isPartTimeOnlyCourse) && (
+                              <span
+                                data-testid={`part-time-blocked-${course.id}`}
+                                className="text-[10px] font-semibold text-red-800 bg-red-50 border border-red-300 rounded px-1.5 py-0.5 whitespace-nowrap"
+                                title={PART_TIME_APPROVAL_REASON}
+                              >
+                                Blocked — Part-time only
+                              </span>
+                            )}
                           </div>
                         </td>
                       </tr>

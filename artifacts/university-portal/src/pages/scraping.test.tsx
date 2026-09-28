@@ -307,6 +307,9 @@ describe("Scraping repair reviewer", () => {
     render(<ScrapingForTest initialReviewState={review} />);
     expect((screen.getByTestId("button-approve-logical-course-1") as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByTestId("button-approve-logical-course-1").title).toMatch(/part-time-only/i);
+    expect(screen.getByTestId("part-time-blocked-1").textContent).toBe("Blocked — Part-time only");
+    expect(screen.getByTestId("part-time-blocked-1").classList.contains("text-red-800")).toBe(true);
+    expect(screen.getByTestId("part-time-blocked-1").classList.contains("bg-red-50")).toBe(true);
     expect((screen.getByTestId("button-approve-logical-course-2") as HTMLButtonElement).disabled).toBe(false);
     const user = userEvent.setup();
     for (const id of [1, 2, 3]) {
