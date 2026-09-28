@@ -11488,11 +11488,8 @@ async def extract_course(
     #     have returned person names or testimonial text before being blocked.
     # Logging fields: location_source, original_location, final_location, course_url.
     if "bcu.ac.uk" in (url or "").lower():
-        _BCU_LOCATION_ALLOWLIST = [
-            "city centre", "city south", "margaret street",
-            "royal birmingham conservatoire", "birmingham",
-            "online", "distance learning", "uk campus",
-        ]
+        from app.services.scraper.bcu_location import is_bcu_keyfact_location
+
         _bcu_raw_loc = (payload.get("course_location") or "").strip()
         _bcu_loc_source = "none"
         try:
@@ -11500,9 +11497,7 @@ async def extract_course(
         except Exception:  # noqa: BLE001
             pass
         if _bcu_raw_loc:
-            _bcu_loc_ok = any(
-                av in _bcu_raw_loc.lower() for av in _BCU_LOCATION_ALLOWLIST
-            )
+            _bcu_loc_ok = is_bcu_keyfact_location(_bcu_raw_loc)
             _bcu_final = _bcu_raw_loc if _bcu_loc_ok else ""
             log.info(
                 "[BCU LOCATION] course_url=%s location_source=%s "

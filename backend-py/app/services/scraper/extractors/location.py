@@ -1607,6 +1607,11 @@ def _from_bcu_keyfacts(soup: BeautifulSoup) -> str | None:
             and title_el.get_text(strip=True).lower() == "location"
         ):
             loc = value_el.get_text(strip=True)
+            # The shared classifier treats "/" as a list delimiter. Here it
+            # is part of BCU's exact partner-site name; splitting it would
+            # cause the later strict allowlist to discard the official value.
+            if loc.casefold() == "wuhan textile university / bcu":
+                return loc
             return _classify_location_value(loc) if loc else None
     return None
 

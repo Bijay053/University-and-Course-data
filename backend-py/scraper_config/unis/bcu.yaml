@@ -76,7 +76,10 @@ extraction:
 
   text_cleaning:
     location:
-      # Strict allowlist — BCU has only three physical campuses plus online.
+      # Include every verified course-facts site, including the School of
+      # Acting in Bournville and the Conservatoire and Jewellery buildings.
+      # This slug recipe is used when the production university ID differs
+      # from the id-specific development recipe.
       # Any extracted location value that does NOT contain one of these entries
       # (case-insensitive substring) is cleared to blank. Belt-and-suspenders
       # guard for testimonial/student-name bleed-through from other page sections.
@@ -84,6 +87,10 @@ extraction:
         - "City Centre"
         - "City South"
         - "Margaret Street"
+        - "Bournville"
+        - "School of Jewellery"
+        - "Royal Birmingham Conservatoire"
+        - "Wuhan Textile University / BCU"
         - "Online"
         - "Distance Learning"
         - "UK Campus"
