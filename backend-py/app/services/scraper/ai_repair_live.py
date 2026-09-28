@@ -193,6 +193,84 @@ _AWARD = re.compile(
 )
 _FAILURES = {"network_failure", "challenge", "unsafe_url", "budget_exhausted", "unsupported_content"}
 _REJECTED = {"listing", "non_course", "non_degree", "ineligible", "not_published"}
+_RELATED_COURSE_SELECTOR = (
+    ".related-courses, .related, .course-list, .course-card, .partners, "
+    "[class*=related-course], [class*=course-card]"
+)
+_NON_COURSE_CATALOGUE_ROUTE = re.compile(
+    r"(?:^|[-/])(?:clearing|fees?|funding|apply|admissions?|open-days?|"
+    r"student-life|accommodation|how-to-apply|short-courses?|"
+    r"professional-development)(?:$|[-/])",
+    re.I,
+)
+
+
+def _course_detail_families(text: str) -> set[str]:
+    """Return distinct labelled detail families, not generic page keywords."""
+    patterns = {
+        "award": r"\b(?:qualification|award|degree)\b",
+        "duration": r"\b(?:duration|course length)\b",
+        "mode": r"\b(?:study mode|mode of study)\b",
+        "location": r"\b(?:campus|location)\b",
+        "intake": r"\b(?:intake|start date)\b",
+        "fees": r"\b(?:international tuition|tuition fee|international fee)\b",
+        "entry": r"\bentry requirements?\b",
+        "english": r"\bIELTS\b",
+    }
+    return {name for name, pattern in patterns.items() if re.search(pattern, text, re.I)}
+
+
+def _fallback_course_region(soup):
+    """Find a title-owning content wrapper when a page has no semantic main.
+
+    Some official templates (including ARU) place the H1 in a hero div and
+    course details in sibling content divs. Climb only from that H1 and require
+    multiple labelled detail families in the candidate wrapper. Related cards
+    are removed from a copy while scoring, so their metadata cannot establish
+    ownership or contaminate the chosen region.
+    """
+    from bs4 import BeautifulSoup
+
+    title = soup.find("h1")
+    if title is None:
+        return None
+    for ancestor in title.parents:
+        if ancestor.name in ("body", "html", "[document]"):
+            break
+        if ancestor.name not in ("div", "section"):
+            continue
+        probe = BeautifulSoup(str(ancestor), "html.parser")
+        for node in probe.select(_RELATED_COURSE_SELECTOR):
+            node.decompose()
+        if len(_course_detail_families(probe.get_text(" ", strip=True))) >= 2:
+            return ancestor
+    return None
+
+
+def _course_links_in_region(region, url: str, extra_hosts=()) -> list[dict]:
+    """Supplement title-keyword discovery for conventional degree detail paths."""
+    links = []
+    seen = set()
+    for anchor in region.select("a[href]"):
+        href = anchor.get("href", "").strip()
+        text = anchor.get_text(" ", strip=True)
+        candidate = urldefrag(urljoin(url, href))[0]
+        path = urlsplit(candidate).path
+        if (
+            len(text) < 5 or not official_url(candidate, url, extra_hosts)
+            or not re.fullmatch(r"/study/(?:undergraduate|postgraduate)/[^/]+/?", path, re.I)
+        ):
+            continue
+        if (
+            re.search(r"/(?:course-search|courses?|subjects?|index)/?$", path, re.I)
+            or _NON_COURSE_CATALOGUE_ROUTE.search(path)
+            or _NON_COURSE_CATALOGUE_ROUTE.search(text)
+        ):
+            continue
+        if candidate not in seen:
+            seen.add(candidate)
+            links.append({"url": candidate, "name": text})
+    return links
 
 
 @dataclass(frozen=True)
@@ -428,10 +506,9 @@ def inspect_page(url: str, html: str, config=None) -> dict:
                for node in soup.select("button, a"))
     )
     extra_hosts = getattr(getattr(config, "discovery", None), "allowed_extra_hostnames", ())
-    canonical = soup.select_one('link[rel="canonical"][href]')
-    if canonical and not official_url(urljoin(url, canonical["href"]), url, extra_hosts):
-        return {**result, "classification": "non_course",
-                "reason": "Cross-host canonical source; official course ownership unverified"}
+    # A canonical is advisory metadata, not proof that the fetched official
+    # page is owned by another host. Keep on-host visible evidence in play;
+    # request eligibility and link eligibility are still enforced separately.
     for node in soup.select("nav, footer, header, aside, [role=navigation]"):
         node.decompose()
     # Prefer the page's primary content over article cards that happen to
@@ -443,15 +520,20 @@ def inspect_page(url: str, html: str, config=None) -> dict:
     if region is None:
         region = soup.select_one("body > div.main:has(h1)")
     if region is None:
+        region = _fallback_course_region(soup)
+    if region is None:
         # Missing course scope must not turn shared footer/legal text into proof.
         page = classify_page(str(soup), url)
-        return {**result, "classification": "listing" if page["course_links"] else "unconfirmed",
+        links = list(page["course_links"])
+        linked_urls = {row["url"] for row in links}
+        for link in _course_links_in_region(soup, url, extra_hosts):
+            if link["url"] not in linked_urls:
+                links.append(link)
+                linked_urls.add(link["url"])
+        return {**result, "classification": "listing" if links else "unconfirmed",
                 "reason": "No identifiable course-owned main/article region",
-                "links": page["course_links"]}
-    for node in region.select(
-        ".related-courses, .related, .course-list, .course-card, .partners, "
-        "[class*=related-course], [class*=course-card]"
-    ):
+                "links": links}
+    for node in region.select(_RELATED_COURSE_SELECTOR):
         node.decompose()
     title_node = region.find("h1")
     title = title_node.get_text(" ", strip=True) if title_node else ""
@@ -482,6 +564,12 @@ def inspect_page(url: str, html: str, config=None) -> dict:
             fields.append({"selector": selector, "text": text[:400]})
     owned_html = str(region)
     page = classify_page(owned_html, url)
+    course_links = list(page["course_links"])
+    linked_urls = {row["url"] for row in course_links}
+    for link in _course_links_in_region(region, url, extra_hosts):
+        if link["url"] not in linked_urls:
+            course_links.append(link)
+            linked_urls.add(link["url"])
     audience_evidence = extract_audience_option_evidence(
         owned_html, url, url, extra_hosts
     )
@@ -501,7 +589,7 @@ def inspect_page(url: str, html: str, config=None) -> dict:
         return 3
     prompt_fields = sorted(fields, key=evidence_priority)[:12]
     result.update(title=title, snippet=region.get_text(" ", strip=True)[:1400],
-                  fields=prompt_fields, owned_html=owned_html, links=page["course_links"],
+                  fields=prompt_fields, owned_html=owned_html, links=course_links,
                   audience_evidence=audience_evidence)
     result["fee_source_links"] = list(dict.fromkeys(
         urldefrag(urljoin(url, node["href"]))[0]
@@ -513,7 +601,7 @@ def inspect_page(url: str, html: str, config=None) -> dict:
     ))[:3]
     blocked, reason = is_blocked_page(url, title)
     if blocked:
-        return {**result, "classification": "listing" if page["page_type"] == "listing" else "non_course",
+        return {**result, "classification": "listing" if page["page_type"] == "listing" or course_links else "non_course",
                 "reason": f"Shared page gate: {reason}"}
     if re.fullmatch(r"(?:our )?(?:partners|partnerships|terms(?: and conditions)?|privacy policy)", title, re.I):
         return {**result, "classification": "non_course", "reason": "Partner directory or legal page"}
@@ -553,7 +641,7 @@ def inspect_page(url: str, html: str, config=None) -> dict:
     if is_generic_course_category_name(title) and not owned_award:
         return {**result, "classification": "listing", "reason": "Shared category gate; no course-owned award"}
     if not positive:
-        return {**result, "classification": "listing" if page["course_links"] else "unconfirmed",
+        return {**result, "classification": "listing" if course_links else "unconfirmed",
                 "reason": "No positive course-owned award and field evidence"}
     # Explicit, course-owned negative availability is never repaired away.
     from app.services.scraper.pipelines.single_course import _is_domestic_only_page, _is_parttime_only_page
@@ -705,9 +793,15 @@ class LiveRepairEvidence:
             if not is_intentionally_excluded_course_url(url)
         ][:2]
         seeds = set(course_candidates + passed)
+        explicit_repair_urls = list(self.ctx.get("repair_url_sample") or [])
+        repair_urls = explicit_repair_urls or list(self.ctx.get("dropped_sample") or [])
+        # If no known course or passed page was supplied, retain a small
+        # explicit repair sample ahead of opportunistic navigation links.
+        # Known course/passed targets keep their existing higher priority.
+        priority_urls = seeds or set(explicit_repair_urls[:2])
         pending = list(dict.fromkeys(
             [self.ctx["scrape_url"]] + course_candidates + passed
-            + (self.ctx.get("repair_url_sample") or self.ctx.get("dropped_sample") or [])
+            + repair_urls
         ))
         fee_sources = []
         while pending and len(self.initial) < limit:
@@ -737,9 +831,13 @@ class LiveRepairEvidence:
                         and not is_intentionally_excluded_course_url(candidate)):
                     linked.append(candidate)
             # Neither root navigation nor links from the first course may
-            # consume the budget before the remaining known seeds are checked.
-            # After those seeds, fresh catalogue links beat stale dropped URLs.
-            index = max((i + 1 for i, candidate in enumerate(pending) if candidate in seeds), default=0)
+            # consume the budget before the remaining priority targets are
+            # checked. After those targets, fresh catalogue links beat stale
+            # dropped URLs.
+            index = max(
+                (i + 1 for i, candidate in enumerate(pending) if candidate in priority_urls),
+                default=0,
+            )
             pending[index:index] = linked
         return self.audit()
 

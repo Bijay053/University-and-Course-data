@@ -21,6 +21,12 @@ Bounded live checks must give known course-page candidates a turn before followi
 
 **How to apply:** Preserve the catalogue root for discovery evidence, then check known course candidates and current passing samples before spending the remaining budget on links or historical dropped URLs. Prefer semantic primary content and only use an article containing the page H1 or a body-level main container when needed. A zero-course result still fails closed but must offer both an automatic retry and the official-URL fallback in the app, not a developer instruction. Historical failed evidence does not re-evaluate itself after a release.
 
+Official-host content must not be rejected solely because its canonical metadata names a different hosting domain. When no known course samples exist, give explicit official search-page samples a bounded turn before following homepage navigation; keep off-host links excluded and require course-owned positive evidence before applying changes.
+
+**Why:** ARU's public pages advertised an Azure hosting canonical, so a three-page automatic check discarded its own official search pages before discovering courses and presented a URL-report prompt despite usable live evidence.
+
+**How to apply:** Treat canonical metadata as a hint, not an ownership veto or a new host allowlist. Prefer submitted/recorded official search sources over opportunistic menu links within the existing page budget, and verify any course candidates independently.
+
 Requirement recovery must work through the normal app for both existing records and new scrapes, not depend on one-off repair scripts. Qualification-based admission is a valid alternative to a numeric score only when backed by deterministic official-source evidence; missing IELTS bands remain unresolved.
 
 **Why:** Overall IELTS and generic admission prose previously concealed unresolved requirements. Real extractor evidence must be tested end to end: fabricated test method names can pass while actual extraction provenance is rejected.

@@ -223,6 +223,134 @@ def test_primary_main_precedes_article_card_and_listing_still_fails_closed():
     assert live.inspect_page(SEED, listing_html, config())["classification"] == "listing"
 
 
+ARU_LISTING = "https://www.aru.ac.uk/study/course-search?levelofstudy=Undergraduate"
+ARU_POSTGRAD_LISTING = "https://www.aru.ac.uk/study/course-search?levelofstudy=Postgraduate"
+ARU_ROOT = "https://www.aru.ac.uk/"
+ARU_COURSE = "https://www.aru.ac.uk/study/undergraduate/accounting-and-finance"
+ARU_CANONICAL_HOST = "https://aru-sc104-prod-uksouth-cd.azurewebsites.net"
+
+
+def test_cross_host_canonical_does_not_discard_official_aru_listing_evidence():
+    html = f"""<html><head><link rel="canonical"
+      href="{ARU_CANONICAL_HOST}/study/course-search?levelofstudy=Undergraduate"></head>
+      <main><h1>Undergraduate courses</h1>
+      <a href="/study/undergraduate/accounting-and-finance">Accounting and Finance</a>
+      <a href="{ARU_CANONICAL_HOST}/study/undergraduate/other-course">Other course</a>
+      <a href="/study/undergraduate/clearing">Clearing</a>
+      </main></html>"""
+
+    result = live.inspect_page(ARU_LISTING, html, config())
+
+    assert result["classification"] == "listing"
+    assert any(link["url"] == ARU_COURSE for link in result["links"])
+    assert not any(ARU_CANONICAL_HOST in link["url"] for link in result["links"])
+    assert not any(link["url"].endswith("/clearing") for link in result["links"])
+
+
+def test_cross_host_canonical_does_not_bypass_course_eligibility_or_non_degree_gates():
+    ineligible = course(extra="<p>Study mode: Online only</p>").replace(
+        "<html>", f'<html><head><link rel="canonical" href="{ARU_CANONICAL_HOST}/x"></head>',
+        1,
+    )
+    short_course = f"""<html><head><link rel="canonical" href="{ARU_CANONICAL_HOST}/x"></head>
+      <main><h1>Professional Development</h1><p>Duration: 6 weeks</p>
+      <p>Study mode: Part-time</p><p>Entry requirements: None</p></main></html>"""
+
+    assert live.inspect_page(ARU_COURSE, ineligible, config())["classification"] == "ineligible"
+    assert live.inspect_page(
+        "https://www.aru.ac.uk/study/professional-and-short-courses/short-course",
+        short_course, config(),
+    )["classification"] == "non_degree"
+
+
+def test_aru_hero_header_course_region_is_owned_and_excludes_related_cards():
+    html = f"""<html><head><link rel="canonical"
+      href="{ARU_CANONICAL_HOST}/study/undergraduate/accounting-and-finance"></head>
+      <body><div class="page-content">
+        <div class="hero-header"><h1>Accounting and Finance</h1></div>
+        <div class="course-content">
+          <p>Qualification: BA (Hons) Accounting and Finance</p>
+          <p>Duration: 3 years</p><p>Study mode: Full-time</p>
+        </div>
+        <div class="related-courses"><h2>Related courses</h2>
+          <p>Award: PhD, Duration: 6 years</p></div>
+      </div></body></html>"""
+
+    result = live.inspect_page(ARU_COURSE, html, config())
+
+    assert result["classification"] == "course"
+    assert result["title"] == "Accounting and Finance"
+    assert result["owned_html"]
+    assert "Related courses" not in result["owned_html"]
+    assert any("Duration: 3 years" in field["text"] for field in result["fields"])
+
+
+@pytest.mark.asyncio
+async def test_probe_follows_on_host_course_links_from_canonicalized_aru_listing():
+    course_html = f"""<html><body><div class="page-content">
+      <div class="hero-header"><h1>Accounting and Finance</h1></div>
+      <div class="course-content"><p>Qualification: BA (Hons)</p>
+      <p>Duration: 3 years</p><p>Study mode: Full-time</p></div>
+      </div></body></html>"""
+    listing_html = f"""<html><head><link rel="canonical"
+      href="{ARU_CANONICAL_HOST}/study/course-search?levelofstudy=Undergraduate"></head>
+      <body><main><h1>Undergraduate courses</h1>
+      <a href="{ARU_COURSE}">Accounting and Finance</a></main></body></html>"""
+    evidence = live.LiveRepairEvidence(context(
+        scrape_url=ARU_LISTING, repair_course_url_sample=[], passed_sample=[],
+        repair_url_sample=[], dropped_sample=[], effective_config=config(),
+    ))
+    visited = []
+
+    async def fetch(url):
+        visited.append(url)
+        evidence.pages_checked += 1
+        html = listing_html if url == ARU_LISTING else course_html
+        record = live.inspect_page(url, html, evidence.config)
+        evidence.records.append(record)
+        return record
+
+    evidence.fetch = fetch
+    result = await evidence.probe()
+
+    assert visited[:2] == [ARU_LISTING, ARU_COURSE]
+    assert result["course_pages"] == 1
+
+
+@pytest.mark.asyncio
+async def test_probe_prioritizes_two_explicit_aru_repair_listings_before_root_links():
+    evidence = live.LiveRepairEvidence(context(
+        scrape_url=ARU_ROOT,
+        repair_course_url_sample=[],
+        passed_sample=[],
+        repair_url_sample=[ARU_LISTING, ARU_POSTGRAD_LISTING],
+        dropped_sample=[],
+        effective_config=config(),
+        effective_discovery={},
+    ))
+    visited = []
+
+    async def fetch(url):
+        visited.append(url)
+        if url == ARU_ROOT:
+            record = {
+                "url": url, "classification": "listing",
+                "links": [{"url": "https://www.aru.ac.uk/study/undergraduate/clearing"}],
+            }
+        elif url in (ARU_LISTING, ARU_POSTGRAD_LISTING):
+            record = {"url": url, "classification": "listing", "links": [{"url": ARU_COURSE}]}
+        else:
+            record = {"url": url, "classification": "course", "links": []}
+        evidence.pages_checked += 1
+        evidence.records.append(record)
+        return record
+
+    evidence.fetch = fetch
+    await evidence.probe()
+
+    assert visited[:4] == [ARU_ROOT, ARU_LISTING, ARU_POSTGRAD_LISTING, ARU_COURSE]
+
+
 def test_hidden_non_degree_and_footer_cannot_reject_degree():
     html = course(extra='<div hidden><dl><dt>Award</dt><dd>Short course</dd></dl></div>')
     html += "<footer>Domestic only. This is a short course.</footer>"

@@ -143,7 +143,8 @@ describe("AiRepairProgress", () => {
     expect(container.querySelector("section")?.className).toContain("border-red-200");
     expect(container.querySelectorAll("li.bg-emerald-100")).toHaveLength(0);
     expect(screen.getAllByText(/Retry automatic repair with the current checks/).length).toBeGreaterThan(0);
-    fireEvent.click(screen.getByRole("button", { name: "Report official course URL" }));
+    expect(screen.getByText(/you do not need to find a URL/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "I already have a course URL (optional)" }));
     expect(onReportOfficialCourse).toHaveBeenCalledOnce();
     expect(screen.queryByText(/Manual investigation/)).toBeNull();
     expect(screen.getByText(/publishing is always manual/)).toBeTruthy();

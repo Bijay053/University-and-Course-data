@@ -263,7 +263,7 @@ export function AiRepairProgress({
               : needsReview
                 ? "The result was not verified automatically. Review the evidence and staged courses."
                 : needsCoursePage
-                  ? "This run did not recognize an individual course page. Retry automatic repair with the current checks, or report an exact official course URL if it still cannot recognize one."
+                   ? "This check could not confirm a course page. Try automatic repair again above; you do not need to find a URL or edit scraper settings."
                 : blocked
                   ? "The automatic checks could not prove a safe correction. Existing courses and settings were left unchanged."
                   : "Testing bounded changes against live official sources."}
@@ -455,7 +455,7 @@ export function AiRepairProgress({
       {(autonomous.reason || (autonomous.phase === "verification_queued" && !autonomous.verification_job_id)) && (
         <p className={`rounded border bg-white/70 px-2 py-1 text-[9px] ${blocked ? "border-red-200 text-red-800" : "border-amber-200 text-amber-800"}`}>
           {needsCoursePage
-            ? "No course was changed. Retry automatic repair with the current checks, or report an official course URL if the page still cannot be recognized."
+             ? "No course was changed. Retry automatic repair with the current checks. An official course URL is only optional if you already have one."
             : autonomous.reason ?? "Config saved. Waiting for the automatic verification scrape; this is not verified yet."}
         </p>
       )}
@@ -463,9 +463,9 @@ export function AiRepairProgress({
         <button
           type="button"
           onClick={onReportOfficialCourse}
-          className="rounded bg-violet-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-violet-700"
+          className="rounded border border-violet-300 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-violet-700 hover:bg-violet-50"
         >
-          Report official course URL
+          I already have a course URL (optional)
         </button>
       )}
 
