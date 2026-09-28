@@ -147,3 +147,4 @@
 - [Approval guidance lifetime](approval-guidance-lifetime.md) — failure advice belongs to uninterrupted evidence state; restoring old values must not revive it.
 - [Database latency validation](database-latency-validation.md) — rollback isolation does not eliminate parallel load or DDL locks; check isolated timing before changing budgets.
 - [Review payload measurement](review-payload-measurement.md) — include background counts and history reads; endpoint-only savings can hide eager evidence downloads.
+- [BCU production recipe identity](bcu-production-recipe-identity.md) — production uses the slug recipe, not the development ID-specific recipe; test both for location changes.
