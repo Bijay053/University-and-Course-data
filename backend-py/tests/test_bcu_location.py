@@ -5,6 +5,7 @@ import asyncio
 import pytest
 
 from app.services.scraper.bcu_location import is_bcu_keyfact_location
+from app.services.scraper.bcu_location import bcu_course_specific_location
 from app.services.scraper.config.context import get_uni_config, set_uni_config
 from app.services.scraper.config.loader import load_uni_config
 from app.services.scraper.extractors import location
@@ -88,3 +89,62 @@ def test_bcu_does_not_read_location_from_outside_keyfacts(bcu_config):
     assert asyncio.run(location.extract(
         html, "https://www.bcu.ac.uk/courses/acting-pgdip-ma-2026-27"
     )) == []
+
+
+@pytest.mark.parametrize(("url", "html", "expected"), [
+    (
+        "https://www.bcu.ac.uk/courses/certificate-of-professionalism-in-innovation",
+        '<div class="panel__inner"><h2>Schedule</h2><p>Three in-person sessions</p>'
+        '<p>Location: STEAMhouse, Belmont Row, Birmingham, B4 7RQ</p></div>',
+        "STEAMhouse",
+    ),
+    (
+        "https://www.bcu.ac.uk/courses/chartered-surveyor-apprenticeship-bsc-hons-2026-27",
+        '<a href="/Download/Asset/fafa2631-9a67-f011-8dca-6045bd0abbe1">'
+        'Download the BSc (Hons) Quantity Surveying course specification</a>'
+        '<a href="/Download/Asset/b26ec895-9a67-f011-8dca-6045bd0abbe1">'
+        'Download the BSc (Hons) Real Estate course specification</a>',
+        "City Centre",
+    ),
+])
+def test_bcu_course_owned_exception(bcu_config, url, html, expected):
+    results = asyncio.run(location.extract(html, url))
+    assert len(results) == 1
+    assert results[0].value == expected
+    assert results[0].method == "location.bcu_course_source"
+    payload = {"course_location": expected, "course_website": url}
+    apply_recipe_rules(payload, {
+        "location_allowed_values": bcu_config.extraction.text_cleaning.location.allowed_values
+    })
+    assert payload["course_location"] == expected
+
+
+@pytest.mark.parametrize(("url", "html"), [
+    ("https://www.bcu.ac.uk/courses/acting-pgdip-ma-2026-27",
+     '<div class="panel__inner"><h2>Schedule</h2>'
+     '<p>Location: STEAMhouse, Belmont Row, Birmingham, B4 7RQ</p></div>'),
+    ("https://www.bcu.ac.uk/courses/certificate-of-professionalism-in-innovation",
+     '<footer>Location: STEAMhouse, Belmont Row, Birmingham, B4 7RQ</footer>'),
+    ("https://www.bcu.ac.uk/courses/chartered-surveyor-apprenticeship-bsc-hons-2026-27",
+     '<a href="/Download/Asset/fafa2631-9a67-f011-8dca-6045bd0abbe1">'
+     'Download the BSc (Hons) Quantity Surveying course specification</a>'),
+    ("https://www.bcu.ac.uk/courses/other-apprenticeship-bsc-hons-2026-27",
+     '<a href="/Download/Asset/fafa2631-9a67-f011-8dca-6045bd0abbe1">'
+     'Download course specification</a><a href="/Download/Asset/b26ec895-9a67-f011-8dca-6045bd0abbe1">'
+     'Download course specification</a>'),
+])
+def test_bcu_exception_requires_exact_course_source(bcu_config, url, html):
+    assert asyncio.run(location.extract(html, url)) == []
+
+
+def test_bcu_exception_does_not_trust_another_host():
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(
+        '<div class="panel__inner"><h2>Schedule</h2>'
+        '<p>Location: STEAMhouse, Belmont Row, Birmingham, B4 7RQ</p></div>',
+        "html.parser",
+    )
+    assert bcu_course_specific_location(
+        soup, "https://evil.example/courses/certificate-of-professionalism-in-innovation"
+    ) is None

@@ -1616,6 +1616,12 @@ def _from_bcu_keyfacts(soup: BeautifulSoup) -> str | None:
     return None
 
 
+def _from_bcu_course_source(soup: BeautifulSoup, url: str) -> str | None:
+    from app.services.scraper.bcu_location import bcu_course_specific_location
+
+    return bcu_course_specific_location(soup, url)
+
+
 def _from_swinburne_international_hero(soup: BeautifulSoup) -> str | None:
     """Read Swinburne's audience-scoped campus hero fact.
 
@@ -1957,6 +1963,9 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
         # rare) the field stays blank and routes to AI/review queue.
         cascade_list = [
             ("bcu_keyfacts", _from_bcu_keyfacts(soup), 0.98),
+            # Narrow exceptions: the short course's labelled Schedule
+            # location and two linked apprenticeship specifications.
+            ("bcu_course_source", _from_bcu_course_source(soup, url), 0.95),
         ]
     elif "uwl.ac.uk" in (url or "").lower():
         # UWL (University of West London): Angular SPA.
