@@ -467,7 +467,7 @@ class TestCatalogueProviderFailure:
         assert any("Catalogue page 2/2" in msg for msg in events)
 
     @pytest.mark.asyncio
-    async def test_two_unreachable_rendered_pages_stop_the_route(self, monkeypatch):
+    async def test_one_unreachable_rendered_page_stops_the_route(self, monkeypatch):
         from app.services.scraper.http_fetcher import ScrapedoAccountError
 
         pages = [f"https://www.uwl.ac.uk/courses/search?page={n}" for n in range(12)]
@@ -490,7 +490,7 @@ class TestCatalogueProviderFailure:
             "app.services.scraper.http_fetcher.get_last_fetch_error",
             lambda url: failure.get(url),
         )
-        with pytest.raises(CataloguePagesUnavailable):
+        with pytest.raises(CataloguePagesUnavailable) as exc_info:
             await _apply_render_listing_pages(
                 links=[],
                 scrape_url="https://www.uwl.ac.uk",
@@ -503,9 +503,12 @@ class TestCatalogueProviderFailure:
                 _sleep_fn=_instant_sleep,
             )
         assert calls == [
-            (pages[0], False), (pages[0], True), (pages[1], True),
+            (pages[0], False), (pages[0], True),
         ]
-        assert any("stopping discovery" in msg for msg in events)
+        failure_message = str(exc_info.value)
+        assert pages[0] in failure_message
+        assert "2 attempt(s)" in failure_message
+        assert "ROTATION_FAILED" in failure_message
 
         async def account_error(url, *, render, rate_limit, max_retries):
             raise ScrapedoAccountError("account unavailable")
@@ -519,7 +522,7 @@ class TestCatalogueProviderFailure:
 
 
 # ---------------------------------------------------------------------------
-# 9. Failed fetch (empty HTML) — returns 0 links, does not raise
+# 9. Failed fetch (empty HTML) — fails closed after page retries
 # ---------------------------------------------------------------------------
 
 async def _instant_sleep(_seconds: float) -> None:
@@ -528,7 +531,7 @@ async def _instant_sleep(_seconds: float) -> None:
 
 class TestFailedFetch:
     @pytest.mark.asyncio
-    async def test_page_outcomes_distinguish_recovered_retry_from_missing_page(self):
+    async def test_page_outcomes_record_failure_and_later_pages_unattempted(self):
         calls = {}
         pages = [f"https://www.example.edu/catalogue?page={n}" for n in range(1, 4)]
 
@@ -541,20 +544,25 @@ class TestFailedFetch:
             return _html_with_links("/courses/bsc")
 
         outcomes = []
-        added = await _apply_render_listing_pages(
-            links=[], scrape_url="https://www.example.edu",
-            render_pages=pages, allow_patterns=[], block_patterns=[],
-            _fetch_fn=fetch, _sleep_fn=_instant_sleep, emit=_noop_emit,
-            page_outcomes=outcomes,
-        )
+        with pytest.raises(CataloguePagesUnavailable) as exc_info:
+            await _apply_render_listing_pages(
+                links=[], scrape_url="https://www.example.edu",
+                render_pages=pages, allow_patterns=[], block_patterns=[],
+                _fetch_fn=fetch, _sleep_fn=_instant_sleep, emit=_noop_emit,
+                page_outcomes=outcomes,
+            )
         from app.services.scraper.orchestrator import _listing_page_summary
         summary = _listing_page_summary(pages, outcomes)
-        assert added == 1
+        assert pages[1] in str(exc_info.value)
+        assert "3 attempt(s)" in str(exc_info.value)
         assert summary["coverage"] == "incomplete"
-        assert (summary["succeeded"], summary["failed"], summary["retried"]) == (2, 1, 2)
-        assert summary["pages"][0]["url"] == pages[1]
-        assert summary["pages"][0]["attempts"] == 3
+        assert (
+            summary["succeeded"], summary["failed"],
+            summary["not_attempted"], summary["retried"],
+        ) == (1, 1, 1, 2)
+        assert next(p for p in summary["pages"] if p["url"] == pages[1])["attempts"] == 3
         assert next(p for p in summary["pages"] if p["url"] == pages[0])["attempts"] == 2
+        assert next(p for p in summary["pages"] if p["url"] == pages[2])["status"] == "not_attempted"
 
     def test_early_abort_and_bounded_report_include_unattempted_pages(self):
         from app.services.scraper.orchestrator import _listing_page_summary
@@ -568,8 +576,8 @@ class TestFailedFetch:
         assert summary["pages"][0]["url"] == pages[0]
 
     @pytest.mark.asyncio
-    async def test_empty_response_returns_zero_links(self):
-        """fetch_fn returning '' → no links added, no exception raised.
+    async def test_empty_response_fails_closed(self):
+        """fetch_fn returning '' fails closed after the configured retries.
 
         We inject _sleep_fn=_instant_sleep to avoid waiting 72 s per page
         for the three retry back-offs (12 + 24 + 36 s).
@@ -578,44 +586,125 @@ class TestFailedFetch:
             return ""
 
         links: list[dict] = []
-        added = await _apply_render_listing_pages(
-            links=links,
-            scrape_url="https://www.example.edu",
-            render_pages=[
-                "https://www.example.edu/courses?page=1",
-                "https://www.example.edu/courses?page=2",
-            ],
-            allow_patterns=[],
-            block_patterns=[],
-            _fetch_fn=always_empty,
-            _sleep_fn=_instant_sleep,
-            emit=_noop_emit,
-        )
-        assert added == 0
+        pages = [
+            "https://www.example.edu/courses?page=1",
+            "https://www.example.edu/courses?page=2",
+        ]
+        outcomes = []
+        with pytest.raises(CataloguePagesUnavailable) as exc_info:
+            await _apply_render_listing_pages(
+                links=links,
+                scrape_url="https://www.example.edu",
+                render_pages=pages,
+                allow_patterns=[],
+                block_patterns=[],
+                _fetch_fn=always_empty,
+                _sleep_fn=_instant_sleep,
+                emit=_noop_emit,
+                page_outcomes=outcomes,
+            )
+        assert pages[0] in str(exc_info.value)
+        assert "3 attempt(s)" in str(exc_info.value)
         assert links == []
+        assert outcomes[0]["status"] == "failed"
+        assert outcomes[0]["attempts"] == 3
+        from app.services.scraper.orchestrator import _listing_page_summary
+        assert _listing_page_summary(pages, outcomes)["not_attempted"] == 1
 
     @pytest.mark.asyncio
-    async def test_one_page_fails_others_still_succeed(self):
-        """A single page returning '' must not abort processing of subsequent pages."""
-        fetch = _make_fetch({
-            # page=1 missing → returns ""
-            "https://www.example.edu/courses?page=2": _html_with_links("/courses/bsc"),
-        })
+    async def test_isolated_failure_between_pages_fails_closed(self):
+        """A nonconsecutive page failure cannot be hidden by surrounding success."""
+        pages = [f"https://www.example.edu/courses?page={n}" for n in range(1, 5)]
+        calls = []
+
+        async def fetch(url, *, render=True):
+            calls.append(url)
+            if url == pages[1]:
+                return ""
+            return _html_with_links(f"/courses/page-{pages.index(url)}")
+
         links: list[dict] = []
+        outcomes = []
+        with pytest.raises(CataloguePagesUnavailable) as exc_info:
+            await _apply_render_listing_pages(
+                links=links,
+                scrape_url="https://www.example.edu",
+                render_pages=pages,
+                allow_patterns=[],
+                block_patterns=[],
+                _fetch_fn=fetch,
+                _sleep_fn=_instant_sleep,
+                emit=_noop_emit,
+                page_outcomes=outcomes,
+            )
+        assert pages[1] in str(exc_info.value)
+        assert calls.count(pages[0]) == 1
+        assert calls.count(pages[1]) == 3
+        assert pages[2] not in calls and pages[3] not in calls
+        assert [outcome["status"] for outcome in outcomes] == ["succeeded", "failed"]
+
+    @pytest.mark.asyncio
+    async def test_transient_empty_retry_then_success_completes(self):
+        calls = 0
+
+        async def fetch(url, *, render=True):
+            nonlocal calls
+            calls += 1
+            return "" if calls == 1 else _html_with_links("/courses/bsc")
+
+        page = "https://www.example.edu/courses"
+        outcomes = []
+        links = []
         added = await _apply_render_listing_pages(
             links=links,
             scrape_url="https://www.example.edu",
-            render_pages=[
-                "https://www.example.edu/courses?page=1",
-                "https://www.example.edu/courses?page=2",
-            ],
+            render_pages=[page],
             allow_patterns=[],
             block_patterns=[],
             _fetch_fn=fetch,
             _sleep_fn=_instant_sleep,
             emit=_noop_emit,
+            page_outcomes=outcomes,
         )
-        assert added == 1, "page=2 links should still be collected even if page=1 failed"
+        from app.services.scraper.orchestrator import _listing_page_summary
+        summary = _listing_page_summary([page], outcomes)
+        assert added == 1
+        assert calls == 2
+        assert summary["coverage"] == "complete"
+        assert summary["retried"] == 1
+        assert outcomes[0]["status"] == "succeeded"
+
+    @pytest.mark.asyncio
+    async def test_fetch_exceptions_retry_then_fail_with_bounded_diagnostic(self):
+        calls = 0
+        page = "https://www.example.edu/catalogue"
+
+        async def raises_fetch_error(url, *, render=True):
+            nonlocal calls
+            calls += 1
+            raise OSError("upstream socket closed " + ("x" * 500))
+
+        outcomes = []
+        with pytest.raises(CataloguePagesUnavailable) as exc_info:
+            await _apply_render_listing_pages(
+                links=[],
+                scrape_url="https://www.example.edu",
+                render_pages=[page],
+                allow_patterns=[],
+                block_patterns=[],
+                _fetch_fn=raises_fetch_error,
+                _sleep_fn=_instant_sleep,
+                emit=_noop_emit,
+                page_outcomes=outcomes,
+            )
+        message = str(exc_info.value)
+        assert calls == 3
+        assert page in message
+        assert "3 attempt(s)" in message
+        assert "OSError: upstream socket closed" in message
+        assert len(message) < 500
+        assert outcomes[0]["status"] == "failed"
+        assert outcomes[0]["attempts"] == 3
 
 
 # ---------------------------------------------------------------------------
@@ -660,16 +749,17 @@ class TestEmitCallbacks:
         async def empty_fetch(url: str, *, render: bool = True) -> str:
             return ""
 
-        await _apply_render_listing_pages(
-            links=[],
-            scrape_url="https://www.example.edu",
-            render_pages=["https://www.example.edu/courses"],
-            allow_patterns=[],
-            block_patterns=[],
-            _fetch_fn=empty_fetch,
-            _sleep_fn=_instant_sleep,
-            emit=capture_emit,
-        )
+        with pytest.raises(CataloguePagesUnavailable):
+            await _apply_render_listing_pages(
+                links=[],
+                scrape_url="https://www.example.edu",
+                render_pages=["https://www.example.edu/courses"],
+                allow_patterns=[],
+                block_patterns=[],
+                _fetch_fn=empty_fetch,
+                _sleep_fn=_instant_sleep,
+                emit=capture_emit,
+            )
         assert not any("Rendered listing pages" in msg for _, msg in events), (
             "Completion emit must be suppressed when 0 links are added"
         )

@@ -857,7 +857,6 @@ async def _apply_render_listing_pages(
     _rlp_base = f"{_rlp_parsed_base.scheme}://{_rlp_parsed_base.netloc}"
     _rlp_host = _rlp_parsed_base.netloc
     _rlp_render = not render_static
-    _consecutive_render_rotation_failures = 0
 
     log.info(
         "[RENDER_PAGES] fetching %d listing page(s) via Scrape.do (render=%s)",
@@ -880,6 +879,7 @@ async def _apply_render_listing_pages(
         }
         if page_outcomes is not None:
             page_outcomes.append(_outcome)
+        _last_page_error = "empty response"
         try:
             _rlp_html = None
             for _rlp_attempt in range(3):
@@ -888,16 +888,32 @@ async def _apply_render_listing_pages(
                 try:
                     # The listing loop owns retries. Avoid multiplying its three
                     # attempts by the fetcher's own retry ladder.
-                    _rlp_html = await _fetch_fn(
-                        _rlp_url, render=_rlp_render, rate_limit=False, max_retries=0,
-                    )
-                except TypeError:
-                    # _fetch_fn may be a test double / injected callable that
-                    # doesn't accept rate_limit — fall back gracefully.
-                    _rlp_html = await _fetch_fn(_rlp_url, render=_rlp_render)
+                    try:
+                        _rlp_html = await _fetch_fn(
+                            _rlp_url, render=_rlp_render, rate_limit=False, max_retries=0,
+                        )
+                    except TypeError:
+                        # _fetch_fn may be a test double / injected callable that
+                        # doesn't accept rate_limit — fall back gracefully.
+                        _rlp_html = await _fetch_fn(_rlp_url, render=_rlp_render)
+                except ScrapedoAccountError:
+                    raise
+                except Exception as _fetch_exc:
+                    _rlp_html = None
+                    _last_page_error = (
+                        f"{type(_fetch_exc).__name__}: {str(_fetch_exc) or 'fetch exception'}"
+                    )[:300]
                 if _rlp_html:
                     break
                 _fetch_error = get_last_fetch_error(_rlp_url)
+                if (
+                    _fetch_error
+                    and _fetch_error.get("ts", 0) >= _fetch_started
+                    and _fetch_error.get("detail")
+                ):
+                    _last_page_error = str(_fetch_error["detail"])[:300]
+                elif _rlp_html is None and _last_page_error == "empty response":
+                    _last_page_error = "fetch returned no usable HTML"
                 _rotation_failed = bool(
                     _fetch_error
                     and _fetch_error.get("ts", 0) >= _fetch_started
@@ -913,7 +929,8 @@ async def _apply_render_listing_pages(
                     )
                     continue
                 # Repeating a provider-level connect failure on the same route
-                # cannot reveal new links. Try another page, not this same one.
+                # cannot reveal new links. End retries for this page and fail
+                # closed below rather than accepting partial catalogue coverage.
                 if _rotation_failed:
                     break
                 if _rlp_attempt == 2:
@@ -925,32 +942,23 @@ async def _apply_render_listing_pages(
                 )
                 await _sleep(_rlp_wait)
             if not _rlp_html:
-                log.warning("[RENDER_PAGES] no response from %s after 3 attempts", _rlp_url)
+                _failure_detail = _last_page_error[:300]
+                _failure_message = (
+                    f"Catalogue page unavailable after {_outcome['attempts']} attempt(s): "
+                    f"{_rlp_url}; last error: {_failure_detail}"
+                )
+                log.warning("[RENDER_PAGES] %s", _failure_message)
                 await emit(
-                    "status",
-                    f"[DISCOVER] Catalogue page {_page_number}/{len(render_pages)} "
-                    f"unavailable: {_rlp_url}",
+                    "status", f"[DISCOVER] {_failure_message}",
                     phase="discover",
                 )
-                if _rlp_render and _rotation_failed:
-                    _consecutive_render_rotation_failures += 1
-                    if _consecutive_render_rotation_failures >= 2:
-                        message = (
-                            "Catalogue provider cannot reach two consecutive "
-                            "rendered pages; stopping discovery rather than "
-                            "staging an incomplete catalogue."
-                        )
-                        await emit(
-                            "status",
-                            f"[ERROR] {message}",
-                            phase="discover",
-                            level="error",
-                        )
-                        raise CataloguePagesUnavailable(message)
-                else:
-                    _consecutive_render_rotation_failures = 0
-                continue
-            _consecutive_render_rotation_failures = 0
+                await emit(
+                    "status",
+                    f"[ERROR] {_failure_message}",
+                    phase="discover",
+                    level="error",
+                )
+                raise CataloguePagesUnavailable(_failure_message)
             _rlp_hrefs = re.findall(r'href=["\']([^"\'<> ]+)["\']', _rlp_html)
             _added_this = 0
             for _h in _rlp_hrefs:
@@ -1003,7 +1011,20 @@ async def _apply_render_listing_pages(
         except CataloguePagesUnavailable:
             raise
         except Exception as _rlp_exc:
-            log.warning("[RENDER_PAGES] failed %s: %s", _rlp_url, _rlp_exc)
+            _error_detail = (
+                f"{type(_rlp_exc).__name__}: "
+                f"{str(_rlp_exc) or 'page processing error'}"
+            )[:300]
+            _failure_message = (
+                f"Catalogue page failed after {_outcome['attempts']} attempt(s): "
+                f"{_rlp_url}; last error: {_error_detail}"
+            )
+            log.warning("[RENDER_PAGES] %s", _failure_message)
+            await emit(
+                "status", f"[ERROR] {_failure_message}",
+                phase="discover", level="error",
+            )
+            raise CataloguePagesUnavailable(_failure_message) from _rlp_exc
 
     if _rlp_total_added:
         log.info(
