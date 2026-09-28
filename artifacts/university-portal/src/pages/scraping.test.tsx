@@ -281,6 +281,47 @@ function initialReview(): ScrapingInitialReviewState {
 }
 
 describe("Scraping repair reviewer", () => {
+  it("blocks PT-only normal review approval but submits mixed and eligible rows, leaving blocked selected", async () => {
+    const review = initialReview();
+    review.courses = [
+      { ...review.courses[0], studyLoad: "PartTimeOnly" },
+      { ...review.courses[1], studyLoad: "Fulltime/Parttime" },
+      { ...review.courses[2], studyLoad: "FullTime" },
+    ] as ScrapingInitialReviewState["courses"];
+    const published = new Set<number>();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/scrape/staged/approve-selected") {
+        const ids = JSON.parse(String(init?.body)).courseIds as number[];
+        ids.forEach(id => published.add(id));
+        return jsonResponse({ approvedIds: ids, approvedCount: ids.length, failed: [], attempted: ids.length });
+      }
+      if (url === "/api/scrape/staged/repair-job") return jsonResponse({ courses: review.courses.filter(course => !published.has(course.id)) });
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.endsWith("/course-quality")) return jsonResponse({ courses: [] });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ScrapingForTest initialReviewState={review} />);
+    expect((screen.getByTestId("button-approve-logical-course-1") as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId("button-approve-logical-course-1").title).toMatch(/part-time-only/i);
+    expect((screen.getByTestId("button-approve-logical-course-2") as HTMLButtonElement).disabled).toBe(false);
+    const user = userEvent.setup();
+    for (const id of [1, 2, 3]) {
+      const checkbox = screen.getByTestId(`checkbox-logical-course-${id}`) as HTMLInputElement;
+      if (!checkbox.checked) await user.click(checkbox);
+    }
+    await user.click(screen.getByRole("button", { name: "Approve (3 courses)" }));
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => String(url) === "/api/scrape/staged/approve-selected")).toHaveLength(2));
+    expect(fetchMock.mock.calls.filter(([url]) => String(url) === "/api/scrape/staged/approve-selected")
+      .map(([, init]) => JSON.parse(String(init?.body)).courseIds)).toEqual([[2], [3]]);
+    await waitFor(() => expect((screen.getByTestId("checkbox-logical-course-1") as HTMLInputElement).checked).toBe(true));
+    expect(screen.getByTestId("button-approve-logical-course-1")).toBeTruthy();
+    expect(screen.queryByTestId("button-approve-logical-course-2")).toBeNull();
+  });
+
   it("shows linked Manchester/Birmingham campus rows as one unselected course and approves both staged IDs", async () => {
     const review = initialReview();
     const makeCampusRow = (id: number, courseLocation: string, fee: number) => ({

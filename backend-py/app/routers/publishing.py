@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.services.scraper.approve_course import ApprovalValidationError
 from app.services.publishing_engine import (
     get_ledger,
     get_publishing_stats,
@@ -85,6 +86,8 @@ class ReviewAction(BaseModel):
 async def approve(sc_id: int, body: ReviewAction, db: Annotated[AsyncSession, Depends(get_db)]):
     try:
         return await manually_approve(sc_id, body.reason, db)
+    except ApprovalValidationError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:

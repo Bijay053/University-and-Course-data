@@ -52,6 +52,7 @@ import { ScholarshipsPanel } from "./university-detail/scholarships-panel";
 import { AssessmentPanel } from "./university-detail/assessment-panel";
 import { RawDataPanel } from "./university-detail/rawdata-panel";
 import { groupLegacyCampusRows } from "@/utils/legacy-campus-groups";
+import { blockedApprovalIds, isPartTimeOnlyCourse, PART_TIME_APPROVAL_REASON } from "@/utils/part-time-approval";
 import { LocationsPanel } from "./university-detail/locations-panel";
 
 const ALL = "__all__";
@@ -1204,7 +1205,16 @@ export default function UniversityDetail() {
     if ((rawSelectedIds.size === 0 && !explicitIds?.length) || bulkApproveRunning) return;
     setBulkApproveRunning(true);
     const ids = explicitIds ?? Array.from(rawSelectedIds);
-    const requested = new Set(ids);
+    const skipped = new Set(groupLegacyCampusRows(rawData)
+      .filter(group => group.members.some(isPartTimeOnlyCourse))
+      .flatMap(group => group.ids.filter(courseId => ids.includes(courseId))));
+    const safeIds = ids.filter(courseId => !skipped.has(courseId));
+    if (!safeIds.length) {
+      setBulkApproveRunning(false);
+      toast({ title: "Approval blocked", description: `${skipped.size} review entries left pending. ${PART_TIME_APPROVAL_REASON}`, variant: "destructive" });
+      return;
+    }
+    const requested = new Set(safeIds);
     const batches = groupLegacyCampusRows(rawData)
       .map(group => group.ids.filter(courseId => requested.has(courseId)))
       .filter(batch => batch.length > 0);
@@ -1261,6 +1271,7 @@ export default function UniversityDetail() {
         title: force ? "Force approve complete" : "Bulk approve complete",
         description: [
           `${approvedCount} approved${force ? " (confidence gate bypassed)" : ""}.`,
+          skipped.size > 0 ? `${skipped.size} skipped: ${PART_TIME_APPROVAL_REASON} Groups containing a blocked campus remain pending.` : "",
           remaining.length > 0 ? `${remaining.length} left pending: ${failures.slice(0, 3).map(failure => failure.error).join(" · ") || "Review their source data."}` : "",
         ].filter(Boolean).join(" "),
         ...(remaining.length > 0 ? { variant: "destructive" as const } : {}),
@@ -1486,6 +1497,10 @@ export default function UniversityDetail() {
 
   async function handleApprove(courseId: number, force = false) {
     if (rawCampusProgress) return;
+    if (blockedApprovalIds(rawData, [courseId]).length) {
+      toast({ title: "Approval blocked", description: PART_TIME_APPROVAL_REASON, variant: "destructive" });
+      return;
+    }
     setApprovingId(courseId);
     try {
       const res = await fetch(`${BASE}/api/scrape/staged/${courseId}/approve`, {

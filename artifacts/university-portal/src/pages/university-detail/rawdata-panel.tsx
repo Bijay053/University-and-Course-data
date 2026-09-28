@@ -1,6 +1,7 @@
 import React from "react";
 import type { StagedCourse } from "../university-detail";
 import { groupLegacyCampusRows } from "../../utils/legacy-campus-groups";
+import { isPartTimeOnlyCourse, PART_TIME_APPROVAL_REASON } from "../../utils/part-time-approval";
 
 type Setter<T> = React.Dispatch<React.SetStateAction<T>>;
 interface RawDataPanelProps {
@@ -37,6 +38,9 @@ export function RawDataPanel(props: RawDataPanelProps) {
   const filteredIds = new Set(filteredRaw.map(course => course.id));
   const logicalGroups = groupLegacyCampusRows(rawData)
     .filter(group => group.members.some(member => filteredIds.has(member.id)));
+  const selectedGroups = groupLegacyCampusRows(rawData).filter(group => group.ids.some(id => rawSelectedIds.has(id)));
+  const selectedBlocked = selectedGroups.filter(group => group.members.some(isPartTimeOnlyCourse));
+  const canApproveSelection = selectedGroups.some(group => !group.members.some(isPartTimeOnlyCourse));
   const toggleGroupSelection = (ids: number[]) => setRawSelectedIds(previous => {
     const next = new Set(previous);
     const allSelected = ids.every(id => next.has(id));
@@ -145,7 +149,7 @@ export function RawDataPanel(props: RawDataPanelProps) {
                 </Button>
                 <Button
                   size="sm"
-                  disabled={rawLoading || bulkMapRunning || bulkApproveRunning}
+                  disabled={rawLoading || bulkMapRunning || bulkApproveRunning || !canApproveSelection}
                   onClick={() => handleBulkApprove(false)}
                   className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
                 >
@@ -159,14 +163,15 @@ export function RawDataPanel(props: RawDataPanelProps) {
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={bulkMapRunning || bulkApproveRunning || bulkRejectRunning}
+                  disabled={bulkMapRunning || bulkApproveRunning || bulkRejectRunning || !canApproveSelection}
                   onClick={() => setShowForceApproveConfirm(true)}
                   className="h-7 text-xs border-amber-400 text-amber-700 bg-amber-50 hover:bg-amber-100"
-                  title="Approve even if confidence is below the 60-point minimum"
+                  title={!canApproveSelection ? PART_TIME_APPROVAL_REASON : "Approve even if confidence is below the 60-point minimum"}
                 >
                   <AlertTriangle className="h-3.5 w-3.5 mr-1" />
                   {`Force Approve (${rawSelectedIds.size})`}
                 </Button>
+                {selectedBlocked.length > 0 && <span className="text-xs text-amber-800" role="status">{PART_TIME_APPROVAL_REASON} Blocked groups remain pending.</span>}
                 <Button
                   size="sm"
                   variant="outline"
@@ -658,8 +663,8 @@ export function RawDataPanel(props: RawDataPanelProps) {
                                   if (members.length === 1) void handleApprove(c.id);
                                   else void handleBulkApprove(false, ids);
                                 }}
-                                disabled={approvingId === c.id}
-                                title="Approve & Import"
+                                disabled={approvingId === c.id || members.some(isPartTimeOnlyCourse)}
+                                title={members.some(isPartTimeOnlyCourse) ? PART_TIME_APPROVAL_REASON : "Approve & Import"}
                                 data-testid={`button-approve-raw-course-${c.id}`}
                                 className="p-1 rounded hover:bg-green-100 text-green-600 disabled:opacity-40 cursor-pointer"
                               >
@@ -679,13 +684,14 @@ export function RawDataPanel(props: RawDataPanelProps) {
                                     });
                                   }
                                 }}
-                                disabled={approvingId === c.id}
-                                title="Force Approve (bypass confidence gate)"
+                                disabled={approvingId === c.id || members.some(isPartTimeOnlyCourse)}
+                                title={members.some(isPartTimeOnlyCourse) ? PART_TIME_APPROVAL_REASON : "Force Approve (bypass confidence gate)"}
                                 data-testid={`button-force-approve-raw-course-${c.id}`}
                                 className="p-1 rounded hover:bg-amber-100 text-amber-600 disabled:opacity-40 cursor-pointer"
                               >
                                 <AlertTriangle className="w-3.5 h-3.5" />
                               </button>
+                              {members.some(isPartTimeOnlyCourse) && <span className="text-[10px] text-amber-800" role="status">{PART_TIME_APPROVAL_REASON} Group remains pending.</span>}
                             </>
                           )}
                           <button

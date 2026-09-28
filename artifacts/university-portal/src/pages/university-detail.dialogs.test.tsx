@@ -57,7 +57,7 @@ type ApprovalResult = {
   approvedIds: number[]; approvedCount: number; splitCount: number;
   failed: Array<{ id: number; error: string }>; attempted: number;
 };
-function renderPage(approval?: (sourceId: number, force: boolean) => ApprovalResult, legacyCampusSplit = false, includeUnrelatedRawRow = false) {
+function renderPage(approval?: (sourceId: number, force: boolean) => ApprovalResult, legacyCampusSplit = false, includeUnrelatedRawRow = false, studyById?: Record<number, string>) {
   const approvedSources = new Set<number>();
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
@@ -89,7 +89,7 @@ function renderPage(approval?: (sourceId: number, force: boolean) => ApprovalRes
               campus_fee_scope: { split_from_id: 12, original_name: "MSc Healthcare Management" },
               fee_variants: { selected: [{ campus: "Manchester", amount: 18000, year: 2026, period: "Annual", study_variant: "Standard" }] },
             } : undefined,
-            status: "pending", completeness: 45,
+            status: "pending", completeness: 45, study_load: studyById?.[12],
           },
           {
             id: 13, university_id: 7, scrape_job_id: "campus-job", course_name: legacyCampusSplit ? "MSc Healthcare Management" : "Campus-fee Course",
@@ -99,13 +99,13 @@ function renderPage(approval?: (sourceId: number, force: boolean) => ApprovalRes
               campus_fee_scope: { split_from_id: 12, original_name: "MSc Healthcare Management" },
               fee_variants: { selected: [{ campus: "Birmingham", amount: 19500, year: 2026, period: "Annual", study_variant: "Standard" }] },
             } : undefined,
-            status: "pending", completeness: 70,
+            status: "pending", completeness: 70, study_load: studyById?.[13],
           },
         ].filter(c => !approvedSources.has(c.id)).concat(includeUnrelatedRawRow ? [{
           id: 14, university_id: 7, scrape_job_id: "other-job", course_name: "Unrelated Selected Course",
           course_website: "https://example.edu/unrelated", course_location: "Perth", degree_level: "Bachelor",
           fee_year: 2026, fee_term: "Annual", currency: "AUD", international_fee: 1000,
-          extraction_method: undefined, status: "pending", completeness: 65,
+          extraction_method: undefined, status: "pending", completeness: 65, study_load: studyById?.[14],
         }] : []) : [{ id: 12, course_name: "Staged Accessible Course", status: "pending", completeness: 45 }])
       : url.includes("/repair/missing/")
       ? { courses: [] }
@@ -142,6 +142,29 @@ async function expectDialogAndClose(
 }
 
 describe("University Detail dialogs", () => {
+  it("disables normal and force approval for PT-only raw rows while publishing mixed/eligible selections", async () => {
+    const user = userEvent.setup();
+    const { fetchMock } = renderPage(sourceId => ({
+      approvedIds: [sourceId], approvedCount: 1, splitCount: 0, failed: [], attempted: 1,
+    }), false, true, { 12: "PartTimeOnly", 13: "Fulltime/Parttime", 14: "FullTime" });
+    await openTab(user, "Raw Data");
+    await screen.findByText("Staged Accessible Course");
+    expect((screen.getByTestId("button-approve-raw-course-12") as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByTestId("button-force-approve-raw-course-12") as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId("button-approve-raw-course-12").title).toMatch(/part-time-only/i);
+    expect((screen.getByTestId("button-approve-raw-course-13") as HTMLButtonElement).disabled).toBe(false);
+    await user.click(screen.getByTitle("Select all"));
+    await user.click(screen.getByRole("button", { name: "Approve (3)" }));
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/approve-selected"))).toHaveLength(2));
+    const calls = fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/approve-selected"));
+    expect(calls.map(([, init]) => JSON.parse(String(init?.body)))).toEqual([
+      { courseIds: [13], force: false }, { courseIds: [14], force: false },
+    ]);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Approve (1)" })).toBeTruthy());
+    expect((screen.getByTestId("button-force-approve-raw-course-12") as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("Staged Accessible Course")).toBeTruthy();
+  });
+
   it("shows legacy campus splits once and expands bulk approval to both persisted IDs", async () => {
     const user = userEvent.setup();
     const { fetchMock } = renderPage(() => ({

@@ -92,6 +92,9 @@ def should_auto_publish(sc: ScrapedCourse) -> AutoPublishDecision:
     score = float(sc.decision_score or 0)
 
     # ── Hard-required field checks ────────────────────────────────────────
+    from app.services.scraper.approve_course import is_part_time_only_course, PART_TIME_APPROVAL_MESSAGE
+    if is_part_time_only_course(sc):
+        return AutoPublishDecision(False, PART_TIME_APPROVAL_MESSAGE, score)
     from app.services.scraper.extractors.ulaw_fees import validated_fee_variants
     fee_variants = validated_fee_variants(sc)
     fee_metadata = getattr(sc, "extraction_method", None)

@@ -18,7 +18,7 @@ from sqlalchemy.pool import NullPool
 from app.database import Base
 from app.models import (
     AcademicRequirement, Course, EnglishRequirement, Fee, Intake,
-    ScrapedCourse, University,
+    ScrapedCourse, ScrapedFieldEvidence, University,
 )
 from app.models.sub_category import CourseSubCategory
 from tests.test_bulk_approval_errors import _post_bulk_approval
@@ -64,7 +64,7 @@ async def approval_database(approval_postgres):
         tables = {
             model.__table__ for model in (
                 University, ScrapedCourse, Course, EnglishRequirement,
-                Fee, Intake, AcademicRequirement,
+                Fee, Intake, AcademicRequirement, ScrapedFieldEvidence,
                 CourseSubCategory,
             )
         }

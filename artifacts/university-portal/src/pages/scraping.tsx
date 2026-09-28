@@ -37,6 +37,7 @@ import { DatedCatalogueReview } from "@/components/dated-catalogue-review";
 import { QualificationRefresh } from "@/components/qualification-refresh";
 import { ApprovedQualificationCohorts } from "@/components/approved-qualification-cohorts";
 import { DEGREE_LEVELS, FEE_TERM_OPTIONS, STUDY_LOADS, STUDY_MODES } from "@/lib/course-constants";
+import { blockedApprovalIds, isPartTimeOnlyCourse, PART_TIME_APPROVAL_REASON } from "@/utils/part-time-approval";
 
 function optionsIncludingCurrent(options: string[], current: string | null): string[] {
   return current && !options.includes(current) ? [current, ...options] : options;
@@ -2507,7 +2508,15 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     if (!reviewJobId || (selectedIds.size === 0 && !explicitIds?.length) || approving || approvalInFlight.current) return;
     const ids = stagedCourses.filter(c => explicitIds ? explicitIds.includes(c.id) : selectedIds.has(c.id)).map(c => c.id);
     if (ids.length === 0) return;
-    const requested = new Set(ids);
+    const blockedGroups = groupLegacyCampusRows(stagedCourses).filter(group =>
+      blockedApprovalIds(group.members, group.ids).length > 0);
+    const skipped = new Set(blockedGroups.flatMap(group => group.ids.filter(id => ids.includes(id))));
+    const safeIds = ids.filter(id => !skipped.has(id));
+    if (safeIds.length === 0) {
+      toast({ title: "Approval blocked", description: `${skipped.size} review entries left pending. ${PART_TIME_APPROVAL_REASON}`, variant: "destructive" });
+      return;
+    }
+    const requested = new Set(safeIds);
     const batches = groupLegacyCampusRows(stagedCourses)
       .map(group => group.ids.filter(id => requested.has(id)))
       .filter(batch => batch.length > 0);
@@ -2587,6 +2596,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       toast({
         title: `${approvedCourseCount} course${approvedCourseCount === 1 ? "" : "s"} approved`,
         description: [
+          skipped.size > 0 ? `${skipped.size} skipped: ${PART_TIME_APPROVAL_REASON} Groups containing a blocked campus remain pending.` : "",
           remaining.size > 0 ? `${remaining.size} campus review entries remain pending. ${failures.slice(0, 3).map(f => f.error).join(" · ") || "Refresh and review their source data."}` : "",
           !refreshed ? "Review could not be refreshed; reload the page to see current rows." : "",
         ].filter(Boolean).join(" ") || "Selected courses were published successfully.",
@@ -2607,6 +2617,10 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   };
 
   const handleApproveSingle = async (id: number, memberIds: number[] = [id]) => {
+    if (blockedApprovalIds(stagedCourses, memberIds).length) {
+      toast({ title: "Approval blocked", description: PART_TIME_APPROVAL_REASON, variant: "destructive" });
+      return;
+    }
     if (memberIds.length > 1) {
       await handleApproveSelected(memberIds);
       return;
@@ -3764,7 +3778,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                   size="sm"
                   className="bg-green-600 hover:bg-green-700 text-white"
                   onClick={() => handleApproveSelected()}
-                  disabled={selectedIds.size === 0 || approving || campusProgress !== null}
+                  disabled={selectedIds.size === 0 || approving || campusProgress !== null || !logicalGroups.some(group => group.ids.some(id => selectedIds.has(id)) && !group.members.some(isPartTimeOnlyCourse))}
                   title="Submit selected courses for approval; review location-specific fee evidence before publishing"
                 >
                   {approving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1" />}
@@ -3783,6 +3797,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             <p className="text-sm text-muted-foreground" role="status">
               One course can include multiple locations and their fee evidence. Review location-specific fees before approval; unresolved fees remain pending.
             </p>
+            {logicalGroups.some(group => group.ids.some(id => selectedIds.has(id)) && group.members.some(isPartTimeOnlyCourse)) && (
+              <p className="text-sm text-amber-800" role="status">{PART_TIME_APPROVAL_REASON} Selected groups containing a part-time-only campus will be skipped and left pending.</p>
+            )}
           </CardHeader>
           <CardContent>
             {retryRows.length > 0 && (
@@ -4377,10 +4394,10 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                className={`h-7 w-7 ${qData && qData.score < 60 ? "text-gray-300 cursor-not-allowed" : "text-green-600 hover:bg-green-50"}`}
-                                onClick={qData && qData.score < 60 ? undefined : () => handleApproveSingle(course.id, ids)}
-                                disabled={campusProgress !== null || approvingId === course.id || (qData !== undefined && qData.score < 60)}
-                                title={qData && qData.score < 60 ? `Cannot approve — Data Quality Failure (score ${qData.score}%)` : "Approve and publish this course"}
+                                className={`h-7 w-7 ${members.some(isPartTimeOnlyCourse) || qData && qData.score < 60 ? "text-gray-300 cursor-not-allowed" : "text-green-600 hover:bg-green-50"}`}
+                                onClick={members.some(isPartTimeOnlyCourse) || qData && qData.score < 60 ? undefined : () => handleApproveSingle(course.id, ids)}
+                                disabled={campusProgress !== null || approvingId === course.id || members.some(isPartTimeOnlyCourse) || (qData !== undefined && qData.score < 60)}
+                                title={members.some(isPartTimeOnlyCourse) ? PART_TIME_APPROVAL_REASON : qData && qData.score < 60 ? `Cannot approve — Data Quality Failure (score ${qData.score}%)` : "Approve and publish this course"}
                                 data-testid={`button-approve-logical-course-${course.id}`}
                               >
                                 {approvingId === course.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
@@ -4404,6 +4421,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                                 ⛔ QF — blocked
                               </span>
                             )}
+                            {members.some(isPartTimeOnlyCourse) && <span className="text-[10px] font-semibold text-amber-800">{PART_TIME_APPROVAL_REASON}</span>}
                           </div>
                         </td>
                       </tr>

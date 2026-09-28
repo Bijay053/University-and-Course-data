@@ -29,6 +29,64 @@ from app.services.sub_category_matcher import resolve_sub_category
 import re
 
 
+_PART_TIME = re.compile(r"\bpart[\s_-]*time\b", re.I)
+_FULL_TIME = re.compile(r"\bfull[\s_-]*time\b", re.I)
+_ONLY_PART_TIME = re.compile(
+    r"\b(?:part[\s_-]*time\s+only|only\s+(?:available|offered|delivered|studied)\s+"
+    r"(?:as\s+|on\s+a\s+)?part[\s_-]*time|available\s+only\s+"
+    r"(?:as\s+|on\s+a\s+)?part[\s_-]*time)\b", re.I,
+)
+PART_TIME_APPROVAL_MESSAGE = (
+    "Cannot approve: this course is offered part-time only. "
+    "Verify a full-time route on the official course page and update the staged study mode/load before retrying."
+)
+
+
+def is_part_time_only_course(sc, evidence=()) -> bool:
+    """Final catalogue boundary; unknown delivery is not proof of part-time study.
+
+    Only selected, course-specific structured mode/duration evidence is considered.
+    Generic page prose (including 'some programs are only available part time')
+    must not override an actual full-time offering.
+    """
+    mode = str(getattr(sc, "study_mode", None) or "")
+    load = str(getattr(sc, "study_load", None) or "")
+    values = (mode, load)
+    bounded = []
+    for item in evidence:
+        if item.field_key not in {"study_mode", "study_load", "duration"} or not item.selected:
+            continue
+        if item.page_type not in {"course", "course_page", None}:
+            continue
+        candidate = str(item.normalized_value or item.candidate_value or "")
+        if candidate:
+            bounded.append(candidate)
+        snippet = str(item.snippet or "")
+        if not snippet and item.raw_text and len(item.raw_text) <= 250:
+            snippet = item.raw_text
+        if snippet and not re.search(r"\bsome\s+(?:programs?|courses?)\b", snippet, re.I):
+            bounded.append(snippet)
+
+    if any(_ONLY_PART_TIME.search(value) for value in (*values, *bounded)):
+        return True
+    # A legacy study_mode="Part-time" is more specific than a defaulted
+    # study_load="Full Time". Both and genuinely mixed modes remain eligible.
+    def full_time_route(value):
+        return bool(_FULL_TIME.search(value) and not re.search(
+            r"\b(?:equivalent\s+full[\s_-]*time|full[\s_-]*time\s+equivalent)\b", value, re.I,
+        ))
+
+    if mode.strip().casefold() == "both" or full_time_route(mode):
+        return False
+    if any(full_time_route(value) for value in bounded):
+        return False
+    if _PART_TIME.search(mode):
+        return True
+    if full_time_route(load):
+        return False
+    return any(_PART_TIME.search(value) for value in (*values, *bounded))
+
+
 class ApprovalValidationError(ValueError):
     """Intentional approval rejection whose message is safe for reviewers."""
 
@@ -144,6 +202,18 @@ async def approve_scraped_course(
         raise ApprovalValidationError(
             "Online-only course was rejected on re-extraction; re-stage from current campus evidence before approval"
         )
+    from app.models import ScrapedFieldEvidence
+    evidence = ()
+    if isinstance(sc, ScrapedCourse):
+        evidence = (await db.execute(
+            select(ScrapedFieldEvidence).where(
+                ScrapedFieldEvidence.scraped_course_id == sc.id,
+                ScrapedFieldEvidence.selected.is_(True),
+                ScrapedFieldEvidence.field_key.in_(("study_mode", "study_load", "duration")),
+            )
+        )).scalars().all()
+    if is_part_time_only_course(sc, evidence):
+        raise ApprovalValidationError(PART_TIME_APPROVAL_MESSAGE)
     # Fee selection may be committing concurrently. For variant-backed rows,
     # decide only after taking the row lock and refreshing the staged values.
     if unresolved_fee_selection(sc) and not (

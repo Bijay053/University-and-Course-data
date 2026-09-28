@@ -14,3 +14,9 @@ UTAS duration panels append catalogue-wide explanatory prose saying that study t
 **Why:** Treating the shared sentence as course-specific rejected hundreds of valid UTAS courses before extraction, including courses whose same panel explicitly offered both part-time and full-time study.
 
 **How to apply:** Generic “some programs” guidance can never prove part-time-only status. Require wording anchored to the current course or a bounded duration value that offers only part-time study.
+
+Legacy staged rows can hold “Part-time” in study mode while study load is missing or defaulted to “Full Time.”
+
+**Why:** Approval must not treat a defaulted load as verified availability when the course-specific mode explicitly says part-time.
+
+**How to apply:** Check both fields at the final publication boundary, including force and bulk actions. Mixed full-time/part-time availability remains eligible; unknown mode alone is not proof of part-time-only delivery.
