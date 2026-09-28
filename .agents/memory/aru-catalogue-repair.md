@@ -20,3 +20,9 @@ The official-catalogue repair fallback is separate from normal discovery: a site
 **Why:** ARU’s normal discovery found hundreds of public URLs, while the fallback’s generic course-path matcher excluded ARU’s study-path course URLs.
 
 **How to apply:** When comparing repair to a fresh scrape, check both discovery implementations and their source-host/URL filtering, not just their shared university recipe.
+
+Bounded repair samples must be chosen after filtering the complete configured sitemap, not from its first N raw locations. Category/navigation URLs often appear first; a valid official source can otherwise produce a failed repair probe before any real course is checked.
+
+**Why:** The initial live fallback had many public-host candidates but sampled only ARU subject-area and guidance pages. Those pages cannot establish course-owned evidence, even though degree detail pages were present later in the same sitemap.
+
+**How to apply:** Keep candidate output bounded but distribute the evidence sample among likely degree details, and separately verify that the sample pages really classify as courses. A healthy sample still does not certify the whole catalogue.

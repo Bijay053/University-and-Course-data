@@ -457,6 +457,135 @@ async def test_aru_repair_uses_canonicalized_sitemap_candidates_and_rejects_fore
 
 
 @pytest.mark.asyncio
+async def test_configured_sitemap_filters_all_rows_and_samples_course_details(monkeypatch):
+    from app.services.scraper import sitemap as sitemap_mod
+    from app.services.scraper.official_catalogue_repair import discover_official_catalogue
+
+    seed = "https://www.aru.ac.uk"
+    cfg = config()
+    cfg.discovery = DiscoveryConfig(
+        sitemap_url=seed + "/sitemap.xml",
+        sitemap_loc_host_canonicalizations=[{
+            "source_host": "publishing.example",
+            "origin": seed,
+            "allowed_path_prefixes": ["/study/"],
+        }],
+        allow_url_patterns=[r"/study/(?:undergraduate|postgraduate)/"],
+        max_candidates=200,
+    )
+    navigation = [
+        seed + "/subject-areas",
+        seed + "/benefits-of-postgraduate-study",
+        seed + "/conversion-courses",
+        seed + "/subject-areas",
+    ]
+    # Put far more than four navigation/category rows ahead of real ARU
+    # course paths to exercise full-result filtering and non-prefix sampling.
+    rows = [{"url": url, "name": url.rsplit("/", 1)[-1]} for url in navigation]
+    rows += [
+        {
+            "url": f"{seed}/study/undergraduate/subject-areas/category-{index:03d}",
+            "name": f"Subject area category {index}",
+        }
+        for index in range(196)
+    ]
+    course_paths = [
+        "accounting-and-finance",
+        "architecture",
+        "biomedical-science",
+        "computer-science",
+        "master-of-business-administration",
+        "master-of-public-health",
+    ]
+    rows += [
+        {
+            "url": f"{seed}/study/{'postgraduate' if path.startswith('master-') else 'undergraduate'}/{path}",
+            "name": path.replace("-", " ").title(),
+        }
+        for path in course_paths
+    ]
+    # Remaining sitemap locs are unrelated malicious hosts and must not be
+    # admitted even though the configured origin allows broad study paths.
+    rows += [
+        {"url": f"https://evil.example/study/undergraduate/hostile-{index}", "name": "Bachelor of Fraud"}
+        for index in range(128)
+    ]
+    assert len(rows) == 334
+    monkeypatch.setattr(sitemap_mod, "discover_from_sitemap", AsyncMock(return_value=rows))
+
+    evidence = live.LiveRepairEvidence(repair_context(
+        scrape_url=seed, effective_config=cfg, effective_discovery={},
+    ))
+    result = await discover_official_catalogue(evidence)
+
+    assert len(result["candidates"]) == 200
+    assert all(url.startswith(seed + "/study/") for url in result["candidates"])
+    assert all(
+        any(f"/{path}" in url for url in result["candidates"])
+        for path in course_paths
+    )
+    assert all(url in result["candidates"] for url in result["sample"])
+    assert 1 <= len(result["sample"]) <= 4
+    assert all(
+        any(f"/{path}" in url for path in course_paths)
+        for url in result["sample"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_configured_sitemap_cap_is_bounded_after_filtering(monkeypatch):
+    from app.services.scraper import sitemap as sitemap_mod
+    from app.services.scraper.official_catalogue_repair import discover_official_catalogue
+
+    seed = "https://www.aru.ac.uk"
+    cfg = config()
+    cfg.discovery = DiscoveryConfig(
+        sitemap_url=seed + "/sitemap.xml",
+        sitemap_loc_host_canonicalizations=[{
+            "source_host": "publishing.example",
+            "origin": seed,
+            "allowed_path_prefixes": ["/study/"],
+        }],
+        allow_url_patterns=[r"/study/undergraduate/"],
+        max_candidates=17,
+    )
+    rows = [
+        {
+            "url": f"{seed}/study/undergraduate/course-{index:03d}",
+            "name": f"Course {index}",
+        }
+        for index in range(334)
+    ]
+    monkeypatch.setattr(sitemap_mod, "discover_from_sitemap", AsyncMock(return_value=rows))
+
+    evidence = live.LiveRepairEvidence(repair_context(
+        scrape_url=seed, effective_config=cfg, effective_discovery={},
+    ))
+    result = await discover_official_catalogue(evidence)
+
+    assert len(result["candidates"]) == 17
+    assert all(seed in url and "evil.example" not in url for url in result["candidates"])
+    assert len(result["sample"]) <= 4
+
+
+def test_aru_navigation_paths_rank_after_degree_detail_paths():
+    from app.services.scraper.official_catalogue_repair import _sitemap_candidate_rank
+
+    degree_url = "https://www.aru.ac.uk/study/postgraduate/master-of-business-msc"
+    degree_rank = _sitemap_candidate_rank(degree_url, "MSc Master of Business")
+    navigation_urls = [
+        "https://www.aru.ac.uk/study/postgraduate/subject-areas",
+        "https://www.aru.ac.uk/study/undergraduate/benefits-of-postgraduate-study",
+        "https://www.aru.ac.uk/study/undergraduate/conversion-courses",
+    ]
+
+    assert all(
+        _sitemap_candidate_rank(url)[0] > degree_rank[0]
+        for url in navigation_urls
+    )
+
+
+@pytest.mark.asyncio
 @pytest.mark.skipif(os.environ.get("RUN_PUBLIC_CATALOGUE_ACCEPTANCE") != "1",
                     reason="Opt-in bounded public website acceptance; no database or credentials")
 async def test_real_leeds_official_source_acceptance():
