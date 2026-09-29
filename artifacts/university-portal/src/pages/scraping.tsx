@@ -1172,6 +1172,13 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   const [editingCourse, setEditingCourse] = useState<StagedCourse | null>(null);
   const [editSaveError, setEditSaveError] = useState<{ title: string; message: string } | null>(null);
   const [editSaving, setEditSaving] = useState(false);
+  const editSession = useRef<{ courseId: number } | null>(null);
+  const closeEditCourse = () => {
+    editSession.current = null;
+    setEditingCourse(null);
+    setEditSaveError(null);
+    setEditSaving(false);
+  };
   const [editLoadingId, setEditLoadingId] = useState<number | null>(null);
   const editRequest = useRef<AbortController | null>(null);
   useEffect(() => () => editRequest.current?.abort(), []);
@@ -3204,7 +3211,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         && reviewJobIdRef.current === reviewJobAtStart
         && campusRequest.current === listRequestAtStart
         && stagedCoursesRef.current.some(row => row === sourceRow)) {
+        editSession.current = { courseId: course.id };
         setEditSaveError(null);
+        setEditSaving(false);
         setEditingCourse(normalizeStagedCourse(payload.course));
       }
     } catch (error) {
@@ -3230,6 +3239,10 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
 
   const handleSaveEdit = async () => {
     if (!editingCourse || editSaving) return;
+    const session = editSession.current;
+    if (!session || session.courseId !== editingCourse.id) return;
+    const editedId = session.courseId;
+    const isCurrentEdit = () => editSession.current === session;
     setEditSaving(true);
     setEditSaveError(null);
     const feeProtected = !!feeVariantAuthority(editingCourse);
@@ -3240,7 +3253,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       : editingCourse;
     let serverRejected = false;
     try {
-      const res = await fetch(`/api/scrape/staged/${editingCourse.id}`, {
+      const res = await fetch(`/api/scrape/staged/${editedId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editPayload),
@@ -3250,12 +3263,12 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         throw new Error(await getFetchErrorMessage(res));
       }
       const data = await readResponseJson<{ course?: StagedCourse }>(res);
+      if (!isCurrentEdit()) return;
       const updatedCourse = data?.course ?? { ...editPayload, lastQualificationApproval: null };
-      const editedId = editingCourse.id;
       const version = beginQualityRefresh(editedId);
-      setApprovalFailures(prev => prev.filter(failure => failure.id !== editingCourse.id));
-      setStagedCourses((prev) => prev.map((c) => c.id === editingCourse.id ? { ...updatedCourse, courseQuality: undefined } : c));
-      setEditingCourse(null);
+      setApprovalFailures(prev => prev.filter(failure => failure.id !== editedId));
+      setStagedCourses((prev) => prev.map((c) => c.id === editedId ? { ...updatedCourse, courseQuality: undefined } : c));
+      closeEditCourse();
       if (reviewJobId) {
         const jobId = reviewJobId;
         void loadStagedCourses(jobId).then(refreshed => {
@@ -3272,12 +3285,12 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         setQualityRefreshState(prev => ({ ...prev, [editedId]: "unavailable" }));
       }
     } catch (error) {
-      setEditSaveError({
+      if (isCurrentEdit()) setEditSaveError({
         title: serverRejected ? "Changes not saved." : "Could not confirm save.",
         message: error instanceof Error ? error.message : String(error),
       });
     } finally {
-      setEditSaving(false);
+      if (isCurrentEdit()) setEditSaving(false);
     }
   };
 
@@ -5116,10 +5129,11 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!editingCourse} onOpenChange={(o) => { if (!o) setEditingCourse(null); }}>
+      <Dialog open={!!editingCourse} onOpenChange={(o) => { if (!o) closeEditCourse(); }}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Scraped Course</DialogTitle>
+            <DialogDescription>Review and save the details for this staged course.</DialogDescription>
           </DialogHeader>
           {editingCourse && (
             <div className="grid grid-cols-2 gap-4">
@@ -5365,7 +5379,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingCourse(null)}>Cancel</Button>
+            <Button variant="outline" onClick={closeEditCourse}>Cancel</Button>
             <Button onClick={handleSaveEdit} disabled={editSaving} className="bg-blue-600 hover:bg-blue-700">
               <Save className="w-4 h-4 mr-1" />
               {editSaving ? "Saving…" : editSaveError ? "Retry Save" : "Save Changes"}

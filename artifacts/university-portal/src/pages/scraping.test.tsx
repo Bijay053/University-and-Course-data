@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from "react";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -446,6 +446,60 @@ describe("review quality snapshot", () => {
     expect(screen.queryByTestId("course-save-error")).toBeNull();
     expect(screen.queryByDisplayValue("My unsaved edit")).toBeNull();
   });
+
+  it.each([
+    { nextId: 2, outcome: "success" },
+    { nextId: 2, outcome: "error" },
+    { nextId: 1, outcome: "success" },
+    { nextId: 1, outcome: "error" },
+  ])("ignores an older $outcome save after opening course $nextId", async ({ nextId, outcome }) => {
+    const review = initialReview();
+    review.courses = review.courses.slice(0, 2);
+    let completeFirstSave!: (response: Response) => void;
+    const firstSave = new Promise<Response>(resolve => { completeFirstSave = resolve; });
+    let puts = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const detail = url.match(/^\/api\/scrape\/staged\/(\d+)\/evidence\?/);
+      if (detail) return jsonResponse({ course: { ...review.courses[Number(detail[1]) - 1], rawData: { source: "official" } } });
+      if (init?.method === "PUT") {
+        puts++;
+        if (puts === 1) return firstSave;
+        expect(url).toBe(`/api/scrape/staged/${nextId}`);
+        expect(JSON.parse(String(init.body)).courseName).toBe("New draft");
+        return jsonResponse({ course: { ...review.courses[nextId - 1], courseName: "New draft" } });
+      }
+      if (url === "/api/scrape/staged/repair-job?view=summary") return jsonResponse({ courses: review.courses });
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<ScrapingForTest initialReviewState={review} />);
+    await user.click(within(screen.getByTestId("row-logical-course-1")).getByTitle("Edit"));
+    await screen.findByDisplayValue("Course 1");
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+    await waitFor(() => expect(puts).toBe(1));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await user.click(within(screen.getByTestId(`row-logical-course-${nextId}`)).getByTitle("Edit"));
+    const name = await screen.findByDisplayValue(`Course ${nextId}`);
+    await user.clear(name);
+    await user.type(name, "New draft");
+
+    act(() => {
+      completeFirstSave(outcome === "success"
+        ? jsonResponse({ course: { ...review.courses[0], courseName: "Old saved edit" } })
+        : jsonResponse({ message: "Old save failed" }, 503));
+    });
+    await firstSave;
+    expect(screen.getByDisplayValue("New draft")).toBeTruthy();
+    expect(screen.queryByTestId("course-save-error")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+    await waitFor(() => expect(puts).toBe(2));
+    await waitFor(() => expect(screen.queryByDisplayValue("New draft")).toBeNull());
+  }, 15_000);
 
   it("restores quality without a retry after a saved edit reloads successfully", async () => {
     const review = initialReview();
