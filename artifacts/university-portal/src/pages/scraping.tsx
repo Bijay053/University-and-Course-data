@@ -5,6 +5,7 @@ import { mergeReextractFieldResults } from "@/utils/reextract-field-aggregation"
 import { groupLegacyCampusRows, legacyCampusGroupName, legacyCampusReviewFees } from "@/utils/legacy-campus-groups";
 import { useListUniversities } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -247,6 +248,60 @@ function hasUnsavedCourseEdits(current: StagedCourse, loaded: StagedCourse): boo
     }
     return (current[field] ?? "") !== (loaded[field] ?? "");
   });
+}
+
+const COURSE_DRAFT_PREFIX = "staged-course-draft:v1:";
+const COURSE_DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+type CourseDraft = {
+  savedAt: number;
+  baseline: Partial<StagedCourse>;
+  changes: Partial<StagedCourse>;
+};
+
+function editableSnapshot(course: StagedCourse): Partial<StagedCourse> {
+  return Object.fromEntries(EDITABLE_COURSE_FIELDS.map(field => [field, course[field]])) as Partial<StagedCourse>;
+}
+
+function courseDraftKey(userId: number, reviewJobId: string, course: StagedCourse): string {
+  return `${COURSE_DRAFT_PREFIX}${userId}:${encodeURIComponent(reviewJobId)}:${encodeURIComponent(course.scrapeJobId)}:${course.universityId}:${course.id}`;
+}
+
+function readCourseDraft(key: string, loaded: StagedCourse): CourseDraft | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const draft: CourseDraft = JSON.parse(raw);
+    const baseline = editableSnapshot(loaded);
+    if (!draft || !Number.isFinite(draft.savedAt) || draft.savedAt > Date.now()
+      || Date.now() - draft.savedAt > COURSE_DRAFT_MAX_AGE_MS
+      || JSON.stringify(draft.baseline) !== JSON.stringify(baseline)
+      || !draft.changes || typeof draft.changes !== "object" || Array.isArray(draft.changes)
+      || !Object.keys(draft.changes).length
+      || Object.keys(draft.changes).some(field => !EDITABLE_COURSE_FIELDS.includes(field as typeof EDITABLE_COURSE_FIELDS[number]))) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    return draft;
+  } catch {
+    // Corrupt or inaccessible browser storage cannot be used for recovery.
+    try { localStorage.removeItem(key); } catch { /* storage unavailable */ }
+    return null;
+  }
+}
+
+function pruneExpiredCourseDrafts(): void {
+  try {
+    for (let index = localStorage.length - 1; index >= 0; index--) {
+      const key = localStorage.key(index);
+      if (!key?.startsWith(COURSE_DRAFT_PREFIX)) continue;
+      let savedAt: unknown;
+      try { savedAt = JSON.parse(localStorage.getItem(key) ?? "").savedAt; } catch { /* invalid draft */ }
+      if (typeof savedAt !== "number" || !Number.isFinite(savedAt)
+        || savedAt > Date.now() || Date.now() - savedAt > COURSE_DRAFT_MAX_AGE_MS) {
+        localStorage.removeItem(key);
+      }
+    }
+  } catch { /* Browser storage may be disabled. */ }
 }
 
 const SAVED_FEE_FIELDS = [
@@ -1198,16 +1253,42 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   const showReviewRef = useRef(false);
   const reviewJobIdRef = useRef<string | null>(null);
   const [editingCourse, setEditingCourse] = useState<StagedCourse | null>(null);
+  const { user: reviewer } = useAuth();
+  useEffect(() => { pruneExpiredCourseDrafts(); }, []);
   const [loadedEditCourse, setLoadedEditCourse] = useState<StagedCourse | null>(null);
+  const [recoverableDraft, setRecoverableDraft] = useState<CourseDraft | null>(null);
   const [confirmDiscardEdit, setConfirmDiscardEdit] = useState(false);
   const [editSaveError, setEditSaveError] = useState<{ title: string; message: string } | null>(null);
   const [editSaving, setEditSaving] = useState(false);
-  const editSession = useRef<{ courseId: number } | null>(null);
+  const editSession = useRef<{ courseId: number; draftKey: string | null; reviewerId: number | null } | null>(null);
   const hasDirtyEdit = !!(editingCourse && loadedEditCourse
     && hasUnsavedCourseEdits(editingCourse, loadedEditCourse));
+  useEffect(() => {
+    const session = editSession.current;
+    if (!session?.draftKey || !editingCourse || !loadedEditCourse
+      || session.courseId !== editingCourse.id || session.reviewerId !== reviewer?.id) return;
+    // Opening the editor must not erase the offered draft before the reviewer decides.
+    if (recoverableDraft && !hasDirtyEdit) return;
+    try {
+      if (!hasDirtyEdit) {
+        localStorage.removeItem(session.draftKey);
+      } else {
+        const changes = Object.fromEntries(EDITABLE_COURSE_FIELDS
+          .filter(field => JSON.stringify(editingCourse[field] ?? null) !== JSON.stringify(loadedEditCourse[field] ?? null))
+          .map(field => [field, editingCourse[field]])) as Partial<StagedCourse>;
+        localStorage.setItem(session.draftKey, JSON.stringify({
+          savedAt: Date.now(), baseline: editableSnapshot(loadedEditCourse), changes,
+        } satisfies CourseDraft));
+      }
+    } catch { /* Browser storage may be disabled; editing and saving still work. */ }
+  }, [editingCourse, loadedEditCourse, hasDirtyEdit, recoverableDraft, reviewer?.id]);
   const dirtyEditRef = useRef(hasDirtyEdit);
   dirtyEditRef.current = hasDirtyEdit;
-  useEffect(() => registerCourseEditNavigationGuard(() => dirtyEditRef.current), []);
+  useEffect(() => registerCourseEditNavigationGuard(() => dirtyEditRef.current, () => {
+    if (editSession.current?.draftKey) {
+      try { localStorage.removeItem(editSession.current.draftKey); } catch { /* storage unavailable */ }
+    }
+  }), []);
   useEffect(() => {
     const editPageUrl = window.location.href;
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -1230,10 +1311,14 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     };
   }, []);
   const closeEditCourse = () => {
+    if (editSession.current?.draftKey) {
+      try { localStorage.removeItem(editSession.current.draftKey); } catch { /* storage unavailable */ }
+    }
     dirtyEditRef.current = false;
     editSession.current = null;
     setEditingCourse(null);
     setLoadedEditCourse(null);
+    setRecoverableDraft(null);
     setConfirmDiscardEdit(false);
     setEditSaveError(null);
     setEditSaving(false);
@@ -3279,11 +3364,14 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         && reviewJobIdRef.current === reviewJobAtStart
         && campusRequest.current === listRequestAtStart
         && stagedCoursesRef.current.some(row => row === sourceRow)) {
-        editSession.current = { courseId: course.id };
+        const loaded = normalizeStagedCourse(payload.course);
+        const draftKey = reviewer?.id != null && reviewJobAtStart
+          ? courseDraftKey(reviewer.id, reviewJobAtStart, loaded) : null;
+        editSession.current = { courseId: course.id, draftKey, reviewerId: reviewer?.id ?? null };
         setEditSaveError(null);
         setEditSaving(false);
-        const loaded = normalizeStagedCourse(payload.course);
         setLoadedEditCourse(loaded);
+        setRecoverableDraft(draftKey ? readCourseDraft(draftKey, loaded) : null);
         setConfirmDiscardEdit(false);
         setEditingCourse(loaded);
       }
@@ -5209,6 +5297,23 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             <DialogTitle>Edit Scraped Course</DialogTitle>
             <DialogDescription>Review and save the details for this staged course.</DialogDescription>
           </DialogHeader>
+          {recoverableDraft && editingCourse && editSession.current?.reviewerId === reviewer?.id && (
+            <div role="status" data-testid="course-draft-recovery" className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
+              <p>An unfinished edit for this course was found on this browser. Restore it or discard it. Nothing is saved to the course until you choose Save Changes.</p>
+              <div className="mt-2 flex gap-2">
+                <Button size="sm" onClick={() => {
+                  setEditingCourse({ ...editingCourse, ...recoverableDraft.changes });
+                  setRecoverableDraft(null);
+                }}>Restore draft</Button>
+                <Button size="sm" variant="outline" onClick={() => {
+                  if (editSession.current?.draftKey) {
+                    try { localStorage.removeItem(editSession.current.draftKey); } catch { /* storage unavailable */ }
+                  }
+                  setRecoverableDraft(null);
+                }}>Discard draft</Button>
+              </div>
+            </div>
+          )}
           {editingCourse && (
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">

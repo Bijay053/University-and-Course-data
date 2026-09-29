@@ -7,6 +7,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Link, Router as WouterRouter } from "wouter";
 import { aroundCourseEditNavigation } from "@/lib/course-edit-navigation-guard";
 
+const reviewerTest = vi.hoisted(() => ({ id: 101 }));
+vi.mock("@/context/auth", () => ({
+  useAuth: () => ({ user: { id: reviewerTest.id } }),
+}));
+
 import {
   annualFeeEquivalentForDisplay,
   durationReportPrefill,
@@ -280,6 +285,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   window.history.replaceState(null, "", "/");
   localStorage.clear();
+  reviewerTest.id = 101;
   feeCardTestControls.showSave = false;
 });
 
@@ -483,13 +489,17 @@ describe("discarding a course edit", () => {
   it("warns on in-app navigation with a changed draft and allows leaving after confirmation", async () => {
     openCourseEditor({ routing: true });
     await editName();
+    const draftKey = "staged-course-draft:v1:101:repair-job:repair-job:7:1";
+    await waitFor(() => expect(localStorage.getItem(draftKey)).not.toBeNull());
     const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
     tryLeavePage();
     expect(confirm).toHaveBeenCalledWith("You have unsaved course edits. Leave this page and discard them?");
     expect(window.location.pathname).toBe("/scraping");
     expect(screen.getByDisplayValue("Draft course")).toBeTruthy();
+    expect(localStorage.getItem(draftKey)).not.toBeNull();
     tryLeavePage();
     expect(window.location.pathname).toBe("/bulk");
+    expect(localStorage.getItem(draftKey)).toBeNull();
   });
 
   it("does not warn when an untouched editor navigates to another page", async () => {
@@ -623,6 +633,110 @@ describe("discarding a course edit", () => {
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Edit Scraped Course" })).toBeNull());
     expect(screen.queryByRole("alertdialog")).toBeNull();
   }, 12000);
+});
+
+describe("interrupted course edits", () => {
+  const key = "staged-course-draft:v1:101:repair-job:repair-job:7:1";
+  function openReview(courseName = "Course 1", reviewJobId = "repair-job") {
+    const review = initialReview();
+    review.jobId = reviewJobId;
+    review.courses = [{ ...review.courses[0], scrapeJobId: reviewJobId, courseName }] as typeof review.courses;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === `/api/scrape/staged/1/evidence?jobId=${reviewJobId}&universityId=7`)
+        return jsonResponse({ course: { ...review.courses[0], rawData: { secret: "not a draft" } } });
+      if (url === "/api/scrape/staged/1" && init?.method === "PUT")
+        return jsonResponse({ course: { ...review.courses[0], courseName: "Draft course" } });
+      if (url === `/api/scrape/staged/${reviewJobId}?view=summary`)
+        return jsonResponse({ courses: review.courses });
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const view = render(<ScrapingForTest initialReviewState={review} />);
+    return { ...view, fetchMock };
+  }
+  async function openEditor() {
+    await userEvent.setup().click(within(screen.getByTestId("row-logical-course-1")).getByTitle("Edit"));
+    return screen.findByDisplayValue("Course 1");
+  }
+  async function makeDraft() {
+    const input = await openEditor();
+    fireEvent.change(input, { target: { value: "Draft course" } });
+    await waitFor(() => expect(localStorage.getItem(key)).toContain("Draft course"));
+  }
+
+  it("offers an opt-in restore after a crash, without retaining raw evidence; removes it after save", async () => {
+    const first = openReview();
+    await makeDraft();
+    const stored = localStorage.getItem(key)!;
+    expect(stored).not.toContain("rawData");
+    expect(stored).not.toContain("secret");
+    first.unmount(); // Simulated browser interruption: no deliberate discard.
+    const second = openReview();
+    await openEditor();
+    expect(screen.getByTestId("course-draft-recovery")).toBeTruthy();
+    expect(screen.getByDisplayValue("Course 1")).toBeTruthy();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Restore draft" }));
+    expect(screen.getByDisplayValue("Draft course")).toBeTruthy();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Save Changes" }));
+    await waitFor(() => expect(localStorage.getItem(key)).toBeNull());
+    expect(second.fetchMock.mock.calls.some(([url, init]) =>
+      String(url) === "/api/scrape/staged/1" && init?.method === "PUT"
+      && JSON.parse(String(init.body)).courseName === "Draft course")).toBe(true);
+  });
+
+  it("rejects stale course data, wrong review job, wrong reviewer and expired drafts", async () => {
+    const first = openReview();
+    await makeDraft();
+    first.unmount();
+    const second = openReview("New server value");
+    await userEvent.setup().click(within(screen.getByTestId("row-logical-course-1")).getByTitle("Edit"));
+    await screen.findByDisplayValue("New server value");
+    expect(screen.queryByTestId("course-draft-recovery")).toBeNull();
+    expect(localStorage.getItem(key)).toBeNull();
+    second.unmount();
+
+    const third = openReview();
+    await makeDraft();
+    third.unmount();
+    reviewerTest.id = 202;
+    const fourth = openReview();
+    await openEditor();
+    expect(screen.queryByTestId("course-draft-recovery")).toBeNull();
+    fourth.unmount();
+    reviewerTest.id = 101;
+    const fifth = openReview("Course 1", "other-job");
+    await openEditor();
+    expect(screen.queryByTestId("course-draft-recovery")).toBeNull();
+    fifth.unmount();
+
+    const expired = JSON.parse(localStorage.getItem(key)!);
+    expired.savedAt = Date.now() - 25 * 60 * 60 * 1000;
+    localStorage.setItem(key, JSON.stringify(expired));
+    openReview();
+    await openEditor();
+    expect(screen.queryByTestId("course-draft-recovery")).toBeNull();
+    expect(localStorage.getItem(key)).toBeNull();
+  });
+
+  it("clears an offered draft on explicit discard and a changed draft when edits are reversed", async () => {
+    const first = openReview();
+    await makeDraft();
+    first.unmount();
+    const second = openReview();
+    await openEditor();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Discard draft" }));
+    expect(localStorage.getItem(key)).toBeNull();
+    expect(screen.getByDisplayValue("Course 1")).toBeTruthy();
+    fireEvent.change(screen.getByDisplayValue("Course 1"), { target: { value: "Temporary" } });
+    await waitFor(() => expect(localStorage.getItem(key)).not.toBeNull());
+    fireEvent.change(screen.getByDisplayValue("Temporary"), { target: { value: "Course 1" } });
+    await waitFor(() => expect(localStorage.getItem(key)).toBeNull());
+    second.unmount();
+  });
 });
 
 describe("fee card updates in an open editor", () => {

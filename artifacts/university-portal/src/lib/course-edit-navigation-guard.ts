@@ -4,6 +4,7 @@ export const COURSE_EDIT_LEAVE_MESSAGE = "You have unsaved course edits. Leave t
 export const COURSE_REPORT_LEAVE_MESSAGE = "You have an unfinished course recovery report. Leave this page and discard it?";
 
 let hasUnsavedCourseEdits: (() => boolean) | null = null;
+let discardCourseEdit: (() => void) | null = null;
 const reportChecks = new Map<() => boolean, "history" | "review">();
 
 export function registerCourseReportNavigationGuard(check: () => boolean, scope: "history" | "review"): () => void {
@@ -20,16 +21,22 @@ export function confirmHistoryReportDiscard(): boolean {
     || window.confirm(COURSE_REPORT_LEAVE_MESSAGE);
 }
 
-export function registerCourseEditNavigationGuard(check: () => boolean): () => void {
+export function registerCourseEditNavigationGuard(check: () => boolean, onDiscard?: () => void): () => void {
   hasUnsavedCourseEdits = check;
+  discardCourseEdit = onDiscard ?? null;
   return () => {
-    if (hasUnsavedCourseEdits === check) hasUnsavedCourseEdits = null;
+    if (hasUnsavedCourseEdits === check) {
+      hasUnsavedCourseEdits = null;
+      discardCourseEdit = null;
+    }
   };
 }
 
 export function confirmCourseEditNavigation(): boolean {
   if (hasUnsavedCourseEdits?.() && !window.confirm(COURSE_EDIT_LEAVE_MESSAGE)) return false;
-  return !hasUnsavedCourseReports() || window.confirm(COURSE_REPORT_LEAVE_MESSAGE);
+  if (hasUnsavedCourseReports() && !window.confirm(COURSE_REPORT_LEAVE_MESSAGE)) return false;
+  if (hasUnsavedCourseEdits?.()) discardCourseEdit?.();
+  return true;
 }
 
 export const aroundCourseEditNavigation: AroundNavHandler = (navigate, to, options) => {
