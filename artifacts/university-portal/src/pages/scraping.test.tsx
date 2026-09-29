@@ -316,6 +316,91 @@ function initialReview(): ScrapingInitialReviewState {
   };
 }
 
+describe("discarding a course edit", () => {
+  function openCourseEditor() {
+    const review = initialReview();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/scrape/staged/1/evidence?jobId=repair-job&universityId=7")
+        return jsonResponse({ course: { ...review.courses[0], rawData: { source: "official" } } });
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      if (init?.method === "PUT") throw new Error("Discard must not save");
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ScrapingForTest initialReviewState={review} />);
+    return fetchMock;
+  }
+
+  async function attemptClose(user: ReturnType<typeof userEvent.setup>, route: "cancel" | "escape" | "outside") {
+    if (route === "cancel") await user.click(screen.getByRole("button", { name: "Cancel" }));
+    if (route === "escape") await user.keyboard("{Escape}");
+    if (route === "outside") fireEvent.pointerDown(document.body);
+  }
+
+  it.each(["cancel", "escape", "outside"] as const)(
+    "warns before %s discards a changed draft, and lets reviewers keep or discard it",
+    async (route) => {
+      const fetchMock = openCourseEditor();
+      const user = userEvent.setup();
+      await user.click(within(screen.getByTestId("row-logical-course-1")).getByTitle("Edit"));
+      const name = await screen.findByDisplayValue("Course 1");
+      fireEvent.change(name, { target: { value: "Draft course" } });
+      await attemptClose(user, route);
+      const prompt = await screen.findByRole("alertdialog", { name: "Discard unsaved course edits?" });
+      expect(screen.getByDisplayValue("Draft course")).toBeTruthy();
+      await user.click(within(prompt).getByRole("button", { name: "Keep editing" }));
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+      expect(screen.getByDisplayValue("Draft course")).toBeTruthy();
+      await attemptClose(user, route);
+      await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Discard changes" }));
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "Edit Scraped Course" })).toBeNull());
+      expect(screen.queryByDisplayValue("Draft course")).toBeNull();
+      expect(fetchMock.mock.calls.some(([url, init]) => String(url) === "/api/scrape/staged/1" && init?.method === "PUT")).toBe(false);
+    },
+    12000,
+  );
+
+  it.each(["cancel", "escape", "outside"] as const)("closes an unchanged draft with %s without warning", async (route) => {
+    openCourseEditor();
+    const user = userEvent.setup();
+    await user.click(within(screen.getByTestId("row-logical-course-1")).getByTitle("Edit"));
+    await screen.findByDisplayValue("Course 1");
+    await attemptClose(user, route);
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Edit Scraped Course" })).toBeNull());
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("does not warn after a reviewer reverses their edits", async () => {
+    openCourseEditor();
+    const user = userEvent.setup();
+    await user.click(within(screen.getByTestId("row-logical-course-1")).getByTitle("Edit"));
+    const name = await screen.findByDisplayValue("Course 1");
+    fireEvent.change(name, { target: { value: "Temporary name" } });
+    fireEvent.change(name, { target: { value: "Course 1" } });
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Edit Scraped Course" })).toBeNull());
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("detects a changed intake list but not a restored empty list", async () => {
+    openCourseEditor();
+    const user = userEvent.setup();
+    await user.click(within(screen.getByTestId("row-logical-course-1")).getByTitle("Edit"));
+    const intake = await screen.findByPlaceholderText("January, March, July");
+    fireEvent.change(intake, { target: { value: "January, March" } });
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await screen.findByRole("alertdialog", { name: "Discard unsaved course edits?" });
+    await user.click(screen.getByRole("button", { name: "Keep editing" }));
+    fireEvent.change(intake, { target: { value: "" } });
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Edit Scraped Course" })).toBeNull());
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  }, 12000);
+});
+
 describe("review quality snapshot", () => {
   it("replaces a running scrape's incomplete degree warning with the score from the displayed row", async () => {
     const review = initialReview();

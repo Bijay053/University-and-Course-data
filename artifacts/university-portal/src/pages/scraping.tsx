@@ -13,6 +13,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ChevronsUpDown, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import {
   FileSpreadsheet, CheckCircle2, Clock, AlertCircle, RefreshCw,
@@ -224,6 +228,25 @@ type StagedCourse = FeeVariantCarrier & {
   extraction_method?: unknown;
   createdAt: string;
 };
+
+const EDITABLE_COURSE_FIELDS = [
+  "courseName", "category", "subCategory", "degreeLevel", "studyMode", "duration",
+  "durationTerm", "studyLoad", "internationalFee", "currency", "feeTerm",
+  "ieltsOverall", "ieltsListening", "ieltsReading", "ieltsWriting", "ieltsSpeaking",
+  "pteOverall", "pteListening", "pteReading", "pteWriting", "pteSpeaking",
+  "toeflOverall", "toeflListening", "toeflReading", "toeflWriting", "toeflSpeaking",
+  "cambridgeOverall", "duolingoOverall", "intakeMonths", "courseWebsite",
+  "courseLocation", "description", "otherRequirement",
+] as const satisfies readonly (keyof StagedCourse)[];
+
+function hasUnsavedCourseEdits(current: StagedCourse, loaded: StagedCourse): boolean {
+  return EDITABLE_COURSE_FIELDS.some(field => {
+    if (field === "intakeMonths") {
+      return (current.intakeMonths ?? []).join(", ") !== (loaded.intakeMonths ?? []).join(", ");
+    }
+    return (current[field] ?? "") !== (loaded[field] ?? "");
+  });
+}
 
 type RequirementState = "numeric" | "qualification_based" | "missing" | "unverified";
 type EnglishRequirementState = "verified" | "missing" | "not_required" | "unknown";
@@ -1170,14 +1193,26 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   const showReviewRef = useRef(false);
   const reviewJobIdRef = useRef<string | null>(null);
   const [editingCourse, setEditingCourse] = useState<StagedCourse | null>(null);
+  const [loadedEditCourse, setLoadedEditCourse] = useState<StagedCourse | null>(null);
+  const [confirmDiscardEdit, setConfirmDiscardEdit] = useState(false);
   const [editSaveError, setEditSaveError] = useState<{ title: string; message: string } | null>(null);
   const [editSaving, setEditSaving] = useState(false);
   const editSession = useRef<{ courseId: number } | null>(null);
   const closeEditCourse = () => {
     editSession.current = null;
     setEditingCourse(null);
+    setLoadedEditCourse(null);
+    setConfirmDiscardEdit(false);
     setEditSaveError(null);
     setEditSaving(false);
+  };
+  const requestCloseEditCourse = () => {
+    if (confirmDiscardEdit) return;
+    if (editingCourse && loadedEditCourse && hasUnsavedCourseEdits(editingCourse, loadedEditCourse)) {
+      setConfirmDiscardEdit(true);
+    } else {
+      closeEditCourse();
+    }
   };
   const [editLoadingId, setEditLoadingId] = useState<number | null>(null);
   const editRequest = useRef<AbortController | null>(null);
@@ -3214,7 +3249,10 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         editSession.current = { courseId: course.id };
         setEditSaveError(null);
         setEditSaving(false);
-        setEditingCourse(normalizeStagedCourse(payload.course));
+        const loaded = normalizeStagedCourse(payload.course);
+        setLoadedEditCourse(loaded);
+        setConfirmDiscardEdit(false);
+        setEditingCourse(loaded);
       }
     } catch (error) {
       if (!controller.signal.aborted) toast({
@@ -3230,6 +3268,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     const course = normalizeStagedCourse(updated as StagedCourse);
     setApprovalFailures(prev => prev.filter(failure => failure.id !== course.id));
     setStagedCourses(prev => prev.map(c => c.id === course.id ? { ...course, courseQuality: undefined } : c));
+    setLoadedEditCourse(prev => prev?.id === course.id ? { ...prev, ...course } : prev);
     setEditingCourse(prev => prev?.id === course.id ? { ...prev, ...course } : prev);
     void retryCourseQuality(course.id).catch(err => {
       toast({ title: "Fee saved, but refresh failed", description: String(err), variant: "destructive" });
@@ -5129,7 +5168,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!editingCourse} onOpenChange={(o) => { if (!o) closeEditCourse(); }}>
+      <Dialog open={!!editingCourse} onOpenChange={(o) => { if (!o) requestCloseEditCourse(); }}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Scraped Course</DialogTitle>
@@ -5379,7 +5418,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={closeEditCourse}>Cancel</Button>
+            <Button variant="outline" onClick={requestCloseEditCourse}>Cancel</Button>
             <Button onClick={handleSaveEdit} disabled={editSaving} className="bg-blue-600 hover:bg-blue-700">
               <Save className="w-4 h-4 mr-1" />
               {editSaving ? "Saving…" : editSaveError ? "Retry Save" : "Save Changes"}
@@ -5387,6 +5426,23 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={confirmDiscardEdit} onOpenChange={setConfirmDiscardEdit}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard unsaved course edits?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your changes to this course have not been saved. Discard them or keep editing.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            <AlertDialogAction onClick={closeEditCourse} className="bg-red-600 text-white hover:bg-red-700">
+              Discard changes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ── Scrape History ─────────────────────────────────────────────────── */}
       <div>
