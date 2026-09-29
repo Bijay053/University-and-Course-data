@@ -767,6 +767,59 @@ def test_selector_evidence_preserves_same_panel_and_official_link():
     assert {row["audience"] for row in result["evidence"]} == {"domestic", "international"}
 
 
+def test_course_title_options_do_not_claim_international_audience():
+    html = """<main><select id="course-selector">
+    <option value="ta_1975">International Business and Management MSc</option>
+    <option value="ta_2073">International Criminal Justice MSc</option>
+    <option value="ta_2082">International Relations MA</option>
+    </select></main>"""
+    result = live.extract_audience_option_evidence(html, ONE, SEED)
+    assert result["status"] == "unconfirmed"
+    assert result["evidence"] == []
+    assert result["issues"] == []
+
+
+@pytest.mark.asyncio
+async def test_configured_sitemap_precedes_navigation_when_no_course_samples(monkeypatch):
+    sitemap_url = "https://university.example/sitemap.xml?page=2"
+    candidates = [f"{SEED}/bachelor-of-{name}" for name in ("arts", "science", "music", "law")]
+    cfg = config()
+    cfg.discovery.sitemap_url = sitemap_url
+    cfg.discovery.allow_url_patterns = [r"university\.example/courses/bachelor-of-"]
+    discovery = {
+        "allow_url_patterns": cfg.discovery.allow_url_patterns,
+        "block_url_patterns": ["/courses/"],
+    }
+    cfg.discovery.model_dump = lambda: discovery
+    ctx = context(repair_course_url_sample=[], passed_sample=[], dropped_sample=[
+        "https://university.example/images/courses.jpg",
+        "https://university.example/study/postgraduate",
+    ], repair_url_sample=[], effective_discovery=discovery, effective_config=cfg)
+    evidence = live.LiveRepairEvidence(ctx)
+    calls = []
+
+    async def fetch(url):
+        calls.append(url)
+        if url == sitemap_url:
+            record = {"url": url, "classification": "sitemap",
+                      "links": [{"url": value} for value in candidates]}
+        else:
+            record = {"url": url, "classification": "course" if url in candidates else "listing"}
+        evidence.pages_checked += 1
+        evidence.records.append(record)
+        return record
+
+    monkeypatch.setattr(evidence, "fetch", fetch)
+    result = await evidence.probe()
+    assert calls[0] == sitemap_url
+    assert set(candidates).issubset(calls)
+    assert len(calls) <= 6
+    assert result["course_pages"] == 4
+    assert result["status"] == "needs_review"
+    assert not evidence.discovery_validation(discovery, {})["accepted"]
+    assert evidence.discovery_validation(discovery, {"block_url_patterns": []})["accepted"]
+
+
 def test_selector_evidence_fails_closed_for_ambiguous_or_image_only_options():
     html = """<main><select>
       <option data-audience="Domestic International"></option>

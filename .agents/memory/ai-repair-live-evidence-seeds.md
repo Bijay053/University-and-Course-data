@@ -20,3 +20,9 @@ Bounded live probes must preserve staged seed priority across every fetched page
 **Why:** ULaw related links displaced remaining staged seeds with online variants. Recognizing those pages as courses then incorrectly demanded discovery changes to admit them; a filtered funding page also kept repair unaccepted.
 
 **How to apply:** Reuse proven intentional exclusions for probe targets and positive evidence. Unknown admitted pages still need review; unknown pages already rejected by effective filters do not independently justify relaxing discovery. Course recognition is not eligibility approval.
+
+When no staged or previously passing course URLs exist, a configured official course sitemap can supply bounded live-evidence candidates even if the failed job discovered many URLs. Do not treat homepage navigation or asset links as substitutes for fresh course-owned evidence.
+
+**Why:** A Portsmouth repair used its entire six-page probe on the homepage, dead media URLs, and broad study pages while the configured sitemap still contained hundreds of current course pages. Discovery count alone prevented the older sitemap seed path.
+
+**How to apply:** Spend a slot within the existing page budget on the configured official sitemap, filter its locations through the effective course URL gates, and independently fetch and classify a small spread of course details. A course-picker option whose name contains “International” is not an international-audience selector.

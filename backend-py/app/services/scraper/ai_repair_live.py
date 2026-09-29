@@ -293,6 +293,12 @@ class AudienceOptionEvidence:
 
 
 _AUDIENCE_RE = re.compile(r"\b(international|overseas|domestic|home|uk)\b", re.I)
+_AUDIENCE_OPTION_LABEL = re.compile(
+    r"^\s*(?:international|overseas|domestic|home|uk)"
+    r"(?:\s+and\s+EU)?\s+(?:students?|applicants?|fee\s*payers?|fees?|tuition)\b"
+    r"|^\s*(?:international|overseas|domestic|home|uk)\s*$",
+    re.I,
+)
 _MONTH_NUM = {m.lower(): i for i, m in enumerate(
     ("January", "February", "March", "April", "May", "June",
      "July", "August", "September", "October", "November", "December"), 1
@@ -327,23 +333,31 @@ def extract_audience_option_evidence(
         relevant = []
         for option in options:
             group = option.find_parent("optgroup")
-            label = " ".join(filter(None, [
+            explicit_label = " ".join(filter(None, [
                 str(option.get("data-audience") or ""),
                 str(option.get("data-fee-type") or ""),
                 str(option.get("aria-label") or ""),
                 str(option.get("title") or ""),
                 " ".join(img.get("alt", "") for img in option.select("img")),
                 str(group.get("label") if group else ""),
-                option.get_text(" ", strip=True),
             ])).strip()
-            matches = {m.casefold() for m in _AUDIENCE_RE.findall(label)}
+            text = option.get_text(" ", strip=True)
+            label = " ".join(filter(None, [explicit_label, text]))
+            # Course-picker options such as "International Relations MA" are
+            # course names, not audience choices. Only explicit metadata or
+            # audience-labelled visible options establish selector identity.
+            identity_text = explicit_label or (text if _AUDIENCE_OPTION_LABEL.search(text) else "")
+            matches = {m.casefold() for m in _AUDIENCE_RE.findall(identity_text)}
             if not matches:
                 continue
-            if len(matches) > 1 or ("home" in matches and "domestic" in matches):
+            identities = {
+                "international" if m in {"international", "overseas"} else "domestic"
+                for m in matches
+            }
+            if len(identities) > 1:
                 issues.append("conflicting audience labels in one selector")
                 continue
-            audience = "international" if matches & {"international", "overseas"} else "domestic"
-            text = option.get_text(" ", strip=True)
+            audience = next(iter(identities))
             # An image-only option has no textual identity and cannot be used.
             image_identity = bool(option.select("img")) and not text
             if image_identity or not text:
@@ -792,6 +806,32 @@ class LiveRepairEvidence:
             url for url in self.ctx.get("passed_sample") or []
             if not is_intentionally_excluded_course_url(url)
         ][:2]
+        sitemap_candidates = []
+        # A high discovered-link count can coexist with zero usable courses:
+        # homepage navigation and asset URLs are not course evidence. Spend
+        # one of the existing six probe slots on the configured official
+        # sitemap when there are no known course/passed samples, then use
+        # bounded, filtered detail candidates before following navigation.
+        sitemap_url = getattr(self.config.discovery, "sitemap_url", None)
+        if not course_candidates and not passed and sitemap_url and limit >= 3:
+            sitemap = await self.fetch(sitemap_url)
+            self.initial[sitemap_url] = sitemap
+            if sitemap.get("classification") == "sitemap":
+                from app.services.scraper.ai_repair_agent import _is_course_url
+                from app.services.scraper.official_catalogue_repair import _sitemap_sample
+
+                eligible = list(dict.fromkeys(
+                    link["url"] for link in sitemap.get("links") or []
+                    if isinstance(link, dict) and isinstance(link.get("url"), str)
+                    and official_url(link["url"], self.ctx["scrape_url"], self.extra_hosts)
+                    # Existing discovery filters may be the defect under
+                    # repair. Apply them only in discovery_validation, after
+                    # fresh course-owned evidence has been collected.
+                    and _is_course_url(link["url"])
+                    and not is_intentionally_excluded_course_url(link["url"])
+                ))
+                sitemap_candidates = _sitemap_sample(eligible, {}, min(4, limit - 2))
+                course_candidates = sitemap_candidates
         seeds = set(course_candidates + passed)
         explicit_repair_urls = list(self.ctx.get("repair_url_sample") or [])
         repair_urls = explicit_repair_urls or list(self.ctx.get("dropped_sample") or [])
