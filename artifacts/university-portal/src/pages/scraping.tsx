@@ -1170,6 +1170,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   const showReviewRef = useRef(false);
   const reviewJobIdRef = useRef<string | null>(null);
   const [editingCourse, setEditingCourse] = useState<StagedCourse | null>(null);
+  const [editSaveError, setEditSaveError] = useState<{ title: string; message: string } | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
   const [editLoadingId, setEditLoadingId] = useState<number | null>(null);
   const editRequest = useRef<AbortController | null>(null);
   useEffect(() => () => editRequest.current?.abort(), []);
@@ -3202,6 +3204,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         && reviewJobIdRef.current === reviewJobAtStart
         && campusRequest.current === listRequestAtStart
         && stagedCoursesRef.current.some(row => row === sourceRow)) {
+        setEditSaveError(null);
         setEditingCourse(normalizeStagedCourse(payload.course));
       }
     } catch (error) {
@@ -3226,13 +3229,16 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   };
 
   const handleSaveEdit = async () => {
-    if (!editingCourse) return;
+    if (!editingCourse || editSaving) return;
+    setEditSaving(true);
+    setEditSaveError(null);
     const feeProtected = !!feeVariantAuthority(editingCourse);
     const original = stagedCourses.find(c => c.id === editingCourse.id);
     const editPayload = feeProtected && original
       ? { ...editingCourse, internationalFee: original.internationalFee, currency: original.currency,
           feeTerm: original.feeTerm, feeYear: original.feeYear, feeSelection: original.feeSelection }
       : editingCourse;
+    let serverRejected = false;
     try {
       const res = await fetch(`/api/scrape/staged/${editingCourse.id}`, {
         method: "PUT",
@@ -3240,8 +3246,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
         body: JSON.stringify(editPayload),
       });
       if (!res.ok) {
-        toast({ title: "Save failed", description: await getFetchErrorMessage(res), variant: "destructive" });
-        return;
+        serverRejected = true;
+        throw new Error(await getFetchErrorMessage(res));
       }
       const data = await readResponseJson<{ course?: StagedCourse }>(res);
       const updatedCourse = data?.course ?? { ...editPayload, lastQualificationApproval: null };
@@ -3265,7 +3271,14 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       } else {
         setQualityRefreshState(prev => ({ ...prev, [editedId]: "unavailable" }));
       }
-    } catch {}
+    } catch (error) {
+      setEditSaveError({
+        title: serverRejected ? "Changes not saved." : "Could not confirm save.",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   const toggleSelect = (id: number) => {
@@ -5346,11 +5359,16 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
               </div>
             </div>
           )}
+          {editSaveError && (
+            <div role="alert" data-testid="course-save-error" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+              <strong>{editSaveError.title}</strong> {editSaveError.message} Your edits are still here. Retry saving when ready.
+            </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingCourse(null)}>Cancel</Button>
-            <Button onClick={handleSaveEdit} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={handleSaveEdit} disabled={editSaving} className="bg-blue-600 hover:bg-blue-700">
               <Save className="w-4 h-4 mr-1" />
-              Save Changes
+              {editSaving ? "Saving…" : editSaveError ? "Retry Save" : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>

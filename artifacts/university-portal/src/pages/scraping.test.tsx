@@ -385,6 +385,8 @@ describe("review quality snapshot", () => {
     await screen.findByDisplayValue("Course 1");
     await user.click(screen.getByRole("button", { name: "Save Changes" }));
     const unavailable = await screen.findByTestId("quality-unavailable-1");
+    expect(screen.queryByTestId("course-save-error")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Retry Save" })).toBeNull();
     expect(within(row).queryByText("90%")).toBeNull();
     expect(unavailable.textContent).toContain("Quality unavailable");
     await user.click(within(unavailable).getByRole("button", { name: "Retry quality" }));
@@ -392,6 +394,57 @@ describe("review quality snapshot", () => {
     expect(within(row).queryByText("90%")).toBeNull();
     expect(screen.queryByTestId("quality-unavailable-1")).toBeNull();
     expect(summaryAttempts).toBe(2);
+  });
+
+  it.each(["network", "http"])("keeps unsaved edits after a %s save failure and retries the PUT", async (failure) => {
+    const review = initialReview();
+    const original = review.courses[0];
+    const quality = { id: 1, score: 90, tier: "good", label: "Good", issues: [], breakdown: {} };
+    review.courses = [{ ...original, courseQuality: quality }] as unknown as ScrapingInitialReviewState["courses"];
+    let attempts = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/scrape/staged/1/evidence?jobId=repair-job&universityId=7")
+        return jsonResponse({ course: { ...original, rawData: { source: "official" } } });
+      if (url === "/api/scrape/staged/1" && init?.method === "PUT") {
+        attempts++;
+        expect(JSON.parse(String(init.body)).courseName).toBe("My unsaved edit");
+        if (attempts === 1) {
+          if (failure === "network") throw new Error("Connection lost");
+          return jsonResponse({ message: "Please try again" }, 503);
+        }
+        return jsonResponse({ course: { ...original, courseName: "My unsaved edit" } });
+      }
+      if (url === "/api/scrape/staged/repair-job?view=summary")
+        return jsonResponse({ courses: [{ ...original, courseName: "My unsaved edit",
+          courseQuality: { ...quality, score: 100 } }] });
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<ScrapingForTest initialReviewState={review} />);
+    const row = screen.getByTestId("row-logical-course-1");
+    await user.click(within(row).getByTitle("Edit"));
+    const name = await screen.findByDisplayValue("Course 1");
+    await user.clear(name);
+    await user.type(name, "My unsaved edit");
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    const error = await screen.findByTestId("course-save-error");
+    expect(error.textContent).toContain(failure === "http" ? "Changes not saved" : "Could not confirm save");
+    expect((screen.getByDisplayValue("My unsaved edit") as HTMLInputElement).value).toBe("My unsaved edit");
+    expect(within(row).getByText("90%")).toBeTruthy();
+    expect(screen.queryByTestId("quality-unavailable-1")).toBeNull();
+    expect(fetchMock.mock.calls.filter(([url]) => String(url) === "/api/scrape/staged/repair-job?view=summary")).toHaveLength(0);
+
+    await user.click(screen.getByRole("button", { name: "Retry Save" }));
+    await waitFor(() => expect(within(row).getByText("100%")).toBeTruthy());
+    expect(attempts).toBe(2);
+    expect(screen.queryByTestId("course-save-error")).toBeNull();
+    expect(screen.queryByDisplayValue("My unsaved edit")).toBeNull();
   });
 
   it("restores quality without a retry after a saved edit reloads successfully", async () => {
