@@ -5,6 +5,11 @@ import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { registerCourseReportNavigationGuard } from "@/lib/course-edit-navigation-guard";
 import { readResponseJson } from "@/lib/readResponseJson";
 import { fetchWithAuth } from "@/lib/api";
 
@@ -68,11 +73,16 @@ export function Exclusions({ counts }: { counts: Record<string, unknown> }) {
   </div>;
 }
 
-export function CourseReport({ jobId, onReview, onStarted, openRequest = 0, prefillCourses = NO_PREFILL_COURSES }: {
+export function CourseReport({ jobId: requestedJobId, onReview, onStarted, openRequest = 0, prefillCourses = NO_PREFILL_COURSES, navigationScope = "review" }: {
   jobId: string; onReview: (id: string) => void; onStarted?: () => void; openRequest?: number;
   prefillCourses?: CourseReportPrefillCourse[];
+  navigationScope?: "history" | "review";
 }) {
   const [open, setOpen] = useState(false);
+  // The parent may select another job while an existing draft is being edited.
+  // Commit the new job and prefill together only after accepting that request.
+  const [jobId, setJobId] = useState(requestedJobId);
+  const [activePrefillCourses, setActivePrefillCourses] = useState(prefillCourses);
   const [reports, setReports] = useState<Report[]>([]);
   const [exclusions, setExclusions] = useState<Record<string, unknown>>({});
   const [error, setError] = useState("");
@@ -85,15 +95,25 @@ export function CourseReport({ jobId, onReview, onStarted, openRequest = 0, pref
   const [retryBusy, setRetryBusy] = useState<string | null>(null);
   const [retryErrors, setRetryErrors] = useState<Record<string, string>>({});
   const [prefillIndex, setPrefillIndex] = useState(0);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const form = useForm<Values>({ defaultValues: defaults });
   const kind = form.watch("kind");
+  const isDraftChanged = () => open && JSON.stringify(form.getValues()) !== JSON.stringify(form.formState.defaultValues);
+  useEffect(() => registerCourseReportNavigationGuard(isDraftChanged, navigationScope), [open, form, navigationScope]);
+  useEffect(() => {
+    if (!isDraftChanged()) setJobId(requestedJobId);
+  }, [requestedJobId, open, form]);
   useEffect(() => {
     if (!openRequest) return;
+    if (isDraftChanged() && !window.confirm("Discard the unfinished course recovery report and open a new one?")) return;
     setPrefillIndex(0);
+    setJobId(requestedJobId);
+    setActivePrefillCourses(prefillCourses);
     form.reset(valuesForPrefill(prefillCourses[0]));
     setError("");
     setOpen(true);
-  }, [form, openRequest, prefillCourses]);
+  // An updated prefill list must not silently replace a draft; only a new request opens it.
+  }, [form, openRequest]);
   useEffect(() => {
     let disposed = false;
     const load = async () => {
@@ -212,10 +232,34 @@ export function CourseReport({ jobId, onReview, onStarted, openRequest = 0, pref
     } catch (e) { setError(e instanceof Error ? e.message : "Report could not be started"); }
   });
 
+  const closeReport = () => {
+    form.reset(defaults);
+    setError("");
+    setOpen(false);
+    setConfirmDiscard(false);
+  };
+
   return <section className="m-4 space-y-3 rounded-lg border bg-muted/20 p-4" aria-label="Course recovery">
     <Button variant="outline" size="sm" data-testid="button-report-courses" onClick={() => {
-      form.reset(defaults); setError(""); setOpen(!open);
+      if (open) {
+        if (isDraftChanged()) setConfirmDiscard(true);
+        else closeReport();
+      } else {
+        form.reset(defaults); setError(""); setOpen(true);
+      }
     }}>Report missing or incorrect courses</Button>
+    <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Discard unfinished course recovery report?</AlertDialogTitle>
+          <AlertDialogDescription>Your report has not been submitted. Discard it or keep editing.</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Keep editing</AlertDialogCancel>
+          <AlertDialogAction onClick={closeReport}>Discard changes</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     <p className="text-xs text-muted-foreground">
       Field completeness measures the courses already found, not catalogue coverage.
       Reports run a fresh, bounded recovery (up to 50 courses / 10 minutes), keep existing pending rows,
@@ -226,9 +270,9 @@ export function CourseReport({ jobId, onReview, onStarted, openRequest = 0, pref
     {historyError && <p role="status" className="text-xs text-destructive">{historyError}</p>}
     {error && <p role={open ? "alert" : "status"} className="text-sm text-destructive" data-testid="report-error">{error}</p>}
     {open && <Form {...form}><form onSubmit={submit} className="space-y-3">
-      {prefillCourses.length > 0 && <div className="rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950">
+      {activePrefillCourses.length > 0 && <div className="rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950">
         <p className="font-medium">Recover official requirements for a staged course</p>
-        {prefillCourses.length > 1 ? (
+        {activePrefillCourses.length > 1 ? (
           <label className="mt-2 block">
             Selected course
             <select
@@ -237,17 +281,18 @@ export function CourseReport({ jobId, onReview, onStarted, openRequest = 0, pref
               data-testid="select-report-prefill-course"
               onChange={(event) => {
                 const index = Number(event.target.value);
+                if (isDraftChanged() && !window.confirm("Discard the unfinished course recovery report and switch courses?")) return;
                 setPrefillIndex(index);
-                form.reset(valuesForPrefill(prefillCourses[index]));
+                form.reset(valuesForPrefill(activePrefillCourses[index]));
                 setError("");
               }}
             >
-              {prefillCourses.map((course, index) => (
+              {activePrefillCourses.map((course, index) => (
                 <option key={`${course.courseUrl ?? "no-url"}-${index}`} value={index}>{course.courseName}</option>
               ))}
             </select>
           </label>
-        ) : <p className="mt-1" data-testid="report-prefill-course">{prefillCourses[0].courseName}</p>}
+        ) : <p className="mt-1" data-testid="report-prefill-course">{activePrefillCourses[0].courseName}</p>}
         <p className="mt-1 text-xs">
           The course page and affected fields are prefilled. Add a separate official requirements URL only when it provides the missing evidence.
         </p>

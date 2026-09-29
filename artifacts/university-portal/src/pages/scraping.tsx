@@ -26,7 +26,7 @@ import {
   Database, Download, RotateCcw, Activity,
 } from "lucide-react";
 import { Link } from "wouter";
-import { confirmCourseEditNavigation, registerCourseEditNavigationGuard } from "@/lib/course-edit-navigation-guard";
+import { confirmCourseEditNavigation, confirmHistoryReportDiscard, hasUnsavedCourseReports, registerCourseEditNavigationGuard } from "@/lib/course-edit-navigation-guard";
 import { getFetchErrorMessage, readResponseJson } from "@/lib/readResponseJson";
 import { Can, useCan } from "@/components/can";
 import {
@@ -1209,10 +1209,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   dirtyEditRef.current = hasDirtyEdit;
   useEffect(() => registerCourseEditNavigationGuard(() => dirtyEditRef.current), []);
   useEffect(() => {
-    if (!hasDirtyEdit) return;
     const editPageUrl = window.location.href;
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (!dirtyEditRef.current) return;
+      if (!dirtyEditRef.current && !hasUnsavedCourseReports()) return;
       event.preventDefault();
       event.returnValue = "";
     };
@@ -1229,7 +1228,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       window.removeEventListener("beforeunload", onBeforeUnload);
       window.removeEventListener("popstate", onPopState, true);
     };
-  }, [hasDirtyEdit]);
+  }, []);
   const closeEditCourse = () => {
     dirtyEditRef.current = false;
     editSession.current = null;
@@ -2753,8 +2752,10 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   const [forceReasons, setForceReasons] = useState<Record<string, string>>({});
   const [cleaningNames, setCleaningNames] = useState(false);
   const [requirementRecoveryRequest, setRequirementRecoveryRequest] = useState(0);
+  const [requirementReportJobId, setRequirementReportJobId] = useState<string | null>(null);
   const [requirementRecoveryCourses, setRequirementRecoveryCourses] = useState<CourseReportPrefillCourse[]>([]);
   const reportNewDurationSource = (course: StagedCourse) => {
+    setRequirementReportJobId(reviewJobId);
     setRequirementRecoveryCourses([durationReportPrefill(course)]);
     setRequirementRecoveryRequest((request) => request + 1);
   };
@@ -3783,6 +3784,15 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       {campusProgress && stagedCourses.length === 0 && <p role="status" className="p-3 text-blue-700">
         Loading courses for review…
       </p>}
+      {requirementReportJobId && requirementRecoveryRequest > 0 && (
+        <CourseReport
+          jobId={requirementReportJobId}
+          openRequest={requirementRecoveryRequest}
+          prefillCourses={requirementRecoveryCourses}
+          onReview={(id) => handleReviewReady(id, selectedUniversityName || "University", true)}
+          onStarted={() => void fetchHistory()}
+        />
+      )}
       {showReview && stagedCourses.length > 0 && (() => {
         const logicalGroups = groupLegacyCampusRows(stagedCourses);
         const displayedGroups = qualitySortDesc
@@ -4018,15 +4028,6 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
               </Can>
             )}
             <DatedCatalogueReview courses={stagedCourses} />
-            {reviewJobId && requirementRecoveryRequest > 0 && (
-              <CourseReport
-                jobId={reviewJobId}
-                openRequest={requirementRecoveryRequest}
-                prefillCourses={requirementRecoveryCourses}
-                onReview={(id) => handleReviewReady(id, selectedUniversityName || "University", true)}
-                onStarted={() => void fetchHistory()}
-              />
-            )}
             {bulkFixJob && (
               <div className={`mb-3 rounded-lg border p-3 ${
                 ["queued", "running"].includes(bulkFixJob.status)
@@ -4314,6 +4315,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                                       .sort((a, b) =>
                                         a.id === course.id ? -1 : b.id === course.id ? 1 : 0,
                                       );
+                                    setRequirementReportJobId(reviewJobId);
                                     setRequirementRecoveryCourses(candidates.map((candidate) => {
                                       const academicUnresolved = candidate.requirementStatus?.academic.state === "missing"
                                         || candidate.requirementStatus?.academic.state === "unverified";
@@ -5021,6 +5023,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                   onReport={reviewJobId && bulkFixJob?.sourceJobId === reviewJobId ? (row) => {
                     const course = stagedCourses.find((course) => course.id === row.id);
                     if (!course) return;
+                    setRequirementReportJobId(reviewJobId);
                     setRequirementRecoveryCourses([smartFixReportPrefill(row, course)]);
                     setShowFixResultsDialog(false);
                     setRequirementRecoveryRequest((current) => current + 1);
@@ -5487,6 +5490,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
               id="history-release-filter"
               value={historyReleaseRevision}
               onChange={(event) => {
+                if (!confirmHistoryReportDiscard()) return;
                 setHistoryPage(1);
                 setHistoryReleaseRevision(event.target.value);
               }}
@@ -5501,6 +5505,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             <Select
               value={historyUniversityId}
               onValueChange={(value) => {
+                if (!confirmHistoryReportDiscard()) return;
                 setHistoryPage(1);
                 setHistoryUniversityId(value);
               }}
@@ -5523,6 +5528,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
               type="checkbox"
               checked={historyMixedReleaseOnly}
               onChange={(event) => {
+                if (!confirmHistoryReportDiscard()) return;
                 setHistoryPage(1);
                 setHistoryMixedReleaseOnly(event.target.checked);
               }}
@@ -5536,6 +5542,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
               size="sm"
               className="h-8 text-xs"
               onClick={() => {
+                if (!confirmHistoryReportDiscard()) return;
                 setHistoryPage(1);
                 setHistoryReleaseRevision("");
                 setHistoryUniversityId("all");
@@ -5581,7 +5588,10 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             <label className="text-xs text-gray-500">Per page:</label>
             <Select
               value={String(historyPageSize)}
-              onValueChange={(v) => { setHistoryPage(1); setHistoryPageSize(Number(v) as 10 | 50 | 100); }}
+              onValueChange={(v) => {
+                if (!confirmHistoryReportDiscard()) return;
+                setHistoryPage(1); setHistoryPageSize(Number(v) as 10 | 50 | 100);
+              }}
             >
               <SelectTrigger className="h-8 w-20 text-xs">
                 <SelectValue />
@@ -5595,7 +5605,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+              onClick={() => { if (confirmHistoryReportDiscard()) setHistoryPage((p) => Math.max(1, p - 1)); }}
               disabled={historyPage <= 1 || loadingHistory}
             >
               Prev
@@ -5606,7 +5616,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setHistoryPage((p) => p + 1)}
+              onClick={() => { if (confirmHistoryReportDiscard()) setHistoryPage((p) => p + 1); }}
               disabled={historyPage * historyPageSize >= historyTotal || loadingHistory}
             >
               Next
@@ -5929,6 +5939,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                       </div>
                       <CourseReport
                         jobId={run.targetedRetryDiagnostic?.source_review_job_id ?? run.runtimeJobId}
+                        navigationScope="history"
                         onReview={id => handleReviewReady(id, run.universityName ?? "University", true)}
                         onStarted={() => void fetchHistory()}
                         openRequest={historyCourseReportOpenRequests[run.runtimeJobId] ?? 0}

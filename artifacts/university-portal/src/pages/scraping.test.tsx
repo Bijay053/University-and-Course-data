@@ -344,6 +344,94 @@ function initialReview(): ScrapingInitialReviewState {
   };
 }
 
+describe("unfinished course recovery report navigation", () => {
+  it("guards history paging and filtering before removing a changed report", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/api/scrape/history?")) return jsonResponse({
+        runs: url.includes("offset=10") ? [{
+          runtimeJobId: "second-job", universityId: 7, universityName: "Another University",
+          status: "completed", releaseHistory: [], releaseWarnings: [],
+        }] : [{
+          runtimeJobId: "first-job", universityId: 7, universityName: "Test University",
+          status: "completed", releaseHistory: [], releaseWarnings: [],
+        }],
+        total: 20,
+      });
+      if (url.endsWith("/course-reports")) return jsonResponse({ reports: [], source_exclusions: {} });
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      return jsonResponse({});
+    }));
+    render(<ScrapingForTest initialReviewState={initialReview()} />);
+    const historyRow = await screen.findByText("Test University");
+    const report = within(historyRow.closest("#scrape-history-first-job") as HTMLElement);
+    fireEvent.click(report.getByTestId("button-report-courses"));
+    fireEvent.change(report.getByTestId("input-report-description"), { target: { value: "Unfinished report" } });
+    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(false).mockReturnValueOnce(true);
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText("Page 1 / 2")).toBeTruthy();
+    expect(report.getByTestId("input-report-description")).toHaveProperty("value", "Unfinished report");
+    fireEvent.change(screen.getByPlaceholderText("e.g. abc123def456"), { target: { value: "release" } });
+    expect(screen.getByPlaceholderText("e.g. abc123def456")).toHaveProperty("value", "");
+    expect(confirm).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(await screen.findByText("Another University")).toBeTruthy();
+    expect(screen.queryByTestId("input-report-description")).toBeNull();
+    confirm.mockRestore();
+  });
+  it("blocks app navigation, back navigation and reload until the report is discarded", async () => {
+    const review = initialReview();
+    review.courses = [{
+      ...review.courses[0],
+      duration: null,
+      durationTerm: null,
+      durationReviewStatus: {
+        status: "confirmed_unpublished",
+        reason: "Official course page does not publish a duration.",
+        sources: [{ url: "https://example.test/courses/1", snippet: "No duration listed." }],
+      },
+    }] as ScrapingInitialReviewState["courses"];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/course-reports")) return jsonResponse({ reports: [], source_exclusions: {} });
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      return jsonResponse({});
+    }));
+    window.history.replaceState(null, "", "/scraping");
+    render(
+      <WouterRouter aroundNav={aroundCourseEditNavigation}>
+        <Link href="/bulk" data-testid="report-nav-away">Bulk Upload</Link>
+        <ScrapingForTest initialReviewState={review} />
+      </WouterRouter>,
+    );
+    await userEvent.setup().click(screen.getByTestId("button-report-duration-1"));
+    const description = await screen.findByTestId("input-report-description");
+    fireEvent.change(description, { target: { value: "My own evidence" } });
+    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(false).mockReturnValueOnce(true);
+    fireEvent.click(screen.getByTestId("report-nav-away"));
+    expect(confirm).toHaveBeenCalledWith("You have an unfinished course recovery report. Leave this page and discard it?");
+    expect(window.location.pathname).toBe("/scraping");
+    expect((description as HTMLTextAreaElement).value).toBe("My own evidence");
+    const unload = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(unload);
+    expect(unload.defaultPrevented).toBe(true);
+    window.history.replaceState(null, "", "/bulk");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    expect(window.location.pathname).toBe("/scraping");
+    expect((description as HTMLTextAreaElement).value).toBe("My own evidence");
+    fireEvent.click(screen.getByTestId("button-approve-logical-course-1"));
+    await waitFor(() => expect(screen.queryByTestId("row-logical-course-1")).toBeNull());
+    expect((screen.getByTestId("input-report-description") as HTMLTextAreaElement).value).toBe("My own evidence");
+    fireEvent.click(screen.getByTestId("report-nav-away"));
+    expect(window.location.pathname).toBe("/bulk");
+    confirm.mockRestore();
+  });
+});
+
 describe("discarding a course edit", () => {
   function openCourseEditor({ routing = false, save = false } = {}) {
     const review = initialReview();

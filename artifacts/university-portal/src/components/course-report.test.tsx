@@ -141,6 +141,96 @@ describe("course report recovery", () => {
     expect((screen.getByTestId("select-report-kind") as HTMLSelectElement).value).toBe("missing");
   });
 
+  it("keeps a changed draft on cancel and clears it only after explicit discard", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({ reports: [], source_exclusions: {} })));
+    render(<CourseReport jobId="parent" onReview={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("button-report-courses"));
+    fireEvent.click(screen.getByTestId("button-report-courses"));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    fireEvent.click(screen.getByTestId("button-report-courses"));
+    fireEvent.change(screen.getByTestId("input-report-description"), { target: { value: "Missing a course" } });
+    fireEvent.click(screen.getByTestId("button-report-courses"));
+    expect(await screen.findByRole("alertdialog", { name: "Discard unfinished course recovery report?" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+    expect((screen.getByTestId("input-report-description") as HTMLTextAreaElement).value).toBe("Missing a course");
+    fireEvent.click(screen.getByTestId("button-report-courses"));
+    fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
+    expect(screen.queryByTestId("input-report-description")).toBeNull();
+    fireEvent.click(screen.getByTestId("button-report-courses"));
+    expect((screen.getByTestId("input-report-description") as HTMLTextAreaElement).value).toBe("");
+  });
+
+  it("warns before replacing a changed prefilled report but not an untouched one", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({ reports: [], source_exclusions: {} })));
+    const courses = [
+      { courseName: "One", courseUrl: "https://uni.edu/one", fields: ["other"] as const, description: "One issue" },
+      { courseName: "Two", courseUrl: "https://uni.edu/two", fields: ["other"] as const, description: "Two issues" },
+    ];
+    render(<CourseReport jobId="parent" onReview={vi.fn()} openRequest={1} prefillCourses={courses.map(c => ({ ...c, fields: [...c.fields] }))} />);
+    const picker = await screen.findByTestId("select-report-prefill-course");
+    fireEvent.change(picker, { target: { value: "1" } });
+    expect((screen.getByTestId("input-report-urls") as HTMLTextAreaElement).value).toBe("https://uni.edu/two");
+    fireEvent.change(screen.getByTestId("input-report-source"), { target: { value: "https://uni.edu/evidence" } });
+    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
+    fireEvent.change(picker, { target: { value: "0" } });
+    expect((screen.getByTestId("input-report-source") as HTMLInputElement).value).toBe("https://uni.edu/evidence");
+    fireEvent.change(picker, { target: { value: "0" } });
+    expect(confirm).toHaveBeenCalledTimes(2);
+    expect((screen.getByTestId("input-report-source") as HTMLInputElement).value).toBe("");
+    confirm.mockRestore();
+  });
+
+  it("keeps the original job and course context if a replacement request is declined", async () => {
+    const fetcher = vi.fn().mockResolvedValue(response({ reports: [], source_exclusions: {} }));
+    vi.stubGlobal("fetch", fetcher);
+    const first = [{ courseName: "First", courseUrl: "https://uni.edu/first", fields: ["other"] as const, description: "First issue" }];
+    const second = [{ courseName: "Second", courseUrl: "https://uni.edu/second", fields: ["other"] as const, description: "Second issue" }];
+    const { rerender } = render(<CourseReport jobId="first-job" onReview={vi.fn()} openRequest={1}
+      prefillCourses={first.map(c => ({ ...c, fields: [...c.fields] }))} />);
+    await screen.findByTestId("report-prefill-course");
+    fireEvent.change(screen.getByTestId("input-report-source"), { target: { value: "https://uni.edu/source" } });
+    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false);
+    rerender(<CourseReport jobId="second-job" onReview={vi.fn()} openRequest={2}
+      prefillCourses={second.map(c => ({ ...c, fields: [...c.fields] }))} />);
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(screen.getByTestId("report-prefill-course").textContent).toContain("First");
+    expect((screen.getByTestId("input-report-urls") as HTMLTextAreaElement).value).toBe("https://uni.edu/first");
+    expect((screen.getByTestId("input-report-source") as HTMLInputElement).value).toBe("https://uni.edu/source");
+    expect(fetcher.mock.calls.every(([url]) => String(url).includes("/first-job/"))).toBe(true);
+    confirm.mockRestore();
+  });
+
+  it("uses a newly selected job when a clean mounted report opens manually", async () => {
+    const fetcher = vi.fn(async (_url: string, init?: RequestInit) => response(
+      init?.method === "POST"
+        ? { job_id: "submitted", status: "queued", found: 0, staged: 0, skipped: 0, errors: 0, exclusions: {}, request: { kind: "missing" } }
+        : { reports: [], source_exclusions: {} },
+    ));
+    vi.stubGlobal("fetch", fetcher);
+    const { rerender } = render(<CourseReport jobId="old-job" onReview={vi.fn()} />);
+    rerender(<CourseReport jobId="new-job" onReview={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("button-report-courses"));
+    fireEvent.change(screen.getByTestId("input-report-urls"), { target: { value: "https://uni.edu/new" } });
+    fireEvent.click(screen.getByTestId("button-submit-report"));
+    await waitFor(() => expect(fetcher.mock.calls.some(([url, init]) =>
+      String(url) === "/api/scrape/jobs/new-job/course-reports" && init?.method === "POST")).toBe(true));
+  });
+
+  it("does not warn after a successful submission closes the form", async () => {
+    const report = { job_id: "child", status: "queued", found: 0, staged: 0, skipped: 0, errors: 0,
+      exclusions: {}, request: { kind: "missing" } };
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) =>
+      response(init?.method === "POST" ? report : { reports: [], source_exclusions: {} })));
+    render(<CourseReport jobId="parent" onReview={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("button-report-courses"));
+    fireEvent.change(screen.getByTestId("input-report-urls"), { target: { value: "https://uni.edu/course" } });
+    fireEvent.click(screen.getByTestId("button-submit-report"));
+    await waitFor(() => expect(screen.queryByTestId("input-report-urls")).toBeNull());
+    fireEvent.click(screen.getByTestId("button-report-courses"));
+    fireEvent.click(screen.getByTestId("button-report-courses"));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
   it("submits official missing URLs and numeric expected count, then shows durable progress", async () => {
     const report = { job_id: "child", status: "queued", found: 0, staged: 0, skipped: 0, errors: 0,
       exclusions: {}, request: { kind: "missing", eligibility_review: true, expected_count: 10 } };
