@@ -1,0 +1,1 @@
+{"run_id": "f7dcfb08e6fb4b6c", "stack_name": "up-db-refresh-rehearsal-f7dcfb08e6fb4b6c", "secret_arn": "arn:aws:secretsmanager:ap-south-1:151955775532:secret:rds!db-896fc581-5dfb-4bc2-9b41-f21338927f19-oFPUay", "schedule_group": "up-db-refresh-f7dcfb08e6fb4b6c", "schedule_name": "up-db-refresh-f7dcfb08e6fb4b6c"}

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import re
 from typing import Iterable
+from urllib.parse import urlsplit
 
 from app.services.scraper.extractors.base import ExtractionResult
 
@@ -270,6 +271,63 @@ def classify_degree_level(course_name: str, page_text: str = "") -> tuple[str | 
     return None, "unknown", None
 
 
+def _from_aru_course_page(html: str, url: str) -> tuple[str | None, str, str | None]:
+    """Read the current ARU course's award, not admissions or related courses."""
+    parts = urlsplit(url)
+    if (parts.hostname not in {"aru.ac.uk", "www.aru.ac.uk"}
+            or not re.fullmatch(r"/study/(?:undergraduate|postgraduate)/[^/]+/?", parts.path)):
+        return None, "unknown", None
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html, "html.parser")
+    heading = soup.select_one("h1#course-page-title")
+    if heading is None:
+        return None, "unknown", None
+    name = heading.get_text(" ", strip=True)
+    if not name:
+        return None, "unknown", None
+
+    awards = []
+    for panel in soup.select("dl.utopian-course-options__list"):
+        for label in panel.find_all("dt"):
+            if label.get_text(" ", strip=True).casefold() != "award":
+                continue
+            value = label.find_next_sibling("dd")
+            if value is not None:
+                award = value.get_text(" ", strip=True)
+                # A combined award is not one selected qualification.
+                if re.search(r"[,/]|\band\b", award, re.I):
+                    return None, "ambiguous", None
+                level = _classify_text(award, _NAME_PATTERNS)
+                if level:
+                    awards.append((level, award))
+    if awards:
+        if len({level for level, _ in awards}) == 1:
+            return awards[0][0], "aru_award", f"Award {awards[0][1]}"[:200]
+        return None, "ambiguous", None
+
+    # Some ARU undergraduate panels have no Award row; their course-owned
+    # <title> ends with an explicit award such as "- BSc (Hons) - ARU".
+    # ARU also inserts "degree" or "degree course" after the H1 on some pages.
+    title = soup.title.get_text(" ", strip=True) if soup.title else ""
+    title_match = re.fullmatch(
+        re.escape(name) + r"(?: degree(?: course)?)? - (.+) - ARU",
+        title, flags=re.I,
+    )
+    if not title_match:
+        return None, "unknown", None
+    suffix = title_match.group(1)
+    if re.search(r"[,/]|\band\b", suffix, re.I):
+        return None, "ambiguous", None
+    segments = [segment.strip() for segment in suffix.split(" - ")]
+    levels = [_classify_text(segment, _NAME_PATTERNS) for segment in segments]
+    if levels and all(level is not None and level == levels[0] for level in levels):
+        return levels[0], "aru_title_award", suffix[:200]
+    if len({level for level in levels if level is not None}) > 1:
+        return None, "ambiguous", None
+    return None, "unknown", None
+
+
 def _from_ltu_banner(html: str) -> tuple[str | None, str, str | None]:
     """Leeds Trinity University banner-title structural extractor.
 
@@ -400,6 +458,19 @@ async def extract(html: str, url: str, course_name: str | None = None) -> list[E
     # to the 'Level' descriptor (Undergraduate/Postgraduate Taught/…).
     # Runs before generic text classification to prevent degree-level noise
     # from other-course listings, nav text, or page prose.
+    _aru_degree, _aru_method, _aru_snippet = _from_aru_course_page(html, url)
+    if _aru_degree:
+        return [ExtractionResult(
+            field_key=field_key,
+            value=_aru_degree,
+            normalized={"degree_level": _aru_degree},
+            confidence=0.95,
+            method=f"degree_level:{_aru_method}",
+            snippet=_aru_snippet,
+        )]
+    if _aru_method == "ambiguous":
+        return []
+
     _bcu_degree, _bcu_method, _bcu_snippet = _from_bcu_panel(html)
     if _bcu_degree:
         results: list[ExtractionResult] = [

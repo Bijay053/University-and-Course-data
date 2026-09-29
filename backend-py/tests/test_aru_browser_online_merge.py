@@ -95,3 +95,36 @@ def test_extended_browser_evidence_retains_extractor_method(monkeypatch):
     assert filled == {"study_mode": "Online"}
     assert evidence[0]["method"] == "per_course_browser_extended"
     assert evidence[0]["source_method"] == "study_mode:rule"
+
+
+def test_aru_rendered_award_fills_missing_degree_with_source_proof(monkeypatch):
+    async def empty_extractor(_html, _url):
+        return []
+
+    for extractor in (
+        per_course_browser.course_name_extractor,
+        per_course_browser.fee,
+        per_course_browser.english_test,
+        per_course_browser.intake,
+        per_course_browser.duration,
+        per_course_browser.location,
+        per_course_browser.study_mode,
+    ):
+        monkeypatch.setattr(extractor, "extract", empty_extractor)
+
+    html = """<title>Brand Management - MSc - ARU</title>
+    <h1 id="course-page-title">Brand Management</h1>
+    <dl class="utopian-course-options__list"><dt>Award</dt><dd>MSc</dd></dl>"""
+    filled, evidence = asyncio.run(per_course_browser._extended_extract(
+        html, "https://www.aru.ac.uk/study/postgraduate/brand-management",
+        {"course_name": "Brand Management"}, override=False,
+    ))
+    assert filled["degree_level"] == "Master's"
+    assert evidence[0]["source_url"].endswith("/brand-management")
+    assert evidence[0]["source_method"] == "degree_level:aru_award"
+    assert evidence[0]["snippet"] == "Award MSc"
+    filled, _ = asyncio.run(per_course_browser._extended_extract(
+        html, "https://www.aru.ac.uk/study/postgraduate/brand-management",
+        {"course_name": "Brand Management", "degree_level": "Bachelor's"}, override=False,
+    ))
+    assert "degree_level" not in filled

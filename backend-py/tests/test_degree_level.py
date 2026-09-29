@@ -95,3 +95,47 @@ def test_extract_uses_passed_course_name_over_generic_title():
     result = next(result for result in out if result.field_key == "degree_level")
     assert result.value == "Master's"
     assert result.method == "degree_level:name"
+
+
+def test_aru_award_panel_owns_degree_not_admissions_or_other_courses():
+    html = """<title>Digital Transformation and Public Value - MSc, PG Cert, PG Dip - ARU</title>
+    <h1 id="course-page-title">Digital Transformation and Public Value</h1>
+    <dl class="utopian-course-options__list"><dt>Award</dt><dd>MSc</dd></dl>
+    <p>Entry requirements: Bachelor's degree. Related: Graduate Certificate.</p>"""
+    out = asyncio.run(degree_level.extract(
+        html, "https://www.aru.ac.uk/study/postgraduate/digital-transformation-and-public-value",
+        course_name="Digital Transformation and Public Value",
+    ))
+    assert [(r.value, r.method) for r in out if r.field_key == "degree_level"] == [
+        ("Master's", "degree_level:aru_award")
+    ]
+
+
+def test_aru_course_owned_title_award_when_panel_has_no_award():
+    html = """<title>International Business &amp; Artificial Intelligence degree course - BSc (Hons) - ARU</title>
+    <h1 id="course-page-title">International Business &amp; Artificial Intelligence</h1>
+    <dl class="utopian-course-options__list"><dt>Duration</dt><dd>3 years</dd></dl>"""
+    out = asyncio.run(degree_level.extract(
+        html, "https://www.aru.ac.uk/study/undergraduate/international-business-and-artificial-intelligence",
+        course_name="International Business & Artificial Intelligence",
+    ))
+    assert [(r.value, r.method) for r in out if r.field_key == "degree_level"] == [
+        ("Bachelor's", "degree_level:aru_title_award")
+    ]
+    assert degree_level._from_aru_course_page(
+        html, "https://elsewhere.example/study/undergraduate/artificial-intelligence-and-data-science"
+    )[0] is None
+
+
+def test_aru_ambiguous_awards_do_not_pick_one_from_title_or_panels():
+    html = """<title>Data Science - MSc, PGCert - ARU</title>
+    <h1 id="course-page-title">Data Science</h1>
+    <dl class="utopian-course-options__list"><dt>Award</dt><dd>MSc</dd></dl>
+    <dl class="utopian-course-options__list"><dt>Award</dt><dd>PGCert</dd></dl>"""
+    assert degree_level._from_aru_course_page(
+        html, "https://www.aru.ac.uk/study/postgraduate/data-science"
+    )[0] is None
+    assert asyncio.run(degree_level.extract(
+        html, "https://www.aru.ac.uk/study/postgraduate/data-science",
+        course_name="Data Science",
+    )) == []

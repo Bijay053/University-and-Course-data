@@ -32,3 +32,9 @@ A mixed official sitemap sample can contain a genuine navigation page. The bound
 **Why:** An actual ARU production probe found three course-owned pages and one listing among four sampled official pages. Requiring every sitemap entry to be a course incorrectly rejected the otherwise verified official source.
 
 **How to apply:** Preserve exact-host and filter replay, require positive course evidence, and let a separate full-catalogue review determine whether the 200-course production floor is met.
+
+ARU's visible H1 often names only the subject, while its selected course-options panel gives the actual award. Some undergraduate pages omit that award row but place the award in an SEO title, sometimes with “degree” or “degree course” inserted after the H1. Treat the title as evidence only when it is tied to that H1 and yields one unambiguous qualification; admissions academic level is not an award.
+
+**Why:** A review scrape had dozens of blank degree levels even though official pages published MSc or BSc. The browser rescue recovered other fields but originally did not carry degree level, and broad page text could contain unrelated qualifications.
+
+**How to apply:** For missing ARU degrees, inspect both static and rendered course-owned evidence and the browser merge. Avoid deriving the award from duration, admissions requirements, related-course text, or a title containing multiple different awards.

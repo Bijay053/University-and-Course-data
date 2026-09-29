@@ -25,6 +25,7 @@ from urllib.parse import urlparse
 from app.services.scraper.browser_pool import pool as browser_pool
 from app.services.scraper.config.context import get_uni_config
 from app.services.scraper.extractors import (
+    degree_level,
     duration,
     english_test,
     fee,
@@ -658,6 +659,7 @@ _EXTENDED_EXTRACT_HOSTS: frozenset[str] = frozenset({
 # overwriting a previously-populated value from the static pass.
 _EXTENDED_SLOTS: tuple[str, ...] = (
     "course_name",
+    "degree_level",
     "international_fee",
     # Fee metadata must travel with the browser-rendered amount. Dropping
     # fee_term left stale static values such as "Session" attached to a new
@@ -771,6 +773,8 @@ async def _extended_extract(
         (location, ["location_text"]),
         (study_mode, ["study_mode"]),
     ]
+    if (urlparse(url).hostname or "").lower() in {"aru.ac.uk", "www.aru.ac.uk"}:
+        extractors.insert(1, (degree_level, ["degree_level"]))
     filled: dict[str, Any] = {}
     evidence: list[dict[str, Any]] = []
 
@@ -785,7 +789,13 @@ async def _extended_extract(
         ):
             continue
         try:
-            results: list[ExtractionResult] = await extractor_mod.extract(rendered, url)
+            if extractor_mod is degree_level:
+                results = await degree_level.extract(
+                    rendered, url,
+                    course_name=filled.get("course_name") or existing_payload.get("course_name"),
+                )
+            else:
+                results = await extractor_mod.extract(rendered, url)
         except Exception as exc:  # noqa: BLE001 — never abort on extractor failure
             log.warning("extended_extract: %s failed on rendered %s: %s",
                         extractor_mod.__name__, url, exc)
