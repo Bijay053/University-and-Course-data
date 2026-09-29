@@ -249,6 +249,10 @@ function hasUnsavedCourseEdits(current: StagedCourse, loaded: StagedCourse): boo
   });
 }
 
+const SAVED_FEE_FIELDS = [
+  "internationalFee", "currency", "feeTerm", "feeYear", "feeSelection",
+  "feeVariants", "fee_variants", "extractionMethod", "extraction_method",
+] as const satisfies readonly (keyof StagedCourse)[];
 type RequirementState = "numeric" | "qualification_based" | "missing" | "unverified";
 type EnglishRequirementState = "verified" | "missing" | "not_required" | "unknown";
 type CourseRequirementStatus = {
@@ -3220,9 +3224,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     if (!normalized.courseQuality) throw new Error("The refreshed course has no quality feedback.");
     setApprovalFailures(prev => prev.filter(failure => failure.id !== id));
     setStagedCourses(prev => prev.map(c => c.id === id ? normalized : c));
-    setEditingCourse(prev => prev?.id === id ? { ...prev, ...normalized,
-      rawData: (prev as StagedCourse & { rawData?: unknown }).rawData,
-      raw_data: (prev as StagedCourse & { raw_data?: unknown }).raw_data } : prev);
+    setEditingCourse(prev => prev?.id === id
+      ? { ...prev, courseQuality: normalized.courseQuality } : prev);
   };
 
   const retryCourseQuality = async (id: number) => {
@@ -3297,8 +3300,8 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     const course = normalizeStagedCourse(updated as StagedCourse);
     setApprovalFailures(prev => prev.filter(failure => failure.id !== course.id));
     setStagedCourses(prev => prev.map(c => c.id === course.id ? { ...course, courseQuality: undefined } : c));
-    setLoadedEditCourse(prev => prev?.id === course.id ? { ...prev, ...course } : prev);
-    setEditingCourse(prev => prev?.id === course.id ? { ...prev, ...course } : prev);
+    setLoadedEditCourse(prev => prev?.id === course.id ? applySavedFeeFields(prev, course) : prev);
+    setEditingCourse(prev => prev?.id === course.id ? applySavedFeeFields(prev, course) : prev);
     void retryCourseQuality(course.id).catch(err => {
       toast({ title: "Fee saved, but refresh failed", description: String(err), variant: "destructive" });
     });
@@ -7038,4 +7041,15 @@ export function ScrapingForTest({ initialReviewState }: { initialReviewState: Sc
 
 export default function Scraping() {
   return <ScrapingPage />;
+}
+
+function applySavedFeeFields(current: StagedCourse, saved: StagedCourse): StagedCourse {
+  const next = { ...current };
+  for (const field of SAVED_FEE_FIELDS) {
+    if (field in saved) {
+      // The response may be a summary without every fee metadata field.
+      Object.assign(next, { [field]: saved[field] });
+    }
+  }
+  return next;
 }

@@ -251,11 +251,36 @@ vi.mock("@/components/scrape-job-card", () => ({
   ScrapeJobCard: () => null,
 }));
 
+const feeCardTestControls = vi.hoisted(() => ({ showSave: false }));
+vi.mock("@/components/published-fee-variants", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/components/published-fee-variants")>();
+  return {
+    ...actual,
+    PublishedFeeVariants: (props: React.ComponentProps<typeof actual.PublishedFeeVariants>) => (
+      <>
+        <actual.PublishedFeeVariants {...props} />
+        {feeCardTestControls.showSave && (
+          <button type="button" onClick={() => {
+            // A server response still contains the old values for unrelated fields.
+            const saved = {
+              ...props.course, id: Number(props.id), courseName: "Course 1", description: "Old description",
+              internationalFee: 19050, currency: "GBP", feeTerm: "Annual", feeYear: 2027,
+              feeSelection: { snapshotToken: "new-token", options: [], selectedOptionId: "new-option" },
+            };
+            props.onCourseUpdated?.(saved);
+          }}>Simulate saved fee</button>
+        )}
+      </>
+    ),
+  };
+});
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   window.history.replaceState(null, "", "/");
   localStorage.clear();
+  feeCardTestControls.showSave = false;
 });
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -512,7 +537,113 @@ describe("discarding a course edit", () => {
   }, 12000);
 });
 
+describe("fee card updates in an open editor", () => {
+  it.each([true, false])("preserves unrelated draft fields and only warns for actual unsaved edits (draft: %s)", async (hasDraft) => {
+    feeCardTestControls.showSave = true;
+    const review = initialReview();
+    const original = {
+      ...review.courses[0], description: "Old description",
+      internationalFee: 17500, currency: "GBP", feeTerm: "Annual", feeYear: 2026,
+      feeVariants: { status: "unresolved", selected: [], options: [] },
+      feeSelection: { snapshotToken: "old-token", options: [], selectedOptionId: null },
+    };
+    review.courses = [original] as ScrapingInitialReviewState["courses"];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/scrape/staged/1/evidence?jobId=repair-job&universityId=7")
+        return jsonResponse({ course: { ...original, rawData: { source: "official" } } });
+      if (url === "/api/scrape/staged/repair-job?view=summary")
+        return jsonResponse({ courses: [{ ...original, internationalFee: 19050, feeYear: 2027,
+          feeSelection: { snapshotToken: "new-token", options: [], selectedOptionId: "new-option" },
+          courseName: "Course 1", courseQuality: {
+            id: 1, score: 85, tier: "review", label: "Needs Review", issues: [], breakdown: {},
+          } }] });
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      if (init?.method === "PUT") throw new Error("Cancel must not save");
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<ScrapingForTest initialReviewState={review} />);
+    await user.click(within(screen.getByTestId("row-logical-course-1")).getByTitle("Edit"));
+    const dialog = await screen.findByRole("dialog", { name: "Edit Scraped Course" });
+    if (hasDraft) {
+      fireEvent.change(within(dialog).getByDisplayValue("Course 1"), { target: { value: "Draft name" } });
+      fireEvent.change(within(dialog).getByDisplayValue("Old description"), { target: { value: "Draft description" } });
+    }
+    await user.click(within(dialog).getByRole("button", { name: "Simulate saved fee" }));
+    await waitFor(() => expect(within(dialog).getByDisplayValue("19050")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("row-logical-course-1").textContent).toContain("85%"));
+    expect(within(dialog).getByDisplayValue(hasDraft ? "Draft name" : "Course 1")).toBeTruthy();
+    expect(within(dialog).getByDisplayValue(hasDraft ? "Draft description" : "Old description")).toBeTruthy();
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    if (hasDraft) {
+      const warning = await screen.findByRole("alertdialog", { name: "Discard unsaved course edits?" });
+      await user.click(within(warning).getByRole("button", { name: "Keep editing" }));
+      expect(within(dialog).getByDisplayValue("Draft name")).toBeTruthy();
+      expect(within(dialog).getByDisplayValue("Draft description")).toBeTruthy();
+    } else {
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "Edit Scraped Course" })).toBeNull());
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+    }
+    expect(fetchMock.mock.calls.some(([url, init]) => String(url) === "/api/scrape/staged/1" && init?.method === "PUT")).toBe(false);
+  });
+});
+
 describe("review quality snapshot", () => {
+  it("does not replace an unsaved fee amount when a quality-only retry returns", async () => {
+    const review = initialReview();
+    const original = { ...review.courses[0], internationalFee: 17500, currency: "GBP", feeTerm: "Annual" };
+    review.courses = [original] as ScrapingInitialReviewState["courses"];
+    let finishRetry!: (response: Response) => void;
+    let saveConfirmed = false;
+    let qualityFailureReturned = false;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/scrape/staged/1/evidence?jobId=repair-job&universityId=7")
+        return jsonResponse({ course: { ...original, rawData: { source: "official" } } });
+      if (url === "/api/scrape/staged/1" && init?.method === "PUT") {
+        saveConfirmed = true;
+        return jsonResponse({ course: original });
+      }
+      if (url === "/api/scrape/staged/repair-job?view=summary") {
+        if (!saveConfirmed) return jsonResponse({ courses: [original] });
+        if (!qualityFailureReturned) {
+          qualityFailureReturned = true;
+          return jsonResponse({ error: "Unavailable" }, 503);
+        }
+        return new Promise<Response>(resolve => { finishRetry = resolve; });
+      }
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<ScrapingForTest initialReviewState={review} />);
+    const row = screen.getByTestId("row-logical-course-1");
+    await user.click(within(row).getByTitle("Edit"));
+    await screen.findByRole("dialog", { name: "Edit Scraped Course" });
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+    const unavailable = await screen.findByTestId("quality-unavailable-1");
+    await user.click(within(unavailable).getByRole("button", { name: "Retry quality" }));
+    await waitFor(() => expect(finishRetry).toBeDefined());
+    await user.click(within(row).getByTitle("Edit"));
+    const dialog = await screen.findByRole("dialog", { name: "Edit Scraped Course" });
+    fireEvent.change(within(dialog).getByDisplayValue("17500"), { target: { value: "18000" } });
+    finishRetry(jsonResponse({ courses: [{
+      ...original, courseQuality: { id: 1, score: 85, tier: "review", label: "Needs Review",
+        issues: [], breakdown: {} },
+    }] }));
+    await waitFor(() => expect(within(row).getByText("85%")).toBeTruthy());
+    expect(within(dialog).getByDisplayValue("18000")).toBeTruthy();
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(await screen.findByRole("alertdialog", { name: "Discard unsaved course edits?" })).toBeTruthy();
+  }, 15000);
+
   it("replaces a running scrape's incomplete degree warning with the score from the displayed row", async () => {
     const review = initialReview();
     const oldQuality = {
