@@ -152,3 +152,4 @@
 - [BCU production recipe identity](bcu-production-recipe-identity.md) — production uses the slug recipe, not the development ID-specific recipe; test both for location changes.
 - [UWL rendered listing coverage](uwl-rendered-listing-coverage.md) — rendered failover can work while nonconsecutive provider 502s omit pages; verify each page, not just the total.
 - [Review quality snapshot](review-quality-snapshot.md) — review scores and chips must derive from the same loaded rows as their displayed fields.
+- [Wouter navigation guards](wouter-navigation-guards.md) — aroundNav handles app links and hook navigation, not browser history; reload uses native beforeunload.

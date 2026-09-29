@@ -26,6 +26,7 @@ import {
   Database, Download, RotateCcw, Activity,
 } from "lucide-react";
 import { Link } from "wouter";
+import { confirmCourseEditNavigation, registerCourseEditNavigationGuard } from "@/lib/course-edit-navigation-guard";
 import { getFetchErrorMessage, readResponseJson } from "@/lib/readResponseJson";
 import { Can, useCan } from "@/components/can";
 import {
@@ -1198,7 +1199,35 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   const [editSaveError, setEditSaveError] = useState<{ title: string; message: string } | null>(null);
   const [editSaving, setEditSaving] = useState(false);
   const editSession = useRef<{ courseId: number } | null>(null);
+  const hasDirtyEdit = !!(editingCourse && loadedEditCourse
+    && hasUnsavedCourseEdits(editingCourse, loadedEditCourse));
+  const dirtyEditRef = useRef(hasDirtyEdit);
+  dirtyEditRef.current = hasDirtyEdit;
+  useEffect(() => registerCourseEditNavigationGuard(() => dirtyEditRef.current), []);
+  useEffect(() => {
+    if (!hasDirtyEdit) return;
+    const editPageUrl = window.location.href;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!dirtyEditRef.current) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    const onPopState = (event: PopStateEvent) => {
+      if (window.location.href === editPageUrl || confirmCourseEditNavigation()) return;
+      // popstate fires after the URL changes. Restore it before Wouter sees the
+      // event, so cancelling Back keeps both the draft and the review page.
+      event.stopImmediatePropagation();
+      window.history.pushState(null, "", editPageUrl);
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    window.addEventListener("popstate", onPopState, true);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      window.removeEventListener("popstate", onPopState, true);
+    };
+  }, [hasDirtyEdit]);
   const closeEditCourse = () => {
+    dirtyEditRef.current = false;
     editSession.current = null;
     setEditingCourse(null);
     setLoadedEditCourse(null);

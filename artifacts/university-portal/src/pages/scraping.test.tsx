@@ -4,6 +4,8 @@ import React from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { Link, Router as WouterRouter } from "wouter";
+import { aroundCourseEditNavigation } from "@/lib/course-edit-navigation-guard";
 
 import {
   annualFeeEquivalentForDisplay,
@@ -252,6 +254,7 @@ vi.mock("@/components/scrape-job-card", () => ({
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  window.history.replaceState(null, "", "/");
   localStorage.clear();
 });
 
@@ -317,12 +320,16 @@ function initialReview(): ScrapingInitialReviewState {
 }
 
 describe("discarding a course edit", () => {
-  function openCourseEditor() {
+  function openCourseEditor({ routing = false, save = false } = {}) {
     const review = initialReview();
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url === "/api/scrape/staged/1/evidence?jobId=repair-job&universityId=7")
         return jsonResponse({ course: { ...review.courses[0], rawData: { source: "official" } } });
+      if (url === "/api/scrape/staged/1" && init?.method === "PUT" && save)
+        return jsonResponse({ course: { ...review.courses[0], courseName: "Draft course" } });
+      if (url === "/api/scrape/staged/repair-job?view=summary")
+        return jsonResponse({ courses: review.courses });
       if (url === "/api/import/history") return jsonResponse([]);
       if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
       if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
@@ -330,9 +337,113 @@ describe("discarding a course edit", () => {
       return jsonResponse({});
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<ScrapingForTest initialReviewState={review} />);
+    if (routing) {
+      window.history.replaceState(null, "", "/scraping");
+      render(
+        <WouterRouter aroundNav={aroundCourseEditNavigation}>
+          <Link href="/bulk" data-testid="nav-away">Bulk Upload</Link>
+          <ScrapingForTest initialReviewState={review} />
+        </WouterRouter>,
+      );
+    } else {
+      render(<ScrapingForTest initialReviewState={review} />);
+    }
     return fetchMock;
   }
+
+  async function editName() {
+    await userEvent.setup().click(within(screen.getByTestId("row-logical-course-1")).getByTitle("Edit"));
+    const name = await screen.findByDisplayValue("Course 1");
+    fireEvent.change(name, { target: { value: "Draft course" } });
+  }
+
+  function tryLeavePage() {
+    fireEvent.click(screen.getByTestId("nav-away"));
+  }
+
+  function tryUnload() {
+    const event = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  }
+
+  it("warns on in-app navigation with a changed draft and allows leaving after confirmation", async () => {
+    openCourseEditor({ routing: true });
+    await editName();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
+    tryLeavePage();
+    expect(confirm).toHaveBeenCalledWith("You have unsaved course edits. Leave this page and discard them?");
+    expect(window.location.pathname).toBe("/scraping");
+    expect(screen.getByDisplayValue("Draft course")).toBeTruthy();
+    tryLeavePage();
+    expect(window.location.pathname).toBe("/bulk");
+  });
+
+  it("does not warn when an untouched editor navigates to another page", async () => {
+    openCourseEditor({ routing: true });
+    await userEvent.setup().click(within(screen.getByTestId("row-logical-course-1")).getByTitle("Edit"));
+    await screen.findByDisplayValue("Course 1");
+    const confirm = vi.spyOn(window, "confirm");
+    tryLeavePage();
+    expect(window.location.pathname).toBe("/bulk");
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it("warns on reload or tab close only while the draft is changed", async () => {
+    openCourseEditor();
+    expect(tryUnload()).toBe(false);
+    await editName();
+    expect(tryUnload()).toBe(true);
+    fireEvent.change(screen.getByDisplayValue("Draft course"), { target: { value: "Course 1" } });
+    expect(tryUnload()).toBe(false);
+    fireEvent.change(screen.getByDisplayValue("Course 1"), { target: { value: "Draft course" } });
+    expect(tryUnload()).toBe(true);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Cancel" }));
+    await userEvent.setup().click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Discard changes" }));
+    expect(tryUnload()).toBe(false);
+  });
+
+  it("does not block navigation after an unchanged draft or a successful save", async () => {
+    openCourseEditor({ routing: true, save: true });
+    const confirm = vi.spyOn(window, "confirm");
+    await userEvent.setup().click(within(screen.getByTestId("row-logical-course-1")).getByTitle("Edit"));
+    await screen.findByDisplayValue("Course 1");
+    expect(tryUnload()).toBe(false);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Cancel" }));
+    await editName();
+    expect(tryUnload()).toBe(true);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Save Changes" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Edit Scraped Course" })).toBeNull());
+    expect(tryUnload()).toBe(false);
+    tryLeavePage();
+    expect(window.location.pathname).toBe("/bulk");
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it("does not block navigation after explicitly discarding a draft", async () => {
+    openCourseEditor({ routing: true });
+    await editName();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Cancel" }));
+    await userEvent.setup().click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Discard changes" }));
+    const confirm = vi.spyOn(window, "confirm");
+    tryLeavePage();
+    expect(window.location.pathname).toBe("/bulk");
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it("restores the review URL and draft when Back navigation is declined", async () => {
+    openCourseEditor({ routing: true });
+    await editName();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
+    window.history.replaceState(null, "", "/bulk");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    expect(window.location.pathname).toBe("/scraping");
+    expect(screen.getByDisplayValue("Draft course")).toBeTruthy();
+    window.history.replaceState(null, "", "/bulk");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    expect(window.location.pathname).toBe("/bulk");
+    expect(confirm).toHaveBeenCalledTimes(2);
+  });
 
   async function attemptClose(user: ReturnType<typeof userEvent.setup>, route: "cancel" | "escape" | "outside") {
     if (route === "cancel") await user.click(screen.getByRole("button", { name: "Cancel" }));
@@ -521,6 +632,9 @@ describe("review quality snapshot", () => {
     const error = await screen.findByTestId("course-save-error");
     expect(error.textContent).toContain(failure === "http" ? "Changes not saved" : "Could not confirm save");
     expect((screen.getByDisplayValue("My unsaved edit") as HTMLInputElement).value).toBe("My unsaved edit");
+    const unsavedUnload = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(unsavedUnload);
+    expect(unsavedUnload.defaultPrevented).toBe(true);
     expect(within(row).getByText("90%")).toBeTruthy();
     expect(screen.queryByTestId("quality-unavailable-1")).toBeNull();
     expect(fetchMock.mock.calls.filter(([url]) => String(url) === "/api/scrape/staged/repair-job?view=summary")).toHaveLength(0);
@@ -530,6 +644,9 @@ describe("review quality snapshot", () => {
     expect(attempts).toBe(2);
     expect(screen.queryByTestId("course-save-error")).toBeNull();
     expect(screen.queryByDisplayValue("My unsaved edit")).toBeNull();
+    const savedUnload = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(savedUnload);
+    expect(savedUnload.defaultPrevented).toBe(false);
   });
 
   it.each([
