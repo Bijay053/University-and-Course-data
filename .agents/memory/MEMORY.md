@@ -119,6 +119,7 @@
 - [Python local-import shadowing](python-local-import-shadowing.md) — a late function-local alias shadows earlier uses across the whole function; caught lock checks can misreport the resulting error as contention.
 - [Verification revision provenance](verification-revision-provenance.md) — completion can integrate concurrent changes; live evidence certifies its recorded revision, not a later merged tree.
 - [Richmond online navigation noise](richmond-online-navigation-noise.md) — require strong delivery evidence; utility links and ordinary online activities do not make a programme online-only.
+- [LSBU render and delivery evidence](lsbu-render-delivery.md) — rendered proxy pages carry usable fields; skip the empty browser pass and distinguish utility “online” text from course-owned delivery.
 - [Injected release resource ownership](injected-release-resource-ownership.md) — cleanup seams must distinguish borrowed test resources from production-owned temporaries.
 - [Canterbury embedded course-year facts](canterbury-embedded-course-year-facts.md) — read the selected Contensis Redux entry year; reject unpublished future-year rows instead of applying blanket fee defaults.
 - [Settings-backed academic requirements](settings-backed-academic-requirements.md) — derive requirement option IDs from stable semantic keys so setting renames propagate without changing degree mappings.

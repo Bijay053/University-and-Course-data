@@ -781,6 +781,26 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
         except Exception:
             pass
     if _suppress_rule:
+        # LSBU's global utility copy looks like a delivery label in flattened
+        # text. Preserve explicit course-owned labels while suppressing that
+        # page-wide rule: genuinely online courses must still be rejected by
+        # the global online-only staging guard.
+        if _host in {"www.lsbu.ac.uk", "lsbu.ac.uk"}:
+            from bs4 import BeautifulSoup
+
+            _main = BeautifulSoup(html, "html.parser").find("main")
+            if _main is not None:
+                _mode, _snippet = _extract_strong_label_value(str(_main))
+                if _mode:
+                    return [
+                        ExtractionResult(
+                            field_key=field_key,
+                            value=_mode,
+                            confidence=0.9,
+                            method="study_mode:strong_label",
+                            snippet=_snippet or "",
+                        )
+                    ]
         return []
 
     # Preserve structural provenance instead of flattening every deterministic

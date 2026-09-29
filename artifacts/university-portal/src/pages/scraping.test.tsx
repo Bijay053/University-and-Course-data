@@ -255,9 +255,9 @@ afterEach(() => {
   localStorage.clear();
 });
 
-function jsonResponse(body: unknown): Response {
+function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
-    status: 200,
+    status,
     headers: { "Content-Type": "application/json" },
   });
 }
@@ -351,6 +351,77 @@ describe("review quality snapshot", () => {
     expect(within(row).queryByText("No Degree Level")).toBeNull();
     expect(within(row).getByText("80%")).toBeTruthy();
     expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/course-quality"))).toBe(false);
+  });
+
+  it("shows an unavailable state after a saved edit cannot reload and retries the current row", async () => {
+    const review = initialReview();
+    const staleQuality = { id: 1, score: 90, tier: "good", label: "Good", issues: [], breakdown: {} };
+    const currentQuality = { ...staleQuality, score: 80, tier: "review", label: "Needs Review" };
+    review.courses = [{ ...review.courses[0], degreeLevel: "Master", courseQuality: staleQuality }] as unknown as ScrapingInitialReviewState["courses"];
+    const original = review.courses[0];
+    let summaryAttempts = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/scrape/staged/1/evidence?jobId=repair-job&universityId=7")
+        return jsonResponse({ course: { ...original, rawData: { source: "official" } } });
+      if (url === "/api/scrape/staged/1" && init?.method === "PUT")
+        return jsonResponse({ course: { ...original, courseName: "Edited course" } });
+      if (url === "/api/scrape/staged/repair-job?view=summary") {
+        summaryAttempts++;
+        if (summaryAttempts === 1) return jsonResponse({ error: "Temporarily unavailable" }, 503);
+        return jsonResponse({ courses: [{ ...original, courseName: "Edited course", courseQuality: currentQuality }] });
+      }
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<ScrapingForTest initialReviewState={review} />);
+    const row = screen.getByTestId("row-logical-course-1");
+    expect(within(row).getByText("90%")).toBeTruthy();
+    await user.click(within(row).getByTitle("Edit"));
+    await screen.findByDisplayValue("Course 1");
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+    const unavailable = await screen.findByTestId("quality-unavailable-1");
+    expect(within(row).queryByText("90%")).toBeNull();
+    expect(unavailable.textContent).toContain("Quality unavailable");
+    await user.click(within(unavailable).getByRole("button", { name: "Retry quality" }));
+    await waitFor(() => expect(within(row).getByText("80%")).toBeTruthy());
+    expect(within(row).queryByText("90%")).toBeNull();
+    expect(screen.queryByTestId("quality-unavailable-1")).toBeNull();
+    expect(summaryAttempts).toBe(2);
+  });
+
+  it("restores quality without a retry after a saved edit reloads successfully", async () => {
+    const review = initialReview();
+    const oldQuality = { id: 1, score: 90, tier: "good", label: "Good", issues: [], breakdown: {} };
+    review.courses = [{ ...review.courses[0], courseQuality: oldQuality }] as unknown as ScrapingInitialReviewState["courses"];
+    const original = review.courses[0];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/scrape/staged/1/evidence?jobId=repair-job&universityId=7")
+        return jsonResponse({ course: { ...original, rawData: { source: "official" } } });
+      if (url === "/api/scrape/staged/1" && init?.method === "PUT")
+        return jsonResponse({ course: { ...original, courseName: "Edited course" } });
+      if (url === "/api/scrape/staged/repair-job?view=summary")
+        return jsonResponse({ courses: [{ ...original, courseName: "Edited course",
+          courseQuality: { ...oldQuality, score: 100 } }] });
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      return jsonResponse({});
+    }));
+    const user = userEvent.setup();
+    render(<ScrapingForTest initialReviewState={review} />);
+    const row = screen.getByTestId("row-logical-course-1");
+    await user.click(within(row).getByTitle("Edit"));
+    await screen.findByDisplayValue("Course 1");
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+    await waitFor(() => expect(within(row).getByText("100%")).toBeTruthy());
+    expect(within(row).queryByText("90%")).toBeNull();
+    expect(screen.queryByTestId("quality-unavailable-1")).toBeNull();
   });
 });
 

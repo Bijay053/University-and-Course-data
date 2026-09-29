@@ -41,6 +41,18 @@ extraction:
   scrape_do_render: true
   scrape_do_skip_fallbacks: true
   skip_browser_rescue: true
+  # The separate missing-English browser pass ran on 77 courses in the logged
+  # scrape and filled zero fields. Do not spend the extraction deadline on it.
+  skip_per_course_browser: true
+  # Avoid overloading the rendered proxy with 12 simultaneous 2 MB course pages.
+  max_parallel_fetch: 6
+
+  study_mode:
+    # LSBU's page-wide rule classified campus courses (including Adult Nursing
+    # and Physiotherapy) as Online from non-course text. Keep the global
+    # online-only gate, but require course-owned delivery evidence.
+    suppress_nav_rule: true
+    online_only_requires_strong_evidence: true
 
   fees:
     default_currency: 'GBP'

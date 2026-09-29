@@ -1148,6 +1148,14 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     stagedCourses.filter(course => course.courseQuality)
       .map(course => [course.id, course.courseQuality!]),
   ) as Record<number, CourseQualityData>, [stagedCourses]);
+  const [qualityRefreshState, setQualityRefreshState] = useState<Record<number, "refreshing" | "unavailable">>({});
+  const qualityRefreshVersion = useRef<Record<number, number>>({});
+  const beginQualityRefresh = (id: number) => {
+    const version = (qualityRefreshVersion.current[id] ?? 0) + 1;
+    qualityRefreshVersion.current[id] = version;
+    setQualityRefreshState(prev => ({ ...prev, [id]: "refreshing" }));
+    return version;
+  };
   const [qualityExpanded, setQualityExpanded] = useState<Set<number>>(new Set());
   const [qualitySortDesc, setQualitySortDesc] = useState(false);
   const [lastScrapeInfo, setLastScrapeInfo] = useState<{ jobId: string; startedAt: string | null; completedAt: string | null; durationMs: number | null; totalFound: number; staged: number; skipped: number; errors: number } | null>(null);
@@ -3125,20 +3133,41 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     } catch {}
   };
 
-  const refreshFeeCourse = async (id: number) => {
-    if (!reviewJobId) return;
-    const res = await fetch(`/api/scrape/staged/${encodeURIComponent(reviewJobId)}?view=summary`, { credentials: "include", cache: "no-store" });
+  const refreshFeeCourse = async (id: number, version: number) => {
+    const jobId = reviewJobIdRef.current;
+    if (!jobId) throw new Error("No review job is open.");
+    const res = await fetch(`/api/scrape/staged/${encodeURIComponent(jobId)}?view=summary`, { credentials: "include", cache: "no-store" });
     if (!res.ok) throw new Error(await getFetchErrorMessage(res));
     const payload = await readResponseJson<StagedCourse[] | { courses: StagedCourse[] }>(res);
+    if (reviewJobIdRef.current !== jobId || qualityRefreshVersion.current[id] !== version) return;
     const courses = Array.isArray(payload) ? payload : payload?.courses ?? [];
     const fresh = courses.find(c => c.id === id);
     if (!fresh) throw new Error("Course is no longer pending review.");
     const normalized = normalizeStagedCourse(fresh);
+    if (!normalized.courseQuality) throw new Error("The refreshed course has no quality feedback.");
     setApprovalFailures(prev => prev.filter(failure => failure.id !== id));
     setStagedCourses(prev => prev.map(c => c.id === id ? normalized : c));
     setEditingCourse(prev => prev?.id === id ? { ...prev, ...normalized,
       rawData: (prev as StagedCourse & { rawData?: unknown }).rawData,
       raw_data: (prev as StagedCourse & { raw_data?: unknown }).raw_data } : prev);
+  };
+
+  const retryCourseQuality = async (id: number) => {
+    const version = beginQualityRefresh(id);
+    const jobId = reviewJobIdRef.current;
+    try {
+      await refreshFeeCourse(id, version);
+      if (reviewJobIdRef.current !== jobId || qualityRefreshVersion.current[id] !== version) return;
+      setQualityRefreshState(prev => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    } catch (error) {
+      if (reviewJobIdRef.current !== jobId || qualityRefreshVersion.current[id] !== version) return;
+      setQualityRefreshState(prev => ({ ...prev, [id]: "unavailable" }));
+      throw error;
+    }
   };
 
   const openEditCourse = async (course: StagedCourse) => {
@@ -3190,7 +3219,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
     setApprovalFailures(prev => prev.filter(failure => failure.id !== course.id));
     setStagedCourses(prev => prev.map(c => c.id === course.id ? { ...course, courseQuality: undefined } : c));
     setEditingCourse(prev => prev?.id === course.id ? { ...prev, ...course } : prev);
-    void refreshFeeCourse(course.id).catch(err => {
+    void retryCourseQuality(course.id).catch(err => {
       toast({ title: "Fee saved, but refresh failed", description: String(err), variant: "destructive" });
     });
     fetchJobs();
@@ -3216,10 +3245,26 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       }
       const data = await readResponseJson<{ course?: StagedCourse }>(res);
       const updatedCourse = data?.course ?? { ...editPayload, lastQualificationApproval: null };
+      const editedId = editingCourse.id;
+      const version = beginQualityRefresh(editedId);
       setApprovalFailures(prev => prev.filter(failure => failure.id !== editingCourse.id));
       setStagedCourses((prev) => prev.map((c) => c.id === editingCourse.id ? { ...updatedCourse, courseQuality: undefined } : c));
       setEditingCourse(null);
-      if (reviewJobId) void loadStagedCourses(reviewJobId);
+      if (reviewJobId) {
+        const jobId = reviewJobId;
+        void loadStagedCourses(jobId).then(refreshed => {
+          if (reviewJobIdRef.current !== jobId || qualityRefreshVersion.current[editedId] !== version) return;
+          const current = stagedCoursesRef.current.find(course => course.id === editedId);
+          setQualityRefreshState(prev => {
+            const next = { ...prev };
+            if (refreshed && (!current || current.courseQuality)) delete next[editedId];
+            else next[editedId] = "unavailable";
+            return next;
+          });
+        });
+      } else {
+        setQualityRefreshState(prev => ({ ...prev, [editedId]: "unavailable" }));
+      }
     } catch {}
   };
 
@@ -4244,6 +4289,18 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                               <span className="text-sm font-bold leading-none">{qData.score}%</span>
                               <span className="font-normal text-[10px] leading-none mt-0.5">{qData.label}</span>
                             </button>
+                          ) : qualityRefreshState[course.id] === "unavailable" ? (
+                            <div role="status" data-testid={`quality-unavailable-${course.id}`} className="text-xs text-amber-700">
+                              <span>Quality unavailable</span>
+                              <button type="button" className="block mx-auto mt-1 text-blue-700 underline hover:text-blue-900"
+                                onClick={() => void retryCourseQuality(course.id).catch(err => {
+                                  toast({ title: "Quality refresh failed", description: String(err), variant: "destructive" });
+                                })}>
+                                Retry quality
+                              </button>
+                            </div>
+                          ) : qualityRefreshState[course.id] === "refreshing" ? (
+                            <span role="status" className="text-gray-500 text-xs">Updating quality…</span>
                           ) : <span className="text-gray-300 text-xs">—</span>}
                         </td>
                         <td className="p-2">
@@ -4268,7 +4325,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
                               {!selectedFeeLines.length && <span className="text-amber-600">Fees need review</span>}
                             </div>
                           ) : feeVariantAuthority(course) ? <PublishedFeeVariants course={course} id={course.id}
-                            onCourseUpdated={handleFeeCourseUpdated} onRefresh={() => refreshFeeCourse(course.id)} /> : course.internationalFee ? (() => {
+                            onCourseUpdated={handleFeeCourseUpdated} onRefresh={() => retryCourseQuality(course.id)} /> : course.internationalFee ? (() => {
                             const _CURR_MAP: Record<string, string> = { GBP: "£", USD: "$", EUR: "€", MYR: "RM", NZD: "NZ$", CAD: "CA$", SGD: "S$", AUD: "A$" };
                             const currSym = (course.currency && _CURR_MAP[course.currency]) ? _CURR_MAP[course.currency] : (course.currency ? `${course.currency} ` : "A$");
                             const isFullCourse = (course.feeTerm || "").toLowerCase().includes("full");
@@ -5124,7 +5181,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
               <div>
                 <label className="text-xs font-medium text-gray-500 mb-1 block">Fee Amount</label>
                  {feeVariantAuthority(editingCourse) && <PublishedFeeVariants course={editingCourse} id={editingCourse.id}
-                   onCourseUpdated={handleFeeCourseUpdated} onRefresh={() => refreshFeeCourse(editingCourse.id)} />}
+                   onCourseUpdated={handleFeeCourseUpdated} onRefresh={() => retryCourseQuality(editingCourse.id)} />}
                  <Input type="number" disabled={!!feeVariantAuthority(editingCourse)} value={editingCourse.internationalFee ?? ""} onChange={(e) => setEditingCourse({ ...editingCourse, internationalFee: e.target.value ? parseFloat(e.target.value) : null })} />
               </div>
               <div className="flex gap-2">
