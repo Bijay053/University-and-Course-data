@@ -23,6 +23,63 @@ from app.services.scraper.extractors.base import ExtractionResult
 
 field_key = "international_fee"
 
+
+def portsmouth_international_fee(
+    html: str, url: str,
+) -> tuple[bool, tuple[int, str, str] | None]:
+    """Return Portsmouth's current course fee accordion, never the UK row.
+
+    The first accordion is the published current intake; subsequent ones may
+    announce a future intake with no price. A UK-only accordion is negative
+    evidence for an international amount, not permission to use the UK price.
+    The boolean indicates that this course has a Portsmouth tuition accordion.
+    """
+    if urlparse(url).hostname not in {"www.port.ac.uk", "port.ac.uk"}:
+        return False, None
+    if "/study/courses/" not in urlparse(url).path:
+        return False, None
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html, "html.parser")
+    found = False
+    for item in soup.select("div.accordion-item"):
+        heading = item.select_one(".accordion-item__button-title")
+        if not heading:
+            continue
+        label = heading.get_text(" ", strip=True)
+        if not re.search(r"(?:UK,?\s*Channel Islands|International and EU students)", label, re.I):
+            continue
+        found = True
+        if not re.search(r"International and EU students", label, re.I):
+            continue
+        text = item.get_text(" ", strip=True)
+        # Full-time wins over an adjacent part-time annual rate. A sole bare
+        # amount is valid for short courses; a part-time-only amount is not.
+        match = re.search(r"\bFull[\s-]?time:\s*£\s*([\d,]+)", text, re.I)
+        if not match and not re.search(r"\bPart[\s-]?time:\s*£", text, re.I):
+            match = re.search(r"£\s*([\d,]+)", text)
+        if match:
+            amount = int(match.group(1).replace(",", ""))
+            if amount > 0:
+                term = (
+                    "Annual"
+                    if match.group(0).lower().startswith("full")
+                    or "per year" in text[match.end():match.end() + 35].lower()
+                    else "Full Course"
+                )
+                return True, (amount, term, text[:240])
+    if not found:
+        # Some HNC/HND templates render a plain UK-only tuition panel rather
+        # than accordion-item markup. The label belongs to the domestic price;
+        # do not treat its GBP amount as international tuition.
+        text = re.sub(r"\s+", " ", soup.get_text(" ", strip=True))
+        if re.search(
+            r"Tuition fees.{0,180}UK,?\s*Channel Islands.{0,100}£",
+            text, re.I,
+        ) and "International and EU students" not in text:
+            return True, None
+    return found, None
+
 # Currency tokens recognised in either prefix or suffix position.
 _CURRENCY_TOKEN = r"A\$|NZ\$|CA\$|US\$|S\$|£|€|\$|AUD|NZD|CAD|USD|GBP|SGD|EUR"
 # Amount grammar: 1-3 leading digits, then any number of (separator + 3-digit
@@ -2648,6 +2705,23 @@ def _from_otago_polytechnic_international_fee(
 async def extract(
     html: str, url: str, *, country: str | None = None
 ) -> list[ExtractionResult]:
+    port_known, port_fee = portsmouth_international_fee(html, url)
+    if port_known:
+        if port_fee is None:
+            return []
+        amount, term, snippet = port_fee
+        return [ExtractionResult(
+            field_key="international_fee",
+            value=amount,
+            normalized={
+                "international_fee": amount,
+                "currency": "GBP",
+                "fee_term": term,
+            },
+            confidence=1.0,
+            snippet=snippet,
+            method="fee.port_international_accordion",
+        )]
     from app.services.scraper.extractors.ulaw_fees import METHOD, parse_course_fees
     ulaw_fee = parse_course_fees(html, url)
     if ulaw_fee is not None:

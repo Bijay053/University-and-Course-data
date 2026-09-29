@@ -24,6 +24,88 @@ from app.services.scraper.url_identity import canonical_course_url_key
 
 log = logging.getLogger(__name__)
 
+_PLYMOUTH_PG_SLUG = re.compile(
+    r"^(?:msc|mres|resm|ma|mba|mphil|phd|pgcert|pgdip|pgce|llm|"
+    r"edd|dclinpsy|mclinres|mclined|md|engd|dba|doctor|march)-",
+    re.IGNORECASE,
+)
+
+
+async def _repair_plymouth_course_routes(
+    found: dict[str, str],
+) -> dict[str, str]:
+    """Verify Plymouth's stale sitemap PG links before changing their identity.
+
+    Its official course sitemap lists postgraduate MSc/PhD/etc. pages under
+    /courses/undergraduate/, where they return 404. Never infer a new URL
+    merely from an award prefix: a valid undergraduate route must stay put.
+    """
+    import httpx
+
+    candidates = []
+    for url in found:
+        parsed = urlparse(url)
+        if parsed.scheme != "https" or parsed.netloc.lower() not in {
+            "www.plymouth.ac.uk", "plymouth.ac.uk",
+        } or parsed.query or parsed.fragment:
+            continue
+        prefix = "/courses/undergraduate/"
+        if not parsed.path.startswith(prefix):
+            continue
+        slug = parsed.path[len(prefix):].strip("/")
+        if "/" not in slug and _PLYMOUTH_PG_SLUG.match(slug):
+            candidate = urlunparse(parsed._replace(
+                path=parsed.path.replace(prefix, "/courses/postgraduate/", 1),
+            ))
+            candidates.append((url, candidate))
+
+    if not candidates:
+        return found
+
+    sem = asyncio.Semaphore(12)
+    async with httpx.AsyncClient(follow_redirects=True, timeout=5.0) as client:
+        async def verify(original: str, replacement: str) -> tuple[str, str] | None:
+            async with sem:
+                try:
+                    old = await client.head(original)
+                    if old.status_code != 404:
+                        return None
+                    new = await client.head(replacement)
+                    if new.status_code == 200 and (
+                        str(new.url).rstrip("/") == replacement.rstrip("/")
+                    ):
+                        return original, replacement
+                except (httpx.HTTPError, ValueError):
+                    pass
+                return None
+
+        tasks = [
+            asyncio.create_task(verify(original, replacement))
+            for original, replacement in candidates
+        ]
+        done, pending = await asyncio.wait(tasks, timeout=35)
+        for task in pending:
+            task.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+        rewrites = dict(
+            result for task in done
+            if not task.cancelled() and not task.exception()
+            if (result := task.result()) is not None
+        )
+
+    if rewrites:
+        log.info(
+            "[DISCOVER] Plymouth: verified %d stale undergraduate sitemap "
+            "URLs against live postgraduate pages", len(rewrites),
+        )
+    # Deduplicate when BFS or the sitemap also found the live PG route.
+    repaired: dict[str, str] = {}
+    for url, name in found.items():
+        fixed = rewrites.get(url, url)
+        repaired.setdefault(fixed, name)
+    return repaired
+
 _SEMANTIC_PAGINATION_QUERY_KEYS = frozenset(
     {
         "page",
@@ -2153,5 +2235,7 @@ async def discover_course_links(
                 kept=len(found),
             )
 
+    if urlparse(origin).hostname in {"www.plymouth.ac.uk", "plymouth.ac.uk"}:
+        found = await _repair_plymouth_course_routes(found)
     raw = [{"url": u, "name": n} for u, n in list(found.items())[:max_courses]]
     return _dedup_year_variants(raw)

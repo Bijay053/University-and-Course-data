@@ -12,6 +12,7 @@ modes is what "Blended" actually means.
 from __future__ import annotations
 
 import re
+import json
 import urllib.parse
 
 from bs4 import BeautifulSoup
@@ -698,15 +699,95 @@ _STUDY_MODE_RULE_SUPPRESSED_HOSTS: frozenset[str] = frozenset({
 })
 
 
+def port_course_instance_modes(html: str, url: str) -> list[str] | None:
+    """Portsmouth publishes delivery for this exact course in JSON-LD.
+
+    Page-wide prose includes English-language *distance learning exclusions*
+    and navigation to unrelated online courses; neither describes this award.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    target = url.split("?", 1)[0].split("#", 1)[0].rstrip("/")
+    for script in soup.find_all("script", type="application/ld+json"):
+        try:
+            document = json.loads(script.get_text() or "")
+        except (ValueError, TypeError):
+            continue
+        nodes = document.get("@graph", []) if isinstance(document, dict) else []
+        if isinstance(document, dict) and document.get("@type") == "Course":
+            nodes = [document, *nodes]
+        for node in nodes:
+            if not isinstance(node, dict) or node.get("@type") != "Course":
+                continue
+            if str(node.get("url") or "").rstrip("/") != target:
+                continue
+            instances = node.get("hasCourseInstance") or []
+            if isinstance(instances, dict):
+                instances = [instances]
+            modes = []
+            for instance in instances:
+                if not isinstance(instance, dict):
+                    continue
+                value = instance.get("courseMode") or []
+                modes.extend(value if isinstance(value, list) else [value])
+            if modes:
+                return [str(m) for m in modes]
+    return None
+
+
+def _port_course_instance_mode(html: str, url: str) -> tuple[str, str] | None:
+    modes = port_course_instance_modes(html, url)
+    if not modes:
+        return None
+    labels = " ".join(modes).lower()
+    campus = "on campus" in labels or "on-campus" in labels
+    online = "online" in labels or "distance learning" in labels
+    if campus or online:
+        mode = "Blended" if campus and online else "On Campus" if campus else "Online"
+        return mode, f"CourseInstance courseMode: {', '.join(modes)}"
+    return None
+
+
 async def extract(html: str, url: str) -> list[ExtractionResult]:
     import urllib.parse as _up
     _host = _up.urlparse(url).netloc.lower()
+    if _host in {"www.plymouth.ac.uk", "plymouth.ac.uk"}:
+        # Plymouth repeats an Academic Partnerships blurb on campus course
+        # pages: "enrol ... closer to home, or engage in distance learning".
+        # That is about the university's partnerships, not this award's
+        # delivery. Remove only the containing blurb, not genuine labelled
+        # online delivery elsewhere on the page.
+        _soup = BeautifulSoup(html, "html.parser")
+        for _panel in _soup.select(".module-accordion-body"):
+            # The words are split by an <a> on the live page, so no single
+            # text node contains the full sentence. Drop the smallest
+            # containing div; leave the rest of the course panel untouched.
+            for _div in reversed(_panel.select("div")):
+                _copy = " ".join(" ".join(_div.stripped_strings).casefold().split())
+                if (
+                    "our academic partnerships enable students" in _copy
+                    and "engage in distance learning" in _copy
+                ):
+                    _div.decompose()
+                    break
+        html = str(_soup)
+    if _host in {"www.port.ac.uk", "port.ac.uk"}:
+        _port_mode = _port_course_instance_mode(html, url)
+        if _port_mode:
+            _mode, _snippet = _port_mode
+            return [
+                ExtractionResult(
+                    field_key=field_key,
+                    value=_mode,
+                    normalized={"study_mode": _mode},
+                    confidence=0.95,
+                    method="study_mode:port_course_instance",
+                    snippet=_snippet,
+                )
+            ]
     if _host == "winchester.ac.uk" or _host.endswith(".winchester.ac.uk"):
         # Winchester's labelled Location fact frequently contains delivery
         # prose.  Classify that bounded course-owned value before page-wide
         # keyword rules can turn "Blended ... on campus" into On Campus.
-        from bs4 import BeautifulSoup
-
         _soup = BeautifulSoup(html, "html.parser")
         for _fact in _soup.select(".uow-course-content__overview-info"):
             _heading = _fact.find(["h2", "h3", "h4", "dt"])
@@ -786,8 +867,6 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:
         # page-wide rule: genuinely online courses must still be rejected by
         # the global online-only staging guard.
         if _host in {"www.lsbu.ac.uk", "lsbu.ac.uk"}:
-            from bs4 import BeautifulSoup
-
             _main = BeautifulSoup(html, "html.parser").find("main")
             if _main is not None:
                 _mode, _snippet = _extract_strong_label_value(str(_main))

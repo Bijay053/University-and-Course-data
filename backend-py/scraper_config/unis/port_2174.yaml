@@ -38,6 +38,10 @@ discovery:
     - 'port\.ac\.uk/study/courses/[^/]+/[^/]+/?$'
 
 extraction:
+  # The SSR course pages have usable data. Serial recovery in the failed run
+  # recovered 26/27 timeouts; cap concurrent remote work instead of spending
+  # the shared 90-second deadline on overloaded batches.
+  max_parallel_fetch: 2
   # Portsmouth course pages often have /fees/ and /entry-requirements/ sub-tabs
   # as separate URLs — follow them to fill missing fee and IELTS fields.
   follow_admission_links: true

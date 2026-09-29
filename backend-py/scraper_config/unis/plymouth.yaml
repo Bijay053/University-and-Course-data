@@ -3,7 +3,7 @@
 # Country: United Kingdom  |  Currency: GBP
 # Discovery: Restricted BFS discovery to strict course directories
 # Notes: Blocked heavy pollution from /study/cpd, /schools, and /apprenticeships.
-#        Disabled online_only filter to prevent valid UK blended courses from being dropped.
+#        Online-only courses remain excluded by the fleet-wide staging guard.
 #
 # IMPORTANT — sub-page pollution fix (2026-06-20):
 #   Plymouth course pages have sub-pages for student profiles, industry stories, etc.
@@ -71,7 +71,9 @@ extraction:
 
   filters:
     online_only:
-      enabled: false
+      enabled: true
+  study_mode:
+    online_only_requires_strong_evidence: true
   staging:
     reject_if_missing:
       - course_name

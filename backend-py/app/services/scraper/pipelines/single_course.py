@@ -11606,6 +11606,55 @@ async def extract_course(
     except Exception as _gal_exc:  # noqa: BLE001 — never break the pipeline
         log.warning("campus_allowlist check failed on %s: %s", url, _gal_exc)
 
+    # Use only this exact course's published CourseInstance study loads.
+    # Portsmouth navigation describes other full-time degrees, which must not
+    # make a part-time-only HNC/HND eligible for the full-time catalogue.
+    if urlparse(url).hostname in {"www.port.ac.uk", "port.ac.uk"} and html:
+        from app.services.scraper.extractors.study_mode import port_course_instance_modes
+
+        _port_modes = port_course_instance_modes(html, url)
+        if _port_modes:
+            _has_full_time = any(_re.search(r"\bfull[\s-]?time\b", m, _re.I) for m in _port_modes)
+            _has_part_time = any(_re.search(r"\bpart[\s-]?time\b", m, _re.I) for m in _port_modes)
+            if _has_full_time or _has_part_time:
+                _port_load = "Full Time" if _has_full_time else "Part Time"
+                payload["study_load"] = _port_load
+                evidence.append({
+                    "field_key": "study_load",
+                    "value": _port_load,
+                    "confidence": 1.0,
+                    "method": "study_load:port_course_instance",
+                    "source_url": url,
+                    "snippet": f"CourseInstance courseMode: {', '.join(_port_modes)}",
+                })
+
+    # Portsmouth has adjacent UK and International accordions. After remote
+    # enrichment and linked-page merging, recheck the source course's own
+    # audience row so an AI guess cannot reintroduce a UK-only amount.
+    if urlparse(url).hostname in {"www.port.ac.uk", "port.ac.uk"} and html:
+        from app.services.scraper.extractors.fee import portsmouth_international_fee
+
+        _port_fee_known, _port_fee = portsmouth_international_fee(html, url)
+        if _port_fee_known:
+            if _port_fee is None:
+                payload["international_fee"] = None
+                for _ev in evidence:
+                    if _ev.get("field_key") == "international_fee":
+                        _ev["decision_status"] = "needs_review"
+            else:
+                _port_amount, _port_term, _port_snippet = _port_fee
+                payload["international_fee"] = _port_amount
+                payload["currency"] = "GBP"
+                payload["fee_term"] = _port_term
+                evidence.append({
+                    "field_key": "international_fee",
+                    "value": _port_amount,
+                    "confidence": 1.0,
+                    "method": "fee.port_international_accordion",
+                    "source_url": url,
+                    "snippet": _port_snippet,
+                })
+
     # ── Evidence selection finalisation ────────────────────────────────────
     # Mark the winning evidence row for each field as decision_status="selected"
     # so that scraped_field_evidence.selected mirrors the actual column values
