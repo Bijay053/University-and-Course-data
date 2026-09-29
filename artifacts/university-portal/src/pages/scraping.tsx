@@ -162,6 +162,7 @@ type StagedCourse = FeeVariantCarrier & {
     rowId: number; jobId: string; universityId: number; reasonCode: string; attemptedAt: string;
   } | null;
   id: number;
+  courseQuality?: CourseQualityData;
   scrapeJobId: string;
   universityId: number;
   courseName: string;
@@ -1143,7 +1144,10 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   useEffect(() => () => { campusRequest.current?.controller.abort(); }, []);
   const [campusProgress, setCampusProgress] = useState<{ done: number; total: number } | null>(null);
   useEffect(() => { stagedCoursesRef.current = stagedCourses; }, [stagedCourses]);
-  const [courseQualityMap, setCourseQualityMap] = useState<Record<number, CourseQualityData>>({});
+  const courseQualityMap = useMemo(() => Object.fromEntries(
+    stagedCourses.filter(course => course.courseQuality)
+      .map(course => [course.id, course.courseQuality!]),
+  ) as Record<number, CourseQualityData>, [stagedCourses]);
   const [qualityExpanded, setQualityExpanded] = useState<Set<number>>(new Set());
   const [qualitySortDesc, setQualitySortDesc] = useState(false);
   const [lastScrapeInfo, setLastScrapeInfo] = useState<{ jobId: string; startedAt: string | null; completedAt: string | null; durationMs: number | null; totalFound: number; staged: number; skipped: number; errors: number } | null>(null);
@@ -1845,20 +1849,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
           .then((r) => r.ok ? r.json() : null)
           .then((reconciliation: RemovalReconciliation | null) => setRemovalReconciliation(reconciliation))
           .catch(() => setRemovalReconciliation(null));
-        // Fire quality fetch in background — uses universityId from first course
-        const uniId = pending[0]?.universityId;
-        if (uniId) {
-          fetch(`/api/scrape/universities/${uniId}/course-quality`, { credentials: "include" })
-            .then((r) => r.ok ? r.json() : null)
-            .then((qData: { courses?: CourseQualityData[] } | null) => {
-              if (controller.signal.aborted || !qData?.courses) return;
-              const map: Record<number, CourseQualityData> = {};
-              for (const q of qData.courses) map[q.id] = q;
-              setCourseQualityMap(map);
-              setQualityExpanded(new Set());
-            })
-            .catch(() => {});
-        }
+        setQualityExpanded(new Set());
       return true;
     } catch (error) {
       console.error(`Failed to load staged courses for ${jobId}`, error);
@@ -3197,7 +3188,7 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
   const handleFeeCourseUpdated = (updated: FeeVariantCarrier & { id: number }) => {
     const course = normalizeStagedCourse(updated as StagedCourse);
     setApprovalFailures(prev => prev.filter(failure => failure.id !== course.id));
-    setStagedCourses(prev => prev.map(c => c.id === course.id ? course : c));
+    setStagedCourses(prev => prev.map(c => c.id === course.id ? { ...course, courseQuality: undefined } : c));
     setEditingCourse(prev => prev?.id === course.id ? { ...prev, ...course } : prev);
     void refreshFeeCourse(course.id).catch(err => {
       toast({ title: "Fee saved, but refresh failed", description: String(err), variant: "destructive" });
@@ -3226,8 +3217,9 @@ function ScrapingPage({ initialReviewState }: { initialReviewState?: ScrapingIni
       const data = await readResponseJson<{ course?: StagedCourse }>(res);
       const updatedCourse = data?.course ?? { ...editPayload, lastQualificationApproval: null };
       setApprovalFailures(prev => prev.filter(failure => failure.id !== editingCourse.id));
-      setStagedCourses((prev) => prev.map((c) => c.id === editingCourse.id ? updatedCourse : c));
+      setStagedCourses((prev) => prev.map((c) => c.id === editingCourse.id ? { ...updatedCourse, courseQuality: undefined } : c));
       setEditingCourse(null);
+      if (reviewJobId) void loadStagedCourses(reviewJobId);
     } catch {}
   };
 

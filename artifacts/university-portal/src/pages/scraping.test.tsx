@@ -316,6 +316,44 @@ function initialReview(): ScrapingInitialReviewState {
   };
 }
 
+describe("review quality snapshot", () => {
+  it("replaces a running scrape's incomplete degree warning with the score from the displayed row", async () => {
+    const review = initialReview();
+    const oldQuality = {
+      id: 1, score: 70, tier: "review", label: "Needs Review",
+      issues: [{ code: "missing_degree_level", label: "No Degree Level", severity: "warning",
+        field: "degree_level", detail: "Degree level not extracted." }],
+      breakdown: { degree_level: { fill: false, quality: null, issues: ["Degree level not extracted."] } },
+    };
+    review.courses = [{
+      ...review.courses[0], courseName: "MA Banking and Finance",
+      degreeLevel: null, courseQuality: oldQuality,
+    }] as unknown as ScrapingInitialReviewState["courses"];
+    const fetched = [{
+      ...review.courses[0], degreeLevel: "Master",
+      courseQuality: { ...oldQuality, score: 80, issues: [],
+        breakdown: { degree_level: { fill: true, quality: "good", issues: [] } } },
+    }];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/scrape/staged/repair-job?view=summary") return jsonResponse({ courses: fetched });
+      if (url === "/api/import/history") return jsonResponse([]);
+      if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
+      if (url.startsWith("/api/scrape/staged/fix-jobs?")) return jsonResponse(null);
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ScrapingForTest initialReviewState={review} />);
+    const row = screen.getByTestId("row-logical-course-1");
+    expect(within(row).getByText("No Degree Level")).toBeTruthy();
+    await userEvent.setup().click(screen.getByTitle("Reload staged courses and refresh quality scores"));
+    await waitFor(() => expect(within(row).getByText("Master")).toBeTruthy());
+    expect(within(row).queryByText("No Degree Level")).toBeNull();
+    expect(within(row).getByText("80%")).toBeTruthy();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/course-quality"))).toBe(false);
+  });
+});
+
 describe("Scraping repair reviewer", () => {
   it("blocks PT-only normal review approval but submits mixed and eligible rows, leaving blocked selected", async () => {
     const review = initialReview();
@@ -985,11 +1023,9 @@ describe("Scraping repair reviewer", () => {
       if (url === "/api/import/history") return jsonResponse([]);
       if (url.startsWith("/api/courses?")) return jsonResponse({ total: 0 });
       if (url === "/api/scrape/staged/repair-job?view=summary")
-        return jsonResponse({ courses: expanded, lastScrape: { staged: 90 } });
-      if (url.endsWith("/course-quality")) return jsonResponse({ courses: [
-        ...expanded.map(c => ({ id: c.id, score: 96, issues: [] })),
-        { id: 99999, score: 20, issues: [{ label: "Unrelated", severity: "error" }] },
-      ] });
+        return jsonResponse({ courses: expanded.map(c => ({
+          ...c, courseQuality: { id: c.id, score: 96, issues: [] },
+        })), lastScrape: { staged: 90 } });
       return jsonResponse({});
     }));
     render(<ScrapingForTest initialReviewState={review} />);

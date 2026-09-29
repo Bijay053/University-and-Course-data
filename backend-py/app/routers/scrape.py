@@ -4543,6 +4543,14 @@ async def staged_one(
         ]
         courses = [_staged_row_to_dict(s) for s in review_rows]
         if view == "summary":
+            # Score the very same loaded ORM rows used for the displayed Level.
+            # A separate university-wide quality request can observe a different
+            # revision while a scraper or reviewer is updating these rows.
+            quality_by_id = {
+                item["id"]: item for item in _score_quality_rows(courses)["courses"]
+            }
+            for course in courses:
+                course["courseQuality"] = quality_by_id[course["id"]]
             await _attach_evidence_counts_bulk(db, courses)
             courses = [_staged_summary(d) for d in courses]
         else:
@@ -6489,8 +6497,6 @@ async def get_course_quality_scores(
           ]
         }
     """
-    from app.services.scraper.data_quality import _check_course
-
     rows = (await db.execute(
         text("""
             SELECT
@@ -6507,6 +6513,13 @@ async def get_course_quality_scores(
         """),
         {"uni_id": university_id},
     )).mappings().all()
+
+    return _score_quality_rows(rows)
+
+
+def _score_quality_rows(rows) -> dict:
+    """Score persisted row snapshots; also used by the staged summary projection."""
+    from app.services.scraper.data_quality import _check_course
 
     # Issue code → short chip label shown in the table
     _CHIP: dict[str, str] = {

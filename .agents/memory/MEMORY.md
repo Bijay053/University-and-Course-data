@@ -150,3 +150,4 @@
 - [Review payload measurement](review-payload-measurement.md) — include background counts and history reads; endpoint-only savings can hide eager evidence downloads.
 - [BCU production recipe identity](bcu-production-recipe-identity.md) — production uses the slug recipe, not the development ID-specific recipe; test both for location changes.
 - [UWL rendered listing coverage](uwl-rendered-listing-coverage.md) — rendered failover can work while nonconsecutive provider 502s omit pages; verify each page, not just the total.
+- [Review quality snapshot](review-quality-snapshot.md) — review scores and chips must derive from the same loaded rows as their displayed fields.
