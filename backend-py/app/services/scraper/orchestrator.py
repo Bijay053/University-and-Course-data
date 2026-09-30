@@ -928,11 +928,10 @@ async def _apply_render_listing_pages(
                         phase="discover",
                     )
                     continue
-                # Repeating a provider-level connect failure on the same route
-                # cannot reveal new links. End retries for this page and fail
-                # closed below rather than accepting partial catalogue coverage.
-                if _rotation_failed:
-                    break
+                # Static ROTATION_FAILED needs a different transport, which we
+                # switched to above. A rendered-page ROTATION_FAILED can be a
+                # transient residential-pool failure; retry this exact page
+                # within the bounded listing budget before failing closed.
                 if _rlp_attempt == 2:
                     break
                 _rlp_wait = (_rlp_attempt + 1) * 12

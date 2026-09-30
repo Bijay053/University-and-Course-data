@@ -503,11 +503,11 @@ class TestCatalogueProviderFailure:
                 _sleep_fn=_instant_sleep,
             )
         assert calls == [
-            (pages[0], False), (pages[0], True),
+            (pages[0], False), (pages[0], True), (pages[0], True),
         ]
         failure_message = str(exc_info.value)
         assert pages[0] in failure_message
-        assert "2 attempt(s)" in failure_message
+        assert "3 attempt(s)" in failure_message
         assert "ROTATION_FAILED" in failure_message
 
         async def account_error(url, *, render, rate_limit, max_retries):
@@ -519,6 +519,63 @@ class TestCatalogueProviderFailure:
                 render_pages=pages[:1], allow_patterns=[], block_patterns=[],
                 _fetch_fn=account_error, emit=emit,
             )
+
+    @pytest.mark.asyncio
+    async def test_transient_rendered_rotation_failure_retries_only_missing_page(
+        self, monkeypatch,
+    ):
+        pages = [
+            f"https://www.uwl.ac.uk/courses/search?query=&page={n}"
+            for n in range(5)
+        ]
+        failure = {}
+        calls = []
+        sleeps = []
+        outcomes = []
+        links = []
+
+        async def fetch(url, *, render, rate_limit, max_retries):
+            calls.append((url, render, max_retries))
+            if url == pages[3] and sum(call[0] == url for call in calls) == 1:
+                failure[url] = {
+                    "ts": time.time(),
+                    "detail": '{"StatusCode":502,"ErrorType":"ROTATION_FAILED"}',
+                }
+                return None
+            return _html_with_links(
+                f"/course/undergraduate/degree-{pages.index(url)}"
+            )
+
+        async def sleep(seconds):
+            sleeps.append(seconds)
+
+        monkeypatch.setattr(
+            "app.services.scraper.http_fetcher.get_last_fetch_error",
+            lambda url: failure.get(url),
+        )
+        added = await _apply_render_listing_pages(
+            links=links,
+            scrape_url="https://www.uwl.ac.uk",
+            render_pages=pages,
+            allow_patterns=[r"/course/undergraduate/[^/]+$"],
+            block_patterns=[],
+            render_static=False,
+            _fetch_fn=fetch,
+            _sleep_fn=sleep,
+            emit=_noop_emit,
+            page_outcomes=outcomes,
+        )
+        from app.services.scraper.orchestrator import _listing_page_summary
+        summary = _listing_page_summary(pages, outcomes)
+        assert added == len(pages)
+        assert len({link["url"] for link in links}) == len(pages)
+        assert [call[0] for call in calls] == pages[:4] + [pages[3], pages[4]]
+        assert all(call[1:] == (True, 0) for call in calls)
+        assert sleeps == [12]
+        assert summary["coverage"] == "complete"
+        assert summary["retried"] == 1
+        assert summary["failed"] == summary["not_attempted"] == 0
+        assert outcomes[3]["attempts"] == 2
 
 
 # ---------------------------------------------------------------------------
