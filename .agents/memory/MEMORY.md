@@ -155,4 +155,5 @@
 - [Wouter navigation guards](wouter-navigation-guards.md) — aroundNav handles app links and hook navigation, not browser history; reload uses native beforeunload.
 - [Deferred React test responses](deferred-react-test-responses.md) — resolve controlled network responses outside async act when other requests remain pending.
 - [Plymouth sitemap and delivery evidence](plymouth-sitemap-delivery.md) — official sitemap misroutes postgraduate awards to 404 undergraduate paths; partnership copy is not course delivery.
+- [Plymouth course locations](plymouth-course-locations.md) — empty application dropdowns are not campuses; course-owned published offerings can supply the real location.
 - [Portsmouth course authority](portsmouth-course-authority.md) — use exact-course instances for delivery/load and international tuition rows for fees; UK-only panels are negative evidence.

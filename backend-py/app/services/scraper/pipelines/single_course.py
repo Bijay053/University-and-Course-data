@@ -8791,6 +8791,10 @@ async def extract_course(
             # rejection filter can fire correctly.
             if k in ("location_text", "course_location") and isinstance(v, str) and _is_location_chrome(v):
                 continue
+            if k in ("location_text", "course_location") and isinstance(v, str):
+                from app.services.scraper.extractors.location import _sanitise_for_display
+                if not _sanitise_for_display(v):
+                    continue  # Dropdown prompt (e.g. "--Select Location--") is not a campus.
             # BCU: suppress FALLBACK AI from filling location — person names in
             # testimonials pollute the value when the keyfacts panel has no Location.
             if k in ("location_text", "course_location") and _is_bcu_host_fb:

@@ -119,7 +119,9 @@ _JUNK = re.compile(
 _NON_LOCATION_VALUE_RE = re.compile(
     r"^(?:(?:domestic|international|home|overseas|students?|"
     r"teaching|study|academic|period|online|virtual|remote|external)\s*)+$"
-    r"|^(?:may|might|some|please|select|choose|view|see)\b",
+    # Dropdown prompts on Plymouth pages appear as "--Select Location--".
+    # Their decorative dashes previously bypassed the bare "select" check.
+    r"|^[\s\-–—_*:;]*(?:may|might|some|please|select|choose|view|see)\b",
     re.IGNORECASE,
 )
 _TRAILING_KEYS = re.compile(
@@ -824,6 +826,34 @@ def _classify_location_value(value: str) -> str | None:
     if not display:
         return None
     return display
+
+
+def _from_plymouth_apply_widget(soup: BeautifulSoup) -> str | None:
+    """Read published offerings for this CourseVersion, not the empty select prompt."""
+    import json
+
+    campuses: list[str] = []
+    for widget in soup.select(
+        '[data-model-type="CourseVersion"] [data-courses-apply-widget-courses-value]'
+    ):
+        try:
+            offerings = json.loads(
+                widget.get("data-courses-apply-widget-courses-value") or "[]"
+            )
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(offerings, list):
+            continue
+        for offering in offerings:
+            if not isinstance(offering, dict):
+                continue
+            if offering.get("publish") is not True or offering.get("in_use") is not True:
+                continue
+            raw = offering.get("location")
+            campus = _classify_location_value(raw) if isinstance(raw, str) else None
+            if campus and campus.casefold() not in {c.casefold() for c in campuses}:
+                campuses.append(campus)
+    return ", ".join(campuses) if campuses else None
 
 
 def _from_strong_dom_walk(soup: BeautifulSoup) -> str | None:
@@ -1939,7 +1969,21 @@ async def extract(html: str, url: str) -> list[ExtractionResult]:  # noqa: ARG00
     # pages, and `course_location` stages blank fleet-wide.  Verified
     # 2026-05-17 on Master of Nursing, Master of Leadership and Management
     # in Education, and Master of Health Management and Policy (Global).
-    if _is_winchester_host:
+    if _parsed_host in {"plymouth.ac.uk", "www.plymouth.ac.uk"}:
+        # The visible application <select> contains only "--Select Location--"
+        # until JavaScript runs; the CourseVersion widget embeds the actual
+        # published offering locations in its own JSON attribute.
+        cascade_list = [
+            ("plymouth_course_offerings", _from_plymouth_apply_widget(soup), 0.99),
+            ("strong", _from_strong_dom_walk(soup), 0.9),
+            ("dl", _from_dl(soup), 0.9),
+            ("div_panel", _from_panel_divs(soup), 0.88),
+            ("table", _from_tables(soup), 0.85),
+            ("heading", _from_headings(soup), 0.7),
+            ("delivery_inperson", _from_delivery_mode_inperson(soup), 0.85),
+            ("text_block", _from_text_block(html_to_text(html)), 0.5),
+        ]
+    elif _is_winchester_host:
         # Do not fall through to generic text walkers: the same page repeats a
         # longer Location paragraph in body content and carries campus links in
         # navigation.  Only the overview fact belongs to this course.

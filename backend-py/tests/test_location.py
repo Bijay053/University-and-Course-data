@@ -13,6 +13,8 @@ are applied before sanitisation so ACAP's footnote cruft is cleaned.
 from __future__ import annotations
 
 import asyncio
+import html
+import json
 
 from app.services.scraper.config import set_uni_config
 from app.services.scraper.config.context import get_uni_config
@@ -70,6 +72,49 @@ def test_gemini_display_sanitizer_removes_location_interpolation():
         == "Sunshine Coast, Moreton Bay"
     )
     assert location._sanitise_for_display("{{ vm.location }}") is None
+
+
+def test_dropdown_location_prompt_is_not_a_campus():
+    """Plymouth's dashed dropdown prompt must not become a staged location."""
+    for prompt in ("--Select Location--", "— Select Location —", "Select Location"):
+        assert location._normalise(prompt) is None
+        assert location._sanitise_for_display(prompt) is None
+        assert location._classify_location_value(prompt) is None
+        for html in (
+            f"<dl><dt>Location</dt><dd>{prompt}</dd></dl>",
+            f"<div><strong>Location</strong></div><div>{prompt}</div>",
+        ):
+            assert _run(location.extract(
+                html, "https://www.plymouth.ac.uk/courses/postgraduate/msc-hydrography"
+            )) == []
+    assert location._sanitise_for_display("Plymouth") == "Plymouth"
+    out = _run(location.extract(
+        "<dl><dt>Location</dt><dd>Plymouth</dd></dl>",
+        "https://www.plymouth.ac.uk/courses/postgraduate/msc-hydrography",
+    ))
+    assert out and out[0].value == "Plymouth"
+
+
+def test_plymouth_course_widget_supplies_real_published_location():
+    offerings = [
+        {"location": "Plymouth", "publish": True, "in_use": True},
+        {"location": "Plymouth", "publish": True, "in_use": True},
+        {"location": "Cornwall", "publish": True, "in_use": True},
+        {"location": "Exeter", "publish": False, "in_use": True},
+        {"location": "Barnstaple", "publish": True, "in_use": False},
+        {"location": "--Select Location--", "publish": True, "in_use": True},
+    ]
+    html_doc = (
+        '<main><div data-model-type="CourseVersion"><div '
+        f'data-courses-apply-widget-courses-value="{html.escape(json.dumps(offerings), quote=True)}">'
+        '<label for="location">Location:</label><select id="location">'
+        '<option value="">--Select Location--</option></select></div></div></main>'
+    )
+    out = _run(location.extract(
+        html_doc, "https://www.plymouth.ac.uk/courses/postgraduate/msc-hydrography"
+    ))
+    assert out and out[0].value == "Plymouth, Cornwall"
+    assert out[0].method == "location.plymouth_course_offerings"
 
 
 def test_dt_dd_location_classifies_via_existing_dl_path():
