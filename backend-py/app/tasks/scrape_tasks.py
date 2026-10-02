@@ -198,12 +198,19 @@ def set_initial_dispatch_lock(job_id: str) -> None:
     The TTL is slightly longer than _REQUEUE_LOCK_TTL_S to give the worker
     time to claim the job before the lock expires.
     """
+    r = None
     try:
         r = _get_redis()
         ttl = _REQUEUE_LOCK_TTL_S + 30
         r.set(_requeue_lock_key(job_id), "1", nx=True, ex=ttl)
     except Exception as exc:  # noqa: BLE001
         log.debug("set_initial_dispatch_lock: Redis unavailable for %s: %s", job_id, exc)
+    finally:
+        if r is not None:
+            try:
+                r.close()
+            except Exception as exc:  # noqa: BLE001
+                log.debug("set_initial_dispatch_lock: Redis close failed for %s: %s", job_id, exc)
 
 
 async def _async_scrape(runtime_job_id: str) -> None:
