@@ -68,6 +68,10 @@ args = "fee-selection-concurrency"
 task = "workflow.run"
 args = "approval-guidance-scale"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "task-loop-resource-cleanup"
+
 [[workflows.workflow]]
 name = "backend-py: FastAPI"
 author = "agent"
@@ -211,6 +215,17 @@ isValidation = true
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "flock -x /tmp/university-portal-db-validation.lock bash -c 'cd backend-py && PYTHONPATH=. python -m pytest tests/test_approval_guidance_scale.py tests/test_durable_approval_guidance.py -q -s -c /dev/null -p no:cacheprovider'"
+
+[[workflows.workflow]]
+name = "task-loop-resource-cleanup"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "flock -x /tmp/university-portal-db-validation.lock bash -c 'cd backend-py && PYTHONPATH=. python -m pytest tests/test_task_loop_resource_cleanup.py tests/test_scrape_task_resource_cleanup.py tests/test_bulk_fix_job.py tests/test_stale_requeue.py tests/test_repair_scrape.py tests/test_phase3_learning.py tests/test_phase7_quality_actions.py tests/test_autonomous_verification_isolation.py -q -c /dev/null -o asyncio_mode=auto -p no:cacheprovider'"
+
+[workflows.workflow.metadata]
+isValidation = true
 
 [agent]
 stack = "PNPM_WORKSPACE"

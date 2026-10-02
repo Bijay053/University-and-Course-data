@@ -76,8 +76,7 @@ def test_production_worker_bounds_descriptor_pressure():
 
 
 @pytest.mark.parametrize("failure", [False, True])
-@pytest.mark.asyncio
-async def test_post_completion_hook_closes_its_separate_database_loop(failure):
+def test_post_completion_hook_closes_its_separate_database_loop(failure):
     from app.tasks import scrape_tasks
 
     query = AsyncMock(
@@ -88,12 +87,13 @@ async def test_post_completion_hook_closes_its_separate_database_loop(failure):
     with (
         patch.object(scrape_tasks, "_async_find_all_queued", query),
         patch.object(scrape_tasks, "engine", SimpleNamespace(dispose=dispose)),
+        patch.object(scrape_tasks, "_sync_dispose"),
     ):
         if failure:
             with pytest.raises(RuntimeError, match="query failed"):
-                await scrape_tasks._post_completion_queued_jobs()
+                scrape_tasks._run_db_coro(scrape_tasks._post_completion_queued_jobs())
         else:
-            assert await scrape_tasks._post_completion_queued_jobs() == []
+            assert scrape_tasks._run_db_coro(scrape_tasks._post_completion_queued_jobs()) == []
         dispose.assert_awaited_once()
 
 

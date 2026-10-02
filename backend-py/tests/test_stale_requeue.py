@@ -27,6 +27,7 @@ import json
 import sys
 import types
 import uuid
+import weakref
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from unittest.mock import MagicMock, call, patch
@@ -703,8 +704,22 @@ def _make_asyncio_run_interceptor(stale_result: list) -> Any:
     return _intercept
 
 
+_submitted_coro_names = weakref.WeakKeyDictionary()
+
+
 def _coro_name(coro: Any) -> str:
     """Extract the coroutine function name from a coroutine object or mock."""
+    if coro in _submitted_coro_names:
+        return _submitted_coro_names[coro]
+    # Task runners now await exit-time cleanup around the submitted coroutine.
+    frame = getattr(coro, "cr_frame", None)
+    if frame and "coro" in frame.f_locals:
+        inner = frame.f_locals["coro"]
+        name = _coro_name(inner)
+        _submitted_coro_names[coro] = name
+        # These interceptors never execute the wrapper or its submitted work.
+        inner.close()
+        return name
     try:
         return coro.__name__
     except AttributeError:

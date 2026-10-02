@@ -6,12 +6,14 @@ connection held in the SQLAlchemy pool from a *previous* task is bound to a
 now-closed loop.  We call ``_sync_dispose()`` **before** every
 ``asyncio.run()`` (not inside the coroutine) so the pool is invalidated
 synchronously — no asyncio involvement, no "Future attached to a different
-loop" error.  See ``_sync_dispose`` for the full explanation.
+loop" error. This is only an entry-time safety fence: task boundaries must
+also await resource closure while the owning loop is still running.
 """
 from __future__ import annotations
 
 import asyncio
 import logging
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 
 from celery.exceptions import SoftTimeLimitExceeded
@@ -87,7 +89,50 @@ def _run_db_coro(coro):  # noqa: ANN001, ANN202
     ``Future attached to a different loop``.
     """
     _sync_dispose()
-    return asyncio.run(coro)
+    return asyncio.run(_with_loop_cleanup(coro))
+
+
+@asynccontextmanager
+async def _task_loop_resources(*, scraper: bool = False):
+    """Close task-owned resources after sessions exit, before loop shutdown.
+
+    DB-only loops must not touch the browser or fetch clients. Fetch-capable
+    tasks use the current-loop cache close helpers (which do not create clients
+    or remove Redis lock/slot keys). Service-local clients remain service-owned.
+    Cleanup is bounded and independent so one failure cannot skip DB closure
+    or replace the task's result/original exception.
+    """
+    try:
+        yield
+    finally:
+        closers = []
+        if scraper:
+            from app.services.scraper.browser_pool import pool
+            from app.services.scraper.http_fetcher import close_shared_client_for_current_loop
+            from app.services.scraper.scrape_do_semaphore import close_client_for_current_loop
+
+            closers.extend([
+                ("browser pool", pool.close),
+                ("HTTP client", close_shared_client_for_current_loop),
+                ("semaphore Redis client", close_client_for_current_loop),
+            ])
+        closers.append(("DB connections", engine.dispose))
+        for label, close in closers:
+            try:
+                await asyncio.wait_for(close(), timeout=10)
+            except (Exception, asyncio.CancelledError) as exc:
+                log.warning("Could not close task %s: %s", label, exc)
+
+
+async def _with_loop_cleanup(coro, *, scraper: bool = False):  # noqa: ANN001, ANN202
+    async with _task_loop_resources(scraper=scraper):
+        return await coro
+
+
+def _run_scraper_coro(coro):  # noqa: ANN001, ANN202
+    """Fresh-loop boundary for probe/repair actions that can fetch live pages."""
+    _sync_dispose()
+    return asyncio.run(_with_loop_cleanup(coro, scraper=True))
 
 
 def _handle_preclaim_failure(runtime_job_id: str, claim_error: RuntimeJobClaimError) -> None:
@@ -243,7 +288,7 @@ async def _async_scrape(runtime_job_id: str) -> None:
 
 
 async def _async_repair(runtime_job_id: str) -> None:
-    async with AsyncSessionLocal() as db:
+    async with _task_loop_resources(scraper=True), AsyncSessionLocal() as db:
         await run_repair(db, runtime_job_id)
 
 
@@ -253,7 +298,7 @@ async def _async_bulk_fix(runtime_job_id: str) -> None:
     from app.routers.scrape import ReExtractBody, re_extract_staged
     from app.services.scraper.job_claim import claim_runtime_job
 
-    async with AsyncSessionLocal() as db:
+    async with _task_loop_resources(scraper=True), AsyncSessionLocal() as db:
         if not await claim_runtime_job(db, runtime_job_id):
             return
         job = await db.get(ScrapeRuntimeJob, runtime_job_id)
@@ -507,11 +552,8 @@ def _dispatch_orphaned_jobs(r, stale) -> None:  # noqa: ANN001
 
 
 async def _post_completion_queued_jobs() -> list[tuple[str, str, int]]:
-    """The hook has its own loop after the scrape loop has closed."""
-    try:
-        return await asyncio.wait_for(_async_find_all_queued(), timeout=10)
-    finally:
-        await asyncio.wait_for(engine.dispose(), timeout=10)
+    """The hook's runner closes its own DB pool after this bounded query."""
+    return await asyncio.wait_for(_async_find_all_queued(), timeout=10)
 
 
 @celery_app.task(name="scrape.university", bind=True, max_retries=0)
@@ -855,6 +897,17 @@ def requeue_stale_queued(self) -> dict:  # noqa: ANN001
         log.exception("requeue_stale_queued Redis connect failed: %s", exc)
         return {"ok": False, "error": f"redis connect: {exc}"}
 
+    try:
+        return _dispatch_stale_jobs(r, stale, recovered)
+    finally:
+        try:
+            r.close()
+        except Exception as exc:  # noqa: BLE001
+            log.warning("Could not close stale-requeue Redis client: %s", exc)
+
+
+def _dispatch_stale_jobs(r, stale, recovered) -> dict:  # noqa: ANN001
+    """Dispatch with the existing locks/routing; the caller owns Redis."""
     dispatched: list[str] = []
     exhausted: list[str] = []
     for jid, jtype, requeue_count in stale:
@@ -928,7 +981,9 @@ def requeue_stale_queued(self) -> dict:  # noqa: ANN001
 
 async def _mark_failed(runtime_job_id: str, err: str) -> None:
     from app.models import ScrapeRuntimeJob
-    async with AsyncSessionLocal() as db:
+    # Explicit fresh-loop failure writers do not pass through _run_db_coro.
+    # The direct pre-claim writer is separate and owns no shared pool.
+    async with _task_loop_resources(), AsyncSessionLocal() as db:
         job = await db.get(ScrapeRuntimeJob, runtime_job_id)
         if job and not _workflow_owned_child(job):
             job.status = "failed"
@@ -1389,9 +1444,8 @@ def probe_and_configure(  # noqa: ANN001
 
             return result
 
-    _sync_dispose()
     try:
-        return asyncio.run(_run())
+        return _run_scraper_coro(_run())
     except Exception as exc:
         log.exception("probe_and_configure failed uni_id=%d: %s", university_id, exc)
         return {"ok": False, "university_id": university_id, "error": str(exc)}
@@ -1549,9 +1603,8 @@ def repair_extractor(
                 "rescraped": rescraped,
             }
 
-    _sync_dispose()
     try:
-        return asyncio.run(_run())
+        return _run_scraper_coro(_run())
     except Exception as exc:
         log.exception("repair_extractor failed for uni_id=%s: %s", university_id, exc)
         raise self.retry(exc=exc, countdown=120)
@@ -1681,9 +1734,8 @@ def run_quality_actions(
                 **result.to_dict(),
             }
 
-    _sync_dispose()
     try:
-        return asyncio.run(_run())
+        return _run_scraper_coro(_run())
     except Exception as exc:
         log.exception(
             "run_quality_actions failed for uni_id=%s job=%s: %s",
@@ -1734,9 +1786,8 @@ def repair_conflicts(
                 "avg_confidence_after": result.avg_confidence_after,
             }
 
-    _sync_dispose()
     try:
-        return asyncio.run(_run())
+        return _run_db_coro(_run())
     except Exception as exc:
         log.exception("[repair_conflicts] job=%s failed: %s", job_id, exc)
         raise self.retry(exc=exc, countdown=60)
@@ -1819,9 +1870,8 @@ def snapshot_storage_monitor(self) -> dict:  # type: ignore[override]
             "estimated_s3_mb": estimated_s3_mb,
         }
 
-    _sync_dispose()
     try:
-        return asyncio.run(_run())
+        return _run_db_coro(_run())
     except Exception as exc:
         log.exception("[SNAPSHOT MONITOR] task failed: %s", exc)
         return {"ok": False, "reason": str(exc)}
@@ -1840,9 +1890,8 @@ def refresh_baselines_weekly(self) -> dict:  # type: ignore[override]
             count = await seed_baselines(db)
             return {"ok": True, "baselines_upserted": count}
 
-    _sync_dispose()
     try:
-        return asyncio.run(_run())
+        return _run_db_coro(_run())
     except Exception as exc:
         log.exception("refresh_baselines_weekly failed: %s", exc)
         return {"ok": False, "reason": str(exc)}
@@ -1868,9 +1917,8 @@ def record_job_performance(  # type: ignore[override]
             from app.services.performance_intelligence import compute_job_performance
             return await compute_job_performance(job_id, db)
 
-    _sync_dispose()
     try:
-        result = asyncio.run(_run())
+        result = _run_db_coro(_run())
         if not result.get("ok"):
             log.warning(
                 "[P8] record_job_performance non-ok uni_id=%s job=%s: %s",
