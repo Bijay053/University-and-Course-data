@@ -1,5 +1,4 @@
-- [Repair pre-claim schema readiness](repair-preclaim-schema.md) — missing claims can mean delivered tasks crashed; require schema readiness, not only service health.
-- [Isolated worker acceptance](isolated-worker-acceptance.md) — preserve migration-defined server defaults and keep async DB snapshots outside sync Playwright’s loop.
+- [Background worker resources](background-worker-resources-index.md) — loop cleanup, client ownership, pre-claim isolation, and safe task testing after module reloads.
 - [Catalogue recovery evidence](catalogue-recovery-evidence.md) — reported counts are investigation inputs; sitemap counts alone do not prove discovery coverage.
 - [UC Canberra SPA + hidden-input fees](uc-canberra-fix.md) — Listing=SPA shell (0 links); sitemap at /services/wcm/site-map/course.xml has 184 courses; fees in id="N-eftsl-international" hidden inputs matched via id="current-year".
 - [MQ coursehandbook resolver](mq-coursehandbook-resolver.md) — Sitemap needs patchright (CF-guarded); resolver needs httpx (127→223/383); BFS seeds return 0 in dev (expected).
@@ -42,9 +41,7 @@
 - [Stage-0 auto-rule vs manual override precedence](stage0-manual-override-precedence.md) — CASCADE-regenerated extraction_rules can silently reclobber a manual per-uni YAML fix via payload write-order.
 - [ECU discovery (Funnelback + PG seeds)](ecu-discovery-funnelback.md) — pre-seed ALL pagination pages; Funnelback JS doubles params (append not replace) → _resolve() dup-key guard + block_url_patterns traversal block fixed.
 - [Multi-campus slug collision](multi-campus-slug-collision.md) — "University of X (City)" satellite campuses get the SAME slug-derived filename as an unrelated same-named uni; verify scrape_url domain matches YAML seed_urls domain before trusting an existing {slug}_{id}.yaml.
-- [Event-loop-bound primitives in Celery](event-loop-bound-primitives.md) — module-level asyncio.Semaphore/Lock break across per-task loops; use per-loop lazy getter dicts.
 - [Discovery URL cache](discovery-url-cache.md) — cached fast-paths must carry the skipped phase's side-channel outputs (blocked fee URLs) too; never cache provider-payload links.
-- [Distributed semaphore lessons](distributed-semaphore-lessons.md) — acquire local semaphore BEFORE fleet-wide Redis slot; cache one redis.asyncio client per event loop (WeakKeyDictionary).
 - [block_url_patterns traversal guard](block-url-patterns-traversal.md) — block_url_patterns is now ALSO a BFS traversal-level guard (compiled early, checked pre-fetch); critical for Scrape.do-backed discovery where each blocked URL saves ~6s.
 - [Bond ES API discovery](bond-es-discovery.md) — program finder is React SPA/AJAX; query /api/v1/elasticsearch/bond_prod_default/_search with generic_search_api; _source.url.0 dot-path extracts array fields.
 - [Australian university discovery and extraction index](australian-university-lessons-index.md) — grouped pointers for catalogue transport, field authority, audience scope, and course-page structure.
@@ -97,8 +94,6 @@
 - [Central profiles in staged re-extraction](central-profiles-staged-reextract.md) — Review → Fix must prefetch central pages; semantic parser changes must bump the English cache schema.
 - [UQ start-semester intake authority](uq-start-semester-intake.md) — UQ intake comes only from the selected program’s Drupal start_semester fact; page-wide date scanning is unsafe.
 - [Bond fee, location, and IELTS authority](bond-fee-ielts-authority.md) — pair IDs/codes; official international Fees tabs can override empty legacy API results; keep delivery and IELTS course-owned.
-- [Celery loop resource cleanup](celery-loop-resource-cleanup.md) — close loop-owned HTTP and database resources before each asyncio.run loop ends or worker descriptors accumulate.
-- [Pre-claim failure ownership fence](preclaim-failure-ownership.md) — emergency worker failure writes bypass the shared pool and may transition only queued jobs.
 - [Monash rendered catalogue](monash-rendered-catalogue.md) — listing query facets do not constrain discovered links; filter short-course codes and use detail-page audience evidence.
 - [UWA campus and fee authority](uwa-campus-fee-authority.md) — use the current course’s labelled campus card and exact course-code lookup against UWA’s international fee calculator.
 - [Curtin structured offering authority](curtin-offering-authority.md) — use labelled key-information blocks and newest international year-1 JSON-LD offer; mixed year/month durations need conversion.

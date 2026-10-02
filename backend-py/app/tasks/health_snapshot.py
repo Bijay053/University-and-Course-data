@@ -10,22 +10,15 @@ Steps:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 
 from sqlalchemy import text
 
 from app.database import AsyncSessionLocal, engine
 from app.tasks.celery_app import celery_app
+from app.tasks.loop_resources import run_task_coro
 
 log = logging.getLogger(__name__)
-
-
-def _sync_dispose() -> None:
-    try:
-        engine.sync_engine.dispose(close=False)
-    except Exception as exc:  # noqa: BLE001
-        log.warning("health_snapshot _sync_dispose: %s", exc)
 
 
 async def _run() -> dict:
@@ -88,9 +81,8 @@ async def _run() -> dict:
 def snapshot_health_daily(self) -> dict:  # noqa: ANN001
     """Snapshot university health scores and detect regressions."""
     log.info("health.snapshot_daily: starting")
-    _sync_dispose()
     try:
-        result = asyncio.run(_run())
+        result = run_task_coro(_run(), engine=engine)
         log.info("health.snapshot_daily: %s", result)
         return result
     except Exception as exc:  # noqa: BLE001

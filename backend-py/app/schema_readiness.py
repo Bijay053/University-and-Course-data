@@ -30,8 +30,7 @@ async def check_worker_schema():
     from app.database import postgres_tls_connect_args
     engine = create_async_engine(settings.database_url, poolclass=NullPool,
                                  connect_args=postgres_tls_connect_args())
-    try:
+    from app.tasks.loop_resources import owned_engine
+    async with owned_engine(engine):
         async with engine.connect() as connection:
             await require_qualification_guidance_schema(connection)
-    finally:
-        await engine.dispose()

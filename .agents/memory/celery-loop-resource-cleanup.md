@@ -28,3 +28,14 @@ letting a teardown error replace a successful result or the original failure.
 loops with a test-owned engine, read-only queries, isolated network services,
 garbage collection disabled, and old loops retained; otherwise weak references
 and garbage collection can conceal socket leaks.
+
+Parent-process startup checks and process-death observers must close only their
+dedicated engines, never the process-wide application engine.
+
+**Why:** Death observers can run concurrently in parent threads while worker
+startup checks use separate loops. Disposing a shared engine from these paths
+can interfere with another operation and undermine durable death evidence.
+
+**How to apply:** Give each observer/check a local engine and a bounded awaited
+close. Keep shared-pool invalidation confined to serial synchronous task
+boundaries, including each separate legacy failure-audit loop.

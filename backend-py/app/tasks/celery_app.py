@@ -217,14 +217,13 @@ async def _reset_via_asyncpg(url: str) -> int:
         url, pool_size=1, max_overflow=0, future=True,
         connect_args=postgres_tls_connect_args(),
     )
-    try:
+    from app.tasks.loop_resources import owned_engine
+    async with owned_engine(_engine):
         _Session = async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
         async with _Session() as db:
             result = await db.execute(text(_RESET_SQL))
             await db.commit()
             return result.rowcount  # type: ignore[return-value]
-    finally:
-        await _engine.dispose()
 
 
 async def _reset_ghost_running_jobs() -> int:
@@ -247,7 +246,8 @@ async def _check_job_status_single(job_id: str) -> str | None:
         _url, pool_size=1, max_overflow=0, future=True,
         connect_args=postgres_tls_connect_args(),
     )
-    try:
+    from app.tasks.loop_resources import owned_engine
+    async with owned_engine(_engine):
         _Sess = async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
         async with _Sess() as _db:
             row = await _db.execute(
@@ -261,8 +261,6 @@ async def _check_job_status_single(job_id: str) -> str | None:
                 {"jid": job_id},
             )
             return row.scalar()
-    finally:
-        await _engine.dispose()
 
 
 @worker_ready.connect

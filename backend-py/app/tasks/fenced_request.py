@@ -58,11 +58,10 @@ async def _persist_death(task_id, identity, proof):
         settings.database_url, connect_args=postgres_tls_connect_args(),
         pool_size=1, max_overflow=0,
     )
-    try:
+    from app.tasks.loop_resources import owned_engine
+    async with owned_engine(engine):
         async with async_sessionmaker(engine)() as db:
             await record_process_death(db, task_id, identity, proof)
-    finally:
-        await engine.dispose()
 
 
 class FencedRequest(Request):

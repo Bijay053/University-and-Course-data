@@ -12,20 +12,12 @@ Beat reconciles autonomous sessions every minute, including after Redis loss.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 
 from app.tasks.celery_app import celery_app
+from app.tasks.loop_resources import run_task_coro
 
 log = logging.getLogger(__name__)
-
-
-def _sync_dispose() -> None:
-    from app.database import engine
-    try:
-        engine.sync_engine.dispose(close=False)
-    except Exception as exc:  # noqa: BLE001
-        log.warning("auto_repair_task _sync_dispose: %s", exc)
 
 
 async def _run(university_id: int, regression_alert_id: int | None) -> dict:
@@ -51,9 +43,8 @@ def generate_repair_suggestion(
 ) -> dict:
     """Generate an auto-repair suggestion for one university."""
     log.info("auto_repair.generate_suggestion: uni=%d alert=%s", university_id, regression_alert_id)
-    _sync_dispose()
     try:
-        result = asyncio.run(_run(university_id, regression_alert_id))
+        result = run_task_coro(_run(university_id, regression_alert_id), fetch=True)
         log.info("auto_repair.generate_suggestion: done — %s", result)
         return result
     except Exception as exc:  # noqa: BLE001
@@ -134,9 +125,8 @@ async def _reconcile_autonomous_repair(job_id: str, session_id: str) -> dict:
 )
 def monitor_ai_scrape_repair(self, job_id: str, session_id: str) -> dict:  # noqa: ANN001
     """Reconcile durable delivery/child state without sleeping on a worker."""
-    _sync_dispose()
     try:
-        result = asyncio.run(_reconcile_autonomous_repair(job_id, session_id))
+        result = run_task_coro(_reconcile_autonomous_repair(job_id, session_id))
     except Exception as exc:
         # Database/broker outages are observable and bounded; status polling
         # can also reconcile from the same durable state after an outage.
@@ -187,9 +177,8 @@ async def _recover_ai_repair_workflows() -> dict:
     default_retry_delay=30, queue="beat", soft_time_limit=120, time_limit=150,
 )
 def recover_ai_repair_workflows(self) -> dict:  # noqa: ANN001
-    _sync_dispose()
     try:
-        return asyncio.run(_recover_ai_repair_workflows())
+        return run_task_coro(_recover_ai_repair_workflows())
     except Exception as exc:
         raise self.retry(exc=exc)
 
@@ -254,20 +243,19 @@ def run_ai_scrape_repair(
         read_session,
         release_repair_lease,
     )
-    _sync_dispose()
     if university_id is not None and lease_token is not None:
         # Durable claim fencing handles duplicate delivery and Redis loss.
         # Do NOT release the lease here: verification retains it until terminal.
-        autonomous_result = asyncio.run(_run_autonomous_repair(
+        autonomous_result = run_task_coro(_run_autonomous_repair(
             job_id, university_id, lease_token, str(self.request.id or lease_token),
-        ))
+        ), fetch=True)
         if autonomous_result is not None:
             return autonomous_result
     if university_id is not None and lease_token is not None:
         if not claim_repair_session(job_id, university_id, lease_token):
             error = "Repair session ownership expired before the worker started."
             try:
-                asyncio.run(
+                run_task_coro(
                     _persist_ai_repair_failure(
                         job_id, university_id, lease_token, error
                     )
@@ -286,7 +274,7 @@ def run_ai_scrape_repair(
             }
 
     try:
-        result = asyncio.run(_run_ai_repair(job_id, lease_token))
+        result = run_task_coro(_run_ai_repair(job_id, lease_token), fetch=True)
         log.info("ai_repair.run_loop: completed job=%s status=%s", job_id, result.get("status"))
         return result
     except Exception as exc:  # noqa: BLE001
@@ -306,8 +294,7 @@ def run_ai_scrape_repair(
             }
             _write_session(job_id, failure_session)
             if university_id is not None and lease_token is not None:
-                _sync_dispose()
-                asyncio.run(
+                run_task_coro(
                     _persist_ai_repair_failure(
                         job_id, university_id, lease_token, str(exc)
                     )

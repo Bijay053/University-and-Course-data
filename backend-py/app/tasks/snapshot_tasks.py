@@ -24,7 +24,6 @@ worker task.
 """
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Any
@@ -33,6 +32,7 @@ from sqlalchemy import text
 
 from app.database import AsyncSessionLocal, engine
 from app.tasks.celery_app import celery_app
+from app.tasks.loop_resources import run_task_coro
 
 log = logging.getLogger(__name__)
 
@@ -148,10 +148,6 @@ async def _async_run_snapshot(triggered_by: str) -> dict[str, Any]:
     snap_time = datetime.now(timezone.utc)
     inserted: dict[str, int] = {}
 
-    # Same dance as scrape_tasks.py: dispose pooled connections that were
-    # bound to a previous event loop before opening a new session.
-    await engine.dispose()
-
     async with AsyncSessionLocal() as db:
         try:
             await _ensure_backup_tables(db)
@@ -182,7 +178,7 @@ async def _async_run_snapshot(triggered_by: str) -> dict[str, Any]:
 
 def _run_snapshot(triggered_by: str) -> dict[str, Any]:
     """Sync wrapper used by the Celery task entrypoint."""
-    return asyncio.run(_async_run_snapshot(triggered_by))
+    return run_task_coro(_async_run_snapshot(triggered_by), engine=engine)
 
 
 @celery_app.task(name="tasks.snapshot.editable", queue="scrape")
