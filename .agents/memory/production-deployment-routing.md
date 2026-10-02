@@ -282,6 +282,20 @@ scheduled, and active work before bounded cleanup. Treat failed inspection as
 active, preserve the full graceful window for work, verify process start
 identity before delayed signals, and check both services after restart.
 
+A completed release-smoke database job does not prove its Celery task returned.
+The release check itself can leave an active task after its DONE evidence passes.
+
+**Why:** The guarded release passed its sample check but correctly stopped at
+the worker-idle fence; its own completed sample was still active in Celery.
+
+**How to apply:** Keep the idle fence intact. Identify the exact sample in
+Celery and independently verify its terminal database status. For an approved
+worker recovery, pause consumption and require that no business job, reserved
+task, scheduled task, or unrelated active task exists. Allow the new worker to
+settle before checking idle again. Revalidate proof freshness after an operator
+pause: rehearsal receipts expire after 24 hours, and renewing billable test
+resources requires fresh approval.
+
 The production Nginx virtual host is hostname-scoped, so a bare
 `http://127.0.0.1/` frontend smoke request can return 404 even when the public
 portal is healthy.
