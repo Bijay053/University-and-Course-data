@@ -2705,6 +2705,10 @@ def _from_otago_polytechnic_international_fee(
 async def extract(
     html: str, url: str, *, country: str | None = None
 ) -> list[ExtractionResult]:
+    from app.services.scraper.extractors.lsbu_fees import course_fee
+    lsbu_known, lsbu_fee = course_fee(html, url)
+    if lsbu_known:
+        return [lsbu_fee] if lsbu_fee is not None else []
     port_known, port_fee = portsmouth_international_fee(html, url)
     if port_known:
         if port_fee is None:

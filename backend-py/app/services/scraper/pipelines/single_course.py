@@ -11659,6 +11659,12 @@ async def extract_course(
                     "snippet": _port_snippet,
                 })
 
+    # LSBU's international headline is annual tuition, not its adjacent UK
+    # price or separate full-course total. Preserve its tuple after AI,
+    # browser/default and broad reject-keyword passes, including omissions.
+    from app.services.scraper.extractors.lsbu_fees import apply_course_fee_authority as _apply_lsbu_fee
+    _apply_lsbu_fee(html or "", url, payload, evidence)
+
     # ── Evidence selection finalisation ────────────────────────────────────
     # Mark the winning evidence row for each field as decision_status="selected"
     # so that scraped_field_evidence.selected mirrors the actual column values
