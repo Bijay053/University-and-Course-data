@@ -3,6 +3,16 @@ name: Production deployment routing
 description: Non-obvious routing constraints for deploying this project to its external AWS host.
 ---
 
+The dedicated production SSM identity permits command submission and retrieval
+by command ID but can deny command listing. Retain each submitted command ID,
+and preserve stdout as well as stderr for failed inspection commands.
+
+**Why:** A failed read-only inspection lost its stdout in the helper's exception;
+listing prior commands to recover its ID was denied by the production identity.
+
+**How to apply:** Observe remote command results by their returned IDs. Do not
+assume diagnostic listing permissions or discard partial output on nonzero exit.
+
 The production checkout can fetch GitHub without having a usable push
 credential. When an authorized preservation commit is created there, transfer
 the commit to the authenticated workspace as a bounded Git bundle and push
