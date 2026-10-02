@@ -69,6 +69,13 @@ def _get_client():
         _clients[loop] = client
     return client
 
+
+async def close_client_for_current_loop() -> None:
+    """Release loop-owned sockets without changing any distributed slot keys."""
+    client = _clients.pop(asyncio.get_running_loop(), None)
+    if client is not None:
+        await client.aclose()
+
 # Sorted set of in-flight holder tokens, scored by acquire epoch-seconds.
 _KEY = "scrapedo:account_inflight"
 # Stale-holder reap threshold.  Must exceed the longest possible single HTTP

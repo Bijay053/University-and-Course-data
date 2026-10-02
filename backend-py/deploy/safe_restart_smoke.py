@@ -57,7 +57,7 @@ except ImportError:  # Direct execution: python deploy/safe_restart_smoke.py
     import database_refresh_rehearsal_proof as rehearsal_proof
 from sqlalchemy import func, select
 
-from app.database import AsyncSessionLocal
+from app.database import AsyncSessionLocal, engine
 from app.models import ScrapedCourse, University
 from app.models.scrape_runtime import ScrapeRuntimeJob, ScrapeRuntimeLog
 from app.release_info import UNKNOWN_RELEASE, get_release_revision
@@ -83,6 +83,10 @@ REHEARSAL_SIGNERS = Path(__file__).with_name(
 DEFAULT_RELEASE_IDENTITY_TIMEOUT_SECONDS = 15.0
 DEFAULT_RELEASE_IDENTITY_WARNING_SECONDS = 5.0
 DEFAULT_RELEASE_IDENTITY_RETRY_SECONDS = 1.0
+DEFAULT_WORKER_RETURN_TIMEOUT_SECONDS = 60.0
+# This short beat task can run as the worker comes up. It must actually return;
+# business tasks and unknown maintenance tasks are never waved through.
+TRANSIENT_WORKER_TASKS = frozenset({"scrape.requeue_stale"})
 DEFAULT_DEPLOYMENT_EVIDENCE_PATH = Path(
     "/var/lib/university-portal/deployment-evidence.jsonl"
 )
@@ -331,14 +335,14 @@ def validate_done_payload(
         )
 
 
-def _run(command: list[str], *, timeout: float = 20) -> str:
+def _run(command: list[str], *, timeout: float = 20, stdout_only: bool = False) -> str:
     result = subprocess.run(
         command, check=False, capture_output=True, text=True, timeout=timeout
     )
     output = f"{result.stdout}\n{result.stderr}".strip()
     if result.returncode:
         raise SmokeFailure(f"{' '.join(command)} failed: {output[:500]}")
-    return output
+    return result.stdout.strip() if stdout_only else output
 
 
 def resolve_expected_release(
@@ -541,7 +545,7 @@ async def _active_counts() -> dict[str, int]:
     return {str(status): int(count) for status, count in rows}
 
 
-async def _create_and_dispatch(university_id: int, course_url: str) -> str:
+async def _create_and_dispatch(university_id: int, course_url: str) -> tuple[str, str]:
     from app.tasks.scrape_tasks import scrape_university, set_initial_dispatch_lock
 
     job_id = f"safe_restart_smoke_{uuid.uuid4().hex}"
@@ -565,7 +569,7 @@ async def _create_and_dispatch(university_id: int, course_url: str) -> str:
         db.add(job)
         await db.commit()
     try:
-        scrape_university.delay(job_id)
+        dispatched = scrape_university.delay(job_id)
         set_initial_dispatch_lock(job_id)
     except Exception:
         async with AsyncSessionLocal() as db:
@@ -575,7 +579,138 @@ async def _create_and_dispatch(university_id: int, course_url: str) -> str:
                 job.error_message = "safe restart smoke dispatch failed"
                 await db.commit()
         raise
-    return job_id
+    return job_id, dispatched.id
+
+
+def _worker_snapshot(celery: Any, timeout_seconds: float) -> dict[str, Any]:
+    """Require complete replies from the same responding worker set."""
+    try:
+        inspect = celery.control.inspect(timeout=timeout_seconds)
+        workers = inspect.ping()
+        if (
+            not isinstance(workers, Mapping)
+            or not workers
+            or any(
+                not isinstance(reply, Mapping) or reply.get("ok") != "pong"
+                for reply in workers.values()
+            )
+        ):
+            raise SmokeFailure("cannot inspect workers: no ping replies")
+        states = {}
+        for state in ("reserved", "scheduled", "active"):
+            replies = getattr(inspect, state)()
+            if not isinstance(replies, Mapping) or set(replies) != set(workers):
+                raise SmokeFailure(f"cannot inspect all workers: incomplete {state} replies")
+            tasks = []
+            for entries in replies.values():
+                if not isinstance(entries, list):
+                    raise SmokeFailure(f"cannot inspect workers: malformed {state} reply")
+                for entry in entries:
+                    task = entry.get("request", entry) if isinstance(entry, Mapping) else None
+                    if not isinstance(task, Mapping) or not task.get("id") or not task.get("name"):
+                        raise SmokeFailure(f"cannot inspect workers: malformed {state} task")
+                    tasks.append(task)
+            states[state] = tasks
+        states["_workers"] = sorted(workers)
+        return states
+    except SmokeFailure:
+        raise
+    except Exception as exc:
+        raise SmokeFailure("cannot inspect worker task lifecycle") from exc
+
+
+async def _wait_for_worker_idle(
+    timeout_seconds: float = DEFAULT_WORKER_RETURN_TIMEOUT_SECONDS,
+    *,
+    sample_task_id: str | None = None,
+    sample_job_id: str | None = None,
+) -> None:
+    """Observe return; never revoke, purge queues, or stop a worker."""
+    if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
+        raise SmokeFailure("worker return timeout must be finite and positive")
+    deadline = time.monotonic() + timeout_seconds
+    expected_workers = None
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise SmokeFailure("worker tasks did not return within the worker return timeout")
+        # Bound the observer process too: a wedged broker/result-backend socket
+        # must not extend the wait indefinitely. This never signals a worker.
+        states, result = _worker_observation(
+            min(25.0, remaining), sample_task_id
+        )
+        workers = states["_workers"]
+        if expected_workers is None:
+            expected_workers = workers
+        elif workers != expected_workers:
+            raise SmokeFailure("cannot inspect workers: worker set changed during the wait")
+        tasks = [
+            task for state in ("reserved", "scheduled", "active")
+            for task in states[state]
+        ]
+        for task in tasks:
+            owned_sample = (
+                sample_task_id is not None
+                and task["id"] == sample_task_id
+                and task["name"] == "scrape.university"
+                and task.get("args") in ([sample_job_id], (sample_job_id,))
+            )
+            if not owned_sample and task["name"] not in TRANSIENT_WORKER_TASKS:
+                raise SmokeFailure(
+                    f"unrelated worker task prevents release: {task['name']} id={task['id']}"
+                )
+        returned = sample_task_id is None
+        if sample_task_id is not None:
+            if not isinstance(result, Mapping):
+                raise SmokeFailure("cannot inspect sample task result")
+            state = result.get("state")
+            if state == "SUCCESS":
+                value = result.get("value")
+                if (
+                    not isinstance(value, Mapping)
+                    or value.get("ok") is not True
+                    or value.get("id") != sample_job_id
+                ):
+                    raise SmokeFailure(
+                        "sample Celery task returned an unsuccessful or mismatched result"
+                    )
+            if state in {"FAILURE", "REVOKED"}:
+                raise SmokeFailure(f"sample Celery task ended as {state}")
+            returned = state == "SUCCESS"
+        if returned and not tasks and time.monotonic() < deadline:
+            return
+        await asyncio.sleep(min(1.0, max(0.0, deadline - time.monotonic())))
+
+
+def _worker_observation(
+    timeout_seconds: float, sample_task_id: str | None
+) -> tuple[dict[str, Any], Mapping[str, Any] | None]:
+    """Read-only, killable observer; keep every broker operation wall-clock bounded."""
+    code = """
+import json, sys
+from deploy.safe_restart_smoke import _worker_snapshot
+from app.tasks.celery_app import celery_app
+states = _worker_snapshot(celery_app, min(5.0, float(sys.argv[1]) / 5))
+result = None
+if sys.argv[2]:
+    sample = celery_app.AsyncResult(sys.argv[2])
+    state = sample.state
+    result = {"state": state, "value": sample.result if state == "SUCCESS" else None}
+print(json.dumps({"states": states, "result": result}))
+"""
+    try:
+        raw = _run(
+            [sys.executable, "-B", "-c", code, str(timeout_seconds), sample_task_id or ""],
+            timeout=timeout_seconds,
+            stdout_only=True,
+        )
+        observation = json.loads(raw)
+        states = observation["states"]
+        if not isinstance(states, dict) or set(states) != {"reserved", "scheduled", "active", "_workers"}:
+            raise ValueError("invalid worker states")
+        return states, observation["result"]
+    except (SmokeFailure, OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as exc:
+        raise SmokeFailure("cannot inspect worker lifecycle within the observation deadline") from exc
 
 
 async def _resolve_university_id(
@@ -724,14 +859,23 @@ async def _main(args: argparse.Namespace) -> None:
     validate_idle_counts(counts)
     release, _ = _verify_release_and_services()
     _verify_api_and_celery(args.api_health_url)
+    worker_timeout = getattr(
+        args, "worker_return_timeout_seconds", DEFAULT_WORKER_RETURN_TIMEOUT_SECONDS
+    )
+    await _wait_for_worker_idle(worker_timeout)
     _verify_ordinary_html(args.course_url)
 
     # Re-check immediately before the first write to close the long preflight gap.
     validate_idle_counts(await _active_counts())
+    await _wait_for_worker_idle(worker_timeout)
     university_id = await _resolve_university_id(args.university_id, args.course_url)
-    job_id = await _create_and_dispatch(university_id, args.course_url)
+    job_id, task_id = await _create_and_dispatch(university_id, args.course_url)
     payload, staged_rows = await _wait_for_done(job_id, args.timeout_seconds)
     validate_done_payload(payload, staged_rows=staged_rows)
+    await _wait_for_worker_idle(
+        worker_timeout, sample_task_id=task_id, sample_job_id=job_id
+    )
+    validate_idle_counts(await _active_counts())
     print(f"safe restart smoke passed: release={release} job_id={job_id}")
 
 
@@ -743,6 +887,12 @@ def main() -> int:
         "--api-health-url", default="http://127.0.0.1:8000/api/health"
     )
     parser.add_argument("--timeout-seconds", type=int, default=300)
+    parser.add_argument(
+        "--worker-return-timeout-seconds",
+        type=float,
+        default=DEFAULT_WORKER_RETURN_TIMEOUT_SECONDS,
+        help="bounded wait for actual Celery return and inspect-confirmed worker idle",
+    )
     parser.add_argument(
         "--release-identity-only",
         action="store_true",
@@ -820,11 +970,19 @@ def main() -> int:
     )
     args = parser.parse_args()
     try:
-        asyncio.run(_main(args))
+        asyncio.run(_main_with_cleanup(args))
     except (SmokeFailure, OSError, ValueError, subprocess.SubprocessError) as exc:
         print(f"safe restart smoke aborted: {exc}", file=sys.stderr)
         return 1
     return 0
+
+
+async def _main_with_cleanup(args: argparse.Namespace) -> None:
+    try:
+        await _main(args)
+    finally:
+        # Close this process's loop-owned connections before asyncio.run exits.
+        await asyncio.wait_for(engine.dispose(), timeout=10)
 
 
 if __name__ == "__main__":

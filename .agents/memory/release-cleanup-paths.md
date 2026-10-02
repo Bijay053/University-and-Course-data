@@ -25,3 +25,16 @@ release revision, active service identities, frontend asset identity, and
 consumer state independently. Use the recorded active revision as the next
 predecessor; never assume the whole release rolled back because the command
 exited nonzero.
+
+Database completion and valid DONE evidence do not establish worker idleness.
+Keep task-return proof separate from scrape-result proof, including the
+post-completion hook and its separately owned event loop.
+
+**Why:** A production release sample passed DONE validation and reached
+completed database status while still occupying a Celery slot. The unchanged
+idle guard correctly refused the update; only explicitly approved recovery of
+that exact sample restored idle.
+
+**How to apply:** Release checks must observe actual Celery return and complete
+worker inspection within a deadline. A timeout is a refusal, not permission to
+terminate a task, purge a queue, or treat terminal database rows as idle.

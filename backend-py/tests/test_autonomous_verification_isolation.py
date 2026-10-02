@@ -646,6 +646,7 @@ def test_generic_requeue_hooks_only_dispatch_ordinary_jobs(generic_recovery, mon
     redis = SimpleNamespace(
         set=lambda key, *a, **kw: locks.append(key) or True,
         delete=lambda *a: None,
+        close=lambda: None,
     )
     monkeypatch.setattr(tasks, "_get_redis", lambda: redis)
     monkeypatch.setattr(tasks.scrape_university, "delay", dispatched.append)

@@ -136,7 +136,10 @@ def _requeue_lock_key(runtime_job_id: str) -> str:
 def _get_redis():
     """Return a synchronous Redis client using the Celery broker URL."""
     import redis as redis_lib
-    return redis_lib.from_url(celery_app.conf.broker_url, decode_responses=True)
+    return redis_lib.from_url(
+        celery_app.conf.broker_url, decode_responses=True,
+        socket_connect_timeout=5, socket_timeout=5,
+    )
 
 
 def set_initial_dispatch_lock(job_id: str) -> None:
@@ -161,6 +164,7 @@ def set_initial_dispatch_lock(job_id: str) -> None:
 async def _async_scrape(runtime_job_id: str) -> None:
     from app.services.scraper.browser_pool import pool as _browser_pool
     from app.services.scraper.http_fetcher import close_shared_client_for_current_loop
+    from app.services.scraper.scrape_do_semaphore import close_client_for_current_loop
 
     # Suppress "RuntimeError: Event loop is closed" noise emitted by the
     # google-genai SDK's GeminiApiClient.aclose() cleanup task.  The SDK
@@ -197,21 +201,25 @@ async def _async_scrape(runtime_job_id: str) -> None:
         # RuntimeError: Event loop is closed — which chains over the real
         # exception and can prevent _mark_failed from being called correctly.
         try:
-            await _browser_pool.close()
-        except Exception:  # noqa: BLE001 — best-effort cleanup
-            pass
+            await asyncio.wait_for(_browser_pool.close(), timeout=10)
+        except Exception as exc:  # noqa: BLE001 — best-effort cleanup
+            log.warning("Could not close scrape browser pool: %s", exc)
         # The shared httpx client is scoped to this asyncio.run() loop. Close
         # it before loop shutdown; otherwise its keep-alive sockets accumulate
         # across tasks in the long-lived Celery child process.
         try:
-            await close_shared_client_for_current_loop()
+            await asyncio.wait_for(close_shared_client_for_current_loop(), timeout=10)
         except Exception as exc:  # noqa: BLE001 — preserve the scrape result
             log.warning("Could not close scrape HTTP client: %s", exc)
+        try:
+            await asyncio.wait_for(close_client_for_current_loop(), timeout=10)
+        except Exception as exc:  # noqa: BLE001 — preserve the scrape result
+            log.warning("Could not close scrape semaphore Redis client: %s", exc)
         # AsyncSession has exited, so every connection returned by this scrape
         # belongs to the still-running current loop and can be closed safely.
         # The entry-time close=False invalidation cannot release those sockets.
         try:
-            await engine.dispose()
+            await asyncio.wait_for(engine.dispose(), timeout=10)
         except Exception as exc:  # noqa: BLE001 — preserve the scrape result
             log.warning("Could not dispose scrape DB connections: %s", exc)
         # Cancel and drain any remaining asyncio tasks (e.g. stray Gemini
@@ -223,9 +231,15 @@ async def _async_scrape(runtime_job_id: str) -> None:
             if _pending:
                 for _t in _pending:
                     _t.cancel()
-                await asyncio.gather(*_pending, return_exceptions=True)
+                done, pending = await asyncio.wait(_pending, timeout=5)
+                for task in done:
+                    if not task.cancelled():
+                        task.exception()
+                if pending:
+                    log.warning("Scrape loop cleanup still has %d pending tasks", len(pending))
         except Exception:  # noqa: BLE001
             pass
+        _loop.set_exception_handler(_orig_exc_handler)
 
 
 async def _async_repair(runtime_job_id: str) -> None:
@@ -429,9 +443,8 @@ def _immediate_requeue_hook() -> None:
     • Jobs whose initial ``.delay()`` call failed silently have no lock and
       are re-dispatched immediately by this hook.
     """
-    _sync_dispose()
     try:
-        stale = asyncio.run(_async_find_all_queued())
+        stale = _run_db_coro(_post_completion_queued_jobs())
     except Exception as exc:  # noqa: BLE001
         log.warning("immediate_requeue_hook: DB query failed: %s", exc)
         return
@@ -445,6 +458,17 @@ def _immediate_requeue_hook() -> None:
         log.warning("immediate_requeue_hook: Redis connect failed: %s", exc)
         return
 
+    try:
+        _dispatch_orphaned_jobs(r, stale)
+    finally:
+        try:
+            r.close()
+        except Exception as exc:  # noqa: BLE001 — preserve the scrape result
+            log.warning("Could not close post-completion Redis client: %s", exc)
+
+
+def _dispatch_orphaned_jobs(r, stale) -> None:  # noqa: ANN001
+    """Preserve the existing lock and routing rules while closing the hook client."""
     for jid, jtype, requeue_count in stale:
         if requeue_count >= _MAX_REQUEUES:
             log.warning(
@@ -480,6 +504,14 @@ def _immediate_requeue_hook() -> None:
             log.warning(
                 "immediate_requeue_hook: dispatch failed for %s: %s", jid, exc
             )
+
+
+async def _post_completion_queued_jobs() -> list[tuple[str, str, int]]:
+    """The hook has its own loop after the scrape loop has closed."""
+    try:
+        return await asyncio.wait_for(_async_find_all_queued(), timeout=10)
+    finally:
+        await asyncio.wait_for(engine.dispose(), timeout=10)
 
 
 @celery_app.task(name="scrape.university", bind=True, max_retries=0)

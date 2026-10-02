@@ -178,7 +178,7 @@ fi
 .venv/bin/python -B - <<'PY'
 import asyncio
 from app.tasks.celery_app import celery_app
-from app.database import AsyncSessionLocal
+from app.database import AsyncSessionLocal, engine
 from sqlalchemy import text
 reply = celery_app.control.cancel_consumer("scrape", reply=True, timeout=10)
 assert reply and all("ok" in value for item in reply for value in item.values()), "Cannot pause consumers"
@@ -192,11 +192,14 @@ for attempt in range(3):
         raise RuntimeError("Workers did not become idle; release left unchanged")
     time.sleep(5)
 async def check():
-    async with AsyncSessionLocal() as db:
-        count = (await db.execute(text(
-            "SELECT count(*) FROM scrape_runtime_jobs WHERE status IN ('queued','running','awaiting_approval')"
-        ))).scalar_one()
-        assert count == 0, "A scrape started during deployment preflight"
+    try:
+        async with AsyncSessionLocal() as db:
+            count = (await db.execute(text(
+                "SELECT count(*) FROM scrape_runtime_jobs WHERE status IN ('queued','running','awaiting_approval')"
+            ))).scalar_one()
+            assert count == 0, "A scrape started during deployment preflight"
+    finally:
+        await engine.dispose()
 asyncio.run(check())
 print("Consumers paused; all workers and jobs idle")
 PY
@@ -279,6 +282,13 @@ cd backend-py
 export RELEASE_REVISION="$target"
 smoke_since="$(date --iso-8601=seconds)"
 systemctl restart uni-api-py.service uni-celery.service
+# Restart readiness is not task idleness. Wait only for known brief maintenance,
+# and still refuse business work, unknown activity, or incomplete inspection.
+.venv/bin/python -B - <<'PY'
+import asyncio
+from deploy.safe_restart_smoke import _wait_for_worker_idle
+asyncio.run(_wait_for_worker_idle())
+PY
 .venv/bin/python -B deploy/safe_restart_smoke.py \
   --release-identity-only --journal-since "$smoke_since" \
   --release-identity-timeout-seconds 30 \
