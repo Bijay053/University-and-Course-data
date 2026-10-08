@@ -1003,6 +1003,12 @@ async def test_rejected_allowlist_proposal_yields_to_other_gates(monkeypatch, tm
     assert not first["patch_applied_ok"]
     assert first["after_pass_count"] == 0
     chat.assert_awaited_once()
+    prompt = chat.await_args.kwargs["user"]
+    assert "EFFECTIVE DISCOVERY CONFIG" in prompt
+    assert "block_url_patterns" in prompt
+    assert "Rejected proposals were NOT applied" in prompt
+    assert "validation_errors=" in prompt
+    assert "full effective-filter simulation rescued 0/2" in prompt
     assert second["patch_applied_ok"] is fix_block
     assert bool(db.writes) is fix_block
     if fix_block:
