@@ -27,3 +27,15 @@ needs its original package context to resolve pinned proof dependencies.
 **How to apply:** Preserve revision fencing and proof validation, materialize
 the immutable target helper temporarily beside its proof assets, preserve its
 package context in observer subprocesses, and remove it before checkout.
+
+A consumer pause is not durable across worker restart. Recheck actual queue
+bindings and business work afterward rather than relying on a prior idle
+observation.
+
+**Why:** A legitimate scrape began during post-restart readiness despite the
+pre-restart pause and complete idle checks. The release correctly refused it
+and restored the previous frontend.
+
+**How to apply:** Keep the unrelated-business-work refusal. Let existing work
+and its scheduled follow-ups finish naturally before an exact-revision guarded
+retry; never revoke or reclassify it as maintenance to finish a release.
