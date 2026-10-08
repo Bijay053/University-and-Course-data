@@ -189,9 +189,18 @@ class _DispatchSession:
 
 @pytest.mark.asyncio(loop_scope="function")
 @pytest.mark.parametrize("endpoint", ["start", "bulk"])
-@pytest.mark.parametrize("delivery", ["success", "failure", "alternating"])
+@pytest.mark.parametrize(
+    ("delivery", "lock_outcome"),
+    [
+        ("success", "success"),
+        ("failure", "success"),
+        ("alternating", "success"),
+        ("success", "command_failure"),
+        ("success", "nx_collision"),
+    ],
+)
 async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
-    monkeypatch, isolated_redis, endpoint, delivery,
+    monkeypatch, isolated_redis, endpoint, delivery, lock_outcome,
 ):
     """Real HTTP handlers + real lock helper; never use the shared broker."""
     from app.dependencies import get_current_user, get_db
@@ -204,6 +213,9 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
     retained_clients = []  # Do not let finalizers mask an unclosed connection.
     delivered_ids = []
     failed_ids = []
+    set_results = []
+    set_failures = []
+    existing_expiries = {}
 
     def forbid_tcp(*args, **kwargs):
         pytest.fail("API dispatch test attempted a non-disposable Redis connection")
@@ -217,6 +229,22 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
             socket_connect_timeout=1, socket_timeout=1,
         )
         client.close = MagicMock(wraps=client.close)
+        real_set = client.set
+
+        def observed_set(name, value, **kwargs):
+            if lock_outcome == "command_failure":
+                # Connect to private Redis and fail the actual SET command.
+                kwargs["ex"] = 0
+            try:
+                result = real_set(name, value, **kwargs)
+            except redis.ResponseError:
+                set_failures.append(name)
+                raise
+            set_results.append((name, result))
+            return result
+
+        client.set = MagicMock(side_effect=observed_set)
+        client.delete = MagicMock(wraps=client.delete)
         retained_clients.append(client)
         return client
 
@@ -243,6 +271,10 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
             failed_ids.append(job_id)
             events.append(("failed", job_id))
             raise redis.ConnectionError("mocked Celery delivery failure")
+        if lock_outcome == "nx_collision":
+            key = st._requeue_lock_key(job_id)
+            observer.set(key, "existing-owner", ex=600)
+            existing_expiries[key] = observer.pexpiretime(key)
         delivered_ids.append(job_id)
         events.append(("delivered", job_id))
 
@@ -300,7 +332,10 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
                 assert len(retained_clients) == len(delivered_ids)
                 for row in session.rows:
                     key = st._requeue_lock_key(row.runtime_job_id)
-                    if row.runtime_job_id in delivered_ids:
+                    if lock_outcome == "nx_collision":
+                        assert observer.get(key) == "existing-owner"
+                        assert observer.pexpiretime(key) == existing_expiries[key]
+                    elif lock_outcome == "success" and row.runtime_job_id in delivered_ids:
                         assert observer.get(key) == "1"
                         assert 0 < observer.ttl(key) <= st._REQUEUE_LOCK_TTL_S + 30
                     else:
@@ -320,10 +355,28 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
             assert len(set(delivered_ids + failed_ids)) == total
             assert [call.args[0] for call in lock_spy.call_args_list] == delivered_ids
             assert set(delivered_ids).isdisjoint(failed_ids)
-            assert observer.dbsize() == len(delivered_ids)
+            delivered_keys = [st._requeue_lock_key(job_id) for job_id in delivered_ids]
+            # Check outcomes outside the best-effort helper/route exception
+            # handlers, which could otherwise swallow a failed mock assertion.
+            if lock_outcome == "command_failure":
+                assert set_failures == delivered_keys
+                assert set_results == []
+                assert observer.dbsize() == 0
+            else:
+                assert set_failures == []
+                expected_result = None if lock_outcome == "nx_collision" else True
+                assert set_results == [(key, expected_result) for key in delivered_keys]
+                assert observer.dbsize() == len(delivered_ids)
+            if lock_outcome == "nx_collision":
+                assert set(existing_expiries) == set(delivered_keys)
             assert observer.info("clients")["connected_clients"] == baseline_connections
-            for owned_client in retained_clients:
+            for job_id, owned_client in zip(delivered_ids, retained_clients, strict=True):
+                owned_client.set.assert_called_once_with(
+                    st._requeue_lock_key(job_id), "1",
+                    nx=True, ex=st._REQUEUE_LOCK_TTL_S + 30,
+                )
                 owned_client.close.assert_called_once_with()
+                owned_client.delete.assert_not_called()
     finally:
         for owned_client in retained_clients:
             owned_client.connection_pool.disconnect()
