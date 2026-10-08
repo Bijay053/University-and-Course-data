@@ -63,3 +63,48 @@ prerequisite is satisfied, rerun the ordinary preflight with its proof and idle
 guards intact, create at most the approved sample, and capture all acceptance
 evidence above. Do not recover a completed sample, revoke tasks, purge queues,
 stop business work, or provision infrastructure to make the check pass.
+
+## Approved verification retry — still blocked
+
+The user confirmed that the lifecycle update had been deployed and approved live
+verification with at most one smoke sample. A fresh read-only inspection on the
+documented production host contradicted that deployment confirmation. This retry
+does not close the live verification: no sample was created or dispatched, and
+the ordinary preflight was not run against the obsolete implementation.
+
+- Inspection timestamp: `2026-10-02T08:30:44+00:00`.
+- Host: `i-03547b132b6aa4ffb`, region `ap-south-1`, checkout
+  `/opt/university-portal`.
+- Checkout HEAD, `.release.env`, API process environment, and Celery process
+  environment all still report
+  `8b0fcc0d220bfb40d05cd428d684b53f40f687b5`.
+- API PID `1901000` remains active since `2026-10-02 02:08:31 UTC`;
+  Celery PID `1901053` remains active since `2026-10-02 02:08:36 UTC`.
+- Source inspection confirms `_wait_for_done` exists, but
+  `_wait_for_worker_idle` and `_worker_observation` do not; the
+  `sample_task_id=task_id` call count is zero.
+- Deployed `backend-py/deploy/safe_restart_smoke.py` SHA-256:
+  `45c584a1af3488dafbd843629c5fdbd9399fec8c68b01c0bb1650b665bc39c81`.
+- Revision/process inspection command:
+  `87bffce1-3905-452b-bd8b-61d63912c509`. Its output includes all revision
+  and process observations above; it exited with code 1 at the zero-match
+  source grep, before later diagnostic commands.
+- Successful read-only source confirmation command:
+  `51f343c6-daa4-4f7f-9d3d-fb8184c5ff0b` (exit code 0).
+
+No deployment, service restart, business-scrape interruption, queue changes,
+task revocation, recovery, infrastructure provisioning, or guard changes were
+performed. Completed database status, canonical DONE evidence, matching
+sample/Celery SUCCESS identity, complete worker-idle replies, and startup
+maintenance remain unverified. The production release prerequisite must be
+resolved on this host (or the intended production target clarified) before
+continuing; approval to verify does not authorize deploying or restarting it.
+
+### User-requested closure after the retry
+
+The user subsequently requested completion of this task. Closure records the
+approved, blocked readiness retry and its evidence only. It does **not** certify
+that the lifecycle update was deployed or that the production sample returned
+normally. Resolving the reported-release/live-host mismatch and performing the
+remaining live acceptance check are deferred follow-ups requiring the relevant
+approvals. No further production operation was performed for closure.
