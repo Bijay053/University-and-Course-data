@@ -11,7 +11,7 @@ This project provides a centralized administrative portal for universities to ma
 - When schema changes are needed, explicitly provide the `pnpm --filter @workspace/db push --force` command before builds.
 - The Node.js API server has been deleted. Python FastAPI is now the sole API server in both dev and production.
 - Provide verification commands to confirm commit deployment, new bundle serving, and correct PM2 environment variables.
-- **GitHub push target**: Always push to `Studyinfocentre/University-and-course-managment` using `STUDYINFO_GITHUB_PAT`. Command: `git push "https://Studyinfocentre:${STUDYINFO_GITHUB_PAT}@github.com/Studyinfocentre/University-and-course-managment.git" HEAD:main`
+- **GitHub production source**: Use `Bijay053/University-and-Course-data`, as requested by the user. Production `origin` must point to `https://github.com/Bijay053/University-and-Course-data.git`. The connected GitHub account can publish commits when saved Git tokens are rejected; preserve exact commit IDs and never force-push.
 
 ## System Architecture
 
@@ -182,9 +182,8 @@ Idempotent: deduplicates on `lower(course_name)` per university. Updates existin
 
 ### GitHub push reminder
 
-GitHub repo: https://github.com/Studyinfocentre/University-and-course-managment (always push here).
-Push command: `git push "https://${STUDYINFO_GITHUB_PAT}@github.com/Studyinfocentre/University-and-course-managment.git" main`
-The Replit `github` remote URL may be stale — always use the push command above directly. Prod remote is `origin`. Always confirm prod is running the latest commit (`git log -1`) before assuming a Replit-side fix is live.
+GitHub repo: https://github.com/Bijay053/University-and-Course-data (the user-selected production source).
+The Replit `github` remote and production `origin` should use this repository. Confirm the exact remote revision and production checkout before release; a successful push alone does not mean production is updated.
 
 ### Historical per-university fixes archived
 

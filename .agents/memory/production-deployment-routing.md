@@ -3,6 +3,18 @@ name: Production deployment routing
 description: Non-obvious routing constraints for deploying this project to its external AWS host.
 ---
 
+An authenticated GitHub connection can transfer exact Git objects when saved
+push tokens are rejected. Bound each payload and verify every object's original
+SHA before updating the branch without force.
+
+**Why:** A truncated bulk object export remained parseable but omitted objects
+and damaged content. Only untruncated, independently hash-verified payloads
+established exact revision provenance.
+
+**How to apply:** Check the truncation flag, split large transfers, parse raw
+tree objects as binary, and compare returned object IDs before advancing the
+remote branch. Never replace unavailable push credentials by copying secrets.
+
 The dedicated production SSM identity permits command submission and retrieval
 by command ID but can deny command listing. Retain each submitted command ID,
 and preserve stdout as well as stderr for failed inspection commands.
