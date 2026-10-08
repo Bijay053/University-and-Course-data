@@ -4,6 +4,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from app.services.monitoring_engine import (
     _ema,
     _sha256,
@@ -177,6 +179,107 @@ class TestDetectChange:
 # ── apply_probe_result ────────────────────────────────────────────────────────
 
 class TestApplyProbeResult:
+    @pytest.mark.parametrize("frequency,interval_days", [(None, 90), (45.0, 14)])
+    async def test_first_change_keeps_frequency_without_a_previous_change(
+        self, frequency, interval_days,
+    ):
+        now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        w = _make_watcher(
+            change_frequency_days=frequency, total_checks=4,
+            total_changes_detected=2, consecutive_unchanged=5,
+            total_scrapes_triggered=3, last_scrape_job_id="existing-job",
+        )
+        db = AsyncMock()
+        probe = {
+            "status_code": 200, "etag": '"new"', "page_hash": "new-page",
+            "sitemap_hash": "new-map",
+        }
+        with patch("app.services.monitoring_engine.datetime") as clock:
+            clock.now.return_value = now
+            await apply_probe_result(w, probe, True, db)
+
+        assert w.change_frequency_days == frequency
+        assert w.last_changed_at == w.last_checked_at == now
+        assert w.next_check_at == now + timedelta(days=interval_days)
+        assert w.last_probe_result == "changed"
+        assert w.last_probe_status_code == 200
+        assert w.last_probe_error is None
+        assert w.total_checks == 5
+        assert w.total_changes_detected == 3
+        assert w.consecutive_unchanged == 0
+        assert (w.etag, w.page_hash, w.sitemap_hash) == (
+            '"new"', "new-page", "new-map",
+        )
+        assert w.total_scrapes_triggered == 3
+        assert w.last_scrape_job_id == "existing-job"
+        # Applying state must not take over persistence or dispatch.
+        assert db.mock_calls == []
+
+    @pytest.mark.parametrize(
+        "gap_days,interval_days",
+        [(7.5, 3), (14, 7), (30, 14), (60, 30), (120, 60)],
+    )
+    async def test_second_change_initializes_frequency_and_scheduling_ladder(
+        self, gap_days, interval_days,
+    ):
+        previous = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        now = previous + timedelta(days=gap_days)
+        w = _make_watcher(last_changed_at=previous)
+        with patch("app.services.monitoring_engine.datetime") as clock:
+            clock.now.return_value = now
+            await apply_probe_result(w, {"status_code": 200}, True, AsyncMock())
+
+        assert w.change_frequency_days == gap_days
+        assert w.last_changed_at == now
+        assert w.next_check_at == now + timedelta(days=interval_days)
+
+    async def test_repeated_changes_blend_gaps_not_intervening_checks(self):
+        first = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        w = _make_watcher()
+        db = AsyncMock()
+        with patch("app.services.monitoring_engine.datetime") as clock:
+            clock.now.return_value = first
+            await apply_probe_result(w, {"status_code": 200}, True, db)
+            clock.now.return_value = second = first + timedelta(days=10)
+            await apply_probe_result(w, {"status_code": 200}, True, db)
+            assert w.change_frequency_days == 10
+            assert w.next_check_at == second + timedelta(days=3)
+
+            clock.now.return_value = second + timedelta(days=5)
+            await apply_probe_result(w, {"status_code": 200}, False, db)
+            assert w.consecutive_unchanged == 1
+            clock.now.return_value = second + timedelta(days=6)
+            await apply_probe_result(w, {"error": "timeout"}, False, db)
+            assert w.consecutive_unchanged == 1
+            assert w.last_changed_at == second
+            assert w.change_frequency_days == 10
+
+            clock.now.return_value = third = second + timedelta(days=30)
+            await apply_probe_result(w, {"status_code": 200}, True, db)
+
+        # 0.3 * 30 + 0.7 * 10 = 16 days: move from 3-day to weekly checks.
+        assert w.change_frequency_days == pytest.approx(16)
+        assert w.next_check_at == third + timedelta(days=7)
+        assert w.last_changed_at == w.last_checked_at == third
+        assert w.total_checks == 5
+        assert w.total_changes_detected == 3
+        assert w.consecutive_unchanged == 0
+        assert w.last_probe_result == "changed"
+        assert w.last_probe_error is None
+        assert w.total_scrapes_triggered == 0
+        assert db.mock_calls == []
+
+    async def test_same_timestamp_does_not_add_a_zero_gap_sample(self):
+        now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        w = _make_watcher(last_changed_at=now, change_frequency_days=30)
+        with patch("app.services.monitoring_engine.datetime") as clock:
+            clock.now.return_value = now
+            await apply_probe_result(w, {"status_code": 200}, True, AsyncMock())
+
+        assert w.change_frequency_days == 30
+        assert w.next_check_at == now + timedelta(days=14)
+        assert w.total_changes_detected == 1
+
     async def test_error_sets_error_result(self):
         w = _make_watcher()
         db = AsyncMock()

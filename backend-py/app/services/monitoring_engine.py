@@ -205,12 +205,13 @@ async def apply_probe_result(
         watcher.last_probe_result = "error"
     elif changed:
         watcher.last_probe_result = "changed"
+        previous_changed_at = watcher.last_changed_at
         watcher.last_changed_at = now
         watcher.total_changes_detected = (watcher.total_changes_detected or 0) + 1
 
         # Learn change frequency from gap since last change
-        if watcher.last_changed_at and watcher.last_changed_at != now:
-            gap_days = (now - watcher.last_changed_at).total_seconds() / 86400
+        if previous_changed_at and previous_changed_at != now:
+            gap_days = (now - previous_changed_at).total_seconds() / 86400
             watcher.change_frequency_days = _ema(watcher.change_frequency_days, gap_days)
 
         watcher.consecutive_unchanged = 0
