@@ -103,6 +103,7 @@
 - [Massey qualification catalogue](massey-qualification-catalogue.md) — use the all-qualifications index; route detail extraction through static proxy because the origin blocks long direct-request runs.
 - [VUW current international catalogue](vuw-current-international-catalogue.md) — bare JSON endpoints can serve stale prior-year fees; use the international query and align intakes to the fee year.
 - [Release cleanup paths](release-cleanup-paths.md) — deployment EXIT traps must use absolute paths or reset cwd before restoring paused consumers.
+- [Release worker readiness](release-worker-readiness.md) — service activity precedes worker replies; sample follow-ups need verified ownership and bounded completion.
 - [APU course delivery identity](apu-course-delivery-identity.md) — APU’s page-wide catalogue contaminates mode keywords; classify delivery from the current course title/H1/URL only.
 - [SIT course panel and fee authority](sit-course-panel-fee-authority.md) — compact to the current programme panel; central international tuition excludes resource fees and requires exact award matching.
 - [Required-fee resume checkpoints](required-fee-resume-checkpoints.md) — exact central-fee recipes must reprocess unproven pending checkpoints and retire only matched rows after clean completion.
