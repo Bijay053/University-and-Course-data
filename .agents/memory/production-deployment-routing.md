@@ -11,9 +11,12 @@ SHA before updating the branch without force.
 and damaged content. Only untruncated, independently hash-verified payloads
 established exact revision provenance.
 
-**How to apply:** Check the truncation flag, split large transfers, parse raw
-tree objects as binary, and compare returned object IDs before advancing the
-remote branch. Never replace unavailable push credentials by copying secrets.
+**How to apply:** Check both the truncation flag and exact expected chunk
+lengths: the programmatic shell callback has returned only 81,920 characters
+while reporting no truncation. Use chunks below that boundary (60,000 ASCII
+characters worked), reconstruct and hash-check every object, parse raw tree
+objects as binary, and compare returned IDs before advancing the remote branch.
+Never replace unavailable push credentials by copying secrets.
 
 The dedicated production SSM identity permits command submission and retrieval
 by command ID but can deny command listing. Retain each submitted command ID,
