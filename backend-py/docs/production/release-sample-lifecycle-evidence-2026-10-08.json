@@ -1,0 +1,127 @@
+{
+  "instance_id": "i-03547b132b6aa4ffb",
+  "region": "ap-south-1",
+  "revision": "4bcb044d9d226eaf7747d806f1f842e2676360aa",
+  "smoke_sha256": "c97fd4ec29501819c0f55e000a7fea2c02fa7a04f78b5b011f6c5550b1f4686f",
+  "readiness_command_id": "efb0c170-86ba-45d0-b8a2-048df6cdb933",
+  "preflight": {
+    "command_id": "45e19bac-e239-4985-a97f-0b179a1ebccc",
+    "status": "Success",
+    "response_code": 0,
+    "started_at": "2026-10-08T06:34:17.592640+00:00",
+    "finished_at": "2026-10-08T06:36:22.880407+00:00",
+    "stdout": "safe restart smoke passed: release=4bcb044d9d226eaf7747d806f1f842e2676360aa job_id=safe_restart_smoke_2e9db0ad053842a8b4ea68ffd4dea0a1",
+    "stderr": "",
+    "maximum_new_samples": 1
+  },
+  "evidence_collection": {
+    "command_id": "3ae75fb7-98c5-45db-bba2-9595874f654d",
+    "status": "Success",
+    "response_code": 0,
+    "execution_started_at": "2026-10-08T06:37:39.866Z",
+    "observed_at": "2026-10-08T06:37:40.435485+00:00",
+    "execution_finished_at": "2026-10-08T06:38:00.866Z",
+    "stderr": ""
+  },
+  "database": {
+    "runtime_job_id": "safe_restart_smoke_2e9db0ad053842a8b4ea68ffd4dea0a1",
+    "status": "completed",
+    "job_type": "safe_restart_smoke",
+    "request_payload": {
+      "courseUrls": [
+        "https://www.torrens.edu.au/courses/business/bachelor-of-applied-business-marketing-partnership-with-ducere"
+      ],
+      "safeRestartSmoke": true
+    },
+    "worker_id": null,
+    "worker_pid": null,
+    "release_revision": "4bcb044d9d226eaf7747d806f1f842e2676360aa",
+    "imported": 0,
+    "skipped": 1,
+    "errors": 0,
+    "requeue_count": 0,
+    "claim_count": 1,
+    "created_at": "2026-10-08 06:35:12.654365+00:00",
+    "completed_at": "2026-10-08 06:35:36.750330+00:00",
+    "staged_rows": 0,
+    "done_sequence": 16,
+    "done_created_at": "2026-10-08 06:35:37.062729+00:00",
+    "canonical_done_payload": {
+      "level": "success",
+      "phase": "complete",
+      "errors": 0,
+      "message": "\u2550\u2550 DONE \u2550\u2550 Found:1 | Staged:0 | Skipped:1 (domestic_only=1) | FetchFailed:0 | Errors:0 | Discovery:0s | Extraction:24s | Sweep:0s | Staging:0s",
+      "skipped": 1,
+      "imported": 0,
+      "totalFound": 1,
+      "fetchFailed": 0,
+      "skip_reasons": {"domestic_only": 1},
+      "phase_timings": {
+        "sweep_s": 0.0,
+        "staging_s": 0.0,
+        "discovery_s": 0.0,
+        "extraction_s": 23.9
+      },
+      "pipeline_stats": {
+        "after_block": 1,
+        "after_filter": 1,
+        "filter_config": {
+          "must_contain": [],
+          "allow_url_patterns": [],
+          "block_url_patterns": [],
+          "course_detail_url_patterns": [
+            "^https?://(?:www\\.)?torrens\\.edu\\.au/courses/[^/?#]+/(?:advanced-diploma|associate-degree|bachelor|certificate|diploma|doctor|doctorate|graduate-certificate|graduate-diploma|master|mba|phd|professional-doctorate|undergraduate-certificate)(?:-|(?:[/?#]|$))"
+          ]
+        },
+        "dropped_sample": [],
+        "raw_discovered": 1,
+        "filter_drop_pct": 0,
+        "block_dropped_pct": 0,
+        "filter_drop_count": 0,
+        "block_dropped_count": 0,
+        "pre_block_discovered": 1,
+        "non_degree_prefetch_sample": [],
+        "non_degree_ai_calls_avoided": 0,
+        "non_degree_prefetch_skipped": 0,
+        "non_degree_browser_launches_avoided": 0
+      },
+      "catalogue_guard": null,
+      "html_compaction": {
+        "accepted": 0,
+        "attempts": 0,
+        "fail_open": 0,
+        "elapsed_ms": 0.0,
+        "input_bytes": 0,
+        "output_bytes": 0,
+        "skipped_small": 0,
+        "reduction_rate": 0.0,
+        "acceptance_rate": 0.0,
+        "fail_open_reasons": {}
+      },
+      "searchstax_filter": null,
+      "performance_savings": null,
+      "skip_reason_samples": {},
+      "sit_catalogue_outcomes": null,
+      "targeted_retry_diagnostic": null
+    }
+  },
+  "celery": {
+    "task_id": "e866f71c-2faf-4826-b95e-067ac177befb",
+    "job_id": "safe_restart_smoke_2e9db0ad053842a8b4ea68ffd4dea0a1",
+    "state": "SUCCESS",
+    "result": {
+      "ok": true,
+      "id": "safe_restart_smoke_2e9db0ad053842a8b4ea68ffd4dea0a1"
+    },
+    "success_journal": "[2026-10-08 06:35:37,157: INFO/ForkPoolWorker-8] Task scrape.university[e866f71c-2faf-4826-b95e-067ac177befb] succeeded in 24.443833603989333s: {'ok': True, 'id': 'safe_restart_smoke_2e9db0ad053842a8b4ea68ffd4dea0a1'}"
+  },
+  "complete_worker_replies": {
+    "ping": {"uni-celery@ip-172-31-40-159": {"ok": "pong"}},
+    "active": {"uni-celery@ip-172-31-40-159": []},
+    "reserved": {"uni-celery@ip-172-31-40-159": []},
+    "scheduled": {"uni-celery@ip-172-31-40-159": []}
+  },
+  "active_database_counts": {},
+  "transient_maintenance_in_preflight_window": [],
+  "restart_performed": false
+}

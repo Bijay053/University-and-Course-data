@@ -6,15 +6,21 @@ description: Why loop-owned network resources must be closed before per-task eve
 Close every loop-owned HTTP client and database pool while the Celery task's
 event loop is still running. Garbage collection and next-task pool invalidation
 are not substitutes for deterministic closure.
+This also applies to short-lived read-only verification collectors: run each
+query and its awaited pool disposal inside the same coroutine/event loop.
 
 **Why:** Long-lived prefork children accumulated keep-alive sockets across
 fresh per-task event loops until they reached the process soft file-descriptor
 limit. New jobs were received but failed before being claimed, leaving the UI
 misleadingly queued.
+SQLAlchemy can log a failed connection close without changing a collector's
+zero exit status, so successful query output alone does not prove clean teardown.
 
 **How to apply:** Any new shared client or connection pool scoped by event loop
 must have an awaited task-boundary cleanup path. Keep a production descriptor
 limit and bounded child recycling as defense in depth, not as the primary fix.
+For verification collectors, check stderr as well as the exit code; distinguish
+observer-only cleanup failures from failures of the task being observed.
 
 Keep cleanup ownership narrow: database-only maintenance loops must not close
 the browser or fetch clients; fetch-capable task boundaries may close only their

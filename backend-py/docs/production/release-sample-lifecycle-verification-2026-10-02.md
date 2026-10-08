@@ -4,6 +4,11 @@
 > shows the October 2 release succeeded on an older target, before the lifecycle
 > update, and later separate releases deployed the update to the same host.
 > This does not retroactively complete the sample acceptance checks below.
+>
+> Subsequent acceptance: [October 8 production lifecycle verification](release-sample-lifecycle-verification-2026-10-08.md)
+> passed the unchanged ordinary preflight with one separately approved new
+> sample, matching persisted DONE/Celery SUCCESS evidence and complete idle
+> replies. The blocked October 2 observations below remain unchanged.
 
 ## Outcome: blocked before sample creation
 
