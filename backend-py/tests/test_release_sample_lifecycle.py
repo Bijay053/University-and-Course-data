@@ -241,6 +241,29 @@ def test_observer_loads_its_own_reviewed_helper(monkeypatch):
     assert smoke._worker_observation(5, None)[0] == snapshot()
 
 
+def test_observer_code_runs_with_package_relative_proof_imports(monkeypatch):
+    prefix = """
+from types import SimpleNamespace
+from app.tasks.celery_app import celery_app
+empty = lambda: {"worker":[]}
+inspector = SimpleNamespace(
+    ping=lambda: {"worker":{"ok":"pong"}},
+    active=empty, reserved=empty, scheduled=empty,
+)
+celery_app.control.inspect = lambda **kwargs: inspector
+"""
+
+    def run(command, **_):
+        return subprocess.check_output(
+            [command[0], "-B", "-c", prefix + command[3], *command[4:]],
+            cwd=Path(smoke.__file__).resolve().parents[1],
+            text=True, timeout=25,
+        )
+
+    monkeypatch.setattr(smoke, "_run", run)
+    assert smoke._worker_observation(25, None)[0] == snapshot()
+
+
 def test_precheckout_smoke_uses_target_without_modifying_installed_helper():
     source = (Path(smoke.__file__).parent / "guarded_release.sh").read_text()
     fence = source.index('verify "$repo_root" "$predecessor" "$target"')

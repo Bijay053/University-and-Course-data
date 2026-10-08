@@ -716,7 +716,7 @@ def _worker_observation(
     """Read-only, killable observer; keep every broker operation wall-clock bounded."""
     code = """
 import importlib.util, json, sys
-spec = importlib.util.spec_from_file_location("release_smoke_observer", sys.argv[3])
+spec = importlib.util.spec_from_file_location("deploy.release_smoke_observer", sys.argv[3])
 module = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = module
 spec.loader.exec_module(module)
