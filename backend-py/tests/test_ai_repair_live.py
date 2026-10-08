@@ -960,6 +960,59 @@ async def test_verified_sibling_course_paths_repair_allowlist_without_ai(monkeyp
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("fix_block", [False, True])
+async def test_rejected_allowlist_proposal_yields_to_other_gates(monkeypatch, tmp_path, fix_block):
+    """Production-shaped failure: the allowlist AND blocklist reject both courses."""
+    urls = [
+        "https://university.example/study-at-northumbria/courses/msc-accounting-dtfaaj6/",
+        "https://university.example/study-at-northumbria/courses/msc-finance-dtffce6/",
+    ]
+    before = {
+        "allow_url_patterns": [r"^/study-at-northumbria/courses/.+/$"],
+        "block_url_patterns": [r"/study-at-northumbria/courses/.*/$", r"/fees/"],
+    }
+    ctx = context(
+        dropped_sample=urls, repair_url_sample=urls, effective_discovery=before,
+        yaml_file=tmp_path / "university.yaml", unis_dir=tmp_path,
+    )
+    from app.services.scraper.verified_url_patterns import proposed_allow_patterns
+    patterns = proposed_allow_patterns(urls, before["allow_url_patterns"])
+    chat = mock_loop(monkeypatch, ctx, {
+        "confidence": 95, "diagnosis": "Both active gates reject courses",
+        "patches": [
+            {"section": "discovery", "field": "allow_url_patterns", "value": patterns},
+            {"section": "discovery", "field": "block_url_patterns",
+             "value": [r"/fees/"] if fix_block else before["block_url_patterns"]},
+        ],
+    })
+    session = agent.read_session("job-live")
+    session["autonomous"]["limits"]["max_attempts"] = 2
+    listing = '<main><h1>Courses</h1>' + "".join(
+        f'<a href="{url}">Master of Finance</a>' for url in urls
+    ) + "</main>"
+
+    async def fetch(url, *_args):
+        return (listing if url == SEED else course()), "", ""
+
+    monkeypatch.setattr(live, "_fetch_official", fetch)
+    monkeypatch.setattr(agent, "_assert_effective_discovery_patch", AsyncMock())
+    db = FakeDb()
+    result = await agent.run_ai_repair_loop("job-live", db)
+    assert len(result["attempts"]) == 2
+    first, second = result["attempts"]
+    assert not first["patch_applied_ok"]
+    assert first["after_pass_count"] == 0
+    chat.assert_awaited_once()
+    assert second["patch_applied_ok"] is fix_block
+    assert bool(db.writes) is fix_block
+    if fix_block:
+        assert second["live_validation"]["accepted"]
+        assert second["after_pass_count"] == 2
+    else:
+        assert result["status"] == "failed"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("cached", [{}, {"autonomous": {"enabled": False}}])
 async def test_durable_claim_keeps_live_gates_when_cache_is_lost_or_stale(monkeypatch, cached):
     chat = mock_loop(monkeypatch, context(), {"patches": []})

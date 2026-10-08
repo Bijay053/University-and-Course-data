@@ -3,6 +3,17 @@ name: Autonomous URL repair safety
 description: Safety contract for operator-triggered OpenAI URL-filter repairs.
 ---
 
+Verify automatic repair through the failed job's actual repair workflow, not
+just a separately retried reported-course URL.
+
+**Why:** Northumbria's targeted course recovery succeeded while the automatic
+repair loop still repeated an ineffective allowlist proposal against a
+conflicting blocklist. Success in one workflow did not prove the other worked.
+
+**How to apply:** Reproduce the stored failed job and its complete effective
+filters; verify subsequent diagnosis, validated persistence, and verification
+scrape separately. Keep claims limited to the workflow actually exercised.
+
 OpenAI may diagnose and propose discovery changes, but deterministic code must
 validate the complete effective allow, block, must-contain, and final
 course-detail filter before any write. A total-loss job must rescue a material

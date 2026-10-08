@@ -3026,8 +3026,9 @@ async def run_ai_repair_loop(
                 )["after"]:
                     deterministic_patterns = proposed_allow_patterns(known_courses, existing_patterns)
                 if deterministic_patterns and any(
-                    patch.get("field") == "allow_url_patterns"
-                    and patch.get("value") == deterministic_patterns
+                    patch.get("section") == "discovery"
+                    and patch.get("field") == "allow_url_patterns"
+                    and patch.get("new_value") == deterministic_patterns
                     for attempt in session["attempts"]
                     for patch in attempt.get("patches_proposed", [])
                 ):
