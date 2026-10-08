@@ -8,6 +8,16 @@ validate the complete effective allow, block, must-contain, and final
 course-detail filter before any write. A total-loss job must rescue a material
 share of known course URLs, not merely one sample.
 
+For total allowlist loss, repeated independently live-verified course paths can
+supply a narrow host/directory proposal without an LLM. Treat that proposal
+exactly like an AI proposal: full simulation, live validation, fenced writes,
+and verification remain mandatory. Do not repeat a rejected proposal on every
+attempt, and never derive a broad rule from a lone page or query duplicates.
+
+**Why:** A verified course-page probe can succeed while the allowlist still
+rejects the entire catalogue; depending only on an AI response leaves a
+deterministically repairable URL-pattern failure unresolved.
+
 Repair evidence must itself pass the production course-page classifier.
 Low-depth jobs often contain only menu, fees, faculty, or category links; probe
 the sitemap outside the broken allowlist to obtain real course candidates.

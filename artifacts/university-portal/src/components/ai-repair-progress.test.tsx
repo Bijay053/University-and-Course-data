@@ -16,6 +16,29 @@ const base: AutonomousRepair = {
   },
 };
 
+it("shows every verification field and replaces stale pending probe text after completion", () => {
+  render(<AiRepairProgress
+    autonomous={{
+      ...base, phase: "needs_review", verification_status: "completed",
+      comparison: {
+        verification: { fee_pct: 100, ielts_pct: 98, intakes_pct: 60, mode_pct: 80, degree_level_pct: 100 },
+        unresolved_fields: ["ielts_pct", "intakes_pct", "mode_pct"],
+        improved_fields: ["fee_pct", "ielts_pct"],
+      },
+    }}
+    currentAttempt={1}
+    liveProbe={{ status: "accepted", reason: "Live candidate validation passed; verification scrape pending." }}
+  />);
+  expect(screen.getByText("Intakes")).toBeTruthy();
+  expect(screen.getByText("Study mode")).toBeTruthy();
+  expect(screen.getByText("Degree level")).toBeTruthy();
+  expect(screen.getByText("60%")).toBeTruthy();
+  expect(screen.getByText("Improved fields:")).toBeTruthy();
+  expect(screen.queryByText(/verification scrape pending/i)).toBeNull();
+  expect(screen.getByText(/See the completed verification results below/)).toBeTruthy();
+  expect(screen.queryByText("Bounded sample verified")).toBeNull();
+});
+
 afterEach(cleanup);
 
 describe("AiRepairProgress", () => {

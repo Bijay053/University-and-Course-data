@@ -72,6 +72,7 @@ export type AutonomousRepair = {
     baseline_quality?: VerificationQuality;
     verification_quality?: VerificationQuality;
     unresolved_fields?: string[] | Record<string, unknown>;
+    improved_fields?: string[];
     regressions?: string[] | Record<string, unknown>;
     capped?: boolean;
     stop_reason?: string | null;
@@ -107,7 +108,8 @@ export type AutonomousRepair = {
 };
 
 type VerificationQuality = Partial<Record<
-  "fee_pct" | "ielts_pct" | "duration_pct" | "location_pct" | "course_name_pct",
+  "fee_pct" | "ielts_pct" | "duration_pct" | "location_pct" | "course_name_pct"
+  | "intakes_pct" | "mode_pct" | "degree_level_pct",
   number
 >>;
 
@@ -117,6 +119,9 @@ const QUALITY_FIELDS: Array<{ key: keyof VerificationQuality; label: string }> =
   { key: "duration_pct", label: "Duration" },
   { key: "location_pct", label: "Location" },
   { key: "course_name_pct", label: "Course names" },
+  { key: "intakes_pct", label: "Intakes" },
+  { key: "mode_pct", label: "Study mode" },
+  { key: "degree_level_pct", label: "Degree level" },
 ];
 
 const PHASES: Array<{ phase: AutonomousRepair["phase"]; label: string }> = [
@@ -339,7 +344,11 @@ export function AiRepairProgress({
             <span>{liveProbe.rejected_pages ?? 0} rejected</span>
             {(liveProbe.failures ?? 0) > 0 && <span className="text-red-700">{liveProbe.failures} failures</span>}
           </div>
-          {liveProbe.reason && <p className="mt-1 text-gray-600">{liveProbe.reason}</p>}
+          {liveProbe.reason && <p className="mt-1 text-gray-600">
+            {comparison && !running
+              ? "Live source checks finished. See the completed verification results below."
+              : liveProbe.reason}
+          </p>}
           {(liveProbe.samples?.length ?? 0) > 0 && (
             <ul className="mt-1 space-y-0.5">
               {liveProbe.samples!.slice(0, 3).map(sample => (
@@ -434,6 +443,9 @@ export function AiRepairProgress({
 
       {comparison && (unresolvedFields.length > 0 || regressions.length > 0 || comparison.capped || (stoppedForTime && !continuationActive)) && (
         <div className="space-y-0.5 rounded border border-amber-200 bg-white/70 px-2 py-1.5 text-[9px] text-amber-900">
+          {(comparison.improved_fields?.length ?? 0) > 0 && (
+            <p><strong>Improved fields:</strong> {comparison.improved_fields!.map(displayComparisonItem).join(", ")}. Remaining checks still apply.</p>
+          )}
           {unresolvedFields.length > 0 && <p><strong>Unresolved fields:</strong> {unresolvedFields.join(", ")}</p>}
           {regressions.length > 0 && <p><strong>Regressions:</strong> {regressions.join(", ")}</p>}
           {stoppedForTime && !continuationActive && (

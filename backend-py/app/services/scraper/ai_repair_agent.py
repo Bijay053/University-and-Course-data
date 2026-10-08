@@ -3012,6 +3012,28 @@ async def run_ai_repair_loop(
 
             # ③ Call OpenAI
             user_msg = _build_user_message(ctx, session["attempts"], phase=phase)
+            # For total allowlist loss, use repeated live-proven course paths
+            # before asking an LLM to invent regexes. These still pass through
+            # the exact same candidate simulation, live validation and fences.
+            deterministic_patterns = None
+            if live and phase == "discovery" and not ctx.get("provider_failure"):
+                from app.services.scraper.verified_url_patterns import proposed_allow_patterns
+                disc = ctx.get("effective_discovery") or {}
+                known_courses = ctx.get("repair_url_sample") or []
+                existing_patterns = disc.get("allow_url_patterns") or []
+                if existing_patterns and not _simulate_filter(
+                    known_courses, existing_patterns, [], [], [],
+                )["after"]:
+                    deterministic_patterns = proposed_allow_patterns(known_courses, existing_patterns)
+                if deterministic_patterns and any(
+                    patch.get("field") == "allow_url_patterns"
+                    and patch.get("value") == deterministic_patterns
+                    for attempt in session["attempts"]
+                    for patch in attempt.get("patches_proposed", [])
+                ):
+                    # A rejected proposal must not consume every retry with
+                    # identical work. Let the next diagnosis address other gates.
+                    deterministic_patterns = None
             if ctx.get("provider_failure"):
                 ai_data = {
                     "diagnosis": "Course search access denied; validate official sitemap alternative.",
@@ -3024,6 +3046,17 @@ async def run_ai_repair_loop(
                             for field, value in live.fallback.get("filter_patch", {}).items()
                         ],
                     ],
+                }
+            elif deterministic_patterns:
+                ai_data = {
+                    "diagnosis": "The allowlist excludes independently verified course pages.",
+                    "root_cause": "allow_url_patterns_too_restrictive",
+                    "confidence": 100,
+                    "explanation": "A narrow host and course-directory rule is proposed from multiple live-verified pages; all remaining gates still apply.",
+                    "patches": [{
+                        "section": "discovery", "field": "allow_url_patterns",
+                        "action": "replace", "value": deterministic_patterns,
+                    }],
                 }
             else:
                 ai_data = await asyncio.wait_for(

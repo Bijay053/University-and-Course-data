@@ -372,13 +372,15 @@ async def test_child_reconciliation_is_truthful(memory, monkeypatch, job, after,
     result = await workflow.reconcile("parent", "session-1", DB(memory))
     assert result["status"] == "completed"
     assert result["autonomous"]["phase"] == expected
-    expected_verdict = (
-        "Bounded fresh verification passed; full catalogue coverage is not certified."
-        if expected == "verified"
-        else "Verification failed, regressed, or left unresolved quality/coverage; manual review required."
-    )
-    assert result["final_verdict"] == expected_verdict
-    assert result["autonomous"]["reason"] == expected_verdict
+    if expected == "verified":
+        assert result["final_verdict"] == "Bounded fresh verification passed; full catalogue coverage is not certified."
+    else:
+        assert result["final_verdict"].startswith("Verification staged ")
+        assert "review" in result["final_verdict"].lower()
+        assert "verification passed" not in result["final_verdict"].lower()
+        if after.get("fee_pct") == 0:
+            assert "Remaining incomplete fields: fee" in result["final_verdict"]
+    assert result["autonomous"]["reason"] == result["final_verdict"]
     assert result["autonomous"]["comparison"]["full_catalogue_verified"] is False
     assert result["autonomous"]["verification_status"] == job.status
     workflow.agent.release_repair_lease.assert_called_once()

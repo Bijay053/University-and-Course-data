@@ -930,6 +930,36 @@ class FakeDb:
 
 
 @pytest.mark.asyncio
+async def test_verified_sibling_course_paths_repair_allowlist_without_ai(monkeypatch, tmp_path):
+    urls = [
+        "https://university.example/courses/study/aerospace-engineering-beng.aspx",
+        "https://university.example/courses/study/advanced-manufacturing-msc.aspx",
+    ]
+    ctx = context(
+        dropped_sample=urls, repair_url_sample=urls,
+        yaml_file=tmp_path / "university.yaml", unis_dir=tmp_path,
+    )
+    chat = mock_loop(monkeypatch, ctx, None)
+    listing = '<main><h1>Courses</h1>' + "".join(
+        f'<a href="{url}">Bachelor of Engineering</a>' for url in urls
+    ) + "</main>"
+
+    async def fetch(url, *_args):
+        return (listing if url == SEED else course()), "", ""
+
+    monkeypatch.setattr(live, "_fetch_official", fetch)
+    monkeypatch.setattr(agent, "_assert_effective_discovery_patch", AsyncMock())
+    db = FakeDb()
+    result = await agent.run_ai_repair_loop("job-live", db)
+    assert result["status"] == "completed", result.get("error")
+    chat.assert_not_awaited()
+    assert result["attempts"][0]["patch_applied_ok"]
+    assert result["attempts"][0]["live_validation"]["accepted"]
+    assert db.writes
+    assert not result["autonomous"]["verified"]
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("cached", [{}, {"autonomous": {"enabled": False}}])
 async def test_durable_claim_keeps_live_gates_when_cache_is_lost_or_stale(monkeypatch, cached):
     chat = mock_loop(monkeypatch, context(), {"patches": []})

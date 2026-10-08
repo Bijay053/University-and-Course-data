@@ -721,8 +721,13 @@ def compare_quality(
         and not guard and not contamination
         and safety.get("safe") is True
     )
+    improved_fields = [
+        key for key in fields
+        if key in before and key in after and after[key] > before[key]
+    ]
     return {
         "baseline": before, "verification": after, "regressions": regressions,
+        "improved_fields": improved_fields,
         "unresolved_fields": unresolved, "sample_verified": clean,
         "critical_quality_count": critical_quality_count,
         "critical_quality": persisted_quality,
@@ -1177,10 +1182,33 @@ async def reconcile(job_id: str, session_id: str, db) -> dict:
                 and metadata.get("capped") is False and not metadata.get("limit_reached")
                 and not metadata.get("budget_exhausted") and not metadata.get("warning")
             )
+            unresolved_labels = ", ".join(
+                key.removesuffix("_pct").replace("_", " ")
+                for key in comparison["unresolved_fields"]
+            )
+            staged = int(after.get("total_staged") or 0)
+            if verified:
+                verdict_reason = "Bounded fresh verification passed; full catalogue coverage is not certified."
+            elif comparison["regressions"] or comparison["critical_quality_count"] or not combined_safety.get("safe"):
+                verdict_reason = (
+                    f"Verification staged {staged} courses, but safety checks or quality regressions require review. "
+                    "No courses were approved or published."
+                )
+                if unresolved_labels:
+                    verdict_reason += f" Remaining incomplete fields: {unresolved_labels}."
+            elif unresolved_labels:
+                verdict_reason = (
+                    f"Verification staged {staged} courses. Remaining incomplete fields: {unresolved_labels}. "
+                    "Review these fields in the verification job; full catalogue coverage is not certified."
+                )
+            else:
+                verdict_reason = (
+                    f"Verification staged {staged} courses. The bounded sample does not prove full catalogue recovery. "
+                    "Review the verification job before continuing the remaining catalogue."
+                )
             return await finish(
                 session, db, "verified" if verified else "needs_review",
-                "Bounded fresh verification passed; full catalogue coverage is not certified." if verified
-                else "Verification failed, regressed, or left unresolved quality/coverage; manual review required.",
+                verdict_reason,
             )
         session.update(status="running", completed_at=None)
         if not (agent.renew_repair_lease(int(session["university_id"]), session_id)
