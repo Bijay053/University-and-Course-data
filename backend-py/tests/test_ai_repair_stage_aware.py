@@ -378,6 +378,44 @@ class TestBuildUserMessagePhase:
         # Must show the actual value, not just the field name
         assert "allow_url_patterns" in msg
         assert "/courses/" in msg  # partial value visible
+        assert 'applied_patches=discovery.allow_url_patterns=["/courses/[^/]+"]' in msg
+        assert "proposed=(no patches proposed)" in msg
+
+    def test_rejected_proposals_are_not_displayed_as_applied(self):
+        attempts = [{
+            "attempt_number": 1,
+            "root_cause": "allow_url_patterns",
+            "patches_proposed": [{
+                "section": "discovery", "field": "allow_url_patterns",
+                "new_value": ["/rejected/"],
+            }],
+            "patches_applied": [],
+            "patch_applied_ok": False,
+            "validation_errors": ["unsafe broad pattern"],
+        }]
+        msg = _build_user_message(self._minimal_ctx(), attempts)
+        assert 'proposed=discovery.allow_url_patterns=["/rejected/"]' in msg
+        assert "applied=False" in msg
+        assert "applied_patches=(no patches applied)" in msg
+        assert "unsafe broad pattern" in msg
+
+    def test_history_displays_proposed_and_applied_values_separately(self):
+        attempts = [{
+            "attempt_number": 1,
+            "root_cause": "allow_url_patterns",
+            "patches_proposed": [{
+                "section": "discovery", "field": "allow_url_patterns",
+                "new_value": ["/proposed/"],
+            }],
+            "patches_applied": [{
+                "section": "discovery", "field": "allow_url_patterns",
+                "new_value": ["/verified/"],
+            }],
+            "patch_applied_ok": True,
+        }]
+        msg = _build_user_message(self._minimal_ctx(), attempts)
+        assert 'proposed=discovery.allow_url_patterns=["/proposed/"]' in msg
+        assert 'applied_patches=discovery.allow_url_patterns=["/verified/"]' in msg
 
     def test_empty_previous_attempts_no_prev_block(self):
         msg = _build_user_message(self._minimal_ctx(), [], phase="discovery")

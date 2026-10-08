@@ -2599,13 +2599,18 @@ def _build_user_message(ctx: dict, previous_attempts: list[dict], phase: str = "
         for a in previous_attempts:
             patches_detail = "; ".join(
                 f"{p.get('section')}.{p.get('field')}={json.dumps(p.get('new_value'))[:80]}"
-                for p in a.get("patches_proposed", [])
+                for p in (a.get("patches_proposed") or [])
             ) or "(no patches proposed)"
+            applied_patches_detail = "; ".join(
+                f"{p.get('section')}.{p.get('field')}={json.dumps(p.get('new_value'))[:80]}"
+                for p in (a.get("patches_applied") or [])
+            ) or "(no patches applied)"
             q_after = a.get("quality_after") or {}
             lines.append(
                 f"  Attempt #{a['attempt_number']} [{a.get('phase','?')} phase]: "
                 f"root_cause={a['root_cause']} | "
                 f"proposed={patches_detail} | applied={a.get('patch_applied_ok', False)} | "
+                f"applied_patches={applied_patches_detail} | "
                 f"validation_errors={json.dumps(a.get('validation_errors', []))} | "
                 f"result={a.get('success_criteria',{}).get('criteria_pass','?')}/6 criteria | "
                 f"fee={q_after.get('fee_pct',0)}% ielts={q_after.get('ielts_pct',0)}% "

@@ -111,7 +111,11 @@ class ReadonlyCycleSession:
         return SimpleNamespace(scalars=lambda: watchers)
 
     async def commit(self):
-        raise AssertionError("acceptance must never commit business data")
+        # The cycle now explicitly finishes its transaction. Only synthetic
+        # watchers are mutated; the real session remains read-only and clean.
+        assert not self.db.new and not self.db.dirty and not self.db.deleted
+        assert (await self.db.execute(text("SHOW transaction_read_only"))).scalar_one() == "on"
+        await self.db.commit()
 
     def add(self, _):
         raise AssertionError("acceptance must never add business rows")

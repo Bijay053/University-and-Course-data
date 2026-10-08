@@ -476,7 +476,11 @@ def _watcher_to_dict(w: UniversityWatcher, uni_name: str = "", uni_country: str 
 # ── Core monitoring loop (called by Celery task) ──────────────────────────────
 
 async def run_monitoring_cycle(db: AsyncSession) -> dict:
-    """Check all due watchers; trigger scrapes for changed ones. Returns summary."""
+    """Check due watchers and commit their probe state before returning a summary.
+
+    This cycle owns persistence even when no scrape is triggered.  The scrape
+    helper still owns its earlier commit under the start lock, before dispatch.
+    """
     now = datetime.now(timezone.utc)
 
     due_result = await db.execute(
@@ -512,6 +516,12 @@ async def run_monitoring_cycle(db: AsyncSession) -> dict:
         except Exception as exc:  # noqa: BLE001
             log.warning("run_monitoring_cycle: watcher %d error: %s", watcher.id, exc)
             errors += 1
+
+    # trigger_scrape commits only on its active-job/new-job paths.  Persist
+    # unchanged/error probes and any checks after the last triggered scrape.
+    # Keep this outside per-watcher error isolation: a failed commit must fail
+    # the cycle rather than report successful checks that were not persisted.
+    await db.commit()
 
     log.info(
         "run_monitoring_cycle: checked=%d changed=%d triggered=%d errors=%d",

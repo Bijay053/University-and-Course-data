@@ -20,3 +20,14 @@ making that address available may expose acceptance keys to active workers.
 **How to apply:** Redirect only the isolated test process's Redis connections
 to its private broker, retain real concurrency assertions, and remove the
 owned process/socket afterwards. Never redirect active worker connections.
+
+A failed preflight ping does not establish ownership of the shared Redis port.
+Do not shut down an endpoint merely because a test script attempted to start it.
+
+**Why:** Validation and managed Redis can start concurrently after a workspace
+resumes. The test startup can lose that race but still treat the managed broker
+as its temporary dependency and stop it on exit, disconnecting active workers.
+
+**How to apply:** Give acceptance its own address and terminate only the exact
+subprocess it created. Restore the managed service separately if an older
+validation script's cleanup stopped it; never reuse it for isolated acceptance.

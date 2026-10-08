@@ -170,7 +170,7 @@ isValidation = true
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "flock -x /tmp/university-portal-db-validation.lock bash -c 'cd backend-py && scripts/run_full_scraper_regression.sh'"
+args = "flock -x /tmp/university-portal-db-validation.lock bash -c 'cd backend-py && PYTHONPATH=. python tests/helpers/run_disposable_redis.py --full-regression'"
 
 [[workflows.workflow]]
 name = "academic-level-migration"
@@ -220,12 +220,12 @@ args = "flock -x /tmp/university-portal-db-validation.lock bash -c 'cd backend-p
 name = "task-loop-resource-cleanup"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "flock -x /tmp/university-portal-db-validation.lock bash -c 'cd backend-py && PYTHONPATH=. python -m pytest tests/test_task_loop_resource_cleanup.py tests/test_scrape_task_resource_cleanup.py tests/test_bulk_fix_job.py tests/test_stale_requeue.py tests/test_repair_scrape.py tests/test_phase3_learning.py tests/test_phase7_quality_actions.py tests/test_autonomous_verification_isolation.py -q -c /dev/null -o asyncio_mode=auto -p no:cacheprovider'"
-
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "flock -x /tmp/university-portal-db-validation.lock bash -c 'cd backend-py && PYTHONPATH=. python tests/helpers/run_disposable_redis.py tests/test_task_loop_resource_cleanup.py tests/test_scrape_task_resource_cleanup.py tests/test_bulk_fix_job.py tests/test_stale_requeue.py tests/test_repair_scrape.py tests/test_phase3_learning.py tests/test_phase7_quality_actions.py tests/test_autonomous_verification_isolation.py -q -c /dev/null -o asyncio_mode=auto -p no:cacheprovider'"
 
 [agent]
 stack = "PNPM_WORKSPACE"
