@@ -3,6 +3,12 @@ name: Autonomous URL repair safety
 description: Safety contract for operator-triggered OpenAI URL-filter repairs.
 ---
 
+Treat URL heuristics as repairable configuration, not as proof against inspecting a page.
+
+**Why:** Applying the same mistaken global URL veto before gathering course-owned evidence prevents automatic repair from ever proving the exception it needs. Conversely, a promising URL alone never proves course eligibility.
+
+**How to apply:** Evaluate positive course-owned award and field evidence independently of repairable URL heuristics; retain hard eligibility checks. Verify a saved exception survives both discovery and staging, including full-URL regex matching.
+
 Verify automatic repair through the failed job's actual repair workflow, not
 just a separately retried reported-course URL.
 

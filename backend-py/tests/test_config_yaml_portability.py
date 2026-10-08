@@ -22,6 +22,39 @@ def _generated_stub(body: str) -> str:
     return f"# Generated-stub-sha256: {digest}\n{body}"
 
 
+def test_foreign_header_recipe_is_neither_loaded_nor_repair_destination(monkeypatch, tmp_path):
+    monkeypatch.setattr(loader, "_UNIS_DIR", tmp_path)
+    foreign = tmp_path / "lincoln.yaml"
+    original = "# Hostname: www.lincoln.ac.nz\ndiscovery:\n  allow_url_patterns: ['/nz-only/']\nextraction:\n  fees:\n    central_page: https://www.lincoln.ac.nz/study/fees\n"
+    foreign.write_text(original)
+    path, _ = loader._select_uni_yaml(
+        slug="lincoln", scrape_url="https://www.lincoln.ac.uk", university_id=97,
+    )
+    assert path == tmp_path / "lincoln_97.yaml"
+    cfg = _load(slug="lincoln", host="www.lincoln.ac.uk", university_id=97)
+    assert "/nz-only/" not in cfg.discovery.allow_url_patterns
+    assert cfg.extraction.fees.central_page != "https://www.lincoln.ac.nz/study/fees"
+    assert path.exists()
+    assert foreign.read_text() == original
+    nz = _load(slug="lincoln", host="www.lincoln.ac.nz", university_id=1753)
+    assert nz.discovery.allow_url_patterns == ["/nz-only/"]
+
+
+def test_foreign_exact_recipe_and_no_id_use_host_scoped_destination(monkeypatch, tmp_path):
+    monkeypatch.setattr(loader, "_UNIS_DIR", tmp_path)
+    foreign = "# Hostname: www.lincoln.ac.nz\ndiscovery:\n  allow_url_patterns: ['/nz-only/']\n"
+    for name in ("lincoln.yaml", "lincoln_97.yaml"):
+        (tmp_path / name).write_text(foreign)
+    for uid in (None, 97):
+        path, _ = loader._select_uni_yaml(
+            slug="lincoln", scrape_url="https://www.lincoln.ac.uk", university_id=uid,
+        )
+        assert path == tmp_path / "lincoln_www_lincoln_ac_uk.yaml"
+        cfg = loader.load_uni_config(slug="lincoln", name="Lincoln", scrape_url="https://www.lincoln.ac.uk", university_id=uid)
+        assert "/nz-only/" not in cfg.discovery.allow_url_patterns
+    assert (tmp_path / "lincoln_97.yaml").read_text() == foreign
+
+
 def test_generated_id_stub_cannot_shadow_matching_shared_recipe(
     monkeypatch, tmp_path
 ) -> None:

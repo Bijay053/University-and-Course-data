@@ -3028,15 +3028,32 @@ async def run_ai_repair_loop(
             # before asking an LLM to invent regexes. These still pass through
             # the exact same candidate simulation, live validation and fences.
             deterministic_patterns = None
+            deterministic_detail_patterns = None
             if live and phase == "discovery" and not ctx.get("provider_failure"):
                 from app.services.scraper.verified_url_patterns import proposed_allow_patterns
                 disc = ctx.get("effective_discovery") or {}
                 known_courses = ctx.get("repair_url_sample") or []
                 existing_patterns = disc.get("allow_url_patterns") or []
+                override_urls = [
+                    url for url, record in live.initial.items()
+                    if record.get("classification") == "course"
+                    and record.get("url_gate_override_required")
+                    and not any(re.search(p, url, re.I) for p in disc.get("course_detail_url_patterns") or [])
+                ]
+                if override_urls:
+                    # Exact live-proven pages only. Never disable a global
+                    # guard or extrapolate an exception from a page title.
+                    deterministic_detail_patterns = [
+                        *(disc.get("course_detail_url_patterns") or []),
+                        *(r"^" + re.escape(url) + r"$" for url in override_urls),
+                    ]
+                    deterministic_patterns = existing_patterns or [
+                        r"^" + re.escape(url) + r"$" for url in known_courses
+                    ]
                 if existing_patterns and not _simulate_filter(
                     known_courses, existing_patterns, [], [], [],
                 )["after"]:
-                    deterministic_patterns = proposed_allow_patterns(known_courses, existing_patterns)
+                    deterministic_patterns = proposed_allow_patterns(known_courses, existing_patterns) or deterministic_patterns
                 if deterministic_patterns and any(
                     patch.get("section") == "discovery"
                     and patch.get("field") == "allow_url_patterns"
@@ -3062,14 +3079,19 @@ async def run_ai_repair_loop(
                 }
             elif deterministic_patterns:
                 ai_data = {
-                    "diagnosis": "The allowlist excludes independently verified course pages.",
+                    "diagnosis": ("A shared URL heuristic blocks independently verified course pages."
+                                  if deterministic_detail_patterns else
+                                  "The allowlist excludes independently verified course pages."),
                     "root_cause": "allow_url_patterns_too_restrictive",
                     "confidence": 100,
                     "explanation": "A narrow host and course-directory rule is proposed from multiple live-verified pages; all remaining gates still apply.",
                     "patches": [{
                         "section": "discovery", "field": "allow_url_patterns",
                         "action": "replace", "value": deterministic_patterns,
-                    }],
+                    }, *([{
+                        "section": "discovery", "field": "course_detail_url_patterns",
+                        "action": "replace", "value": deterministic_detail_patterns,
+                    }] if deterministic_detail_patterns else [])],
                 }
             else:
                 ai_data = await asyncio.wait_for(

@@ -906,6 +906,68 @@ def mock_loop(monkeypatch, ctx, ai):
     return openai_client.chat_json
 
 
+@pytest.mark.asyncio
+async def test_shared_url_heuristic_repaired_by_exact_yaml_exception(monkeypatch, tmp_path):
+    urls = [f"https://university.example/study-at-example/awards/{slug}" for slug in ("law", "science")]
+    ctx = context(dropped_sample=urls, repair_url_sample=urls,
+                  effective_discovery={"allow_url_patterns": ["/study-at-example/awards/"]},
+                  yaml_file=tmp_path / "university.yaml", unis_dir=tmp_path)
+    chat = mock_loop(monkeypatch, ctx, None)
+    listing = '<main><h1>Courses</h1>' + "".join(
+        f'<a href="{url}">Bachelor of Laws</a>' for url in urls
+    ) + "</main>"
+    async def fetch(url, *_args):
+        return (listing if url == SEED else course()), "", ""
+    monkeypatch.setattr(live, "_fetch_official", fetch)
+    monkeypatch.setattr(agent, "_assert_effective_discovery_patch", AsyncMock())
+    db = FakeDb()
+    result = await agent.run_ai_repair_loop("job-live", db)
+    assert result["attempts"][0]["patch_applied_ok"], result
+    chat.assert_not_awaited()
+    patches = result["attempts"][0]["patches_proposed"]
+    patterns = next(p["new_value"] for p in patches if p["field"] == "course_detail_url_patterns")
+    import re
+    assert all(any(re.search(p, u) for p in patterns) for u in urls)
+    assert not any(re.search(p, urls[0] + "/fees") for p in patterns)
+    assert "course_detail_url_patterns" in ctx["yaml_file"].read_text()
+
+
+@pytest.mark.parametrize("html", [
+    "<main><h1>Bachelor of Laws</h1><p>Our programmes</p></main>",
+    course(extra="<p>This course is available to domestic students only.</p>"),
+    course(extra="<p>Delivery: Online only</p>"),
+    course(extra="<p>Study mode: part-time only</p>"),
+])
+def test_url_exception_never_uses_title_alone_or_overrides_eligibility(html):
+    result = live.inspect_page("https://university.example/study-at-example/awards/law", html, config())
+    assert result["classification"] != "course"
+
+
+@pytest.mark.asyncio
+async def test_archive_repair_prefers_robots_current_sitemap_before_old_urls(monkeypatch):
+    cfg = config()
+    cfg.discovery.use_wayback = True
+    sitemap = SEED.rstrip("/") + "/sitemap-en.xml"
+    ctx = context(effective_config=cfg, repair_url_sample=[SEED + "/arc/old.htm"])
+    visited = []
+    opaque = ["https://university.example/course/appcmpms/", "https://university.example/course/desresma/"]
+    async def fetch(url, *_args):
+        visited.append(url)
+        if url.endswith("/robots.txt"):
+            return f"Sitemap: https://evil.example/catalogue.xml\nSitemap: {sitemap}", "", ""
+        if url == sitemap:
+            return f'<?xml version="1.0"?><urlset><url><loc>{opaque[0]}</loc></url><url><loc>{opaque[1]}</loc></url></urlset>', "", ""
+        return (LISTING if url == SEED else course()), "", ""
+    monkeypatch.setattr(live, "_fetch_official", fetch)
+    evidence = live.LiveRepairEvidence(ctx)
+    result = await evidence.probe()
+    assert visited[:2] == ["https://university.example/robots.txt", sitemap]
+    assert result["course_pages"] >= 2
+    assert all(url in visited for url in opaque)
+    assert not any("evil.example" in url for url in visited)
+    assert evidence.pages_checked <= 6
+
+
 class FakeDb:
     def __init__(self, cfg=None, rowcount=1):
         self.cfg = cfg or {}

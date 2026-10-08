@@ -364,7 +364,7 @@ def test_yaml_resolution_never_guesses_by_id_or_text_and_preserves_recipe(monkey
     path, _ = agent._apply_to_yaml(None, tmp_path, 1, SEED,
                                    {"discovery": {"official_catalogue_fallback": True}},
                                    expected_text=None)
-    assert path == tmp_path / "university.yaml"
+    assert path == tmp_path / "university_1.yaml"
     assert unrelated.read_text() == original
     assert loader._select_uni_yaml(slug="university", university_id=1, scrape_url=SEED)[0] == path
 

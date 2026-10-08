@@ -106,6 +106,27 @@ async def test_listing_page_still_follows_nav_links(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_verified_full_url_detail_exception_retains_shared_blocked_candidate(monkeypatch):
+    import re
+    from app.services.scraper.config.schema import DiscoveryConfig
+    import app.services.scraper.sitemap as sm
+    url = "https://example.edu/study-at-example/awards/bachelor-of-law"
+    fetched = []
+    async def fetch(target, **kwargs):
+        fetched.append(target)
+        if target == "https://example.edu/":
+            return f'<main><h1>Study</h1><a href="{url}">Bachelor of Law</a></main>'
+        return '<main><h1>Bachelor of Law</h1><p>Duration: 3 years</p><p>Study mode: Full time</p></main>'
+    async def sitemap(*args, **kwargs):
+        return []
+    monkeypatch.setattr(discovery, "fetch_html", fetch)
+    monkeypatch.setattr(sm, "discover_from_sitemap", sitemap)
+    cfg = DiscoveryConfig(course_detail_url_patterns=["^" + re.escape(url) + "$"])
+    out = await discovery.discover_course_links("https://example.edu/", max_pages=4, max_courses=10, discovery_config=cfg)
+    assert url in {row["url"] for row in out}
+
+
+@pytest.mark.asyncio
 async def test_sitemap_fallback_threshold_boundary(monkeypatch):
     """Sitemap fallback fires when crawl yields STRICTLY FEWER than
     ``_SITEMAP_FALLBACK_THRESHOLD`` candidates. This guards against an

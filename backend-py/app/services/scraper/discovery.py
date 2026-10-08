@@ -1030,6 +1030,7 @@ async def discover_course_links(
     _yaml_allow_compiled: list[tuple[str, re.Pattern]] = []  # (raw_pat, compiled)
     if discovery_config is not None:
         _ap_raw = list(getattr(discovery_config, "allow_url_patterns", None) or [])
+        _ap_raw += list(getattr(discovery_config, "course_detail_url_patterns", None) or [])
         for _raw in _ap_raw:
             try:
                 _yaml_allow_compiled.append((_raw, re.compile(_raw)))
@@ -1076,7 +1077,10 @@ async def discover_course_links(
     # accidentally promoted to candidates.
     _force_candidate_compiled: list[tuple[str, re.Pattern]] = []
     if discovery_config is not None:
-        for _raw in list(getattr(discovery_config, "force_candidate_url_patterns", None) or []):
+        for _raw in [
+            *(getattr(discovery_config, "force_candidate_url_patterns", None) or []),
+            *(getattr(discovery_config, "course_detail_url_patterns", None) or []),
+        ]:
             try:
                 _force_candidate_compiled.append((_raw, re.compile(_raw)))
             except re.error:
@@ -1213,7 +1217,7 @@ async def discover_course_links(
             _url_parsed = urlparse(url)
             if _url_parsed.netloc == _uni_netloc:
                 for _raw_pat, _compiled_pat in _yaml_allow_compiled:
-                    if _compiled_pat.search(_url_parsed.path):
+                    if _compiled_pat.search(url) or _compiled_pat.search(_url_parsed.path):
                         _yaml_allow_override = True
                         if emit:
                             await emit(

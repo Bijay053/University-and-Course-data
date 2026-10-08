@@ -157,7 +157,8 @@ async def _fetch_official(url: str, config, timeout: float) -> tuple[str, str, s
                 return "", "network_failure", "Redirect refused; destination not verified"
             response.raise_for_status()
             content_type = response.headers.get("content-type", "").lower()
-            if "html" not in content_type and "xml" not in content_type:
+            is_robots = urlsplit(url).path == "/robots.txt" and "text/plain" in content_type
+            if "html" not in content_type and "xml" not in content_type and not is_robots:
                 return "", "unsupported_content", "Live HTML evidence required"
             chunks, size = [], 0
             async for chunk in response.aiter_bytes():
@@ -169,6 +170,8 @@ async def _fetch_official(url: str, config, timeout: float) -> tuple[str, str, s
                 if len(chunk) > remaining:
                     break
             html = b"".join(chunks).decode(response.encoding or "utf-8", errors="replace")
+            if is_robots:
+                return html, "", ""
             if "xml" in content_type:
                 # A truncated sitemap cannot establish a usable catalogue.
                 if size >= _MAX_PROBE_HTML_BYTES:
@@ -490,6 +493,15 @@ def audience_scoped_recipe_proposals(evidence: dict) -> dict:
 
 
 def inspect_page(url: str, html: str, config=None) -> dict:
+    if urlsplit(url).path == "/robots.txt":
+        extra_hosts = getattr(getattr(config, "discovery", None), "allowed_extra_hostnames", ())
+        sources = [
+            value.strip() for value in re.findall(r"(?im)^sitemap:\s*(\S+)", html)
+            if official_url(value.strip(), url, extra_hosts)
+        ]
+        return {"url": url, "classification": "robots",
+                "links": [{"url": value} for value in dict.fromkeys(sources)],
+                "reason": "Official sitemap declarations; not course evidence"}
     if html.lstrip().startswith("<?xml") or re.match(r"\s*<urlset\b", html):
         from xml.etree import ElementTree
         try:
@@ -614,7 +626,8 @@ def inspect_page(url: str, html: str, config=None) -> dict:
         and urldefrag(urljoin(url, node["href"]))[0] != urldefrag(url)[0]
     ))[:3]
     blocked, reason = is_blocked_page(url, title)
-    if blocked:
+    url_override = blocked and reason in {"marketing_page", "category_landing_page_url_block"} and not is_blocked_page(None, title)[0]
+    if blocked and not url_override:
         return {**result, "classification": "listing" if page["page_type"] == "listing" or course_links else "non_course",
                 "reason": f"Shared page gate: {reason}"}
     if re.fullmatch(r"(?:our )?(?:partners|partnerships|terms(?: and conditions)?|privacy policy)", title, re.I):
@@ -657,6 +670,9 @@ def inspect_page(url: str, html: str, config=None) -> dict:
     if not positive:
         return {**result, "classification": "listing" if course_links else "unconfirmed",
                 "reason": "No positive course-owned award and field evidence"}
+    if url_override and not owned_award:
+        return {**result, "classification": "unconfirmed",
+                "reason": "URL exception requires an explicit course-owned award"}
     # Explicit, course-owned negative availability is never repaired away.
     from app.services.scraper.pipelines.single_course import _is_domestic_only_page, _is_parttime_only_page
     from app.services.scraper.guards import is_confirmed_host_online_only_page
@@ -666,11 +682,12 @@ def inspect_page(url: str, html: str, config=None) -> dict:
     from app.services.scraper.extractors.eligibility import _NEG
     if _NEG.search(region.get_text(" ", strip=True)):
         return {**result, "classification": "ineligible", "reason": "Explicit international-audience exclusion"}
-    if re.search(r"\b(?:study mode|mode of study|delivery)\b\s*[:\-]?\s*online\s+only\b", field_text, re.I):
+    if re.search(r"\b(?:study mode|mode of study|delivery)\b\s*[:\-]?\s*online\s+only\b", region.get_text(" ", strip=True), re.I):
         return {**result, "classification": "ineligible", "reason": "Explicit online-only delivery"}
     if re.search(r"\b(?:duration|study mode|mode of study)\b.{0,50}\b(?:part.time only|only (?:available )?part.time)\b", field_text, re.I):
         return {**result, "classification": "ineligible", "reason": "Explicit part-time-only route"}
     return {**result, "classification": "course",
+            "url_gate_override_required": bool(url_override),
             "reason": "Visible course-owned award/identity and multiple course fields"}
 
 
@@ -813,12 +830,21 @@ class LiveRepairEvidence:
         # sitemap when there are no known course/passed samples, then use
         # bounded, filtered detail candidates before following navigation.
         sitemap_url = getattr(self.config.discovery, "sitemap_url", None)
+        if (not sitemap_url and not course_candidates and not passed
+                and limit >= 4 and getattr(self.config.discovery, "use_wayback", False)):
+            # Archived URL volume is not current course evidence. Use the
+            # site's own sitemap declaration, not a guessed vendor endpoint.
+            robots_url = urljoin(self.ctx["scrape_url"], "/robots.txt")
+            robots = await self.fetch(robots_url)
+            self.initial[robots_url] = robots
+            sources = robots.get("links") or []
+            sitemap_url = sources[0]["url"] if sources else urljoin(self.ctx["scrape_url"], "/sitemap.xml")
         if not course_candidates and not passed and sitemap_url and limit >= 3:
             sitemap = await self.fetch(sitemap_url)
             self.initial[sitemap_url] = sitemap
             if sitemap.get("classification") == "sitemap":
                 from app.services.scraper.ai_repair_agent import _is_course_url
-                from app.services.scraper.official_catalogue_repair import _sitemap_sample
+                from app.services.scraper.official_catalogue_repair import _sitemap_sample, _sitemap_candidate_rank
 
                 eligible = list(dict.fromkeys(
                     link["url"] for link in sitemap.get("links") or []
@@ -827,7 +853,7 @@ class LiveRepairEvidence:
                     # Existing discovery filters may be the defect under
                     # repair. Apply them only in discovery_validation, after
                     # fresh course-owned evidence has been collected.
-                    and _is_course_url(link["url"])
+                    and (_is_course_url(link["url"]) or _sitemap_candidate_rank(link["url"])[0] <= 1)
                     and not is_intentionally_excluded_course_url(link["url"])
                 ))
                 sitemap_candidates = _sitemap_sample(eligible, {}, min(4, limit - 2))
@@ -893,7 +919,7 @@ class LiveRepairEvidence:
             "failures": failures,
             "reason": ("Bounded live evidence; full scrape verification still required" if courses
                        else "No positive live course evidence; no automatic apply is safe"),
-            "samples": [{k: r.get(k) for k in ("url", "classification", "reason", "title", "snippet", "fields", "audience_evidence", "fee_source_links", "reference_only", "linked_from")}
+            "samples": [{k: r.get(k) for k in ("url", "classification", "reason", "title", "snippet", "fields", "audience_evidence", "fee_source_links", "reference_only", "linked_from", "url_gate_override_required")}
                         for r in self.records],
         }
 
@@ -907,6 +933,9 @@ class LiveRepairEvidence:
             or any(r["classification"] == "course" and not is_intentionally_excluded_course_url(url)
                    and not passes(url, discovery)
                    for url, r in self.initial.items())
+            or any(r.get("url_gate_override_required") and not any(
+                re.search(p, url, re.I) for p in discovery.get("course_detail_url_patterns") or []
+            ) for url, r in self.initial.items() if r["classification"] == "course")
             or any(url in known and r["classification"] in _REJECTED and passes(url, discovery)
                    for url, r in self.initial.items())
             or any(url in known and r["classification"] == "unconfirmed" and passes(url, discovery)
@@ -919,11 +948,20 @@ class LiveRepairEvidence:
                    if r["classification"] == "course" and not is_intentionally_excluded_course_url(url)}
         rejected = {url for url, r in self.initial.items()
                     if r["classification"] in _REJECTED and url in (self.ctx.get("passed_sample") or [])}
-        old = {url for url in courses if passes(url, before)}
+        old = {url for url in courses if passes(url, before) and (
+            not self.initial[url].get("url_gate_override_required") or any(
+                re.search(p, url, re.I) for p in before.get("course_detail_url_patterns") or []
+            )
+        )}
         new = {url for url in courses if passes(url, after)}
         bad_old = {url for url in rejected if passes(url, before)}
         bad_new = {url for url in rejected if passes(url, after)}
         reasons = []
+        for url in new:
+            if self.initial[url].get("url_gate_override_required") and not any(
+                re.search(p, url, re.I) for p in after.get("course_detail_url_patterns") or []
+            ):
+                reasons.append("Live course needs a scoped course_detail_url_patterns exception")
         fallback = getattr(self, "fallback", {})
         fallback_sample = fallback.get("sample", [])
         fallback_sample_records = [(url, self.initial.get(url)) for url in fallback_sample]

@@ -194,6 +194,7 @@ def _create_stub_yaml(
     scrape_url: str,
     hostname: str,
     university_id: int | None,
+    target_path: Path | None = None,
 ) -> Path:
     """Write a minimal stub YAML for a university with no existing config file.
 
@@ -209,6 +210,8 @@ def _create_stub_yaml(
         target = path
     else:
         target = _UNIS_DIR / f"{slug}.yaml"
+    if target_path is not None:
+        target = target_path
 
     if target.exists():
         return target
@@ -336,7 +339,10 @@ def _select_uni_yaml(
     )
     scrape_host = urlparse(scrape_url).hostname or ""
 
-    if exact is not None and exact.exists():
+    exact_host = _declared_yaml_hostname(exact) if exact and exact.exists() else ""
+    if exact is not None and exact.exists() and (
+        not exact_host or _hosts_match(scrape_host, exact_host)
+    ):
         if _is_generated_stub(exact):
             verified_matches: list[Path] = []
             if shared.exists() and _hosts_match(
@@ -395,6 +401,18 @@ def _select_uni_yaml(
             [path.name for path in matches],
         )
 
+    shared_host = _declared_yaml_hostname(shared) if shared.exists() else ""
+    if (shared_host and not _hosts_match(scrape_host, shared_host)) or (
+        exact_host and not _hosts_match(scrape_host, exact_host)
+    ):
+        # Return the same safe destination to both runtime loading and repair
+        # persistence. Never let a repair overwrite the other institution.
+        safe = exact if exact is not None and not exact.exists() else (
+            directory / f"{slug}_{re.sub(r'[^a-z0-9]+', '_', scrape_host.lower())}.yaml"
+        )
+        return safe, True
+    if not shared.exists() and exact is not None:
+        return exact, True
     return shared, False
 
 
@@ -607,6 +625,9 @@ def load_uni_config(
     )
     runtime_yaml_path = _RUNTIME_UNIS_DIR / uni_yaml_path.name
     runtime_uni = _load_yaml_file(runtime_yaml_path)
+    runtime_host = _declared_yaml_hostname(runtime_yaml_path) if runtime_uni else ""
+    if runtime_host and not _hosts_match(urlparse(scrape_url).hostname or "", runtime_host):
+        runtime_uni = {}
     if runtime_uni:
         # A guarded release moves a verified generated stub here when the
         # incoming release starts tracking the same filename. Apply the old
@@ -626,8 +647,8 @@ def load_uni_config(
         # where both resolve to the same YAML file.  The id-specific filename
         # (e.g. canterbury_1750.yaml) is the PRIMARY disambiguation mechanism;
         # hostname_guard is a defence-in-depth safety net for shared slug files.
-        _guard_host = per_uni.pop("hostname_guard", None)
-        if _guard_host is not None:
+        _guard_host = per_uni.pop("hostname_guard", None) or _declared_yaml_hostname(uni_yaml_path)
+        if _guard_host:
             _scrape_host = urlparse(scrape_url).hostname or ""
             _host_ok = _hosts_match(_scrape_host, _guard_host)
             if not _host_ok:
@@ -672,6 +693,7 @@ def load_uni_config(
             scrape_url=scrape_url,
             hostname=_parsed_host,
             university_id=university_id,
+            target_path=uni_yaml_path,
         )
         _stub_data = _load_yaml_file(_stub_path)
         if _stub_data:

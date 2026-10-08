@@ -3,6 +3,12 @@ name: Developer-free recovery UX
 description: Product rule for blocked automatic course recovery and user-facing remediation.
 ---
 
+Automatic repair should fix blockers without needing a developer. When a global rule blocks a valid course, repair should update the university's YAML.
+
+**Why:** The user explicitly repeated this requirement after successive blocked recovery attempts.
+
+**How to apply:** Prove the course from live, course-owned evidence, then apply a scoped university exception through normal validation and persistence. Do not weaken eligibility or domain-ownership checks. Explain unresolved evidence failures honestly rather than promising that every external outage can be repaired.
+
 When automatic recovery cannot recognize an individual course page, the user action is to submit the exact official course URL through the bounded course-report flow. Do not expose scraper configuration, regexes, internal repair stages, or “manual developer investigation” as the remediation.
 
 Provider access failures need an in-app discovery repair action, not only a report form for individual missing courses. Try independently validated official catalogue sources; keep the report form as the fallback when discovery cannot be repaired safely.
