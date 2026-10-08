@@ -1,5 +1,10 @@
 # Release-sample lifecycle verification — 2026-10-02
 
+> Later reconciliation: [October 8 release and live-host evidence](reported-release-reconciliation-2026-10-08.md)
+> shows the October 2 release succeeded on an older target, before the lifecycle
+> update, and later separate releases deployed the update to the same host.
+> This does not retroactively complete the sample acceptance checks below.
+
 ## Outcome: blocked before sample creation
 
 The user separately approved one production smoke sample, with no deployment,

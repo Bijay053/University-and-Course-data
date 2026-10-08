@@ -16,6 +16,19 @@ compare the current tree and revision before diagnosing the original change
 again. Repair the integrated code, rerun affected checks, and preserve the
 original evidence's revision rather than relabelling it as proof of later code.
 
+Reconcile a reported release against its exact successful command target and
+required commit ancestry, not just the fact that a deployment completed.
+
+**Why:** A successful release preceded the lifecycle change it was later
+assumed to contain. Later releases on the same host resolved the missing code,
+but could not make the earlier acceptance observations successful.
+
+**How to apply:** Preserve the historical observation, compare the receipt's
+target with the required change, and independently check current checkout,
+process identities, and deployed source. A failed post-checkout release can
+leave new backend code running; do not equate checkout movement with completion
+or assume that a failed release fully rolled back.
+
 For production course-identity reconciliation, treat a reviewed ID mapping as
 approval for that exact membership, not as permission to absorb newly
 published IDs. New scrape runs can connect previously separate groups even
