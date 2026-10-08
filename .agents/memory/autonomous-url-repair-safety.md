@@ -14,6 +14,19 @@ conflicting blocklist. Success in one workflow did not prove the other worked.
 filters; verify subsequent diagnosis, validated persistence, and verification
 scrape separately. Keep claims limited to the workflow actually exercised.
 
+Repair diagnosis needs the complete effective filter configuration and truthful
+rejection feedback, not just configuration overrides or applied-patch history.
+
+**Why:** After duplicate-proposal suppression was repaired, live Northumbria
+attempts still changed discovery depth instead of the conflicting catch-all
+block rule. Supplying merged gates and explaining rejected proposals enabled
+a validated combined correction. A low candidate count after traversal blocking
+does not prove shallow discovery.
+
+**How to apply:** Keep all active gates visible in diagnosis, distinguish
+proposed/rejected/applied changes, and include validation failures in retry
+history. Preserve full-filter validation; never bypass it to obtain a success.
+
 OpenAI may diagnose and propose discovery changes, but deterministic code must
 validate the complete effective allow, block, must-contain, and final
 course-detail filter before any write. A total-loss job must rescue a material
