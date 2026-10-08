@@ -3125,8 +3125,9 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                         and _c1_meta.get("scope_version") == _DISCOVERY_CACHE_SCOPE_VERSION
                         and _c1_meta.get("scope_key") == _c1_scope_key
                     )
+                    from app.services.scraper.discovery_cache_scope import reusable_course_count
                     _c1_coverage_ok = _discovery_cache_coverage_sufficient(
-                        course_count=len(_c1_course),
+                        course_count=reusable_course_count(_c1_course),
                         expected_min_courses=_c1_expected_min,
                     )
                     if (

@@ -102,3 +102,15 @@ def discovery_cache_coverage_sufficient(
     """Return whether a discovery result is complete enough to cache/reuse."""
     required = max(5, int(expected_min_courses or 0))
     return int(course_count or 0) >= required
+
+
+def reusable_course_count(links: list[dict]) -> int:
+    """Do not let cached navigation satisfy course-coverage requirements."""
+    from app.services.scraper.guards import is_blocked_page
+
+    return sum(
+        1 for link in links
+        if isinstance(link, dict) and isinstance(link.get("url"), str)
+        and link["url"] and not link.get("fee_page") and not link.get("cache_meta")
+        and not is_blocked_page(link["url"], link.get("title"))[0]
+    )

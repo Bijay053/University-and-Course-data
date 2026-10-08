@@ -1874,6 +1874,14 @@ def is_blocked_page(url: str | None, title: str | None = None) -> tuple[bool, st
                 if pat in path:
                     if pat in _host_exceptions:
                         continue  # host-specific exception — skip this block
+                    if pat == "/study-at-" and re.match(
+                        r"^/study-at-[^/]+/courses(?:/|$)", path
+                    ) and _last_path_segment(path) not in {"fees", "funding"}:
+                        # A university's study namespace can own its real
+                        # catalogue (e.g. Northumbria). This only removes the
+                        # namespace veto: all remaining URL/title guards and
+                        # course-owned evidence checks still apply.
+                        continue
                     return (True, reason)
             # Pass 2: last-segment exact match (stricter than substring)
             last = _last_path_segment(path)

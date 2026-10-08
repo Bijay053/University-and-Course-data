@@ -64,3 +64,19 @@ Both patterns have been **removed from the global lists entirely** and moved to 
 UTAS/Flinders category hubs are still correctly blocked by `_is_category_landing()` and `_BLOCK_URL_LAST_SEGMENTS` (independent mechanisms that don't use substring matching).
 
 **Rule going forward:** single-university URL blocks belong in that university's YAML `block_url_patterns`, not in shared Python modules. Use the host-exception dict pattern only as a last resort for patterns that genuinely need to be global.
+
+## Repair evidence must be able to contradict a namespace heuristic
+
+Do not infer that a whole university study namespace is marketing-only.
+Inspect an actual official course and distinguish its catalogue subtree from
+fee, funding, and landing-page siblings.
+
+**Why:** Northumbria's live MSc page was reachable and had course-owned fields,
+but the shared study-namespace veto rejected it in discovery, repair evidence,
+and reported-course recovery. Configuration-only repair could not resolve that
+shared veto, and a cached navigation-only result kept repeating the failure.
+
+**How to apply:** Verify the same official page through the shared guard and
+live repair classifier, preserve sibling exclusions, and ensure cached rejected
+links cannot satisfy course-coverage requirements. Service health alone does
+not verify an automatic repair.
