@@ -154,3 +154,4 @@
 - [Plymouth sitemap and delivery evidence](plymouth-sitemap-delivery.md) — official sitemap misroutes postgraduate awards to 404 undergraduate paths; partnership copy is not course delivery.
 - [Plymouth course locations](plymouth-course-locations.md) — empty application dropdowns are not campuses; course-owned published offerings can supply the real location.
 - [Portsmouth course authority](portsmouth-course-authority.md) — use exact-course instances for delivery/load and international tuition rows for fees; UK-only panels are negative evidence.
+- [Dispatch test failure sentinels](dispatch-test-failure-sentinels.md) — verify mock outcomes outside broad delivery exception handlers so ordering assertions cannot be swallowed.
