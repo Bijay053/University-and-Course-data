@@ -107,6 +107,10 @@ class SmokeFailure(RuntimeError):
     """A safe-restart precondition or proof failed."""
 
 
+class WorkerNotReady(SmokeFailure):
+    """The worker has not yet replied to its initial readiness probe."""
+
+
 def persist_deployment_timing_evidence(
     path: Path,
     *,
@@ -587,6 +591,8 @@ def _worker_snapshot(celery: Any, timeout_seconds: float) -> dict[str, Any]:
     try:
         inspect = celery.control.inspect(timeout=timeout_seconds)
         workers = inspect.ping()
+        if workers is None or workers == {}:
+            raise WorkerNotReady("cannot inspect workers: no ping replies")
         if (
             not isinstance(workers, Mapping)
             or not workers
@@ -624,6 +630,7 @@ async def _wait_for_worker_idle(
     *,
     sample_task_id: str | None = None,
     sample_job_id: str | None = None,
+    wait_for_startup: bool = False,
 ) -> None:
     """Observe return; never revoke, purge queues, or stop a worker."""
     if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
@@ -636,9 +643,17 @@ async def _wait_for_worker_idle(
             raise SmokeFailure("worker tasks did not return within the worker return timeout")
         # Bound the observer process too: a wedged broker/result-backend socket
         # must not extend the wait indefinitely. This never signals a worker.
-        states, result = _worker_observation(
-            min(25.0, remaining), sample_task_id
-        )
+        try:
+            states, result = _worker_observation(
+                min(25.0, remaining), sample_task_id
+            )
+        except WorkerNotReady:
+            # Only the initial post-restart absence of replies is readiness.
+            # Once observed, a disappearing worker remains a hard failure.
+            if not wait_for_startup or expected_workers is not None or sample_task_id is not None:
+                raise
+            await asyncio.sleep(min(1.0, max(0.0, deadline - time.monotonic())))
+            continue
         workers = states["_workers"]
         if expected_workers is None:
             expected_workers = workers
@@ -655,7 +670,20 @@ async def _wait_for_worker_idle(
                 and task["name"] == "scrape.university"
                 and task.get("args") in ([sample_job_id], (sample_job_id,))
             )
-            if not owned_sample and task["name"] not in TRANSIENT_WORKER_TASKS:
+            kwargs = task.get("kwargs")
+            owned_performance = (
+                sample_task_id is not None
+                and sample_job_id is not None
+                and task["name"] == "scrape.record_job_performance"
+                and task.get("args") in ([], ())
+                and isinstance(kwargs, Mapping)
+                and set(kwargs) == {"university_id", "job_id"}
+                and kwargs["job_id"] == sample_job_id
+                and isinstance(kwargs["university_id"], int)
+                and not isinstance(kwargs["university_id"], bool)
+                and kwargs["university_id"] > 0
+            )
+            if not owned_sample and not owned_performance and task["name"] not in TRANSIENT_WORKER_TASKS:
                 raise SmokeFailure(
                     f"unrelated worker task prevents release: {task['name']} id={task['id']}"
                 )
@@ -687,10 +715,18 @@ def _worker_observation(
 ) -> tuple[dict[str, Any], Mapping[str, Any] | None]:
     """Read-only, killable observer; keep every broker operation wall-clock bounded."""
     code = """
-import json, sys
-from deploy.safe_restart_smoke import _worker_snapshot
+import importlib.util, json, sys
+spec = importlib.util.spec_from_file_location("release_smoke_observer", sys.argv[3])
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+_worker_snapshot, WorkerNotReady = module._worker_snapshot, module.WorkerNotReady
 from app.tasks.celery_app import celery_app
-states = _worker_snapshot(celery_app, min(5.0, float(sys.argv[1]) / 5))
+try:
+    states = _worker_snapshot(celery_app, min(5.0, float(sys.argv[1]) / 5))
+except WorkerNotReady:
+    print(json.dumps({"not_ready": True}))
+    sys.exit(0)
 result = None
 if sys.argv[2]:
     sample = celery_app.AsyncResult(sys.argv[2])
@@ -700,15 +736,19 @@ print(json.dumps({"states": states, "result": result}))
 """
     try:
         raw = _run(
-            [sys.executable, "-B", "-c", code, str(timeout_seconds), sample_task_id or ""],
+            [sys.executable, "-B", "-c", code, str(timeout_seconds), sample_task_id or "", str(Path(__file__).resolve())],
             timeout=timeout_seconds,
             stdout_only=True,
         )
         observation = json.loads(raw)
+        if observation == {"not_ready": True}:
+            raise WorkerNotReady("cannot inspect workers: no ping replies")
         states = observation["states"]
         if not isinstance(states, dict) or set(states) != {"reserved", "scheduled", "active", "_workers"}:
             raise ValueError("invalid worker states")
         return states, observation["result"]
+    except WorkerNotReady:
+        raise
     except (SmokeFailure, OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as exc:
         raise SmokeFailure("cannot inspect worker lifecycle within the observation deadline") from exc
 

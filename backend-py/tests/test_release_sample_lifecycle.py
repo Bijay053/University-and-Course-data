@@ -111,6 +111,148 @@ async def test_persistent_restart_activity_refuses_release(monkeypatch, lifecycl
 
 
 @pytest.mark.asyncio
+async def test_post_restart_initial_readiness_waits_for_complete_idle(monkeypatch, lifecycle):
+    reads = iter([None, snapshot(task("scrape.requeue_stale", "beat", None)), snapshot()])
+
+    def observe(*_):
+        view = next(reads)
+        if view is None:
+            raise smoke.WorkerNotReady("no ping replies")
+        return view, None
+
+    monkeypatch.setattr(smoke, "_worker_observation", observe)
+    await smoke._wait_for_worker_idle(5, wait_for_startup=True)
+    assert lifecycle.sleeps == [1, 1]
+
+
+@pytest.mark.asyncio
+async def test_post_restart_readiness_is_bounded(monkeypatch, lifecycle):
+    def observe(*_):
+        raise smoke.WorkerNotReady("no ping replies")
+
+    monkeypatch.setattr(smoke, "_worker_observation", observe)
+    with pytest.raises(smoke.SmokeFailure, match="did not return"):
+        await smoke._wait_for_worker_idle(2, wait_for_startup=True)
+    assert lifecycle.now == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("wait,observed", [(False, False), (True, True)])
+async def test_readiness_never_excuses_missing_established_worker(monkeypatch, lifecycle, wait, observed):
+    reads = iter([snapshot(task("scrape.requeue_stale", "beat", None)), None] if observed else [None])
+
+    def observe(*_):
+        view = next(reads)
+        if view is None:
+            raise smoke.WorkerNotReady("no ping replies")
+        return view, None
+
+    monkeypatch.setattr(smoke, "_worker_observation", observe)
+    with pytest.raises(smoke.WorkerNotReady):
+        await smoke._wait_for_worker_idle(5, wait_for_startup=wait)
+
+
+@pytest.mark.asyncio
+async def test_startup_malformed_inspection_is_not_retried(monkeypatch, lifecycle):
+    def observe(*_):
+        raise smoke.SmokeFailure("incomplete active replies")
+
+    monkeypatch.setattr(smoke, "_worker_observation", observe)
+    with pytest.raises(smoke.SmokeFailure, match="incomplete"):
+        await smoke._wait_for_worker_idle(5, wait_for_startup=True)
+    assert not lifecycle.sleeps
+
+
+def performance_task(job_id="sample-job"):
+    return {
+        "name": "scrape.record_job_performance", "id": "performance-task",
+        "args": [], "kwargs": {"university_id": 1, "job_id": job_id},
+    }
+
+
+@pytest.mark.parametrize("state", ["active", "reserved", "scheduled"])
+@pytest.mark.asyncio
+async def test_owned_sample_performance_must_really_finish(monkeypatch, lifecycle, state):
+    view = snapshot()
+    view[state] = [performance_task()]
+    reads = iter([view, snapshot()])
+    monkeypatch.setattr(smoke, "_worker_snapshot", lambda *_: next(reads))
+    monkeypatch.setattr(celery_app, "AsyncResult", lambda _: SimpleNamespace(
+        state="SUCCESS", result={"ok": True, "id": "sample-job"},
+    ))
+    await smoke._wait_for_worker_idle(5, sample_task_id="sample-task", sample_job_id="sample-job")
+    assert lifecycle.sleeps == [1]
+
+
+@pytest.mark.parametrize("bad", [
+    performance_task("other-job"),
+    {**performance_task(), "kwargs": "{'job_id':'sample-job'}"},
+    {**performance_task(), "args": ["sample-job"]},
+    {**performance_task(), "kwargs": {"job_id": "sample-job"}},
+    {**performance_task(), "kwargs": {"job_id": "sample-job", "university_id": True}},
+])
+@pytest.mark.parametrize("state", ["active", "reserved", "scheduled"])
+@pytest.mark.asyncio
+async def test_unproven_performance_ownership_refuses_release(monkeypatch, lifecycle, bad, state):
+    view = snapshot()
+    view[state] = [bad]
+    monkeypatch.setattr(smoke, "_worker_snapshot", lambda *_: view)
+    monkeypatch.setattr(celery_app, "AsyncResult", lambda _: SimpleNamespace(
+        state="SUCCESS", result={"ok": True, "id": "sample-job"},
+    ))
+    with pytest.raises(smoke.SmokeFailure, match="unrelated worker task"):
+        await smoke._wait_for_worker_idle(5, sample_task_id="sample-task", sample_job_id="sample-job")
+    assert not lifecycle.sleeps
+
+
+@pytest.mark.asyncio
+async def test_performance_is_not_allowed_without_owned_sample(monkeypatch, lifecycle):
+    monkeypatch.setattr(smoke, "_worker_snapshot", lambda *_: snapshot(performance_task()))
+    with pytest.raises(smoke.SmokeFailure, match="unrelated worker task"):
+        await smoke._wait_for_worker_idle(5)
+
+
+@pytest.mark.asyncio
+async def test_owned_performance_timeout_still_refuses_release(monkeypatch, lifecycle):
+    monkeypatch.setattr(smoke, "_worker_snapshot", lambda *_: snapshot(performance_task()))
+    monkeypatch.setattr(celery_app, "AsyncResult", lambda _: SimpleNamespace(
+        state="SUCCESS", result={"ok": True, "id": "sample-job"},
+    ))
+    with pytest.raises(smoke.SmokeFailure, match="did not return"):
+        await smoke._wait_for_worker_idle(2, sample_task_id="sample-task", sample_job_id="sample-job")
+
+
+def test_observer_preserves_only_explicit_not_ready_marker(monkeypatch):
+    monkeypatch.setattr(smoke, "_run", lambda *a, **k: '{"not_ready":true}')
+    with pytest.raises(smoke.WorkerNotReady):
+        smoke._worker_observation(5, None)
+    monkeypatch.setattr(smoke, "_run", lambda *a, **k: '{"not_ready":true,"active":[]}')
+    with pytest.raises(smoke.SmokeFailure, match="observation deadline"):
+        smoke._worker_observation(5, None)
+
+
+def test_observer_loads_its_own_reviewed_helper(monkeypatch):
+    def run(command, **_):
+        assert command[-1] == str(Path(smoke.__file__).resolve())
+        compile(command[3], "<worker-observer>", "exec")
+        return '{"states":{"active":[],"reserved":[],"scheduled":[],"_workers":["worker"]},"result":null}'
+
+    monkeypatch.setattr(smoke, "_run", run)
+    assert smoke._worker_observation(5, None)[0] == snapshot()
+
+
+def test_precheckout_smoke_uses_target_without_modifying_installed_helper():
+    source = (Path(smoke.__file__).parent / "guarded_release.sh").read_text()
+    fence = source.index('verify "$repo_root" "$predecessor" "$target"')
+    extract = source.index('"$target:backend-py/deploy/safe_restart_smoke.py" > "$smoke_helper"')
+    run = source.index('"$python_bin" -B "$smoke_helper"')
+    cleanup = source.index('rm -f "$smoke_helper"', run)
+    pause = source.index("# Pause consumption")
+    assert fence < extract < run < cleanup < pause
+    assert 'trap \'rm -f "$smoke_helper"\' EXIT' in source
+
+
+@pytest.mark.asyncio
 async def test_disappearing_worker_is_not_an_idle_worker(monkeypatch, lifecycle):
     first = snapshot(task("scrape.requeue_stale", "beat-task", None))
     first["_workers"] = ["worker", "other-worker"]
@@ -243,7 +385,7 @@ async def test_smoke_closes_own_database_loop_even_on_failure(monkeypatch):
 def test_guarded_release_waits_after_restart_without_replacing_idle_guard():
     source = (Path(__file__).resolve().parents[1] / "deploy" / "guarded_release.sh").read_text()
     restart = source.index("systemctl restart uni-api-py.service uni-celery.service")
-    idle = source.index("asyncio.run(_wait_for_worker_idle())", restart)
+    idle = source.index("asyncio.run(_wait_for_worker_idle(120, wait_for_startup=True))", restart)
     identity = source.index("--release-identity-only", restart)
     assert restart < idle < identity
     assert 'states = {state:getattr(inspect,state)() for state in ("reserved","scheduled","active")}' in source

@@ -62,8 +62,16 @@ if [ "$release_test_mode" != 1 ]; then
   export PYTHONPATH=.
   run_release_user "$revision_fence" verify "$repo_root" "$predecessor" "$target"
   verify_target_worker_schema
-  "$python_bin" -B deploy/safe_restart_smoke.py \
+  # Use the reviewed target's sample lifecycle rules before checkout, without
+  # modifying installed code. Keep the helper beside its pinned proof assets.
+  smoke_helper="$(mktemp "$backend_root/deploy/.release-smoke.XXXXXX.py")"
+  trap 'rm -f "$smoke_helper"' EXIT
+  run_release_user git -C "$repo_root" show \
+    "$target:backend-py/deploy/safe_restart_smoke.py" > "$smoke_helper"
+  "$python_bin" -B "$smoke_helper" \
     --expected-rehearsal-account-id "$expected_disposable_account"
+  rm -f "$smoke_helper"
+  trap - EXIT
 fi
 
 # Pause consumption, then inspect every task state before changing code.
@@ -287,7 +295,7 @@ systemctl restart uni-api-py.service uni-celery.service
 .venv/bin/python -B - <<'PY'
 import asyncio
 from deploy.safe_restart_smoke import _wait_for_worker_idle
-asyncio.run(_wait_for_worker_idle())
+asyncio.run(_wait_for_worker_idle(120, wait_for_startup=True))
 PY
 .venv/bin/python -B deploy/safe_restart_smoke.py \
   --release-identity-only --journal-since "$smoke_since" \
