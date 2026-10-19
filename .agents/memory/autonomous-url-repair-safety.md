@@ -5,6 +5,12 @@ description: Safety contract for operator-triggered OpenAI URL-filter repairs.
 
 Treat URL heuristics as repairable configuration, not as proof against inspecting a page.
 
+Carry independently verified course identities into every subsequent filter simulation.
+
+**Why:** A live-validated opaque course route can fail the legacy URL-shape classifier. Reclassifying it after accepting a repair makes rescue counts zero, preventing verification and incorrectly advancing into unrelated field repairs.
+
+**How to apply:** Preserve the trusted live-course set through baseline, proposal, termination and unchanged-config checks. Do not trust arbitrary URLs or relax audience checks for field changes.
+
 **Why:** Applying the same mistaken global URL veto before gathering course-owned evidence prevents automatic repair from ever proving the exception it needs. Conversely, a promising URL alone never proves course eligibility.
 
 **How to apply:** Evaluate positive course-owned award and field evidence independently of repairable URL heuristics; retain hard eligibility checks. Verify a saved exception survives both discovery and staging, including full-URL regex matching.

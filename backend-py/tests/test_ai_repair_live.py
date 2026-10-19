@@ -932,6 +932,42 @@ async def test_shared_url_heuristic_repaired_by_exact_yaml_exception(monkeypatch
     assert "course_detail_url_patterns" in ctx["yaml_file"].read_text()
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("already_fixed", [False, True])
+async def test_live_proven_opaque_courses_finish_discovery_without_field_repair(monkeypatch, tmp_path, already_fixed):
+    from app.services.ai_repair_workflow import accepted_live_probe
+    urls = ["https://university.example/course/appcmpms/", "https://university.example/course/desresma/"]
+    assert all(not agent._is_course_url(url) for url in urls)
+    ctx = context(repair_course_url_sample=urls, repair_url_sample=urls, dropped_sample=urls,
+                  effective_discovery={"allow_url_patterns": ["/course/" if already_fixed else "/broken/"]},
+                  yaml_file=tmp_path / "university.yaml", unis_dir=tmp_path)
+    chat = mock_loop(monkeypatch, ctx, {
+        "confidence": 95, "diagnosis": "Wrong allowlist",
+        "patches": [{"section": "discovery", "field": "allow_url_patterns", "value": ["/course/"]}],
+    })
+    async def fetch(url, *_args):
+        # No international-price/audience evidence: this is a URL repair,
+        # not permission to write fee or audience extraction rules.
+        html = '<main><h1>MSc Computing</h1><dl><dt>Award</dt><dd>MSc</dd><dt>Duration</dt><dd>1 year</dd></dl></main>'
+        listing = '<main><h1>Our courses</h1>' + "".join(f'<a href="{u}">MSc Computing</a>' for u in urls) + '</main>'
+        return (listing if url == SEED else html), "", ""
+    monkeypatch.setattr(live, "_fetch_official", fetch)
+    monkeypatch.setattr(agent, "_assert_effective_discovery_patch", AsyncMock())
+    result = await agent.run_ai_repair_loop("job-live", FakeDb())
+    assert result["status"] == "completed", result
+    assert len(result["attempts"]) == 1
+    assert result["attempts"][0]["after_pass_count"] == 2
+    assert accepted_live_probe(result)
+    if already_fixed:
+        chat.assert_not_awaited()
+
+
+def test_unverified_opaque_urls_do_not_count_as_proven_courses():
+    url = "https://university.example/course/appcmpms/"
+    assert agent._simulate_filter([url], ["/course/"], [])["total"] == 0
+    assert agent._simulate_filter([url], ["/course/"], [], confirmed_course_urls=[url])["after"] == 1
+
+
 @pytest.mark.parametrize("html", [
     "<main><h1>Bachelor of Laws</h1><p>Our programmes</p></main>",
     course(extra="<p>This course is available to domestic students only.</p>"),

@@ -29,7 +29,7 @@ import uuid
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 log = logging.getLogger(__name__)
 
@@ -2231,8 +2231,13 @@ def _simulate_filter(
     block_pats: list[str],
     must_contain: list[str] | None = None,
     course_detail_pats: list[str] | None = None,
+    *,
+    confirmed_course_urls: Iterable[str] = (),
 ) -> dict:
-    course_urls = [u for u in dropped if _is_course_url(u)]
+    # URL shape is only a heuristic. Independently verified live course pages
+    # (including opaque /course/abc123/ routes) must survive this second pass.
+    confirmed = set(confirmed_course_urls)
+    course_urls = [u for u in dropped if u in confirmed or _is_course_url(u)]
     if not course_urls:
         return {"before": 0, "after": 0, "total": 0, "rescued": []}
 
@@ -2936,12 +2941,17 @@ async def run_ai_repair_loop(
         # UI deterministic evidence to launch the fresh verification scrape.
         current_disc = dict(ctx.get("effective_discovery") or {})
         current_urls = ctx.get("repair_url_sample") or ctx.get("dropped_sample") or []
+        confirmed_course_urls = {
+            url for url, page in live.initial.items()
+            if page.get("classification") == "course"
+        } if live is not None else set()
         current_sim = _simulate_filter(
             current_urls,
             current_disc.get("allow_url_patterns", []),
             current_disc.get("block_url_patterns", []),
             current_disc.get("must_contain", []),
             current_disc.get("course_detail_url_patterns", []),
+            confirmed_course_urls=confirmed_course_urls,
         )
         current_minimum = max(1, (current_sim["total"] + 1) // 2)
         if (
@@ -3057,6 +3067,7 @@ async def run_ai_repair_loop(
                     ]
                 if existing_patterns and not _simulate_filter(
                     known_courses, existing_patterns, [], [], [],
+                    confirmed_course_urls=confirmed_course_urls,
                 )["after"]:
                     deterministic_patterns = proposed_allow_patterns(known_courses, existing_patterns) or deterministic_patterns
                 if deterministic_patterns and any(
@@ -3259,6 +3270,7 @@ async def run_ai_repair_loop(
                 current_disc.get("block_url_patterns", []),
                 current_disc.get("must_contain", []),
                 current_disc.get("course_detail_url_patterns", []),
+                confirmed_course_urls=confirmed_course_urls,
             )
             sim["before"] = sim["after"]
             _URL_FILTER_FIELDS = {
@@ -3296,6 +3308,7 @@ async def run_ai_repair_loop(
                         current_disc.get("block_url_patterns", []),
                         current_disc.get("must_contain", []),
                         current_disc.get("course_detail_url_patterns", []),
+                        confirmed_course_urls=confirmed_course_urls,
                     )
                     proposed_disc = {**current_disc, **disc_patch}
                     sim = _simulate_filter(
@@ -3304,6 +3317,7 @@ async def run_ai_repair_loop(
                         proposed_disc.get("block_url_patterns", []),
                         proposed_disc.get("must_contain", []),
                         proposed_disc.get("course_detail_url_patterns", []),
+                        confirmed_course_urls=confirmed_course_urls,
                     )
                     sim["before"] = baseline_sim["after"]
 
