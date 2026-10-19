@@ -199,8 +199,13 @@ def set_initial_dispatch_lock(job_id: str) -> None:
     time to claim the job before the lock expires.
     """
     r = None
+    owned_pool = None
     try:
         r = _get_redis()
+        # redis-py sets this literal flag for a pool constructed by the client
+        # (or explicitly transferred to it). Borrowed pools must stay alive.
+        if getattr(r, "auto_close_connection_pool", False) is True:
+            owned_pool = r.connection_pool
         ttl = _REQUEUE_LOCK_TTL_S + 30
         r.set(_requeue_lock_key(job_id), "1", nx=True, ex=ttl)
     except Exception as exc:  # noqa: BLE001
@@ -211,6 +216,18 @@ def set_initial_dispatch_lock(job_id: str) -> None:
                 r.close()
             except Exception as exc:  # noqa: BLE001
                 log.debug("set_initial_dispatch_lock: Redis close failed for %s: %s", job_id, exc)
+                if owned_pool is not None:
+                    try:
+                        # One local disconnect attempt, no retries or Redis
+                        # commands. This private, single-SET client has at most
+                        # one connection; never use a replacement/shared pool
+                        # assigned to the client during a failing close().
+                        owned_pool.disconnect()
+                    except Exception as fallback_exc:  # noqa: BLE001
+                        log.debug(
+                            "set_initial_dispatch_lock: owned pool cleanup failed for %s: %s",
+                            job_id, fallback_exc,
+                        )
 
 
 async def _async_scrape(runtime_job_id: str) -> None:

@@ -58,6 +58,7 @@ def test_closes_owned_client_without_changing_lock_contract(
     from app.tasks import scrape_tasks as st
 
     client = MagicMock()
+    client.auto_close_connection_pool = True
     if set_fails:
         client.set.side_effect = redis.ConnectionError("SET unavailable")
     if close_fails:
@@ -72,6 +73,69 @@ def test_closes_owned_client_without_changing_lock_contract(
     )
     client.close.assert_called_once_with()
     client.delete.assert_not_called()
+    if close_fails:
+        client.connection_pool.disconnect.assert_called_once_with()
+    else:
+        client.connection_pool.disconnect.assert_not_called()
+
+
+@pytest.mark.parametrize("ownership", [False, None, "yes", 1])
+def test_failed_close_never_disconnects_borrowed_or_unknown_pool(monkeypatch, ownership):
+    from app.tasks import scrape_tasks as st
+    client = MagicMock()
+    client.auto_close_connection_pool = ownership
+    client.close.side_effect = redis.ConnectionError("close unavailable")
+    monkeypatch.setitem(st.set_initial_dispatch_lock.__globals__, "_get_redis", lambda: client)
+    st.set_initial_dispatch_lock("borrowed")
+    client.close.assert_called_once_with()
+    client.connection_pool.disconnect.assert_not_called()
+    client.delete.assert_not_called()
+
+
+def test_fallback_uses_captured_owned_pool_and_never_retries(monkeypatch):
+    from app.tasks import scrape_tasks as st
+    owned, borrowed = MagicMock(), MagicMock()
+    owned.disconnect.side_effect = redis.ConnectionError("fallback unavailable")
+    client = MagicMock(auto_close_connection_pool=True, connection_pool=owned)
+    def fail_close():
+        client.connection_pool = borrowed
+        raise redis.ConnectionError("close unavailable")
+    client.close.side_effect = fail_close
+    monkeypatch.setitem(st.set_initial_dispatch_lock.__globals__, "_get_redis", lambda: client)
+    assert st.set_initial_dispatch_lock("captured-owner") is None
+    owned.disconnect.assert_called_once_with()
+    borrowed.disconnect.assert_not_called()
+    client.delete.assert_not_called()
+
+
+def test_borrowed_real_pool_remains_usable_after_failed_close(monkeypatch, isolated_redis):
+    from app.tasks import scrape_tasks as st
+    socket_path, observer = isolated_redis
+    pool = redis.ConnectionPool(
+        connection_class=redis.UnixDomainSocketConnection, path=socket_path,
+        decode_responses=True, socket_connect_timeout=1, socket_timeout=1,
+    )
+    borrowed = redis.Redis(connection_pool=pool)
+    peer = redis.Redis(connection_pool=pool)
+    pool.disconnect = MagicMock(wraps=pool.disconnect)
+    borrowed.close = MagicMock(side_effect=redis.ConnectionError("close unavailable"))
+    monkeypatch.setitem(st.set_initial_dispatch_lock.__globals__, "_get_redis", lambda: borrowed)
+    monkeypatch.setattr(redis.Connection, "connect", lambda *_a, **_k: pytest.fail("shared broker prohibited"))
+    try:
+        assert borrowed.auto_close_connection_pool is False
+        peer.set("peer-owned", "keep", ex=600)
+        expiry = observer.pexpiretime("peer-owned")
+        connections = observer.info("clients")["connected_clients"]
+        assert st.set_initial_dispatch_lock("borrowed-real") is None
+        borrowed.close.assert_called_once_with()
+        pool.disconnect.assert_not_called()
+        assert peer.get("peer-owned") == "keep"
+        assert observer.pexpiretime("peer-owned") == expiry
+        assert observer.get(st._requeue_lock_key("borrowed-real")) == "1"
+        assert observer.info("clients")["connected_clients"] == connections
+    finally:
+        # The test owns this shared fixture pool, but the helper does not.
+        pool.disconnect()
 
 
 def test_client_creation_failure_remains_best_effort(monkeypatch):
@@ -356,6 +420,9 @@ async def test_bulk_skips_active_jobs_without_delivery_or_lock(
         ("success", "command_failure"),
         ("success", "client_creation_failure"),
         ("success", "close_failure"),
+        ("success", "nx_collision_close_failure"),
+        ("success", "command_failure_close_failure"),
+        ("success", "fallback_failure"),
         ("success", "nx_collision"),
     ],
 )
@@ -379,6 +446,14 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
     creation_failures = []
     close_attempts = []
     written_expiries = {}
+    close_fails = lock_outcome in {
+        "close_failure", "nx_collision_close_failure",
+        "command_failure_close_failure", "fallback_failure",
+    }
+    collision = lock_outcome in {"nx_collision", "nx_collision_close_failure"}
+    set_fails = lock_outcome in {"command_failure", "command_failure_close_failure"}
+    fallback_attempts = []
+    teardown_disconnects = []
 
     def forbid_tcp(*args, **kwargs):
         pytest.fail("API dispatch test attempted a non-disposable Redis connection")
@@ -401,20 +476,26 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
 
         def observed_close():
             close_attempts.append(client)
-            if lock_outcome == "close_failure":
-                # Raise before releasing the real connection. Test teardown,
-                # not a finalizer or the failing close(), must disconnect it.
+            if close_fails:
+                # Raise before releasing the connection: application fallback
+                # must clean it up independently of test teardown/finalizers.
                 raise redis.ConnectionError("close unavailable")
             return real_close()
 
         client.close = MagicMock(side_effect=observed_close)
-        client.connection_pool.disconnect = MagicMock(
-            wraps=client.connection_pool.disconnect,
-        )
+        real_disconnect = client.connection_pool.disconnect
+        teardown_disconnects.append(real_disconnect)
+        def observed_disconnect():
+            if close_fails:
+                fallback_attempts.append(client)
+            if lock_outcome == "fallback_failure":
+                raise redis.ConnectionError("fallback unavailable")
+            return real_disconnect()
+        client.connection_pool.disconnect = MagicMock(side_effect=observed_disconnect)
         real_set = client.set
 
         def observed_set(name, value, **kwargs):
-            if lock_outcome == "command_failure":
+            if set_fails:
                 # Connect to private Redis and fail the actual SET command.
                 kwargs["ex"] = 0
             try:
@@ -423,7 +504,7 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
                 set_failures.append(name)
                 raise
             set_results.append((name, result))
-            if lock_outcome == "close_failure":
+            if close_fails:
                 written_expiries[name] = observer.pexpiretime(name)
             return result
 
@@ -456,7 +537,7 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
             failed_ids.append(job_id)
             events.append(("failed", job_id))
             raise redis.ConnectionError("mocked Celery delivery failure")
-        if lock_outcome == "nx_collision":
+        if collision:
             key = st._requeue_lock_key(job_id)
             observer.set(key, "existing-owner", ex=600)
             existing_expiries[key] = observer.pexpiretime(key)
@@ -513,7 +594,7 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
                         "sessionId": session.rows[0].request_payload["session_id"],
                         "queued": 3, "ok": True,
                     }
-                retained_connections = len(retained_clients) if lock_outcome == "close_failure" else 0
+                retained_connections = len(retained_clients) if lock_outcome == "fallback_failure" else 0
                 assert len(os.listdir("/proc/self/fd")) <= baseline + retained_connections
                 assert lock_spy.call_count == len(delivered_ids)
                 assert factory_spy.call_count == len(delivered_ids)
@@ -522,13 +603,13 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
                 )
                 for row in session.rows:
                     key = st._requeue_lock_key(row.runtime_job_id)
-                    if lock_outcome == "nx_collision":
+                    if collision:
                         assert observer.get(key) == "existing-owner"
                         assert observer.pexpiretime(key) == existing_expiries[key]
-                    elif lock_outcome in {"success", "close_failure"} and row.runtime_job_id in delivered_ids:
+                    elif lock_outcome in {"success", "close_failure", "fallback_failure"} and row.runtime_job_id in delivered_ids:
                         assert observer.get(key) == "1"
                         assert 0 < observer.ttl(key) <= st._REQUEUE_LOCK_TTL_S + 30
-                        if lock_outcome == "close_failure":
+                        if close_fails:
                             assert observer.pexpiretime(key) == written_expiries[key]
                     else:
                         assert observer.get(key) is None
@@ -558,27 +639,30 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
                 assert retained_clients == []
                 assert set_results == set_failures == []
                 assert observer.dbsize() == 0
-            elif lock_outcome == "command_failure":
+            elif set_fails:
                 assert set_failures == delivered_keys
                 assert set_results == []
                 assert observer.dbsize() == 0
             else:
                 assert set_failures == []
-                expected_result = None if lock_outcome == "nx_collision" else True
+                expected_result = None if collision else True
                 assert set_results == [(key, expected_result) for key in delivered_keys]
                 assert observer.dbsize() == len(delivered_ids)
-            if lock_outcome == "nx_collision":
+            if collision:
                 assert set(existing_expiries) == set(delivered_keys)
             assert close_attempts == retained_clients
-            retained_connections = len(retained_clients) if lock_outcome == "close_failure" else 0
+            retained_connections = len(retained_clients) if lock_outcome == "fallback_failure" else 0
             assert observer.info("clients")["connected_clients"] == baseline_connections + retained_connections
-            if lock_outcome == "close_failure":
+            if close_fails:
+                assert fallback_attempts == retained_clients
+                assert len(teardown_disconnects) == len(retained_clients)
+                for owned_client in retained_clients:
+                    owned_client.connection_pool.disconnect.assert_called_once_with()
+            if close_fails and not set_fails:
                 assert set(written_expiries) == set(delivered_keys)
                 for key in delivered_keys:
-                    assert observer.get(key) == "1"
+                    assert observer.get(key) == ("existing-owner" if collision else "1")
                     assert observer.pexpiretime(key) == written_expiries[key]
-                for owned_client in retained_clients:
-                    owned_client.connection_pool.disconnect.assert_not_called()
             client_ids = [] if lock_outcome == "client_creation_failure" else delivered_ids
             for job_id, owned_client in zip(client_ids, retained_clients, strict=True):
                 owned_client.set.assert_called_once_with(
@@ -591,11 +675,9 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
         try:
             # Direct pool teardown still runs when assertions or injected
             # close() fail; all clients remain retained until this point.
-            for owned_client in retained_clients:
-                owned_client.connection_pool.disconnect()
-            if lock_outcome == "close_failure":
-                for owned_client in retained_clients:
-                    owned_client.connection_pool.disconnect.assert_called_once_with()
+            for disconnect in teardown_disconnects:
+                disconnect()
+            if close_fails:
                 if baseline is not None:
                     assert len(os.listdir("/proc/self/fd")) <= baseline
                     # Redis observes socket EOF asynchronously; boundedly wait

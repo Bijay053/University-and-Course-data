@@ -67,3 +67,4 @@ backend-py/baselines/
 baselines/
 ielts_overall
 attached_assets/
+/generated-artifacts/
