@@ -354,6 +354,7 @@ async def test_bulk_skips_active_jobs_without_delivery_or_lock(
         ("failure", "success"),
         ("alternating", "success"),
         ("success", "command_failure"),
+        ("success", "client_creation_failure"),
         ("success", "nx_collision"),
     ],
 )
@@ -374,6 +375,7 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
     set_results = []
     set_failures = []
     existing_expiries = {}
+    creation_failures = []
 
     def forbid_tcp(*args, **kwargs):
         pytest.fail("API dispatch test attempted a non-disposable Redis connection")
@@ -382,6 +384,12 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
     monkeypatch.setattr(redis.Connection, "connect", forbid_tcp)
 
     def redis_factory():
+        if lock_outcome == "client_creation_failure":
+            # Exercise the actual helper's factory boundary, before a client
+            # exists. Record externally so broad exception handlers cannot
+            # conceal a missing helper invocation or delivery-order failure.
+            creation_failures.append(events[-1])
+            raise redis.ConnectionError("client unavailable")
         client = redis.Redis(
             unix_socket_path=socket_path, decode_responses=True,
             socket_connect_timeout=1, socket_timeout=1,
@@ -408,7 +416,8 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
 
     real_lock = st.set_initial_dispatch_lock
     # Patch the actual helper globals, including after import/reload tests.
-    monkeypatch.setitem(real_lock.__globals__, "_get_redis", redis_factory)
+    factory_spy = MagicMock(side_effect=redis_factory)
+    monkeypatch.setitem(real_lock.__globals__, "_get_redis", factory_spy)
 
     def lock_after_delivery(job_id):
         assert events[-1] == ("delivered", job_id)
@@ -487,7 +496,10 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
                     }
                 assert len(os.listdir("/proc/self/fd")) <= baseline
                 assert lock_spy.call_count == len(delivered_ids)
-                assert len(retained_clients) == len(delivered_ids)
+                assert factory_spy.call_count == len(delivered_ids)
+                assert len(retained_clients) == (
+                    0 if lock_outcome == "client_creation_failure" else len(delivered_ids)
+                )
                 for row in session.rows:
                     key = st._requeue_lock_key(row.runtime_job_id)
                     if lock_outcome == "nx_collision":
@@ -513,10 +525,18 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
             assert len(set(delivered_ids + failed_ids)) == total
             assert [call.args[0] for call in lock_spy.call_args_list] == delivered_ids
             assert set(delivered_ids).isdisjoint(failed_ids)
+            assert len(sessions) == 32
+            assert len({id(session) for session in sessions}) == 32
+            assert factory_spy.call_args_list == [call() for _ in delivered_ids]
             delivered_keys = [st._requeue_lock_key(job_id) for job_id in delivered_ids]
             # Check outcomes outside the best-effort helper/route exception
             # handlers, which could otherwise swallow a failed mock assertion.
-            if lock_outcome == "command_failure":
+            if lock_outcome == "client_creation_failure":
+                assert creation_failures == [("lock", jid) for jid in delivered_ids]
+                assert retained_clients == []
+                assert set_results == set_failures == []
+                assert observer.dbsize() == 0
+            elif lock_outcome == "command_failure":
                 assert set_failures == delivered_keys
                 assert set_results == []
                 assert observer.dbsize() == 0
@@ -528,7 +548,8 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
             if lock_outcome == "nx_collision":
                 assert set(existing_expiries) == set(delivered_keys)
             assert observer.info("clients")["connected_clients"] == baseline_connections
-            for job_id, owned_client in zip(delivered_ids, retained_clients, strict=True):
+            client_ids = [] if lock_outcome == "client_creation_failure" else delivered_ids
+            for job_id, owned_client in zip(client_ids, retained_clients, strict=True):
                 owned_client.set.assert_called_once_with(
                     st._requeue_lock_key(job_id), "1",
                     nx=True, ex=st._REQUEUE_LOCK_TTL_S + 30,
