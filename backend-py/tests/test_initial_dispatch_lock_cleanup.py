@@ -355,6 +355,7 @@ async def test_bulk_skips_active_jobs_without_delivery_or_lock(
         ("alternating", "success"),
         ("success", "command_failure"),
         ("success", "client_creation_failure"),
+        ("success", "close_failure"),
         ("success", "nx_collision"),
     ],
 )
@@ -376,6 +377,8 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
     set_failures = []
     existing_expiries = {}
     creation_failures = []
+    close_attempts = []
+    written_expiries = {}
 
     def forbid_tcp(*args, **kwargs):
         pytest.fail("API dispatch test attempted a non-disposable Redis connection")
@@ -394,7 +397,20 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
             unix_socket_path=socket_path, decode_responses=True,
             socket_connect_timeout=1, socket_timeout=1,
         )
-        client.close = MagicMock(wraps=client.close)
+        real_close = client.close
+
+        def observed_close():
+            close_attempts.append(client)
+            if lock_outcome == "close_failure":
+                # Raise before releasing the real connection. Test teardown,
+                # not a finalizer or the failing close(), must disconnect it.
+                raise redis.ConnectionError("close unavailable")
+            return real_close()
+
+        client.close = MagicMock(side_effect=observed_close)
+        client.connection_pool.disconnect = MagicMock(
+            wraps=client.connection_pool.disconnect,
+        )
         real_set = client.set
 
         def observed_set(name, value, **kwargs):
@@ -407,6 +423,8 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
                 set_failures.append(name)
                 raise
             set_results.append((name, result))
+            if lock_outcome == "close_failure":
+                written_expiries[name] = observer.pexpiretime(name)
             return result
 
         client.set = MagicMock(side_effect=observed_set)
@@ -466,6 +484,7 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
         else {"university_ids": [43, 41, 42], "fast_mode": False}
     )
     jobs_per_request = 1 if endpoint == "start" else 3
+    baseline = baseline_connections = None
     gc_was_enabled = gc.isenabled()
     gc.disable()
     try:
@@ -494,7 +513,8 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
                         "sessionId": session.rows[0].request_payload["session_id"],
                         "queued": 3, "ok": True,
                     }
-                assert len(os.listdir("/proc/self/fd")) <= baseline
+                retained_connections = len(retained_clients) if lock_outcome == "close_failure" else 0
+                assert len(os.listdir("/proc/self/fd")) <= baseline + retained_connections
                 assert lock_spy.call_count == len(delivered_ids)
                 assert factory_spy.call_count == len(delivered_ids)
                 assert len(retained_clients) == (
@@ -505,9 +525,11 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
                     if lock_outcome == "nx_collision":
                         assert observer.get(key) == "existing-owner"
                         assert observer.pexpiretime(key) == existing_expiries[key]
-                    elif lock_outcome == "success" and row.runtime_job_id in delivered_ids:
+                    elif lock_outcome in {"success", "close_failure"} and row.runtime_job_id in delivered_ids:
                         assert observer.get(key) == "1"
                         assert 0 < observer.ttl(key) <= st._REQUEUE_LOCK_TTL_S + 30
+                        if lock_outcome == "close_failure":
+                            assert observer.pexpiretime(key) == written_expiries[key]
                     else:
                         assert observer.get(key) is None
 
@@ -547,7 +569,16 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
                 assert observer.dbsize() == len(delivered_ids)
             if lock_outcome == "nx_collision":
                 assert set(existing_expiries) == set(delivered_keys)
-            assert observer.info("clients")["connected_clients"] == baseline_connections
+            assert close_attempts == retained_clients
+            retained_connections = len(retained_clients) if lock_outcome == "close_failure" else 0
+            assert observer.info("clients")["connected_clients"] == baseline_connections + retained_connections
+            if lock_outcome == "close_failure":
+                assert set(written_expiries) == set(delivered_keys)
+                for key in delivered_keys:
+                    assert observer.get(key) == "1"
+                    assert observer.pexpiretime(key) == written_expiries[key]
+                for owned_client in retained_clients:
+                    owned_client.connection_pool.disconnect.assert_not_called()
             client_ids = [] if lock_outcome == "client_creation_failure" else delivered_ids
             for job_id, owned_client in zip(client_ids, retained_clients, strict=True):
                 owned_client.set.assert_called_once_with(
@@ -557,7 +588,22 @@ async def test_repeated_api_dispatch_keeps_queued_contract_and_releases_redis(
                 owned_client.close.assert_called_once_with()
                 owned_client.delete.assert_not_called()
     finally:
-        for owned_client in retained_clients:
-            owned_client.connection_pool.disconnect()
-        if gc_was_enabled:
-            gc.enable()
+        try:
+            # Direct pool teardown still runs when assertions or injected
+            # close() fail; all clients remain retained until this point.
+            for owned_client in retained_clients:
+                owned_client.connection_pool.disconnect()
+            if lock_outcome == "close_failure":
+                for owned_client in retained_clients:
+                    owned_client.connection_pool.disconnect.assert_called_once_with()
+                if baseline is not None:
+                    assert len(os.listdir("/proc/self/fd")) <= baseline
+                    # Redis observes socket EOF asynchronously; boundedly wait
+                    # for server-side accounting, without masking a leak.
+                    deadline = time.monotonic() + 5
+                    while observer.info("clients")["connected_clients"] != baseline_connections:
+                        assert time.monotonic() < deadline, "retained Redis connections survived teardown"
+                        time.sleep(0.01)
+        finally:
+            if gc_was_enabled:
+                gc.enable()
