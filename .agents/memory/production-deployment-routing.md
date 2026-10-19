@@ -18,6 +18,18 @@ characters worked), reconstruct and hash-check every object, parse raw tree
 objects as binary, and compare returned IDs before advancing the remote branch.
 Never replace unavailable push credentials by copying secrets.
 
+Pace GitHub connector object transfers and retry transient rate-limit/server
+failures before treating them as corrupt Git objects.
+
+**Why:** Parallel object uploads exceeded the connector's 10 requests/second
+limit, and a valid tree creation returned a transient server error. A subsequent
+read can confirm an object exists even if its creation response was lost.
+
+**How to apply:** Transfer dependencies before parents, throttle requests, use
+bounded backoff, and require exact returned object hashes before advancing the
+branch without force. Keep compressed transfer data temporary rather than
+retaining multi-megabyte raw callback results in the execution notebook.
+
 The dedicated production SSM identity permits command submission and retrieval
 by command ID but can deny command listing. Retain each submitted command ID,
 and preserve stdout as well as stderr for failed inspection commands.
