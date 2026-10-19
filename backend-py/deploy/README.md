@@ -1,5 +1,47 @@
 # Deploy artifacts
 
+## Read-only inspection of an existing restart smoke sample
+
+Use `inspect_restart_smoke.py`, **not** `safe_restart_smoke.py`, when the sample
+already exists. Obtain the explicit job and Celery task IDs from the original
+run. Obtain the complete expected worker nodenames from the deployment inventory,
+not by assuming that every expected worker answered ping.
+
+With the relevant production approval, run from `backend-py` on the deployed host
+using its normal database/Redis environment and Python interpreter:
+
+```sh
+PYTHONPATH=. .venv/bin/python -B deploy/inspect_restart_smoke.py \
+  --job-id safe_restart_smoke_EXISTING_JOB_ID \
+  --task-id EXISTING_CELERY_TASK_UUID \
+  --expected-worker uni-celery@EXPECTED_HOST
+```
+
+Repeat `--expected-worker` for each expected worker. Optional `--timeout` sets
+each Celery inspection timeout (default 10 seconds, maximum 60).
+`--expected-skip-reason` defaults to `domestic_only`.
+The command needs permission to read the service MainPIDs' release environment.
+It never dispatches, recovers, restarts, commits, or creates a sample. All database
+reads use one repeatable-read, read-only transaction; engine disposal is awaited
+in the same event loop even on failure.
+
+JSON stdout contains persisted DONE (including sequence/time), actual staged-row
+count, job counters and sample revision, current Git/release-file/process revisions,
+the smoke-script hash, AsyncResult identity/state/result, unabridged current
+ping/active/reserved/scheduled replies, and active database counts. Missing results,
+identity mismatches, incomplete replies, current non-idleness, or invalid sample
+outcomes exit 1 with validation errors. Success exits 0. Operational failures also
+exit 1 with an error type, without exposing credentials or a traceback.
+No result-backend wait, result deletion, or worker state mutation is performed.
+
+This follows `../docs/production/release-sample-lifecycle-evidence-2026-10-08.json`
+but is explicitly a **later observation**, with observation start/end timestamps.
+It is not a simultaneous distributed snapshot and cannot retroactively certify
+the original acceptance time or earlier idle state. A historical sample may have
+an older revision than the currently deployed code; both revisions are retained
+without claiming that the sample tested the newer release. This command does not
+replace the original smoke gate or authorize a subsequent restart.
+
 Service files, secure credential rotation tools, plus the cutover runbook
 in `../README.md`.
 

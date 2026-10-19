@@ -39,3 +39,13 @@ and restored the previous frontend.
 **How to apply:** Keep the unrelated-business-work refusal. Let existing work
 and its scheduled follow-ups finish naturally before an exact-revision guarded
 retry; never revoke or reclassify it as maintenance to finish a release.
+
+Keep later sample inspections separate from original acceptance receipts.
+
+**Why:** Worker idleness is time-dependent. A later successful task result and
+empty queues cannot establish whether all workers replied or were idle at the
+earlier acceptance time; a historical sample also cannot certify a newer release.
+
+**How to apply:** Timestamp the later observation window, retain sample and current
+process revisions separately, and require the expected worker inventory rather
+than inferring completeness from whichever workers answered ping.
