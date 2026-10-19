@@ -156,3 +156,4 @@
 - [Plymouth course locations](plymouth-course-locations.md) — empty application dropdowns are not campuses; course-owned published offerings can supply the real location.
 - [Portsmouth course authority](portsmouth-course-authority.md) — use exact-course instances for delivery/load and international tuition rows for fees; UK-only panels are negative evidence.
 - [Dispatch test failure sentinels](dispatch-test-failure-sentinels.md) — verify mock outcomes outside broad delivery exception handlers so ordering assertions cannot be swallowed.
+- [Discovery alert scope](discovery-alert-scope.md) — selected-course recoveries need outcome-based alerts, not catalogue-size thresholds.

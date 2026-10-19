@@ -2087,6 +2087,71 @@ def _is_targeted_retry_payload(payload: dict | None) -> bool:
     return bool(_target_course_urls_from_payload(payload))
 
 
+def _record_selected_staging_outcome(
+    failures: dict[str, str], result: Any, *, source_url: str | None,
+) -> None:
+    """Keep alert-only staging failures without changing legacy skip counters."""
+    key = canonical_course_url_key(source_url or "")
+    if not key:
+        return
+    reason = str(result.reason or "")
+    # stage_course uses rejected: for deliberate URL/category/eligibility
+    # gates and same-job duplicates. These are settled exclusions or existing
+    # review rows, not failed persistence. Successful retries clear old failures.
+    if result.saved or reason.startswith("rejected:"):
+        failures.pop(key, None)
+    else:
+        failures[key] = reason[:500] or "staging failed without a reason"
+
+
+async def _alert_failed_selected_course_recovery(
+    db, *, job, uni_id: int, uni_name: str, scrape_url: str, summary: dict,
+    staging_failures: dict[str, str] | None = None,
+) -> None:
+    """Alert on selected-course outcomes, never on their deliberately small scope.
+
+    courseUrls/course_urls are the same bounded request scope used to bypass
+    discovery. A courseReport label, fast mode, or retry source alone is not
+    enough. Settled/excluded URLs are not proof of successful staging; use the
+    existing error counters and terminal status instead of progress counts.
+    """
+    selected = _target_course_urls_from_payload(job.request_payload)
+    if not selected or job.status == "stopped":
+        return
+    if (
+        job.status not in {"failed", "failed_degraded"}
+        and not summary.get("errors")
+        and not summary.get("fetch_failed")
+        and not staging_failures
+    ):
+        return
+    report = (job.request_payload or {}).get("courseReport")
+    diagnostic = {
+        "scope": "selected_course_recovery",
+        "scrape_url": scrape_url,
+        "selected_count": len(selected),
+        "candidates_found": int(summary.get("discovered_raw", summary.get("discovered", 0)) or 0),
+        "staged": int(job.imported or 0),
+        "errors": int(summary.get("errors", 0) or 0),
+        "fetch_failed": int(summary.get("fetch_failed", 0) or 0),
+        "status": job.status,
+        "source_job_id": (
+            report.get("source_job_id") if isinstance(report, dict) else None
+        ) or (job.request_payload or {}).get("retrySourceJobId"),
+    }
+    if staging_failures:
+        diagnostic["staging_failures"] = dict(staging_failures)
+    try:
+        await _persist_and_deliver_discovery_failure_alert(
+            db, job=job, uni_id=uni_id, uni_name=uni_name,
+            scrape_url=scrape_url,
+            candidates_found=diagnostic["candidates_found"],
+            diagnostic=diagnostic,
+        )
+    except Exception as exc:  # notification failure must not change recovery
+        log.error("[TIER7] Failed to persist/deliver selected-course alert: %s", exc)
+
+
 def _targeted_retry_all_filtered_diagnostic(
     *,
     selected_urls: list[str],
@@ -2368,10 +2433,24 @@ async def _run_scrape_entry(db: AsyncSession, runtime_job_id: str) -> dict:
         await db.commit()
         return {"ok": False, "reason": str(exc)}
     if verification:
-        return await run_bounded_verification(
+        result = await run_bounded_verification(
             db, job, verification,
             lambda: _run_claimed_scrape(db, job, verification),
         )
+        if (
+            result.get("reason") in {"time_budget_exhausted", "gemini_primary_budget_exhausted"}
+            and _is_targeted_retry_payload(job.request_payload)
+        ):
+            # The wrapper owns cancellation and authoritative row reconciliation.
+            # Alert only AFTER it commits the exhausted outcome; the inner runner
+            # cannot reliably distinguish its cancellation from an operator stop.
+            await _alert_failed_selected_course_recovery(
+                db, job=job, uni_id=job.university_id,
+                uni_name=f"University {job.university_id}",
+                scrape_url=job.url or "",
+                summary={"discovered": job.total_found or 0},
+            )
+        return result
     if full_review:
         return await run_full_catalogue_review(
             db, job, lambda: _run_claimed_scrape(db, job),
@@ -2545,6 +2624,11 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
     _resume_processed_offset = 0
     _same_job_resume_staged = 0
     _bypassed_resume_course_ids: list[int] = []
+    _selected_staging_failures: dict[str, str] = {}
+    # Exception-path alerts may run before the university lookup succeeds.
+    uni_id = job.university_id
+    uni_name = f"University {uni_id}"
+    scrape_url = ""
 
     async def _finalize_stopped() -> dict:
         """Mark the job as user-stopped and emit a terminal log row."""
@@ -4683,7 +4767,9 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         # the alert to discovery_failure_alerts and push via Slack/email so
         # operators see it without tailing logs.
         _TIER7_THRESHOLD = 3
-        if len(links) < _TIER7_THRESHOLD:
+        # Explicit selected URLs bypass catalogue discovery. Their outcome is
+        # checked at finalization, not against a whole-catalogue size floor.
+        if not _targeted_retry and len(links) < _TIER7_THRESHOLD:
             try:
                 _diag = {
                     "scrape_url": scrape_url,
@@ -5322,6 +5408,12 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                     summary["stage"] = "domain_guard_abort"
                     summary["domain_guard_foreign_count"] = len(_dom_bad_links)
                     summary["domain_guard_expected_apex"] = _dom_scrape_host
+                    if _targeted_retry:
+                        # A bounded report may use the university's website host
+                        # while discovery uses a different catalogue host. Keep
+                        # this guard intact, but persist the failed outcome and
+                        # alert through the normal exception finalizer.
+                        raise RuntimeError(_dom_msg)
                     return {
                         "status": "error",
                         "error": _dom_msg,
@@ -7695,6 +7787,10 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                             targeted_retry=_targeted_retry,
                             preserve_existing=_preserve_review,
                         )
+                        if _targeted_retry:
+                            _record_selected_staging_outcome(
+                                _selected_staging_failures, res, source_url=r.get("url"),
+                            )
                         await checkpoint_report_urls(db, job, _verification, [r.get("url")])
                         _record_staged_quality_payload(
                             _all_staged_dicts,
@@ -8061,6 +8157,10 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                                     preserve_existing=_preserve_review,
                                 ),
                                 timeout=_remaining_stage_budget,
+                            )
+                        if _targeted_retry:
+                            _record_selected_staging_outcome(
+                                _selected_staging_failures, _sw_res, source_url=_sweep_url,
                             )
                         _record_staged_quality_payload(
                             _all_staged_dicts,
@@ -9148,6 +9248,12 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
         await db.commit()
         log.info("Scrape %s %s: %s", runtime_job_id, job.status, summary)
 
+        await _alert_failed_selected_course_recovery(
+            db, job=job, uni_id=uni_id, uni_name=uni_name,
+            scrape_url=scrape_url, summary=summary,
+            staging_failures=_selected_staging_failures,
+        )
+
         if _full_review:
             persist_review_policy(
                 job, outcome=job.status, counters=dict(summary),
@@ -9591,6 +9697,11 @@ async def _run_claimed_scrape(db: AsyncSession, job, _verification=None) -> dict
                 "(status will be written by _mark_failed fallback)",
                 runtime_job_id,
             )
+        await _alert_failed_selected_course_recovery(
+            db, job=job, uni_id=uni_id, uni_name=uni_name,
+            scrape_url=scrape_url, summary=summary,
+            staging_failures=_selected_staging_failures,
+        )
         return {"ok": False, "reason": str(exc), **summary}
     finally:
         # ── Release the per-university Redis distributed lock ────────────────

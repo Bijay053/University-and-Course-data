@@ -114,7 +114,7 @@ def deliver_discovery_failure_alert(
     candidates_found: int,
     diagnostic: dict,
 ) -> dict[str, Any]:
-    """Fire-and-forget Slack/email when discovery yields < 3 candidates.
+    """Send Slack/email for low catalogue coverage or a failed selected recovery.
 
     Wraps the raw transport helpers so the orchestrator can call this with
     a single line.  No-ops gracefully when neither transport is configured.
@@ -134,6 +134,20 @@ def deliver_discovery_failure_alert(
         "",
         "Diagnostic snapshot:",
     ]
+    if diagnostic.get("scope") == "selected_course_recovery":
+        subject = f"[Tier-7] Selected-course recovery failed — {uni_name}"
+        lines = [
+            f"University:  {uni_name}  (id={uni_id})",
+            f"Scrape URL:  {scrape_url}",
+            f"Selected course URLs:  {diagnostic.get('selected_count', candidates_found)}",
+            f"Staged:  {diagnostic.get('staged', 0)}",
+            "",
+            "The explicitly selected course recovery did not finish cleanly.",
+            "This was not a full catalogue discovery run.",
+            "Check the selected URLs, fetch/extraction errors and eligibility diagnostics.",
+            "",
+            "Diagnostic snapshot:",
+        ]
     for key, val in diagnostic.items():
         lines.append(f"  {key}: {val}")
     lines.append("")

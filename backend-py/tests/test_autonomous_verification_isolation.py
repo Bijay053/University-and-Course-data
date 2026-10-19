@@ -323,8 +323,11 @@ async def test_real_orchestrator_timeout_skips_cleanup_and_releases_tasks_and_lo
     assert len(closed) == 2
 
 
-async def test_production_verification_recovery_is_a_successful_targeted_noop(monkeypatch):
-    """Durable verification rows must classify all-selected recovery as success."""
+@pytest.mark.parametrize("foreign_domain", [False, True])
+async def test_production_verification_recovery_is_a_successful_targeted_noop(
+    monkeypatch, foreign_domain,
+):
+    """Resolved selections are a no-op; domain-guard aborts persist and alert."""
     import redis.asyncio as aioredis
     from app.services.scraper import pdf_link_discoverer
 
@@ -340,6 +343,21 @@ async def test_production_verification_recovery_is_a_successful_targeted_noop(mo
         scrape_url="https://study.csu.edu.au/international/courses",
         scrape_config=None,
     )
+    if foreign_domain:
+        selected = selected[:1]
+        recovered = []
+        # Report validation can accept the website URL, while the scrape URL
+        # uses a sibling host that does not permit it through the domain guard.
+        university.website_url = "https://study.csu.edu.au"
+        university.scrape_url = "https://catalogue.csu.edu.au/courses"
+        from app.services.scraper import config
+        from app.services.scraper.config.schema import UniConfig
+        # Keep the actual domain guard, without creating a generated YAML stub.
+        monkeypatch.setattr(config, "get_config_for_host", lambda *args, **kwargs: UniConfig(
+            slug="domain-guard-test", name=university.name,
+            base_url="https://catalogue.csu.edu.au",
+            scrape_url=university.scrape_url,
+        ))
 
     class Result:
         def __init__(self, *, scalar=None, rows=()):
@@ -383,6 +401,8 @@ async def test_production_verification_recovery_is_a_successful_targeted_noop(mo
         status="running",
     )
     db = DB()
+    committed_statuses = []
+    db.commit.side_effect = lambda: committed_statuses.append(job.status)
 
     async def background(*args):
         await asyncio.Event().wait()
@@ -411,9 +431,8 @@ async def test_production_verification_recovery_is_a_successful_targeted_noop(mo
     monkeypatch.setattr(orch, "_heartbeat_pulser", background)
     monkeypatch.setattr(orch, "_stop_poller", background)
     monkeypatch.setattr(orch, "AsyncSessionLocal", EmitSession)
-    monkeypatch.setattr(
-        orch, "_persist_and_deliver_discovery_failure_alert", AsyncMock()
-    )
+    alert = AsyncMock()
+    monkeypatch.setattr(orch, "_persist_and_deliver_discovery_failure_alert", alert)
     monkeypatch.setattr(
         pdf_link_discoverer,
         "discover_pdf_links_for_university",
@@ -434,8 +453,29 @@ async def test_production_verification_recovery_is_a_successful_targeted_noop(mo
 
     monkeypatch.setattr(orch, "_targeted_retry_all_filtered_diagnostic", classify)
 
-    limits = VerificationLimits("parent", "session", max_courses=50)
+    limits = VerificationLimits(
+        "parent", "session", max_courses=50,
+        round_index=1 if foreign_domain else 0,
+    )
     result = await orch._run_claimed_scrape(db, job, limits)
+
+    if foreign_domain:
+        assert result["ok"] is False
+        assert result["stage"] == "domain_guard_abort"
+        assert job.status == "failed"
+        assert job.completed_at is not None
+        assert "[DOMAIN GUARD]" in job.error_message
+        assert committed_statuses[-1] == "failed"
+        alert.assert_awaited_once()
+        diagnostic = alert.await_args.kwargs["diagnostic"]
+        assert diagnostic["scope"] == "selected_course_recovery"
+        assert diagnostic["selected_count"] == 1
+        assert diagnostic["status"] == "failed"
+        assert diagnostic["staged"] == 0
+        assert not classification  # aborted before the normal finalizer
+        assert job.request_payload["courseReport"]["source_job_id"] == "source"
+        redis.aclose.assert_awaited_once()
+        return
 
     assert result["ok"] is False  # synthetic stop immediately after classification
     assert classification["extraction_urls"] == []
