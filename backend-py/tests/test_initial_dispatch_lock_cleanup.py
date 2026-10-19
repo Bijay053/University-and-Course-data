@@ -1,12 +1,13 @@
 """Initial API dispatch owns its Redis client, but must leave the lock intact."""
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import gc
 import os
 import subprocess
 import time
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 import httpx
 import pytest
@@ -185,6 +186,163 @@ class _DispatchSession:
     async def commit(self):
         self.committed_ids.update(row.runtime_job_id for row in self.rows)
         self.events.append(("commit", tuple(self.committed_ids)))
+
+
+class _ActiveDispatchSession(_DispatchSession):
+    """Owned active rows, exercising the real router's lock and lookup calls."""
+
+    def __init__(self, events, active_jobs):
+        super().__init__(events)
+        self.active_jobs = active_jobs
+        self.locked_ids = []
+        self.looked_up_ids = []
+
+    async def execute(self, statement, params=None):
+        from app.models import ScrapeRuntimeJob
+        from sqlalchemy.sql.elements import TextClause
+
+        if isinstance(statement, TextClause):
+            assert str(statement) == "SELECT pg_advisory_xact_lock(:uid)"
+            self.locked_ids.append(params["uid"])
+            return SimpleNamespace(scalar_one_or_none=lambda: None)
+
+        assert statement.column_descriptions[0]["entity"] is ScrapeRuntimeJob
+        uid = statement.compile().params["university_id_1"]
+        assert self.locked_ids[-1] == uid
+        self.looked_up_ids.append(uid)
+        return SimpleNamespace(
+            scalar_one_or_none=lambda: self.active_jobs.get(uid),
+        )
+
+
+@pytest.fixture
+def active_dispatch_http(monkeypatch):
+    """Private app and sessions; neither PostgreSQL nor Celery/Redis is used."""
+    from app.dependencies import get_current_user, get_db
+    from app.routers.scrape import router
+    from app.tasks import scrape_tasks as st
+
+    events = []
+    sessions = []
+    active_jobs = {}
+    delay = MagicMock(side_effect=lambda jid: events.append(("delivered", jid)))
+    lock = MagicMock(side_effect=lambda jid: events.append(("lock", jid)))
+    monkeypatch.setattr(st, "scrape_university", SimpleNamespace(delay=delay))
+    monkeypatch.setattr(st, "set_initial_dispatch_lock", lock)
+
+    async def owned_db():
+        session = _ActiveDispatchSession(events, active_jobs)
+        sessions.append(session)
+        yield session
+
+    app = FastAPI()
+    app.include_router(router, prefix="/api/scrape")
+    app.dependency_overrides[get_db] = owned_db
+    app.dependency_overrides[get_current_user] = lambda: {
+        "sub": "isolated-test", "permissions": ["scraping.trigger"],
+    }
+    return SimpleNamespace(
+        app=app, events=events, sessions=sessions, active_jobs=active_jobs,
+        delay=delay, lock=lock,
+    )
+
+
+def _owned_active_job(uid, status):
+    from app.models import ScrapeRuntimeJob
+
+    return ScrapeRuntimeJob(
+        runtime_job_id=f"job_active_{uid}", university_id=uid,
+        university_name=f"Isolated University {uid}",
+        url=f"https://university-{uid}.example/courses", job_type="single",
+        status=status, created_at=datetime.now(timezone.utc), request_payload={},
+    )
+
+
+@pytest.mark.asyncio(loop_scope="function")
+@pytest.mark.parametrize("active_status", ["queued", "running", "awaiting_approval"])
+async def test_repeated_start_reuses_active_job_without_delivery_or_lock(
+    active_dispatch_http, active_status,
+):
+    owned = active_dispatch_http
+    active = _owned_active_job(42, active_status)
+    owned.active_jobs[42] = active
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=owned.app), base_url="http://isolated.test",
+    ) as client:
+        for _ in range(2):
+            response = await client.post(
+                "/api/scrape/start", json={"university_id": 42, "fast_mode": False},
+            )
+            assert response.status_code == 202, response.text
+            assert response.json() == {
+                "jobId": active.runtime_job_id,
+                "runtimeJobId": active.runtime_job_id,
+                "status": active_status, "reused": True, "ok": True,
+            }
+            session = owned.sessions[-1]
+            assert session.locked_ids == session.looked_up_ids == [42]
+            assert session.rows == []
+            assert session.committed_ids == set()
+            owned.delay.assert_not_called()
+            owned.lock.assert_not_called()
+
+    assert owned.events == [("commit", ()), ("commit", ())]
+    assert active.status == active_status
+    assert active.request_payload == {}
+
+
+@pytest.mark.asyncio(loop_scope="function")
+@pytest.mark.parametrize("all_active", [False, True], ids=["mixed", "all-active"])
+async def test_bulk_skips_active_jobs_without_delivery_or_lock(
+    active_dispatch_http, all_active,
+):
+    owned = active_dispatch_http
+    statuses = {41: "queued", 42: "running", 43: "awaiting_approval"}
+    active_ids = set(statuses) if all_active else {42}
+    owned.active_jobs.update({
+        uid: _owned_active_job(uid, statuses[uid]) for uid in active_ids
+    })
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=owned.app), base_url="http://isolated.test",
+    ) as client:
+        response = await client.post(
+            "/api/scrape/bulk",
+            json={"university_ids": [43, 41, 42], "fast_mode": False},
+        )
+
+    assert response.status_code == 202, response.text
+    payload = response.json()
+    assert payload["sessionId"].startswith("bulk_")
+    assert payload == {
+        "sessionId": payload["sessionId"], "queued": 0 if all_active else 2,
+        "ok": True,
+    }
+    session, = owned.sessions
+    assert session.locked_ids == session.looked_up_ids == [41, 42, 43]
+    assert [row.university_id for row in session.rows] == ([] if all_active else [41, 43])
+    new_ids = [row.runtime_job_id for row in session.rows]
+    assert len(set(new_ids)) == len(new_ids)
+    assert set(new_ids).isdisjoint(
+        active.runtime_job_id for active in owned.active_jobs.values()
+    )
+    assert session.committed_ids == set(new_ids)
+    for row in session.rows:
+        assert row.status == "queued"
+        assert row.request_payload["session_id"] == payload["sessionId"]
+    # Exact external assertions catch both extra active deliveries and swallowed
+    # dispatch/lock errors, including the no-work all-active response.
+    assert owned.delay.call_args_list == [call(jid) for jid in new_ids]
+    assert owned.lock.call_args_list == [call(jid) for jid in new_ids]
+    assert owned.events[0][0] == "commit"
+    assert owned.events[1:] == [
+        event for jid in new_ids for event in [("delivered", jid), ("lock", jid)]
+    ]
+    if all_active:
+        owned.delay.assert_not_called()
+        owned.lock.assert_not_called()
+    for uid, active in owned.active_jobs.items():
+        assert active.status == statuses[uid]
+        assert active.request_payload == {}
 
 
 @pytest.mark.asyncio(loop_scope="function")
