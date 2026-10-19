@@ -156,6 +156,45 @@ Do not bypass the entrypoint's disposable-account proof, worker/job idle gates,
 tracked and generated config reconciliation, release-identity smoke checks,
 public smoke checks, or EXIT cleanup.
 
+### Per-release acceptance manifest
+
+Each guarded attempt retains a private
+`/var/lib/university-portal/release-manifests/release_<id>/manifest.json`.
+`RELEASE_MANIFEST=...` prints its location before the first sample. The directory
+contains that invocation's original `preflight/` and `post_restart/` ordinary
+smoke receipts. These are separate from standalone smoke receipts; neither
+rollback nor the standalone receipt archive's local pruning removes them.
+
+The manifest helper is extracted from the exact reviewed target before checkout
+and kept outside the checkout until cleanup. The preflight sample certifies the
+predecessor; after restart, service-identity and public frontend checks, a **new
+ordinary sample** certifies the target. Each phase requires successful command
+exit, exactly one receipt in a fresh private directory, matching revision and
+job/task identities, timestamps within that invocation, canonical DONE outcome,
+and complete idle-worker/database evidence. Later read-only observations from
+`inspect_restart_smoke.py` are never accepted as replacements.
+
+The allowlisted manifest records both full revisions, unique attempt identity,
+phase times/status, original job/task IDs, relative receipt filenames and SHA256
+hashes of the **exact retained file bytes**. It contains no environment values,
+commands, exception details, URLs, or sample payloads. Before final completion,
+both receipts are re-read and their hashes and identities checked again.
+
+`preflight_passed: true` is not release completion. `post_restart_passed` also
+is not completion: only after all remaining release checks, reconciliation
+finalization and successful EXIT cleanup does `status: completed` /
+`release_completed: true` permit the
+`DEPLOYED_RELEASE` message. A normal failure records `status: failed`, preserves
+any accepted phase references and original receipts, and runs the existing
+rollback. Abrupt termination can leave a running phase; that is **not** proof of
+completion. Rollback can restore frontend/config state without reverting backend
+HEAD; inspect the actual current release before any subsequent attempt.
+
+Do not retry samples to repair missing evidence or relabel an old receipt.
+Preserve the entire attempt directory, including evidence from failed attempts.
+The existing receipt archive is for standalone receipts only; it does not
+currently archive release manifests or their paired copies.
+
 ## Tracked operator recipe preservation
 
 The guarded release accepts tracked worktree edits only when every change is a

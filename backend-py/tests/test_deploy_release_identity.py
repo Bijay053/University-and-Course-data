@@ -605,7 +605,11 @@ def test_guarded_release_builds_and_verifies_frontend_before_success() -> None:
     nginx_reload = script.index("systemctl reload nginx.service", publish)
     restart = script.index("systemctl restart uni-api-py.service uni-celery.service")
     public_verify = script.index('--public-url "$public_url"', restart)
-    success = script.index('echo "DEPLOYED_RELEASE=$target"')
+    # Success is now emitted by EXIT cleanup, after receipt revalidation.
+    success = script.index("\nrelease_succeeded=1", public_verify)
+    cleanup = script[script.index("cleanup_release()"):script.index("trap cleanup_release EXIT")]
+    assert cleanup.index("resume_consumers") < cleanup.index("if complete_release_evidence; then")
+    assert cleanup.index("if complete_release_evidence; then") < cleanup.index('echo "DEPLOYED_RELEASE=$target"')
 
     assert (
         build

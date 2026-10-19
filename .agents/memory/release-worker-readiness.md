@@ -49,3 +49,16 @@ earlier acceptance time; a historical sample also cannot certify a newer release
 **How to apply:** Timestamp the later observation window, retain sample and current
 process revisions separately, and require the expected worker inventory rather
 than inferring completeness from whichever workers answered ping.
+
+Bind release acceptance to the original sample invocation, not the newest
+available successful receipt. Preflight success alone must never imply a
+completed release, even when checkout and restart later succeed.
+
+**Why:** Release-identity checks prove which code is running, not that an
+ordinary sample passed on that code. A late failure can leave target services
+running while rollback restores other parts of the release.
+
+**How to apply:** Keep predecessor and target sample proofs separate and retain
+both through rollback. Mark completion only after final checks and cleanup;
+later read-only inspection can explain the outcome but cannot replace either
+original acceptance.

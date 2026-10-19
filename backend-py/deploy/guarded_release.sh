@@ -19,6 +19,32 @@ backend_root="$repo_root/backend-py"
 python_bin="${GUARDED_RELEASE_PYTHON:-$backend_root/.venv/bin/python}"
 revision_fence="${GUARDED_RELEASE_REVISION_FENCE:-$backend_root/deploy/release_revision_fence.sh}"
 resume_marker="${GUARDED_RELEASE_RESUME_MARKER:-}"
+release_manifest=""
+manifest_helper=""
+
+initialize_release_evidence() {
+  release_manifest="$("$python_bin" -B "$manifest_helper" init \
+    --directory "${GUARDED_RELEASE_MANIFEST_DIRECTORY:-/var/lib/university-portal/release-manifests}" \
+    --predecessor "$predecessor" --target "$target")"
+  echo "RELEASE_MANIFEST=$release_manifest"
+}
+
+retain_release_evidence() {
+  if [ -n "$release_manifest" ]; then
+    "$python_bin" -B "$manifest_helper" fail --manifest "$release_manifest"
+  fi
+}
+
+release_sample() {
+  local phase="$1"
+  shift
+  "$python_bin" -B "$manifest_helper" sample \
+    --manifest "$release_manifest" --phase "$phase" -- "$@"
+}
+
+complete_release_evidence() {
+  "$python_bin" -B "$manifest_helper" complete --manifest "$release_manifest"
+}
 
 run_release_user() {
   if [ "$release_test_mode" = 1 ]; then
@@ -65,12 +91,16 @@ if [ "$release_test_mode" != 1 ]; then
   # Use the reviewed target's sample lifecycle rules before checkout, without
   # modifying installed code. Keep the helper beside its pinned proof assets.
   smoke_helper="$(mktemp "$backend_root/deploy/.release-smoke.XXXXXX.py")"
-  trap 'rm -f "$smoke_helper" "${smoke_helper%.py}.receipt.py"' EXIT
+  manifest_helper="$(mktemp)"
+  trap 'retain_release_evidence; rm -f "$smoke_helper" "${smoke_helper%.py}.receipt.py" "$manifest_helper"' EXIT
+  run_release_user git -C "$repo_root" show \
+    "$target:backend-py/deploy/release_manifest.py" > "$manifest_helper"
+  initialize_release_evidence
   run_release_user git -C "$repo_root" show \
     "$target:backend-py/deploy/safe_restart_smoke.py" > "$smoke_helper"
   run_release_user git -C "$repo_root" show \
     "$target:backend-py/deploy/smoke_receipt.py" > "${smoke_helper%.py}.receipt.py"
-  "$python_bin" -B "$smoke_helper" \
+  release_sample preflight "$python_bin" -B "$smoke_helper" \
     --expected-rehearsal-account-id "$expected_disposable_account"
   rm -f "$smoke_helper" "${smoke_helper%.py}.receipt.py"
   trap - EXIT
@@ -111,8 +141,18 @@ cleanup_frontend_release() {
   fi
 }
 cleanup_release() {
+  local exit_status=$?
+  if [ "$exit_status" != 0 ]; then
+    release_succeeded=0
+  fi
   cd "$repo_root"
   rollback_failed=0
+  # Record an aborted attempt before rollback. Never delete manifest/receipts;
+  # rollback may restore frontend/config files without reverting backend HEAD.
+  evidence_failed=0
+  if [ "$release_succeeded" != 1 ]; then
+    retain_release_evidence || evidence_failed=1
+  fi
   cleanup_frontend_release
   if [ "$reconciliation_committed" != 1 ] && [ -n "$reconciler" ] && [ -s "$reconciliation_manifest" ]; then
     if ! run_release_user "$python_bin" -B "$reconciler" rollback \
@@ -129,6 +169,7 @@ cleanup_release() {
     fi
   fi
   if [ "$rollback_failed" = 1 ]; then
+    retain_release_evidence || true
     echo "Release config rollback failed; consumers remain paused and manifests are retained" >&2
     cd "$backend_root"
     if [ "$release_test_mode" = 1 ]; then
@@ -160,6 +201,18 @@ PY
   rm -f "$tracked_recipe_manifest"
   cd "$backend_root"
   resume_consumers
+  if [ "$release_succeeded" = 1 ]; then
+    if complete_release_evidence; then
+      echo "DEPLOYED_RELEASE=$target"
+    else
+      retain_release_evidence || true
+      evidence_failed=1
+    fi
+  fi
+  if [ "$release_test_mode" != 1 ]; then
+    rm -f "$manifest_helper"
+  fi
+  return "$evidence_failed"
 }
 trap cleanup_release EXIT
 
@@ -172,6 +225,13 @@ if [ "$release_test_mode" = 1 ]; then
   : > "$tracked_recipe_manifest"
   run_release_user "$revision_fence" verify "$repo_root" "$predecessor" "$target"
   verify_target_worker_schema
+  # Optional hermetic lifecycle seam. Injected helpers are borrowed; the
+  # ordinary reconciliation-only tests retain their existing behavior.
+  if [ -n "${GUARDED_RELEASE_TEST_SMOKE:-}" ]; then
+    manifest_helper="${GUARDED_RELEASE_TEST_MANIFEST_HELPER:?}"
+    initialize_release_evidence
+    release_sample preflight "$python_bin" -B "$GUARDED_RELEASE_TEST_SMOKE"
+  fi
   run_release_user "$python_bin" -B "$reconciler" prepare-tracked \
     --repo-root "$repo_root" --target "$target" \
     --manifest "$tracked_recipe_manifest"
@@ -182,6 +242,16 @@ if [ "$release_test_mode" = 1 ]; then
     "$GUARDED_RELEASE_BEFORE_CHECKOUT_HOOK"
   fi
   run_release_user "$revision_fence" checkout "$repo_root" "$predecessor" "$target"
+  if [ -n "${GUARDED_RELEASE_TEST_SMOKE:-}" ]; then
+    if [ -n "${GUARDED_RELEASE_TEST_RESTART_HOOK:-}" ]; then
+      "$GUARDED_RELEASE_TEST_RESTART_HOOK"
+    fi
+    release_sample post_restart "$python_bin" -B "$GUARDED_RELEASE_TEST_SMOKE"
+    if [ -n "${GUARDED_RELEASE_TEST_FINALIZE_HOOK:-}" ]; then
+      "$GUARDED_RELEASE_TEST_FINALIZE_HOOK"
+    fi
+    release_succeeded=1
+  fi
   exit 0
 fi
 
@@ -315,10 +385,11 @@ PY
 )"
 .venv/bin/python -B deploy/verify_frontend_release.py \
   --dist "$frontend_dist" --target "$target" --public-url "$public_url"
+release_sample post_restart "$python_bin" -B deploy/safe_restart_smoke.py \
+  --expected-rehearsal-account-id "$expected_disposable_account"
 sudo -u ubuntu /opt/university-portal/backend-py/.venv/bin/python -B "$reconciler" finalize \
   --manifest "$reconciliation_manifest"
 sudo -u ubuntu /opt/university-portal/backend-py/.venv/bin/python -B "$reconciler" finalize-tracked \
   --manifest "$tracked_recipe_manifest"
 reconciliation_committed=1
 release_succeeded=1
-echo "DEPLOYED_RELEASE=$target"
