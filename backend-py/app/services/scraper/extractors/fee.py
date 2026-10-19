@@ -2705,6 +2705,10 @@ def _from_otago_polytechnic_international_fee(
 async def extract(
     html: str, url: str, *, country: str | None = None
 ) -> list[ExtractionResult]:
+    from app.services.scraper.extractors.cumbria_fees import course_fee as cumbria_course_fee
+    cumbria_known, cumbria_fee = cumbria_course_fee(html, url)
+    if cumbria_known:
+        return [cumbria_fee] if cumbria_fee is not None else []
     from app.services.scraper.extractors.lsbu_fees import course_fee
     lsbu_known, lsbu_fee = course_fee(html, url)
     if lsbu_known:
