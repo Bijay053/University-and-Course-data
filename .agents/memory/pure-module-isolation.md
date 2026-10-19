@@ -27,3 +27,14 @@ or utility function to a module that has heavy transitive imports, check whether
 it can be factored out into a no-app-deps module. Use `python -m py_compile` as
 a quick check first (fast under any load); then test in isolation with
 `PYTHONPATH=. python -m pytest <file> -c /dev/null -p no:cacheprovider`.
+
+Keep focused test commands on the same import path as the full regression;
+do not add the tests directory to `PYTHONPATH` to enable sibling-test imports.
+
+**Why:** A focused archive/restore check passed with an extra tests import path
+but failed in the full regression because a sibling fixture module was not
+importable by its bare filename.
+
+**How to apply:** Keep small storage fakes self-contained or use a properly
+packaged shared helper. Check new isolated tests with `PYTHONPATH=.` and pytest's
+importlib mode as well when they import local helpers.

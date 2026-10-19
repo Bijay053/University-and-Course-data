@@ -76,6 +76,10 @@ args = "task-loop-resource-cleanup"
 task = "workflow.run"
 args = "initial-dispatch-concurrency"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "smoke-receipt-restore"
+
 [[workflows.workflow]]
 name = "backend-py: FastAPI"
 author = "agent"
@@ -241,6 +245,17 @@ args = "flock -x /tmp/university-portal-db-validation.lock bash -c 'cd backend-p
 
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow]]
+name = "smoke-receipt-restore"
+author = "agent"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend-py && PYTHONPATH=. python -m pytest tests/test_restore_smoke_receipts.py tests/test_archive_smoke_receipts.py tests/test_smoke_receipt.py --import-mode=importlib -q -c /dev/null --noconftest -p no:cacheprovider"
 
 [agent]
 stack = "PNPM_WORKSPACE"

@@ -63,6 +63,62 @@ could not be safely handled. Rerun **the archive command**, never the sample.
 Arrange any periodic invocation through the approved production operations
 process; no timer or service is installed by this change.
 
+### Restore an archived receipt onto a replacement host
+
+`restore_smoke_receipts.py` retrieves **existing evidence only**. Obtain separate
+approval before accessing production storage. Nothing runs automatically, and
+the command never imports the smoke runner, dispatches a sample, queries the
+database/workers, writes to S3, changes bucket policies, or deletes versions.
+
+After approval, supply the approved bucket, owning account, region and exact
+original sample job ID (no inferred defaults for any of these):
+
+```bash
+cd /root/University-and-Course-data && python3 -B backend-py/deploy/restore_smoke_receipts.py \
+  --bucket APPROVED_EXISTING_BUCKET \
+  --expected-owner APPROVED_12_DIGIT_ACCOUNT \
+  --region APPROVED_REGION \
+  --job-id safe_restart_smoke_ORIGINAL_32_LOWERCASE_HEX_ID
+```
+
+Credentials use the normal AWS chain; never pass credentials on the command line.
+The read-only identity needs `s3:ListBucketVersions` restricted to the
+`release-smoke-receipts/v1/` prefix and `s3:GetObjectVersion` on that prefix.
+Every request includes `ExpectedBucketOwner`. Recovery does not require changing
+or revalidating lifecycle policies: an existing noncurrent version can still be
+recovered even if a delete marker hides the key.
+
+All pages of the exact job prefix are searched. When multiple content hashes or
+object versions match, the command fails closed, **never choosing the newest**.
+Use the approved archive inventory to supply `--sha256 ORIGINAL_CONTENT_HASH`
+and/or `--version-id ORIGINAL_S3_VERSION_ID` until exactly one version matches.
+Missing, inaccessible, oversized, corrupted or ambiguous evidence is an error,
+not a reason to start another sample. Listings are bounded to 100 pages.
+
+The selected version is fetched explicitly. Its bytes must match the SHA256 in
+both its key and metadata, its returned version must match, and the receipt's
+kind, schema and database/Celery job identities must agree with the requested job.
+Duplicate JSON keys and conflicting task-result job IDs are rejected. SHA256
+checks detect corruption; they are not a signature or proof of current release
+health. This restores historical acceptance, not acceptance of the new host.
+
+The default destination is `/var/lib/university-portal/smoke-receipts`; use
+`--directory PRIVATE_DIRECTORY` to change it. The destination must be owned by
+the invoking user with mode 0700 and must not be a symlink. The receipt is
+published atomically as `<job-id>.json`, mode 0600, under the archive's local
+lock. Existing byte-identical private files are left untouched (including their
+mtime). Different bytes, even formatting-only differences, unsafe permissions,
+symlinks and nonregular files fail without overwriting local evidence.
+
+The archived bytes, revision, original acceptance and worker timestamps are
+preserved exactly. The separate JSON command summary says
+`operation: restore_smoke_receipt`, `new_acceptance: false`, and reports
+`restored` or `already_present` with a **restoration check** time, never a new
+acceptance time. Retain that summary in the operator's recovery log; it is not
+inserted into the original receipt. Failures print fixed reasons without raw
+provider errors or receipt contents. After any failure, retry restoration only;
+if the local publish succeeded before a later error, retry is idempotent.
+
 Use `inspect_restart_smoke.py`, **not** `safe_restart_smoke.py`, when the sample
 already exists. Obtain the explicit job and Celery task IDs from the original
 run. Obtain the complete expected worker nodenames from the deployment inventory,
