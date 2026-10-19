@@ -1,0 +1,5063 @@
+{
+  "summary": {
+    "job_id": "job_8946508ca070",
+    "revision": "f9d8af9965344ec4a6f6921cc799a9b3c80d1df6",
+    "job_status": "completed",
+    "counts": {
+      "total_found": 581,
+      "current": 581,
+      "imported": 385,
+      "skipped": 96,
+      "errors": 82
+    },
+    "fetch_failed": 18,
+    "official_urls": 406,
+    "official_urls_observed": 406,
+    "official_urls_extraction_completed": 398,
+    "official_urls_staged_pending": 310,
+    "official_url_outcomes": {
+      "staged_pending": 310,
+      "skipped": 41,
+      "extract_error": 47,
+      "filter_excluded": 8
+    },
+    "official_fulltime_urls": 363,
+    "official_fulltime_urls_extraction_completed": 355,
+    "official_fulltime_urls_staged_pending": 310,
+    "official_fulltime_outcomes": {
+      "staged_pending": 310,
+      "extract_error": 40,
+      "skipped": 5,
+      "filter_excluded": 8
+    },
+    "explicit_distance_urls": 8,
+    "fulltime_non_distance_candidates": 361,
+    "fulltime_non_distance_staged": 310,
+    "fulltime_non_distance_outcomes": {
+      "extract_error": 40,
+      "staged_pending": 310,
+      "filter_excluded": 8,
+      "skipped": 3
+    },
+    "fulltime_non_distance_staging_pct": 85.87,
+    "non_catalogue_urls_processed": 183,
+    "non_catalogue_urls_staged_pending": 75,
+    "progress_log_urls": 578,
+    "settled_urls_without_progress_log": [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-artificial-intelligence-uusari1/",
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-global-business-management-logistics-and-supply-chain-hong-kong/",
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/found-dip-int-foundation-programme-in-business-and-law-12-months-qa-on-campus-dufibe4/"
+    ],
+    "published_unchanged": true,
+    "original_pending_unchanged": true,
+    "full_catalogue_verified": false
+  },
+  "captured_at": "2026-10-19T05:08:05.538896+00:00",
+  "started_at": "2026-10-19T04:14:26.93598+00:00",
+  "completed_at": "2026-10-19T05:04:47.442311+00:00",
+  "request_payload": {
+    "url": "https://www.northumbria.ac.uk",
+    "feePage": null,
+    "fastMode": false,
+    "fast_mode": false,
+    "universityId": 96,
+    "university_id": 96,
+    "forceDiscovery": true,
+    "universityName": "Northumbria University",
+    "scholarshipPage": null,
+    "defaultStudyMode": null,
+    "requirementsPage": null,
+    "universityCountry": "United Kingdom",
+    "fullCatalogueReviewOnly": true,
+    "academicRequirementsPage": null
+  },
+  "review_policy": {
+    "scope": "full_catalogue",
+    "outcome": "completed",
+    "version": 1,
+    "counters": {
+      "errors": 82,
+      "staged": 385,
+      "skipped": 96,
+      "discovered": 581,
+      "fetch_failed": 18,
+      "discovered_raw": 596
+    },
+    "review_only": true,
+    "completed_at": "2026-10-19T05:04:47.442311+00:00",
+    "skip_reasons": {
+      "online_only": 27,
+      "part_time_only": 50,
+      "category_landing_page_missing_degree_qua": 19
+    },
+    "error_message": null,
+    "interrupted_by": null,
+    "pipeline_stats": {
+      "after_block": 596,
+      "after_filter": 581,
+      "filter_config": {
+        "must_contain": [],
+        "allow_url_patterns": [
+          "^https?://www\\.northumbria\\.ac\\.uk/study-at-northumbria/courses/[^/]+/$"
+        ],
+        "block_url_patterns": [
+          "/study-at-northumbria/courses/.+(archive|course-finder|results)/",
+          "/study-at-northumbria/courses/.*(contact|apply|enquire)",
+          "/study-at-northumbria/courses/.*(tutor-profiles|study-and-travel-abroad)",
+          "/sitemap\\.xml"
+        ],
+        "course_detail_url_patterns": []
+      },
+      "dropped_sample": [
+        "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-global-business-management-human-resources-completion-award-london-subject-to-validation-uu/",
+        "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-global-business-management-logistics-and-supply-chain-completion-award-london-uufgba1/",
+        "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-global-business-management-marketing-completion-award-london-subject-to-validation-uuflbk1/",
+        "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-global-business-management-london-uuflbn1/",
+        "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-international-banking-and-finance-completion-award-london-subject-to-validation-uufikl1/",
+        "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-international-tourism-hospitality-and-events-completion-award-london-subject-to-validation/",
+        "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/beng-hons-mechanical-engineering-i2i-dufmag1/",
+        "https://www.northumbria.ac.uk/study-at-northumbria/courses/postgraduate/msc-sustainable-civil-engineering-dtfsve6/"
+      ],
+      "raw_discovered": 596,
+      "filter_drop_pct": 3,
+      "block_dropped_pct": 0,
+      "filter_drop_count": 15,
+      "block_dropped_count": 0,
+      "pre_block_discovered": 596,
+      "non_degree_prefetch_sample": [],
+      "non_degree_ai_calls_avoided": 0,
+      "non_degree_prefetch_skipped": 0,
+      "non_degree_browser_launches_avoided": 0
+    },
+    "duplicate_skips": 0,
+    "fresh_discovery": true,
+    "automatic_repair": false,
+    "fresh_extraction": true,
+    "automatic_publish": false,
+    "preserve_existing": true,
+    "saved_checkpoints": false,
+    "removal_reconciliation": false,
+    "full_catalogue_verified": false,
+    "verification_sample_cap": null
+  },
+  "pipeline_stats": {
+    "after_block": 596,
+    "after_filter": 581,
+    "filter_config": {
+      "must_contain": [],
+      "allow_url_patterns": [
+        "^https?://www\\.northumbria\\.ac\\.uk/study-at-northumbria/courses/[^/]+/$"
+      ],
+      "block_url_patterns": [
+        "/study-at-northumbria/courses/.+(archive|course-finder|results)/",
+        "/study-at-northumbria/courses/.*(contact|apply|enquire)",
+        "/study-at-northumbria/courses/.*(tutor-profiles|study-and-travel-abroad)",
+        "/sitemap\\.xml"
+      ],
+      "course_detail_url_patterns": []
+    },
+    "dropped_sample": [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-global-business-management-human-resources-completion-award-london-subject-to-validation-uu/",
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-global-business-management-logistics-and-supply-chain-completion-award-london-uufgba1/",
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-global-business-management-marketing-completion-award-london-subject-to-validation-uuflbk1/",
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-global-business-management-london-uuflbn1/",
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-international-banking-and-finance-completion-award-london-subject-to-validation-uufikl1/",
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-international-tourism-hospitality-and-events-completion-award-london-subject-to-validation/",
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/beng-hons-mechanical-engineering-i2i-dufmag1/",
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/postgraduate/msc-sustainable-civil-engineering-dtfsve6/"
+    ],
+    "raw_discovered": 596,
+    "filter_drop_pct": 3,
+    "block_dropped_pct": 0,
+    "filter_drop_count": 15,
+    "block_dropped_count": 0,
+    "pre_block_discovered": 596,
+    "non_degree_prefetch_sample": [],
+    "non_degree_ai_calls_avoided": 0,
+    "non_degree_prefetch_skipped": 0,
+    "non_degree_browser_launches_avoided": 0
+  },
+  "published_after": [
+    {
+      "count": 386,
+      "fingerprint": "4a162f72f25c45004c56c048557cc404"
+    }
+  ],
+  "original_pending_after": [
+    {
+      "count": 61,
+      "fingerprint": "998ec1db2a5f694e5e561b982c072327"
+    }
+  ],
+  "staging_status": [
+    {
+      "status": "pending",
+      "auto_publish_status": "data_quality_failure",
+      "count": 2
+    },
+    {
+      "status": "pending",
+      "auto_publish_status": "review",
+      "count": 383
+    }
+  ],
+  "derived_jobs": [],
+  "active_university_jobs": [],
+  "sources": [
+    {
+      "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/",
+      "status": 200,
+      "bytes": 710333,
+      "sha256": "74348698e40413f361493ab00bad62bbed6cc1c9f5665c8be960137be2b743f9"
+    },
+    {
+      "url": "https://www.northumbria.ac.uk/sitemap.xml",
+      "status": 200,
+      "bytes": 2721110,
+      "sha256": "3e4dec29f2595b1901e43614eb61d66fd2353d136cd689bc4f0b0f03ff89ec10"
+    }
+  ],
+  "source_captured_at_utc": "2026-10-19T04:13:49.954505+00:00",
+  "listing_delivery_counts": {
+    "full_time": 363,
+    "part_time": 37,
+    "distance_learning": 6
+  },
+  "sitemap_counts": {
+    "sitemap_total_urls": 13471,
+    "sitemap_course_namespace_urls": 3237,
+    "sitemap_root_detail_urls": 532
+  },
+  "effective_admin_config": {
+    "discovery": {
+      "allow_url_patterns": [
+        "^https?://www\\.northumbria\\.ac\\.uk/study-at-northumbria/courses/[^/]+/$"
+      ],
+      "block_url_patterns": [
+        "/study-at-northumbria/courses/.+(archive|course-finder|results)/",
+        "/study-at-northumbria/courses/.*(contact|apply|enquire)",
+        "/study-at-northumbria/courses/.*(tutor-profiles|study-and-travel-abroad)",
+        "/sitemap\\.xml"
+      ]
+    }
+  },
+  "effective_discovery": {
+    "sitemap_url": "https://www.northumbria.ac.uk/sitemap.xml",
+    "always_sitemap_supplement": true,
+    "expected_min_courses": null,
+    "allow_url_patterns": [
+      "^https?://www\\.northumbria\\.ac\\.uk/study-at-northumbria/courses/[^/]+/$"
+    ],
+    "block_url_patterns": [
+      "/study-at-northumbria/courses/.+(archive|course-finder|results)/",
+      "/study-at-northumbria/courses/.*(contact|apply|enquire)",
+      "/study-at-northumbria/courses/.*(tutor-profiles|study-and-travel-abroad)",
+      "/sitemap\\.xml"
+    ],
+    "course_detail_url_patterns": [],
+    "allowed_extra_hostnames": [],
+    "seed_urls": [],
+    "max_candidates": null
+  },
+  "recipe": null,
+  "configured_limits": {
+    "gemini_primary_usd": 1.0,
+    "course_timeout_seconds": 90.0,
+    "parallel": 12
+  },
+  "provider_cost": {
+    "recorded_gemini_primary_usd": 0.08513677,
+    "ceiling_hit": false,
+    "scrape_do_static_calls": 0,
+    "scrape_do_render_calls": 0,
+    "scope": "Recorded per-course Gemini primary only; not a total AI/proxy cost accounting."
+  },
+  "skip_counters": {
+    "data_quality": {
+      "total_issues": 110,
+      "critical_urls": [
+        "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-laws-professional-legal-practice-dtfplp6/",
+        "https://www.northumbria.ac.uk/study-at-northumbria/courses/mba-mpa/"
+      ],
+      "warning_count": 78,
+      "critical_count": 2,
+      "critical_issues": [
+        {
+          "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-laws-professional-legal-practice-dtfplp6/",
+          "code": "annual_fee_too_low_critical",
+          "message": "Fee 2,006 GBP/year (≈ 3,912 AUD) is critically below the expected minimum for master's (critical threshold: 12,000 AUD/yr). Likely a domestic, partial, or incorrectly extracted international fee. Expected range: 20,000–80,000/yr (AUD).",
+          "severity": "critical",
+          "course_name": "Master of Laws Professional Legal Practice (Sqe1) LLM 1 Year Full Time | September Start"
+        },
+        {
+          "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/mba-mpa/",
+          "code": "missing_english_requirement",
+          "message": "Postgraduate course has no English language test score (IELTS / PTE / TOEFL / CAE). International students cannot be assessed for admission — manual review required.",
+          "severity": "critical",
+          "course_name": "Master of Business Administration and Master of Public Administration"
+        }
+      ],
+      "affected_course_count": 2
+    },
+    "gemini_timeout": 111,
+    "challenge_shell": 0,
+    "html_compaction": {
+      "accepted": 0,
+      "attempts": 0,
+      "fail_open": 0,
+      "elapsed_ms": 0.0,
+      "input_bytes": 0,
+      "output_bytes": 0,
+      "skipped_small": 0,
+      "reduction_rate": 0.0,
+      "acceptance_rate": 0.0,
+      "fail_open_reasons": {}
+    },
+    "vision_early_exit": 0,
+    "staging_rejections": {
+      "reasons": {
+        "online_only": 27,
+        "part_time_only": 50,
+        "category_landing_page_missing_degree_qua": 19
+      },
+      "samples": {}
+    },
+    "gemini_circuit_open": 217,
+    "browser_http_skipped": 181
+  },
+  "event_outcome_counts": [
+    {
+      "kind": "extract_error",
+      "reason": "fetch_failed",
+      "count": 18
+    },
+    {
+      "kind": "extract_error",
+      "reason": "per_course_timeout",
+      "count": 82
+    },
+    {
+      "kind": "skipped",
+      "reason": "rejected: category_landing_page_missing_degree_qualifier",
+      "count": 19
+    },
+    {
+      "kind": "skipped",
+      "reason": "rejected: online_only",
+      "count": 27
+    },
+    {
+      "kind": "skipped",
+      "reason": "rejected: part_time_only",
+      "count": 50
+    }
+  ],
+  "terminal_event": {
+    "level": "success",
+    "phase": "complete",
+    "errors": 82,
+    "message": "══ DONE ══ Found:581 | Staged:385 | Skipped:96 (part_time_only=50, online_only=27, category_landing_page_missing_degree_qua=19) | FetchFailed:18 | Errors:82 | Discovery:7s | Extraction:3013s | Sweep:0s | Staging:0s",
+    "skipped": 96,
+    "imported": 385,
+    "totalFound": 581,
+    "fetchFailed": 18,
+    "skip_reasons": {
+      "online_only": 27,
+      "part_time_only": 50,
+      "category_landing_page_missing_degree_qua": 19
+    },
+    "phase_timings": {
+      "sweep_s": 0.0,
+      "staging_s": 0.0,
+      "discovery_s": 6.9,
+      "extraction_s": 3013.2
+    },
+    "pipeline_stats": {
+      "after_block": 596,
+      "after_filter": 581,
+      "filter_config": {
+        "must_contain": [],
+        "allow_url_patterns": [
+          "^https?://www\\.northumbria\\.ac\\.uk/study-at-northumbria/courses/[^/]+/$"
+        ],
+        "block_url_patterns": [
+          "/study-at-northumbria/courses/.+(archive|course-finder|results)/",
+          "/study-at-northumbria/courses/.*(contact|apply|enquire)",
+          "/study-at-northumbria/courses/.*(tutor-profiles|study-and-travel-abroad)",
+          "/sitemap\\.xml"
+        ],
+        "course_detail_url_patterns": []
+      },
+      "dropped_sample": [
+        "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-global-business-management-human-resources-completion-award-london-subject-to-validation-uu/",
+        "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-global-business-management-logistics-and-supply-chain-completion-award-london-uufgba1/",
+        "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-global-business-management-marketing-completion-award-london-subject-to-validation-uuflbk1/",
+        "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-global-business-management-london-uuflbn1/",
+        "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-international-banking-and-finance-completion-award-london-subject-to-validation-uufikl1/",
+        "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-international-tourism-hospitality-and-events-completion-award-london-subject-to-validation/",
+        "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/beng-hons-mechanical-engineering-i2i-dufmag1/",
+        "https://www.northumbria.ac.uk/study-at-northumbria/courses/postgraduate/msc-sustainable-civil-engineering-dtfsve6/"
+      ],
+      "raw_discovered": 596,
+      "filter_drop_pct": 3,
+      "block_dropped_pct": 0,
+      "filter_drop_count": 15,
+      "block_dropped_count": 0,
+      "pre_block_discovered": 596,
+      "non_degree_prefetch_sample": [],
+      "non_degree_ai_calls_avoided": 0,
+      "non_degree_prefetch_skipped": 0,
+      "non_degree_browser_launches_avoided": 0
+    },
+    "catalogue_guard": null,
+    "html_compaction": {
+      "accepted": 0,
+      "attempts": 0,
+      "fail_open": 0,
+      "elapsed_ms": 0.0,
+      "input_bytes": 0,
+      "output_bytes": 0,
+      "skipped_small": 0,
+      "reduction_rate": 0.0,
+      "acceptance_rate": 0.0,
+      "fail_open_reasons": {}
+    },
+    "searchstax_filter": null,
+    "performance_savings": {
+      "cpd_skipped": 0,
+      "skipped_empty_text": 0,
+      "vision_ocr_skipped": 24,
+      "http_fetches_skipped": 128,
+      "empty_text_ai_skipped": 0,
+      "estimated_seconds_saved": 480,
+      "browser_retry_empty_text": 0,
+      "estimated_ai_calls_saved": 24,
+      "estimated_cost_saved_usd": 0.0036,
+      "non_degree_static_skipped": 0,
+      "fallback_skipped_empty_text": 0,
+      "non_degree_ai_calls_avoided": 0,
+      "non_degree_prefetch_skipped": 0,
+      "non_degree_browser_launches_avoided": 0
+    },
+    "skip_reason_samples": {},
+    "sit_catalogue_outcomes": null,
+    "targeted_retry_diagnostic": null
+  },
+  "eligibility_trace": [
+    {
+      "sequence": 214,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/advanced-musculoskeletal-physiotherapy-practice-dtpssk8/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='Coach Lane Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/advanced-musculoskeletal-physiotherapy-practice-dtpssk8/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 337,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-law-bar-course-llm-dtpbte6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-law-bar-course-llm-dtpbte6/",
+        "payload_study_mode": "Online",
+        "extracted_study_mode": "Online"
+      }
+    },
+    {
+      "sequence": 396,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/biomedical-science-pt-bsc-hons-dupbom1/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:location_derived",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='Newcastle' method=study_mode:location_derived url=https://www.northumbria.ac.uk/study-at-northumbria/courses/biomedical-science-pt-bsc-hons-dupbom1/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 460,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/biotechnology-dtpbty6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/biotechnology-dtpbty6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 852,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/creative-and-cultural-industries-management-dtpcci6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/creative-and-cultural-industries-management-dtpcci6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 904,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/creative-writing-dtpcwr6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/creative-writing-dtpcwr6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 920,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-criminology-extended-degree-uusxmg1/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-criminology-extended-degree-uusxmg1/",
+        "payload_study_mode": "Online",
+        "extracted_study_mode": "Online"
+      }
+    },
+    {
+      "sequence": 1097,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/data-protection-law-and-information-governance-dtpdpg6/",
+        "kind": "online_only_skip",
+        "level": "info",
+        "phase": "extract",
+        "message": "[ONLINE ONLY] https://www.northumbria.ac.uk/study-at-northumbria/courses/data-protection-law-and-information-governance-dtpdpg6/ — authoritative delivery evidence; skipping enrichment"
+      }
+    },
+    {
+      "sequence": 1105,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/criminology-uuscmg1/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='Online' location=None method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/criminology-uuscmg1/",
+        "payload_study_mode": "Online",
+        "extracted_study_mode": "Online"
+      }
+    },
+    {
+      "sequence": 1123,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/criminology-and-criminal-justice-dtpscz6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:location_derived",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='Newcastle' method=study_mode:location_derived url=https://www.northumbria.ac.uk/study-at-northumbria/courses/criminology-and-criminal-justice-dtpscz6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 1437,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/english-literature-dtdegl6/",
+        "kind": "online_only_skip",
+        "level": "info",
+        "phase": "extract",
+        "message": "[ONLINE ONLY] https://www.northumbria.ac.uk/study-at-northumbria/courses/english-literature-dtdegl6/ — authoritative delivery evidence; skipping enrichment"
+      }
+    },
+    {
+      "sequence": 1488,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/english-literature-dtpeli7/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/english-literature-dtpeli7/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 1504,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/english-literature-dtpegl6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:location_derived",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:location_derived url=https://www.northumbria.ac.uk/study-at-northumbria/courses/english-literature-dtpegl6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 1525,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/english-literature-dtpegld6/",
+        "kind": "online_only_skip",
+        "level": "info",
+        "phase": "extract",
+        "message": "[ONLINE ONLY] https://www.northumbria.ac.uk/study-at-northumbria/courses/english-literature-dtpegld6/ — authoritative delivery evidence; skipping enrichment"
+      }
+    },
+    {
+      "sequence": 1561,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-business-administration-dtpmbn6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-business-administration-dtpmbn6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 1724,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-forensic-psychology-dtpfsy6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-forensic-psychology-dtpfsy6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 1776,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/forensic-science-dtpfrs6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/forensic-science-dtpfrs6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 2154,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-research-healthcare-professional-practice-dtphcf6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='Blended' location='Coach Lane Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-research-healthcare-professional-practice-dtphcf6/",
+        "payload_study_mode": "Blended",
+        "extracted_study_mode": "Blended"
+      }
+    },
+    {
+      "sequence": 2244,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/history-ma-ft-dl-dtdhtr6/",
+        "kind": "online_only_skip",
+        "level": "info",
+        "phase": "extract",
+        "message": "[ONLINE ONLY] https://www.northumbria.ac.uk/study-at-northumbria/courses/history-ma-ft-dl-dtdhtr6/ — authoritative delivery evidence; skipping enrichment"
+      }
+    },
+    {
+      "sequence": 2272,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/history-dtphtr7/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/history-dtphtr7/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 2286,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/history-dtdhty6/",
+        "kind": "online_only_skip",
+        "level": "info",
+        "phase": "extract",
+        "message": "[ONLINE ONLY] https://www.northumbria.ac.uk/study-at-northumbria/courses/history-dtdhty6/ — authoritative delivery evidence; skipping enrichment"
+      }
+    },
+    {
+      "sequence": 2292,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/history-dtphtr6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:location_derived",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:location_derived url=https://www.northumbria.ac.uk/study-at-northumbria/courses/history-dtphtr6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 2423,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/international-relations-conflict-and-security-ma-pt-dtpirc6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/international-relations-conflict-and-security-ma-pt-dtpirc6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 2446,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-international-sport-management-dtpisj6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='Newcastle' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-international-sport-management-dtpisj6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 2465,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/law-cyber-law-llm-part-time-dtdlcb6/",
+        "kind": "online_only_skip",
+        "level": "info",
+        "phase": "extract",
+        "message": "[ONLINE ONLY] https://www.northumbria.ac.uk/study-at-northumbria/courses/law-cyber-law-llm-part-time-dtdlcb6/ — authoritative delivery evidence; skipping enrichment"
+      }
+    },
+    {
+      "sequence": 2484,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/law-space-law-llm-part-time-dtdlsl6/",
+        "kind": "online_only_skip",
+        "level": "info",
+        "phase": "extract",
+        "message": "[ONLINE ONLY] https://www.northumbria.ac.uk/study-at-northumbria/courses/law-space-law-llm-part-time-dtdlsl6/ — authoritative delivery evidence; skipping enrichment"
+      }
+    },
+    {
+      "sequence": 2528,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/mamsc-product-design-futures-dtppdf6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:location_derived",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:location_derived url=https://www.northumbria.ac.uk/study-at-northumbria/courses/mamsc-product-design-futures-dtppdf6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 2578,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/public-health-dtppuh6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='Coach Lane Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/public-health-dtppuh6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 2641,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/health-psychology-dtphpy6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/health-psychology-dtphpy6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 2789,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/microbiology-dtpmgy6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:location_derived",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='Newcastle' method=study_mode:location_derived url=https://www.northumbria.ac.uk/study-at-northumbria/courses/microbiology-dtpmgy6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 2953,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/ma-neurodiversity--inclusive-practice-dtpndp6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='Coach Lane Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/ma-neurodiversity--inclusive-practice-dtpndp6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 3062,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-public-administration-dtpmpa6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-public-administration-dtpmpa6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 3119,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/nutritional-science-dtpnls6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/nutritional-science-dtpnls6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 3168,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/occupational-and-organisational-psychology-dtpoco6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:location_derived",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:location_derived url=https://www.northumbria.ac.uk/study-at-northumbria/courses/occupational-and-organisational-psychology-dtpoco6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 3189,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/ma-preventive-conservation-distance-learning-dtdpvc6/",
+        "kind": "online_only_skip",
+        "level": "info",
+        "phase": "extract",
+        "message": "[ONLINE ONLY] https://www.northumbria.ac.uk/study-at-northumbria/courses/ma-preventive-conservation-distance-learning-dtdpvc6/ — authoritative delivery evidence; skipping enrichment"
+      }
+    },
+    {
+      "sequence": 3323,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/psychology-dtppcy6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:location_derived",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='Newcastle' method=study_mode:location_derived url=https://www.northumbria.ac.uk/study-at-northumbria/courses/psychology-dtppcy6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 3388,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-psychology-with-criminology-uufpcy3cmz/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "none",
+        "message": "[FIELD TRACE] study_mode=None location='Newcastle' method=none url=https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-psychology-with-criminology-uufpcy3cmz/",
+        "payload_study_mode": null,
+        "extracted_study_mode": null
+      }
+    },
+    {
+      "sequence": 3448,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/sport-and-exercise-psychology-dtpsxp6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/sport-and-exercise-psychology-dtpsxp6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 3563,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-sport-performance-and-analysis-dtpspa6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:location_derived",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='Newcastle' method=study_mode:location_derived url=https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-sport-performance-and-analysis-dtpspa6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 3603,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-science-strength-and-conditioning-dtpshc6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-science-strength-and-conditioning-dtpshc6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 3791,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/occupational-psychology-drpocp7/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/occupational-psychology-drpocp7/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 3921,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/pg-cert-leading-positive-behaioural-support-in-organisations-newcastle-dtplso6/",
+        "kind": "online_only_skip",
+        "level": "info",
+        "phase": "extract",
+        "message": "[ONLINE ONLY] https://www.northumbria.ac.uk/study-at-northumbria/courses/pg-cert-leading-positive-behaioural-support-in-organisations-newcastle-dtplso6/ — authoritative delivery evidence; skipping enrichment"
+      }
+    },
+    {
+      "sequence": 3946,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/advanced-diploma-in-leading-positive-behavioural-support-in-organisations-newcastle-duplso4/",
+        "kind": "online_only_skip",
+        "level": "info",
+        "phase": "extract",
+        "message": "[ONLINE ONLY] https://www.northumbria.ac.uk/study-at-northumbria/courses/advanced-diploma-in-leading-positive-behavioural-support-in-organisations-newcastle-duplso4/ — authoritative delivery evidence; skipping enrichment"
+      }
+    },
+    {
+      "sequence": 3974,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/presessional-english-language-and-study-skills-dofega4/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/presessional-english-language-and-study-skills-dofega4/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 3989,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/higher-apprenticeship-in-community-specialist-practitioner-dtpcpc6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='Coach Lane Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/higher-apprenticeship-in-community-specialist-practitioner-dtpcpc6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 4220,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-healthcare-leadership-and-management-dtphld6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-healthcare-leadership-and-management-dtphld6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 4249,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/presessional-english-language-and-study-skills-dofegb4/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/presessional-english-language-and-study-skills-dofegb4/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 4320,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/nebosh-national-general-certificate-in-occupational-health-and-safety-dl-dupbod8/",
+        "kind": "online_only_skip",
+        "level": "info",
+        "phase": "extract",
+        "message": "[ONLINE ONLY] https://www.northumbria.ac.uk/study-at-northumbria/courses/nebosh-national-general-certificate-in-occupational-health-and-safety-dl-dupbod8/ — authoritative delivery evidence; skipping enrichment"
+      }
+    },
+    {
+      "sequence": 4336,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/nebosh-national-general-certificate-in-occupational-safety-and-health-pt-dupbos8/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:location_derived",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='Start January, May, September' method=study_mode:location_derived url=https://www.northumbria.ac.uk/study-at-northumbria/courses/nebosh-national-general-certificate-in-occupational-safety-and-health-pt-dupbos8/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 4413,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/ma-education-leadership-and-learning-dtdmll6/",
+        "kind": "online_only_skip",
+        "level": "info",
+        "phase": "extract",
+        "message": "[ONLINE ONLY] https://www.northumbria.ac.uk/study-at-northumbria/courses/ma-education-leadership-and-learning-dtdmll6/ — authoritative delivery evidence; skipping enrichment"
+      }
+    },
+    {
+      "sequence": 4473,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-accounting-and-finance-with-international-year-one-in-business-ft-uuflay1/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='London' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-accounting-and-finance-with-international-year-one-in-business-ft-uuflay1/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 4521,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/nebosh-national-diploma-in-occupational-health-and-safety-pt-dupneb8/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:strong_label",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='Northumbria University, Newcastle City Campus' method=study_mode:strong_label url=https://www.northumbria.ac.uk/study-at-northumbria/courses/nebosh-national-diploma-in-occupational-health-and-safety-pt-dupneb8/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 4527,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/solicitor-higher-apprenticeship-dupsor1/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/solicitor-higher-apprenticeship-dupsor1/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 4636,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-quantity-surveying-construction-degree-apprenticeship-dupqss1/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='Various Locations' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-quantity-surveying-construction-degree-apprenticeship-dupqss1/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 4738,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-digital-marketing-distance-learning-dtddmk6/",
+        "kind": "online_only_skip",
+        "level": "info",
+        "phase": "extract",
+        "message": "[ONLINE ONLY] https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-digital-marketing-distance-learning-dtddmk6/ — authoritative delivery evidence; skipping enrichment"
+      }
+    },
+    {
+      "sequence": 4747,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-public-health-kaplan-subject-to-validation-dtpphk6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='Newcastle' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-public-health-kaplan-subject-to-validation-dtpphk6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 4769,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-occupational-and-organisational-psychology-distance-learning-dtdopy6/",
+        "kind": "online_only_skip",
+        "level": "info",
+        "phase": "extract",
+        "message": "[ONLINE ONLY] https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-occupational-and-organisational-psychology-distance-learning-dtdopy6/ — authoritative delivery evidence; skipping enrichment"
+      }
+    },
+    {
+      "sequence": 4814,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/ha-in-specialist-community-public-health-nursing-school-nursing-dtfhan6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='Coach Lane Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/ha-in-specialist-community-public-health-nursing-school-nursing-dtfhan6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 4826,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-computer-science-with-artificial-intelligence-distance-learning-dtdsar6/",
+        "kind": "online_only_skip",
+        "level": "info",
+        "phase": "extract",
+        "message": "[ONLINE ONLY] https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-computer-science-with-artificial-intelligence-distance-learning-dtdsar6/ — authoritative delivery evidence; skipping enrichment"
+      }
+    },
+    {
+      "sequence": 4845,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-science-advanced-clinical-practitioner-sexual-health-dtprsh6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-science-advanced-clinical-practitioner-sexual-health-dtprsh6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 4876,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-science-advanced-clinical-practitioner-advanced-critical-care-practitioner-dtprcc6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-science-advanced-clinical-practitioner-advanced-critical-care-practitioner-dtprcc6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 4911,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-business-and-management-distance-learning-dtdbnt6/",
+        "kind": "online_only_skip",
+        "level": "info",
+        "phase": "extract",
+        "message": "[ONLINE ONLY] https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-business-and-management-distance-learning-dtdbnt6/ — authoritative delivery evidence; skipping enrichment"
+      }
+    },
+    {
+      "sequence": 4924,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-science-advanced-clinical-practitioner-emergency-care-dtprec6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='Coach Lane Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-science-advanced-clinical-practitioner-emergency-care-dtprec6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 4962,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/doctor-of-sport-and-exercise-psychology-drpsep7/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/doctor-of-sport-and-exercise-psychology-drpsep7/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 5034,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/arts-dtpaar6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/arts-dtpaar6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 5039,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/applied-linguistics-for-tesol-dtpalt6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/applied-linguistics-for-tesol-dtpalt6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 5052,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-surveying-quantity-surveying-distance-learning-dtdpsq6/",
+        "kind": "online_only_skip",
+        "level": "info",
+        "phase": "extract",
+        "message": "[ONLINE ONLY] https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-surveying-quantity-surveying-distance-learning-dtdpsq6/ — authoritative delivery evidence; skipping enrichment"
+      }
+    },
+    {
+      "sequence": 5069,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-surveying-real-estate-distance-learning-dtdpsf6/",
+        "kind": "online_only_skip",
+        "level": "info",
+        "phase": "extract",
+        "message": "[ONLINE ONLY] https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-surveying-real-estate-distance-learning-dtdpsf6/ — authoritative delivery evidence; skipping enrichment"
+      }
+    },
+    {
+      "sequence": 5071,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-quantity-surveying-dupqys1/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:strong_label",
+        "message": "[FIELD TRACE] study_mode='Blended' location='City Campus, Northumbria University' method=study_mode:strong_label url=https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-quantity-surveying-dupqys1/",
+        "payload_study_mode": "Blended",
+        "extracted_study_mode": "Blended"
+      }
+    },
+    {
+      "sequence": 5075,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/design-dtpdey6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/design-dtpdey6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 5239,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-business-and-management-distance-learning-dupbde1/",
+        "kind": "online_only_skip",
+        "level": "info",
+        "phase": "extract",
+        "message": "[ONLINE ONLY] https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-business-and-management-distance-learning-dupbde1/ — authoritative delivery evidence; skipping enrichment"
+      }
+    },
+    {
+      "sequence": 5254,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/doctorate-of-design-drpdde7/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/doctorate-of-design-drpdde7/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 5257,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-science-advanced-clinical-practitioner-primary-care-dtprpc6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-science-advanced-clinical-practitioner-primary-care-dtprpc6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 5296,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/doctor-of-sport-drpdsp7/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/doctor-of-sport-drpdsp7/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 5406,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/interior-architecture-pg-cert-dtfiah6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/interior-architecture-pg-cert-dtfiah6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 5410,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/ha-in-specialist-community-public-health-nursing-health-visiting-dtfhav6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='Coach Lane Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/ha-in-specialist-community-public-health-nursing-health-visiting-dtfhav6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 5432,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-computer-science-with-data-analytics-distance-learning-dtdcda6/",
+        "kind": "online_only_skip",
+        "level": "info",
+        "phase": "extract",
+        "message": "[ONLINE ONLY] https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-computer-science-with-data-analytics-distance-learning-dtdcda6/ — authoritative delivery evidence; skipping enrichment"
+      }
+    },
+    {
+      "sequence": 5467,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-science-advanced-clinical-practitioner-degree-apprenticeship-dtpuap6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-science-advanced-clinical-practitioner-degree-apprenticeship-dtpuap6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 5477,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/mental-health-law-and-practice-dl-dudmlh6/",
+        "kind": "online_only_skip",
+        "level": "info",
+        "phase": "extract",
+        "message": "[ONLINE ONLY] https://www.northumbria.ac.uk/study-at-northumbria/courses/mental-health-law-and-practice-dl-dudmlh6/ — authoritative delivery evidence; skipping enrichment"
+      }
+    },
+    {
+      "sequence": 5481,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-science-advanced-clinical-practitioner-dtprap6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-science-advanced-clinical-practitioner-dtprap6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 5552,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/doctor-of-business-administration-dtpbad7/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/doctor-of-business-administration-dtpbad7/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 5572,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/doctor-of-philosophy-drpxxr7/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='Various Locations' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/doctor-of-philosophy-drpxxr7/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 5602,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/professional-practice-in-mental-health-law-dtdpml6/",
+        "kind": "online_only_skip",
+        "level": "info",
+        "phase": "extract",
+        "message": "[ONLINE ONLY] https://www.northumbria.ac.uk/study-at-northumbria/courses/professional-practice-in-mental-health-law-dtdpml6/ — authoritative delivery evidence; skipping enrichment"
+      }
+    },
+    {
+      "sequence": 5868,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/presessional-english-language-and-study-skills-dofegd4/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/presessional-english-language-and-study-skills-dofegd4/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 5921,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/pg-cert-eye-movement-desensitisation-and-reprocessing-dtpeym6/",
+        "kind": "online_only_skip",
+        "level": "info",
+        "phase": "extract",
+        "message": "[ONLINE ONLY] https://www.northumbria.ac.uk/study-at-northumbria/courses/pg-cert-eye-movement-desensitisation-and-reprocessing-dtpeym6/ — authoritative delivery evidence; skipping enrichment"
+      }
+    },
+    {
+      "sequence": 5978,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/postgraduate-certificate-in-public-health-kaplan-dtpphl6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "gemini_primary",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='Singapore City Singapore' method=gemini_primary url=https://www.northumbria.ac.uk/study-at-northumbria/courses/postgraduate-certificate-in-public-health-kaplan-dtpphl6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 5984,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/postgraduate-certificate-healthcare-management-kaplan-dtphml6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "gemini_primary",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='Singapore City Singapore' method=gemini_primary url=https://www.northumbria.ac.uk/study-at-northumbria/courses/postgraduate-certificate-healthcare-management-kaplan-dtphml6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 6046,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/found-dip-int-foundation-programme-in-art-design-and-media-12-months-qa-on-campus-dufdme4/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='Newcastle' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/found-dip-int-foundation-programme-in-art-design-and-media-12-months-qa-on-campus-dufdme4/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 6080,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-global-business-management-logistics-and-supply-chain-hong-kong/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='110 Middlesex Street, London' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-global-business-management-logistics-and-supply-chain-hong-kong/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 6117,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/spatial-and-environmental-design-ma-dtppti6/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/spatial-and-environmental-design-ma-dtppti6/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 6120,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/beng-hons-civil-engineering-degree-apprenticeship-dupcig1/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='City Campus, Northumbria University' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/beng-hons-civil-engineering-degree-apprenticeship-dupcig1/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    },
+    {
+      "sequence": 6150,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-surveying-building-surveying-distance-learning-dtdpsb6/",
+        "kind": "online_only_skip",
+        "level": "info",
+        "phase": "extract",
+        "message": "[ONLINE ONLY] https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-surveying-building-surveying-distance-learning-dtdpsb6/ — authoritative delivery evidence; skipping enrichment"
+      }
+    },
+    {
+      "sequence": 6184,
+      "payload": {
+        "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/found-dip-int-foundation-programme-in-engineering-12-months-qa-on-campus-dufigg4/",
+        "kind": "field_trace_study_mode",
+        "level": "info",
+        "phase": "extract",
+        "method": "study_mode:rule",
+        "message": "[FIELD TRACE] study_mode='On Campus' location='Newcastle' method=study_mode:rule url=https://www.northumbria.ac.uk/study-at-northumbria/courses/found-dip-int-foundation-programme-in-engineering-12-months-qa-on-campus-dufigg4/",
+        "payload_study_mode": "On Campus",
+        "extracted_study_mode": "On Campus"
+      }
+    }
+  ],
+  "official_url_ledger_columns": [
+    "url",
+    "name",
+    "listing_delivery",
+    "extraction_completed",
+    "outcome",
+    "reason_or_error"
+  ],
+  "official_url_ledger": [
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-accounting-extended-degree-uusxci1/",
+      "Accounting (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-accounting-and-finance-completion-award-newcastle-uufatf1/",
+      "Accounting and Finance (Top-Up) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-accounting-and-finance-newcastle-uusatf1/",
+      "Accounting and Finance (Top-Up) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-accounting-and-finance-completion-award-london-subject-to-validation-uufatl1/",
+      "Accounting and Finance (Top-Up) BSc (Hons) (London)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-accounting-and-finance-dtfaaf6/",
+      "Accounting and Finance MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-accounting-uusaci1/",
+      "Accounting BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-science-advanced-computer-science-with-advanced-practice-dtsavf6/",
+      "Advanced Computer Science MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-advanced-computer-science-dtfava6/",
+      "Advanced Computer Science MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-advanced-computer-science-16-months-dtfavb6/",
+      "Advanced Computer Science MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/advanced-musculoskeletal-physiotherapy-practice-dtpssk8/",
+      "Advanced Musculoskeletal Physiotherapy Practice",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: category_landing_page_missing_degree_qualifier"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/beng-hons-aerospace-satellite-engineering-extended-degree---uusxes1/",
+      "Aerospace Satellite Engineering (Extended Degree) BEng (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-aerospace-satellite-engineering-with-advanced-practice-dtsaea6/",
+      "Aerospace Satellite Engineering (with Advanced Practice) MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/beng-hons-aerospace-satellite-engineering---uusaes1/",
+      "Aerospace Satellite Engineering BEng (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/meng-hons-aerospace-satellite-engineering---uusaet1/",
+      "Aerospace Satellite Engineering MEng (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-aerospace-satellite-engineering-dtfaes6/",
+      "Aerospace Satellite Engineering MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-aerospace-satellite-engineering---dtfaet6/",
+      "Aerospace Satellite Engineering MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-architecture-extended-degree-uufxhe1/",
+      "Architecture (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/architecture-ba-hons-uufahe1/",
+      "Architecture BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/architecture-march-ft-dufaht1/",
+      "Architecture MArch",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/artificial-intelligence-extended-degree-bsc-hons-uusxri1/",
+      "Artificial Intelligence (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-artificial-intelligence-uusari1/",
+      "Artificial Intelligence BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-artificial-intelligence-dtfari6/",
+      "Artificial Intelligence MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/automotive-engineering-extended-degree-uusxuv1/",
+      "Automotive Engineering (Extended Degree) BEng (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/beng-hons-automotive-engineering-uusauv1/",
+      "Automotive Engineering BEng (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/meng-automotive-engineering-uusauo1/",
+      "Automotive Engineering MEng (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bar-course-ft-dtfbtc6/",
+      "Bar Course",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bar-course-pt-dtpbtc6/",
+      "Bar Course",
+      "part_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/masters-of-law-bar-course-llm-ft-dtfbte6/",
+      "Bar Course LLM",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-law-bar-course-llm-dtpbte6/",
+      "Bar Course LLM",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: online_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bar-knowledge-course-dtpbkt8/",
+      "Bar Knowledge Course",
+      "part_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bar-skills-course-dtpbsk6/",
+      "Bar Skills Course",
+      "part_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-biochemistry-extended-degree-uusxch1/",
+      "Biochemistry (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/biochemistry-bsc-hons-uusbch1/",
+      "Biochemistry BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-biological-sciences-extended-degree-uusxbb1/",
+      "Biological Sciences (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-biological-sciences-uuscbb1/",
+      "Biological Sciences BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-biomedical-science-extended-degree-uusxom1/",
+      "Biomedical Science (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/biomedical-science-uusbom1/",
+      "Biomedical Science BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/biomedical-science-pt-bsc-hons-dupbom1/",
+      "Biomedical Science BSc (Hons)",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-biotechnology-extended-degree-uusxot1/",
+      "Biotechnology (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-biotechnology-uusbot1/",
+      "Biotechnology BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/biotechnology-dtfbty6/",
+      "Biotechnology MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/biotechnology-dtpbty6/",
+      "Biotechnology MSc",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-criminology-with-law-extended-degree-uusxmg3lyw/",
+      "BSc (Hons) Criminology with Law (Extended Degree)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-building-surveying-extended-degree-uusxdv1/",
+      "Building Surveying (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/building-surveying-bsc-ft-uusbdv1/",
+      "Building Surveying BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/business-analytics-msc-dtfbna6/",
+      "Business Analytics MSc",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/business-analytics-msc-with-advanced-practice-dtsbnl6/",
+      "Business Analytics MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-business-and-analytics-extended-degree-uusxaa1/",
+      "Business and Analytics (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-business-and-analytics-uusbaa1/",
+      "Business and Analytics BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-business-and-entrepreneurship-extended-degree-uusxer1/",
+      "Business and Entrepreneurship (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-business-and-entrepreneurship-uusber1/",
+      "Business and Entrepreneurship BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-business-and-human-resource-management-extended-degree-uusxrm1/",
+      "Business and Human Resource Management (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-business-and-human-resource-management-uusbrm1/",
+      "Business and Human Resource Management BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-business-and-management-dtfbdn6/",
+      "Business and Management MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-business-and-management-with-advanced-practice-dtsbdn6/",
+      "Business and Management MSc",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-business-and-marketing-extended-degree-uusxmr2mrn/",
+      "Business and Marketing (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/business-and-marketing-ba-hons-uusbmr2mrn/",
+      "Business and Marketing BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-business-and-supply-chain-management-extended-degree-uusxmt1/",
+      "Business and Supply Chain Management (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-business-and-supply-chain-management-uuscmt1/",
+      "Business and Supply Chain Management BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-business-computing-extended-degree-uusxcp1/",
+      "Business Computing (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-business-computing-uusbcp1/",
+      "Business Computing BSc (Hons)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-business-management-extended-degree-uusxnb1/",
+      "Business Management (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-business-management-uusbnb1/",
+      "Business Management BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-business-management-i2i-sports-dufbni1/",
+      "Business Management BA (Hons) (i2i International Soccer Academy)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-career-guidance-and-coaching-extended-degree-uusxgo1/",
+      "Career Guidance and Coaching  (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-career-guidance-and-coaching-uuscgo1/",
+      "Career Guidance and Coaching BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-chemistry-extended-degree-uusxhy1/",
+      "Chemistry (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/chemistry-uuschy1/",
+      "Chemistry BSc (Hons)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/chemistry-uusmch1/",
+      "Chemistry MChem",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ma-childhood-and-early-year-studies-dtfcew6/",
+      "Childhood And Early Year Studies MA",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-childhood-and-early-years-studies-extended-degree-uufxes1/",
+      "Childhood and Early Years Studies (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/childhood-and-early-years-studies-ba-hons-uufces1/",
+      "Childhood and Early Years Studies BA (Hons)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/beng-hons-civil-engineering-extended-degree-uusxie1/",
+      "Civil Engineering (Extended Degree) BEng (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/civil-engineering-beng-ft-uuscie1/",
+      "Civil Engineering BEng (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/civil-engineering-meng-ft-uusciv1/",
+      "Civil Engineering MEng (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-clinical-exercise-physiology--dtfcxp6/",
+      "Clinical Exercise Physiology MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-clinical-exercise-physiology-dtpcxp6/",
+      "Clinical Exercise Physiology MSc",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/communication-design-ma-dtfcdg6/",
+      "Communication Design MA",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-computer-science-extended-degree-uusxms1/",
+      "Computer Science (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-computer-science-uuscms1/",
+      "Computer Science BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-computer-science-dtfcsd6/",
+      "Computer Science MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-computer-science-16-months-dtfmcs6/",
+      "Computer Science MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-computer-science-with-advanced-practice--dtscsm6/",
+      "Computer Science MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-computing-top-up-award-uufcou1/",
+      "Computing (Top-Up) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-computing-with-artificial-intelligence-technology-full-time-london-subject-uufctg3arn/",
+      "Computing with Artificial Intelligence Technology BSc (Hons) (London)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-computing-with-cyber-security-technology--full-time-london-subject-to-validation-uufctg3cyt/",
+      "Computing with Cyber Security Technology BSc (Hons) (London)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-computing-with-data-science-and-big-data-technology-full-time-london-uufctg3dsb/",
+      "Computing with Data Science and Big Data Technology BSc (Hons) (London)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-computing-with-information-technology-management-full-time-london-subject-to-validation-uuf/",
+      "Computing with Information Technology Management BSc (Hons) (London)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-computing-with-technology-full-time-london-subject-to-validation-uufctg1tcn/",
+      "Computing with Technology BSc (Hons) (London)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ma-conservation-of-fine-art-easel-paintings-dtfcfp6/",
+      "Conservation of Fine Art (Easel Paintings) MA",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ma-conservation-of-fine-art-works-of-art-on-paper-dtfcfq6/",
+      "Conservation of Fine Art (Works of Art on Paper) MA",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-construction-management-extended-degree-uusxum1/",
+      "Construction Management (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-construction-management-uuscum1/",
+      "Construction Management BSc Degree (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/construction-project-management-with-bim-with-advanced-practice-msc-ft-dtscjp6/",
+      "Construction Project Management with BIM MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/construction-project-management-with-bim-msc-ft-dtfcpj6/",
+      "Construction Project Management with BIM MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/creative-and-cultural-industries-management-dtfcci6/",
+      "Creative and Cultural Industries Management MA",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/creative-and-cultural-industries-management-dtpcci6/",
+      "Creative and Cultural Industries Management MA",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/creative-writing-dtfcwr6/",
+      "Creative Writing MA",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/creative-writing-dtpcwr6/",
+      "Creative Writing MA",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-criminology-extended-degree-uusxmg1/",
+      "Criminology (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "skipped",
+      "rejected: online_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/criminology-and-criminal-justice-dtfscr6/",
+      "Criminology and Criminal Justice MA",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/criminology-and-criminal-justice-dtpscz6/",
+      "Criminology and Criminal Justice MA",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-criminology-and-forensic-science-extended-degree-uusxmg2frs/",
+      "Criminology and Forensic Science (Extended Degree) BSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/criminology-and-forensic-science-uuscmg2frs/",
+      "Criminology and Forensic Science BSc (Hons)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-criminology-and-sociology-extended-degree-uusxso2scg/",
+      "Criminology and Sociology (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/criminology-and-sociology-uuscmg2scg/",
+      "Criminology and Sociology BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/criminology-uuscmg1/",
+      "Criminology BSc (Hons)",
+      "full_time",
+      true,
+      "skipped",
+      "rejected: online_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-criminology-with-criminal-justice-extended-degree-uusxmg3crj/",
+      "Criminology with Criminal Justice (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-criminology-with-criminal-justice-uuscmg3crj/",
+      "Criminology with Criminal Justice BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-criminology-with-law-uuscmg3lyw/",
+      "Criminology with Law BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/data-protection-law-and-information-governance-dtpdpg6/",
+      "Data Protection Law and Information Governance Postgraduate Certificate",
+      "distance_learning",
+      true,
+      "skipped",
+      "rejected: online_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-data-science-extended-degree-uusxsc1/",
+      "Data Science (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-data-science-uusdsc1/",
+      "Data Science BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/data-science-msc-16-months-dtfdas6/",
+      "Data Science MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/data-science-msc-dtfdsc6/",
+      "Data Science MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/data-science-advance-practice-msc-dtsdsc6/",
+      "Data Science MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-digital-design-extended-degree-newcastle-uusxid1/",
+      "Digital Design (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-digital-design-uusdid1/",
+      "Digital Design BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/digital-marketing-msc-ft-dtfdgm6/",
+      "Digital Marketing MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/disaster-management-and-sustainable-development-msc-ft-dtfdsd6/",
+      "Disaster Management and Sustainable Development MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/disaster-management-and-sustainable-development-with-advanced-practice-msc-ft-dtsdds6/",
+      "Disaster Management and Sustainable Development MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-economics-extended-degree-uusxic1/",
+      "Economics (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-economics-and-finance-extended-degree-uusxcf1/",
+      "Economics and Finance (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-economics-and-finance-uusecf1/",
+      "Economics and Finance BSc Degree (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/economics-bsc-hons-uuseic1/",
+      "Economics BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ma-education-leadership-and-management-dtfldt6/",
+      "Education (Leadership and Management) MA",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/education-leadership-and-management-ma-dtpldt6/",
+      "Education (Leadership and Management) MA",
+      "part_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ma-education-teaching-and-learning-dtftcl6/",
+      "Education (Teaching and Learning) MA",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/education-teaching-and-learning-ma-dtptcl6/",
+      "Education (Teaching and Learning) MA",
+      "part_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/education-ma-dtfect6/",
+      "Education MA",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/education-ma-dtpect6/",
+      "Education MA",
+      "part_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/beng-hons-electrical-and-electronic-engineering-extended-degree-uusxeg1/",
+      "Electrical and Electronic Engineering (Extended Degree) BEng (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-electrical-and-electronic-engineering-with-advanced-practice-dtseea6/",
+      "Electrical and Electronic Engineering (with Advanced Practice) MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/beng-hons-electrical-and-electronic-engineering-uuseeg1/",
+      "Electrical and Electronic Engineering BEng (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/meng-hons-electrical-and-electronic-engineering-uusmge1/",
+      "Electrical and Electronic Engineering MEng (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-electrical-and-electronic-engineering-dtfeel6/",
+      "Electrical and Electronic Engineering MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-electrical-and-electronic-engineering-dtfeea6/",
+      "Electrical and Electronic Engineering MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/beng-hons-electrical-engineering-top-up-award-uufeei1/",
+      "Electrical Engineering (Top-Up) BEng (Hons)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/electrical-power-engineering-with-advanced-practice-dtseen6/",
+      "Electrical Power Engineering MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/electrical-power-engineering-msc-ft-dtfepz6/",
+      "Electrical Power Engineering MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-electrical-power-engineering-dtfepn6/",
+      "Electrical Power Engineering MSc",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-engineering-management-dtfemn6/",
+      "Engineering Management MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-engineering-management-dtfemi6/",
+      "Engineering Management MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-science-engineering-management-with-advanced-practice-dtsemd6/",
+      "Engineering Management with Advanced Practice MSc",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-english-language-extended-degree-uusxan1/",
+      "English Language (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-english-language-and-literature-extended-degree-uusxst2egl/",
+      "English Language and Literature (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/english-language-and-literature-ba-hons-uuslst2egl/",
+      "English Language and Literature BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-english-language-uuslan1/",
+      "English Language BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-english-literature-extended-degree-uusxgl1/",
+      "English Literature (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/english-literature-and-creative-writing-extended-degree-ba-hons-uusxgl2cwr/",
+      "English Literature and Creative Writing (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/english-literature-and-creative-writing-uusegl2cwr/",
+      "English Literature and Creative Writing BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-english-literature-and-history-extended-degree-uusxgl2htr/",
+      "English Literature and History (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/english-literature-and-history-ba-hons-uusegl2htr/",
+      "English Literature and History BA (Hons)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/english-literature-ba-hons-uusegl1/",
+      "English Literature BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/english-literature-dtfegl6/",
+      "English Literature MA",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/english-literature-dtpegl6/",
+      "English Literature MA",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/english-literature-dtpegld6/",
+      "English Literature MA",
+      "distance_learning",
+      true,
+      "skipped",
+      "rejected: online_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/english-literature-dtdegl6/",
+      "English Literature MA",
+      "full_time",
+      true,
+      "skipped",
+      "rejected: online_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/english-literature-mres-dtfeli7/",
+      "English Literature MRes",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/english-literature-dtpeli7/",
+      "English Literature MRes",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-entrepreneurship-and-innovation-management-dtfeim6/",
+      "Entrepreneurship and Innovation Management MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-entrepreneurship-and-innovation-management-with-advanced-practice-dtseim6/",
+      "Entrepreneurship and Innovation Management MSc",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-environmental-science-extended-degree-uusxse1/",
+      "Environmental Science (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-environmental-science-uusese1/",
+      "Environmental Science BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-business-administration-dtpmbn6/",
+      "Executive Master of Business Administration (EMBA)",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: category_landing_page_missing_degree_qualifier"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-fashion-extended-degree-newcastle-uusxfh1/",
+      "Fashion (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-fashion-uusfhi1/",
+      "Fashion BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-fashion-business-top-up-award-uuffbz1/",
+      "Fashion Business (Top-Up) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-fashion-communication-extended-degree-uusxco1/",
+      "Fashion Communication (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-fashion-communication-uusfco1/",
+      "Fashion Communication BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-fashion-design-and-marketing-extended-degree-uusxmd1/",
+      "Fashion Design and Marketing (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-fashion-design-and-marketing-uusfmd1/",
+      "Fashion Design and Marketing BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/fashion-design-ma-dtffnd6/",
+      "Fashion Design MA",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-film-extended-degree-newcastle-uusxli1/",
+      "Film (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-film-uusfli1/",
+      "Film BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-finance-and-investment-management-extended-degree-uusxvg1/",
+      "Finance and Investment Management (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/finance-and-investment-management-bsc-hons-uusfvg1/",
+      "Finance and Investment Management BSc (Hons)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-finance-dtffce6/",
+      "Finance MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/finance-msc-with-advanced-practice-dtsfcn6/",
+      "Finance MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-financial-mathematics-extended-degree-uusxcm1/",
+      "Financial Mathematics (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-financial-mathematics-uusfcm1/",
+      "Financial Mathematics BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-fine-art-extended-degree-uusxnt1/",
+      "Fine Art (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-fine-art-uusfnt1/",
+      "Fine Art BA (Hons)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-food-science-and-nutrition-extended-degree-uusxsu1/",
+      "Food Science and Nutrition (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/food-science-and-nutrition-uusfsu1/",
+      "Food Science and Nutrition BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-football-coaching-and-performance-extended-degree-uusxbc1/",
+      "Football Coaching and Performance (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-football-coaching-and-performance-extended-degree-i2i-dufxbi1/",
+      "Football Coaching and Performance (Extended Degree) BSc (Hons) (i2i International Soccer Academy)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-football-coaching-and-performance-uusfbc1/",
+      "Football Coaching and Performance BSc (Hons)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-football-coaching-and-performance-i2i-duffbi1/",
+      "Football Coaching and Performance BSc (Hons) (i2i International Soccer Academy)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/forensic-accounting-dtffra6/",
+      "Forensic Accounting MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-forensic-psychology-dtffsy6/",
+      "Forensic Psychology MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-forensic-psychology-dtpfsy6/",
+      "Forensic Psychology MSc",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-forensic-science-extended-degree-uusxrs1/",
+      "Forensic Science (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/forensic-science-uusfrs1/",
+      "Forensic Science BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/forensic-science-dtffrs6/",
+      "Forensic Science MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/forensic-science-dtpfrs6/",
+      "Forensic Science MSc",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-furniture-and-product-design-extended-degree-uusxpd1/",
+      "Furniture and Product Design (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-furniture-and-product-design-uusfpd1/",
+      "Furniture and Product Design BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-games-computing-extended-degree-uusxxo1/",
+      "Games Computing (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-games-computing-uusgco1/",
+      "Games Computing BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-geography-extended-degree-uusxey1/",
+      "Geography (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-geography-extended-degree-uusxgg1/",
+      "Geography (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/geography-ba-ft-uusgey1/",
+      "Geography BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-geography-uusgeg1/",
+      "Geography BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-global-business-management-finance-newcastle-uusgbf1/",
+      "Global Business Management (Finance) (Top-Up) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-global-business-management-finance-completion-award-newcastle-uufgbf1/",
+      "Global Business Management (Finance) (Top-Up) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-global-business-management-human-resources-completion-award-london-subject-to-validation-uu/",
+      "Global Business Management (Human Resources) (Top-Up) BSc (Hons)",
+      "full_time",
+      false,
+      "filter_excluded",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-global-business-management-human-resources-newcastle-uusgbh1/",
+      "Global Business Management (Human Resources) (Top-Up) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-global-business-management-human-resources-completion-award-newcastle--uufgbh1/",
+      "Global Business Management (Human Resources) (Top-Up) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-global-business-management-logistics-and-supply-chain-completion-award-london-uufgba1/",
+      "Global Business Management (Logistics & Supply Chain) (Top-Up) BSc (Hons) (London)",
+      "full_time",
+      false,
+      "filter_excluded",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-global-business-management-logistics-and-supply-chain-completion-award-newcastle-uufgbs1/",
+      "Global Business Management (Logistics and Supply Chain) (Top-Up) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-global-business-management-logistics-and-supply-chain-newcastle-uusgbs1/",
+      "Global Business Management (Logistics and Supply Chain) (Top-Up) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-global-business-management-marketing-completion-award-newcastle-uufgbk1/",
+      "Global Business Management (Marketing) (Top-Up) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-global-business-management-marketing-newcastle-uusgbk1/",
+      "Global Business Management (Marketing) (Top-Up) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-global-business-management-marketing-completion-award-london-subject-to-validation-uuflbk1/",
+      "Global Business Management (Marketing) (Top-Up) BSc (Hons) (London)",
+      "full_time",
+      false,
+      "filter_excluded",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-global-business-management-completion-award-newcastle-uufgbn1/",
+      "Global Business Management (Top-Up) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-global-business-management-newcastle-uusgbn1/",
+      "Global Business Management (Top-Up) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-global-business-management-london-uuflbn1/",
+      "Global Business Management (Top-Up) BSc (Hons) (London)",
+      "full_time",
+      false,
+      "filter_excluded",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-global-development-with-advanced-practice-dtsgdp6/",
+      "Global Development MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-global-human-resource-management-dtfghr6/",
+      "Global Human Resource Management MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-global-logistics-and-supply-chain-management-dtfgsc6/",
+      "Global Logistics, Operations and Supply Chain Management MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-global-logistics-and-supply-chain-management-with-advanced-practice-dtsgsc6/",
+      "Global Logistics, Operations and Supply Chain Management MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-graphic-and-digital-design-top-up-uufgdd1/",
+      "Graphic and Digital Design (Top-Up) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-graphic-design-extended-degree-newcastle-uusxsn1/",
+      "Graphic Design (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-graphic-design-uusgsn1/",
+      "Graphic Design BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-health-and-social-care-extended-degree-uusxlc1/",
+      "Health and Social Care (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-health-and-social-care-uushlc1/",
+      "Health and Social Care BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/health-psychology-dtfhpy6/",
+      "Health Psychology MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/health-psychology-dtphpy6/",
+      "Health Psychology MSc",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-healthcare-leadership-and-management-dtfhlt6/",
+      "Healthcare Leadership and Management MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-research-healthcare-professional-practice-dtphcf6/",
+      "Healthcare Professional Practice MRes",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-history-extended-degree-uusxtr1/",
+      "History (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-history-and-american-studies-extended-degree-uusxtr2ast/",
+      "History and American Studies (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-history-and-american-studies-newcastle-uushtr2ast/",
+      "History and American Studies BA (Hons)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-history-and-politics-extended-degree-newcastle-uusxtr2plt/",
+      "History and Politics (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/history-and-politics-ba-hons-uushtr2plt/",
+      "History and Politics BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/history-ba-hons-uushtr1/",
+      "History BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/history-ma-dtfhtr6/",
+      "History MA",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/history-dtphtr6/",
+      "History MA",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/history-dtdhty6/",
+      "History MA",
+      "distance_learning",
+      true,
+      "skipped",
+      "rejected: online_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/history-ma-ft-dl-dtdhtr6/",
+      "History MA",
+      "full_time",
+      true,
+      "skipped",
+      "rejected: online_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/history-dtfhtr7/",
+      "History MRes",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/history-dtphtr7/",
+      "History MRes",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-human-computer-interaction-dtfhct6/",
+      "Human-Computer Interaction MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-interior-architecture-extended-degree-uusxah1/",
+      "Interior Architecture (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-interior-architecture-uusiah1/",
+      "Interior Architecture BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-interior-design-extended-degree-uusxrd1/",
+      "Interior Design (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-interior-design-uusird1/",
+      "Interior Design BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-international-banking-and-finance-completion-award-newcastle-uufikf1/",
+      "International Banking and Finance (Top-Up) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-international-banking-and-finance-newcastle-uusikf1/",
+      "International Banking and Finance (Top-Up) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-international-banking-and-finance-completion-award-london-subject-to-validation-uufikl1/",
+      "International Banking and Finance (Top-Up) BSc (Hons) (London)",
+      "full_time",
+      false,
+      "filter_excluded",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-international-business-management-extended-degree-uusxbg1/",
+      "International Business Management (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-international-business-management-uusibg1/",
+      "International Business Management BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-science-international-business-management-with-advanced-practice-dtsinq6/",
+      "International Business Management MSc",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/international-business-management-dtfinb6/",
+      "International Business Management MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/international-finance-and-investment-msc-ft-dtfifi6/",
+      "International Finance and Investment MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/international-finance-and-investment-msc-with-advanced-practice-dtsifn6/",
+      "International Finance and Investment MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-international-hospitality-and-tourism-management-dtfihy6/",
+      "International Hospitality and Tourism Management MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/international-hospitality-and-tourism-management-msc-dtsihy6/",
+      "International Hospitality and Tourism Management MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-international-relations-and-politics-extended-degree-uusxrp1/",
+      "International Relations and Politics (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/international-relations-and-politics-ba-hons-uusirp1/",
+      "International Relations and Politics BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/international-relations-conflict-and-security-ma-pt-dtfirc6/",
+      "International Relations, Conflict and Security MA",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/international-relations-conflict-and-security-ma-pt-dtpirc6/",
+      "International Relations, Conflict and Security MA",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-international-sport-management-dtfisn6/",
+      "International Sport Management MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-international-sport-management-dtpisj6/",
+      "International Sport Management MSc",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-international-tourism-hospitality-and-events-completion-award-newcastle-uufith1/",
+      "International Tourism, Hospitality and Events (Top-Up) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-international-tourism-hospitality-and-events-newcastle-uusith1/",
+      "International Tourism, Hospitality and Events (Top-Up) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-international-tourism-hospitality-and-events-completion-award-london-subject-to-validation/",
+      "International Tourism, Hospitality and Events (Top-Up) BSc (Hons) (London)",
+      "full_time",
+      false,
+      "filter_excluded",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-laws-law-criminal-justice-newcastle-dtflij6/",
+      "Law (Criminal Justice) LLM",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-laws-law-cyber-law-newcastle-dtflcb6/",
+      "Law (Cyber Law) LLM",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/law-cyber-law-llm-part-time-dtdlcb6/",
+      "Law (Cyber Law) LLM",
+      "distance_learning",
+      true,
+      "skipped",
+      "rejected: online_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/llb-hons-law-extended-degree-uusxyw1/",
+      "Law (Extended Degree) LLB (Hons)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-laws-law-international-commercial-law-newcastle-dtflcl6/",
+      "Law (International Commercial Law) LLM",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-laws-law-space-law-dtflsl6/",
+      "Law (Space Law) LLM",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/law-space-law-llm-part-time-dtdlsl6/",
+      "Law (Space Law) LLM",
+      "distance_learning",
+      true,
+      "skipped",
+      "rejected: online_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/llb-hons-law-uuslyw1/",
+      "Law LLB (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-laws-professional-legal-practice-dtfplp6/",
+      "LLM Professional Legal Practice",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/mamsc-product-design-futures-dtfpdf6/",
+      "MA/MSc Product Design Futures",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/mamsc-product-design-futures-dtppdf6/",
+      "MA/MSc Product Design Futures",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-marketing-extended-degree-uusxtg1/",
+      "Marketing (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/marketing-ba-hons-uusmtg1/",
+      "Marketing BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-marketing-dtfmtg6/",
+      "Marketing MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/marketing-msc-with-advanced-practice-dtsmtk6/",
+      "Marketing MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/mass-communication-completion-uufmas1/",
+      "Mass Communication (Top-Up) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/mass-communication-and-business-uufmcx1/",
+      "Mass Communication and Business (Top-Up) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-business-administration-dtfmbr6/",
+      "Master of Business Administration MBA",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-public-health-dtfpux6/",
+      "Master of Public Health",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/public-health-dtppuh6/",
+      "Master of Public Health",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-mathematics-extended-degree-newcastle-uuxmth1/",
+      "Mathematics (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/mathematics-bsc-ft-uusmth1/",
+      "Mathematics BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/mathematics-mmath-hons-ft-uusmim1/",
+      "Mathematics MMath (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/beng-hons-mechanical-aerospace-engineering-extended-degree-uusxre1/",
+      "Mechanical Aerospace Engineering (Extended Degree) BEng (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/mechanical-aerospace-engineering-beng-uusmre1/",
+      "Mechanical Aerospace Engineering BEng (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/mechanical-aerospace-engineering-meng-uusmpg1/",
+      "Mechanical Aerospace Engineering MEng (Hons)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/beng-hons-mechanical-engineering-extended-degree-uusxxr1/",
+      "Mechanical Engineering (Extended Degree) BEng (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/beng-hons-mechanical-engineering-extended-degree-i2i-dufxag1/",
+      "Mechanical Engineering (Extended Degree) BEng (Hons) (i2i International Soccer Academy)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/beng-hons-mechanical-engineering-uusmer1/",
+      "Mechanical Engineering BEng (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/beng-hons-mechanical-engineering-i2i-dufmag1/",
+      "Mechanical Engineering BEng (Hons) (i2i International Soccer Academy)",
+      "full_time",
+      false,
+      "filter_excluded",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/meng-hons-mechanical-engineering-uusmcr1/",
+      "Mechanical Engineering MEng (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-mechanical-engineering-dtfmgn6/",
+      "Mechanical Engineering MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-science-mechanical-engineering-with-advanced-practice-dtsmgc6/",
+      "Mechanical Engineering MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-mechanical-engineering-dtfmgh6/",
+      "Mechanical Engineering MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-media-and-communication-extended-degree-newcastle-uuxmcd1/",
+      "Media and Communication (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-media-and-communication-uusmcd1/",
+      "Media and Communication BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/microbiology-dtfmgy6/",
+      "Microbiology MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/microbiology-dtpmgy6/",
+      "Microbiology MSc",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-midwifery-studies-extended-degree-uufxys1/",
+      "Midwifery Studies (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-midwifery-studies-uufmys1/",
+      "Midwifery Studies BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-public-administration-dtpmpa6/",
+      "MPA",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-networks-and-cyber-security-extended-degree-uusxcs1/",
+      "Networks and Cyber Security (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-networks-and-cyber-security-uusncs1/",
+      "Networks and Cyber Security BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ma-neurodiversity-inclusive-practice-dtfndp6/",
+      "Neurodiversity and Inclusive Practice MA",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ma-neurodiversity--inclusive-practice-dtpndp6/",
+      "Neurodiversity and Inclusive Practice MA",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/foundation-degree-in-science-nursing-associate-uufsna5/",
+      "Nursing Associate FdSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/nursing-science-dufngs1/",
+      "Nursing Science BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-nursing-science-registered-nurse-adult-extended-degree-uufxsu1/",
+      "Nursing Science Registered Nurse (Adult) (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-nursing-science-registered-nurse-adult-uufnsu1/",
+      "Nursing Science Registered Nurse (Adult) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-nursing-science-registered-nurse-child-extended-degree-uufxsb1/",
+      "Nursing Science Registered Nurse (Child) (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-nursing-science-registered-nurse-child-uufnsb1/",
+      "Nursing Science Registered Nurse (Child) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-nursing-science-registered-nurse-learning-disability-uufnsg1/",
+      "Nursing Science Registered Nurse (Learning Disability) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/nursing-science-registered-nurse-mental-health-uufnsj1/",
+      "Nursing Science Registered Nurse (Mental Health) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-nursing-science-registered-nurse-learning-disability-extended-degree-uufxsg1/",
+      "Nursing Science, Registered Nurse (Learning Disability) (Extended Degree) BSc Hons",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-nursing-science-registered-nurse-mental-health-extended-degree-uufxsj1/",
+      "Nursing Science, Registered Nurse (Mental Health) (Extended Degree) BSc Hons",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/nutritional-science-dtfnls6/",
+      "Nutritional Science MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/nutritional-science-dtpnls6/",
+      "Nutritional Science MSc",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/occupational-and-organisational-psychology-dtfoco6/",
+      "Occupational and Organisational Psychology MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/occupational-and-organisational-psychology-dtpoco6/",
+      "Occupational and Organisational Psychology MSc",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-occupational-therapy-extended-degree-uufxty1/",
+      "Occupational Therapy (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-occupational-therapy-preregistration-dtfoty6/",
+      "Occupational Therapy (Pre-Registration) MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/occupational-therapy-bsc-hons-uufoty1/",
+      "Occupational Therapy BSc (Hons)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-operating-department-practice-extended-degree-newcastle-uufxdp1/",
+      "Operating Department Practice (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-operating-department-practice-uufodp1/",
+      "Operating Department Practice BSc (Hons)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-physical-geography-extended-degree-uusxgh1/",
+      "Physical Geography (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-physical-geography-uuspgh1/",
+      "Physical Geography BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-physics-extended-degree-uusxhi1/",
+      "Physics (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/physics-bsc-ft-uusphi1/",
+      "Physics BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/physics-mphys-ft-uusics1/",
+      "Physics MPhys (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-physics-with-astrophysics-extended-degree-uusxhi3asy/",
+      "Physics with Astrophysics (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/physics-with-astrophysics-bsc-ft-uusphi3asy/",
+      "Physics with Astrophysics BSc (Hons)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/physics-with-astrophysics-mphys-ft-uusics3asr/",
+      "Physics with Astrophysics MPhys (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-physiotherapy-extended-degree-uufxth1/",
+      "Physiotherapy (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/physiotherapy-uufpth1/",
+      "Physiotherapy BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ma-preventive-conservation-distance-learning-dtdpvc6/",
+      "Preventive Conservation MA",
+      "distance_learning",
+      true,
+      "skipped",
+      "rejected: online_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-primary-education-extended-degree-uufxpm1/",
+      "Primary Education (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/primary-education-uufepm1/",
+      "Primary Education BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/pgce-primary-ttfpmd6/",
+      "Primary Education PGCE",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-product-design-extended-degree-newcastle-uusxpt1/",
+      "Product Design (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-product-design-uusptg1/",
+      "Product Design BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-professional-policing-extended-degree-uufxlc1/",
+      "Professional Policing (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/professional-policing-bsc-hons-uufplc1/",
+      "Professional Policing BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/project-management-with-advanced-practice-dtspmj6/",
+      "Project Management MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/project-management-msc-ft-dtfpjm6/",
+      "Project Management MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-psychology-extended-degree-uufxcz1/",
+      "Psychology (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/psychology-bsc-hons-uufpcz1/",
+      "Psychology BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/psychology-dtfrps7/",
+      "Psychology MRes",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/psychology-dtfpcy6/",
+      "Psychology MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/psychology-dtppcy6/",
+      "Psychology MSc",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-psychology-with-criminology-extended-degree-uufxcy3cmz/",
+      "Psychology with Criminology (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-psychology-with-criminology-uufpcy3cmz/",
+      "Psychology with Criminology BSc (Hons)",
+      "full_time",
+      true,
+      "skipped",
+      "rejected: category_landing_page_missing_degree_qualifier"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ma-publishing-dtfpui6/",
+      "Publishing MA",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-quantity-surveying-extended-degree-uusxts1/",
+      "Quantity Surveying (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/quantity-surveying-bsc-ft-uusqts1/",
+      "Quantity Surveying BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-real-estate-extended-degree-uusxez1/",
+      "Real Estate (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/real-estate-bsc-ft-uusrez1/",
+      "Real Estate BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/real-estate-with-advanced-practice-dtsear6/",
+      "Real Estate MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/real-estate-msc-ft-dtfrez6/",
+      "Real Estate MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-renewable-and-sustainable-energy-technologies-12-months-dtfrsu6/",
+      "Renewable and Sustainable Energy Technologies MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-renewable-and-sustainable-energy-technologies-16-months-dtfrst6/",
+      "Renewable and Sustainable Energy Technologies MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-renewable-and-sustainable-energy-technologies-with-advanced-practice-dtsrte6/",
+      "Renewable and Sustainable Energy Technologies MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-social-work-extended-degree-uufxck1/",
+      "Social Work (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-social-work-uufsck1/",
+      "Social Work BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/social-work-ma-dtfsok6/",
+      "Social Work MA",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-sociology-extended-degree-uusxcg1/",
+      "Sociology (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/sociology-bsc-ft-uusscg1/",
+      "Sociology BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/teaching-and-learning-specialist-support-diphe-degree-apprenticeship-duftla1/",
+      "Specialist Teaching Assistant Apprenticeship (STAA)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-sport-exercise-and-nutrition-dtfstn6/",
+      "Sport and Exercise Nutrition MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-sport-exercise-and-nutrition-dtpstn6/",
+      "Sport and Exercise Nutrition MSc",
+      "part_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/sport-and-exercise-psychology-dtfsxp6/",
+      "Sport and Exercise Psychology MSc",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/sport-and-exercise-psychology-dtpsxp6/",
+      "Sport and Exercise Psychology MSc",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-sport-and-exercise-science-extended-degree-uusxxs1/",
+      "Sport and Exercise Science (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-sport-and-exercise-science-i2i-dufxcs1/",
+      "Sport and Exercise Science (Extended Degree) BSc (Hons) (i2i International Soccer Academy)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-sport-and-exercise-science-uussxs1/",
+      "Sport and Exercise Science BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-sport-and-exercise-science-i2i-dufscs1/",
+      "Sport and Exercise Science BSc (Hons) (i2i International Soccer Academy)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-sport-coaching-extended-degree-uusxoa1/",
+      "Sport Coaching (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-sport-coaching-i2i-dufxou1/",
+      "Sport Coaching (Extended Degree) BSc (Hons) (i2i International Soccer Academy)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-sport-coaching-uussoa1/",
+      "Sport Coaching BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-sport-coaching-i2i-dufsou1/",
+      "Sport Coaching BSc (Hons) (i2i International Soccer Academy)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-sport-management-extended-degree-uusxrt1/",
+      "Sport Management (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-sport-management-i2i-dufxgs1/",
+      "Sport Management (Extended Degree) BSc (Hons) (i2i International Soccer Academy)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-sport-management-uussrt1/",
+      "Sport Management BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-sport-management-i2i-dufsgs1/",
+      "Sport Management BSc (Hons) (i2i International Soccer Academy)",
+      "full_time",
+      true,
+      "extract_error",
+      "per_course_timeout"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-science-sport-performance-and-analysis-dtfspa6/",
+      "Sport Performance and Analysis MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-sport-performance-and-analysis-dtpspa6/",
+      "Sport Performance and Analysis MSc",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-sport-exercise-and-nutrition-extended-degree-uusxet1/",
+      "Sport, Exercise and Nutrition (Extended Degree) BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-sport-exercise-and-nutrition-i2i-dufxss1/",
+      "Sport, Exercise and Nutrition (Extended Degree) BSc (Hons) (i2i International Soccer Academy)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-sport-exercise-and-nutrition-uusset1/",
+      "Sport, Exercise and Nutrition BSc (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-sport-exercise-and-nutrition-i2i-dufsss1/",
+      "Sport, Exercise and Nutrition BSc (Hons) (i2i International Soccer Academy)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-science-strength-and-conditioning-dtfshc6/",
+      "Strength and Conditioning MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-science-strength-and-conditioning-dtpshc6/",
+      "Strength and Conditioning MSc",
+      "part_time",
+      true,
+      "skipped",
+      "rejected: part_time_only"
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/sustainable-and-ethical-fashion-ma-dtfsue6/",
+      "Sustainable and Ethical Fashion MA",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/postgraduate/msc-sustainable-civil-engineering-dtfsve6/",
+      "Sustainable Civil Engineering MSc",
+      "full_time",
+      false,
+      "filter_excluded",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-sustainable-civil-engineering-with-advanced-practice-dtssva6/",
+      "Sustainable Civil Engineering with Advanced Practice MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/teacher-training-in-school-pgce-ttfpme6/",
+      "Teacher Training in School PGCE",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-tourism-and-events-management-extended-degree-uusxen1/",
+      "Tourism and Events Management (Extended Degree) BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-tourism-and-events-management-uusten1/",
+      "Tourism and Events Management BA (Hons)",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ],
+    [
+      "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-tourism-and-visitor-economy-dtftve6/",
+      "Tourism and Visitor Economy MSc",
+      "full_time",
+      true,
+      "staged_pending",
+      ""
+    ]
+  ],
+  "unlisted_staged_urls": [
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/applied-linguistics-for-tesol-dtfalt6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/arts-dtfaar6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/ba-hons-childhood-and-early-years-studies-dufcey1/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/bachelor-of-science-hons-sport-coaching-hong-kong-space-dufsco1/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-business-enterprise-and-innovation-management-london-subject-to-validation---uufbei1/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-global-business-management-completion-award-hong-kong-dufhbn1/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-global-business-management-human-resources-kaplan-singapore/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-global-business-management-human-resources-level-4-entry-uufghr1/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-global-business-management-kaplan-singapore/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-global-business-management-level-4-entry-uufgbm1/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-global-business-management-logistics-and-supply-chain-kaplan-singapore/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-global-business-management-logistics-and-supply-chain-level-4-entry-uufgls1/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-global-business-management-marketing-level-4-entry-uufgmm1/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-international-tourism-hospitality-and-events-kaplan-singapore/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-nursing-science-registered-nurse-adult-degree-apprenticeship-dufdaa1/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-occupational-therapy-degree-apprenticeship-dufoyd1/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-social-work-degree-apprenticeship-dufwda1/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/business-and-enterprise-management-extended-degree-dufxbe1/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/business-enterprise-creation-and-management-london-uufbcz1/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/business-with-entrepreneurship-with-advanced-practice-london-dtsenq6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/business-with-human-resource-management-london-dtfbrz6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/business-with-human-resource-management-with-advanced-practice-london-campus-dtsbrq6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/business-with-international-management-london-dtfbiq6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/construction-project-management-with-bim-dtfcpf6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/cyber-security-with-advanced-practice-london-campus-dtscbz6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/design-dtfdey6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/digital-and-technology-management-extended-degree-dufxdt1/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/digital-marketing-london-dtfdgz6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/doctor-of-business-administration-dtfbad7/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/doctor-of-philosophy-drfxxr7/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/doctor-of-sport-and-exercise-psychology-drfsep7/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/doctor-of-sport-drfdsp7/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/doctorate-of-design-drfdde7/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/foundation-degree-in-science-fdsc-nursing-associate-apprenticeship-dufsnd5/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/geography-bsc-ft-uusgeh1/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/guidance-and-counselling-ba-hons-uusguc1/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/hons-degree-ft-fashion-design--marketing-studies-sri-lanka-duffms1/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/hons-degree-ft-global-fashion-management-other-dufglf1/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/hons-degree-ft-global-visual-communication-design-other-dufgvd1/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/hons-degree-ft-interior-design-sri-lanka-dufide1/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/hons-degree-ft-visual-communication-design-sri-lanka-dufgrp1/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/international-relations-conflict-and-security-jan-ft-dtfiry6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/london-business-with-financial-management-dtfbfl6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/ma-digital-and-immersive-arts-dtfdii6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/mass-communication-with-advertising-ba-hons-uusmcm3avt/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-architecture-degree-apprenticeship-dtpara1/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-arts-luxury-brand-management-london-subject-to-validation-dtflbz6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-business-administration-dtpmbr6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-science-computing-and-technology-with-advanced-practice-london-dtscot6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/master-of-science-cyber-security-technology-with-advanced-practice-london-dtscyy6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/mba-mpa/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-accounting-and-finance-newcastle-dtfaaj6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-artificial-intelligence-technology-full-time-london-subject-to-validation-dtfarn6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-big-data-and-data-science-technology-full-time-london-subject-to-validation-dtfbgd6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-business-and-management-dtfbdj6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-business-with-entrepreneurship-london-dtfenz6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-business-with-marketing-management-london-dtfbal6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-computing-and-technology-london-dtfctc6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-cyber-security-technology-london-dtfcyt6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-data-science-dtfdsj6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-finance-qatar-dtffcq6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-global-development-dtfglb6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-global-development-dtfglv6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-global-logistics-operations-and-supply-chain-management-dtfgsj6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-global-sustainable-business-management-dtfgbs6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-healthcare-leadership-and-management-dtfhld6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-international-business-management-dtfijb6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-international-project-management-with-advanced-practice--dtsipr6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-mathematics-dtfmth6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-nursing-science-registered-nurse-adult--dtfnax6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-nursing-science-registered-nurse-mental-health-dtfnmx6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/msc-physiotherapy-preregistration--dtfpth6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/professional-doctorate-in-health-social-care-and-education-drphle6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/project-management-dtfpjz6/",
+    "https://www.northumbria.ac.uk/study-at-northumbria/courses/responsible-innovation-ma-dtfrin6/"
+  ],
+  "discovery_evidence": [
+    {
+      "sequence": 2,
+      "event": "status",
+      "payload": {
+        "kind": "verification_preserve_review",
+        "level": "info",
+        "phase": "cleanup",
+        "cleared": 0,
+        "message": "Verification: preserved all existing review rows; fresh extraction"
+      }
+    },
+    {
+      "sequence": 7,
+      "event": "status",
+      "payload": {
+        "kind": "crawl_start",
+        "level": "discover",
+        "phase": "discover",
+        "message": "[DISCOVER] Crawling from https://www.northumbria.ac.uk/study-at-northumbria/ (max 25 pages, max 9223372036854775807 candidates)"
+      }
+    },
+    {
+      "sequence": 9,
+      "event": "status",
+      "payload": {
+        "kind": "page_done",
+        "added": 413,
+        "level": "discover",
+        "phase": "discover",
+        "total": 413,
+        "message": "[DISCOVER] Page 1/25: +413 candidates (total 413) — https://www.northumbria.ac.uk/study-at-northumbria/"
+      }
+    },
+    {
+      "sequence": 34,
+      "event": "status",
+      "payload": {
+        "kind": "sitemap_supplement",
+        "level": "discover",
+        "phase": "discover",
+        "message": "[DISCOVER] supplementing 413 BFS candidate(s) with configured sitemap",
+        "crawl_total": 413
+      }
+    },
+    {
+      "sequence": 35,
+      "event": "status",
+      "payload": {
+        "kind": "sitemap_start",
+        "level": "discover",
+        "phase": "discover",
+        "message": "[DISCOVER] sitemap: fetching configured URL https://www.northumbria.ac.uk/sitemap.xml"
+      }
+    },
+    {
+      "sequence": 36,
+      "event": "status",
+      "payload": {
+        "kind": "sitemap_page",
+        "added": 532,
+        "level": "discover",
+        "phase": "discover",
+        "total": 532,
+        "message": "[DISCOVER] sitemap https://www.northumbria.ac.uk/sitemap.xml: +532 candidates (total 532)"
+      }
+    },
+    {
+      "sequence": 37,
+      "event": "status",
+      "payload": {
+        "kind": "sitemap_done",
+        "level": "discover",
+        "phase": "discover",
+        "total": 532,
+        "offset": 0,
+        "message": "[DISCOVER] sitemap: done — 532 unique candidates",
+        "returned": 532
+      }
+    },
+    {
+      "sequence": 38,
+      "event": "status",
+      "payload": {
+        "kind": "sitemap_supplement_done",
+        "added": 183,
+        "level": "discover",
+        "phase": "discover",
+        "total": 596,
+        "message": "[DISCOVER] sitemap supplement added 183 new candidate(s) (total now 596)"
+      }
+    },
+    {
+      "sequence": 49,
+      "event": "status",
+      "payload": {
+        "kept": 589,
+        "kind": "extract_gate_summary",
+        "level": "extract",
+        "phase": "extract",
+        "counts": {
+          "marketing_page": 7
+        },
+        "dropped": 7,
+        "message": "[EXTRACT] gate dropped 7 non-course candidate(s) — marketing_page=7"
+      }
+    },
+    {
+      "sequence": 50,
+      "event": "status",
+      "payload": {
+        "kept": 581,
+        "kind": "extract_allow_url_filter",
+        "level": "extract",
+        "phase": "extract",
+        "dropped": 8,
+        "message": "[EXTRACT] allow_url_patterns: dropped 8 / 589 URL(s) (1%) not matching per-uni whitelist (581 remain)",
+        "drop_pct": 1.4,
+        "patterns": [
+          "^https?://www\\.northumbria\\.ac\\.uk/study-at-northumbria/courses/[^/]+/$"
+        ],
+        "dropped_sample": [
+          "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-global-business-management-human-resources-completion-award-london-subject-to-validation-uu/",
+          "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-global-business-management-logistics-and-supply-chain-completion-award-london-uufgba1/",
+          "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-global-business-management-marketing-completion-award-london-subject-to-validation-uuflbk1/",
+          "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-global-business-management-london-uuflbn1/",
+          "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-international-banking-and-finance-completion-award-london-subject-to-validation-uufikl1/",
+          "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-international-tourism-hospitality-and-events-completion-award-london-subject-to-validation/",
+          "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/beng-hons-mechanical-engineering-i2i-dufmag1/",
+          "https://www.northumbria.ac.uk/study-at-northumbria/courses/postgraduate/msc-sustainable-civil-engineering-dtfsve6/"
+        ]
+      }
+    }
+  ],
+  "limits": [
+    "Full-time catalogue cards do not alone prove international eligibility.",
+    "Skipped labels are pipeline decisions, not independent proof that each exclusion is correct.",
+    "Counts are URL/offering coverage, not deduplicated award counts or a data-quality approval.",
+    "Unlisted sitemap pages need separate currency/eligibility review before approval.",
+    "The pre-existing cache had already been replaced by later runs. Its seven original navigation links were checked read-only against the production helper, not reinserted.",
+    "Parent course-row and original pending-row hashes were compared; dependent tables were not independently fingerprinted before the run.",
+    "The local login page rendered; the authenticated review UI was not visually verified."
+  ]
+}

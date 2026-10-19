@@ -1,0 +1,86 @@
+{
+  "captured_at_utc": "2026-10-19T04:17:35.215886+00:00",
+  "transport": "direct HTTP; concurrency 2; timeout 30s; no retries or paid proxy",
+  "pages": [
+    {
+      "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-global-business-management-human-resources-completion-award-london-subject-to-validation-uu/",
+      "status": 200,
+      "final_url": "https://london.northumbria.ac.uk/course/global-business-management-human-resources/",
+      "h1": "BSc (Hons) Global Business Management (Human Resources) (Top-Up)",
+      "canonical": "https://london.northumbria.ac.uk/course/global-business-management-human-resources/",
+      "bytes": 251019,
+      "sha256": "540a71a27a1b7ac2bda27f7ddb6e8b1e7068d108dac7f7839126fd67bcef7c0c",
+      "international_snippet": " University London About this course Entry requirements Modules Fees How to apply Enquire now Study International Apply Student Support About Us Contact Us Back Study Undergraduate degrees Postgraduate degrees Business Cyber Security Computing & Tech All Courses Full-time Part-time Online Important dates Back International Pre-Arrival Information Back Apply How to apply Entry requirements Finance Scholarships and bursaries Make a payment FAQs Back Student Support Student support Accommodation En"
+    },
+    {
+      "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-global-business-management-logistics-and-supply-chain-completion-award-london-uufgba1/",
+      "status": 200,
+      "final_url": "https://london.northumbria.ac.uk/course/bsc-hons-global-business-management-logistics-and-supply-chain/",
+      "h1": "BSc (Hons) Global Business Management (Logistics and Supply Chain) (Top-Up)",
+      "canonical": "https://london.northumbria.ac.uk/course/bsc-hons-global-business-management-logistics-and-supply-chain/",
+      "bytes": 249460,
+      "sha256": "61bc186902a173f280eb20960ac98f460b27a22c41854546c438e179c27bd913",
+      "international_snippet": " University London About this course Entry requirements Modules Fees How to apply Enquire now Study International Apply Student Support About Us Contact Us Back Study Undergraduate degrees Postgraduate degrees Business Cyber Security Computing & Tech All Courses Full-time Part-time Online Important dates Back International Pre-Arrival Information Back Apply How to apply Entry requirements Finance Scholarships and bursaries Make a payment FAQs Back Student Support Student support Accommodation En"
+    },
+    {
+      "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-global-business-management-marketing-completion-award-london-subject-to-validation-uuflbk1/",
+      "status": 200,
+      "final_url": "https://london.northumbria.ac.uk/course/bsc-hons-global-business-management-marketing/",
+      "h1": "BSc (Hons) Global Business Management (Marketing) (Top-Up)",
+      "canonical": "https://london.northumbria.ac.uk/course/bsc-hons-global-business-management-marketing/",
+      "bytes": 249726,
+      "sha256": "32cb587a0fbb42814499ebd7b4f868d4719f1cedaca7b7e1f89732f6c372752f",
+      "international_snippet": " University London About this course Entry requirements Modules Fees How to apply Enquire now Study International Apply Student Support About Us Contact Us Back Study Undergraduate degrees Postgraduate degrees Business Cyber Security Computing & Tech All Courses Full-time Part-time Online Important dates Back International Pre-Arrival Information Back Apply How to apply Entry requirements Finance Scholarships and bursaries Make a payment FAQs Back Student Support Student support Accommodation En"
+    },
+    {
+      "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-global-business-management-london-uuflbn1/",
+      "status": 200,
+      "final_url": "https://london.northumbria.ac.uk/course/bsc-hons-global-business-management-top-up/",
+      "h1": "BSc (Hons) Global Business Management (Top-Up)",
+      "canonical": "https://london.northumbria.ac.uk/course/bsc-hons-global-business-management-top-up/",
+      "bytes": 255868,
+      "sha256": "648e2376ec1f6501e5671bfdc785c582eb691fd60edc77f3efbfddb8f813d93d",
+      "international_snippet": " University London About this course Entry requirements Modules Fees How to apply Enquire now Study International Apply Student Support About Us Contact Us Back Study Undergraduate degrees Postgraduate degrees Business Cyber Security Computing & Tech All Courses Full-time Part-time Online Important dates Back International Pre-Arrival Information Back Apply How to apply Entry requirements Finance Scholarships and bursaries Make a payment FAQs Back Student Support Student support Accommodation En"
+    },
+    {
+      "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-international-banking-and-finance-completion-award-london-subject-to-validation-uufikl1/",
+      "status": 200,
+      "final_url": "https://london.northumbria.ac.uk/course/bsc-hons-international-banking-and-finance/",
+      "h1": "BSc (Hons) International Banking and Finance (Top-Up)",
+      "canonical": "https://london.northumbria.ac.uk/course/bsc-hons-international-banking-and-finance/",
+      "bytes": 278857,
+      "sha256": "9fb428ac560fd3f69940e287d476f2fa6cfa3cbef1dde5b4ad9f52fbadccf2d1",
+      "international_snippet": "BSc (Hons) International Banking & Finance | Northumbria University London About this course Entry requirements Modules Fees How to apply Enquire now Study International Apply Student Support About Us Contact Us Back Study Undergraduate degrees Postgraduate degrees Business Cyber Security Computing & Tech All Courses Full-time Part-time Online Important dates Back International Pre-Arrival Information Back A"
+    },
+    {
+      "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/bsc-hons-international-tourism-hospitality-and-events-completion-award-london-subject-to-validation/",
+      "status": 200,
+      "final_url": "https://london.northumbria.ac.uk/course/bsc-hons-international-tourism-hospitality-and-events/",
+      "h1": "BSc (Hons) International Tourism, Hospitality and Events (Top-Up)",
+      "canonical": "https://london.northumbria.ac.uk/course/bsc-hons-international-tourism-hospitality-and-events/",
+      "bytes": 255346,
+      "sha256": "21624f3125d13837f11e555eeb8ccd3ce9c9bf6b1f05904f011969522f1d3b4a",
+      "international_snippet": "International Tourism, Hospitality and Events | Northumbria University London About this course Entry requirements Modules Fees How to apply Enquire now Study International Apply Student Support About Us Contact Us Back Study Undergraduate degrees Postgraduate degrees Business Cyber Security Computing & Tech All Courses Full-time Part-time Online Important dates Back International Pre-Arrival Info"
+    },
+    {
+      "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/beng-hons-mechanical-engineering-i2i-dufmag1/",
+      "status": 200,
+      "final_url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/beng-hons-mechanical-engineering-i2i-dufmag1/",
+      "h1": "Mechanical Engineering BEng (Hons) i2i International Soccer Academy",
+      "canonical": "https://www.northumbria.ac.uk/study-at-northumbria/courses/undergraduate/beng-hons-mechanical-engineering-i2i-dufmag1/",
+      "bytes": 427303,
+      "sha256": "c76fa068c9a0815179d924cdc1d65890a645aacedbccb0e61c25283453d0948f",
+      "international_snippet": "Mechanical Engineering BEng (Hons) | i2i International Soccer Academy | Northumbria University, Newcastle Skip navigation APPLY NOW REGISTER YOUR INTEREST Book an Open Day If you\u2019d like to receive the latest updates from Northumbria about our courses, events, finance & funding then enter your details below. Nationality ---------- UK --------- United Kingdom Guernsey Isle of Man (The) Jersey ---------- EU --------- Austria Belgium British"
+    },
+    {
+      "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/postgraduate/msc-sustainable-civil-engineering-dtfsve6/",
+      "status": 200,
+      "final_url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/postgraduate/msc-sustainable-civil-engineering-dtfsve6/",
+      "h1": "Sustainable Civil Engineering MSc 1 Year, Full-Time | September Start",
+      "canonical": "https://www.northumbria.ac.uk/study-at-northumbria/courses/postgraduate/msc-sustainable-civil-engineering-dtfsve6/",
+      "bytes": 419726,
+      "sha256": "4610ace5d22806029be99d362817ec6fd4754e91873cd7a566f8e8679addec6c",
+      "international_snippet": "ofessional qualifications and/or relevant work experience will be considered on an individual basis International qualifications: If you have studied a non UK qualification, you can see how your qualifications compare to the standard entry criteria, by selecting the country that you received the qualification in, from our country pages. Visit www.northumbria.ac.uk/yourcountry English language requirements: International applicants are required to have a minimum overall IELTS (Academic) score of "
+    }
+  ]
+}

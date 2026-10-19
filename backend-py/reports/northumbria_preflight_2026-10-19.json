@@ -1,0 +1,60 @@
+{
+  "university_id": 96,
+  "university_name": "Northumbria University",
+  "production_revision": "f9d8af9965344ec4a6f6921cc799a9b3c80d1df6",
+  "production_worker_started_at_utc": "2026-10-19T03:49:57Z",
+  "preflight": {
+    "active_database_jobs": 0,
+    "worker_active": 0,
+    "worker_reserved": 0,
+    "worker_scheduled": 0,
+    "api_service": "active",
+    "worker_service": "active",
+    "probe_status": "configured"
+  },
+  "baseline": {
+    "published_courses": {
+      "count": 386,
+      "ordered_row_json_md5": "4a162f72f25c45004c56c048557cc404"
+    },
+    "existing_pending_rows": {
+      "count": 61,
+      "ordered_row_json_md5": "998ec1db2a5f694e5e561b982c072327"
+    },
+    "existing_approved_staging_rows": 393
+  },
+  "fresh_start": {
+    "entry_point": "app.routers.scrape.start_scrape",
+    "body": {
+      "universityId": 96,
+      "url": "https://www.northumbria.ac.uk",
+      "fullCatalogueReviewOnly": true,
+      "forceDiscovery": true,
+      "fastMode": false
+    },
+    "job_id": "job_8946508ca070",
+    "reused": false,
+    "initial_status": "queued",
+    "pre_dispatch_checks": "Repeated worker idle and database active-job checks immediately before calling the supported start route; refused any earlier full-review run that day.",
+    "production_mutations": "One supported scrape start only. No settings changes, deployment, service restart, approval, deletion, stop, lock clearing, or manual redispatch."
+  },
+  "navigation_cache_regression": {
+    "input": "The same seven navigation links present at the head of the existing cache: research-degrees, international UG fees/funding, PGR fees/funding, coming-to-Northumbria, and postgraduate-study.",
+    "input_count": 7,
+    "production_reusable_course_count": 0,
+    "production_coverage_sufficient": false,
+    "legacy_cache_scope_version_without_metadata": "Rejected by the existing scope gate; not injected into production."
+  },
+  "verification_commands": [
+    "cd backend-py && PYTHONPATH=. python -m pytest tests/test_discovery_cache_scope.py tests/test_full_catalogue_review.py -q -c /dev/null -p no:cacheprovider"
+  ],
+  "verification_result": {
+    "passed": 42,
+    "warnings": 2
+  },
+  "limits": [
+    "Baseline hashes cover full rows in courses and the pre-existing pending scraped_courses set, not every dependent-table row.",
+    "Existing published rows came from earlier activity; this audit does not approve or certify their contents.",
+    "The seven-link production helper check is read-only and does not overwrite the discovery cache."
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "captured_at_utc": "2026-10-19T04:29:03.155402+00:00",
+  "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-criminology-extended-degree-uusxmg1/",
+  "http_status": 200,
+  "sha256": "413e13504c8a5f9ce1006f6a65daf8afaea2c60657e65727274fc19d9d6d92ca",
+  "h1": "Criminology (Extended Degree) BSc (Hons)",
+  "course_header_facts": [
+    "Typical Annual Fee UK £5,760 | International £19,850 Scholarship & Discount eligibility may apply",
+    "Modules Module Information",
+    "Entry Requirements Entry Information",
+    "Mode of Study 4 years Full Time or 5 years with a placement (sandwich)/study abroad",
+    "UCAS Code Z003",
+    "Start Date September 2027"
+  ],
+  "online_mentions": [
+    "Online Shop",
+    "Online Shop",
+    "Study in a dynamic, technology-enhanced learning environment designed to extend your experience beyond the traditional classroom. Interactive software used in lectures and seminars lets you engage and respond in real time, while our virtual learning environment gives you access to e-reading lists, video podcasts, and online quizzes whenever and wherever you study.",
+    "Online Shop"
+  ],
+  "learning_location": [
+    "Location for Learning Newcastle's diverse communities, public sector organisations, and social landscape provide a rich and inspiring backdrop for studying criminology in the real world.",
+    "Location for Learning Newcastle's diverse communities, public sector organisations, and social landscape provide a rich and inspiring backdrop for studying criminology in the real world."
+  ],
+  "pipeline_outcome": "rejected: online_only",
+  "assessment": "The course-owned facts support full-time study in Newcastle and publish international tuition. Visible online mentions refer to Online Shop navigation and online quizzes alongside lectures and seminars, not exclusive online delivery. The online-only rejection is not justified by this page; do not bypass other eligibility checks."
+}

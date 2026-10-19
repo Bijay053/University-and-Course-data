@@ -14,3 +14,4 @@ description: Pointers to site-specific discovery and extraction lessons for UK u
 - [Leeds Trinity provider fallback](leedstrinity-searchstax.md), [Lincoln Bishop listing](lincolnbishop-static-listing-undercounted.md), [Hull static discovery](hull-discovery.md): verify official fallback discovery.
 - [UC Leeds qualifier](ucleeds-degree-qualifier-false-positive.md): degree word absence does not prove a category page.
 - [Huddersfield intake authority](huddersfield-intake-authority.md): placeholder metadata needs exact labelled course dates, not range facets or deadlines.
+- [Northumbria catalogue scope](northumbria-catalogue-scope.md): current cards include nested UG/PG routes and London redirects; sitemap counts are not current-course counts.

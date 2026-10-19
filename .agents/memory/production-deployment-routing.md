@@ -28,6 +28,16 @@ listing prior commands to recover its ID was denied by the production identity.
 **How to apply:** Observe remote command results by their returned IDs. Do not
 assume diagnostic listing permissions or discard partial output on nonzero exit.
 
+Keep each SSM stdout evidence payload below 22 KB and split large inventories
+into independently decodable parts, even when compressing and base64-encoding.
+
+**Why:** SSM's bounded stdout can truncate a valid, successful audit response;
+compression alone does not guarantee a full-catalogue inventory fits.
+
+**How to apply:** Enforce the encoded-size bound before printing, then collect
+progress, staged-row mappings, outcomes, and summaries separately. Never treat
+a truncated result as an empty or complete dataset.
+
 The production checkout can fetch GitHub without having a usable push
 credential. When an authorized preservation commit is created there, transfer
 the commit to the authenticated workspace as a bounded Git bundle and push

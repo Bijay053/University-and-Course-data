@@ -1,0 +1,113 @@
+{
+  "captured_at_utc": "2026-10-19T05:09:00.994777+00:00",
+  "transport": "Direct HTTP; concurrency 2; timeout 30s; no retry or paid proxy",
+  "pages": [
+    {
+      "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/criminology-uuscmg1/",
+      "status": 200,
+      "final_url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/criminology-uuscmg1/",
+      "sha256": "1eabc454e98b6c6f7c40176dab04ad89363dff2ce7366634c87dbcb0457bf66f",
+      "h1": "Criminology BSc (Hons)",
+      "facts": [
+        "Typical Annual Fee UK £10,050 | International £19,850 Scholarship & Discount eligibility may apply",
+        "Modules Module Information",
+        "Entry Requirements Entry Information",
+        "Mode of Study 3 years Full Time or 4 years with a placement (sandwich)/study abroad",
+        "UCAS Code M900",
+        "Start Date September 2027"
+      ],
+      "quotes": [
+        "Campus Planning and Development",
+        "3 years Full Time or 4 years with a placement (sandwich)/study abroad",
+        "City Campus, Northumbria University, Newcastle"
+      ]
+    },
+    {
+      "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/english-literature-dtdegl6/",
+      "status": 200,
+      "final_url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/english-literature-dtdegl6/",
+      "sha256": "02e17ba63045fcee0e0f8e33c4641af74db1d33b31e11d528823f955f0831aca",
+      "h1": "English Literature MA 1 Year Full-Time | Distance Learning",
+      "facts": [],
+      "quotes": [
+        "MA English Literature Distance Learning | Northumbria",
+        "Campus Planning and Development",
+        "1 Year Full-Time | Distance Learning",
+        "Whether undertaken for the continued love of literature, or for personal or professional development, studying our Distance Learning MA English Literature will help you gain a more confident critical voice, and advanced analytical and research skills.",
+        "Whether undertaken for the continued love of literature, or for personal or professional development, studying our Distance Learning MA English Literature will help you gain a more confident critical voice and advanced analytical and research skills.",
+        "Mode of Study 1 year Full Time (Distance Learning) 3 other options available",
+        "Location City Campus, Northumbria University",
+        "Watch Programme Leader Dr Rosie White tell us about this Distance Learning Masters in a Minute (or so...) and then hear about Emma's experience as a student on the course.",
+        "On-campus or at home, experience Northumbria your way. Book onto one of our events.",
+        "The delivery of the MA offers a degree of flexibility by allowing you to choose your learning environment.  The MA in English Literature is offered in a traditional classroom setting with regular face-to-face supervision, or alternatively you can complete the course via distance learning through a Virtual Learning Environment (VLE).",
+        "Northumbria's 24/7 CSE-accredited University Library offers a comprehensive service to Distance Learning students, to ensure you can use the Library in a way that works for you.",
+        "1 year Full Time / Sep start",
+        "2 years Part Time (Distance Learning) / Sep start",
+        "Full time Courses are primarily delivered via on-campus face to face learning but could include elements of online learning.",
+        "Northumbria University is committed to developing an inclusive, diverse and accessible campus and wider University community and are determined to ensure that opportunities we provide are open to all.",
+        "We are proud to work in partnership with AccessAble to provide Detailed Access Guides to our buildings and facilities across our City, Coach Lane and London Campuses. A Detailed Access Guide lets you know what access will be like when you visit somewhere. It looks at the route you will use getting in and what is available inside. All guides have Accessibility Symbols that give you a quick overview of what is available, and photographs to show you what to expect. The guides are produced by trained surveyors who visit our campuses annually to ensure you have trusted and accurate information."
+      ]
+    },
+    {
+      "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/history-ma-ft-dl-dtdhtr6/",
+      "status": 200,
+      "final_url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/history-ma-ft-dl-dtdhtr6/",
+      "sha256": "6cf82a04246508f8079a3d721637896e171b92822fd05121adc8ada4952f07ec",
+      "h1": "History MA 1 to 2 Years Full-Time | Distance Learning",
+      "facts": [],
+      "quotes": [
+        "Campus Planning and Development",
+        "1 to 2 Years Full-Time | Distance Learning",
+        "If you\nhave any questions about distance learning then make sure to check out all\nour available information about Online Degrees .",
+        "Mode of Study 1 year Full Time (Distance Learning) 3 other options available",
+        "Location City Campus, Northumbria University",
+        "This course is primarily delivered online to provide you with the flexibility to study at times convenient to you.",
+        "On-campus or at home, experience Northumbria your way. Book onto one of our events.",
+        "As a distance-based learner a large proportion of your course’s content will be delivered online using the latest innovative software.",
+        "Take a virtual tour of our world class campus facilities - including Lipman Building where you'll be based - explore the Institute of Humanities, and discover more about our CSE-accredited University Library.",
+        "1 year Full Time / Sep start",
+        "2 years Part Time (Distance Learning) / Sep start",
+        "Full time Courses are primarily delivered via on-campus face to face learning but could include elements of online learning.",
+        "Northumbria University is committed to developing an inclusive, diverse and accessible campus and wider University community and are determined to ensure that opportunities we provide are open to all.",
+        "We are proud to work in partnership with AccessAble to provide Detailed Access Guides to our buildings and facilities across our City, Coach Lane and London Campuses. A Detailed Access Guide lets you know what access will be like when you visit somewhere. It looks at the route you will use getting in and what is available inside. All guides have Accessibility Symbols that give you a quick overview of what is available, and photographs to show you what to expect. The guides are produced by trained surveyors who visit our campuses annually to ensure you have trusted and accurate information."
+      ]
+    },
+    {
+      "url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-psychology-with-criminology-uufpcy3cmz/",
+      "status": 200,
+      "final_url": "https://www.northumbria.ac.uk/study-at-northumbria/courses/bsc-hons-psychology-with-criminology-uufpcy3cmz/",
+      "sha256": "ae1e772f98e55d2cba38d3c1f426467ab95fa3e6653ab56f5043cfc51ac02ae7",
+      "h1": "Psychology with Criminology at Northumbria",
+      "facts": [
+        "Typical Annual Fee UK £10,050 | International £19,850 Scholarship & Discount eligibility may apply",
+        "Modules Module Information",
+        "Entry Requirements Entry Information",
+        "Mode of Study 3 years Full Time or 4 years with optional study abroad year",
+        "UCAS Code C8M9",
+        "Start Date September 2027"
+      ],
+      "quotes": [
+        "Psychology with Criminology BSc (Hons) | Northumbria",
+        "Campus Planning and Development",
+        "Psychology with Criminology at Northumbria",
+        "3 years Full Time or 4 years with optional study abroad year",
+        "This extended degree offers an alternative route into higher education if you don't meet the standard entry requirements. Your foundation year covers psychology and its various disciplines, including health, occupational, organisational, and sport and exercise, and you can gain the fundamental knowledge and academic skills needed to pursue your degree.",
+        "Explore the core areas of psychology and criminology, building your understanding of crime, behaviour and its underpinnings, alongside practical and research methods. By the end of this year, you can be equipped to analyse psychological and criminological theory using evidence-based reasoning.",
+        "Study advanced research methods, psychobiology, cognition, individual differences, social and developmental psychology, prisons and punishment as well as contemporary issues in criminality. By the end of this year, you can be ready to take on autonomous research tasks.",
+        "Spend an additional year studying psychology at an approved partner university overseas. This experience broadens your cultural awareness, strengthens your independence, and deepens your academic knowledge - all while earning credit towards your degree.",
+        "Undertake the Psychology Project Module, the capstone of your degree, bringing together the elements you have studied across the course. Meanwhile, complete advanced modules in neuropsychology, mental health, and choose your criminology specialisms, including, but not limited to, modules exploring violence, social harm, intimate partner violence, and the crimes of the powerful. By the end of this year, you can be equipped to contribute confidently to psychology and criminology-related fields",
+        "City Campus, Northumbria University, Newcastle",
+        "Introduction to Psychology",
+        "The module is designed to introduce you to the basic principles of qualitative research skills. On this module you willl learn about qualitative research methodologies, written and verbal communication skills and other transferrable skills within Psychology. You will plan, conduct and report qualitative research studies in both formative and summative assessments. In addition, you will learn about research ethics, good practice in research and demonstrate a range of transferrable skills including communication skills and an understanding of the role of teamwork.",
+        "Why Study Psychology?",
+        "Northumbria's research in Psychology, Psychiatry and Neuroscience is ranked 15th in the UK for research power, meaning your teaching is shaped by world-class academic inquiry. (REF, 2021)",
+        "Psychology at Northumbria is ranked Top 10 in the UK for Student Experience, reflecting the quality of teaching, staff support, and community you can join. (Times Good University Guide, 2026)",
+        "Studying psychology and criminology together gives you a distinctive combination of analytical and social skills that opens doors across sectors, from criminal justice to research, education, and beyond.",
+        "The combination of psychological literacy, critical thinking, data analysis, and ethical awareness makes graduates well-suited to a broad range of roles. BPS accreditation means eligible graduates can apply for Graduate Basis for Chartership - the first step towards postgraduate study or a career as a Chartered Psychologist. Graduates can aspire to careers in psychology, criminal justice, social work, education, human resources, and research, with the analytical and interpersonal skills to thrive across a variety of professional contexts. Furthermore, Northumbria's Careers and Employment Service provides tailored support, including CV workshops, interview preparation, and networking events with sector professionals.",
+        "In the final year, you undertake an empirical Psychology project, writing your dissertation. As part of this process, you will indicate your topic preference and research interests and be matched with a dissertation supervisor. Additionally, the Voluntary Research Assistant scheme within the School of Psychology offers hands-on experience working alongside Northumbria academics and contributing to active research in the department. Past projects have explored topics such as evolutionary perspectives on human behaviour, cognitive processes in reading and learning, neurodivergent experiences and identity, and the psychological dimensions of mental health and wellbeing.",
+        "Learn from research-active academics publishing and practising across sleep research, identity, body image, trust in social media, developmental psychology, and human behaviour. In criminology, staff expertise reflects the breadth of contemporary crime, justice, criminological theory, social harm, violence, criminal markets, and policy debates nationally and internationally.",
+        "Explore our School of Psychology staff profiles"
+      ]
+    }
+  ]
+}
