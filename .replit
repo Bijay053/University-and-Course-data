@@ -72,6 +72,10 @@ args = "approval-guidance-scale"
 task = "workflow.run"
 args = "task-loop-resource-cleanup"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "initial-dispatch-concurrency"
+
 [[workflows.workflow]]
 name = "backend-py: FastAPI"
 author = "agent"
@@ -226,6 +230,17 @@ isValidation = true
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "flock -x /tmp/university-portal-db-validation.lock bash -c 'cd backend-py && PYTHONPATH=. python tests/helpers/run_disposable_redis.py tests/test_task_loop_resource_cleanup.py tests/test_scrape_task_resource_cleanup.py tests/test_bulk_fix_job.py tests/test_stale_requeue.py tests/test_repair_scrape.py tests/test_phase3_learning.py tests/test_phase7_quality_actions.py tests/test_autonomous_verification_isolation.py -q -c /dev/null -o asyncio_mode=auto -p no:cacheprovider'"
+
+[[workflows.workflow]]
+name = "initial-dispatch-concurrency"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "flock -x /tmp/university-portal-db-validation.lock bash -c 'cd backend-py && ALLOW_ISOLATED_DISPATCH_TESTS=1 PYTHONPATH=. python -m pytest tests/test_initial_dispatch_concurrency.py tests/test_initial_dispatch_lock_cleanup.py -q -o asyncio_default_test_loop_scope=function -o asyncio_default_fixture_loop_scope=function'"
+
+[workflows.workflow.metadata]
+isValidation = true
 
 [agent]
 stack = "PNPM_WORKSPACE"
