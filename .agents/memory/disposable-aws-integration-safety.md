@@ -19,6 +19,18 @@ Hand off a signed rehearsal receipt to its destination within the same operation
 
 **How to apply:** Validate teardown and signature, then deliver the receipt to the protected destination before ending the background operation. If the operation is interrupted, verify the remote receipt and exact disposable-resource deletion before retrying.
 
+Disposable bucket ownership should be established by the provisioning service,
+not by treating a successful client response as the sole evidence of ownership.
+
+**Why:** S3 bucket creation and tagging are separate calls. A lost create response
+or a failure before tagging can leave a bucket that a tag-fenced cleanup routine
+must refuse to delete. Provider-managed tagged provisioning and a saved run
+identity allow safe recovery without weakening the ownership check.
+
+**How to apply:** For new disposable storage rehearsals, use tagged provisioning,
+save non-secret resource identities before creation, and recover killed child
+processes with ownership-checked cleanup before independently verifying absence.
+
 **Why:** A real rehearsal passed rotation and worker readiness but failed its final count check because shell escaping reached SQLite literally. Source-presence tests had passed without executing that check.
 
 **How to apply:** Extract the actual template check and exercise success, missing execution, and duplicate execution locally before provisioning another disposable database.

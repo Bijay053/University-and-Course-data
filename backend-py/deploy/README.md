@@ -63,6 +63,116 @@ could not be safely handled. Rerun **the archive command**, never the sample.
 Arrange any periodic invocation through the approved production operations
 process; no timer or service is installed by this change.
 
+### Disposable archive-storage integration (separate approval required)
+
+`deploy.rehearse_archive_storage` and
+`tests/test_archive_storage_aws_integration.py` test **storage only**, with
+synthetic receipts. They do not import the application, invoke a smoke runner,
+create scrape jobs, contact SSM/EC2, or change production configuration. Ordinary
+test runs skip all three live cases.
+
+Do **not** enable the integration without separate approval for billable AWS
+execution. It creates one fresh CloudFormation stack containing one private,
+versioned, encrypted S3 bucket per case. It borrows an existing dedicated
+asymmetric RSA KMS signing key; it never creates or deletes that key. No database,
+host, worker, queue, or production archive bucket is used.
+
+Required operator setup, in a separately approved disposable account:
+
+- Explicit `DISPOSABLE_AWS_ACCESS_KEY_ID`, `DISPOSABLE_AWS_SECRET_ACCESS_KEY`,
+  and optional `DISPOSABLE_AWS_SESSION_TOKEN`, supplied through the secret store.
+  There is no fallback to application credentials.
+- `DISPOSABLE_AWS_ACCOUNT_ID`, `PRODUCTION_AWS_ACCOUNT_ID`, and
+  `DISPOSABLE_AWS_REGION`. STS must match the disposable account. The supplied
+  production ID and the repository's immutable production denylist are rejected.
+- `DISPOSABLE_AWS_PROOF_SIGNING_KEY_ID`: an enabled RSA `SIGN_VERIFY` key in
+  that account/region. Grant DescribeKey and Sign only on this dedicated key.
+- `ARCHIVE_STORAGE_SIGNERS_PATH`: an independently reviewed public-key pin file,
+  using the existing rehearsal signer format:
+  `{"schema_version":1,"signers":[{"account_id":"DISPOSABLE_ACCOUNT",
+  "signing_key_arn":"EXACT_KMS_KEY_ARN","public_key_pem":"PINNED_PUBLIC_PEM"}]}`.
+  Do not trust a public key supplied by a proof itself. No private keys or
+  presigned URLs are saved.
+- `ARCHIVE_STORAGE_PROOF_DIRECTORY`: an existing, operator-controlled persistent
+  artifact directory. Configure the approved CI job to collect its state/proof
+  files **even on failure**, in the same job; do not rely on pytest temporary
+  directories or a later workspace session for evidence handoff. Local generated
+  output should be under ignored `generated-artifacts/`.
+- Permissions limited to STS identity, the disposable stack names and bucket
+  names (`uni-archive-it-*`): CloudFormation create/describe/resource management/
+  delete and S3 bucket create/delete, tags, ownership controls, encryption,
+  versioning, public-access blocks, lifecycle, listing versions, conditional
+  puts, exact-version gets/deletes. Do not grant access to production buckets.
+  CloudFormation applies run-specific ownership tags during provisioning;
+  cleanup refuses a stack or bucket whose tag does not match.
+
+After separate approval and setup, run:
+
+```bash
+cd /root/University-and-Course-data && cd backend-py && \
+  RUN_DISPOSABLE_AWS_ARCHIVE_STORAGE=1 PYTHONPATH=. python -m pytest \
+  tests/test_archive_storage_aws_integration.py -q -c /dev/null \
+  --noconftest --import-mode=importlib -p no:cacheprovider
+```
+
+Expect approximately 30–40 minutes for the three serial cases: AWS recommends
+15 minutes after first enabling versioning before object writes, and both the
+success and post-upload failure cases honor that interval. Cases verify:
+
+- A real S3 `IfNoneMatch="*"` conflict, one durable version, AES256 encryption,
+  byte-for-byte readback and matching SHA256 metadata.
+- Upload committed to S3 followed by an injected lost response. Retrying the
+  archive reuses the stored versions without another upload or scrape sample.
+- Real public-access-block/lifecycle configuration refusal, with no receipt
+  uploads or local deletion. The public-access test disables only
+  `IgnorePublicAcls`; bucket-owner-enforced ownership and `BlockPublicPolicy`
+  remain enabled, and no public policy or ACL is ever granted.
+- Newest local receipt retention, and preservation of older receipts on actual
+  body/metadata corruption or exact-version deletion, injected read failure,
+  and a local file changed during verification.
+
+The success case and injected failures after stack creation/upload all run
+cleanup. Cleanup lists **every page**, deletes each exact `VersionId` including
+delete markers, checks no versions remain, deletes only the tagged owned stack,
+and independently verifies both stack and bucket absence. Tests independently
+repeat those absence checks; an expected nonzero exit is not cleanup proof.
+
+Only a complete success **after cleanup** writes a mode-0600, atomic KMS-signed
+`disposable_archive_storage` proof. It includes run/account/region, resources,
+checks and the harness/archive code digest. Its signature is verified against
+the pinned public key before writing. `archive_storage_proof.validate_proof`
+also checks the run, purpose, current code digest and 24-hour freshness offline.
+This proof is not a database refresh or release-smoke acceptance receipt.
+Failed cases produce only non-secret state, never a success proof.
+
+On a crash, timeout or unverified cleanup, retain the state JSON. After confirming
+the exact approved run/account/region, retry ownership-checked teardown (no
+scenarios run and no success proof is created):
+
+```bash
+cd /root/University-and-Course-data && cd backend-py && \
+  python -m deploy.rehearse_archive_storage \
+  --expected-account-id APPROVED_DISPOSABLE_ACCOUNT \
+  --production-account-id PRODUCTION_ACCOUNT --region APPROVED_REGION \
+  --run-id EXACT_RUN_ID_FROM_STATE --state-output /approved/artifacts/STATE.json \
+  --proof-output /approved/artifacts/UNUSED_PROOF.json \
+  --proof-signing-key-id APPROVED_KEY --signers /approved/archive-signers.json \
+  --cleanup-only --i-understand-this-creates-disposable-aws-resources
+```
+
+Do not bypass missing ownership tags or suppress cleanup failures. Investigate
+in the disposable account; the harness deliberately will not delete an unowned
+resource. No periodic workflow or production configuration is installed.
+
+Offline checks (no AWS operations):
+
+```bash
+cd /root/University-and-Course-data && cd backend-py && PYTHONPATH=. python -m pytest \
+  tests/test_archive_storage_harness.py tests/test_archive_storage_aws_integration.py \
+  tests/test_archive_smoke_receipts.py --import-mode=importlib -q -c /dev/null \
+  --noconftest -p no:cacheprovider
+```
+
 ### Restore an archived receipt onto a replacement host
 
 `restore_smoke_receipts.py` retrieves **existing evidence only**. Obtain separate
